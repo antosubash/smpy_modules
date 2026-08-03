@@ -23,8 +23,8 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.contracts.schemas import MediaAssetRead, MediaAssetVariant
 from pagebuilder.models import MediaAsset
-from pagebuilder.schemas import MediaAssetRead, MediaAssetVariant
 from pagebuilder.settings import PagebuilderSettings
 
 logger = logging.getLogger(__name__)

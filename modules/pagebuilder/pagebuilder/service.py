@@ -15,9 +15,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.contracts.schemas import PageCreate, PageUpdate
 from pagebuilder.diff import revision_diff
 from pagebuilder.models import Page, PageRevision, PageStatus, RevisionEvent
-from pagebuilder.schemas import PageCreate, PageUpdate
 
 
 class _Unset:

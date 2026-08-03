@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.metadata
+
 from pagebuilder.module import PagebuilderModule
 
 
@@ -12,8 +14,15 @@ class TestMeta:
     def test_meta_requires_framework(self):
         assert PagebuilderModule.meta.requires_framework is not None
 
-    def test_meta_version_bumped(self):
-        assert PagebuilderModule.meta.version == "0.2.0"
+    def test_meta_version_tracks_package_metadata(self):
+        """meta.version must not drift from pyproject.toml.
+
+        The lockstep release bump edits pyproject only, so meta reads the
+        installed distribution version rather than carrying its own literal.
+        """
+        assert PagebuilderModule.meta.version == importlib.metadata.version(
+            "simple_module_pagebuilder"
+        )
 
 
 def _registered_paths(app) -> set[str]:

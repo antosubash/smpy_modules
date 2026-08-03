@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib.metadata
 import importlib.resources
 import logging
 from datetime import UTC, datetime
@@ -18,6 +19,11 @@ from pagebuilder.settings import PagebuilderSettings
 
 _scheduler_log = logging.getLogger("simple_module.pagebuilder.scheduler")
 
+# Read from installed package metadata so pyproject.toml is the single source
+# of truth. The lockstep release bump edits pyproject only; a hardcoded string
+# here would silently fall behind it.
+_VERSION = importlib.metadata.version("simple_module_pagebuilder")
+
 
 class PagebuilderModule(ModuleBase):
     meta = ModuleMeta(
@@ -25,7 +31,9 @@ class PagebuilderModule(ModuleBase):
         route_prefix="/api/pagebuilder",
         view_prefix="/pagebuilder",
         depends_on=[],
-        version="0.2.0",
+        version=_VERSION,
+        # The framework API version (1.0.0) is decoupled from the framework
+        # package version (0.0.x) — this range is correct as written.
         requires_framework=">=1.0,<2.0",
     )
 

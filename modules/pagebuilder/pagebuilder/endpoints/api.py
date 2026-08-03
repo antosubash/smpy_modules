@@ -13,16 +13,7 @@ from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.deps import get_media_service
-from pagebuilder.layout_service import LayoutService
-from pagebuilder.media_service import MediaService
-from pagebuilder.permissions import (
-    PERM_APPROVE,
-    PERM_EDIT,
-    PERM_PUBLISH,
-    RequiresPermission,
-)
-from pagebuilder.schemas import (
+from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionDetail,
     LayoutRevisionListResponse,
@@ -42,6 +33,15 @@ from pagebuilder.schemas import (
     PageScheduleRequest,
     PageUpdate,
     RevisionDiffResponse,
+)
+from pagebuilder.deps import get_media_service
+from pagebuilder.layout_service import LayoutService
+from pagebuilder.media_service import MediaService
+from pagebuilder.permissions import (
+    PERM_APPROVE,
+    PERM_EDIT,
+    PERM_PUBLISH,
+    RequiresPermission,
 )
 from pagebuilder.service import _UNSET, PagesService
 

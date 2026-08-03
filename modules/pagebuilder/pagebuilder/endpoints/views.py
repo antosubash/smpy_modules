@@ -17,10 +17,7 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.deps import get_media_service, get_settings
-from pagebuilder.layout_service import LayoutService, public_layout_props
-from pagebuilder.media_service import MediaService
-from pagebuilder.schemas import (
+from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
     LayoutRevisionRead,
@@ -31,6 +28,9 @@ from pagebuilder.schemas import (
     PageRevisionListResponse,
     PageRevisionRead,
 )
+from pagebuilder.deps import get_media_service, get_settings
+from pagebuilder.layout_service import LayoutService, public_layout_props
+from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 

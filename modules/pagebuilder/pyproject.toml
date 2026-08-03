@@ -1,7 +1,11 @@
 [project]
 name = "simple_module_pagebuilder"
 version = "0.1.0"
-description = "Drag-and-drop visual page builder for SimpleModule hosts"
+description = "Drag-and-drop visual page builder for simple_module apps"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
+keywords = ["simple-module", "pagebuilder", "cms", "puck"]
 requires-python = ">=3.12"
 dependencies = [
     # Ranges, not exact pins: an `==` here would make this module
@@ -14,6 +18,9 @@ dependencies = [
     "sqlmodel>=0.0.21",
     "Pillow>=10.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
 
 [project.entry-points.simple_module]
 pagebuilder = "pagebuilder.module:PagebuilderModule"
