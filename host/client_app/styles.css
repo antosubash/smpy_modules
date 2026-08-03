@@ -1,0 +1,12 @@
+@import "@simple-module-py/ui/styles/globals.css";
+@import "./modules.generated.css";
+
+/* App-level source scanning — host code + workspace module pages.
+ * Wheel-installed modules are covered by modules.generated.css. */
+@source "./**/*.{ts,tsx}";
+@source "../../modules/*/*/pages/**/*.{ts,tsx}";
+
+body {
+  margin: 0;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}

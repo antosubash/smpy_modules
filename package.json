@@ -1,0 +1,23 @@
+{
+  "name": "simple-module-python-modules",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "host/client_app",
+    "modules/*"
+  ],
+  "scripts": {
+    "dev": "npm run --workspace host/client_app dev",
+    "build": "npm run --workspace host/client_app build",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.11",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.0.0"
+  }
+}
