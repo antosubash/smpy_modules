@@ -48,11 +48,10 @@ def rewrite_asset_paths(node: Any) -> Any:
         return {k: rewrite_asset_paths(v) for k, v in node.items()}
     if isinstance(node, list):
         return [rewrite_asset_paths(v) for v in node]
-    if isinstance(node, str) and node.startswith("/gca/"):
-        # Only assets move; in-site links like "/gca/contact" stay as they are
-        # so they keep pointing at page routes rather than at files.
-        if node.startswith(("/gca/images/", "/gca/partners/")) or node.endswith(".svg"):
-            return f"/static{node}"
+    # Only assets move; in-site links like "/gca/contact" stay as they are so
+    # they keep pointing at page routes rather than at files.
+    if isinstance(node, str) and node.startswith(("/gca/images/", "/gca/partners/")):
+        return f"/static{node}"
     return node
 
 
