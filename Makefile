@@ -49,7 +49,7 @@ downgrade:
 test: test-py test-js
 
 test-py:
-	uv run pytest host/tests
+	uv run pytest host/tests scripts/tests
 	@for d in modules/*/; do \
 	  if [ -d "$$d/tests" ]; then echo "--- pytest $$d"; (cd "$$d" && uv run pytest) || exit 1; fi \
 	done
