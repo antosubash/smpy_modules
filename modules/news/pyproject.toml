@@ -1,0 +1,49 @@
+[project]
+name = "simple_module_news"
+version = "0.1.0"
+description = "News articles backed by page-builder pages"
+requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
+keywords = ["simple-module", "news", "articles", "cms"]
+# Ranges, never `==`: an exact framework pin makes a published module
+# uninstallable in any host running a newer framework build.
+dependencies = [
+    "simple_module_core>=0.0.25,<0.1",
+    "simple_module_db>=0.0.25,<0.1",
+    "simple_module_hosting>=0.0.25,<0.1",
+    "simple_module_pagebuilder>=0.1,<0.2",
+    "pydantic-settings>=2.0",
+    "sqlalchemy>=2.0",
+]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
+
+[project.entry-points.simple_module]
+news = "news.module:NewsModule"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.25,<0.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["news"]
+
+# package.json lives at the module root so npm workspaces see it; copying it
+# into the package lets the host discover JS deps after a pip install. This
+# module ships no bundled frontend build, so there is no dist to include.
+[tool.hatch.build.targets.wheel.force-include]
+"package.json" = "news/package.json"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+# Resolve the sibling module from the workspace during development. This is
+# tool config, so the published wheel still carries the range above.
+[tool.uv.sources]
+simple_module_pagebuilder = { workspace = true }
