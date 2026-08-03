@@ -34,10 +34,21 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pagebuilder"]
+# The built frontend bundle is gitignored, so hatchling's VCS-aware file
+# selection skips it. `artifacts` is the supported way to pull ignored build
+# output back in. A force-include can't be used here: it demands the path
+# exist, which breaks a build from a clean checkout, and it double-adds any
+# file that is tracked.
+artifacts = ["pagebuilder/static/dist/**"]
 
+# package.json lives at the module root so npm workspaces see it; copying it
+# into the package lets a wheel-installed host discover the module's JS deps
+# through importlib.resources.
 [tool.hatch.build.targets.wheel.force-include]
-"pagebuilder/static/dist" = "pagebuilder/static/dist"
 "package.json" = "pagebuilder/package.json"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["pagebuilder/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

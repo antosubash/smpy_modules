@@ -1,0 +1,206 @@
+# Lockstep release: one version, one tag, every module published.
+#
+# The tag reaches origin only in `finalize`, after every publish has
+# succeeded, so a failed build never strands an orphan tag.
+#
+# One-time PyPI setup per module, at https://pypi.org/manage/account/publishing/
+#   PyPI project name = simple_module_<name>
+#   Owner             = antosubash
+#   Repository name   = simple_module_python_modules
+#   Workflow filename = release.yml
+#   Environment       = pypi
+#
+# Every new module must be added to the `publish-pypi` matrix below.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump (ignored if `version` is set)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Explicit version override (e.g. 0.2.0)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+
+jobs:
+  # Resolve the release version once and share it with every downstream job.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Inputs reach the shell as environment variables, never as ${{ }}
+      # interpolated into the script body — otherwise a crafted `version`
+      # would be executed as shell before the format check below runs.
+      - id: compute
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_BUMP: ${{ inputs.bump }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            ver="$INPUT_VERSION"
+          else
+            ver=$(BUMP="$INPUT_BUMP" python3 <<'PY'
+          import os, pathlib, re, tomllib
+          cur = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          m = re.match(r"^(\d+)\.(\d+)\.(\d+)", cur)
+          if not m:
+              raise SystemExit(f"cannot parse current version: {cur!r}")
+          major, minor, patch = map(int, m.groups())
+          bump = os.environ["BUMP"]
+          if bump == "major":
+              major, minor, patch = major + 1, 0, 0
+          elif bump == "minor":
+              minor, patch = minor + 1, 0
+          else:
+              patch += 1
+          print(f"{major}.{minor}.{patch}")
+          PY
+          )
+          fi
+          echo "${ver}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-]?(a|b|rc|alpha|beta)[0-9]*)?$' \
+            || { echo "::error::'${ver}' is not a valid version"; exit 1; }
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${ver}"
+
+  # Bump versions in the working tree only (no commit), build, upload.
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Bump versions (working tree only)
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: uv run python scripts/bump_version.py "$RELEASE_VERSION"
+
+      - name: Install npm workspace
+        run: npm ci
+
+      - name: Build module frontends
+        run: |
+          make gen-pages
+          npm run build
+
+      - name: Build wheels + sdists
+        run: uv build --all-packages --out-dir dist-py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-py
+          path: dist-py/
+          retention-days: 14
+
+  publish-pypi:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # mint OIDC token for PyPI Trusted Publishing
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - simple_module_pagebuilder
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-py
+          path: dist-py
+
+      # uv writes wheels under the normalised (hyphenated) distribution name
+      # while the sdist may use either form, so match both.
+      - name: Select this package's artifacts
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          mkdir -p upload
+          norm=$(echo "$PACKAGE" | tr '_' '-')
+          find dist-py -maxdepth 1 -type f \
+            \( -iname "$PACKAGE-*" -o -iname "$norm-*" \) \
+            -exec cp {} upload/ \;
+          ls -l upload
+          test -n "$(ls -A upload)" || {
+            echo "::error::no artifacts found for $PACKAGE"; exit 1; }
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: upload
+
+  # Only now does anything reach origin.
+  finalize:
+    needs: [resolve, publish-pypi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Bump versions
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: uv run python scripts/bump_version.py "$RELEASE_VERSION"
+
+      - name: Commit and tag
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release v$RELEASE_VERSION"
+          git tag "v$RELEASE_VERSION"
+          git push origin HEAD:main --follow-tags
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: gh release create "v$RELEASE_VERSION" --generate-notes

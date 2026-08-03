@@ -56,11 +56,6 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      # Module wheels force-include `<pkg>/static/dist`, which is gitignored
-      # (it's produced by the frontend build). Editable installs still need
-      # the directory to exist, so stub it before uv sync.
-      - name: Stub force-include dirs
-        run: mkdir -p modules/pagebuilder/pagebuilder/static/dist
 
       - name: Sync workspace (all packages, with dev extras)
         run: uv sync --all-packages --all-extras
@@ -94,8 +89,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Stub force-include dirs
-        run: mkdir -p modules/pagebuilder/pagebuilder/static/dist
 
       - name: Sync Python workspace
         run: uv sync --all-packages
@@ -137,8 +130,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Stub force-include dirs
-        run: mkdir -p modules/pagebuilder/pagebuilder/static/dist
 
       - name: Sync Python workspace
         run: uv sync --all-packages --all-extras
@@ -230,8 +221,6 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      - name: Stub force-include dirs
-        run: mkdir -p modules/pagebuilder/pagebuilder/static/dist
 
       - name: Sync workspace
         run: uv sync --all-packages --all-extras
@@ -247,3 +236,11 @@ jobs:
 
       - name: File size
         run: uv run python scripts/check_file_size.py
+
+      # Guards the lockstep invariant: every publishable manifest carries the
+      # same version as the repo root.
+      - name: Version sync
+        run: uv run python scripts/bump_version.py --check-current
+
+      - name: Bump script tests
+        run: uv run pytest scripts/tests
