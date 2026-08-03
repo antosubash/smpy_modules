@@ -1,5 +1,5 @@
-import { Render, type Data } from '@measured/puck';
 import { Head } from '@inertiajs/react';
+import { type Data, Render } from '@measured/puck';
 
 import { layoutPuckConfig } from '../components/layoutPuckConfig';
 import { puckConfig } from '../components/puckConfig';

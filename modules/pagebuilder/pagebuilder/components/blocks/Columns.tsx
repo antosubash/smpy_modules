@@ -1,4 +1,4 @@
-import { DropZone, type ComponentConfig } from '@measured/puck';
+import { type ComponentConfig, DropZone } from '@measured/puck';
 
 interface ColumnsProps {
   columns: { width: number }[];

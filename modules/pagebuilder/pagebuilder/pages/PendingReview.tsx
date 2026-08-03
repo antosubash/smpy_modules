@@ -1,7 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-import { approvePage, promptAndReject, type PageRead } from '../utils/api';
+import { approvePage, type PageRead, promptAndReject } from '../utils/api';
 
 interface Props {
   pages: { items: PageRead[] };

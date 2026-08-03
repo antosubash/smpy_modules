@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { listMedia, rememberPickedAsset, type MediaAssetRead } from '../../utils/api';
+import { listMedia, type MediaAssetRead, rememberPickedAsset } from '../../utils/api';
 
 interface MediaPickerProps {
   value: string;

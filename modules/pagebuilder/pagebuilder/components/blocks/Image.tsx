@@ -1,6 +1,6 @@
 import type { ComponentConfig } from '@measured/puck';
 
-import { DEFAULT_IMAGE_SIZES, buildSrcset, lookupAsset } from '../../utils/api';
+import { buildSrcset, DEFAULT_IMAGE_SIZES, lookupAsset } from '../../utils/api';
 import { MediaPicker } from './MediaPicker';
 
 type AltKind = 'meaningful' | 'decorative';

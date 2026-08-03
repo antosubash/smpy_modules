@@ -1,14 +1,14 @@
-import { Puck, type Data } from '@measured/puck';
+import { type Data, Puck } from '@measured/puck';
 import '@measured/puck/puck.css';
 import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 import { emptyLayoutData, layoutPuckConfig } from '../components/layoutPuckConfig';
 import {
-  restoreLayoutRevision,
-  saveLayout,
   type LayoutDetail,
   type LayoutRevisionRead,
+  restoreLayoutRevision,
+  saveLayout,
 } from '../utils/api';
 
 interface Props {
