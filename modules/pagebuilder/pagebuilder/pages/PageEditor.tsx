@@ -159,7 +159,7 @@ export default function PageEditor() {
           // Note for anyone auditing selectors: Puck renders that button as a
           // <span>, not a <button>, so it never appeared in the accessibility
           // tree and the e2e suite could not have caught this.
-          overrides={{ headerActions: () => null }}
+          overrides={{ headerActions: () => <></> }}
           onChange={form.setData}
         />
       </div>

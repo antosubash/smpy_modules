@@ -21,6 +21,15 @@ async def list_uploads(
     min_size_bytes: int | None = Query(default=None, ge=0),
     max_size_bytes: int | None = Query(default=None, ge=0),
     cursor: int | None = Query(default=None, ge=1),
+    offset: int | None = Query(
+        default=None,
+        ge=0,
+        description=(
+            'Offset paging, for callers that jump to an arbitrary page (the '
+            'image-picker gallery). Takes precedence over `cursor` and makes '
+            'the response carry `total`.'
+        ),
+    ),
     limit: int = Query(default=60, ge=1, le=200),
 ) -> MediaAssetListResponse:
     # ``folder`` absent → no folder filter. ``folder=""`` (or whitespace)
@@ -33,21 +42,26 @@ async def list_uploads(
             folder_filter = trimmed
         else:
             unfiled_only = True
+    filters = {
+        "search": search,
+        "content_type": content_type,
+        "folder": folder_filter,
+        "unfiled_only": unfiled_only,
+        "min_size_bytes": min_size_bytes,
+        "max_size_bytes": max_size_bytes,
+    }
     assets, next_cursor = await media.list_assets(
-        search=search,
-        content_type=content_type,
-        folder=folder_filter,
-        unfiled_only=unfiled_only,
-        min_size_bytes=min_size_bytes,
-        max_size_bytes=max_size_bytes,
-        cursor=cursor,
-        limit=limit,
+        cursor=cursor, offset=offset, limit=limit, **filters
     )
     folders = await media.list_folders()
+    # The COUNT is only worth running for offset callers; cursor paging
+    # detects the end of the list from the row count it already fetched.
+    total = await media.count_assets(**filters) if offset is not None else None
     return MediaAssetListResponse(
         items=[media.to_read(a) for a in assets],
         next_cursor=next_cursor,
         folders=folders,
+        total=total,
     )
 
 

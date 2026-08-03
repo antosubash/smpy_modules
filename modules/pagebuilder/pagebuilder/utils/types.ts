@@ -93,6 +93,8 @@ export interface MediaListResponse {
   items: MediaAssetRead[];
   next_cursor: number | null;
   folders: string[];
+  /** Only present when the request used offset paging. */
+  total?: number | null;
 }
 
 export interface MediaListQuery {
@@ -107,6 +109,9 @@ export interface MediaListQuery {
   min_size_bytes?: number;
   max_size_bytes?: number;
   cursor?: number;
+  /** Offset paging, used by the image-picker gallery. Makes the response
+   *  carry `total`; takes precedence over `cursor`. */
+  offset?: number;
   limit?: number;
 }
 

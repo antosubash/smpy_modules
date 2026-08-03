@@ -19,6 +19,7 @@ function buildMediaQuery(params: MediaListQuery | undefined): string {
   if (params.min_size_bytes !== undefined) qs.set('min_size_bytes', String(params.min_size_bytes));
   if (params.max_size_bytes !== undefined) qs.set('max_size_bytes', String(params.max_size_bytes));
   if (params.cursor !== undefined) qs.set('cursor', String(params.cursor));
+  if (params.offset !== undefined) qs.set('offset', String(params.offset));
   if (params.limit !== undefined) qs.set('limit', String(params.limit));
   const q = qs.toString();
   return q ? `?${q}` : '';

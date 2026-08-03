@@ -234,3 +234,6 @@ class MediaAssetListResponse(BaseModel):
     items: list[MediaAssetRead]
     next_cursor: int | None = None
     folders: list[str] = Field(default_factory=list)
+    total: int | None = None
+    """Row count matching the filters. Only set for offset paging — cursor
+    paging deliberately avoids the extra COUNT query."""

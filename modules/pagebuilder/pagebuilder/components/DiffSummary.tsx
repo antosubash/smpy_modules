@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { RevisionDiff } from '../utils/api';
 
 interface Props {
@@ -15,7 +16,7 @@ function renderValue(value: unknown): string {
  * three lists of blocks (added / removed / changed). Designed to fit
  * inside the editor's history panel without a separate page.
  */
-export function DiffSummary({ diff }: Props): JSX.Element {
+export function DiffSummary({ diff }: Props): React.JSX.Element {
   const { metadata, blocks } = diff;
   const metaKeys = Object.keys(metadata);
   const totalChanges =

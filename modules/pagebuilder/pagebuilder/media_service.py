@@ -22,6 +22,7 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder import media_queries
 from pagebuilder.contracts.schemas import MediaAssetRead, MediaAssetVariant
 from pagebuilder.media_images import (
     CONTENT_TYPE_EXTENSIONS,
@@ -79,60 +80,26 @@ class MediaService:
             created_at=asset.created_at,
         )
 
+    async def count_assets(self, **filters) -> int:
+        """Total rows matching *filters* — pairs with offset paging."""
+        return await media_queries.count_assets(self.db, **filters)
+
     async def list_assets(
         self,
         *,
-        search: str | None = None,
-        content_type: str | None = None,
-        folder: str | None = None,
-        unfiled_only: bool = False,
-        min_size_bytes: int | None = None,
-        max_size_bytes: int | None = None,
         cursor: int | None = None,
+        offset: int | None = None,
         limit: int = _DEFAULT_PAGE_SIZE,
+        **filters,
     ) -> tuple[list[MediaAsset], int | None]:
-        """Return one page of assets newest-first plus the next cursor.
+        """One page of assets newest-first, plus the next cursor.
 
-        The cursor is the smallest ``id`` returned on the previous page;
-        callers fetch the next page by passing it as ``cursor``. The
-        function asks the DB for ``limit + 1`` rows so it can detect the
-        end of the list without a separate ``count()`` query.
-
-        Pass ``unfiled_only=True`` to limit to rows with ``folder IS NULL``
-        (the sidebar's "Unfiled" bucket). ``folder`` and ``unfiled_only``
-        are mutually exclusive at the call site.
+        See :func:`pagebuilder.media_queries.list_assets` for the two paging
+        modes; the image-picker gallery uses the offset one.
         """
-        page_size = max(1, min(limit, _MAX_PAGE_SIZE))
-        stmt = select(MediaAsset)
-        if search:
-            # SQLite LIKE is case-insensitive for ASCII by default; this
-            # matches what users expect ("hero" finds "Hero.jpg").
-            stmt = stmt.where(MediaAsset.original_filename.like(f"%{search}%"))
-        if content_type:
-            if content_type.endswith("/*"):
-                prefix = content_type[:-1]
-                stmt = stmt.where(MediaAsset.content_type.like(f"{prefix}%"))
-            else:
-                stmt = stmt.where(MediaAsset.content_type == content_type)
-        if unfiled_only:
-            stmt = stmt.where(MediaAsset.folder.is_(None))
-        elif folder is not None:
-            stmt = stmt.where(MediaAsset.folder == folder)
-        if min_size_bytes is not None:
-            stmt = stmt.where(MediaAsset.size_bytes >= min_size_bytes)
-        if max_size_bytes is not None:
-            stmt = stmt.where(MediaAsset.size_bytes <= max_size_bytes)
-        if cursor is not None:
-            stmt = stmt.where(MediaAsset.id < cursor)
-        stmt = stmt.order_by(MediaAsset.id.desc()).limit(page_size + 1)
-        result = await self.db.execute(stmt)
-        rows = list(result.scalars().all())
-        next_cursor: int | None = None
-        if len(rows) > page_size:
-            rows = rows[:page_size]
-            tail = rows[-1].id
-            next_cursor = tail
-        return rows, next_cursor
+        return await media_queries.list_assets(
+            self.db, cursor=cursor, offset=offset, limit=limit, **filters
+        )
 
     async def list_folders(self) -> list[str]:
         """Return every distinct non-empty folder name, sorted."""

@@ -1,4 +1,6 @@
 import type { ComponentConfig } from '@measured/puck';
+
+import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';
 import { renderRichText } from './_internal/rich-text';
 
@@ -34,7 +36,7 @@ export const LogoCloudWidget: ComponentConfig<LogoCloudWidgetProps> = {
       type: 'array',
       label: 'Logos',
       arrayFields: {
-        src: { type: 'text', label: 'Image URL' },
+        src: createImageField(mediaLibraryAdapter, 'Image'),
         alt: { type: 'text', label: 'Alt text' },
         href: { type: 'text', label: 'Link (optional)' },
       },

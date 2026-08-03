@@ -3,6 +3,8 @@
 
 import type { ComponentConfig } from '@measured/puck';
 
+import { createImageField, mediaLibraryAdapter } from '../../fields';
+
 import { type FeatureCardsWidgetProps, FeatureCardsWidgetRender } from './feature-cards-render';
 
 export type * from './feature-cards-render';
@@ -66,7 +68,7 @@ export const FeatureCardsWidget: ComponentConfig<FeatureCardsWidgetProps> = {
           ],
         },
         iconBg: { type: 'text', label: 'Icon badge colour' },
-        iconUrl: { type: 'text', label: 'Icon image URL (overrides icon)' },
+        iconUrl: createImageField(mediaLibraryAdapter, 'Icon image (overrides icon)'),
         iconAlt: { type: 'text', label: 'Icon image alt text' },
         href: { type: 'text', label: 'Link URL' },
         tag: { type: 'text', label: 'Tag (top-right)' },

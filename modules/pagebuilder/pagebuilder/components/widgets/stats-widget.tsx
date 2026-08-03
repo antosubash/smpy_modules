@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@measured/puck';
 import type { CSSProperties } from 'react';
+import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -36,7 +37,7 @@ export const StatsWidget: ComponentConfig<StatsWidgetProps> = {
       arrayFields: {
         value: { type: 'text', label: 'Value' },
         label: { type: 'text', label: 'Label' },
-        iconUrl: { type: 'text', label: 'Icon image (optional)' },
+        iconUrl: createImageField(mediaLibraryAdapter, 'Icon image (optional)'),
       },
       defaultItemProps: { value: '100+', label: 'Item' },
       min: 1,

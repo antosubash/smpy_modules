@@ -1,5 +1,5 @@
 import type { ComponentConfig } from '@measured/puck';
-import { createCheckboxField } from '../../fields';
+import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock } from './_internal/rich-text';
 import {
@@ -222,9 +222,9 @@ export const HeroWidget: ComponentConfig<HeroWidgetProps> = {
     eyebrow: { type: 'text', label: 'Eyebrow (optional)' },
     title: { type: 'text', label: 'Title' },
     subtitle: { type: 'textarea', label: 'Subtitle' },
-    logoUrl: { type: 'text', label: 'Logo image (replaces title, optional)' },
+    logoUrl: createImageField(mediaLibraryAdapter, 'Logo image (replaces title, optional)'),
     logoAlt: { type: 'text', label: 'Logo alt text' },
-    imageUrl: { type: 'text', label: 'Image URL' },
+    imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
     imageAlt: { type: 'text', label: 'Image alt text' },
     imageMaskUrl: {
       type: 'text',

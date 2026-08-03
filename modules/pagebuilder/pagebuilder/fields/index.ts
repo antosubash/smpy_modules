@@ -1,4 +1,9 @@
-// Only the checkbox field is ported. The GCA widgets take image paths as plain
-// text props, so the file-picker field (which needs a host-supplied adapter)
-// isn't required. Wiring the module's own MediaPicker in here is future work.
+// Custom Puck fields for this module.
+//
+// The image field is backed by the module's own media library, so authors
+// swap a picture by choosing a different upload rather than typing a path.
 export { createCheckboxField } from './checkbox-field';
+export { FileGallery } from './file-picker/file-gallery';
+export { createImageField, ImagePickerFieldRenderer } from './file-picker/image-picker-field';
+export type { FileItem, FilePickerAdapter } from './file-picker/types';
+export { mediaLibraryAdapter } from './media-adapter';

@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@measured/puck';
 import type { CSSProperties } from 'react';
+import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 import { TextLink } from './_shared/text-link';
@@ -78,7 +79,7 @@ export const ArticleCardsWidget: ComponentConfig<ArticleCardsWidgetProps> = {
       type: 'array',
       label: 'Articles',
       arrayFields: {
-        imageUrl: { type: 'text', label: 'Image URL' },
+        imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
         imageAlt: { type: 'text', label: 'Image alt text' },
         eyebrow: { type: 'text', label: 'Category tag' },
         date: { type: 'text', label: 'Date' },

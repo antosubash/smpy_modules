@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@measured/puck';
+import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
 import { layoutPuckConfig } from '../components/layoutPuckConfig';
 import { puckConfig } from '../components/puckConfig';
@@ -48,6 +49,13 @@ export default function PublicPage({
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   return (
     <>
+      {/* The admin shell mounts this through AuthenticatedLayout; a public page
+          has no layout, so without it the configured brand colour and favicon
+          stopped at the sign-in wall. The widgets' `--pb-accent` and their
+          solid `bg-primary-800` surfaces read the `--primary` / ramp variables
+          it writes, so this is what makes Settings → Branding reach the
+          public site. */}
+      <BrandingHead />
       <Head title={title}>
         {meta_description && (
           <>

@@ -88,21 +88,22 @@ rendering at `/p/{slug}`.
 
 ## Assets
 
-`public/gca/` in GeoWiki holds `logo-main.svg`, `logo-reversed.svg`, and seven
-partner SVGs (Leverhulme, UKRI, ERC, Bristol, ESA, IIASA, GEO-TREES). These are
-copied into the demo host's static directory.
-
-**The eight content photographs are not available.** GCA's content references
-`/gca/images/*.jpg`, but that directory is not in the GeoWiki repo — its
-`seed-images.ts` uploads them from a local dir into the file store at seed time.
-
-Rather than fabricate or borrow imagery, the seeded content keeps the original
-paths and the host ships generated placeholder images at those paths, clearly
-marked as placeholders. Every missing photo is listed in the seed output so the
-gap is visible rather than silent:
+`frontend/packages/gca/data/gca/` in GeoWiki holds `logo-main.svg`,
+`logo-reversed.svg`, seven partner SVGs (Leverhulme, UKRI, ERC, Bristol, ESA,
+IIASA, GEO-TREES), and eight content photographs under `images/`:
 
 `atlas-map`, `biodiversity`, `canopy-aerial`, `canopy-up`, `collaboration`,
 `forest-aerial-river`, `governance-diagram`, `hero-lidar`.
+
+All of them are copied into the demo host's static directory. GeoWiki's
+`seed-images.ts` uploads the photographs into its file store at seed time;
+`scripts/gca/seed_pages.py` does the equivalent here, uploading them into the
+media library and rewriting the content's `/gca/images/*.jpg` paths to the
+resulting `/media/pagebuilder/*` URLs. Every photograph on a seeded page is
+therefore swappable from the editor's image picker.
+
+The brand and partner marks stay on `/static`: they are SVG, which the media
+library rejects because SVG can carry script.
 
 ## Constraints
 

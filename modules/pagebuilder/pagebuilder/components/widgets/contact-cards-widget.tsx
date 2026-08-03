@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@measured/puck';
 import { User } from 'lucide-react';
 import type { CSSProperties } from 'react';
+import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { AccentText } from './_internal/accent-text';
 import { renderRichText } from './_internal/rich-text';
 
@@ -47,7 +48,7 @@ export const ContactCardsWidget: ComponentConfig<ContactCardsWidgetProps> = {
         role: { type: 'text', label: 'Role' },
         email: { type: 'text', label: 'Email' },
         phone: { type: 'text', label: 'Phone' },
-        imageUrl: { type: 'text', label: 'Image URL' },
+        imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
       },
       defaultItemProps: {
         name: 'Jane Doe',

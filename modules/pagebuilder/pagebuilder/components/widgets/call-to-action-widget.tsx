@@ -3,6 +3,8 @@
 
 import type { ComponentConfig } from '@measured/puck';
 
+import { createImageField, mediaLibraryAdapter } from '../../fields';
+
 import { type CallToActionWidgetProps, CallToActionWidgetRender } from './call-to-action-render';
 
 export type * from './call-to-action-render';
@@ -54,7 +56,7 @@ export const CallToActionWidget: ComponentConfig<CallToActionWidgetProps> = {
       type: 'array',
       label: 'Images (lime band)',
       arrayFields: {
-        src: { type: 'text', label: 'Image URL' },
+        src: createImageField(mediaLibraryAdapter, 'Image'),
         alt: { type: 'text', label: 'Alt text' },
         caption: { type: 'text', label: 'Caption' },
       },

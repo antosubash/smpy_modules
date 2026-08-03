@@ -46,31 +46,30 @@ export interface PageRootProps {
 
 type WidgetProps<T extends { render: (props: never) => unknown }> = Parameters<T['render']>[0];
 
-export const puckConfig: Config<
-  {
-    Heading: Parameters<typeof HeadingBlock.render>[0];
-    Text: Parameters<typeof TextBlock.render>[0];
-    Image: Parameters<typeof ImageBlock.render>[0];
-    Button: Parameters<typeof ButtonBlock.render>[0];
-    Columns: Parameters<typeof ColumnsBlock.render>[0];
-    Spacer: Parameters<typeof SpacerBlock.render>[0];
-    PageHeader: WidgetProps<typeof PageHeaderWidget>;
-    Hero: WidgetProps<typeof HeroWidget>;
-    EyebrowSection: WidgetProps<typeof EyebrowSectionWidget>;
-    MediaObject: WidgetProps<typeof MediaObjectWidget>;
-    CallToAction: WidgetProps<typeof CallToActionWidget>;
-    FeatureCards: WidgetProps<typeof FeatureCardsWidget>;
-    Faq: WidgetProps<typeof FaqWidget>;
-    Stats: WidgetProps<typeof StatsWidget>;
-    ArticleCards: WidgetProps<typeof ArticleCardsWidget>;
-    ContactCards: WidgetProps<typeof ContactCardsWidget>;
-    ContactForm: WidgetProps<typeof ContactFormWidget>;
-    LogoCloud: WidgetProps<typeof LogoCloudWidget>;
-    Tags: WidgetProps<typeof TagsWidget>;
-    Divider: WidgetProps<typeof DividerWidget>;
-  },
-  PageRootProps
-> = {
+type PuckComponents = {
+  Heading: Parameters<typeof HeadingBlock.render>[0];
+  Text: Parameters<typeof TextBlock.render>[0];
+  Image: Parameters<typeof ImageBlock.render>[0];
+  Button: Parameters<typeof ButtonBlock.render>[0];
+  Columns: Parameters<typeof ColumnsBlock.render>[0];
+  Spacer: Parameters<typeof SpacerBlock.render>[0];
+  PageHeader: WidgetProps<typeof PageHeaderWidget>;
+  Hero: WidgetProps<typeof HeroWidget>;
+  EyebrowSection: WidgetProps<typeof EyebrowSectionWidget>;
+  MediaObject: WidgetProps<typeof MediaObjectWidget>;
+  CallToAction: WidgetProps<typeof CallToActionWidget>;
+  FeatureCards: WidgetProps<typeof FeatureCardsWidget>;
+  Faq: WidgetProps<typeof FaqWidget>;
+  Stats: WidgetProps<typeof StatsWidget>;
+  ArticleCards: WidgetProps<typeof ArticleCardsWidget>;
+  ContactCards: WidgetProps<typeof ContactCardsWidget>;
+  ContactForm: WidgetProps<typeof ContactFormWidget>;
+  LogoCloud: WidgetProps<typeof LogoCloudWidget>;
+  Tags: WidgetProps<typeof TagsWidget>;
+  Divider: WidgetProps<typeof DividerWidget>;
+};
+
+export const puckConfig: Config<PuckComponents, PageRootProps> = {
   root: {
     fields: {
       title: { type: 'text' },
@@ -118,6 +117,11 @@ export const puckConfig: Config<
     },
     forms: { title: 'Forms', components: ['ContactForm', 'Tags'] },
   },
+  // Puck's Config expects each entry as ComponentConfig<WithId<WithPuckProps<P>>>
+  // while a widget declares ComponentConfig<P>. Its `defaultProps` makes the
+  // generic invariant, so every entry fails to assign even though the runtime
+  // shape is right. Upstream hits this too and casts the same way. One cast
+  // here keeps the per-widget types honest.
   components: {
     Heading: HeadingBlock,
     Text: TextBlock,
@@ -139,7 +143,7 @@ export const puckConfig: Config<
     LogoCloud: LogoCloudWidget,
     Tags: TagsWidget,
     Divider: DividerWidget,
-  },
+  } as unknown as Config<PuckComponents, PageRootProps>['components'],
 };
 
 export const emptyData = {
@@ -156,4 +160,4 @@ export const editorViewports = [
   { width: 360, height: 640, label: 'Mobile', icon: 'Smartphone' },
   { width: 768, height: 1024, label: 'Tablet', icon: 'Tablet' },
   { width: 1280, height: 800, label: 'Desktop', icon: 'Monitor' },
-] as const;
+];

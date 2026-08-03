@@ -3,6 +3,8 @@
 
 import type { ComponentConfig } from '@measured/puck';
 
+import { createImageField, mediaLibraryAdapter } from '../../fields';
+
 import { type MediaObjectWidgetProps, MediaObjectWidgetRender } from './media-object-render';
 
 export type * from './media-object-render';
@@ -10,7 +12,7 @@ export type * from './media-object-render';
 export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
   label: 'Media object (image + body + link)',
   fields: {
-    imageUrl: { type: 'text', label: 'Image URL' },
+    imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
     imageAlt: { type: 'text', label: 'Image alt text' },
     imageMaskUrl: {
       type: 'text',
@@ -117,7 +119,7 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
       type: 'array',
       label: 'Logos (optional)',
       arrayFields: {
-        src: { type: 'text', label: 'Logo image' },
+        src: createImageField(mediaLibraryAdapter, 'Logo image'),
         alt: { type: 'text', label: 'Alt text' },
       },
       defaultItemProps: { src: '', alt: '' },

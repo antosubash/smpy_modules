@@ -9,6 +9,7 @@ dependencies = [
     "simple_module_users==0.0.25",
     "simple_module_dashboard==0.0.25",
     "simple_module_permissions==0.0.25",
+    "simple_module_branding==0.0.25",
     "simple_module_pagebuilder",
 ]
 

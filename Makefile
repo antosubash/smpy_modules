@@ -1,4 +1,4 @@
-.PHONY: install install-py install-js dev dev-api dev-ui build gen-pages sync-module-deps \
+.PHONY: install install-py install-js dev dev-api dev-ui build gen-pages sync-module-deps typecheck \
         migrate migration downgrade test test-py test-js e2e lint kill \
         link-framework unlink-framework new-module env
 
@@ -60,9 +60,20 @@ test-js:
 e2e:
 	npm run test:e2e
 
+# Typecheck module TSX. `npm run build` only runs tsc over host/client_app, so
+# without this a module-level type error (a missing import, a dropped props
+# annotation) reaches the browser with every suite green.
+typecheck:
+	@for d in modules/*/; do \
+	  if [ -f "$$d/tsconfig.json" ]; then \
+	    echo "--- tsc $$d"; npx tsc --noEmit -p "$$d/tsconfig.json" || exit 1; \
+	  fi \
+	done
+
 lint:
 	uvx ruff check .
 	npx biome check .
+	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
