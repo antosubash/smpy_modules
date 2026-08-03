@@ -90,6 +90,16 @@ async def list_categories(
     return [CategoryCount(category=name, count=int(count)) for name, count in rows]
 
 
+async def page_exists(db: AsyncSession, page_id: int) -> bool:
+    """Whether the page an article would attach to is actually there.
+
+    Checked explicitly because there is no foreign key to do it — and an
+    article pointing at a missing page is not inert: SQLite reuses the id, so
+    the row re-attaches to whatever page is created next.
+    """
+    return await db.scalar(select(Page.id).where(Page.id == page_id)) is not None
+
+
 async def get_by_page(db: AsyncSession, page_id: int) -> NewsArticle | None:
     return await db.scalar(select(NewsArticle).where(NewsArticle.page_id == page_id))
 

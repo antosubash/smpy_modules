@@ -24,6 +24,7 @@ import sys
 
 import httpx
 
+from canopy_atlas.seed.articles import news_is_installed, seed_articles
 from canopy_atlas.seed.pages import (
     APP_NAME,
     csrf_headers,
@@ -59,7 +60,16 @@ def run(base_url: str, email: str, password: str, *, publish: bool) -> int:
             print(f"Site layout: {chrome} header/footer block(s).")
         print()
 
-        seeded, total = seed_pages(client, base_url, headers, uploads, publish=publish)
+        # canopy_atlas does not depend on news: without it the pages keep
+        # their hand-authored article cards.
+        live_feed = news_is_installed(client, base_url)
+        if live_feed:
+            count = seed_articles(client, base_url, headers, uploads, publish=publish)
+            print(f"News: {count} article(s); the news strips read the API.\n")
+
+        seeded, total = seed_pages(
+            client, base_url, headers, uploads, publish=publish, live_feed=live_feed
+        )
 
     print(f"\nSeeded {seeded}/{total} pages.")
     print(

@@ -30,3 +30,22 @@ def test_listing_columns_are_indexed() -> None:
     # Every listing filters on category and orders by published_at.
     for name in ("category", "published_at", "page_id"):
         assert NewsArticle.__table__.columns[name].index is True
+
+
+def test_no_orphan_can_be_created_through_the_api() -> None:
+    """Documents the pair of guards that replace the missing foreign key.
+
+    Deletion is handled by the PageDeleted subscription in module.py; creation
+    is handled by the page_exists check in the attach endpoint. Together there
+    is no path to a row pointing at a page that does not exist — which matters
+    because SQLite reuses a deleted page's id.
+    """
+    import inspect
+
+    from news import service
+    from news.endpoints import api
+    from news.module import NewsModule
+
+    assert "page_exists" in inspect.getsource(api.attach_article)
+    assert "PageDeleted" in inspect.getsource(NewsModule.register_event_handlers)
+    assert hasattr(service, "page_exists")

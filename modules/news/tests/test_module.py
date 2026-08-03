@@ -43,10 +43,12 @@ class TestRoutes:
         assert f"{constants.ROUTE_PREFIX_API}/articles" in paths
         assert f"{constants.ROUTE_PREFIX_API}/categories" in paths
 
-    def test_page_constant_matches_view_literal(self):
-        # Guards against the inlined render literal drifting from the constant
-        # (the literal is required inline for SM003/SM004 static AST pairing).
-        assert constants._PAGE_LIST in inspect.getsource(views)
+    def test_view_renders_the_page_the_constant_names(self):
+        # The TSX file's path is what defines the page name, so a rename that
+        # misses one side is a 404 the type system cannot see. The view reads
+        # the constant, so this pins the constant to the file that must exist.
+        assert f"{NewsModule.meta.name}/NewsList" == constants._PAGE_LIST
+        assert "constants._PAGE_LIST" in inspect.getsource(views)
 
 
 class TestPermissions:

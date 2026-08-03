@@ -12,11 +12,13 @@ whole surface: :mod:`._workflow` holds the status transitions and
 from __future__ import annotations
 
 from fastapi import HTTPException
+from simple_module_core.events import EventBus
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.contracts.schemas import PageCreate, PageUpdate
 from pagebuilder.models import Page, PageRevision, PageStatus
 from pagebuilder.service._common import _UNSET, _normalize_to_utc
@@ -28,8 +30,11 @@ __all__ = ["_UNSET", "PagesService"]
 
 
 class PagesService(WorkflowMixin, RevisionsMixin):
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, event_bus: EventBus | None = None) -> None:
         self.db = db
+        # Optional so every existing caller — and every test — keeps working;
+        # only the delete path uses it.
+        self.event_bus = event_bus
 
     async def list_pages(self) -> list[Page]:
         result = await self.db.execute(select(Page).order_by(Page.id.desc()))
@@ -116,9 +121,21 @@ class PagesService(WorkflowMixin, RevisionsMixin):
 
     async def delete(self, page_id: int) -> None:
         page = await self.get_page(page_id)
+        slug = page.slug
         await self.db.execute(
             sa_delete(PageRevision).where(PageRevision.page_id == page_id)
         )
         await self.db.delete(page)
         await self.db.flush()
+        if self.event_bus is None:
+            return
+        # Commit *before* publishing. A subscriber runs on its own session, so
+        # on SQLite it would hit "database is locked" against this request's
+        # still-open write transaction — and the bus swallows a handler error
+        # into a log line, so the row would quietly survive.
+        await self.db.commit()
+        # Announce it so modules keying their own rows to this page can drop
+        # them. Without this a stale row does not merely dangle — SQLite reuses
+        # the id, so it re-attaches to the next page created.
+        await self.event_bus.publish(PageDeleted(page_id=page_id, slug=slug))
 

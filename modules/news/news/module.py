@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import importlib.metadata
 
-from fastapi import APIRouter
+from fastapi import APIRouter, FastAPI
+from pagebuilder.contracts.events import PageDeleted
 from simple_module_core import ModuleBase, ModuleMeta
+from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuItem, MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
@@ -60,6 +62,28 @@ class NewsModule(ModuleBase):
                 group=constants.MENU_GROUP,
             )
         )
+
+    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
+        """Drop an article when its page is deleted.
+
+        This is not tidiness. There is no cross-module foreign key to cascade
+        from, and a leftover row does not merely dangle: SQLite reuses the
+        deleted page's id, so the article silently re-attaches to whatever page
+        is created next and the listing shows one article's title under
+        another's metadata.
+        """
+        if app is None:
+            return
+
+        async def _drop_article(event: PageDeleted) -> None:
+            from news import service
+
+            async with app.state.sm.db.session_factory() as db:
+                article = await service.get_by_page(db, event.page_id)
+                if article is not None:
+                    await service.delete(db, article)
+
+        bus.subscribe(PageDeleted, _drop_article)
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """Let the feed block list articles for an anonymous visitor.

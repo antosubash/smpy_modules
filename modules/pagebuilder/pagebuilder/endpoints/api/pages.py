@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,5 +75,11 @@ async def update_page(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[require_edit],
 )
-async def delete_page(page_id: int, db: AsyncSession = Depends(get_db)) -> None:
-    await PagesService(db).delete(page_id)
+async def delete_page(
+    page_id: int, request: Request, db: AsyncSession = Depends(get_db)
+) -> None:
+    # The bus is passed only here: deleting a page is the one operation other
+    # modules must hear about, because nothing at the database level can tell
+    # them (no cross-module foreign keys, so no cascade).
+    bus = getattr(request.app.state.sm, "event_bus", None)
+    await PagesService(db, event_bus=bus).delete(page_id)

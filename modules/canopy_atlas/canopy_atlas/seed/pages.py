@@ -7,6 +7,7 @@ from importlib.resources import files
 
 import httpx
 
+from canopy_atlas.seed.articles import use_live_feed
 from canopy_atlas.seed.uploads import rewrite_asset_paths
 
 CONTENT_DIR = files("canopy_atlas") / "seed" / "content"
@@ -101,8 +102,13 @@ def seed_pages(
     uploads: dict[str, str],
     *,
     publish: bool,
+    live_feed: bool = False,
 ) -> tuple[int, int]:
-    """Create or update every page in the manifest. Returns (seeded, total)."""
+    """Create or update every page in the manifest. Returns (seeded, total).
+
+    With *live_feed*, the news strips become NewsFeed blocks reading the news
+    API instead of the hand-authored cards baked into the content.
+    """
     manifest = json.loads((CONTENT_DIR / "_manifest.json").read_text())
     by_slug = _existing_pages(client, base_url)
 
@@ -111,6 +117,8 @@ def seed_pages(
         slug, title = entry["slug"], entry["title"]
         data = json.loads((CONTENT_DIR / f"{slug}.json").read_text())
         data = rewrite_asset_paths(data, uploads)
+        if live_feed:
+            data = use_live_feed(data)
         # These pages are composed of full-bleed sections; the base config
         # defaults to a contained column. The design pack is *not* set here —
         # it is a site-wide branding setting, not a page property.

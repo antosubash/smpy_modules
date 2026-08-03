@@ -45,3 +45,70 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
+
+const CSRF_COOKIE = 'news_csrf';
+
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function write<T>(path: string, method: string, body?: unknown): Promise<T | null> {
+  const token = readCookie(CSRF_COOKIE);
+  const response = await fetch(`${BASE}${path}`, {
+    method,
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.status === 204 ? null : ((await response.json()) as T);
+}
+
+export const attachArticle = (data: {
+  page_id: number;
+  category?: string;
+  published_at?: string | null;
+}) => write<ArticleRead>('/articles', 'POST', data);
+
+export const updateArticle = (
+  id: number,
+  data: { category?: string; published_at?: string | null },
+) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
+
+export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
+
+/** Create the page an article's body lives in, through pagebuilder's API. */
+export async function createArticlePage(title: string, slug: string): Promise<number> {
+  const token = readCookie('pagebuilder_csrf');
+  const response = await fetch('/api/pagebuilder/pages', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({
+      title,
+      slug,
+      draft_data: { root: { props: { title, width: 'full' } }, content: [], zones: {} },
+    }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const { id } = (await response.json()) as { id: number };
+  return id;
+}
+
+/** `Field campaign in Estonia` -> `field-campaign-in-estonia`. */
+export function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 200);
+}

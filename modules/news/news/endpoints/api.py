@@ -87,6 +87,8 @@ async def attach_article(
     body: ArticleCreate, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
     """Make an existing page an article."""
+    if not await service.page_exists(db, body.page_id):
+        raise HTTPException(status_code=404, detail=f"Page {body.page_id} does not exist.")
     if await service.get_by_page(db, body.page_id) is not None:
         raise HTTPException(
             status_code=409, detail=f"Page {body.page_id} is already an article."
