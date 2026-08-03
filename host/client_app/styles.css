@@ -1,13 +1,17 @@
 @import "@simple-module-py/ui/styles/globals.css";
 @import "./modules.generated.css";
 
-/* Design tokens for the ported GCA widget set, then the GCA pack that
- * overrides them under `.gca-root`. Imported by package specifier — the
- * npm workspace symlinks modules/pagebuilder into node_modules. A
- * wheel-installed host would need to import these from the installed
- * package instead; gen-pages only emits @source entries, not @import. */
+/* Base design tokens for the widget set, then any design pack that overrides
+ * them under its own root class. A pack ships with the module that owns the
+ * brand — the framework's DesignPackRegistry supplies the dropdown entry in
+ * Settings -> Branding, but not the stylesheet, so each pack a host installs
+ * has to be imported here.
+ *
+ * Imported by package specifier: the npm workspace symlinks modules/* into
+ * node_modules. gen-pages only emits @source entries, not @import, so a
+ * wheel-installed host writes these lines by hand too. */
 @import "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css";
-@import "@simple-module-py/pagebuilder/pagebuilder/static/gca-pack.css";
+@import "@simple-module-py/canopy-atlas/canopy_atlas/static/gca-pack.css";
 
 /* App-level source scanning — host code + workspace modules.
  * Wheel-installed modules are covered by modules.generated.css.

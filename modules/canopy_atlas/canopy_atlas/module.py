@@ -24,6 +24,10 @@ to this, so changing it means re-seeding every page."""
 
 DESIGN_PACK = DesignPack(value="gca", label="Canopy Atlas")
 
+# Modules this one depends on, kept as a constant so depends_on carries no bare
+# string literal — see scripts/check_hardcoded_strings.py.
+_MODULE_PAGEBUILDER = "PageBuilder"
+
 
 def _static_dir() -> Path:
     return Path(str(importlib.resources.files("canopy_atlas") / "static"))
@@ -36,7 +40,7 @@ class CanopyAtlasModule(ModuleBase):
         view_prefix="/canopy-atlas",
         # The seed writes through pagebuilder's API and the pack styles its
         # widgets, so the host must boot them in that order.
-        depends_on=["PageBuilder"],
+        depends_on=[_MODULE_PAGEBUILDER],
         version=_VERSION,
         # The framework API version (1.0.0) is decoupled from the framework
         # package version (0.0.x) — this range is correct as written.
