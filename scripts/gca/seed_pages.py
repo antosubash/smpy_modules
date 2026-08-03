@@ -34,6 +34,10 @@ DEFAULT_BASE_URL = "http://localhost:8000"
 # frontend/packages/gca/data/gca/images. GeoWiki's seed uploads them into its
 # file store the same way this one uploads them into the media library.
 
+# Brand lockups used by the header/footer. Like the partner marks these are
+# SVG, so they stay on the static mount rather than the media library.
+GCA_STATIC_LOGOS = frozenset({"/gca/logo-main.svg", "/gca/logo-reversed.svg"})
+
 GCA_APP_NAME = "Global Canopy Atlas"
 # The ink from the "🎨 GCA Design System" Buttons/Links page (SNAG_005) — GCA's
 # action colour, not the green.
@@ -97,6 +101,31 @@ def seed_branding(client: httpx.Client, base_url: str) -> str | None:
     return response.json().get("primary_color")
 
 
+def seed_layout(
+    client: httpx.Client, base_url: str, headers: dict[str, str], uploads: dict[str, str]
+) -> int:
+    """Publish GCA's header and footer into the site-wide layout.
+
+    The layout is one record shared by every page, which is what the header and
+    footer are — so they live there rather than being repeated at the top and
+    bottom of twelve pages.
+    """
+    layout = json.loads((CONTENT_DIR / "_layout.json").read_text())
+    response = client.put(
+        f"{base_url}/api/pagebuilder/layout",
+        json={
+            "header_data": rewrite_asset_paths(layout["header"], uploads),
+            "footer_data": rewrite_asset_paths(layout["footer"], uploads),
+            "note": "GCA seed",
+        },
+        headers=headers,
+    )
+    if response.status_code >= 400:
+        print(f"Layout: FAILED ({response.status_code}) {response.text[:160]}")
+        return 0
+    return len(layout["header"]["content"]) + len(layout["footer"]["content"])
+
+
 def rewrite_asset_paths(node: Any, uploads: dict[str, str]) -> Any:
     """Repoint image paths at their media-library URLs.
 
@@ -113,8 +142,9 @@ def rewrite_asset_paths(node: Any, uploads: dict[str, str]) -> Any:
         if node in uploads:
             return uploads[node]
         # In-site links like "/gca/contact" stay as they are so they keep
-        # pointing at page routes rather than at files.
-        if node.startswith("/gca/partners/"):
+        # pointing at page routes rather than at files. Only the two brand
+        # lockups and the partner marks are files.
+        if node.startswith("/gca/partners/") or node in GCA_STATIC_LOGOS:
             return f"/static{node}"
     return node
 
@@ -150,6 +180,10 @@ def seed(base_url: str, email: str, password: str, publish: bool) -> int:
         color = seed_branding(client, base_url)
         if color:
             print(f"Branding: {GCA_APP_NAME}, action colour {color}.")
+
+        chrome = seed_layout(client, base_url, headers, uploads)
+        if chrome:
+            print(f"Site layout: {chrome} header/footer block(s).")
         print()
 
         existing = client.get(

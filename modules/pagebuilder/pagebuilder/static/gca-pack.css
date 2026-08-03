@@ -110,6 +110,12 @@
 	   (SNAG_018). */
 	--pb-hero-overlay: rgb(12 33 40 / 0.2);
 
+	/* Footer links hover to the light green. This one stays a pack literal
+	   rather than following branding: it has to read against the dark footer
+	   block, which an arbitrary configured brand colour is not guaranteed to
+	   do. Header/nav link colour does follow branding — see the ramp above. */
+	--pb-footer-link-hover: #9dc288;
+
 	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
 	color: var(--gca-ink);
 	background: var(--gca-bg);

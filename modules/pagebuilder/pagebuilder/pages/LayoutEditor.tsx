@@ -1,6 +1,7 @@
 import { type Data, Puck } from '@measured/puck';
 import '@measured/puck/puck.css';
 import { router, usePage } from '@inertiajs/react';
+import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useState } from 'react';
 
 import { emptyLayoutData, layoutPuckConfig } from '../components/layoutPuckConfig';
@@ -67,6 +68,17 @@ export default function LayoutEditor() {
 
   return (
     <div className="h-screen flex flex-col">
+      {/* These editors render their own full-screen shell instead of
+          AuthenticatedLayout, so nothing else mounts BrandingHead for them —
+          and the preview would show the framework's default action colour
+          while the published page shows the configured one.
+
+          Known gap: this preview still renders outside any design-pack root,
+          because the layout is site-wide while the pack is chosen per page —
+          there's no one right pack to preview against. Pack-level overrides
+          (GCA pins its solid surfaces to the exact brand colour rather than
+          the derived ramp step) therefore show slightly off here. */}
+      <BrandingHead />
       <div className="border-b bg-white px-4 py-2 flex items-center gap-3 flex-wrap">
         <button
           type="button"

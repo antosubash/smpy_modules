@@ -128,8 +128,13 @@ test.describe('Ported GCA widgets', () => {
     await expect(page.getByText('Does the accordion render?')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Topics' })).toBeVisible();
 
-    // The design pack is opt-in per page and drives the whole GCA look.
-    await expect(page.locator('.gca-root')).toHaveCount(1);
+    // The design pack is opt-in per page and drives the whole GCA look. Two
+    // roots, not one: the page root renders its own (which is what the *editor*
+    // preview sees), and PublicPage hoists a second one around the whole
+    // document so the header and footer get the pack too. Nesting them is
+    // harmless — the tokens are identical — and the page body is inside both.
+    await expect(page.locator('.gca-root')).toHaveCount(2);
+    await expect(page.locator('main .gca-root')).toHaveCount(1);
   });
 
   test('the FAQ accordion opens', async ({ page }) => {

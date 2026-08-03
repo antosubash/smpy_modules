@@ -1,6 +1,7 @@
 import { type Data, Puck } from '@measured/puck';
 import '@measured/puck/puck.css';
 import { usePage } from '@inertiajs/react';
+import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useState } from 'react';
 
 import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
@@ -64,6 +65,11 @@ export default function PageEditor() {
 
   return (
     <div className="h-screen flex flex-col">
+      {/* These editors render their own full-screen shell instead of
+          AuthenticatedLayout, so nothing else mounts BrandingHead for them —
+          and the preview would show the framework's default action colour
+          while the published page shows the configured one. */}
+      <BrandingHead />
       <PageEditorToolbar
         pageId={form.pageId}
         title={form.title}

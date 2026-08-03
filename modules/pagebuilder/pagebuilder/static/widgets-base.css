@@ -41,3 +41,17 @@
 	--pb-hero-logo-max-h: 14rem;
 	--pb-hero-pull: 0px;
 }
+
+/* The public page wraps the layout's header slot in its own <header>, whose
+   box is exactly as tall as the header block inside it — so `position: sticky`
+   on that block would have no distance to travel and silently do nothing. The
+   SiteHeader widget therefore marks itself and the *wrapper* takes the sticky
+   positioning. Scoped by the attribute so a header built from plain blocks, or
+   one with "stick to the top" switched off, still scrolls away normally. */
+/* Descendant, not child: Puck's <Render> wraps every block in its own div, so
+   the widget is a grandchild of the slot wrapper, never a direct child. */
+header:has([data-pb-site-header="sticky"]) {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+}

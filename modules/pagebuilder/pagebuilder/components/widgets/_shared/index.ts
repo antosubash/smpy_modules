@@ -34,4 +34,6 @@ export {
 } from './mask';
 export type { SectionProps, SectionSpacing, SectionVariant } from './section';
 export { Section } from './section';
+export type { SocialIconName } from './social-icon';
+export { SOCIAL_ICON_NAMES, SOCIAL_ICON_OPTIONS, SocialIcon } from './social-icon';
 export { TextLink } from './text-link';

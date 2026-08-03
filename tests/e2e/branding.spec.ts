@@ -13,15 +13,29 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  * `--pb-accent`.
  */
 
+/**
+ * Navigate to a public page and wait for the design-pack root to exist.
+ *
+ * Inertia renders client-side, so `goto` resolves before React has mounted
+ * anything — reading a computed style straight after it hits a bare document
+ * and throws. Every read below goes through here.
+ */
+let visit = 0;
+async function gotoPublic(page: Page, path: string) {
+  // Unique query per visit: the branding value is baked into the
+  // server-rendered HTML and the public page ships `max-age=60`, so re-visiting
+  // the same URL after a colour change can be served from cache.
+  visit += 1;
+  await page.goto(`${path}?cb=${visit}`);
+  await page.locator('.gca-root').first().waitFor();
+}
+
 /** Read a resolved custom property off the design-pack root. */
 async function packVar(page: Page, name: string): Promise<string> {
-  return page.evaluate(
-    (prop) =>
-      getComputedStyle(document.querySelector('.gca-root') as Element)
-        .getPropertyValue(prop)
-        .trim(),
-    name,
-  );
+  return page
+    .locator('.gca-root')
+    .first()
+    .evaluate((el, prop) => getComputedStyle(el).getPropertyValue(prop).trim(), name);
 }
 
 async function setBrandColor(page: Page, color: string) {
@@ -99,7 +113,7 @@ test.describe('Branding drives the widget tokens', () => {
   test('the configured colour reaches the public page', async ({ page }) => {
     await login(page);
     await setBrandColor(page, '#b3261e');
-    await page.goto(publicPath);
+    await gotoPublic(page, publicPath);
 
     // BrandingHead writes the ramp inline on :root...
     await expect
@@ -114,7 +128,7 @@ test.describe('Branding drives the widget tokens', () => {
   test('re-branding re-themes an already-published page', async ({ page }) => {
     await login(page);
     await setBrandColor(page, '#4527a0');
-    await page.goto(publicPath);
+    await gotoPublic(page, publicPath);
 
     await expect.poll(() => packVar(page, '--pb-accent')).toBe('#4527a0');
     // The pack's own neutrals are NOT the brand colour — GCA's ink still sets
@@ -125,7 +139,7 @@ test.describe('Branding drives the widget tokens', () => {
   test('the hover step lifts off the brand colour rather than darkening', async ({ page }) => {
     await login(page);
     await setBrandColor(page, '#1a353e');
-    await page.goto(publicPath);
+    await gotoPublic(page, publicPath);
 
     // GCA's Buttons spec hovers *lighter* (SNAG_005). The pack aliases the 900
     // step to the derived ramp's 600 so that holds for any brand colour; a

@@ -47,8 +47,14 @@ export default function PublicPage({
   layout_footer,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
+  // The design pack is declared per page, but its CSS is scoped to a root
+  // class that the *page* root renders — i.e. inside <main>. The header and
+  // footer sit outside it, so without hoisting the class here the site chrome
+  // would fall back to the base tokens and read as a different site.
+  const designPack = (data?.root as { props?: { designPack?: string } } | undefined)?.props
+    ?.designPack;
   return (
-    <>
+    <div className={designPack && designPack !== 'base' ? `${designPack}-root` : undefined}>
       {/* The admin shell mounts this through AuthenticatedLayout; a public page
           has no layout, so without it the configured brand colour and favicon
           stopped at the sign-in wall. The widgets' `--pb-accent` and their
@@ -98,6 +104,6 @@ export default function PublicPage({
           <Render config={layoutPuckConfig} data={layout_footer as unknown as Data} />
         </footer>
       )}
-    </>
+    </div>
   );
 }

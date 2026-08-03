@@ -1,0 +1,183 @@
+{
+  "header": {
+    "root": {
+      "props": {}
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "SiteHeader",
+        "props": {
+          "id": "site-header",
+          "logoUrl": "/gca/logo-main.svg",
+          "logoAlt": "Global Canopy Atlas",
+          "homeHref": "/p/home",
+          "utilityLinks": [
+            {
+              "label": "Join our mailing list",
+              "href": "/p/contact",
+              "icon": ""
+            },
+            {
+              "label": "Donate",
+              "href": "/p/contact",
+              "icon": ""
+            },
+            {
+              "label": "BlueSky",
+              "href": "https://bsky.app",
+              "icon": "bluesky"
+            },
+            {
+              "label": "LinkedIn",
+              "href": "https://linkedin.com",
+              "icon": "linkedin"
+            }
+          ],
+          "navItems": [
+            {
+              "label": "The atlas",
+              "href": "/p/data-map",
+              "children": []
+            },
+            {
+              "label": "The project",
+              "href": "",
+              "children": [
+                {
+                  "label": "Our process",
+                  "href": "/p/our-process"
+                },
+                {
+                  "label": "How to use the data",
+                  "href": "/p/how-to-use-the-data"
+                },
+                {
+                  "label": "Outputs",
+                  "href": "/p/outputs"
+                }
+              ]
+            },
+            {
+              "label": "About us",
+              "href": "",
+              "children": [
+                {
+                  "label": "Who we are",
+                  "href": "/p/who-we-are"
+                },
+                {
+                  "label": "Our statements & policies",
+                  "href": "/p/our-statements"
+                },
+                {
+                  "label": "FAQs",
+                  "href": "/p/faqs"
+                }
+              ]
+            },
+            {
+              "label": "News",
+              "href": "/p/news-index",
+              "children": []
+            }
+          ],
+          "ctaLabel": "Contact us",
+          "ctaHref": "/p/contact",
+          "sticky": true
+        }
+      }
+    ]
+  },
+  "footer": {
+    "root": {
+      "props": {}
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "SiteFooter",
+        "props": {
+          "id": "site-footer",
+          "logoUrl": "/gca/logo-reversed.svg",
+          "logoAlt": "Global Canopy Atlas",
+          "homeHref": "/p/home",
+          "links": [
+            {
+              "label": "The atlas",
+              "href": "/p/data-map"
+            },
+            {
+              "label": "Our process",
+              "href": "/p/our-process"
+            },
+            {
+              "label": "Who we are",
+              "href": "/p/who-we-are"
+            },
+            {
+              "label": "Contact us",
+              "href": "/p/contact"
+            },
+            {
+              "label": "Terms of use",
+              "href": "/p/terms"
+            },
+            {
+              "label": "Privacy notice",
+              "href": "/p/privacy"
+            }
+          ],
+          "note": ""
+        }
+      },
+      {
+        "type": "LogoCloud",
+        "props": {
+          "id": "footer-partners",
+          "title": "Supported and funded by",
+          "items": [
+            {
+              "src": "/gca/partners/leverhulme.svg",
+              "alt": "Leverhulme Trust",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/ukri.svg",
+              "alt": "UK Research and Innovation",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/erc.svg",
+              "alt": "ERC",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/bristol.svg",
+              "alt": "University of Bristol",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/esa.svg",
+              "alt": "European Space Agency",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/iiasa.svg",
+              "alt": "IIASA",
+              "href": ""
+            },
+            {
+              "src": "/gca/partners/geo-trees.svg",
+              "alt": "GEO-TREES",
+              "href": ""
+            }
+          ],
+          "eyebrow": "",
+          "heading": "",
+          "variant": "inline"
+        }
+      }
+    ]
+  }
+}
