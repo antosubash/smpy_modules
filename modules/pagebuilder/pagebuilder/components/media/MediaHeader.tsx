@@ -1,4 +1,8 @@
-/** Media library title bar: back-to-pages link and the file picker. */
+/** Media library actions: back-to-pages link and the file picker.
+ *
+ * Rendered into PageShell's `actions` slot, so the heading lives there
+ * rather than here.
+ */
 
 import { router } from '@inertiajs/react';
 import type { ChangeEvent, RefObject } from 'react';
@@ -10,28 +14,27 @@ interface Props {
 
 export function MediaHeader({ fileInputRef, onFilesSelected }: Props) {
   return (
-    <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-      <h1 className="text-3xl font-bold">Media library</h1>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => router.visit('/pagebuilder')}
-          className="px-4 py-2 rounded border hover:bg-gray-50 font-medium"
-        >
-          ← Pages
-        </button>
-        <label className="px-4 py-2 rounded font-medium cursor-pointer text-white bg-blue-600 hover:bg-blue-700">
-          Upload
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={onFilesSelected}
-          />
-        </label>
-      </div>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => router.visit('/pagebuilder')}
+        className="px-4 py-2 rounded border hover:bg-gray-50 font-medium"
+      >
+        ← Pages
+      </button>
+      {/* Stays a <label> wrapping the input: that pairing is what makes the
+          hidden file input clickable, and a <button> cannot wrap it. */}
+      <label className="px-4 py-2 rounded font-medium cursor-pointer text-white bg-blue-600 hover:bg-blue-700">
+        Upload
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={onFilesSelected}
+        />
+      </label>
+    </>
   );
 }

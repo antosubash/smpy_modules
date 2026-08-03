@@ -1,4 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
+import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import type React from 'react';
 import {
   type ChangeEvent,
   type DragEvent,
@@ -14,7 +17,8 @@ import { MediaFolderSidebar } from '../components/media/MediaFolderSidebar';
 import { MediaGrid } from '../components/media/MediaGrid';
 import { MediaHeader } from '../components/media/MediaHeader';
 import { MediaDropzone, MediaUploadQueue } from '../components/media/MediaUploadQueue';
-import type { ListFilters, UploadItem } from '../components/media/types';
+import type { ListFilters } from '../components/media/types';
+import { useMediaUploads } from '../hooks/useMediaUploads';
 import {
   deleteMedia,
   listMedia,
@@ -22,7 +26,7 @@ import {
   type MediaListResponse,
   uploadMedia,
 } from '../utils/api';
-import { parseKB, uploadKey } from '../utils/mediaFormat';
+import { parseKB } from '../utils/mediaFormat';
 
 interface Props {
   initial: MediaListResponse;
@@ -48,7 +52,6 @@ export default function MediaLibrary() {
     maxKB: '',
   });
   const [uploadFolder, setUploadFolder] = useState<string>('');
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -130,82 +133,33 @@ export default function MediaLibrary() {
     }
   };
 
-  const startUploads = useCallback(
-    (files: File[]) => {
-      if (files.length === 0) return;
-      const folderForBatch = uploadFolder.trim();
-      const items: UploadItem[] = files.map((file) => ({
-        id: uploadKey(file),
-        file,
-        status: 'pending',
-        loaded: 0,
-        total: file.size,
-        error: null,
-      }));
-      setUploads((prev) => [...prev, ...items]);
-      setMessage(null);
-
-      // Upload sequentially to avoid swamping the server with a 50-file
-      // drop; the per-file progress bar is what makes this feel fast.
-      void (async () => {
-        let succeeded = 0;
-        for (const item of items) {
-          setUploads((prev) =>
-            prev.map((u) => (u.id === item.id ? { ...u, status: 'uploading' } : u)),
-          );
-          try {
-            const asset = await uploadMedia(item.file, {
-              folder: folderForBatch || null,
-              onProgress: (loaded, total) => {
-                setUploads((prev) =>
-                  prev.map((u) =>
-                    u.id === item.id ? { ...u, loaded, total: total || u.total } : u,
-                  ),
-                );
-              },
-            });
-            setUploads((prev) =>
-              prev.map((u) => (u.id === item.id ? { ...u, status: 'done', loaded: u.total } : u)),
-            );
-            // Splice the new asset into the visible list when it matches
-            // the active filter (matches "any folder" or the same folder
-            // the user is browsing). Otherwise the user will see it as
-            // soon as they switch back to that folder.
-            const matchesActiveFolder =
-              filters.folder === null ||
-              (filters.folder === '' && !asset.folder) ||
-              filters.folder === asset.folder;
-            if (matchesActiveFolder) {
-              setAssets((prev) => [asset, ...prev]);
-            }
-            if (asset.folder && !folders.includes(asset.folder)) {
-              setFolders((prev) => Array.from(new Set([...prev, asset.folder!])).sort());
-            }
-            succeeded += 1;
-          } catch (e) {
-            setUploads((prev) =>
-              prev.map((u) =>
-                u.id === item.id
-                  ? {
-                      ...u,
-                      status: 'error',
-                      error: e instanceof Error ? e.message : 'Upload failed',
-                    }
-                  : u,
-              ),
-            );
-          }
-        }
-        if (succeeded > 0) {
-          setMessage(`Uploaded ${succeeded} file${succeeded === 1 ? '' : 's'}.`);
-          // Best-effort: also re-sync via Inertia so the SSR props
-          // reflect the new state on next reload.
-          router.reload({ only: ['initial'] });
-        }
-      })();
+  // Splice a freshly uploaded asset into the visible list when it matches the
+  // active filter; otherwise it appears when the user switches to that folder.
+  const handleUploaded = useCallback(
+    (asset: MediaAssetRead) => {
+      const matchesActiveFolder =
+        filters.folder === null ||
+        (filters.folder === '' && !asset.folder) ||
+        filters.folder === asset.folder;
+      if (matchesActiveFolder) {
+        setAssets((prev) => [asset, ...prev]);
+      }
+      if (asset.folder) {
+        setFolders((prev) =>
+          prev.includes(asset.folder as string)
+            ? prev
+            : Array.from(new Set([...prev, asset.folder as string])).sort(),
+        );
+      }
     },
-    [filters.folder, folders, uploadFolder],
+    [filters.folder],
   );
+
+  const { uploads, startUploads, dismissUpload } = useMediaUploads({
+    uploadFolder,
+    onUploaded: handleUploaded,
+    setMessage,
+  });
 
   const onFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files ? Array.from(e.target.files) : [];
@@ -220,10 +174,6 @@ export default function MediaLibrary() {
     startUploads(files);
   };
 
-  const dismissUpload = (id: string) => {
-    setUploads((prev) => prev.filter((u) => u.id !== id));
-  };
-
   const activeFolderLabel = (() => {
     if (filters.folder === null) return 'All assets';
     if (filters.folder === '') return 'Unfiled';
@@ -231,9 +181,12 @@ export default function MediaLibrary() {
   })();
 
   return (
-    <div className="max-w-7xl mx-auto p-8">
-      <MediaHeader fileInputRef={fileInputRef} onFilesSelected={onFileInputChange} />
-
+    <PageShell
+      title="Media library"
+      description="Images available to every page."
+      maxWidth="full"
+      actions={<MediaHeader fileInputRef={fileInputRef} onFilesSelected={onFileInputChange} />}
+    >
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <MediaFolderSidebar
           folders={folders}
@@ -289,6 +242,8 @@ export default function MediaLibrary() {
           )}
         </section>
       </div>
-    </div>
+    </PageShell>
   );
 }
+
+MediaLibrary.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;

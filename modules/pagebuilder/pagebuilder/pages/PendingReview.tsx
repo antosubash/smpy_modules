@@ -1,4 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
+import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import type React from 'react';
 import { useState } from 'react';
 
 import { approvePage, type PageRead, promptAndReject } from '../utils/api';
@@ -45,18 +48,19 @@ export default function PendingReview() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Pending review</h1>
+    <PageShell
+      title="Pending review"
+      description="Pages submitted for approval."
+      actions={
         <button
           type="button"
           onClick={() => router.visit('/pagebuilder')}
-          className="text-blue-600 hover:underline text-sm"
+          className="px-4 py-2 rounded border hover:bg-gray-50 font-medium"
         >
           ← All pages
         </button>
-      </div>
-
+      }
+    >
       {message && <p className="mb-4 text-sm text-red-700">{message}</p>}
 
       {pages.items.length === 0 ? (
@@ -111,6 +115,8 @@ export default function PendingReview() {
           </tbody>
         </table>
       )}
-    </div>
+    </PageShell>
   );
 }
+
+PendingReview.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;

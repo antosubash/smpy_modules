@@ -1,4 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
+import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import type React from 'react';
 import { useState } from 'react';
 
 import { ScheduledBadge } from '../components/ScheduledBadge';
@@ -25,10 +28,11 @@ export default function PageList() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Pages</h1>
-        <div className="flex gap-2">
+    <PageShell
+      title="Pages"
+      description="Compose, review, and publish site pages."
+      actions={
+        <>
           <button
             type="button"
             onClick={() => router.visit('/pagebuilder/pending')}
@@ -57,9 +61,9 @@ export default function PageList() {
           >
             New page
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {pages.items.length === 0 ? (
         <div className="text-gray-500 border border-dashed rounded p-8 text-center">
           No pages yet. Click "New page" to create your first one.
@@ -123,6 +127,8 @@ export default function PageList() {
           </tbody>
         </table>
       )}
-    </div>
+    </PageShell>
   );
 }
+
+PageList.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
