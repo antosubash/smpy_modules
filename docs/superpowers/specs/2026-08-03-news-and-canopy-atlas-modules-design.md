@@ -1,7 +1,8 @@
 # News and Canopy Atlas modules — design
 
 **Date:** 2026-08-03
-**Status:** approved, not yet implemented
+**Status:** implemented. Sections marked *As built* record where the
+implementation departed from this design and why.
 
 ## Goal
 
@@ -255,13 +256,7 @@ class NewsArticle(Base, AuditMixin, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     page_id: int = Field(
-        sa_column=Column(
-            Integer,
-            ForeignKey("pagebuilder_pages.id", ondelete="CASCADE"),
-            unique=True,
-            index=True,
-            nullable=False,
-        )
+        sa_column=Column(Integer, nullable=False, unique=True, index=True)
     )
     category: str = Field(default="", max_length=80, index=True)
     published_at: datetime | None = Field(
@@ -275,14 +270,31 @@ Everything else is the `Page`: title, slug, body, excerpt
 and SEO. A sidecar rather than columns on `Page` keeps `pagebuilder` a generic
 CMS that knows nothing about news.
 
-The costs, stated plainly: every listing is a join, page deletion must cascade,
-and the news branch's first migration needs
-`depends_on = ("pagebuilder",)` alongside `branch_labels = ("news",)` because
-the foreign key crosses branch labels.
+**As built — `page_id` carries no database foreign key**, which this spec
+originally assumed it would. `create_module_base` gives every module its own
+`MetaData`, so a cross-module `ForeignKey` cannot resolve its target table and
+SQLAlchemy raises `NoReferencedTableError` when the mapper configures. There is
+therefore no `ON DELETE CASCADE` to rely on, and no `depends_on` needed on the
+migration either.
 
-`published_at` is the article's display date, deliberately separate from
-`Page.publish_at`, which is the single-shot scheduling field and is cleared on
-every flip.
+That is not a small loss, and the reasoning that first covered it — "the
+listing inner-joins the page, so an orphan is invisible" — is wrong. SQLite
+reuses a deleted row's id, so an orphan does not dangle: it re-attaches to the
+next page created, and the listing shows one article's title under another's
+metadata.
+
+Two guards replace the cascade, and between them no orphan can exist:
+
+- `pagebuilder` publishes a `PageDeleted` event and `news` subscribes, dropping
+  the row. The event is published *after* the delete commits — a subscriber
+  runs on its own session, and on SQLite an open write transaction on the
+  request's session makes it fail with "database is locked". The bus logs a
+  handler failure rather than raising, so without the commit the row survives
+  silently while the endpoint returns 204.
+- `POST /articles` 404s when the page does not exist, closing the path where an
+  API caller creates the orphan directly.
+
+The remaining cost is that every listing is a join.
 
 ### API — `/api/news`
 
