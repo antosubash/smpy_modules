@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import pytest
+
+# Imported from `conftest`, not `tests.conftest`: with an editable
+# framework checkout on sys.path (make link-framework) the bare `tests`
+# package is ambiguous and resolves to the framework's own.
+from conftest import create_draft
 from httpx import AsyncClient
-from tests.conftest import create_draft
 
 pytestmark = pytest.mark.asyncio
 

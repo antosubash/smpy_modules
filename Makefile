@@ -63,9 +63,11 @@ e2e:
 # Typecheck module TSX. `npm run build` only runs tsc over host/client_app, so
 # without this a module-level type error (a missing import, a dropped props
 # annotation) reaches the browser with every suite green.
+# The `find` guard skips a module that has a tsconfig but no sources yet —
+# tsc treats an empty program as TS18003 and fails the build.
 typecheck:
 	@for d in modules/*/; do \
-	  if [ -f "$$d/tsconfig.json" ]; then \
+	  if [ -f "$$d/tsconfig.json" ] && [ -n "$$(find "$$d" -name '*.ts' -o -name '*.tsx' | head -1)" ]; then \
 	    echo "--- tsc $$d"; npx tsc --noEmit -p "$$d/tsconfig.json" || exit 1; \
 	  fi \
 	done

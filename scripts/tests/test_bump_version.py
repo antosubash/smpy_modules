@@ -70,14 +70,25 @@ def test_module_version_matches_root_version():
     assert str(root) == str(mod)
 
 
+def _all_manifests() -> list:
+    """Every file a bump rewrites — discovered the same way the script does.
+
+    Listing them individually is what let this test corrupt the tree: it was
+    written when pagebuilder was the only module, so a bump left every *other*
+    module's manifest sitting at the test's throwaway version, and the very
+    next `--check-current` run failed on a tree nobody had edited.
+    """
+    return [
+        REPO / "pyproject.toml",
+        *sorted((REPO / "modules").glob("*/pyproject.toml")),
+        *sorted((REPO / "modules").glob("*/package.json")),
+    ]
+
+
 def test_framework_pins_survive_a_real_bump():
     """Round-trip a real bump and restore, asserting the pins are unchanged."""
     manifest = REPO / "modules" / "pagebuilder" / "pyproject.toml"
-    original = manifest.read_text()
-    root_manifest = REPO / "pyproject.toml"
-    root_original = root_manifest.read_text()
-    package_json = REPO / "modules" / "pagebuilder" / "package.json"
-    package_original = package_json.read_text()
+    snapshot = {path: path.read_text() for path in _all_manifests()}
     try:
         assert _run("9.9.9").returncode == 0
         bumped = tomlkit.parse(manifest.read_text())
@@ -86,6 +97,14 @@ def test_framework_pins_survive_a_real_bump():
         assert "simple_module_core>=0.0.25,<0.1" in deps
         assert not any("simple_module_core==" in d for d in deps)
     finally:
-        manifest.write_text(original)
-        root_manifest.write_text(root_original)
-        package_json.write_text(package_original)
+        for path, original in snapshot.items():
+            path.write_text(original)
+
+
+def test_a_real_bump_restores_every_module_not_just_the_first():
+    """Guards the fixture above: after the round-trip the tree must be synced.
+
+    Without it, a second module's manifest silently keeps the bumped version.
+    """
+    test_framework_pins_survive_a_real_bump()
+    assert _run("--check-current").returncode == 0
