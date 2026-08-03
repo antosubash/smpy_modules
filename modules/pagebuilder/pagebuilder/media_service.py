@@ -7,110 +7,38 @@ holds the sanitized filename, original name, content-type, byte size,
 intrinsic dimensions, and a ``variants`` map of server-generated
 thumbnails. Public URLs are derived as
 ``f"{settings.media_url_prefix}/{filename}"``.
+
+Filename sanitising, content sniffing, and thumbnail generation live in
+:mod:`pagebuilder.media_images`.
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
-import re
 import uuid
 from pathlib import Path
-from typing import Any
 
 from fastapi import HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.contracts.schemas import MediaAssetRead, MediaAssetVariant
+from pagebuilder.media_images import (
+    CONTENT_TYPE_EXTENSIONS,
+    SNIFF_BYTES,
+    normalize_folder,
+    process_image,
+    safe_extension,
+    sniff_content_type,
+)
 from pagebuilder.models import MediaAsset
 from pagebuilder.settings import PagebuilderSettings
 
-logger = logging.getLogger(__name__)
-
-_EXT_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
-
-# Folders are user-supplied path-like strings, so we constrain the
-# alphabet and reject traversal segments before they reach the DB.
-_FOLDER_SEGMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_FOLDER_MAX_LENGTH = 300
 _DEFAULT_PAGE_SIZE = 60
 _MAX_PAGE_SIZE = 200
 
-
-def normalize_folder(raw: str | None) -> str | None:
-    """Canonicalize a folder path or raise 422.
-
-    Strips surrounding slashes/whitespace, collapses double slashes,
-    and validates each segment against ``_FOLDER_SEGMENT_RE``. An empty
-    or ``None`` input becomes ``None`` (the asset is unfiled).
-    """
-    if raw is None:
-        return None
-    cleaned = raw.strip().strip("/")
-    if not cleaned:
-        return None
-    if len(cleaned) > _FOLDER_MAX_LENGTH:
-        raise HTTPException(status_code=422, detail="Folder path is too long")
-    segments = [seg for seg in cleaned.split("/") if seg]
-    for segment in segments:
-        if segment in {".", ".."} or not _FOLDER_SEGMENT_RE.match(segment):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "Folder segments must start with an alphanumeric and "
-                    "contain only letters, digits, '.', '_' or '-'"
-                ),
-            )
-    return "/".join(segments)
-
-# Header signatures for the formats this module accepts. We sniff the
-# first bytes of every upload so a malicious client can't claim
-# `image/png` while shipping HTML/JS/PHP that StaticFiles would later
-# serve back under a same-origin URL. Pure-Python so no native dep.
-_SNIFF_BYTES = 64
-
-_MAGIC_SIGNATURES: tuple[tuple[bytes, str], ...] = (
-    (b"\xff\xd8\xff", "image/jpeg"),
-    (b"\x89PNG\r\n\x1a\n", "image/png"),
-    (b"GIF87a", "image/gif"),
-    (b"GIF89a", "image/gif"),
-)
-
-# WebP needs a two-part check (RIFF + WEBP at offset 8); handled inline.
-_CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-}
-
-
-def _sniff_content_type(head: bytes) -> str | None:
-    for sig, ctype in _MAGIC_SIGNATURES:
-        if head.startswith(sig):
-            return ctype
-    if len(head) >= 12 and head[0:4] == b"RIFF" and head[8:12] == b"WEBP":
-        return "image/webp"
-    return None
-
-
-def _safe_extension(name: str) -> str:
-    match = _EXT_RE.search(name or "")
-    return match.group(0).lower() if match else ""
-
-
-def _is_animated(image: Image.Image) -> bool:
-    """Detect multi-frame images we should leave alone.
-
-    Pillow can downscale individual frames of animated GIF/WEBP but
-    re-encoding the animation into webp is a different code path and
-    the issue's acceptance criteria explicitly say animated GIFs skip
-    transcoding. ``getattr`` defends against formats where Pillow
-    doesn't set ``is_animated`` at all.
-    """
-    return bool(getattr(image, "is_animated", False))
+# Re-exported: callers reach for these through the service module.
+__all__ = ["MediaService", "normalize_folder"]
 
 
 class MediaService:
@@ -237,8 +165,8 @@ class MediaService:
                 detail=f"Content-type {declared!r} is not allowed",
             )
 
-        head = await upload.read(_SNIFF_BYTES)
-        sniffed = _sniff_content_type(head)
+        head = await upload.read(SNIFF_BYTES)
+        sniffed = sniff_content_type(head)
         if sniffed is None or sniffed not in allowed:
             raise HTTPException(
                 status_code=415,
@@ -257,7 +185,7 @@ class MediaService:
         # Pin the on-disk extension to the sniffed type so we never store
         # a JPEG under a `.png` name (StaticFiles serves the mime based
         # on the extension).
-        ext = _CONTENT_TYPE_EXTENSIONS.get(content_type) or _safe_extension(original)
+        ext = CONTENT_TYPE_EXTENSIONS.get(content_type) or safe_extension(original)
         filename = f"{uuid.uuid4().hex}{ext}"
 
         root = self.storage_root
@@ -292,7 +220,12 @@ class MediaService:
         # them on the event loop blocks other concurrent uploads. The
         # thread offload is essentially free for a single request and
         # turns parallel uploads back into parallel work.
-        width, height, variants = await asyncio.to_thread(self._process_image, target)
+        width, height, variants = await asyncio.to_thread(
+            process_image,
+            target,
+            thumbnail_widths=self.settings.media_thumbnail_widths,
+            webp_quality=self.settings.media_webp_quality,
+        )
 
         asset = MediaAsset(
             filename=filename,
@@ -320,75 +253,3 @@ class MediaService:
                     (root / name).unlink(missing_ok=True)
         await self.db.delete(asset)
         await self.db.flush()
-
-    def _process_image(
-        self, source: Path
-    ) -> tuple[int | None, int | None, dict[str, Any]]:
-        """Extract dimensions and generate webp thumbnails for a raster image.
-
-        Returns ``(width, height, variants)``. On any failure (corrupt
-        file, format Pillow can't decode, animated image) returns
-        ``(None, None, {})`` so the upload still completes — the original
-        is served as-is and the Image block falls back to a plain
-        ``<img src>``.
-        """
-        try:
-            with Image.open(source) as image:
-                src_w, src_h = image.size
-                if src_w <= 0 or src_h <= 0:
-                    return src_w or None, src_h or None, {}
-                # Capture dimensions even for animated images — the
-                # original is still served, and a known intrinsic size
-                # lets the Image block emit width/height to avoid CLS.
-                if _is_animated(image):
-                    return src_w, src_h, {}
-                image.load()
-                variants = self._generate_thumbnails(image, source, src_w, src_h)
-        except (UnidentifiedImageError, OSError, ValueError) as exc:
-            # Logged at INFO because this is expected for corrupt or
-            # exotic-but-valid uploads — not a code bug.
-            logger.info("Skipping image processing for %s: %s", source.name, exc)
-            return None, None, {}
-        return src_w, src_h, variants
-
-    def _generate_thumbnails(
-        self,
-        image: Image.Image,
-        source: Path,
-        src_w: int,
-        src_h: int,
-    ) -> dict[str, Any]:
-        widths = sorted({w for w in self.settings.media_thumbnail_widths if w > 0})
-        if not widths:
-            return {}
-        # Webp doesn't support paletted/CMYK directly the same way; convert
-        # once up front so each resize doesn't re-do the work.
-        if image.mode not in ("RGB", "RGBA"):
-            base = image.convert("RGBA" if "A" in image.mode else "RGB")
-        else:
-            base = image
-        stem = source.stem
-        out_dir = source.parent
-        quality = self.settings.media_webp_quality
-        variants: dict[str, Any] = {}
-        for width in widths:
-            if width >= src_w:
-                # No upscaling — skip widths at or above the source. The
-                # original file already covers visitors at full size.
-                continue
-            ratio = width / src_w
-            height = max(1, round(src_h * ratio))
-            resized = base.resize((width, height), Image.Resampling.LANCZOS)
-            out_name = f"{stem}_w{width}.webp"
-            out_path = out_dir / out_name
-            # method=4 is Google's recommended encoder default — method=6
-            # is ~5x slower for marginal byte-size gains at q=82.
-            resized.save(out_path, format="WEBP", quality=quality, method=4)
-            variants[f"w{width}"] = {
-                "filename": out_name,
-                "content_type": "image/webp",
-                "width": width,
-                "height": height,
-                "size_bytes": out_path.stat().st_size,
-            }
-        return variants

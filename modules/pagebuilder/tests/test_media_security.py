@@ -6,7 +6,8 @@ import io
 
 import pytest
 from fastapi import HTTPException, UploadFile
-from pagebuilder.media_service import MediaService, _sniff_content_type
+from pagebuilder.media_images import sniff_content_type
+from pagebuilder.media_service import MediaService
 from pagebuilder.models import Base, MediaAsset  # noqa: F401 — register metadata
 from pagebuilder.settings import PagebuilderSettings
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -22,29 +23,29 @@ _SVG_PAYLOAD = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</scrip
 
 
 def test_sniff_png() -> None:
-    assert _sniff_content_type(_PNG_HEADER) == "image/png"
+    assert sniff_content_type(_PNG_HEADER) == "image/png"
 
 
 def test_sniff_jpeg() -> None:
-    assert _sniff_content_type(_JPEG_HEADER) == "image/jpeg"
+    assert sniff_content_type(_JPEG_HEADER) == "image/jpeg"
 
 
 def test_sniff_gif() -> None:
-    assert _sniff_content_type(_GIF_HEADER) == "image/gif"
+    assert sniff_content_type(_GIF_HEADER) == "image/gif"
 
 
 def test_sniff_webp() -> None:
-    assert _sniff_content_type(_WEBP_HEADER) == "image/webp"
+    assert sniff_content_type(_WEBP_HEADER) == "image/webp"
 
 
 def test_sniff_rejects_php_disguised_as_png() -> None:
-    assert _sniff_content_type(_PHP_PAYLOAD) is None
+    assert sniff_content_type(_PHP_PAYLOAD) is None
 
 
 def test_sniff_rejects_svg() -> None:
     # SVG isn't in our sniffer's allowlist — even if a host re-enables
     # the content-type, the sniffer won't match it.
-    assert _sniff_content_type(_SVG_PAYLOAD) is None
+    assert sniff_content_type(_SVG_PAYLOAD) is None
 
 
 def test_svg_not_in_default_allowed_types() -> None:

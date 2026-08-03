@@ -40,6 +40,25 @@ smpy host sync-js-deps --host-client-app=host/client_app
 smpy host gen-pages --host-dir=host/client_app
 ```
 
+## Usage
+
+Once installed and migrated, sign in and open `/pagebuilder`:
+
+1. **Create a page** — `/pagebuilder/new`. Give it a title; the slug is derived
+   from it and stays editable.
+2. **Compose it** — drag blocks from the Puck sidebar. Images come from the
+   media library, which uploads and thumbnails them for you.
+3. **Publish it** — publish directly with `pagebuilder.publish`, or submit for
+   review if your role only carries `pagebuilder.edit`. Reviewers work through
+   `/pagebuilder/pending`.
+4. **Schedule it** — set `publish_at` / `unpublish_at` instead of publishing
+   now, and the poller flips the status at the due time.
+5. **View it** — the page is live at `/p/{slug}`, wrapped in the site layout
+   from `/pagebuilder/layout`.
+
+Every transition writes a revision, so `/pagebuilder/{id}/edit` can compare any
+two revisions and restore either one as a draft.
+
 ## Migrations
 
 This module ships **no** migrations — that is the framework convention. Its

@@ -1,160 +1,27 @@
-"""Business logic for pagebuilder pages.
+"""Status transitions: publish, unpublish, schedule, submit, approve, reject.
 
-Service is constructed per-request from the injected ``AsyncSession``;
-the DB session's commit-on-write behavior is provided by the framework's
-``get_db`` dependency.
+Mixed into :class:`~pagebuilder.service.PagesService`. Split out to keep each
+file focused; the methods are unchanged and still rely on ``self.db``,
+``self.get_page``, and ``self._record_revision`` from the composing class.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import delete as sa_delete
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder.contracts.schemas import PageCreate, PageUpdate
-from pagebuilder.diff import revision_diff
-from pagebuilder.models import Page, PageRevision, PageStatus, RevisionEvent
+from pagebuilder.models import Page, PageStatus, RevisionEvent
+from pagebuilder.service._common import _UNSET, _normalize_to_utc, _Unset
+from pagebuilder.service._revisions import RevisionsMixin
 
 
-class _Unset:
-    """Sentinel separating ``field=None`` (clear) from "field not provided"."""
+class WorkflowMixin(RevisionsMixin):
+    """Status-transition behaviour for :class:`PagesService`."""
 
-
-_UNSET = _Unset()
-
-
-def _normalize_to_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
-
-
-class PagesService:
-    def __init__(self, db: AsyncSession) -> None:
-        self.db = db
-
-    async def list_pages(self) -> list[Page]:
-        result = await self.db.execute(select(Page).order_by(Page.id.desc()))
-        return list(result.scalars().all())
-
-    async def list_pending(self) -> list[Page]:
-        """Pages in ``submitted_for_review`` — the approver queue."""
-        result = await self.db.execute(
-            select(Page)
-            .where(Page.status == PageStatus.SUBMITTED_FOR_REVIEW)
-            .order_by(Page.id.desc())
-        )
-        return list(result.scalars().all())
-
-    async def get_page(self, page_id: int) -> Page:
-        page = await self.db.get(Page, page_id)
-        if page is None:
-            raise HTTPException(status_code=404, detail="Page not found")
-        return page
-
-    async def get_by_slug_published(self, slug: str) -> Page | None:
-        result = await self.db.execute(
-            select(Page).where(
-                Page.slug == slug,
-                Page.status == PageStatus.PUBLISHED,
-            )
-        )
-        return result.scalars().first()
-
-    async def list_indexable_published(self) -> list[Page]:
-        """Published pages eligible for sitemap inclusion.
-
-        Excludes ``index_in_search=False`` (used both by the sitemap
-        generator and any external indexing job). Ordered by ``updated_at``
-        descending so the freshest content surfaces first when a consumer
-        only reads the head of the list.
-        """
-        result = await self.db.execute(
-            select(Page)
-            .where(
-                Page.status == PageStatus.PUBLISHED,
-                Page.index_in_search.is_(True),  # type: ignore[union-attr]
-            )
-            .order_by(Page.updated_at.desc())
-        )
-        return list(result.scalars().all())
-
-    async def create(self, data: PageCreate) -> Page:
-        page = Page(
-            title=data.title,
-            slug=data.slug,
-            meta_description=data.meta_description,
-            og_image=data.og_image,
-            canonical_url=data.canonical_url,
-            index_in_search=data.index_in_search,
-            json_ld=data.json_ld,
-            draft_data=data.draft_data,
-            publish_at=_normalize_to_utc(data.publish_at),
-            unpublish_at=_normalize_to_utc(data.unpublish_at),
-            status=PageStatus.DRAFT,
-        )
-        self.db.add(page)
-        try:
-            await self.db.flush()
-        except IntegrityError as exc:
-            await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Slug already in use") from exc
-        await self.db.refresh(page)
-        return page
-
-    async def update(self, page_id: int, data: PageUpdate) -> Page:
-        page = await self.get_page(page_id)
-        update = data.model_dump(exclude_unset=True)
-        for field, value in update.items():
-            setattr(page, field, value)
-        self.db.add(page)
-        try:
-            await self.db.flush()
-        except IntegrityError as exc:
-            await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Slug already in use") from exc
-        await self.db.refresh(page)
-        return page
-
-    async def delete(self, page_id: int) -> None:
-        page = await self.get_page(page_id)
-        await self.db.execute(
-            sa_delete(PageRevision).where(PageRevision.page_id == page_id)
-        )
-        await self.db.delete(page)
-        await self.db.flush()
-
-    def _record_revision(
-        self,
-        page: Page,
-        *,
-        event: RevisionEvent,
-        note: str | None = None,
-    ) -> PageRevision:
-        """Append an audit row mirroring *page*'s current draft state.
-
-        Publish / approve callers overwrite ``published_data`` with
-        ``draft_data`` before recording, so ``draft_data`` is the single
-        snapshot source every event needs. Caller owns the flush so the
-        page row + revision land in one transaction.
-        """
-        revision = PageRevision(
-            page_id=page.id or 0,
-            title=page.title,
-            meta_description=page.meta_description,
-            og_image=page.og_image,
-            data=page.draft_data,
-            event=event,
-            note=note,
-        )
-        self.db.add(revision)
-        return revision
+    db: AsyncSession
 
     async def publish(self, page_id: int, note: str | None = None) -> Page:
         page = await self.get_page(page_id)
@@ -338,43 +205,3 @@ class PagesService:
         await self.db.refresh(page)
         return page
 
-    async def list_revisions(self, page_id: int) -> list[PageRevision]:
-        result = await self.db.execute(
-            select(PageRevision)
-            .where(PageRevision.page_id == page_id)
-            .order_by(PageRevision.id.desc())
-        )
-        return list(result.scalars().all())
-
-    async def get_revision(self, page_id: int, revision_id: int) -> PageRevision:
-        revision = await self.db.get(PageRevision, revision_id)
-        if revision is None or revision.page_id != page_id:
-            raise HTTPException(status_code=404, detail="Revision not found")
-        return revision
-
-    async def diff_revisions(self, page_id: int, before_id: int, after_id: int) -> dict:
-        """Block-level diff between two revisions of the same page.
-
-        Both revisions are validated to belong to ``page_id`` via
-        :meth:`get_revision`, so a cross-page id pair surfaces as a 404
-        rather than silently diffing across pages.
-        """
-        before = await self.get_revision(page_id, before_id)
-        after = await self.get_revision(page_id, after_id)
-        result = revision_diff(before, after)
-        result["before_id"] = before.id
-        result["after_id"] = after.id
-        return result
-
-    async def restore_revision(self, page_id: int, revision_id: int) -> Page:
-        """Copy a revision's payload into the page's draft (does not publish)."""
-        page = await self.get_page(page_id)
-        revision = await self.get_revision(page_id, revision_id)
-        page.title = revision.title
-        page.meta_description = revision.meta_description
-        page.og_image = revision.og_image
-        page.draft_data = revision.data
-        self.db.add(page)
-        await self.db.flush()
-        await self.db.refresh(page)
-        return page
