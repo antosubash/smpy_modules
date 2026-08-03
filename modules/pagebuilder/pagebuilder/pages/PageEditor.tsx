@@ -149,11 +149,18 @@ export default function PageEditor() {
           data={form.data}
           viewports={editorViewports}
           iframe={{ enabled: true }}
+          // Puck's header renders its own primary "Publish" alongside a copy of
+          // the page title. Its Publish was wired to a draft save, so the app
+          // showed two identical blue Publish buttons where the louder one did
+          // the quieter thing. Dropping headerActions leaves the toolbar above
+          // as the only publish control; the title, undo/redo and the sidebar
+          // toggles stay in Puck's header.
+          //
+          // Note for anyone auditing selectors: Puck renders that button as a
+          // <span>, not a <button>, so it never appeared in the accessibility
+          // tree and the e2e suite could not have caught this.
+          overrides={{ headerActions: () => null }}
           onChange={form.setData}
-          onPublish={(newData) => {
-            form.setData(newData);
-            void workflow.handleSave(newData);
-          }}
         />
       </div>
     </div>
