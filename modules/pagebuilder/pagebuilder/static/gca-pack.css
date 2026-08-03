@@ -1,0 +1,189 @@
+/* GCA (Global Canopy Atlas) design pack.
+ *
+ * Ported from IIASA.GeoWiki's packages/gca/src/gca.css. Scoped to `.gca-root`
+ * so it only applies where a page opts in — the base tokens in
+ * widgets-base.css govern everywhere else.
+ *
+ * The upstream file relies on the consuming app loading GCA's web fonts via a
+ * hoisted <link>; without them the display font falls back through the stack
+ * declared in --pb-display-font.
+ */
+.gca-root {
+	/* Brand palette */
+	--gca-ink: #1a353e; /* dark teal — dark surfaces, headings */
+	--gca-ink-2: #02444e;
+	--gca-ink-3: #003740;
+	--gca-teal: #468f8c;
+	--gca-green: #00a550; /* primary action green */
+	--gca-green-2: #00a94f;
+	--gca-green-light: #9dc288;
+	--gca-blue: #3f5387;
+	--gca-bg: #ffffff;
+	--gca-bg-muted: #f3f3f4;
+	--gca-lavender: #eeedff;
+	--gca-line: #e4e6e7;
+
+	/* Remap shadcn/design-system tokens within GCA scope so shared UI adopts
+	   the GCA look without touching other tenants. */
+	--background: #ffffff;
+	--foreground: #1a353e;
+	--primary: #00a550;
+	--primary-foreground: #ffffff;
+	--secondary: #1a353e;
+	--secondary-foreground: #ffffff;
+	--muted: #f3f3f4;
+	--muted-foreground: #5b6b6f;
+	--border: #e4e6e7;
+	--radius: 0.5rem;
+
+	/* Page-builder (Puck widget) theme tokens — GCA overrides of the Recodo
+	   defaults so the shared widgets render in the GCA style when used inside the
+	   GCA tenant. Per the Figma type tokens, GCA section headings (H2/H3/H4) are
+	   Plus Jakarta Sans *Light* (300); card/small titles (H8) are SemiBold (600);
+	   the page-hero title (H1 Accent) is SemiBold Italic. */
+	--pb-display-weight: 300;
+	--pb-card-title-weight: 600;
+	--pb-hero-title-weight: 600;
+	--pb-hero-title-style: italic;
+	--pb-display-tracking: 0;
+	--pb-display-font:
+		"Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+	--pb-body-color: #686873;
+	--pb-heading-color: #1a353e;
+	--pb-surface: #ffffff;
+	--pb-surface-muted: #f6f8f7;
+	/* Per the "🎨 GCA Design System" Buttons/Links page, GCA's action colour is
+	   the ink (#1a353e) with a teal hover — not green (SNAG_005). */
+	--pb-accent: #1a353e;
+	--pb-accent-foreground: #ffffff;
+
+	/* Type scale from the design-system Typography page (SNAG_004):
+	   H1 60 / H2 44 / H3 40, all Plus Jakarta Sans Light at 120% leading. */
+	--pb-heading-xl: clamp(2.5rem, 1.9rem + 2.6vw, 3.75rem);
+	--pb-heading-lg: clamp(2rem, 1.55rem + 1.9vw, 2.75rem);
+	--pb-heading-md: clamp(1.75rem, 1.45rem + 1.5vw, 2.5rem);
+	--pb-heading-leading: 1.2;
+
+	/* Text links ("View all →", "Learn more …"): ink, teal on hover, no
+	   underline — Button Link spec on the design-system Buttons page. */
+	--pb-link-color: #1a353e;
+	--pb-link-hover-color: #468f8c;
+	--pb-link-hover-decoration: none;
+	--pb-link-size: 1.125rem;
+	--pb-link-weight: 600;
+
+	/* Cards: H8 (22/SemiBold) titles, 16px body, white "Category tag" chips
+	   sitting on the image (SNAG_008/010/011). */
+	--pb-card-title-size: 1.375rem;
+	--pb-card-body-size: 1rem;
+	--pb-card-meta-size: 1rem;
+	--pb-card-tag-bg: rgb(255 255 255 / 0.92);
+	--pb-card-tag-color: #1a353e;
+	--pb-eyebrow-size: 1.125rem;
+
+	/* Buttons are pills: ink default, teal hover (SNAG_005). The primary-***
+	   remaps below retarget the shared CTAButton Tailwind palette. */
+	--pb-button-radius: 9999px;
+	--pb-button-weight: 600;
+	--pb-button-font-size: 1.0625rem;
+	--pb-button-font-size-md: 0.9375rem;
+	/* Full primary ramp remap so any widget step renders in the GCA ink/teal
+	   family (800 = primary ink, 900 = the teal hover per the Buttons spec;
+	   the rest interpolate so e.g. `bg-primary-700 hover:bg-primary-800` or a
+	   `from-primary-700 to-primary-900` gradient stays coherent). */
+	--color-primary-50: #eef4f3;
+	--color-primary-100: #d9e7e6;
+	--color-primary-200: #c0d8d6;
+	--color-primary-300: #9cc3c1;
+	--color-primary-400: #6fa7a5;
+	--color-primary-500: #468f8c;
+	--color-primary-600: #337074;
+	--color-primary-700: #25525c;
+	--color-primary-800: #1a353e;
+	--color-primary-900: #468f8c;
+	--color-primary-950: #0f2228;
+
+	/* Hero: the Figma hero has a barely-there scrim, not the stock 55% black
+	   (SNAG_018). */
+	--pb-hero-overlay: rgb(12 33 40 / 0.2);
+
+	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+	color: var(--gca-ink);
+	background: var(--gca-bg);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* SNAG_001: the GCA design frame is 1440px wide with 48px gutters (content
+   1344px) — wider than the shared Tailwind `container` cap (1280 at the lg/xl
+   breakpoints). Scope the wider container to GCA so every page-builder widget
+   and section block matches the Figma layout width without touching other
+   tenants. This file is imported unlayered, so it wins over the layered
+   Tailwind utilities — which is also why the :not() guard is required: without
+   it, this rule would defeat the narrower `max-w-3xl`-style caps that prose
+   widgets (Faq, EyebrowSection, …) put on their own containers. */
+.gca-root .container:not([class*="max-w-"]) {
+	max-width: 1440px;
+}
+@media (min-width: 1024px) {
+	.gca-root .container {
+		padding-inline: 3rem;
+	}
+}
+
+.gca-root h1,
+.gca-root h2,
+.gca-root h3,
+.gca-root h4,
+.gca-display {
+	font-family:
+		"Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+.gca-wordmark {
+	font-family: "Plus Jakarta Sans", sans-serif;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	line-height: 0.98;
+}
+
+/* SNAG_019: the partner logo strip is greyscale, spreads edge-to-edge across
+   the content width, has a larger spaced label and a bottom keyline. Scoped
+   over the shared LogoCloud widget via its data hook so other tenants keep the
+   default centered colour strip. The spread + larger logos only apply from xl
+   up (all 7 logos fit one row there) — below that the strip wraps, where
+   `space-between` would strand wrapped logos at opposite edges, so the
+   widget's own centered layout and h-10 logos read better. */
+.gca-root [data-pb-logo-strip] {
+	border-bottom: 1px solid #e4e6e7;
+	padding-block: 3.5rem;
+}
+.gca-root [data-pb-logo-strip] [data-pb-logo-label] {
+	font-size: 1rem;
+	letter-spacing: 0.18em;
+	color: #5b6b6f;
+	margin-bottom: 2.5rem;
+}
+.gca-root [data-pb-logo-strip] img {
+	filter: grayscale(1);
+	opacity: 0.75;
+}
+.gca-root [data-pb-logo-strip] img:hover {
+	opacity: 1;
+}
+@media (min-width: 1280px) {
+	.gca-root [data-pb-logo-strip] [data-pb-logo-row] {
+		justify-content: space-between;
+		gap: 2rem 2.5rem;
+	}
+	.gca-root [data-pb-logo-strip] img {
+		height: 3rem;
+	}
+}
+
+/* SNAG_010: "Data stories" tags sit top-right on GCA cards (white chip, ink
+   text — colours come from the --pb-card-tag-* tokens above). */
+.gca-root [data-pb-story-tag] {
+	left: auto;
+	right: 1rem;
+}

@@ -1,6 +1,14 @@
 @import "@simple-module-py/ui/styles/globals.css";
 @import "./modules.generated.css";
 
+/* Design tokens for the ported GCA widget set, then the GCA pack that
+ * overrides them under `.gca-root`. Imported by package specifier — the
+ * npm workspace symlinks modules/pagebuilder into node_modules. A
+ * wheel-installed host would need to import these from the installed
+ * package instead; gen-pages only emits @source entries, not @import. */
+@import "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css";
+@import "@simple-module-py/pagebuilder/pagebuilder/static/gca-pack.css";
+
 /* App-level source scanning — host code + workspace modules.
  * Wheel-installed modules are covered by modules.generated.css.
  *
