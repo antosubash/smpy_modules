@@ -1,0 +1,177 @@
+{
+  "root": {
+    "props": {}
+  },
+  "content": [
+    {
+      "type": "PageHeader",
+      "props": {
+        "id": "ph",
+        "eyebrow": "Newsroom",
+        "title": "News, events & data stories",
+        "description": "Updates, releases, field stories and insights from the Global Canopy Atlas project.",
+        "ctaLabel": "",
+        "ctaHref": ""
+      }
+    },
+    {
+      "type": "Tags",
+      "props": {
+        "id": "filter",
+        "label": "Filter news",
+        "items": [
+          {
+            "label": "All",
+            "href": "#",
+            "active": true
+          },
+          {
+            "label": "Data stories",
+            "href": "#",
+            "active": false
+          },
+          {
+            "label": "Updates",
+            "href": "#",
+            "active": false
+          },
+          {
+            "label": "Releases",
+            "href": "#",
+            "active": false
+          },
+          {
+            "label": "Events",
+            "href": "#",
+            "active": false
+          },
+          {
+            "label": "In the press",
+            "href": "#",
+            "active": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "ArticleCards",
+      "props": {
+        "id": "news",
+        "title": "",
+        "viewAllLabel": "",
+        "viewAllHref": "",
+        "columns": "4",
+        "items": [
+          {
+            "imageUrl": "/gca/images/biodiversity.jpg",
+            "imageAlt": "",
+            "eyebrow": "Data story",
+            "date": "Aug 5, 2025",
+            "title": "Mapping canopy height across European broadleaf forests",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/1"
+          },
+          {
+            "imageUrl": "/gca/images/collaboration.jpg",
+            "imageAlt": "",
+            "eyebrow": "Update",
+            "date": "Jul 22, 2025",
+            "title": "Field campaign: measuring biodiversity in Estonia",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/2"
+          },
+          {
+            "imageUrl": "/gca/images/forest-aerial-river.jpg",
+            "imageAlt": "",
+            "eyebrow": "Release",
+            "date": "Jun 30, 2025",
+            "title": "New release: open canopy layers for 12 countries",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/3"
+          },
+          {
+            "imageUrl": "/gca/images/canopy-aerial.jpg",
+            "imageAlt": "",
+            "eyebrow": "In the press",
+            "date": "Jun 02, 2025",
+            "title": "Why the world's forests need a shared 3D map",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/4"
+          },
+          {
+            "imageUrl": "/gca/images/canopy-up.jpg",
+            "imageAlt": "",
+            "eyebrow": "Data story",
+            "date": "May 18, 2025",
+            "title": "From point clouds to policy: the GCA pipeline",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/5"
+          },
+          {
+            "imageUrl": "/gca/images/atlas-map.jpg",
+            "imageAlt": "",
+            "eyebrow": "Insight",
+            "date": "May 03, 2025",
+            "title": "Standardising airborne LiDAR across biomes",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/6"
+          },
+          {
+            "imageUrl": "/gca/images/biodiversity.jpg",
+            "imageAlt": "",
+            "eyebrow": "Update",
+            "date": "Apr 21, 2025",
+            "title": "Inside a multi-temporal canopy scan",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/7"
+          },
+          {
+            "imageUrl": "/gca/images/collaboration.jpg",
+            "imageAlt": "",
+            "eyebrow": "Data story",
+            "date": "Apr 09, 2025",
+            "title": "Open science and the future of forest monitoring",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/8"
+          },
+          {
+            "imageUrl": "/gca/images/forest-aerial-river.jpg",
+            "imageAlt": "",
+            "eyebrow": "Release",
+            "date": "Mar 27, 2025",
+            "title": "Canopy structure as a proxy for biodiversity",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/9"
+          },
+          {
+            "imageUrl": "/gca/images/canopy-aerial.jpg",
+            "imageAlt": "",
+            "eyebrow": "Event",
+            "date": "Mar 12, 2025",
+            "title": "GCA at the Living Planet Symposium",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/10"
+          },
+          {
+            "imageUrl": "/gca/images/canopy-up.jpg",
+            "imageAlt": "",
+            "eyebrow": "Update",
+            "date": "Feb 28, 2025",
+            "title": "New collaborators join the canopy atlas",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/11"
+          },
+          {
+            "imageUrl": "/gca/images/atlas-map.jpg",
+            "imageAlt": "",
+            "eyebrow": "Data story",
+            "date": "Feb 14, 2025",
+            "title": "Tracking disturbance with repeat LiDAR",
+            "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
+            "href": "/gca/news/12"
+          }
+        ]
+      }
+    }
+  ]
+}

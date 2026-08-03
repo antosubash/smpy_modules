@@ -52,7 +52,8 @@ export const TagsWidget: ComponentConfig<TagsWidgetProps> = {
       <nav aria-label={label || 'Tags'} className="container mx-auto px-4 py-4 sm:px-6 lg:px-8">
         <ul className="flex flex-wrap gap-2">
           {items.map((tag, idx) => (
-            <li key={tag.label || tag.href || `tag-${idx}`}>
+            // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+            <li key={idx}>
               <a
                 href={tag.href || '#'}
                 aria-current={tag.active ? 'page' : undefined}

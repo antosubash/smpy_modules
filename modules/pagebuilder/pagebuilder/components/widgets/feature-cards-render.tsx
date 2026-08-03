@@ -109,7 +109,8 @@ export const FeatureCardsWidgetRender = ({
               const colored = Boolean(item.cardBg);
               return (
                 <a
-                  key={item.href || item.title || `feature-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   href={item.href || '#'}
                   className={
                     colored

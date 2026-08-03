@@ -77,7 +77,8 @@ export function StatsView({ title, subtitle, items, surface }: StatsWidgetProps)
           <dl className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((stat, idx) => (
               <div
-                key={stat.label || stat.value || `stat-${idx}`}
+                // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                key={idx}
                 className="relative flex min-h-[142px] flex-col justify-center rounded-[12px] border border-[var(--border,#dcdcdf)] bg-[var(--pb-surface,#ffffff)] px-6 py-5"
               >
                 {stat.iconUrl && (
@@ -115,7 +116,8 @@ export function StatsView({ title, subtitle, items, surface }: StatsWidgetProps)
             <dl className="flex flex-col justify-center sm:flex-row sm:flex-wrap lg:flex-nowrap">
               {items.map((stat, idx) => (
                 <div
-                  key={stat.label || stat.value || `stat-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   className={cn(
                     'flex flex-1 flex-col px-4 py-4 sm:px-6',
                     idx > 0 ? 'sm:border-l sm:border-[#1a353e]/20' : '',
@@ -166,7 +168,8 @@ export function StatsView({ title, subtitle, items, surface }: StatsWidgetProps)
         >
           {items.map((stat, idx) => (
             <div
-              key={stat.label || stat.value || `stat-${idx}`}
+              // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+              key={idx}
               className="flex flex-col items-center"
             >
               {stat.iconUrl && (

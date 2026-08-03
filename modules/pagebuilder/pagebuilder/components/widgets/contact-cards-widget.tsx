@@ -98,7 +98,8 @@ export const ContactCardsWidget: ComponentConfig<ContactCardsWidgetProps> = {
             team ? (
               // Image-top team card: rectangular media (dark placeholder with a
               // person glyph when no photo), left-aligned name + affiliation.
-              <div key={item.name || item.email || `contact-${idx}`}>
+              // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+              <div key={idx}>
                 {item.imageUrl ? (
                   <img
                     src={item.imageUrl}
@@ -125,7 +126,8 @@ export const ContactCardsWidget: ComponentConfig<ContactCardsWidgetProps> = {
               </div>
             ) : (
               <div
-                key={item.name || item.email || `contact-card-${idx}`}
+                // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                key={idx}
                 className="rounded-lg border bg-white dark:bg-gray-900 p-6 text-center shadow-sm"
               >
                 {item.imageUrl ? (

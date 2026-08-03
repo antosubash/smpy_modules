@@ -136,7 +136,8 @@ export const ArticleCardsWidget: ComponentConfig<ArticleCardsWidgetProps> = {
           // with `allowLinks: false` — a nested <a> is invalid HTML and
           // browsers split the card link in two.
           <a
-            key={item.href || item.title || `article-${idx}`}
+            // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+            key={idx}
             href={item.href || '#'}
             className="group block"
           >

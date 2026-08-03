@@ -107,7 +107,8 @@ export function MediaObjectText({
           {bullets
             .filter((b) => b.title || b.body)
             .map((point, i) => (
-              <li key={point.title || point.body || `bullet-${i}`} className="flex gap-3">
+              // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+              <li key={i} className="flex gap-3">
                 {bulletMarker === 'square' && (
                   <span
                     aria-hidden="true"
@@ -187,7 +188,8 @@ export function MediaObjectText({
             .filter((l) => l.src)
             .map((logo, i) => (
               <img
-                key={logo.src || `logo-${i}`}
+                // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                key={i}
                 src={logo.src}
                 alt={logo.alt}
                 className="h-12 w-auto object-contain"

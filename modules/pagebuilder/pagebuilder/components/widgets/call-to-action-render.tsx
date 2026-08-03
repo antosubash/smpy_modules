@@ -4,6 +4,12 @@
 import type { CSSProperties } from 'react';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { CTAButton, Heading, Section } from './_shared';
+import {
+  BAND_SHELL,
+  DISPLAY_STYLE,
+  LIME_HEADING_STYLE,
+  SOFT_HEADING_STYLE,
+} from './call-to-action-styles';
 
 export type CtaLink = { label: string; href: string };
 export type CtaImage = { src: string; alt: string; caption: string };
@@ -27,31 +33,6 @@ export type CallToActionWidgetProps = {
   links: CtaLink[];
   images: CtaImage[];
 };
-
-const DISPLAY_STYLE: CSSProperties = {
-  fontWeight: 'var(--pb-display-weight)' as CSSProperties['fontWeight'],
-  letterSpacing: 'var(--pb-display-tracking)',
-  fontFamily: 'var(--pb-display-font)',
-};
-
-// Hoisted band-heading styles (constant tokens only). The fallback clamps
-// reproduce the prior `text-2xl sm:text-3xl lg:text-4xl` responsive steps:
-// 24px on phones, 30px at 640px, 36px at 1024px.
-const SOFT_HEADING_STYLE: CSSProperties = {
-  ...DISPLAY_STYLE,
-  color: '#1a353e',
-  fontSize: 'var(--pb-heading-lg, clamp(1.5rem, 1.25rem + 1.5625vw, 2.25rem))',
-};
-
-const LIME_HEADING_STYLE: CSSProperties = {
-  ...DISPLAY_STYLE,
-  color: '#1a353e',
-  fontSize: 'var(--pb-heading-xl, clamp(1.5rem, 1.25rem + 1.5625vw, 2.25rem))',
-};
-
-// Inset bands (lime / soft) share one shell so they line up with every other
-// contained section at the same content width across breakpoints.
-const BAND_SHELL = 'container mx-auto px-4 py-12 sm:px-6 lg:px-8';
 
 export const CallToActionWidgetRender = ({
   surface,
@@ -106,7 +87,8 @@ export const CallToActionWidgetRender = ({
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
               {links.map((link, idx) => (
                 <a
-                  key={link.href || link.label || `cta-link-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   href={link.href || '#'}
                   className="text-sm font-semibold underline-offset-4 hover:underline"
                   style={{ color: 'var(--pb-surface-contrast, #ffffff)' }}
@@ -160,7 +142,8 @@ export const CallToActionWidgetRender = ({
             <ul className="self-center">
               {links.map((link, idx) => (
                 <li
-                  key={link.href || link.label || `cta-row-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   className="border-t border-[#1a353e]/15 last:border-b"
                 >
                   <a
@@ -208,7 +191,8 @@ export const CallToActionWidgetRender = ({
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-10 gap-y-3">
               {links.map((link, idx) => (
                 <a
-                  key={link.href || link.label || `cta-pill-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   href={link.href || '#'}
                   className="text-[17px] font-semibold text-[#1a353e] transition-colors hover:text-[#468f8c]"
                 >
@@ -255,7 +239,8 @@ export const CallToActionWidgetRender = ({
             <div className="grid grid-cols-3 gap-4">
               {images.map((img, idx) => (
                 <div
-                  key={img.src || img.alt || `cta-img-${idx}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+                  key={idx}
                   className="relative aspect-square overflow-hidden rounded-lg bg-[#1a353e]/10"
                 >
                   {img.src && (

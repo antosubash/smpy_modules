@@ -67,7 +67,8 @@ export const LogoCloudWidget: ComponentConfig<LogoCloudWidgetProps> = {
             }
           >
             {items?.map((logo, idx) => (
-              <LogoCloudItem key={logo.src || logo.alt || `logo-${idx}`} logo={logo} />
+              // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+              <LogoCloudItem key={idx} logo={logo} />
             ))}
           </div>
         </EyebrowSplitSection>
@@ -94,7 +95,8 @@ export const LogoCloudWidget: ComponentConfig<LogoCloudWidgetProps> = {
           className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6"
         >
           {items?.map((logo, idx) => (
-            <LogoCloudItem key={logo.src || logo.alt || `logo-${idx}`} logo={logo} />
+            // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
+            <LogoCloudItem key={idx} logo={logo} />
           ))}
         </div>
       </section>

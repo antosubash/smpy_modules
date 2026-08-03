@@ -1,0 +1,108 @@
+{
+  "root": {
+    "props": {}
+  },
+  "content": [
+    {
+      "type": "PageHeader",
+      "props": {
+        "id": "ph",
+        "eyebrow": "Legal",
+        "title": "Privacy notice",
+        "description": "How the Global Canopy Atlas collects, uses and protects your information.",
+        "ctaLabel": "",
+        "ctaHref": ""
+      }
+    },
+    {
+      "type": "Heading",
+      "props": {
+        "id": "h0",
+        "text": "1. Introduction",
+        "level": "3",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Text",
+      "props": {
+        "id": "t0",
+        "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+        "size": "base",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Heading",
+      "props": {
+        "id": "h1",
+        "text": "2. Use of the Global Canopy Atlas",
+        "level": "3",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Text",
+      "props": {
+        "id": "t1",
+        "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+        "size": "base",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Heading",
+      "props": {
+        "id": "h2",
+        "text": "3. Data and licensing",
+        "level": "3",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Text",
+      "props": {
+        "id": "t2",
+        "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+        "size": "base",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Heading",
+      "props": {
+        "id": "h3",
+        "text": "4. Liability",
+        "level": "3",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Text",
+      "props": {
+        "id": "t3",
+        "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+        "size": "base",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Heading",
+      "props": {
+        "id": "h4",
+        "text": "5. Changes to this notice",
+        "level": "3",
+        "align": "left"
+      }
+    },
+    {
+      "type": "Text",
+      "props": {
+        "id": "t4",
+        "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
+        "size": "base",
+        "align": "left"
+      }
+    }
+  ]
+}
