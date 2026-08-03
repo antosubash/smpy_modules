@@ -1,0 +1,36 @@
+[project]
+name = "simple_module_pagebuilder"
+version = "0.1.0"
+description = "Drag-and-drop visual page builder for SimpleModule hosts"
+requires-python = ">=3.12"
+dependencies = [
+    # Ranges, not exact pins: an `==` here would make this module
+    # uninstallable in any host running a newer framework build.
+    "simple_module_core>=0.0.25,<0.1",
+    "simple_module_db>=0.0.25,<0.1",
+    "simple_module_hosting>=0.0.25,<0.1",
+    "pydantic-settings>=2.0",
+    "sqlalchemy>=2.0",
+    "sqlmodel>=0.0.21",
+    "Pillow>=10.0",
+]
+
+[project.entry-points.simple_module]
+pagebuilder = "pagebuilder.module:PagebuilderModule"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.25,<0.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pagebuilder"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"pagebuilder/static/dist" = "pagebuilder/static/dist"
+"package.json" = "pagebuilder/package.json"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

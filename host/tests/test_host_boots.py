@@ -32,3 +32,16 @@ def test_core_modules_registered(app):
 def test_openapi_schema_generates(app):
     schema = app.openapi()
     assert schema["openapi"].startswith("3.")
+
+
+def test_pagebuilder_registered(app):
+    assert "PageBuilder" in _module_names(app)
+
+
+def test_pagebuilder_routes_mounted(app):
+    # Read the OpenAPI schema rather than walking app.routes: since FastAPI
+    # 0.141 an included router is wrapped in a single _IncludedRouter with no
+    # `path`, so app.routes exposes nothing for it.
+    paths = set(app.openapi()["paths"])
+    assert "/api/pagebuilder/pages" in paths
+    assert "/pagebuilder/media" in paths

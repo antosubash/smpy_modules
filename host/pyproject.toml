@@ -9,11 +9,16 @@ dependencies = [
     "simple_module_users==0.0.25",
     "simple_module_dashboard==0.0.25",
     "simple_module_permissions==0.0.25",
+    "simple_module_pagebuilder",
 ]
 
 # Host is an application, not a distributable package.
 [tool.uv]
 package = false
+
+# In-repo modules resolve from the workspace, not PyPI.
+[tool.uv.sources.simple_module_pagebuilder]
+workspace = true
 
 [dependency-groups]
 dev = [
