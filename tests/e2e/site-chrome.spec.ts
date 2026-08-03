@@ -74,7 +74,7 @@ async function publishPage(page: Page): Promise<string> {
       title: 'Chrome',
       slug,
       draft_data: {
-        root: { props: { title: 'Chrome', width: 'full', designPack: 'gca' } },
+        root: { props: { title: 'Chrome', width: 'full' } },
         content: [
           { type: 'Heading', props: { id: 'h', text: 'Page body', level: 'h1', align: 'left' } },
         ],
@@ -102,6 +102,10 @@ test.describe('Site header and footer', () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     await login(page);
+    // The pack is site-wide now, so the "pack reaches the chrome" spec below
+    // needs branding to have selected one.
+    await page.goto('/branding/');
+    await page.request.put('/api/branding/', { data: { design_pack: 'gca' } });
     publicPath = await publishPage(page);
     await page.close();
   });

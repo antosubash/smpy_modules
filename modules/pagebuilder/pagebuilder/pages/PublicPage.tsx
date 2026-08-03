@@ -1,6 +1,7 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { type Data, Render } from '@measured/puck';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
+import type { SharedProps } from '@simple-module-py/ui/types';
 
 import { layoutPuckConfig } from '../components/layoutPuckConfig';
 import { puckConfig } from '../components/puckConfig';
@@ -47,14 +48,17 @@ export default function PublicPage({
   layout_footer,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
-  // The design pack is declared per page, but its CSS is scoped to a root
-  // class that the *page* root renders — i.e. inside <main>. The header and
-  // footer sit outside it, so without hoisting the class here the site chrome
-  // would fall back to the base tokens and read as a different site.
-  const designPack = (data?.root as { props?: { designPack?: string } } | undefined)?.props
-    ?.designPack;
+  // The design pack is a site-wide branding setting: one site, one look. Its
+  // CSS is scoped to a root class, applied here around the *whole* document so
+  // the header and footer adopt it too — a class on the page root alone would
+  // stop at <main> and leave the chrome reading as a different site.
+  //
+  // `designPack` is not on the published SharedProps type yet; the cast goes
+  // away when the framework release carrying it lands.
+  const { branding } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
+  const designPack = (branding as unknown as { designPack?: string | null })?.designPack;
   return (
-    <div className={designPack && designPack !== 'base' ? `${designPack}-root` : undefined}>
+    <div className={designPack ? `${designPack}-root` : undefined}>
       {/* The admin shell mounts this through AuthenticatedLayout; a public page
           has no layout, so without it the configured brand colour and favicon
           stopped at the sign-in wall. The widgets' `--pb-accent` and their

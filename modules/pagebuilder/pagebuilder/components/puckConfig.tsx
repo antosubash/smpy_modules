@@ -37,11 +37,6 @@ export interface PageRootProps {
    * and nesting them in a 4xl column crushes them.
    */
   width: 'contained' | 'full';
-  /**
-   * Adds the design pack's root class. The pack's CSS is scoped to it, so a
-   * page opts in rather than the tokens applying site-wide.
-   */
-  designPack: 'base' | 'gca';
 }
 
 type WidgetProps<T extends { render: (props: never) => unknown }> = Parameters<T['render']>[0];
@@ -80,26 +75,14 @@ export const puckConfig: Config<PuckComponents, PageRootProps> = {
           { label: 'Full width', value: 'full' },
         ],
       },
-      designPack: {
-        type: 'radio',
-        options: [
-          { label: 'Base', value: 'base' },
-          { label: 'Canopy Atlas', value: 'gca' },
-        ],
-      },
     },
-    defaultProps: { title: 'Untitled page', width: 'contained', designPack: 'base' },
-    render: ({ children, width, designPack }) => (
-      <div
-        className={[
-          width === 'full' ? '' : 'max-w-4xl mx-auto p-6',
-          designPack === 'gca' ? 'gca-root' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {children}
-      </div>
+    // The design pack used to be a root prop here. It is a site-wide branding
+    // setting now — one site, one look — so PublicPage applies its root class
+    // around the whole document instead, which is also what lets the header
+    // and footer adopt it.
+    defaultProps: { title: 'Untitled page', width: 'contained' },
+    render: ({ children, width }) => (
+      <div className={width === 'full' ? undefined : 'max-w-4xl mx-auto p-6'}>{children}</div>
     ),
   },
   categories: {
@@ -148,7 +131,7 @@ export const puckConfig: Config<PuckComponents, PageRootProps> = {
 
 export const emptyData = {
   content: [],
-  root: { props: { title: 'Untitled page', width: 'contained', designPack: 'base' } },
+  root: { props: { title: 'Untitled page', width: 'contained' } },
 };
 
 /**

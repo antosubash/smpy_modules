@@ -102,7 +102,7 @@ test.describe('Ported GCA widgets', () => {
         title: 'Widget coverage',
         slug,
         draft_data: {
-          root: { props: { title: 'Widget coverage', width: 'full', designPack: 'gca' } },
+          root: { props: { title: 'Widget coverage', width: 'full' } },
           content,
           zones: {},
         },
@@ -128,13 +128,11 @@ test.describe('Ported GCA widgets', () => {
     await expect(page.getByText('Does the accordion render?')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Topics' })).toBeVisible();
 
-    // The design pack is opt-in per page and drives the whole GCA look. Two
-    // roots, not one: the page root renders its own (which is what the *editor*
-    // preview sees), and PublicPage hoists a second one around the whole
-    // document so the header and footer get the pack too. Nesting them is
-    // harmless — the tokens are identical — and the page body is inside both.
-    await expect(page.locator('.gca-root')).toHaveCount(2);
-    await expect(page.locator('main .gca-root')).toHaveCount(1);
+    // Exactly one root: the pack is a site-wide branding setting, so
+    // PublicPage wraps the whole document and the page root renders none of
+    // its own. The body is inside it.
+    await expect(page.locator('.gca-root')).toHaveCount(1);
+    await expect(page.locator('.gca-root main')).toHaveCount(1);
   });
 
   test('the FAQ accordion opens', async ({ page }) => {
@@ -147,7 +145,7 @@ test.describe('Ported GCA widgets', () => {
         title: 'FAQ behaviour',
         slug,
         draft_data: {
-          root: { props: { title: 'FAQ behaviour', width: 'full', designPack: 'gca' } },
+          root: { props: { title: 'FAQ behaviour', width: 'full' } },
           content: [
             {
               type: 'Faq',

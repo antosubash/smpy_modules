@@ -160,7 +160,10 @@ test.describe('Image block + media picker', () => {
     //    attribute we care about and the browser actually loaded a
     //    variant (currentSrc points at a `.webp`).
     await page.goto(`/p/${slug}`);
-    const img = page.locator('img');
+    // Scoped to <main>: a bare `img` locator also matches the site layout's
+    // header logo, footer logo and partner strip, which every published page
+    // carries once a layout is seeded.
+    const img = page.locator('main img');
     await expect(img).toBeVisible();
     await expect(img).toHaveAttribute('loading', 'lazy');
     await expect(img).toHaveAttribute('decoding', 'async');

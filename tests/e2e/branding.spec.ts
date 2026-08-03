@@ -58,7 +58,7 @@ async function seedGcaPage(page: Page): Promise<string> {
       title: 'Branding',
       slug,
       draft_data: {
-        root: { props: { title: 'Branding', width: 'full', designPack: 'gca' } },
+        root: { props: { title: 'Branding', width: 'full' } },
         content: [
           {
             type: 'EyebrowSection',
@@ -99,6 +99,10 @@ test.describe('Branding drives the widget tokens', () => {
       headers: { Accept: 'application/json' },
     });
     original = (await current.json()).primary_color ?? '';
+    // The pack is site-wide now, so a page no longer carries it — these specs
+    // read tokens off `.gca-root`, which only exists once branding selects it.
+    await page.goto('/branding/');
+    await page.request.put('/api/branding/', { data: { design_pack: 'gca' } });
     publicPath = await seedGcaPage(page);
     await page.close();
   });
