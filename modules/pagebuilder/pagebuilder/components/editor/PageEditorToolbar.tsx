@@ -73,19 +73,22 @@ export function PageEditorToolbar({
       <Button variant="link" size="sm" onClick={() => router.visit('/pagebuilder')}>
         ← All pages
       </Button>
+      {/* Explicit widths, not min-w: Input's base class list carries `w-full`,
+          which would stretch these across the row and wrap the toolbar onto
+          three lines. cn()'s tailwind-merge resolves w-64/w-52 over w-full. */}
       <Input
         type="text"
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
         placeholder="Page title"
-        className="h-8 min-w-[16rem] text-sm font-medium"
+        className="h-8 w-64 shrink-0 text-sm font-medium"
       />
       <Input
         type="text"
         value={effectiveSlug}
         onChange={(e) => onSlugChange(slugify(e.target.value))}
         placeholder="slug"
-        className="h-8 min-w-[12rem] font-mono text-sm"
+        className="h-8 w-52 shrink-0 font-mono text-sm"
       />
       <StatusBadge status={status} />
       <ScheduledBadge status={status} publishAt={publishAt} unpublishAt={unpublishAt} />
