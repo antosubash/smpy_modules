@@ -75,19 +75,42 @@ artifacts = ["orders/static/dist/**"]
 artifacts = ["orders/static/dist/**"]
 ```
 
-## 4. Write its README
+## 4. Wire it into the UI and the auth layer
+
+Two hooks are easy to forget because nothing fails loudly without them:
+
+**`register_menu_items`** — without it the module boots and its routes work,
+but nothing links to them. Note that menu role filtering is a plain
+intersection with no admin bypass: listing roles hides the entry from an
+`admin` user unless `"admin"` is among them. Leave `roles` empty when the
+views are auth-gated rather than permission-gated.
+
+**`register_public_routes`** — `AuthMiddleware` gates *every* request. Any
+route meant for anonymous visitors (a public viewer, sitemap, robots, a
+webhook) must be exempted here or it 302s to the login page. Two traps:
+
+- Rules match with `startswith`, so terminate directory prefixes with `/`.
+  A bare `/p` also matches `/pagebuilder/` — that hands your whole admin UI
+  to anonymous visitors.
+- Pin the methods (`{"GET", "HEAD"}`) so the exemption can't widen later.
+
+Playwright specs run authenticated and will not catch a missing exemption.
+Assert on the registry directly — see
+`modules/pagebuilder/tests/test_public_routes.py`.
+
+## 5. Write its README
 
 `scripts/check_readmes.py` requires an H1, at least 500 bytes, and the words
 "Install" and "Usage". Cover what the module does, installation, its settings
 and permissions, and its routes.
 
-## 5. Register its tests
+## 6. Register its tests
 
 Add `modules/orders/tests` to `testpaths` in the root `pyproject.toml`.
 `make test-py` discovers `modules/*/tests` automatically, but `testpaths`
 keeps a bare `uv run pytest` honest.
 
-## 6. Add it to CI and the release matrix
+## 7. Add it to CI and the release matrix
 
 In `.github/workflows/ci.yml`, add a pytest step:
 
@@ -105,7 +128,7 @@ In `.github/workflows/release.yml`, add it to the `publish-pypi` matrix —
           - simple_module_orders
 ```
 
-## 7. Install and migrate
+## 8. Install and migrate
 
 ```bash
 make install
@@ -125,14 +148,14 @@ nothing — and apply it:
 make migrate
 ```
 
-## 8. One-time PyPI setup
+## 9. One-time PyPI setup
 
 Before the first release, create the project on
 <https://pypi.org/manage/account/publishing/> with the field values in the
 header comment of `.github/workflows/release.yml`. No API token is needed;
 publishing uses OIDC trusted publishing.
 
-## 9. Verify
+## 10. Verify
 
 ```bash
 make lint

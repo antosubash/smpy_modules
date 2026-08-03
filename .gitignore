@@ -28,6 +28,7 @@ host/*.db
 # Playwright
 playwright-report/
 test-results/
+.playwright-mcp/
 
 # macOS
 .DS_Store

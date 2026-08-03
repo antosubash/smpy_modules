@@ -13,11 +13,32 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 from simple_module_core import ModuleBase, ModuleMeta
+from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.public_routes import PublicRouteRegistry
 
 from pagebuilder.settings import PagebuilderSettings
 
 _scheduler_log = logging.getLogger("simple_module.pagebuilder.scheduler")
+
+# Sidebar entries. Grouped under "Content" so an app that installs several
+# content modules clusters them together rather than scattering them.
+_MENU_GROUP = "Content"
+_URL_PAGES = "/pagebuilder/"
+_URL_LAYOUT = "/pagebuilder/layout"
+_URL_MEDIA = "/pagebuilder/media"
+_ICON_PAGES = "file-text"
+_ICON_LAYOUT = "layout"
+_ICON_MEDIA = "image"
+
+
+def _dir_prefix(prefix: str) -> str:
+    """Normalise a route prefix to end in exactly one "/".
+
+    Public-route rules match with ``str.startswith``, so an unterminated
+    prefix leaks into sibling paths that merely share its first characters.
+    """
+    return f"{prefix.rstrip('/')}/"
 
 # Read from installed package metadata so pyproject.toml is the single source
 # of truth. The lockstep release bump edits pyproject only; a hardcoded string
@@ -50,6 +71,69 @@ class PagebuilderModule(ModuleBase):
         if self.settings is None:
             self.settings = PagebuilderSettings()
         return self.settings
+
+    def register_public_routes(self, registry: PublicRouteRegistry) -> None:
+        """Exempt the reader-facing surface from authentication.
+
+        Without this the whole point of the module is defeated: ``AuthMiddleware``
+        gates every request, so a published page, the sitemap, and robots.txt all
+        302 an anonymous visitor to the login screen.
+
+        GET/HEAD only — the admin API lives under a different prefix, but pinning
+        the verbs keeps the exemption from widening if a future route adds a POST
+        under one of these paths.
+        """
+        settings = self._resolved_settings()
+        read_only = {"GET", "HEAD"}
+        # Trailing slash is load-bearing. These are startswith() prefixes, so a
+        # bare "/p" would also exempt "/pagebuilder/" — the entire admin surface.
+        registry.add_prefix(_dir_prefix(settings.public_route_prefix), methods=read_only)
+        # Published pages reference uploaded images; without this the page
+        # renders for an anonymous visitor but every image 302s to login.
+        registry.add_prefix(_dir_prefix(settings.media_url_prefix), methods=read_only)
+        if settings.sitemap_enabled:
+            registry.add_exact("/sitemap.xml", methods=read_only)
+        if settings.robots_enabled:
+            registry.add_exact("/robots.txt", methods=read_only)
+
+    def register_menu_items(self, registry: MenuRegistry) -> None:
+        """Contribute the admin surface to the host's sidebar.
+
+        Deliberately not role-gated. Menu role filtering is a plain
+        intersection with no admin bypass, so listing the pagebuilder roles
+        here would hide the entries from an ``admin`` user. It would also
+        misrepresent the gating: these views require authentication only —
+        it's the write endpoints that carry per-permission dependencies — so
+        every authenticated user can reach them.
+        """
+        registry.add_many(
+            [
+                MenuItem(
+                    label="Pages",
+                    url=_URL_PAGES,
+                    icon=_ICON_PAGES,
+                    order=200,
+                    section=MenuSection.SIDEBAR,
+                    group=_MENU_GROUP,
+                ),
+                MenuItem(
+                    label="Site layout",
+                    url=_URL_LAYOUT,
+                    icon=_ICON_LAYOUT,
+                    order=210,
+                    section=MenuSection.SIDEBAR,
+                    group=_MENU_GROUP,
+                ),
+                MenuItem(
+                    label="Media library",
+                    url=_URL_MEDIA,
+                    icon=_ICON_MEDIA,
+                    order=220,
+                    section=MenuSection.SIDEBAR,
+                    group=_MENU_GROUP,
+                ),
+            ]
+        )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from pagebuilder.endpoints.api import router as api
