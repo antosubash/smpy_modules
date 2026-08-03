@@ -4,7 +4,7 @@ import { router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useState } from 'react';
 
-import { emptyLayoutData, layoutPuckConfig } from '../components/layoutPuckConfig';
+import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import {
   type LayoutDetail,
   type LayoutRevisionRead,
@@ -73,11 +73,11 @@ export default function LayoutEditor() {
           and the preview would show the framework's default action colour
           while the published page shows the configured one.
 
-          Known gap: this preview still renders outside any design-pack root,
-          because the layout is site-wide while the pack is chosen per page —
-          there's no one right pack to preview against. Pack-level overrides
-          (GCA pins its solid surfaces to the exact brand colour rather than
-          the derived ramp step) therefore show slightly off here. */}
+          Known gap: this preview renders outside the design-pack root, so the
+          pack's token overrides don't apply here — GCA pins its solid surfaces
+          to the exact brand colour, while this preview shows the derived ramp
+          step. Applying the class here would need the pack name threaded from
+          the branding shared prop into both Puck instances. */}
       <BrandingHead />
       <div className="border-b bg-white px-4 py-2 flex items-center gap-3 flex-wrap">
         <button
@@ -149,7 +149,7 @@ export default function LayoutEditor() {
           </div>
           <div className="flex-1 min-h-0">
             <Puck
-              config={layoutPuckConfig}
+              config={getLayoutPuckConfig()}
               data={headerData}
               iframe={{ enabled: false }}
               onChange={setHeaderData}
@@ -166,7 +166,7 @@ export default function LayoutEditor() {
           </div>
           <div className="flex-1 min-h-0">
             <Puck
-              config={layoutPuckConfig}
+              config={getLayoutPuckConfig()}
               data={footerData}
               iframe={{ enabled: false }}
               onChange={setFooterData}

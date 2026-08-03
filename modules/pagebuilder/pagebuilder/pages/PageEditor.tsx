@@ -8,7 +8,7 @@ import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
 import { SchedulePanel } from '../components/editor/SchedulePanel';
 import { SeoSettingsPanel } from '../components/editor/SeoSettingsPanel';
-import { editorViewports, emptyData, puckConfig } from '../components/puckConfig';
+import { editorViewports, emptyData, getPuckConfig } from '../components/puckConfig';
 import { useAutosave } from '../hooks/useAutosave';
 import { useEditorForm } from '../hooks/useEditorForm';
 import { usePageRevisions } from '../hooks/usePageRevisions';
@@ -151,7 +151,7 @@ export default function PageEditor() {
 
       <div className="flex-1 min-h-0">
         <Puck
-          config={puckConfig}
+          config={getPuckConfig()}
           data={form.data}
           viewports={editorViewports}
           iframe={{ enabled: true }}

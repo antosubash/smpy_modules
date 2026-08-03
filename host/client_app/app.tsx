@@ -1,3 +1,5 @@
+// First: registers every module's Puck blocks before the first render.
+import './blocks';
 import { createInertiaApp, router } from '@inertiajs/react';
 import { configureI18n, updateI18n } from '@simple-module-py/i18n';
 import { createRoot } from 'react-dom/client';

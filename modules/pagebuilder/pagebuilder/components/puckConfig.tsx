@@ -7,6 +7,13 @@
 
 import type { Config } from '@measured/puck';
 
+import {
+  type BlockRegistration,
+  declareBuiltInBlocks,
+  registeredBlocks,
+  registryVersion,
+} from './blockRegistry';
+
 import { ButtonBlock } from './blocks/Button';
 import { ColumnsBlock } from './blocks/Columns';
 import { HeadingBlock } from './blocks/Heading';
@@ -64,7 +71,7 @@ type PuckComponents = {
   Divider: WidgetProps<typeof DividerWidget>;
 };
 
-export const puckConfig: Config<PuckComponents, PageRootProps> = {
+export const basePageConfig: Config<PuckComponents, PageRootProps> = {
   root: {
     fields: {
       title: { type: 'text' },
@@ -128,6 +135,54 @@ export const puckConfig: Config<PuckComponents, PageRootProps> = {
     Divider: DividerWidget,
   } as unknown as Config<PuckComponents, PageRootProps>['components'],
 };
+
+// Names pagebuilder itself ships. Declared rather than duplicated in the
+// registry so there is only one list to keep in sync, and so a module that
+// tries to register one of these fails loudly instead of shadowing it.
+declareBuiltInBlocks(Object.keys(basePageConfig.components));
+
+/** Merge a registration's blocks and category into an accumulating config. */
+function applyRegistration(
+  components: Record<string, unknown>,
+  categories: Record<string, { title?: string; components: string[] }>,
+  registration: BlockRegistration,
+): void {
+  Object.assign(components, registration.blocks);
+  if (!registration.category) return;
+  const { key, title } = registration.category;
+  categories[key] = {
+    title,
+    components: [...(categories[key]?.components ?? []), ...Object.keys(registration.blocks)],
+  };
+}
+
+let cachedConfig: Config<PuckComponents, PageRootProps> | null = null;
+let cachedVersion = -1;
+
+/**
+ * The page palette: pagebuilder's own blocks plus whatever modules registered.
+ *
+ * Memoised on the registry version rather than unconditionally — caching on
+ * first call would silently drop any block registered after the first render.
+ * Call it inside a component, never at module scope.
+ */
+export function getPuckConfig(): Config<PuckComponents, PageRootProps> {
+  if (cachedConfig && cachedVersion === registryVersion()) return cachedConfig;
+  const components: Record<string, unknown> = { ...basePageConfig.components };
+  const categories = { ...basePageConfig.categories } as Record<
+    string,
+    { title?: string; components: string[] }
+  >;
+  for (const registration of registeredBlocks()) {
+    applyRegistration(components, categories, registration);
+  }
+  cachedConfig = { ...basePageConfig, categories, components } as Config<
+    PuckComponents,
+    PageRootProps
+  >;
+  cachedVersion = registryVersion();
+  return cachedConfig;
+}
 
 export const emptyData = {
   content: [],

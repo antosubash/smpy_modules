@@ -54,7 +54,11 @@ test-py:
 	  if [ -d "$$d/tests" ]; then echo "--- pytest $$d"; (cd "$$d" && uv run pytest) || exit 1; fi \
 	done
 
+# Unit tests for module frontend code, from the repo root — vitest.config.ts
+# includes modules/**/*.test.ts(x). The e2e suite covers browser behaviour;
+# this covers logic a browser test can only reach indirectly.
 test-js:
+	npx vitest run
 	npm run --workspace host/client_app test --if-present
 
 e2e:

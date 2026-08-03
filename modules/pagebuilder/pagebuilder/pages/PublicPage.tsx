@@ -3,8 +3,8 @@ import { type Data, Render } from '@measured/puck';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import type { SharedProps } from '@simple-module-py/ui/types';
 
-import { layoutPuckConfig } from '../components/layoutPuckConfig';
-import { puckConfig } from '../components/puckConfig';
+import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
+import { getPuckConfig } from '../components/puckConfig';
 
 interface Props {
   title: string;
@@ -97,15 +97,15 @@ export default function PublicPage({
       </Head>
       {layout_header && (
         <header data-testid="site-header">
-          <Render config={layoutPuckConfig} data={layout_header as unknown as Data} />
+          <Render config={getLayoutPuckConfig()} data={layout_header as unknown as Data} />
         </header>
       )}
       <main>
-        <Render config={puckConfig} data={data as unknown as Data} />
+        <Render config={getPuckConfig()} data={data as unknown as Data} />
       </main>
       {layout_footer && (
         <footer data-testid="site-footer">
-          <Render config={layoutPuckConfig} data={layout_footer as unknown as Data} />
+          <Render config={getLayoutPuckConfig()} data={layout_footer as unknown as Data} />
         </footer>
       )}
     </div>
