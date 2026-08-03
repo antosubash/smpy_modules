@@ -1,6 +1,8 @@
 /** Top toolbar: title/slug inputs, status badges, and workflow actions. */
 
 import { router } from '@inertiajs/react';
+import { Button } from '@simple-module-py/ui/components/ui/button';
+import { Input } from '@simple-module-py/ui/components/ui/input';
 
 import type { PageDetail } from '../../utils/api';
 import { formatSaveLabel, type SaveState } from '../../utils/editorSnapshot';
@@ -59,40 +61,37 @@ export function PageEditorToolbar({
   onApprove,
   onReject,
 }: Props) {
+  const saveStateClass =
+    saveState === 'error'
+      ? 'text-xs text-destructive'
+      : isDirty
+        ? 'text-xs text-amber-700'
+        : 'text-xs text-muted-foreground';
+
   return (
-    <div className="border-b bg-white px-4 py-2 flex items-center gap-3 flex-wrap">
-      <button
-        type="button"
-        onClick={() => router.visit('/pagebuilder')}
-        className="text-gray-600 hover:underline text-sm"
-      >
+    <div className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
+      <Button variant="link" size="sm" onClick={() => router.visit('/pagebuilder')}>
         ← All pages
-      </button>
-      <input
+      </Button>
+      <Input
         type="text"
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
         placeholder="Page title"
-        className="border rounded px-2 py-1 text-sm font-medium min-w-[16rem]"
+        className="h-8 min-w-[16rem] text-sm font-medium"
       />
-      <input
+      <Input
         type="text"
         value={effectiveSlug}
         onChange={(e) => onSlugChange(slugify(e.target.value))}
         placeholder="slug"
-        className="border rounded px-2 py-1 text-sm font-mono min-w-[12rem]"
+        className="h-8 min-w-[12rem] font-mono text-sm"
       />
       <StatusBadge status={status} />
       <ScheduledBadge status={status} publishAt={publishAt} unpublishAt={unpublishAt} />
       {pageId !== null && (
         <span
-          className={
-            saveState === 'error'
-              ? 'text-xs text-red-600'
-              : isDirty
-                ? 'text-xs text-amber-700'
-                : 'text-xs text-gray-500'
-          }
+          className={saveStateClass}
           data-testid="autosave-status"
           title={autosaveError ?? undefined}
         >
@@ -100,89 +99,68 @@ export function PageEditorToolbar({
         </span>
       )}
       <div className="ml-auto flex gap-2">
-        <button
-          type="button"
-          onClick={onToggleSettings}
-          className="px-3 py-1 text-sm rounded border hover:bg-gray-50"
-        >
+        <Button variant="outline" size="sm" onClick={onToggleSettings}>
           SEO
-        </button>
-        <button
-          type="button"
-          onClick={onToggleHistory}
-          disabled={pageId === null}
-          className="px-3 py-1 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="outline" size="sm" disabled={pageId === null} onClick={onToggleHistory}>
           History ({revisionCount})
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onSave}
-          className="px-3 py-1 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy} onClick={onSave}>
           Save draft
-        </button>
+        </Button>
         {status === 'published' && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onUnpublish}
-            className="px-3 py-1 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
-          >
+          <Button variant="outline" size="sm" disabled={busy} onClick={onUnpublish}>
             Unpublish
-          </button>
+          </Button>
         )}
         {status === 'draft' && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-amber-500 text-amber-700 hover:bg-amber-50"
             disabled={busy || pageId === null}
             onClick={onSubmitForReview}
-            className="px-3 py-1 text-sm rounded border border-amber-500 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
             Submit for review
-          </button>
+          </Button>
         )}
         {status === 'submitted_for_review' && (
           <>
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive text-destructive hover:bg-destructive/10"
               disabled={busy}
               onClick={onReject}
-              className="px-3 py-1 text-sm rounded border border-red-500 text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
               Reject
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="sm"
+              className="bg-green-600 text-white hover:bg-green-700"
               disabled={busy}
               onClick={onApprove}
-              className="px-3 py-1 text-sm rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
               Approve
-            </button>
+            </Button>
           </>
         )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onPublish}
-          className="px-3 py-1 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-        >
+        <Button size="sm" disabled={busy} onClick={onPublish}>
           Publish
-        </button>
+        </Button>
+        {/* Stays an <a>: the e2e selects it with getByRole('link', {name: /^view$/i}). */}
         {status === 'published' && pageId !== null && (
           <a
             href={`/p/${effectiveSlug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3 py-1 text-sm rounded border hover:bg-gray-50"
+            className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"
           >
             View
           </a>
         )}
       </div>
-      {message && <span className="w-full text-sm text-gray-600 mt-1">{message}</span>}
+      {message && <span className="mt-1 w-full text-sm text-muted-foreground">{message}</span>}
     </div>
   );
 }

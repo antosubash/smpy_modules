@@ -1,5 +1,7 @@
 /** Folder navigation and the upload-target folder input. */
 
+import { Input } from '@simple-module-py/ui/components/ui/input';
+
 interface FolderItemProps {
   label: string;
   active: boolean;
@@ -74,14 +76,14 @@ export function MediaFolderSidebar({
         >
           Upload to folder
         </label>
-        <input
+        <Input
           id="media-upload-folder"
           type="text"
           value={uploadFolder}
           onChange={(e) => onUploadFolderChange(e.target.value)}
           list="pagebuilder-folder-suggestions"
           placeholder="e.g. marketing/heros"
-          className="w-full px-2 py-1.5 border rounded text-sm"
+          className="w-full"
         />
         <datalist id="pagebuilder-folder-suggestions">
           {folderOptions.map((name) => (

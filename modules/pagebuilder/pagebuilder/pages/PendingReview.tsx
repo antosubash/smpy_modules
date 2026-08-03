@@ -1,5 +1,14 @@
 import { router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { Button } from '@simple-module-py/ui/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
 import { useState } from 'react';
@@ -52,68 +61,65 @@ export default function PendingReview() {
       title="Pending review"
       description="Pages submitted for approval."
       actions={
-        <button
-          type="button"
-          onClick={() => router.visit('/pagebuilder')}
-          className="px-4 py-2 rounded border hover:bg-gray-50 font-medium"
-        >
+        <Button variant="outline" onClick={() => router.visit('/pagebuilder')}>
           ← All pages
-        </button>
+        </Button>
       }
     >
-      {message && <p className="mb-4 text-sm text-red-700">{message}</p>}
+      {message && <p className="mb-4 text-sm text-destructive">{message}</p>}
 
       {pages.items.length === 0 ? (
-        <div className="text-gray-500 border border-dashed rounded p-8 text-center">
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           No pages are awaiting review.
         </div>
       ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b text-left text-sm text-gray-600">
-              <th className="py-2 pr-4">Title</th>
-              <th className="py-2 pr-4">Slug</th>
-              <th className="py-2 pr-4">Submitted</th>
-              <th className="py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Slug</TableHead>
+              <TableHead>Submitted</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {pages.items.map((p) => (
-              <tr key={p.id} className="border-b hover:bg-gray-50">
-                <td className="py-3 pr-4 font-medium">{p.title}</td>
-                <td className="py-3 pr-4 text-gray-600 font-mono text-sm">{p.slug}</td>
-                <td className="py-3 pr-4 text-sm text-gray-600">
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.title}</TableCell>
+                <TableCell className="font-mono text-sm text-muted-foreground">{p.slug}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
                   {p.updated_at ? new Date(p.updated_at).toLocaleString() : '—'}
-                </td>
-                <td className="py-3 text-right space-x-3">
-                  <button
-                    type="button"
+                </TableCell>
+                <TableCell className="space-x-1 text-right">
+                  <Button
+                    variant="link"
+                    size="sm"
                     onClick={() => router.visit(`/pagebuilder/${p.id}/edit`)}
-                    className="text-blue-600 hover:underline text-sm"
                   >
                     Review
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
                     disabled={busy === p.id}
                     onClick={() => handleApprove(p.id)}
-                    className="text-green-700 hover:underline text-sm disabled:opacity-50"
                   >
                     Approve
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-destructive"
                     disabled={busy === p.id}
                     onClick={() => handleReject(p.id)}
-                    className="text-red-600 hover:underline text-sm disabled:opacity-50"
                   >
                     Reject
-                  </button>
-                </td>
-              </tr>
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </PageShell>
   );

@@ -5,6 +5,7 @@
  */
 
 import { router } from '@inertiajs/react';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import type { ChangeEvent, RefObject } from 'react';
 
 interface Props {
@@ -15,16 +16,12 @@ interface Props {
 export function MediaHeader({ fileInputRef, onFilesSelected }: Props) {
   return (
     <>
-      <button
-        type="button"
-        onClick={() => router.visit('/pagebuilder')}
-        className="px-4 py-2 rounded border hover:bg-gray-50 font-medium"
-      >
+      <Button variant="outline" onClick={() => router.visit('/pagebuilder')}>
         ← Pages
-      </button>
+      </Button>
       {/* Stays a <label> wrapping the input: that pairing is what makes the
           hidden file input clickable, and a <button> cannot wrap it. */}
-      <label className="px-4 py-2 rounded font-medium cursor-pointer text-white bg-blue-600 hover:bg-blue-700">
+      <label className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90">
         Upload
         <input
           ref={fileInputRef}
