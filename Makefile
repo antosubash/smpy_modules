@@ -86,14 +86,22 @@ env:
 	  p.write_text(p.read_text().replace('replace-me-with-a-generated-secret', secrets.token_urlsafe(32)))" && \
 	  echo ".env created with a generated SM_SECRET_KEY")
 
+# First-party modules the host installs from PyPI that also live in the
+# framework repo. Linking core/db/hosting alone is not enough when the work
+# spans one of these — the host would keep running the released build and the
+# change would look like it had no effect.
+FRAMEWORK_MODULES ?= branding
+
 # Develop against an unreleased framework checkout.
 #   make link-framework FRAMEWORK=/Volumes/ext1/GitHub/simple_module_python
+# Override the module list with e.g. FRAMEWORK_MODULES="branding users".
 link-framework:
 	@test -n "$(FRAMEWORK)" || (echo 'Usage: make link-framework FRAMEWORK=/path/to/simple_module_python' && exit 1)
 	uv pip install -e $(FRAMEWORK)/framework/core \
 	               -e $(FRAMEWORK)/framework/db \
-	               -e $(FRAMEWORK)/framework/hosting
-	@echo "Framework linked. Run 'make unlink-framework' to restore PyPI versions."
+	               -e $(FRAMEWORK)/framework/hosting \
+	               $(foreach m,$(FRAMEWORK_MODULES),-e $(FRAMEWORK)/modules/$(m))
+	@echo "Framework linked ($(FRAMEWORK_MODULES)). Run 'make unlink-framework' to restore PyPI versions."
 
 unlink-framework:
 	uv sync --all-packages --all-extras --reinstall
