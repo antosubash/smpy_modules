@@ -36,6 +36,9 @@ export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
   render: ({ columns, gap }) => (
     <div className={`flex flex-wrap ${gapClass[gap]} my-4`}>
       {columns.map((col, idx) => (
+        // The index IS the column's identity — the DropZone name below is
+        // derived from it, so reordering moves the zone's contents regardless.
+        // biome-ignore lint/suspicious/noArrayIndexKey: index is the column's identity
         <div key={idx} style={{ flex: col.width }} className="min-w-0">
           <DropZone zone={`col-${idx}`} />
         </div>

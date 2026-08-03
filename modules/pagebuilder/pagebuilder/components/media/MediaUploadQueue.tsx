@@ -18,6 +18,9 @@ export function MediaDropzone({
   onDrop,
 }: DropzoneProps) {
   return (
+    // A drag-and-drop target has no interactive ARIA role that fits. The
+    // keyboard-accessible path to the same action is the header Upload button.
+    // biome-ignore lint/a11y/noStaticElementInteractions: drop target; keyboard path is the Upload button
     <div
       onDragOver={(e) => {
         e.preventDefault();

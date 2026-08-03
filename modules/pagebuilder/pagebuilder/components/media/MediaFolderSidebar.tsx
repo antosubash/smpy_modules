@@ -68,8 +68,14 @@ export function MediaFolderSidebar({
         </ul>
       </div>
       <div>
-        <label className="block text-sm font-semibold text-gray-600 mb-1">Upload to folder</label>
+        <label
+          htmlFor="media-upload-folder"
+          className="block text-sm font-semibold text-gray-600 mb-1"
+        >
+          Upload to folder
+        </label>
         <input
+          id="media-upload-folder"
           type="text"
           value={uploadFolder}
           onChange={(e) => onUploadFolderChange(e.target.value)}

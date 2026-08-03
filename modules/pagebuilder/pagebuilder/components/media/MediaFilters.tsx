@@ -19,8 +19,11 @@ export function MediaFilters({ filters, onChange }: Props) {
   return (
     <div className="flex flex-wrap gap-3 items-end mb-4">
       <div className="flex-1 min-w-[200px]">
-        <label className="block text-xs text-gray-500 mb-1">Search</label>
+        <label htmlFor="media-filter-search" className="block text-xs text-gray-500 mb-1">
+          Search
+        </label>
         <input
+          id="media-filter-search"
           type="search"
           value={filters.search}
           onChange={(e) => onChange((f) => ({ ...f, search: e.target.value }))}
@@ -29,8 +32,11 @@ export function MediaFilters({ filters, onChange }: Props) {
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Type</label>
+        <label htmlFor="media-filter-type" className="block text-xs text-gray-500 mb-1">
+          Type
+        </label>
         <select
+          id="media-filter-type"
           value={filters.contentType}
           onChange={(e) => onChange((f) => ({ ...f, contentType: e.target.value }))}
           className="px-2 py-2 border rounded text-sm"
@@ -43,8 +49,11 @@ export function MediaFilters({ filters, onChange }: Props) {
         </select>
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Min KB</label>
+        <label htmlFor="media-filter-min-kb" className="block text-xs text-gray-500 mb-1">
+          Min KB
+        </label>
         <input
+          id="media-filter-min-kb"
           type="number"
           inputMode="numeric"
           min={0}
@@ -54,8 +63,11 @@ export function MediaFilters({ filters, onChange }: Props) {
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Max KB</label>
+        <label htmlFor="media-filter-max-kb" className="block text-xs text-gray-500 mb-1">
+          Max KB
+        </label>
         <input
+          id="media-filter-max-kb"
           type="number"
           inputMode="numeric"
           min={0}

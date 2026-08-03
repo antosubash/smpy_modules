@@ -70,6 +70,10 @@ export default function PublicPage({
         {canonical_url && <link rel="canonical" href={canonical_url} />}
         {!index_in_search && <meta name="robots" content="noindex,nofollow" />}
         {jsonLdScript && (
+          // Emitting author-composed JSON-LD is the feature. The content is
+          // written by permission-holding editors and served under the CSP in
+          // PagebuilderSettings.public_csp.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: author-composed JSON-LD is the feature
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
         )}
       </Head>

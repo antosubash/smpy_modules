@@ -38,9 +38,11 @@ export function useAutosave({
 }: Params): Autosave {
   // Memoize the stringify — Puck ``data`` can be hundreds of KB on a
   // populated page, and the component re-renders on every keystroke.
+  // Depending on the `snapshotPayload` object itself would defeat the memo —
+  // the caller rebuilds it every render. The fields listed are its full contents.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: listed fields are the object's full contents
   const currentSnapshot = useMemo(
     () => snapshotKey(snapshotPayload),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       snapshotPayload.title,
       snapshotPayload.slug,
@@ -53,9 +55,10 @@ export function useAutosave({
     ],
   );
 
-  // Inertia remounts on a different page id, which is the right time for
-  // a fresh baseline — so this is computed once per mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Intentionally mount-only. Inertia remounts the editor on a different page
+  // id, which is exactly when a fresh baseline is wanted; recomputing on prop
+  // identity would reset the dirty state mid-edit.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only baseline is deliberate
   const baseline = useMemo(() => snapshotKey(initialSnapshot), []);
 
   const [savedSnapshot, setSavedSnapshot] = useState<string>(baseline);
@@ -81,6 +84,10 @@ export function useAutosave({
   // New (unsaved) pages opt out: the first save creates the row and
   // redirects, which can't sensibly happen on a background timer.
   const autosaveInFlight = useRef(false);
+  // `data` and `writePayload` are read inside the timeout, not at effect setup.
+  // Adding them would re-arm the debounce on every keystroke and the save would
+  // never fire; `currentSnapshot` already changes whenever they do.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are read in the timeout, not at setup
   useEffect(() => {
     if (pageId === null) return;
     if (!isDirty) return;

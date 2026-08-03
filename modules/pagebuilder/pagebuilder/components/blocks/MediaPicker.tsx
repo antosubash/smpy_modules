@@ -101,6 +101,9 @@ function MediaPickerModal({
   }, [onClose]);
 
   return (
+    // Click-outside is a mouse affordance only. The keyboard path is the
+    // Escape handler registered above, plus the labelled Close button inside.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Escape and the Close button are the keyboard paths
     <div
       role="dialog"
       aria-modal="true"
@@ -108,6 +111,10 @@ function MediaPickerModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
+      {/* Not an interactive element — the handler only stops the backdrop's
+          click-to-close from firing when the click lands inside the dialog. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: only stops backdrop click-through */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops backdrop click-through */}
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}

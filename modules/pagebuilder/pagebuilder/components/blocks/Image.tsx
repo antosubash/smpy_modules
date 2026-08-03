@@ -1,6 +1,11 @@
 import type { ComponentConfig } from '@measured/puck';
 
-import { buildSrcset, DEFAULT_IMAGE_SIZES, lookupAsset } from '../../utils/api';
+import {
+  buildSrcset,
+  DEFAULT_IMAGE_SIZES,
+  lookupAsset,
+  type MediaAssetRead,
+} from '../../utils/api';
 import { MediaPicker } from './MediaPicker';
 
 type AltKind = 'meaningful' | 'decorative';
@@ -69,7 +74,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
   },
   resolveData: async ({ props }, { changed }) => {
     if (!changed.src || !props.src) return { props };
-    let asset;
+    let asset: MediaAssetRead | undefined;
     try {
       asset = await lookupAsset(props.src);
     } catch {
