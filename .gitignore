@@ -22,6 +22,9 @@ host/client_app/modules.generated.css
 # Local databases
 host/*.db
 
+# Runtime upload storage (PagebuilderSettings.media_root)
+var/
+
 # Env
 .env
 

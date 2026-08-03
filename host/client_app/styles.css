@@ -1,10 +1,16 @@
 @import "@simple-module-py/ui/styles/globals.css";
 @import "./modules.generated.css";
 
-/* App-level source scanning — host code + workspace module pages.
- * Wheel-installed modules are covered by modules.generated.css. */
+/* App-level source scanning — host code + workspace modules.
+ * Wheel-installed modules are covered by modules.generated.css.
+ *
+ * The module glob deliberately covers the whole package, not just pages/.
+ * Puck blocks, shared components and hooks all carry Tailwind classes, and
+ * scanning pages/ alone meant a class only reached the bundle when some
+ * other scanned file happened to use it too — so e.g. the Heading block's
+ * text-5xl silently never applied. */
 @source "./**/*.{ts,tsx}";
-@source "../../modules/*/*/pages/**/*.{ts,tsx}";
+@source "../../modules/*/*/**/*.{ts,tsx}";
 
 body {
   margin: 0;
