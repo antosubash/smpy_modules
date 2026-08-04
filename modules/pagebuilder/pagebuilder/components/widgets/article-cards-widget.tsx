@@ -1,7 +1,7 @@
 /** ArticleCards widget: field definitions and config assembly.
  *  Types and the grid itself live in article-cards-render.tsx. */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { ArticleCardsGrid, type ArticleCardsWidgetProps } from './article-cards-render';

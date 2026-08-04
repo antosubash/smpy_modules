@@ -5,7 +5,7 @@
  * blocks, so the strip is composed in rather than duplicated here.
  */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 

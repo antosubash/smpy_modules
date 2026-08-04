@@ -47,6 +47,19 @@ async function createPageWithImage(page: Page, title: string, slug: string): Pro
 }
 
 /**
+ * Select a block so the inspector renders its fields.
+ *
+ * Puck 0.21 put the outline behind a left-hand navigation rail, so the block
+ * palette and the outline no longer render at the same time. Clicking a block
+ * name without switching first lands on the palette entry of the same name,
+ * which selects nothing and leaves the inspector showing the page root.
+ */
+async function selectBlockFromOutline(page: Page, name: string): Promise<void> {
+  await page.getByRole('navigation').getByText('Outline', { exact: true }).click();
+  await page.getByRole('button', { name }).last().click();
+}
+
+/**
  * Wipe every page + media asset before each test so flakiness from a
  * previously-failed run doesn't cascade.
  */
@@ -119,9 +132,9 @@ test.describe('Image block + media picker', () => {
     // 3) Open the editor and select the Image from the outline so the
     //    inspector renders the custom picker field.
     await page.goto(`/pagebuilder/${pageId}/edit`);
-    await page.getByRole('button', { name: 'Image' }).last().click();
+    await selectBlockFromOutline(page, 'Image');
 
-    const srcInput = page.getByPlaceholder('Pick from library or paste a URL');
+    const srcInput = page.getByRole('textbox', { name: 'Pick from library or paste a URL' });
     await expect(srcInput).toBeVisible();
     await expect(srcInput).toHaveValue('');
     // Derived fields are empty before the pick.
@@ -193,12 +206,12 @@ test.describe('Image block + media picker', () => {
     const pageId = await createPageWithImage(page, `Manual page ${slug}`, slug);
 
     await page.goto(`/pagebuilder/${pageId}/edit`);
-    await page.getByRole('button', { name: 'Image' }).last().click();
+    await selectBlockFromOutline(page, 'Image');
 
     // Type an arbitrary external URL — picker should respect it and
     // `resolveData` must NOT clobber siblings since the URL doesn't
     // match a /media/pagebuilder/ asset.
-    const srcInput = page.getByPlaceholder('Pick from library or paste a URL');
+    const srcInput = page.getByRole('textbox', { name: 'Pick from library or paste a URL' });
     await srcInput.fill('https://example.com/external.png');
     // Blur to commit the value into Puck state.
     await page.getByRole('textbox', { name: 'alt' }).click();

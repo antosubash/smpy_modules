@@ -1,7 +1,7 @@
 /** Contact form widget: field definitions and config assembly.
  *  Types and render live in contact-form-render.tsx. */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { ContactFormRender, type ContactFormWidgetProps } from './contact-form-render';
 

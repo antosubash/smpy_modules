@@ -1,4 +1,4 @@
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';

@@ -1,7 +1,6 @@
 {
   "extends": "@simple-module-py/tsconfig/base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./canopy_atlas/*"],
       "@simple-module-py/ui/*": ["../../packages/ui/src/*"]

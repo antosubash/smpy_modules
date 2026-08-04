@@ -1,7 +1,7 @@
 /** MediaObjectWidget: field definitions and config assembly.
  *  Types, helpers and render live in media-object-render.tsx. */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 

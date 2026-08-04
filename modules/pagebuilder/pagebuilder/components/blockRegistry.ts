@@ -11,7 +11,7 @@
  * which is what guarantees the registry is populated before the first render.
  */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 // Puck's ComponentConfig is invariant in its props, so a registry that holds
 // configs for unrelated prop shapes cannot be typed precisely. The runtime

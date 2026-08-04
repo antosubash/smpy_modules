@@ -27,7 +27,7 @@ function findNodeModulesRoot(start: string): string {
   }
   return start;
 }
-const fsRoot = findNodeModulesRoot(__dirname);
+const fsRoot = findNodeModulesRoot(import.meta.dirname);
 
 // Load the module pages manifest written by the Python host at boot.
 // Each entry points at an absolute pages/ directory — typically inside a
@@ -43,7 +43,7 @@ const fsRoot = findNodeModulesRoot(__dirname);
 // pre-bundler never sees those bare specifiers and Node module resolution
 // walks up from inside .venv/site-packages — never reaching
 // host/client_app/node_modules.
-const manifestPath = path.resolve(__dirname, 'modules.manifest.json');
+const manifestPath = path.resolve(import.meta.dirname, 'modules.manifest.json');
 const moduleFsAllow: string[] = [];
 const moduleOptimizeEntries: string[] = [];
 const modulePkgJsonPaths: string[] = [];
@@ -110,7 +110,7 @@ function collectOptimizeIncludes(): string[] {
     'use-sync-external-store/shim/with-selector',
   ]);
   const visited = new Set<string>();
-  const queue: string[] = [path.join(__dirname, 'package.json'), ...modulePkgJsonPaths];
+  const queue: string[] = [path.join(import.meta.dirname, 'package.json'), ...modulePkgJsonPaths];
   while (queue.length > 0) {
     const pkgJsonPath = queue.shift();
     if (!pkgJsonPath || visited.has(pkgJsonPath)) continue;
@@ -137,7 +137,7 @@ function collectOptimizeIncludes(): string[] {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  root: __dirname,
+  root: import.meta.dirname,
   resolve: {
     dedupe: [...REACT_CORE_DEPS, '@simple-module-py/ui', '@simple-module-py/i18n'],
   },
@@ -149,7 +149,7 @@ export default defineConfig({
     outDir: '../static/dist',
     manifest: true,
     rollupOptions: {
-      input: path.resolve(__dirname, 'main.tsx'),
+      input: path.resolve(import.meta.dirname, 'main.tsx'),
     },
   },
   server: {

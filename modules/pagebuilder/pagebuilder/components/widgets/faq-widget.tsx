@@ -1,7 +1,7 @@
 /** FAQ widget: field definitions and config assembly.
  *  Types, styles and render live in faq-render.tsx. */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 
 import { FaqRender, type FaqWidgetProps } from './faq-render';
 

@@ -16,9 +16,10 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.11",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^22.0.0",
-    "vitest": "^3.2.7"
+    "@biomejs/biome": "^2.5.7",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
