@@ -104,9 +104,14 @@ test.describe('Design pack comes from branding', () => {
   test('the branding page offers the installed packs', async ({ page }) => {
     await login(page);
     await page.goto('/branding/');
-    const select = page.locator('#design_pack');
-    await expect(select).toBeVisible();
-    // canopy_atlas registers this one; the empty option is the base look.
-    await expect(select.locator('option')).toHaveText([/None/, 'Canopy Atlas']);
+    const trigger = page.locator('#design_pack');
+    await expect(trigger).toBeVisible();
+    // Branding uses the Radix select, as every other admin dropdown in the
+    // framework does (`native-select` ships in the UI kit but nothing uses
+    // it). So the choices are `role="option"` items in a portalled listbox,
+    // not `<option>` children of the trigger — they only exist once it opens.
+    await trigger.click();
+    // canopy_atlas registers this one; the "None" entry is the base look.
+    await expect(page.getByRole('option')).toHaveText([/None/, 'Canopy Atlas']);
   });
 });
