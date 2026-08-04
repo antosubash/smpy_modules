@@ -1,0 +1,57 @@
+/* Base design tokens for the ported GCA widget set.
+ *
+ * The widgets read these through var(), so a site changes their whole look
+ * by overriding the tokens rather than by editing widget classes. A design
+ * pack (e.g. gca.css) layers over this.
+ */
+
+:root {
+	/* Page-builder (Puck widget) theme tokens — Recodo defaults. Tenants that
+	   need a different look (e.g. GCA in .gca-root) override these so the same
+	   widgets render per-tenant via the `style` property instead of hardcoded
+	   classes. */
+	--pb-display-weight: 300;
+	--pb-display-tracking: -0.025em;
+	--pb-display-font: var(--font-sans);
+	--pb-body-color: var(--muted-foreground);
+	--pb-heading-color: var(--foreground);
+	--pb-surface: var(--card);
+	--pb-surface-muted: var(--muted);
+	--pb-accent: var(--primary);
+	--pb-accent-foreground: var(--primary-foreground);
+	/* Text color on colored band surfaces (MediaObject/Faq/CallToAction
+	   surfaceColor, FeatureCards cardBg). */
+	--pb-surface-contrast: #ffffff;
+	/* CTA/Button pill shape + trailing arrow. `0.375rem` = the prior `rounded-md`;
+	   arrow is off by default (tenants set `inline-block` to reveal "→"). */
+	--pb-button-radius: 0.375rem;
+	--pb-button-arrow-display: none;
+	/* Section-eyebrow case/tracking is deliberately NOT defaulted here.
+	   `--pb-eyebrow-transform`/`--pb-eyebrow-tracking` are read only through
+	   `var(…, <fallback>)` in the widgets, and a var() fallback is skipped
+	   entirely once the property is set — so declaring `none`/`normal` globally
+	   made every call site's own fallback unreachable. That silently flattened
+	   the one call site whose previous literal was `uppercase tracking-wide`
+	   (Timeline "blobs"). The values here were byte-identical to
+	   EYEBROW_CASE_STYLE's fallbacks in _shared/mask.ts, so removing them
+	   changes nothing for the sentence-case eyebrows and lets each call site
+	   state its own prior literal. Tenants still override via their design pack. */
+	/* Hero geometry (consumed by the Hero/PageHeader widgets). */
+	--pb-hero-min-h: 560px;
+	--pb-hero-logo-max-h: 14rem;
+	--pb-hero-pull: 0px;
+}
+
+/* The public page wraps the layout's header slot in its own <header>, whose
+   box is exactly as tall as the header block inside it — so `position: sticky`
+   on that block would have no distance to travel and silently do nothing. The
+   SiteHeader widget therefore marks itself and the *wrapper* takes the sticky
+   positioning. Scoped by the attribute so a header built from plain blocks, or
+   one with "stick to the top" switched off, still scrolls away normally. */
+/* Descendant, not child: Puck's <Render> wraps every block in its own div, so
+   the widget is a grandchild of the slot wrapper, never a direct child. */
+header:has([data-pb-site-header="sticky"]) {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+}

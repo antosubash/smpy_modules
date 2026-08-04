@@ -1,0 +1,41 @@
+[project]
+name = "simple-module-python-modules"
+version = "0.1.0"
+description = "Distributable modules for simple_module_python applications"
+requires-python = ">=3.12"
+dependencies = []
+
+# Workspace root: not built or installed itself.
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["host", "modules/*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.8",
+    "tomlkit>=0.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Alembic writes these; reformatting machine-generated DDL to satisfy a
+# line-length rule adds churn to every migration for no benefit.
+extend-exclude = ["host/migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "C4", "RET", "PTH", "PIE", "RUF"]
+ignore = [
+    "B008",   # Depends() in default args is idiomatic FastAPI
+    "B027",   # Empty methods in ABC without @abstractmethod — optional hooks
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["host/tests", "modules/pagebuilder/tests", "scripts/tests"]
+addopts = "--durations=20"

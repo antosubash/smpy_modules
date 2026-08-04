@@ -1,0 +1,126 @@
+{
+  "root": {
+    "props": {}
+  },
+  "content": [
+    {
+      "type": "PageHeader",
+      "props": {
+        "id": "ph",
+        "eyebrow": "",
+        "title": "How to use the GCA interactive data map",
+        "description": "Nunc tristique turpis justo, nec semper mi volutpat id. Quisque at magna id ipsum malesuada sodales sit amet ut ipsum. Morbi sodales tincidunt volutpat. Etiam purus nisl, ornare in ipsum a, iaculis sollicitudin velit. Nulla ut erat non augue rhoncus a mi.",
+        "align": "left",
+        "ctaLabel": "",
+        "ctaHref": ""
+      }
+    },
+    {
+      "type": "EyebrowSection",
+      "props": {
+        "id": "es1",
+        "eyebrow": "",
+        "heading": "The Global Canopy Atlas interactive map",
+        "body": "Morbi quis interdum augue. Nullam bibendum scelerisque urna sed suscipit. Etiam vel erat vel lacus dictum lobortis. Nunc ac nisi finibus, ornare mi quis, euismod eros. Mauris ullamcorper interdum eros. Sed pellentesque bibendum orci, ut eleifend urna dictum non. In ac finibus ante, in vehicula purus."
+      }
+    },
+    {
+      "type": "EyebrowSection",
+      "props": {
+        "id": "es2",
+        "eyebrow": "",
+        "heading": "Step 1 — Lorem ipsum dolorem sit amat",
+        "body": "Morbi quis interdum augue. Nullam bibendum scelerisque urna sed suscipit. Etiam vel erat vel lacus dictum lobortis. Nunc ac nisi finibus, ornare mi quis, euismod eros. Mauris ullamcorper interdum eros. Sed pellentesque bibendum orci, ut eleifend urna dictum non. In ac finibus ante, in vehicula purus."
+      }
+    },
+    {
+      "type": "Image",
+      "props": {
+        "id": "img1",
+        "src": "/gca/images/atlas-map.jpg",
+        "alt": "The Global Canopy Atlas interactive map",
+        "caption": "Image caption goes here, if CMS field is populated",
+        "rounded": "xl",
+        "maxWidth": "4xl"
+      }
+    },
+    {
+      "type": "EyebrowSection",
+      "props": {
+        "id": "es3",
+        "eyebrow": "",
+        "heading": "Step 2 — Lorem ipsum dolorem sit amat",
+        "body": "Mauris a purus tempus, pharetra ligula vitae, mollis justo. Pellentesque commodo posuere tempus. Maecenas lorem dui, pretium quis faucibus vitae, fringilla a mauris. In pharetra eu metus eget semper. Donec molestie cursus ipsum ut imperdiet. Integer cursus faucibus sem sed pellentesque. Nulla eleifend massa pretium, accumsan nibh aliquam, placerat erat."
+      }
+    },
+    {
+      "type": "Image",
+      "props": {
+        "id": "img2",
+        "src": "/gca/images/canopy-aerial.jpg",
+        "alt": "Exploring a site in the atlas",
+        "caption": "Image caption goes here, if CMS field is populated",
+        "rounded": "xl",
+        "maxWidth": "4xl"
+      }
+    },
+    {
+      "type": "EyebrowSection",
+      "props": {
+        "id": "es4",
+        "eyebrow": "",
+        "heading": "",
+        "body": "Nam quis mauris ut justo aliquet bibendum. Sed a tincidunt mauris. Donec placerat nisi sed laoreet maximus. Maecenas ultricies orci quis augue imperdiet dictum. Donec sollicitudin eleifend est ac commodo. Sed semper mollis lorem vel mollis. Mauris lorem diam, varius nec rutrum sed, rhoncus eget tortor."
+      }
+    },
+    {
+      "type": "Divider",
+      "props": {
+        "id": "div"
+      }
+    },
+    {
+      "type": "EyebrowSection",
+      "props": {
+        "id": "es5",
+        "eyebrow": "",
+        "heading": "Downloading the data",
+        "body": "Maecenas ligula felis, condimentum sit amet imperdiet at, imperdiet in neque. In consectetur purus vel ex viverra placerat. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Aenean eget massa at neque aliquam cursus vel in mauris. In eget metus gravida, elementum nulla non, gravida erat."
+      }
+    },
+    {
+      "type": "CallToAction",
+      "props": {
+        "id": "links",
+        "surface": "related",
+        "align": "left",
+        "eyebrow": "Keep exploring",
+        "heading": "You might also be interested",
+        "subheading": "",
+        "primaryLabel": "",
+        "primaryHref": "",
+        "secondaryLabel": "",
+        "secondaryHref": "",
+        "links": [
+          {
+            "label": "Our process",
+            "href": "/gca/our-process"
+          },
+          {
+            "label": "Outputs",
+            "href": "/gca/outputs"
+          },
+          {
+            "label": "FAQs",
+            "href": "/gca/faqs"
+          },
+          {
+            "label": "Contact us",
+            "href": "/gca/contact"
+          }
+        ],
+        "images": []
+      }
+    }
+  ]
+}

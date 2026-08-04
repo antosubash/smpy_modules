@@ -1,0 +1,258 @@
+{
+  "root": {
+    "props": {}
+  },
+  "content": [
+    {
+      "type": "PageHeader",
+      "props": {
+        "id": "ph",
+        "eyebrow": "",
+        "title": "Our process",
+        "description": "How the Global Canopy Atlas is built — from raw airborne LiDAR to an open, standardised global canopy dataset.",
+        "ctaLabel": "",
+        "ctaHref": ""
+      }
+    },
+    {
+      "type": "MediaObject",
+      "props": {
+        "id": "s1",
+        "surface": "default",
+        "imageUrl": "/gca/images/hero-lidar.jpg",
+        "imageAlt": "Airborne LiDAR point cloud",
+        "imagePosition": "right",
+        "heading": "01_Raw data ingestion & discovery",
+        "body": "We gathered disparate airborne LiDAR data from thousands of unique flights worldwide, covering everything from dense tropical rainforests to sparse boreal woodlands.",
+        "linkLabel": "",
+        "linkHref": ""
+      }
+    },
+    {
+      "type": "MediaObject",
+      "props": {
+        "id": "s2",
+        "surface": "default",
+        "imageUrl": "/gca/images/atlas-map.jpg",
+        "imageAlt": "Harmonised canopy map",
+        "imagePosition": "left",
+        "heading": "02_Data harmonisation & quality control",
+        "body": "Raw point clouds were put through a uniform quality-control workflow to remove errors, normalize terrain variations, and resolve flight-line overlaps, ensuring cross-biome consistency.",
+        "linkLabel": "",
+        "linkHref": ""
+      }
+    },
+    {
+      "type": "MediaObject",
+      "props": {
+        "id": "s3",
+        "surface": "default",
+        "imageUrl": "/gca/images/biodiversity.jpg",
+        "imageAlt": "Open canopy data",
+        "imagePosition": "right",
+        "heading": "03_Open access distribution",
+        "body": "The Global Canopy Atlas is built entirely on the principles of open science and public accessibility, with 87% of the atlas data entirely open-access under a CC-BY 4.0 international license.",
+        "linkLabel": "",
+        "linkHref": ""
+      }
+    },
+    {
+      "type": "MediaObject",
+      "props": {
+        "id": "delivering",
+        "surface": "dark",
+        "imageUrl": "/gca/images/collaboration.jpg",
+        "imageAlt": "Researchers working with canopy data",
+        "imagePosition": "left",
+        "heading": "Delivering an interactive map of global canopy",
+        "body": "By processing and harmonising 3,458 airborne laser scanning (ALS) acquisitions, we have created a uniform, open-access dataset covering 56,554 km² across the world's major biomes.",
+        "linkLabel": "Explore the atlas",
+        "linkHref": "/canopy-atlas"
+      }
+    },
+    {
+      "type": "Stats",
+      "props": {
+        "id": "st",
+        "surface": "lime",
+        "title": "",
+        "subtitle": "",
+        "items": [
+          {
+            "value": "100+",
+            "label": "Project contributors"
+          },
+          {
+            "value": "3,458",
+            "label": "ALS acquisitions"
+          },
+          {
+            "value": "56,554 km²",
+            "label": "Total area mapped"
+          },
+          {
+            "value": "19%",
+            "label": "Multi-temporal scans"
+          },
+          {
+            "value": "87%",
+            "label": "Open-access data"
+          }
+        ]
+      }
+    },
+    {
+      "type": "CallToAction",
+      "props": {
+        "id": "accessible",
+        "surface": "related",
+        "align": "left",
+        "eyebrow": "GCA is powered by",
+        "heading": "What makes it all possible",
+        "subheading": "This project is the result of an unprecedented global collaboration between international research labs, space agencies, and field ecologists. By pooling resources and standardizing independent datasets, we've built a shared foundation for the future of forest conservation.",
+        "primaryLabel": "",
+        "primaryHref": "",
+        "secondaryLabel": "",
+        "secondaryHref": "",
+        "links": [
+          {
+            "label": "Our people & collaborators",
+            "href": "/gca/who-we-are"
+          },
+          {
+            "label": "A global network of research sites",
+            "href": "/gca/data-map"
+          },
+          {
+            "label": "Funders & supporters",
+            "href": "/gca/who-we-are"
+          },
+          {
+            "label": "Our vision for the future",
+            "href": "/gca/our-statements"
+          }
+        ],
+        "images": []
+      }
+    },
+    {
+      "type": "Faq",
+      "props": {
+        "id": "faq",
+        "eyebrow": "FAQs",
+        "title": "Frequently asked questions",
+        "items": [
+          {
+            "question": "What source data does the atlas use?",
+            "answer": "Airborne laser scanning (ALS) acquisitions contributed by more than 100 institutions, harmonised into a single open dataset."
+          },
+          {
+            "question": "What licence is the data released under?",
+            "answer": "The majority of the atlas (87%) is released open-access under a CC-BY 4.0 international license."
+          },
+          {
+            "question": "How is quality controlled?",
+            "answer": "Every point cloud passes a uniform QC workflow that removes errors, normalises terrain, and resolves flight-line overlaps."
+          },
+          {
+            "question": "Can I contribute data?",
+            "answer": "Yes — we are always looking for new collaborators and data contributors. Get in touch via the contact page."
+          }
+        ]
+      }
+    },
+    {
+      "type": "FeatureCards",
+      "props": {
+        "id": "outputs",
+        "eyebrow": "Outputs",
+        "title": "Explore the project's outputs and peer-reviewed publications",
+        "subtitle": "",
+        "linkLabel": "View all",
+        "linkHref": "/gca/outputs",
+        "columns": "4",
+        "items": [
+          {
+            "title": "Datasets",
+            "description": "Open canopy height and cover layers.",
+            "icon": "chart",
+            "iconBg": "#1a7a6b",
+            "iconUrl": "",
+            "href": "/gca/outputs"
+          },
+          {
+            "title": "Publications",
+            "description": "Peer-reviewed papers and methods.",
+            "icon": "search",
+            "iconBg": "#8b7fd6",
+            "iconUrl": "",
+            "href": "/gca/outputs"
+          },
+          {
+            "title": "Tools",
+            "description": "Notebooks and APIs to work with the data.",
+            "icon": "waves",
+            "iconBg": "#2e6fb5",
+            "iconUrl": "",
+            "href": "/gca/outputs"
+          },
+          {
+            "title": "Data stories",
+            "description": "Case studies from GCA sites.",
+            "icon": "tree",
+            "iconBg": "#6aa84f",
+            "iconUrl": "",
+            "href": "/gca/news"
+          }
+        ]
+      }
+    },
+    {
+      "type": "CallToAction",
+      "props": {
+        "id": "getinvolved",
+        "surface": "lime",
+        "align": "left",
+        "heading": "Get involved",
+        "subheading": "Join an international community of ecologists, remote sensing engineers, and foresters using open data to understand earth's woody ecosystems.",
+        "primaryLabel": "Contact us",
+        "primaryHref": "/gca/contact",
+        "secondaryLabel": "",
+        "secondaryHref": "",
+        "links": [],
+        "images": [
+          {
+            "src": "/gca/images/biodiversity.jpg",
+            "alt": "",
+            "caption": "20 m"
+          },
+          {
+            "src": "/gca/images/canopy-aerial.jpg",
+            "alt": "",
+            "caption": "20 m"
+          },
+          {
+            "src": "/gca/images/forest-aerial-river.jpg",
+            "alt": "",
+            "caption": "64 m"
+          },
+          {
+            "src": "/gca/images/canopy-up.jpg",
+            "alt": "",
+            "caption": "22 m"
+          },
+          {
+            "src": "/gca/images/collaboration.jpg",
+            "alt": "",
+            "caption": "32 m"
+          },
+          {
+            "src": "/gca/images/atlas-map.jpg",
+            "alt": "",
+            "caption": ""
+          }
+        ]
+      }
+    }
+  ]
+}

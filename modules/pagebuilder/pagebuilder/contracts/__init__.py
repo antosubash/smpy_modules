@@ -1,0 +1,57 @@
+"""PageBuilder contracts — the public interface for other modules.
+
+Everything outside this package is internal and may change without a
+major version bump.
+"""
+
+from pagebuilder.contracts.schemas import (
+    BlockChange,
+    LayoutDetail,
+    LayoutRead,
+    LayoutRevisionDetail,
+    LayoutRevisionListResponse,
+    LayoutRevisionRead,
+    LayoutUpdate,
+    MediaAssetListResponse,
+    MediaAssetRead,
+    MediaAssetVariant,
+    MetadataChange,
+    PageCreate,
+    PageDetail,
+    PageListResponse,
+    PageNoteRequest,
+    PageRead,
+    PageRejectRequest,
+    PageRevisionDetail,
+    PageRevisionListResponse,
+    PageRevisionRead,
+    PageScheduleRequest,
+    PageUpdate,
+    RevisionDiffResponse,
+)
+
+__all__ = [
+    "BlockChange",
+    "LayoutDetail",
+    "LayoutRead",
+    "LayoutRevisionDetail",
+    "LayoutRevisionListResponse",
+    "LayoutRevisionRead",
+    "LayoutUpdate",
+    "MediaAssetListResponse",
+    "MediaAssetRead",
+    "MediaAssetVariant",
+    "MetadataChange",
+    "PageCreate",
+    "PageDetail",
+    "PageListResponse",
+    "PageNoteRequest",
+    "PageRead",
+    "PageRejectRequest",
+    "PageRevisionDetail",
+    "PageRevisionListResponse",
+    "PageRevisionRead",
+    "PageScheduleRequest",
+    "PageUpdate",
+    "RevisionDiffResponse",
+]

@@ -1,0 +1,30 @@
+@import "@simple-module-py/ui/styles/globals.css";
+@import "./modules.generated.css";
+
+/* Base design tokens for the widget set, then any design pack that overrides
+ * them under its own root class. A pack ships with the module that owns the
+ * brand — the framework's DesignPackRegistry supplies the dropdown entry in
+ * Settings -> Branding, but not the stylesheet, so each pack a host installs
+ * has to be imported here.
+ *
+ * Imported by package specifier: the npm workspace symlinks modules/* into
+ * node_modules. gen-pages only emits @source entries, not @import, so a
+ * wheel-installed host writes these lines by hand too. */
+@import "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css";
+@import "@simple-module-py/canopy-atlas/canopy_atlas/static/gca-pack.css";
+
+/* App-level source scanning — host code + workspace modules.
+ * Wheel-installed modules are covered by modules.generated.css.
+ *
+ * The module glob deliberately covers the whole package, not just pages/.
+ * Puck blocks, shared components and hooks all carry Tailwind classes, and
+ * scanning pages/ alone meant a class only reached the bundle when some
+ * other scanned file happened to use it too — so e.g. the Heading block's
+ * text-5xl silently never applied. */
+@source "./**/*.{ts,tsx}";
+@source "../../modules/*/*/**/*.{ts,tsx}";
+
+body {
+  margin: 0;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}
