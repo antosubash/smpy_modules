@@ -86,3 +86,39 @@ describe('every block renders with its defaults', () => {
     expect(typeof html).toBe('string');
   });
 });
+
+describe('blocks tolerate data stored before a field existed', () => {
+  // `defaultProps` only covers a block dropped *now*. A Button saved before
+  // `size` existed arrives without it, and `sizeClass[undefined]` yields
+  // `undefined` — which `cn()` silently drops, so the button renders with no
+  // size classes at all rather than crashing. Nothing in a normal suite
+  // notices, because every other fixture is built from the current defaults.
+  //
+  // So the assertion is that the *expected class* is present. Checking the
+  // output merely doesn't say "undefined" passes even with the default
+  // removed, which is how the first version of this test was useless.
+  const cases: { name: string; props: Record<string, unknown>; expected: string[] }[] = [
+    {
+      name: 'Button',
+      props: { label: 'Old', href: '/x', variant: 'primary', target: '_self' },
+      expected: ['px-5', 'bg-primary-700'],
+    },
+    {
+      name: 'Text',
+      props: { text: 'Old copy.', align: 'left' },
+      expected: ['text-base', 'text-left'],
+    },
+    {
+      name: 'Heading',
+      props: { text: 'Old', level: 'h2', align: 'left' },
+      expected: ['text-3xl', 'text-left'],
+    },
+  ];
+
+  it.each(cases)('$name', ({ name, props, expected }) => {
+    const config = catalogComponents[name as keyof typeof catalogComponents] as AnyConfig;
+    const Render = config.render;
+    const html = renderToStaticMarkup(<Render {...props} />);
+    for (const cls of expected) expect(html).toContain(cls);
+  });
+});

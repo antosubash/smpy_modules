@@ -1,8 +1,8 @@
 # Pagebuilder feature parity with IIASA.GeoWiki
 
-**Status:** Phases 0, 2 and 3 done — the widget count now matches at **56**
-(§9, §10, §11). Remaining: Phase 1 (the three diverged primitives),
-Phase 4 (`conversion/`), Phase 5 (`translation/`).
+**Status:** Phases 0–3 done — the widget count matches at **56** and the
+three diverged primitives are aligned (§9–§12). Remaining: Phase 4
+(`conversion/`), Phase 5 (`translation/`).
 **Date:** 2026-08-05
 **Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -90,7 +90,10 @@ them.
 that work was done and its migration written, (c) stopped amortising against
 anything.)
 
-## 3. Gap B — three primitives that diverged (needs data migration)
+## 3. Gap B — three primitives that diverged — **closed, see §12**
+
+> Both migrations this section calls for turned out to be avoidable; §12 says
+> why. Kept as written for the reasoning that led there.
 
 These are not missing; they're *different*, and two differ in stored prop
 values, so porting them is a breaking change to existing page data.
@@ -185,9 +188,10 @@ whether a stored *string* is Puck JSON, and our data arrives from Inertia
 already parsed. It earns its place with Phase 4, when HTML content becomes
 possible — porting it now would be speculative.
 
-**Phase 1 — primitives.** Port Heading, Text and Button to GeoWiki's versions
-with their `hN`→`N` and plain-text→`<p>` migrations registered through Phase 0's
-machinery. Highest-risk phase; smallest diff. *~300 lines + 2 migrations.*
+**Phase 1 — primitives. ✅ done (§12).** Neither planned migration was needed:
+Heading keeps its own `level` spelling, and Text gets rich text through the
+markdown renderer rather than Puck's HTML-storing field. The "highest-risk
+phase" ended up the one that touched no stored data at all.
 
 **Phase 2 — widget bulk. ✅ done (§11).** Landed as one change rather than the
 four planned batches: the port turned out to be mechanical once the shared
@@ -213,10 +217,9 @@ server changes: it is pure data transformation.
    pure functions with no persistence; this repo would need a table and an
    Alembic revision in `host/migrations/versions/` under a `pagebuilder` branch
    label. That's a schema decision, not a port.
-4. **Does `Text` becoming rich text change the public-page CSP?** Rich text
-   renders stored HTML. `public-viewer-headers.spec.ts` asserts a CSP on
-   `/p/{slug}`; the sanitisation boundary needs confirming before Phase 1
-   ships, not after.
+4. ~~**Does `Text` becoming rich text change the public-page CSP?**~~
+   **Answered by not creating the question** — Text renders parsed markdown,
+   never stored HTML, so there is no sanitisation boundary to confirm. §12.
 
 ## 9. Phase 0 as built, and what it turned up
 
@@ -369,7 +372,71 @@ that were already in the bundle. For context, the `/rsc` switch from §10 is now
 worth more than it was: it would take the public page to roughly 664 kB, well
 under where it started.
 
-## 12. Measurement
+## 12. The three primitives, and two places I didn't follow upstream
+
+Button, Heading and Text now carry everything GeoWiki's do. Two of the three
+deviate from upstream in how the data is *stored*, deliberately, and both
+deviations mean **no migration was needed** — §3 planned two and neither
+happened.
+
+### Button — full port, plus defaults for old data
+
+Gains `outline`, `size`, `color`, `indent`, rich-text labels, the theme-driven
+radius and the optional trailing arrow. `primary`/`ghost` now read the branding
+ramp (`bg-primary-700`) instead of the hardcoded `bg-blue-600`, so the block
+follows Settings → Branding like the other 55.
+
+`size`, `color` and `indent` are defaulted **in the render signature**, not
+only in `defaultProps`. `defaultProps` applies to a block dropped now; every
+Button already on a page predates these fields and arrives with them undefined.
+Upstream doesn't default `size` either — it presumably had no such data.
+
+### Heading — port the rendering, keep the enum
+
+Gains rich text, the `--pb-heading-color` / `--pb-display-*` tokens and the
+container wrapper, and its hardcoded `font-bold` is gone so design packs can
+actually reach it.
+
+**`level` stays `h1`…`h6` rather than upstream's `1`…`6`.** §3 called this
+"data-incompatible, requires a migration" — but the enum is an internal
+representation no author ever sees. Adopting the other spelling would mean
+migrating every stored Heading to change nothing visible. Parity is in what the
+block can express, not in how the value is spelled.
+
+This also removes the §3 alignment hazard: `text-${align}` is now a lookup map,
+so it no longer depends on those class names happening to appear literally in
+other files.
+
+### Text — rich text, without stored HTML
+
+Gains the `size` prop and renders through `RichTextBlock`, so authors get bold,
+italic, code, links, bullets and paragraphs.
+
+**It stays a `textarea`, not Puck's `richtext` field.** That was §8 Q4 — "does
+Text becoming rich text change the public CSP?" The answer is to not create the
+question. Puck's `richtext` stores HTML and hands it to Puck to render;
+`RichTextBlock` parses light markdown into React elements and never builds
+anything from stored markup (it also drops `javascript:` hrefs). Same expressive
+range for the author, no injection surface.
+
+That matters more here than upstream. Pages reach the public viewer through a
+review workflow, so not every author is fully trusted; and the CSP that would
+otherwise be the backstop is `SM_PAGEBUILDER_PUBLIC_CSP` — operator-tunable,
+documented as safe to empty. Relying on it to contain stored HTML would be
+betting on a setting whose whole purpose is to be changed. It also keeps this
+block consistent with the other 50, which all render copy this way.
+
+### A test that didn't test anything
+
+The first version of the backward-compatibility test asserted the rendered HTML
+didn't contain the string `"undefined"`. It passed with the default deliberately
+removed — `cn()` drops undefined values silently, so a Button missing `size`
+renders with *no* size classes rather than a broken one. The assertion is now
+that the expected class is present, and that version does fail when the default
+is taken away. Worth stating because the failure mode is invisible: nothing
+crashes, the button is just unstyled.
+
+## 13. Measurement
 
 Re-run the parity count with:
 
