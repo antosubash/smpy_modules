@@ -72,8 +72,40 @@ describe('extract / apply round trip', () => {
     expect(out.content[0].props.text).toBe(original.content[0].props.text);
   });
 
-  it('survives content that is not valid JSON', () => {
+  it('survives content that is not valid JSON, on both halves', () => {
+    // The two are documented as exact inverses, so `apply` must not crash on
+    // input that `extract` handled by returning nothing.
     expect(extractTranslatableStrings('not json', config).strings).toEqual([]);
+    expect(applyTranslatedStrings('not json', [], [])).toBe('not json');
+  });
+
+  it('leaves machine-readable text fields out of the translation set', () => {
+    // These are all `text`/`textarea` — indistinguishable from copy by field
+    // type. A translator handed a srcset returns something reflowed, and the
+    // browser then requests a URL that does not exist.
+    const technical = JSON.stringify({
+      content: [
+        {
+          type: 'Image',
+          props: {
+            id: 'i1',
+            src: '/a.png',
+            alt: 'Real copy',
+            srcset: '/a-800.png 800w, /a-1600.png 1600w',
+            sizes: '(max-width: 600px) 100vw, 50vw',
+          },
+        },
+        { type: 'Html', props: { id: 'x1', html: '<b>markup</b>', height: '400px' } },
+      ],
+      root: { props: { title: 'P', width: 'contained' } },
+    });
+
+    const { strings } = extractTranslatableStrings(technical, config);
+    expect(strings).toContain('Real copy');
+    expect(strings).not.toContain('/a-800.png 800w, /a-1600.png 1600w');
+    expect(strings).not.toContain('(max-width: 600px) 100vw, 50vw');
+    expect(strings).not.toContain('<b>markup</b>');
+    expect(strings).not.toContain('400px');
   });
 });
 

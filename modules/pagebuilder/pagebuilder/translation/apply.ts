@@ -21,7 +21,16 @@ export function applyTranslatedStrings(
   paths: FieldPath[],
   translations: string[],
 ): string {
-  const parsed: unknown = JSON.parse(puckJson);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(puckJson);
+  } catch {
+    // `extractTranslatableStrings` returns an empty result for unparseable
+    // input rather than throwing. These two are documented as exact inverses,
+    // so a caller that survived the first half must not be crashed by the
+    // second — hand the input straight back untouched.
+    return puckJson;
+  }
 
   paths.forEach((path, index) => {
     const translation = translations[index];

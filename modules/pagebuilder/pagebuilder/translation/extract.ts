@@ -124,7 +124,18 @@ export function extractTranslatableStrings(puckJson: string, config: Config): Ex
   }
 
   const root = parsed.root;
-  if (isRecord(root)) visitBlock(root, ['root']);
+  if (isRecord(root)) {
+    if (isRecord(root.props)) {
+      visitBlock(root, ['root']);
+    } else if (config.root?.fields) {
+      // Oldest shape: root props sit directly on `root` with no `props` nest.
+      // `visitBlock` bails on those because it requires `props`, which would
+      // make a pre-0.20 page's title quietly untranslatable — and this file
+      // already goes out of its way to handle the other legacy shape (`zones`),
+      // so handling one and not the other would be arbitrary.
+      visitFields(root, config.root.fields as Record<string, Field>, ['root']);
+    }
+  }
 
   return { strings, paths };
 }

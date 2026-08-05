@@ -27,11 +27,6 @@ export function getLayoutPuckConfig(): Config {
   if (cachedConfig && cachedVersion === registryVersion()) return cachedConfig;
 
   const pageConfig = getPuckConfig();
-  // From the *base* blocks, not the merged page palette: a module's page-only
-  // registration must not leak into the header and footer. Only a
-  // `layout: true` registration is added back below.
-  const { Columns: _drop, ...layoutComponents } = basePageConfig.components;
-  const components: Record<string, unknown> = { ...layoutComponents };
   const categories: Record<string, { title?: string; components: string[] }> = {
     // Site chrome is registered here and NOT in the page palette: a nav bar
     // dropped into the middle of a page would render a second one under the
@@ -45,6 +40,19 @@ export function getLayoutPuckConfig(): Config {
     collections: { title: 'Collections', components: ['LogoCloud'] },
     layout: { components: ['Spacer', 'Divider'] },
   };
+
+  // Built from the categories above — an allowlist, not "the page palette minus
+  // a couple". The subtractive form silently inherited every block added to the
+  // page: when the catalogue went from 20 to 56, the header/footer editor
+  // quietly started offering Leaderboard, Timeline and ~45 other page sections
+  // under Puck's catch-all "Other" group, because they had no category here.
+  // Site chrome is a deliberately small palette; it has to stay one by
+  // construction.
+  const components: Record<string, unknown> = {};
+  for (const name of Object.values(categories).flatMap((c) => c.components)) {
+    const block = (basePageConfig.components as Record<string, unknown>)[name];
+    if (block) components[name] = block;
+  }
 
   components.SiteHeader = SiteHeaderWidget;
   components.SiteFooter = SiteFooterWidget;

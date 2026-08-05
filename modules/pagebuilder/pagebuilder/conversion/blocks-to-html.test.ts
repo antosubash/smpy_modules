@@ -58,10 +58,19 @@ describe('blocksToHtml', () => {
     ).toBe('<img src="/a.png" alt="" width="800" height="600">');
   });
 
-  it('passes raw Html through untouched', () => {
-    expect(blocksToHtml([b('Html', { html: '<section>raw</section>' })]).html).toBe(
-      '<section>raw</section>',
-    );
+  it('treats Html as lossy unless raw markup is explicitly asked for', () => {
+    // The Html widget renders its markup inside `<iframe sandbox>` because a
+    // ContentEditor's input isn't fully trusted. This function's output has no
+    // such boundary, so emitting it has to be a decision the caller makes.
+    const { html, lossyTypes } = blocksToHtml([b('Html', { html: '<section>raw</section>' })]);
+    expect(html).toBe('');
+    expect(lossyTypes).toEqual(['Html']);
+  });
+
+  it('passes raw Html through when opted in', () => {
+    expect(
+      blocksToHtml([b('Html', { html: '<section>raw</section>' })], { includeRawHtml: true }).html,
+    ).toBe('<section>raw</section>');
   });
 
   it('attributes a quote from whichever of author and source is filled in', () => {

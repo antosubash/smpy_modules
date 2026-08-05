@@ -53,6 +53,27 @@ describe('getLayoutPuckConfig', () => {
     expect(Object.keys(getLayoutPuckConfig().components)).not.toContain('Columns');
   });
 
+  it('offers only the curated chrome palette, not the whole page catalogue', () => {
+    // This used to be built subtractively — the page palette minus a couple of
+    // names — so every block added to the page silently appeared here too.
+    // When the catalogue went 20 → 56, the header/footer editor started
+    // offering Leaderboard, Timeline and ~45 other page sections under Puck's
+    // catch-all "Other" group. Site chrome is a deliberately small palette.
+    const names = Object.keys(getLayoutPuckConfig().components);
+    expect(names).toEqual(
+      expect.arrayContaining(['SiteHeader', 'SiteFooter', 'Heading', 'Text', 'Image']),
+    );
+    expect(names).not.toContain('Leaderboard');
+    expect(names).not.toContain('Timeline');
+    expect(names).not.toContain('Newsletter');
+    // Every name offered must be filed under a category — an uncategorised
+    // block is exactly what lands in "Other".
+    const categorised = Object.values(getLayoutPuckConfig().categories ?? {}).flatMap(
+      (c) => c.components ?? [],
+    );
+    expect(names.filter((n) => !categorised.includes(n))).toEqual([]);
+  });
+
   it('excludes a page-only registration', () => {
     // A news feed belongs on a page, not in the header or footer.
     registerPuckBlocks({ blocks: { Widget: stub } });

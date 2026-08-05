@@ -63,6 +63,32 @@ describe('migrateContent', () => {
     expect(columns[1].content[0].props).toMatchObject({ text: 'Orphan' });
   });
 
+  it('rescues a zone whose name it does not recognise', () => {
+    // Puck deletes every zone it grouped for the block once the migrate fn
+    // returns, read or not — so a name this function ignores doesn't raise the
+    // "no slot exists" error, it just stops existing. Only `col-<int>` was
+    // ever written here, but the whole point of the function is that losing
+    // author content can't be silent.
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const legacy = {
+      content: [{ type: 'Columns', props: { id: 'C1', gap: 'md', columns: [{ width: 1 }] } }],
+      root: { props: {} },
+      zones: {
+        'C1:col-0': [{ type: 'Heading', props: { id: 'h1', text: 'Kept', level: 'h2' } }],
+        'C1:mystery': [{ type: 'Heading', props: { id: 'h2', text: 'Rescued', level: 'h2' } }],
+      },
+    } as unknown as Data;
+
+    const result = migrateContent(legacy, getPuckConfig());
+
+    const columns = result.content?.[0]?.props?.columns as { content: { props: unknown }[] }[];
+    const everything = columns.flatMap((c) => c.content).map((b) => b.props);
+    expect(everything).toContainEqual(expect.objectContaining({ text: 'Kept' }));
+    expect(everything).toContainEqual(expect.objectContaining({ text: 'Rescued' }));
+    expect(warn).toHaveBeenCalled();
+  });
+
   it('leaves an empty zones map alone', () => {
     // Puck writes `zones: {}` on pages that once held a DropZone and no longer
     // do. Treating that as legacy would migrate every such page on every

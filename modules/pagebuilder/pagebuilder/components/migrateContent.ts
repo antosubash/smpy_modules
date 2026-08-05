@@ -23,7 +23,11 @@ function hasLegacyShape(data: Data): boolean {
   const legacy = data as LegacyData;
   if (legacy.zones && Object.keys(legacy.zones).length > 0) return true;
   const root = legacy.root;
-  return !!root && !('props' in root) && Object.keys(root).length > 0;
+  // `!root.props` rather than `!("props" in root)`, matching Puck's own check.
+  // A stored `root: { props: null, … }` has the key but no usable value, and
+  // treating it as modern would hand `<Render>` a null `root.props` instead of
+  // letting Puck normalise it.
+  return !!root && !root.props && Object.keys(root).length > 0;
 }
 
 /** A `Columns` column, pre- and post-migration. */
@@ -43,23 +47,54 @@ type ColumnItem = { width?: number; content?: Content };
  * saved after a column was removed can still carry a zone for it. Sizing the
  * result to cover both means such orphaned content reappears in a real column
  * instead of being silently dropped on migration.
+ *
+ * Anything left over is appended to the last column rather than abandoned.
+ * Puck deletes *every* zone it grouped for this block once we return, whether
+ * or not we read it — so a zone this function doesn't claim is not left behind
+ * to raise the "no slot exists" error, it simply stops existing. Only
+ * `col-<int>` was ever emitted here, so the sweep should find nothing; it costs
+ * one pass and removes the one path where losing author content would be
+ * silent, which is the failure this function exists to prevent.
  */
+const COLUMN_ZONE = /^col-(\d+)$/;
+/** Guards the loop below against an absurd index in stored data. */
+const MAX_COLUMNS = 64;
+
 function migrateColumnsZones(
   props: { id: string } & Record<string, unknown>,
   zones: Record<string, Content>,
 ): { id: string } & Record<string, unknown> {
   const stored = Array.isArray(props.columns) ? (props.columns as ColumnItem[]) : [];
-  const zoneIndices = Object.keys(zones)
-    .map((name) => Number.parseInt(name.replace(/^col-/, ''), 10))
-    .filter((n) => Number.isInteger(n) && n >= 0);
-  const count = Math.max(stored.length, ...zoneIndices.map((n) => n + 1), 0);
+  const indexed = new Map<number, Content>();
+  const unclaimed: Content = [];
+  for (const [name, blocks] of Object.entries(zones)) {
+    const match = COLUMN_ZONE.exec(name);
+    const index = match ? Number(match[1]) : -1;
+    if (index >= 0 && index < MAX_COLUMNS) indexed.set(index, blocks);
+    else if (Array.isArray(blocks)) unclaimed.push(...blocks);
+  }
+
+  const count = Math.min(
+    Math.max(stored.length, ...[...indexed.keys()].map((n) => n + 1), 0),
+    MAX_COLUMNS,
+  );
 
   const columns: ColumnItem[] = [];
   for (let i = 0; i < count; i += 1) {
     columns.push({
       width: stored[i]?.width ?? 1,
-      content: zones[`col-${i}`] ?? stored[i]?.content ?? [],
+      content: indexed.get(i) ?? stored[i]?.content ?? [],
     });
+  }
+
+  if (unclaimed.length > 0) {
+    if (columns.length === 0) columns.push({ width: 1, content: [] });
+    const last = columns[columns.length - 1];
+    last.content = [...(last.content ?? []), ...unclaimed];
+    console.warn(
+      `[pagebuilder] ${unclaimed.length} block(s) from an unrecognised Columns zone were ` +
+        `appended to the last column of "${props.id}" rather than dropped.`,
+    );
   }
   return { ...props, columns };
 }

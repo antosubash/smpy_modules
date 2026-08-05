@@ -82,8 +82,12 @@ describe('catalogue structure', () => {
 describe('every block renders with its defaults', () => {
   it.each(entries.map(([name, config]) => ({ name, config })))('$name', ({ config }) => {
     const Render = config.render;
+    // The real assertion is that this line doesn't throw. `toBe('string')`
+    // could never fail — renderToStaticMarkup always returns one — so it said
+    // nothing about the widget. Requiring output also catches a block that
+    // renders to nothing at all with its own defaults.
     const html = renderToStaticMarkup(<Render {...withSlotsResolved(config)} />);
-    expect(typeof html).toBe('string');
+    expect(html).not.toBe('');
   });
 });
 
@@ -103,16 +107,11 @@ describe('blocks tolerate data stored before a field existed', () => {
       props: { label: 'Old', href: '/x', variant: 'primary', target: '_self' },
       expected: ['px-5', 'bg-primary-700'],
     },
-    {
-      name: 'Text',
-      props: { text: 'Old copy.', align: 'left' },
-      expected: ['text-base', 'text-left'],
-    },
-    {
-      name: 'Heading',
-      props: { text: 'Old', level: 'h2', align: 'left' },
-      expected: ['text-3xl', 'text-left'],
-    },
+    // Every asserted class must come from a prop the case OMITS, otherwise the
+    // assertion is satisfied by the explicit prop and the default it is meant
+    // to guard can be deleted with the test still green.
+    { name: 'Text', props: { text: 'Old copy.' }, expected: ['text-base', 'text-left'] },
+    { name: 'Heading', props: { text: 'Old' }, expected: ['text-3xl', 'text-left'] },
   ];
 
   it.each(cases)('$name', ({ name, props, expected }) => {

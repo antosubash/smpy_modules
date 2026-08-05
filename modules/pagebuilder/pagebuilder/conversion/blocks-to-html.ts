@@ -13,18 +13,36 @@ import type { PuckBlock } from './types';
 
 export type BlocksToHtmlResult = { html: string; lossyTypes: string[] };
 
+export type BlocksToHtmlOptions = {
+  /**
+   * Emit `Html` blocks' stored markup verbatim. **Off by default.**
+   *
+   * The Html widget renders that markup inside `<iframe sandbox>` precisely
+   * because a ContentEditor's input is not fully trusted. This function's
+   * output has no such boundary — a caller inlining it into an email or a feed
+   * would run whatever the block contains in their own origin. Off by default,
+   * `Html` is reported in `lossyTypes` like any other block with no safe flat
+   * representation. Turn it on only where the output is going somewhere the
+   * markup is already trusted to run.
+   */
+  includeRawHtml?: boolean;
+};
+
 /** `h3` (what we store) and `3` (what upstream stores) both mean the same. */
 function headingLevel(raw: unknown): string {
   const match = /^h?([1-6])$/.exec(String(raw ?? ''));
   return match ? match[1] : '2';
 }
 
-export function blocksToHtml(blocks: PuckBlock[]): BlocksToHtmlResult {
+export function blocksToHtml(
+  blocks: PuckBlock[],
+  options: BlocksToHtmlOptions = {},
+): BlocksToHtmlResult {
   const parts: string[] = [];
   const lossy = new Set<string>();
 
   for (const block of blocks) {
-    const html = blockToHtml(block);
+    const html = blockToHtml(block, options);
     if (html === null) {
       lossy.add(block.type);
     } else if (html) {
@@ -34,10 +52,11 @@ export function blocksToHtml(blocks: PuckBlock[]): BlocksToHtmlResult {
   return { html: parts.join('\n'), lossyTypes: [...lossy] };
 }
 
-function blockToHtml(block: PuckBlock): string | null {
+function blockToHtml(block: PuckBlock, options: BlocksToHtmlOptions): string | null {
   const props = block.props ?? {};
   switch (block.type) {
     case 'Html':
+      if (!options.includeRawHtml) return null;
       return typeof props.html === 'string' ? props.html : null;
 
     // Text and Markdown both hold markdown here — Text is the light inline

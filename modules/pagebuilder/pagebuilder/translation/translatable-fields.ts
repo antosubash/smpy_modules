@@ -18,6 +18,19 @@ const DENYLIST_PATTERNS: readonly RegExp[] = [
   /colou?r$/i,
   /bg$/i,
   /^id$/i,
+  // `srcset` and `sizes` are responsive-image descriptors —
+  // "/img-800.png 800w, /img-1600.png 1600w" and "(max-width: 600px) 100vw".
+  // `/src$/i` is end-anchored so it does not catch `srcset`, and nothing
+  // catches `sizes`. A translator handed either returns something reflowed,
+  // and the browser then requests a URL that doesn't exist.
+  /^srcset$/i,
+  /^sizes$/i,
+  // CSS lengths: `height` (Html, Iframe), `bodyMaxWidth` (MediaObject). Any
+  // casing, so `maxWidth` and `minHeight` are covered too.
+  /(^|[a-z])(width|height)$/i,
+  // The Html widget's field is raw markup, not prose. Sending it out for
+  // translation gets the tags rewritten along with the words.
+  /^html$/i,
   // camelCase technical identifiers (`questId`, `clusterId`). Anchored to a
   // capital `I` so it matches a real `…Id` suffix and never a lowercase word
   // that happens to end in "id" (`grid`, `valid`).
