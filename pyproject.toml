@@ -37,5 +37,10 @@ ignore = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["host/tests", "modules/pagebuilder/tests", "scripts/tests"]
+testpaths = [
+    "host/tests",
+    "modules/news/tests",
+    "modules/pagebuilder/tests",
+    "scripts/tests",
+]
 addopts = "--durations=20"

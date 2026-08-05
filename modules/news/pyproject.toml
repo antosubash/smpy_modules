@@ -13,7 +13,11 @@ dependencies = [
     "simple_module_core>=0.0.25,<0.1",
     "simple_module_db>=0.0.25,<0.1",
     "simple_module_hosting>=0.0.25,<0.1",
-    "simple_module_pagebuilder>=0.1,<0.2",
+    # Lockstep sibling: floor tracks the first release that carried the block
+    # registry this module registers NewsFeed into. Must stay a 0.0.x range —
+    # the repo publishes at 0.0.x, so `>=0.1` would be unsatisfiable and the
+    # wheel uninstallable.
+    "simple_module_pagebuilder>=0.0.1,<0.1",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
 ]

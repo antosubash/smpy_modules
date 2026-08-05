@@ -43,9 +43,16 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     pagebuilder publishes no page-deleted event, so there is nothing to hang a
     cascade on either.
 
-    What makes that safe: every listing inner-joins the page, so an article
+    Two things make that safe. Every listing inner-joins the page, so an article
     whose page was deleted stops appearing immediately rather than surfacing a
-    broken link. The row itself is inert until something detaches it.
+    broken link. And an orphan is removed rather than left invisible — by the
+    ``PageDeleted`` subscription first, and by the startup sweep
+    (``service.reconcile_orphans``) when that event is missed.
+
+    The sweep is not belt-and-braces. An invisible orphan does not stay
+    invisible: SQLite reuses a deleted row's id, so the row re-attaches to
+    whatever page is created next and lists one article's category and date
+    against another article's page.
     """
 
     category: str = Field(default="", max_length=80, index=True)

@@ -13,6 +13,7 @@ viewer would mean duplicating all of it.
 from __future__ import annotations
 
 import importlib.metadata
+import logging
 
 from fastapi import APIRouter, FastAPI
 from pagebuilder.contracts.events import PageDeleted
@@ -23,6 +24,8 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
 from news import constants
+
+logger = logging.getLogger(__name__)
 
 _VERSION = importlib.metadata.version("simple_module_news")
 
@@ -71,6 +74,11 @@ class NewsModule(ModuleBase):
         deleted page's id, so the article silently re-attaches to whatever page
         is created next and the listing shows one article's title under
         another's metadata.
+
+        This is the fast path, not a guarantee — the bus logs a handler failure
+        rather than raising it, and pagebuilder has already committed the page
+        deletion by the time we run. ``on_startup``'s sweep is what makes the
+        outcome eventual rather than merely likely.
         """
         if app is None:
             return
@@ -78,12 +86,39 @@ class NewsModule(ModuleBase):
         async def _drop_article(event: PageDeleted) -> None:
             from news import service
 
+            # Outside a request, so `get_db` is not managing this session and
+            # the commit is ours to make.
             async with app.state.sm.db.session_factory() as db:
                 article = await service.get_by_page(db, event.page_id)
                 if article is not None:
                     await service.delete(db, article)
+                    await db.commit()
 
         bus.subscribe(PageDeleted, _drop_article)
+
+    async def on_startup(self, app: FastAPI) -> None:
+        """Sweep away articles whose page no longer exists.
+
+        Closes the window the ``PageDeleted`` subscription cannot: if that
+        handler ever fails, the row survives with nothing to retry it, and the
+        only trace is a log line. A restart is a cheap, natural boundary at
+        which to reconcile, and the sweep costs one indexed anti-join over a
+        table holding one row per article.
+
+        A non-zero count means an event was lost, so it is logged at warning —
+        the repair should be visible, not silent.
+        """
+        from news import service
+
+        async with app.state.sm.db.session_factory() as db:
+            dropped = await service.reconcile_orphans(db)
+            await db.commit()
+        if dropped:
+            logger.warning(
+                "Dropped %d orphaned news article(s) whose page no longer exists; "
+                "a PageDeleted event was missed.",
+                dropped,
+            )
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """Let the feed block list articles for an anonymous visitor.

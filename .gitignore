@@ -39,3 +39,5 @@ test-results/
 # QA / verify pipeline artifacts (/qa, /vf)
 .qa/
 .verify/
+# Scratch database a /qa run boots against, so it never touches host/app.db.
+qa.db*

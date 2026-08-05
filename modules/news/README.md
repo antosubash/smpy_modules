@@ -53,6 +53,10 @@ Reads are anonymous because the feed block runs on public pages. Listing is
 ordered newest first with undated articles last, and an editor additionally
 sees articles whose page is still a draft.
 
+`PUT` is a **partial** update: a field you omit is left alone. Sending
+`published_at` as an explicit `null` is different from omitting it — that
+undates the article, which is a real state rather than an error.
+
 `DELETE` detaches the metadata; the page and its body stay.
 
 ## Design note: no foreign key
@@ -62,9 +66,18 @@ every module its own `MetaData`, so a cross-module `ForeignKey` cannot resolve
 its target table, and pagebuilder publishes no page-deleted event to hang a
 cascade on either.
 
-What makes that safe is that every listing inner-joins the page: an article
+Two things make that safe. Every listing inner-joins the page, so an article
 whose page was deleted stops appearing immediately rather than rendering a card
-that links nowhere. The row itself is inert until something detaches it.
+that links nowhere. And the orphan is then removed rather than merely hidden —
+by a `PageDeleted` subscription first, and by a sweep at application startup
+when that event is missed.
+
+The sweep is not belt-and-braces. The event bus logs a handler failure instead
+of raising it, and pagebuilder has already committed the page deletion by the
+time the handler runs, so a dropped event leaves the row behind with nothing to
+retry it. An invisible orphan does not stay invisible either: SQLite reuses a
+deleted row's id, so the row would re-attach to whatever page is created next
+and list one article's category and date against another article's page.
 
 ## Development
 
