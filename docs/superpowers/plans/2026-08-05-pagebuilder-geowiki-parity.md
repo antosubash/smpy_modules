@@ -1,6 +1,6 @@
 # Pagebuilder feature parity with IIASA.GeoWiki
 
-**Status:** plan — nothing implemented.
+**Status:** plan. Phase 0 implemented (§9); phases 1–5 not started.
 **Date:** 2026-08-05
 **Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -31,7 +31,7 @@ content-pipeline gap**, not converging the two products. Everything in
 | `--pb-*` theme tokens | yes | yes — 17 tokens in `static/widgets-base.css` |
 | HTML ⇄ Puck conversion | yes (355 lines) | **no** |
 | Content translation extract/apply | yes (272 lines) | **no** |
-| `migrateContent` on load | yes (36 lines) | **no** |
+| `migrateContent` on load | yes (36 lines) | yes — ported, §9 |
 
 The good news is that the *foundation* is already here. `_shared/`,
 `_internal/`, `fields/` and the `--pb-*` token layer are line-for-line ports.
@@ -130,10 +130,10 @@ lists as deferred (pagebuilder's TSX copy is hardcoded English with no
 `locales/en.json`). They're independent; content i18n has no server side here
 yet, so it needs a storage decision (see §7).
 
-### `migrate-content.ts` (36 lines)
-Runs Puck's `migrate()` on load and drops components no longer in the config,
-so stale page data can't crash the editor. Small, high-value, and a
-prerequisite for §3's migrations. **Do this first.**
+### `migrate-content.ts` (36 lines) — **done, see §9**
+Runs Puck's `migrate()` on load, guarded so modern payloads skip the walk and a
+zone that can't convert can't blank the page. Small, high-value, and a
+prerequisite for §3's migrations.
 
 ## 5. Not gaps — ours only, keep as-is
 
@@ -166,10 +166,11 @@ these. Nothing in this plan should regress them.
 
 Each phase is independently shippable and independently revertable.
 
-**Phase 0 — safety net.** Port `migrate-content.ts` and `is-puck-content.ts`.
-Wire `migrateContent` into `PageEditor` and `PublicPage` load paths. Nothing
-user-visible; makes every later phase safe by guaranteeing unknown components
-degrade instead of crashing. *~55 lines + tests.*
+**Phase 0 — safety net. ✅ done (§9).** `migrateContent` ported and wired into
+all four load paths. `is-puck-content.ts` deliberately *not* ported: it checks
+whether a stored *string* is Puck JSON, and our data arrives from Inertia
+already parsed. It earns its place with Phase 4, when HTML content becomes
+possible — porting it now would be speculative.
 
 **Phase 1 — primitives.** Port Heading, Text and Button to GeoWiki's versions
 with their `hN`→`N` and plain-text→`<p>` migrations registered through Phase 0's
@@ -180,9 +181,12 @@ interactive (2) → sections/actions (18, Timeline split). Each batch is a
 self-contained PR: widgets + registry + category + a rendering test per widget.
 *~3,400 lines.*
 
-**Phase 3 — layout family.** Whichever of §2's options is chosen. Sequenced
-last because option (c) shares its migration with the `DropZone`→slot-field
-change from the perf plan, and doing both at once halves the data risk.
+**Phase 3 — layout family.** Whichever of §2's options is chosen. Now known to
+be more load-bearing than it first looked — see §9: until `Columns` moves to
+slot fields, Puck cannot migrate *any* legacy zones payload, so Phase 0's
+success path stays unreachable and those pages remain on the deprecated
+DropZone render path indefinitely. This is the same migration the perf plan
+needs for its 46% public-bundle cut, so it pays for itself three times over.
 
 **Phase 4 — conversion.** Port `conversion/` plus its 5 test files. Needs no
 server changes: it is pure data transformation.
@@ -206,7 +210,32 @@ server changes: it is pure data transformation.
    `/p/{slug}`; the sanitisation boundary needs confirming before Phase 1
    ships, not after.
 
-## 9. Measurement
+## 9. Phase 0 as built, and what it turned up
+
+`components/migrateContent.ts` + tests, wired into `PageEditor` (draft load)
+and all three `PublicPage` renders (page, layout header, layout footer).
+Migration happens on the way *in*, so a draft nobody edits is never rewritten.
+
+Writing the test for the success path is what surfaced the finding above:
+**it has no success path today.** `migrate()` converts a legacy zone only into
+a *slot field of the same name*, and grepping the whole module turns up zero
+`type: 'slot'` fields — `Columns` is the only nesting block and it still
+renders `<DropZone zone={\`col-${idx}\`} />`. Every populated `zones` map
+therefore throws:
+
+```
+Could not migrate DropZone "C1:col-0" to slot field.
+No slot exists with the name "col-0".
+```
+
+The catch path is the live path, not a defensive corner. That doesn't make
+Phase 0 pointless — containing that throw is exactly what stops one bad zone
+from blanking a page, and the legacy-root branch does migrate cleanly — but it
+does move the `Columns`→slots port from "cleanup" to "the thing that unblocks
+this." The tests assert the current limitation explicitly rather than skipping
+it, so whoever does Phase 3 gets a failing expectation pointing at the work.
+
+## 10. Measurement
 
 Re-run the parity count with:
 

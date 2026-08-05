@@ -8,6 +8,7 @@ import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
 import { SchedulePanel } from '../components/editor/SchedulePanel';
 import { SeoSettingsPanel } from '../components/editor/SeoSettingsPanel';
+import { migrateContent } from '../components/migrateContent';
 import { editorViewports, emptyData, getPuckConfig } from '../components/puckConfig';
 import { useAutosave } from '../hooks/useAutosave';
 import { useEditorForm } from '../hooks/useEditorForm';
@@ -31,7 +32,13 @@ function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
     canonicalUrl: page?.canonical_url ?? '',
     indexInSearch: page?.index_in_search ?? true,
     jsonLdText: page?.json_ld ? JSON.stringify(page.json_ld, null, 2) : '',
-    data: (page?.draft_data as unknown as Data) || (emptyData as unknown as Data),
+    // Migrated on the way in rather than on save: a draft the author never
+    // touches is never rewritten, so the stored payload only changes shape
+    // once they actually edit it.
+    data: migrateContent(
+      (page?.draft_data as unknown as Data) || (emptyData as unknown as Data),
+      getPuckConfig(),
+    ),
   };
 }
 

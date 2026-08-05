@@ -4,6 +4,7 @@ import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import type { SharedProps } from '@simple-module-py/ui/types';
 
 import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
+import { migrateContent } from '../components/migrateContent';
 import { getPuckConfig } from '../components/puckConfig';
 
 interface Props {
@@ -57,6 +58,12 @@ export default function PublicPage({
   // away when the framework release carrying it lands.
   const { branding } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   const designPack = (branding as unknown as { designPack?: string | null })?.designPack;
+  // Bound once per render because each of the three `migrateContent` calls
+  // below needs the same config its `<Render>` gets — migrating against a
+  // different palette than the one rendering would resolve zones to slots the
+  // renderer doesn't have.
+  const pageConfig = getPuckConfig();
+  const layoutConfig = getLayoutPuckConfig();
   return (
     <div className={designPack ? `${designPack}-root` : undefined}>
       {/* The admin shell mounts this through AuthenticatedLayout; a public page
@@ -97,15 +104,21 @@ export default function PublicPage({
       </Head>
       {layout_header && (
         <header data-testid="site-header">
-          <Render config={getLayoutPuckConfig()} data={layout_header as unknown as Data} />
+          <Render
+            config={layoutConfig}
+            data={migrateContent(layout_header as unknown as Data, layoutConfig)}
+          />
         </header>
       )}
       <main>
-        <Render config={getPuckConfig()} data={data as unknown as Data} />
+        <Render config={pageConfig} data={migrateContent(data as unknown as Data, pageConfig)} />
       </main>
       {layout_footer && (
         <footer data-testid="site-footer">
-          <Render config={getLayoutPuckConfig()} data={layout_footer as unknown as Data} />
+          <Render
+            config={layoutConfig}
+            data={migrateContent(layout_footer as unknown as Data, layoutConfig)}
+          />
         </footer>
       )}
     </div>
