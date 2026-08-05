@@ -14,12 +14,23 @@ interface ImageProps {
   src: string;
   alt: string;
   altKind: AltKind;
+  /** Visible prose under the image. Distinct from `alt`, which describes the
+   *  image to a screen reader — the two are rarely the same sentence. */
+  caption?: string;
   width: number | null;
   height: number | null;
   objectFit: 'cover' | 'contain' | 'fill';
   srcset: string;
   sizes: string;
 }
+
+// Captions read their look from the design pack the way the widget set does,
+// so a tenant restyles them by overriding tokens instead of patching this
+// block. `--pb-caption-color` falls through to the pack's body colour, which
+// is what an unstyled pack (and widgets-base) already defines.
+const CAPTION_CLASS =
+  'mt-2 text-[length:var(--pb-caption-size,0.875rem)] leading-[var(--pb-body-leading,1.625)]';
+const CAPTION_STYLE = { color: 'var(--pb-caption-color, var(--pb-body-color))' };
 
 function resolveSizes(srcset: string, sizes: string): string | undefined {
   if (sizes) return sizes;
@@ -50,6 +61,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
       ],
     },
     alt: { type: 'text' },
+    caption: { type: 'text', label: 'Caption' },
     width: { type: 'number' },
     height: { type: 'number' },
     objectFit: {
@@ -67,6 +79,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
     src: '',
     alt: '',
     altKind: 'meaningful',
+    caption: '',
     width: null,
     height: null,
     objectFit: 'cover',
@@ -96,7 +109,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
       },
     };
   },
-  render: ({ src, alt, altKind, width, height, objectFit, srcset, sizes }) => {
+  render: ({ src, alt, altKind, caption, width, height, objectFit, srcset, sizes }) => {
     if (!src) {
       return (
         <div className="my-3 p-6 border-2 border-dashed border-gray-300 rounded text-center text-gray-500 text-sm">
@@ -105,7 +118,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
       );
     }
     const decorative = altKind === 'decorative';
-    return (
+    const image = (
       <img
         src={src}
         srcSet={srcset || undefined}
@@ -118,8 +131,20 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
         loading="lazy"
         decoding="async"
         style={{ objectFit, maxWidth: '100%' }}
-        className="my-3"
+        // Inside a <figure> the margin belongs to the figure, and `block`
+        // drops the inline descender gap above the caption. Uncaptioned
+        // images keep the exact markup they had before the field existed.
+        className={caption ? 'block' : 'my-3'}
       />
+    );
+    if (!caption) return image;
+    return (
+      <figure className="my-3">
+        {image}
+        <figcaption className={CAPTION_CLASS} style={CAPTION_STYLE}>
+          {caption}
+        </figcaption>
+      </figure>
     );
   },
 };
