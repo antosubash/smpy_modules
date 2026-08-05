@@ -13,6 +13,7 @@ const heights: Record<SpacerProps['size'], number> = {
 };
 
 export const SpacerBlock: ComponentConfig<SpacerProps> = {
+  label: 'Spacer',
   fields: {
     size: {
       type: 'select',

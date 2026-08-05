@@ -6,6 +6,7 @@ interface TextProps {
 }
 
 export const TextBlock: ComponentConfig<TextProps> = {
+  label: 'Text',
   fields: {
     text: { type: 'textarea' },
     align: {

@@ -18,6 +18,7 @@ const gapClass: Record<ColumnsProps['gap'], string> = {
 };
 
 export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
+  label: 'Columns',
   fields: {
     columns: {
       type: 'array',

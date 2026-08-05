@@ -1,6 +1,8 @@
 # Pagebuilder feature parity with IIASA.GeoWiki
 
-**Status:** plan. Phase 0 implemented (§9) and Phase 3's `Columns`→slots half (§10); phases 1, 2, 4, 5 not started.
+**Status:** Phases 0, 2 and 3 done — the widget count now matches at **56**
+(§9, §10, §11). Remaining: Phase 1 (the three diverged primitives),
+Phase 4 (`conversion/`), Phase 5 (`translation/`).
 **Date:** 2026-08-05
 **Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -20,24 +22,28 @@ content-pipeline gap**, not converging the two products. Everything in
 
 ## 1. Measured inventory
 
-| | GeoWiki | Ours |
-|---|---|---|
-| Widgets registered | 55 | 20 |
-| Widget source lines | 8,416 | 4,645 |
-| Shared `_shared/` primitives | 10 | 11 (`social-icon.tsx` extra) |
-| Shared `_internal/` primitives | 6 | 6 |
-| `fields/` (file picker, checkbox) | yes | yes — already ported |
-| `utils/` (`cn`, `parse-list`, `decorative-image`) | yes | yes — already ported |
-| `--pb-*` theme tokens | yes | yes — 17 tokens in `static/widgets-base.css` |
-| HTML ⇄ Puck conversion | yes (355 lines) | **no** |
-| Content translation extract/apply | yes (272 lines) | **no** |
-| `migrateContent` on load | yes (36 lines) | yes — ported, §9 |
+Sections 1–8 are the original survey, kept as the baseline the work was planned
+against. Where something has since been done, the row or heading says so and
+points at the section that records it.
+
+| | GeoWiki | Ours (at survey) | Ours (now) |
+|---|---|---|---|
+| Widgets registered | 55 | 20 | **56** — §11 |
+| Widget source lines | 8,416 | 4,645 | ~8,400 |
+| Shared `_shared/` primitives | 10 | 11 (`social-icon.tsx` extra) | same |
+| Shared `_internal/` primitives | 6 | 6 | same |
+| `fields/` (file picker, checkbox) | yes | already ported | same |
+| `utils/` (`cn`, `parse-list`, `decorative-image`) | yes | already ported | same |
+| `--pb-*` theme tokens | yes | 17, in `static/widgets-base.css` | same |
+| HTML ⇄ Puck conversion | yes (355 lines) | **no** | still no — Phase 4 |
+| Content translation extract/apply | yes (272 lines) | **no** | still no — Phase 5 |
+| `migrateContent` on load | yes (36 lines) | **no** | yes — §9 |
 
 The good news is that the *foundation* is already here. `_shared/`,
 `_internal/`, `fields/` and the `--pb-*` token layer are line-for-line ports.
 The gap is almost entirely widgets plus three self-contained subsystems.
 
-## 2. Gap A — 36 missing widgets
+## 2. Gap A — 36 missing widgets — **closed, see §11**
 
 Shared today (19): Heading, Text, Image, Button, Spacer, PageHeader, Hero,
 EyebrowSection, MediaObject, CallToAction, FeatureCards, Faq, Stats,
@@ -72,12 +78,17 @@ Our `Columns` block — now on slot fields, §10 — overlaps GeoWiki's four-wid
 - **(c) Replace `Columns` with the family + a stored-data migration.** Closest
   to GeoWiki, but it's now the *most* expensive option, not the cheapest.
 
-**The recommendation has flipped to (b).** It was (c) on the reasoning that it
-would share a stored-data migration with the `DropZone`→slots work — but that
-work is done and its migration is written, so (c) no longer amortises against
-anything. It would mean a *second* migration to move authors off a `Columns`
-block that already works. (b) adds what's genuinely missing and leaves the
-working block alone.
+**Resolved as (a)** by the instruction to port all widgets — `Container`,
+`Row`, `Column` and `Grid` all landed alongside `Columns`, no migration needed.
+The palette does now offer more than one route to a two-column row; if that
+proves confusing in use, the cheap follow-up is to move the redundant ones into
+a `_hidden` category rather than delete them, since stored pages may reference
+them.
+
+(For the record, the recommendation had moved from (c) to (b) before this:
+(c)'s appeal was sharing a migration with the `DropZone`→slots work, and once
+that work was done and its migration written, (c) stopped amortising against
+anything.)
 
 ## 3. Gap B — three primitives that diverged (needs data migration)
 
@@ -178,15 +189,14 @@ possible — porting it now would be speculative.
 with their `hN`→`N` and plain-text→`<p>` migrations registered through Phase 0's
 machinery. Highest-risk phase; smallest diff. *~300 lines + 2 migrations.*
 
-**Phase 2 — widget bulk, in four batches.** Text & content (8) → media (4) →
-interactive (2) → sections/actions (18, Timeline split). Each batch is a
-self-contained PR: widgets + registry + category + a rendering test per widget.
-*~3,400 lines.*
+**Phase 2 — widget bulk. ✅ done (§11).** Landed as one change rather than the
+four planned batches: the port turned out to be mechanical once the shared
+primitives were confirmed present, so splitting it would have added review
+surface without reducing risk. Coverage came as a catalogue-wide render test
+instead of a per-widget e2e page.
 
-**Phase 3 — layout family.** The `Columns`→slots half is **done (§10)**; what
-remains is the §2 decision about whether to also port `Container` / `Row` /
-`Column` / `Grid`. That decision no longer blocks anything: the migration it
-was going to share has already been written.
+**Phase 3 — layout family. ✅ done (§10 + §11).** `Columns`→slots in §10;
+`Container` / `Row` / `Column` / `Grid` with the rest of the bulk.
 
 **Phase 4 — conversion.** Port `conversion/` plus its 5 test files. Needs no
 server changes: it is pure data transformation.
@@ -195,12 +205,10 @@ server changes: it is pure data transformation.
 
 ## 8. Open questions
 
-1. **Is the widget bulk actually wanted, or only a subset?** 36 widgets is the
-   dominant cost of this plan. Several (Welcome, UnderConstruction,
-   Leaderboard, AppStoreBadges) look specific to GeoWiki's product rather than
-   generally useful in a distributable module. A named subset would cut Phase 2
-   substantially.
-2. **Layout: option (a), (b) or (c)?** Recommendation is now (b) — see §2; it changed once the shared migration landed.
+1. ~~**Is the widget bulk actually wanted, or only a subset?**~~ **Answered:
+   all of them.** Done — §11.
+2. ~~**Layout: option (a), (b) or (c)?**~~ **Resolved as (a)** by the above —
+   see §2.
 3. **Where does translated page content live?** GeoWiki's `translation/` is
    pure functions with no persistence; this repo would need a table and an
    Alembic revision in `host/migrations/versions/` under a `pagebuilder` branch
@@ -278,7 +286,90 @@ so the switch is now a two-line change (`PublicPage`'s `Render` import and
 `migrateContent`'s `migrate` import) whenever it's wanted. Both were verified
 green on the full 46-test e2e suite before reverting.
 
-## 11. Measurement
+## 11. All 36 widgets ported
+
+Answering §8 Q1 with "port all widgets", so the layout question in §2 resolved
+to option (a) as a side effect — `Container` / `Row` / `Column` / `Grid` all
+landed alongside the existing `Columns`.
+
+**The count now matches: 56 blocks on both sides.**
+
+The port itself was mechanical, because the earlier work had already brought
+across everything the widgets *depend on*. Only three import paths differ, and
+one of those was a file we already had under a different name:
+
+| GeoWiki | here |
+|---|---|
+| `../utils` | `../../utils/widgetUtils` |
+| `../fields` | `../../fields` |
+| `../conversion/markdown` | `../../utils/markdown` (same file) |
+
+Three things needed judgement rather than a rewrite rule:
+
+**Image fields.** GeoWiki declares them as plain text and swaps in the picker
+centrally via `IMAGE_FIELDS` / `ARRAY_IMAGE_FIELDS` in `createPuckConfig`. This
+module inlines `createImageField(mediaLibraryAdapter, …)` at the field instead,
+so 12 fields across 11 widgets were converted by hand. One deliberate
+divergence: GeoWiki patches `Leaderboard.top.avatarUrl` but not
+`Leaderboard.rows.avatarUrl` — same avatar, same widget, and a picker on one
+with a raw text box on the other is a worse editor, not a more faithful one, so
+both are wired.
+
+**Timeline.** At 472 lines it was the only widget over the 300-line cap, split
+the way `media-object` already was: `timeline-layout.ts` (types + marker
+geometry), `timeline-render.tsx`, `timeline-widget.tsx` (fields).
+
+**The catalogue.** 56 entries would have pushed `puckConfig.tsx` well past the
+cap, so the list moved to `widgetCatalog.ts`, leaving the config file with the
+root definition and registry merge — the parts that don't grow. The props type
+is now *derived* rather than hand-listed:
+
+```ts
+type PropsOf<T> = T extends ComponentConfig<infer P> ? P : never;
+export type CatalogProps = {
+  [K in keyof typeof catalogComponents]: PropsOf<(typeof catalogComponents)[K]>;
+};
+```
+
+That replaces what would have been a second 56-entry list to keep in step, and
+it fixes the slot problem from §10 generally: the old `WidgetProps` helper read
+a block's props off its *render* signature, where Puck has already rewritten
+`Slot` to `SlotComponent`. `PropsOf` reads them off the config, which carries
+the stored form. Verified by type probe that it recovers real unions rather
+than collapsing to `never` — an invalid heading level is still a compile error.
+
+Categories were extended with **Interactive** (Accordion, Tabs) and **Utility**
+(Html, Alert, SocialBanner, UnderConstruction, Welcome), and `CenteredHero` is
+palette-hidden as it is upstream. `catalogCategories` is typed against the
+catalogue's own keys, so a category naming a block that doesn't exist is a
+compile error rather than an entry that silently never appears.
+
+### Coverage
+
+`widgetCatalog.test.tsx` renders **every** block with its own `defaultProps`
+through `renderToStaticMarkup` — no jsdom needed, and it is what an author gets
+the instant they drag one in. Plus three structural invariants: every block
+filed under exactly one category, every block labelled, every field given a
+default. Unit tests went 22 → 81.
+
+That last invariant caught a real (if cosmetic) gap: the six original blocks
+had no `label` while all 50 ported ones did. Puck falls back to the raw key, so
+nothing was broken — but the palette was inconsistent, and it is now.
+
+### Cost
+
+| | before | after |
+|---|---|---|
+| public `/p/{slug}` | 1115 kB | 1179 kB |
+| editor | 1132 kB | 1196 kB |
+| shared | 478 kB | 478 kB |
+
+**+64 kB for 36 widgets** — they share the `_shared` / `_internal` primitives
+that were already in the bundle. For context, the `/rsc` switch from §10 is now
+worth more than it was: it would take the public page to roughly 664 kB, well
+under where it started.
+
+## 12. Measurement
 
 Re-run the parity count with:
 

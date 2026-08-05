@@ -16,6 +16,7 @@ const sizeClass: Record<HeadingProps['level'], string> = {
 };
 
 export const HeadingBlock: ComponentConfig<HeadingProps> = {
+  label: 'Heading',
   fields: {
     text: { type: 'text' },
     level: {

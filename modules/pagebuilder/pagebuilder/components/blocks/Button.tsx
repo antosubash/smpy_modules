@@ -14,6 +14,7 @@ const variantClass: Record<ButtonProps['variant'], string> = {
 };
 
 export const ButtonBlock: ComponentConfig<ButtonProps> = {
+  label: 'Button',
   fields: {
     label: { type: 'text' },
     href: { type: 'text' },
