@@ -141,6 +141,7 @@ jobs:
       matrix:
         package:
           - simple_module_pagebuilder
+          - simple_module_news
     steps:
       - uses: actions/download-artifact@v4
         with:

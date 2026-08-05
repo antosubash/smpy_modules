@@ -192,7 +192,7 @@ async def update(
     article: NewsArticle,
     *,
     category: str | None = None,
-    published_at: datetime | None | _Unset = UNSET,
+    published_at: datetime | _Unset | None = UNSET,
 ) -> NewsArticle:
     if category is not None:
         article.category = category

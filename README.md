@@ -13,6 +13,7 @@ and adds one dependency line, no registration code.
 | Directory | Package | Purpose |
 |---|---|---|
 | `modules/pagebuilder` | [`simple_module_pagebuilder`](https://pypi.org/project/simple_module_pagebuilder/) | Drag-and-drop visual page builder with revisions, approvals, media library, scheduling, and SEO |
+| `modules/news` | [`simple_module_news`](https://pypi.org/project/simple_module_news/) | News articles backed by page-builder pages — listing API, category/date metadata, and a live feed block |
 
 ## Layout
 

@@ -71,7 +71,14 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n.** Pagebuilder's TSX copy is hardcoded English; there is no
-  `locales/en.json`. Other first-party modules have one.
+- **UI i18n.** No module here is translated — pagebuilder, news and
+  canopy_atlas all have hardcoded English TSX and no `locales/en.json`. The
+  framework's own modules do have one, but the convention depends on
+  `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`) and **this
+  repo's host does not wire i18n at all** — no dependency, no loader, no
+  generation step. So adding a `locales/en.json` to one module here does
+  nothing on its own; the host has to adopt the framework's i18n first, and
+  then all three modules convert together. Don't do it piecemeal during
+  unrelated work.
 - **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
   repo is canonical; that one is frozen.

@@ -1,7 +1,7 @@
 # News module — release readiness — design
 
 **Date:** 2026-08-05
-**Status:** proposed
+**Status:** implemented, except where marked *As built*.
 **Module:** `modules/news` → `simple_module_news`
 
 ## Goal
@@ -408,6 +408,16 @@ repo has a locales file to copy, the convention has to come from the framework
 repo. If that turns out to be unsettled, item 4 is dropped from this spec and
 recorded in `CLAUDE.md` alongside the existing pagebuilder i18n note, rather
 than inventing a convention during a release-prep change.
+
+**As built — item 4 was dropped.** The framework's modules do have
+`locales/en.json`, but the convention depends on `@simple-module-py/i18n`
+(`t(keys.<module>.<section>.<key>)`), and this repo's host wires no i18n at
+all: no dependency, no loader, no generation step. A `locales/en.json` added to
+news alone would be a file nothing reads. Adopting i18n is a host-level change
+that pagebuilder and canopy_atlas have to make at the same time, so it is now
+recorded in `CLAUDE.md` as deferred work with that reasoning, and the
+pre-existing note there — which implied only pagebuilder was affected — was
+corrected.
 
 **Not automatable — needs the maintainer.** PyPI Trusted Publishing must be
 configured once for the `simple_module_news` project name before the matrix
