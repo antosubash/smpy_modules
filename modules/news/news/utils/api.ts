@@ -48,9 +48,14 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
 
 const CSRF_COOKIE = 'news_csrf';
 const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
-/** Any GET under pagebuilder's admin prefix makes its middleware mirror the
- *  session CSRF token into a readable cookie. Cheapest one available. */
-const PAGEBUILDER_CSRF_PRIMER = '/api/pagebuilder/pages?limit=1';
+/** A pagebuilder *view* route, deliberately not one of its API routes.
+ *
+ *  Only the view router carries the dependency that mints the CSRF token into
+ *  the session; the API router merely validates one. Its cookie middleware can
+ *  therefore only mirror a token that a view request already created, so
+ *  priming against `/api/pagebuilder/...` returns 200 and sets nothing.
+ */
+const PAGEBUILDER_CSRF_PRIMER = '/pagebuilder/';
 
 function readCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -119,7 +124,7 @@ async function pagebuilderCsrfToken(): Promise<string | null> {
   if (existing) return existing;
   await fetch(PAGEBUILDER_CSRF_PRIMER, {
     credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'text/html' },
   });
   return readCookie(PAGEBUILDER_CSRF_COOKIE);
 }

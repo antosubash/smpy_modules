@@ -32,10 +32,6 @@ var/
 playwright-report/
 test-results/
 .playwright-mcp/
-# QA / verify run artifacts — screenshots, reports, scratch databases.
-.qa/
-.verify/
-qa.db*
 
 # macOS
 .DS_Store
@@ -43,3 +39,5 @@ qa.db*
 # QA / verify pipeline artifacts (/qa, /vf)
 .qa/
 .verify/
+# Scratch database a /qa run boots against, so it never touches host/app.db.
+qa.db*
