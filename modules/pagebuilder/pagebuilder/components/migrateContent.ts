@@ -57,8 +57,15 @@ type ColumnItem = { width?: number; content?: Content };
  * silent, which is the failure this function exists to prevent.
  */
 const COLUMN_ZONE = /^col-(\d+)$/;
-/** Guards the loop below against an absurd index in stored data. */
-const MAX_COLUMNS = 64;
+/**
+ * Ceiling on a column index taken from a *zone name*, which is the only input
+ * here with no natural bound — `col-500000` would otherwise size the loop
+ * below. It deliberately does not cap the stored `columns` array: that is real
+ * author data, however long, and clamping it would trade an allocation worry
+ * for silent content loss. An index past the ceiling isn't dropped either; it
+ * falls through to the unclaimed sweep.
+ */
+const MAX_ZONE_INDEX = 64;
 
 function migrateColumnsZones(
   props: { id: string } & Record<string, unknown>,
@@ -70,14 +77,11 @@ function migrateColumnsZones(
   for (const [name, blocks] of Object.entries(zones)) {
     const match = COLUMN_ZONE.exec(name);
     const index = match ? Number(match[1]) : -1;
-    if (index >= 0 && index < MAX_COLUMNS) indexed.set(index, blocks);
+    if (index >= 0 && index < MAX_ZONE_INDEX) indexed.set(index, blocks);
     else if (Array.isArray(blocks)) unclaimed.push(...blocks);
   }
 
-  const count = Math.min(
-    Math.max(stored.length, ...[...indexed.keys()].map((n) => n + 1), 0),
-    MAX_COLUMNS,
-  );
+  const count = Math.max(stored.length, ...[...indexed.keys()].map((n) => n + 1), 0);
 
   const columns: ColumnItem[] = [];
   for (let i = 0; i < count; i += 1) {

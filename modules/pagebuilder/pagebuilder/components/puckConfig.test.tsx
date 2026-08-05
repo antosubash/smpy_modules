@@ -66,12 +66,24 @@ describe('getLayoutPuckConfig', () => {
     expect(names).not.toContain('Leaderboard');
     expect(names).not.toContain('Timeline');
     expect(names).not.toContain('Newsletter');
-    // Every name offered must be filed under a category — an uncategorised
-    // block is exactly what lands in "Other".
+    // Every built-in must be filed under a category, since an uncategorised
+    // block is what lands in Puck's "Other" group. This holds for built-ins
+    // only — the registry is empty here, and a module registering with
+    // `layout: true` and no category still joins `components` by design.
     const categorised = Object.values(getLayoutPuckConfig().categories ?? {}).flatMap(
       (c) => c.components ?? [],
     );
     expect(names.filter((n) => !categorised.includes(n))).toEqual([]);
+  });
+
+  it('still renders a block that was offered here before the palette was curated', () => {
+    // Puck renders nothing for a type its config doesn't know — no error, no
+    // placeholder. A footer saved with a ContactForm back when the layout
+    // palette was the whole page palette must not silently lose that section.
+    const names = Object.keys(getLayoutPuckConfig().components);
+    expect(names).toEqual(expect.arrayContaining(['ContactForm', 'Hero', 'PageHeader']));
+    // ...but they are not offered: `_legacy` is `visible: false`.
+    expect(getLayoutPuckConfig().categories?._legacy?.visible).toBe(false);
   });
 
   it('excludes a page-only registration', () => {

@@ -89,6 +89,26 @@ describe('migrateContent', () => {
     expect(warn).toHaveBeenCalled();
   });
 
+  it('keeps every stored column, however many there are', () => {
+    // The zone-index ceiling exists to stop an absurd zone *name* sizing the
+    // loop. It must not clamp the stored `columns` array — that is real author
+    // data, and trading an allocation worry for silent content loss would be
+    // the wrong side of the deal.
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const columns = Array.from({ length: 70 }, (_, i) => ({ width: i }));
+    const legacy = {
+      content: [{ type: 'Columns', props: { id: 'C1', gap: 'md', columns } }],
+      root: { props: {} },
+      zones: { 'C1:col-0': [{ type: 'Text', props: { id: 't', text: 'x' } }] },
+    } as unknown as Data;
+
+    const result = migrateContent(legacy, getPuckConfig());
+
+    const out = result.content?.[0]?.props?.columns as { width: number }[];
+    expect(out).toHaveLength(70);
+    expect(out[69].width).toBe(69);
+  });
+
   it('leaves an empty zones map alone', () => {
     // Puck writes `zones: {}` on pages that once held a DropZone and no longer
     // do. Treating that as legacy would migrate every such page on every
