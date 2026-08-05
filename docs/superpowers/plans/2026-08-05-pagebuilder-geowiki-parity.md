@@ -1,8 +1,10 @@
 # Pagebuilder feature parity with IIASA.GeoWiki
 
-**Status:** Phases 0–3 done — the widget count matches at **56** and the
-three diverged primitives are aligned (§9–§12). Remaining: Phase 4
-(`conversion/`), Phase 5 (`translation/`).
+**Status:** Parity reached, with two documented exceptions. Widgets match at
+**56**, the diverged primitives are aligned, `translation/` is ported in full
+and `blocksToHtml` with it (§9–§13). Not ported: `htmlToBlocks` and
+`isPuckContent` — §13 says why, and it is a judgement worth revisiting rather
+than an oversight.
 **Date:** 2026-08-05
 **Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -35,8 +37,9 @@ points at the section that records it.
 | `fields/` (file picker, checkbox) | yes | already ported | same |
 | `utils/` (`cn`, `parse-list`, `decorative-image`) | yes | already ported | same |
 | `--pb-*` theme tokens | yes | 17, in `static/widgets-base.css` | same |
-| HTML ⇄ Puck conversion | yes (355 lines) | **no** | still no — Phase 4 |
-| Content translation extract/apply | yes (272 lines) | **no** | still no — Phase 5 |
+| Puck → HTML | yes | **no** | yes — §13 |
+| HTML → Puck | yes | **no** | held, §13 |
+| Content translation extract/apply | yes (272 lines) | **no** | yes — §13 |
 | `migrateContent` on load | yes (36 lines) | **no** | yes — §9 |
 
 The good news is that the *foundation* is already here. `_shared/`,
@@ -128,7 +131,7 @@ respectively). It is not broken today, but it is load-bearing coincidence —
 the port to GeoWiki's explicit `ALIGN_CLASS` lookup maps removes the hazard as
 a side effect.
 
-## 4. Gap C — three missing subsystems
+## 4. Gap C — three missing subsystems — **closed, see §9 and §13**
 
 ### `conversion/` (~355 lines) — HTML ⇄ Puck
 `blocks-to-html` 58, `html-to-blocks` 111, `markdown` 163, `is-puck-content`
@@ -202,10 +205,12 @@ instead of a per-widget e2e page.
 **Phase 3 — layout family. ✅ done (§10 + §11).** `Columns`→slots in §10;
 `Container` / `Row` / `Column` / `Grid` with the rest of the bulk.
 
-**Phase 4 — conversion.** Port `conversion/` plus its 5 test files. Needs no
-server changes: it is pure data transformation.
+**Phase 4 — conversion. ◐ partly done (§13).** `blocksToHtml` ported and
+adapted; `htmlToBlocks` / `isPuckContent` held, with reasons.
 
-**Phase 5 — translation.** Port `translation/`. Blocked on the §8 decision.
+**Phase 5 — translation. ✅ done (§13).** Not blocked after all: upstream's
+version is pure functions with no storage either, so porting it at parity never
+needed the schema decision. Wiring it to a route still would.
 
 ## 8. Open questions
 
@@ -213,10 +218,10 @@ server changes: it is pure data transformation.
    all of them.** Done — §11.
 2. ~~**Layout: option (a), (b) or (c)?**~~ **Resolved as (a)** by the above —
    see §2.
-3. **Where does translated page content live?** GeoWiki's `translation/` is
-   pure functions with no persistence; this repo would need a table and an
-   Alembic revision in `host/migrations/versions/` under a `pagebuilder` branch
-   label. That's a schema decision, not a port.
+3. **Where does translated page content live?** Still open, but it never
+   blocked the port (§13) — it is the question for *using* translation, not
+   for having it. A host that wants it needs a table and an Alembic revision
+   in `host/migrations/versions/` under a `pagebuilder` branch label.
 4. ~~**Does `Text` becoming rich text change the public-page CSP?**~~
    **Answered by not creating the question** — Text renders parsed markdown,
    never stored HTML, so there is no sanitisation boundary to confirm. §12.
@@ -436,7 +441,71 @@ that the expected class is present, and that version does fail when the default
 is taken away. Worth stating because the failure mode is invisible: nothing
 crashes, the button is just unstyled.
 
-## 13. Measurement
+## 13. `translation/` ported, `conversion/` ported in part — and why
+
+### `translation/` — complete, and simpler than upstream
+
+`extract` / `apply` / `translatable-fields` are here, pure and with no storage
+of their own, exactly as upstream. `applyTranslatedStrings` is the exact
+inverse of `extractTranslatableStrings`: feed it the strings it just gave you
+and the document comes back structurally identical.
+
+**The `IMAGE_FIELDS` / `ARRAY_IMAGE_FIELDS` plumbing dropped out.** Upstream
+needs it because an image field is declared `type: "text"` there and only
+swapped for the picker when the config is assembled — by name it is
+indistinguishable from copy, so a second map has to list every one. This module
+inlines `createImageField` at the field, which yields `type: "custom"`, so the
+image fields fail the text-type check and are excluded structurally. Two maps
+and their two lookup helpers stop being necessary. §11's inlining paid for
+itself here.
+
+**One thing upstream's version would have got wrong here:** it walks `array`
+fields and the `zones` map, because that is where nested blocks lived. Since
+§10, ours live in a **slot** — `Columns.columns[].content` — and a walker with
+no rule for slots finds the Columns block, sees a field type it doesn't handle,
+and silently skips everything the author nested inside. The blocks are right
+there and nothing looks at them. `extract.ts` recurses into slots through
+`visitBlock`, and there are two tests for it that both fail if the branch is
+removed (checked, not assumed). `zones` traversal is kept as well, for
+documents that haven't been through the editor since the migration.
+
+### `conversion/` — `blocksToHtml` yes, `htmlToBlocks` held
+
+`blocksToHtml` is ported and adapted: Heading accepts both level spellings,
+Image carries `width`/`height` when the picker stored them, Quote attributes
+from `author`/`source`, and unconvertible types are named in `lossyTypes` so a
+caller can say precisely what didn't survive.
+
+The one real adaptation is **Text, which inverts upstream's logic**. Over there
+the field holds HTML, so `blocksToHtml` passes it through and only escapes it
+when it looks like legacy plain text. Here it holds markdown (§12), so it goes
+through `markdownToHtml` — `**x**` has to *become* an element, and anything
+tag-shaped in it is literal content that has to be escaped. Passing it through,
+which is correct upstream, would print asterisks on the page here. Both
+directions have a test.
+
+**`htmlToBlocks` and `isPuckContent` are deliberately not ported.** They exist
+upstream to solve a problem this repo doesn't have: GeoWiki's CMS stores page
+content that may be *either* HTML or Puck JSON, so it needs to sniff which one
+it has and import the HTML case. Here a pagebuilder page is always Puck JSON —
+there is no dual-format storage, no format to detect, and no legacy HTML to
+import. Porting them would mean:
+
+- a new `jsdom` dev dependency (they use `DOMParser`, and this repo's vitest
+  runs in `node` with no DOM), and
+- a new HTML→markdown converter, because our `Text` holds markdown rather than
+  HTML, so upstream's "accumulate flow content into a Text block" step has no
+  direct equivalent. Routing that content to `Html` blocks instead isn't a
+  substitute — ours renders in a fixed-height sandboxed iframe, so every
+  paragraph would become its own 400px frame.
+
+That is a real amount of machinery, a new dependency, and a new failure surface
+for a capability nothing calls. It is the same judgement made in §9 about
+`is-puck-content` and for the same reason. **If a route ever needs to import
+HTML pages, this is the thing to build** — the note is here so the decision is
+visible rather than looking like an omission.
+
+## 14. Measurement
 
 Re-run the parity count with:
 
