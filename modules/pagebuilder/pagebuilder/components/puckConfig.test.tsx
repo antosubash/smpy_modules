@@ -76,12 +76,31 @@ describe('getLayoutPuckConfig', () => {
     expect(names.filter((n) => !categorised.includes(n))).toEqual([]);
   });
 
-  it('still renders a block that was offered here before the palette was curated', () => {
+  it('still renders every block that was offered here before the palette was curated', () => {
     // Puck renders nothing for a type its config doesn't know — no error, no
     // placeholder. A footer saved with a ContactForm back when the layout
     // palette was the whole page palette must not silently lose that section.
+    //
+    // The full list, not a sample: this is the set the site-layout editor
+    // offered before the catalogue grew, so any one of them could be sitting in
+    // a stored header or footer, and dropping any one is the same silent loss.
     const names = Object.keys(getLayoutPuckConfig().components);
-    expect(names).toEqual(expect.arrayContaining(['ContactForm', 'Hero', 'PageHeader']));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'PageHeader',
+        'Hero',
+        'EyebrowSection',
+        'MediaObject',
+        'CallToAction',
+        'FeatureCards',
+        'Faq',
+        'Stats',
+        'ArticleCards',
+        'ContactCards',
+        'ContactForm',
+        'Tags',
+      ]),
+    );
     // ...but they are not offered: `_legacy` is `visible: false`.
     expect(getLayoutPuckConfig().categories?._legacy?.visible).toBe(false);
   });
