@@ -6,7 +6,7 @@
  * build can't reach `<Puck>`/`<Render>` in a shape they no longer understand.
  */
 
-import { type Config, type Data, migrate } from '@puckeditor/core';
+import { type Config, type Content, type Data, migrate } from '@puckeditor/core';
 
 /**
  * Pre-slots payloads keep nested content in a top-level `zones` map keyed
@@ -26,6 +26,44 @@ function hasLegacyShape(data: Data): boolean {
   return !!root && !('props' in root) && Object.keys(root).length > 0;
 }
 
+/** A `Columns` column, pre- and post-migration. */
+type ColumnItem = { width?: number; content?: Content };
+
+/**
+ * Fold a pre-slots `Columns` block's zones into its array slots.
+ *
+ * Puck's own zone→slot conversion only matches a zone against a *top-level*
+ * slot field of the same name. `Columns` can't have one: the column count is
+ * author-controlled, so its slot lives at `columns[i].content` inside an array
+ * field. `migrateDynamicZonesForComponent` is the escape hatch for exactly
+ * that shape — Puck hands us the block's props plus its zones (keyed by bare
+ * prop name, `col-0` / `col-1` / …) and takes whatever props we return.
+ *
+ * The zone index is authoritative, not the stored `columns` array: a page
+ * saved after a column was removed can still carry a zone for it. Sizing the
+ * result to cover both means such orphaned content reappears in a real column
+ * instead of being silently dropped on migration.
+ */
+function migrateColumnsZones(
+  props: { id: string } & Record<string, unknown>,
+  zones: Record<string, Content>,
+): { id: string } & Record<string, unknown> {
+  const stored = Array.isArray(props.columns) ? (props.columns as ColumnItem[]) : [];
+  const zoneIndices = Object.keys(zones)
+    .map((name) => Number.parseInt(name.replace(/^col-/, ''), 10))
+    .filter((n) => Number.isInteger(n) && n >= 0);
+  const count = Math.max(stored.length, ...zoneIndices.map((n) => n + 1), 0);
+
+  const columns: ColumnItem[] = [];
+  for (let i = 0; i < count; i += 1) {
+    columns.push({
+      width: stored[i]?.width ?? 1,
+      content: zones[`col-${i}`] ?? stored[i]?.content ?? [],
+    });
+  }
+  return { ...props, columns };
+}
+
 /**
  * Run Puck's `migrate()`, but only when the payload actually carries a legacy
  * shape.
@@ -36,21 +74,21 @@ function hasLegacyShape(data: Data): boolean {
  * are the overwhelming majority would put two needless walks and a console
  * line on the hot path.
  *
- * `migrate()` throws on a zone it can't convert, and today that is *every*
- * populated zones map we could be handed: it only converts a zone into a slot
- * field of the same name, and no component in either config declares one —
- * `Columns`, our only nesting block, still renders `<DropZone zone="col-N">`.
- * So the catch below is the live path, not a defensive corner. Returning the
- * original data keeps the legacy DropZone rendering path working, which is
- * what those pages were relying on anyway.
- *
- * Porting `Columns` to slot fields is what turns the success path on; until
- * then this function's job for zones payloads is purely to contain the throw.
+ * `migrate()` still throws on a zone nothing claims — a zone whose owning
+ * component is no longer in the tree, say. Returning the original data there
+ * keeps the rest of the page rendering: the blast radius stays at the one bad
+ * zone rather than the whole document.
  */
-export function migrateContent(data: Data, config: Config): Data {
+export function migrateContent<T extends Data>(data: T, config: Config): T {
   if (!hasLegacyShape(data)) return data;
   try {
-    return migrate(data, config);
+    // Generic because this is shape-preserving: the same document comes back,
+    // only reshaped internally. `migrate()` is declared against the loose
+    // `Data`, so the narrowing it can't express is asserted once here rather
+    // than at each of the four call sites.
+    return migrate(data, config, {
+      migrateDynamicZonesForComponent: { Columns: migrateColumnsZones },
+    }) as T;
   } catch (err) {
     console.error('[pagebuilder] Could not migrate legacy content; rendering as-is:', err);
     return data;

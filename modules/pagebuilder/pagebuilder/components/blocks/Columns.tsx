@@ -1,7 +1,13 @@
-import { type ComponentConfig, DropZone } from '@puckeditor/core';
+import type { ComponentConfig, Slot } from '@puckeditor/core';
 
-interface ColumnsProps {
-  columns: { width: number }[];
+export interface ColumnsProps {
+  /**
+   * `width` is a flex ratio, not a fraction — two columns at 1 and 2 split
+   * 1/3 : 2/3. `content` is the column's own slot; it lives inside the array
+   * so the number of columns stays author-controlled. A top-level slot field
+   * per column would cap the block at however many we declared.
+   */
+  columns: { width: number; content: Slot }[];
   gap: 'sm' | 'md' | 'lg';
 }
 
@@ -17,8 +23,9 @@ export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
       type: 'array',
       arrayFields: {
         width: { type: 'number' },
+        content: { type: 'slot' },
       },
-      defaultItemProps: { width: 1 },
+      defaultItemProps: { width: 1, content: [] },
     },
     gap: {
       type: 'select',
@@ -30,19 +37,27 @@ export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
     },
   },
   defaultProps: {
-    columns: [{ width: 1 }, { width: 1 }],
+    columns: [
+      { width: 1, content: [] },
+      { width: 1, content: [] },
+    ],
     gap: 'md',
   },
   render: ({ columns, gap }) => (
     <div className={`flex flex-wrap ${gapClass[gap]} my-4`}>
-      {columns.map((col, idx) => (
-        // The index IS the column's identity — the DropZone name below is
-        // derived from it, so reordering moves the zone's contents regardless.
-        // biome-ignore lint/suspicious/noArrayIndexKey: index is the column's identity
-        <div key={idx} style={{ flex: col.width }} className="min-w-0">
-          <DropZone zone={`col-${idx}`} />
-        </div>
-      ))}
+      {columns.map((col, idx) => {
+        // Puck hands each slot back as a component, so it has to be bound to a
+        // capitalised name before it can be used as an element.
+        const Content = col.content;
+        return (
+          // The index IS the column's identity — it's what the pre-slots zone
+          // name was derived from, and what the migration maps back onto.
+          // biome-ignore lint/suspicious/noArrayIndexKey: index is the column's identity
+          <div key={idx} style={{ flex: col.width }} className="min-w-0">
+            <Content />
+          </div>
+        );
+      })}
     </div>
   ),
 };

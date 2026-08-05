@@ -22,33 +22,45 @@ describe('migrateContent', () => {
     expect(log).not.toHaveBeenCalledWith(expect.stringContaining('Migrating DropZones'));
   });
 
-  it('survives a Columns zone, which cannot migrate while Columns uses DropZone', () => {
-    // Documents a real limitation, not a hypothetical one. `Columns` is the
-    // only nesting block we ship and it renders `<DropZone zone="col-N">`;
-    // migrate() can only convert a zone into a *slot field* of the same name,
-    // and no component in our config declares one. So every stored page with a
-    // populated zones map takes the catch path below — which is precisely why
-    // this module exists, and why the Columns→slots port is a prerequisite for
-    // zone migration ever succeeding rather than optional cleanup.
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('folds Columns zones into the per-column array slots', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const legacy = {
-      content: [{ type: 'Columns', props: { id: 'C1', columns: [{}, {}] } }],
+      content: [{ type: 'Columns', props: { id: 'C1', gap: 'md', columns: [{}, {}] } }],
       root: { props: {} },
       zones: {
-        'C1:col-0': [{ type: 'Heading', props: { id: 'h1', text: 'Nested', level: 'h2' } }],
+        'C1:col-0': [{ type: 'Heading', props: { id: 'h1', text: 'Left', level: 'h2' } }],
+        'C1:col-1': [{ type: 'Text', props: { id: 't1', text: 'Right' } }],
       },
     } as unknown as Data;
 
     const result = migrateContent(legacy, getPuckConfig());
 
-    expect(result).toBe(legacy);
-    expect(error).toHaveBeenCalled();
-    // The zones map is left intact, so the nested heading is still reachable
-    // by the renderer's legacy DropZone path.
-    expect(
-      (result as unknown as { zones: Record<string, unknown> }).zones['C1:col-0'],
-    ).toBeTruthy();
+    expect((result as unknown as { zones?: unknown }).zones).toBeUndefined();
+    const columns = result.content?.[0]?.props?.columns as { content: { props: unknown }[] }[];
+    expect(columns[0].content[0].props).toMatchObject({ text: 'Left' });
+    expect(columns[1].content[0].props).toMatchObject({ text: 'Right' });
+  });
+
+  it('recovers a zone whose column was deleted before the migration', () => {
+    // A page saved after a column was removed still carries that column's
+    // zone. Sizing the result to the zone indices as well as the stored array
+    // means the orphaned block resurfaces in a real column instead of being
+    // dropped on the floor — silently losing author content during a migration
+    // is the one failure mode here that can't be undone.
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const legacy = {
+      content: [{ type: 'Columns', props: { id: 'C1', gap: 'md', columns: [{ width: 1 }] } }],
+      root: { props: {} },
+      zones: {
+        'C1:col-1': [{ type: 'Heading', props: { id: 'h9', text: 'Orphan', level: 'h2' } }],
+      },
+    } as unknown as Data;
+
+    const result = migrateContent(legacy, getPuckConfig());
+
+    const columns = result.content?.[0]?.props?.columns as { content: { props: unknown }[] }[];
+    expect(columns).toHaveLength(2);
+    expect(columns[1].content[0].props).toMatchObject({ text: 'Orphan' });
   });
 
   it('leaves an empty zones map alone', () => {

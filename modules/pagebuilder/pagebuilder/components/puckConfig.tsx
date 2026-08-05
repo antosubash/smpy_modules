@@ -15,7 +15,7 @@ import {
 } from './blockRegistry';
 
 import { ButtonBlock } from './blocks/Button';
-import { ColumnsBlock } from './blocks/Columns';
+import { ColumnsBlock, type ColumnsProps } from './blocks/Columns';
 import { HeadingBlock } from './blocks/Heading';
 import { ImageBlock } from './blocks/Image';
 import { SpacerBlock } from './blocks/Spacer';
@@ -59,12 +59,23 @@ type WidgetProps<T extends { render: (props: never) => unknown }> = Omit<
   'id' | 'puck' | 'editMode'
 >;
 
+/**
+ * Slot-bearing blocks can't use `WidgetProps` and must name their props type
+ * directly.
+ *
+ * Puck maps a `Slot` (the stored array) to a `SlotComponent` (a renderable) on
+ * its way into `render`, and that mapping is one-way — recovering the props
+ * from the render signature yields the component form, which is not what
+ * `defaultProps` and the stored data use. `Columns` is the only such block
+ * today; the widened `Config` key below is deliberate, not an oversight.
+ */
+
 type PuckComponents = {
   Heading: WidgetProps<typeof HeadingBlock>;
   Text: WidgetProps<typeof TextBlock>;
   Image: WidgetProps<typeof ImageBlock>;
   Button: WidgetProps<typeof ButtonBlock>;
-  Columns: WidgetProps<typeof ColumnsBlock>;
+  Columns: ColumnsProps;
   Spacer: WidgetProps<typeof SpacerBlock>;
   PageHeader: WidgetProps<typeof PageHeaderWidget>;
   Hero: WidgetProps<typeof HeroWidget>;

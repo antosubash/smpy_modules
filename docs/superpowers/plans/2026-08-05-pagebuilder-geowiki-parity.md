@@ -1,6 +1,6 @@
 # Pagebuilder feature parity with IIASA.GeoWiki
 
-**Status:** plan. Phase 0 implemented (§9); phases 1–5 not started.
+**Status:** plan. Phase 0 implemented (§9) and Phase 3's `Columns`→slots half (§10); phases 1, 2, 4, 5 not started.
 **Date:** 2026-08-05
 **Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -61,21 +61,23 @@ SimpleActionList 98, Alert 47, UnderConstruction 41, Welcome 38
 
 ### Layout needs a decision, not a port
 
-Our single `Columns` block (48 lines, legacy `DropZone`) overlaps GeoWiki's
-four-widget `Container` / `Row` / `Column` / `Grid` family. Porting all four
-alongside `Columns` gives authors five confusable ways to make a two-column
-row. Options:
+Our `Columns` block — now on slot fields, §10 — overlaps GeoWiki's four-widget
+`Container` / `Row` / `Column` / `Grid` family. Porting all four alongside
+`Columns` gives authors five confusable ways to make a two-column row. Options:
 
-- **(a) Port the family, keep `Columns` as a deprecated alias.** Full parity;
-  costs a palette that's briefly confusing and a later removal.
-- **(b) Port `Container` + `Grid` only.** Covers what `Row`/`Column` do via
-  slot fields without duplicating `Columns`. Not literal parity.
-- **(c) Replace `Columns` with the family + a stored-data migration.** Cleanest
-  end state, and it composes with the `DropZone`→slot-field work already
-  identified in the perf plan (that migration is needed anyway).
+- **(a) Port the family, keep `Columns`.** Full parity; costs a palette with
+  redundant ways to do the same thing.
+- **(b) Port `Container` + `Grid` only.** Covers what `Row`/`Column` do without
+  duplicating `Columns`. Not literal parity, and the smallest change.
+- **(c) Replace `Columns` with the family + a stored-data migration.** Closest
+  to GeoWiki, but it's now the *most* expensive option, not the cheapest.
 
-**(c) is the recommendation** precisely because it shares a migration with work
-already queued. Doing (a) now means writing that migration twice.
+**The recommendation has flipped to (b).** It was (c) on the reasoning that it
+would share a stored-data migration with the `DropZone`→slots work — but that
+work is done and its migration is written, so (c) no longer amortises against
+anything. It would mean a *second* migration to move authors off a `Columns`
+block that already works. (b) adds what's genuinely missing and leaves the
+working block alone.
 
 ## 3. Gap B — three primitives that diverged (needs data migration)
 
@@ -181,12 +183,10 @@ interactive (2) → sections/actions (18, Timeline split). Each batch is a
 self-contained PR: widgets + registry + category + a rendering test per widget.
 *~3,400 lines.*
 
-**Phase 3 — layout family.** Whichever of §2's options is chosen. Now known to
-be more load-bearing than it first looked — see §9: until `Columns` moves to
-slot fields, Puck cannot migrate *any* legacy zones payload, so Phase 0's
-success path stays unreachable and those pages remain on the deprecated
-DropZone render path indefinitely. This is the same migration the perf plan
-needs for its 46% public-bundle cut, so it pays for itself three times over.
+**Phase 3 — layout family.** The `Columns`→slots half is **done (§10)**; what
+remains is the §2 decision about whether to also port `Container` / `Row` /
+`Column` / `Grid`. That decision no longer blocks anything: the migration it
+was going to share has already been written.
 
 **Phase 4 — conversion.** Port `conversion/` plus its 5 test files. Needs no
 server changes: it is pure data transformation.
@@ -200,7 +200,7 @@ server changes: it is pure data transformation.
    Leaderboard, AppStoreBadges) look specific to GeoWiki's product rather than
    generally useful in a distributable module. A named subset would cut Phase 2
    substantially.
-2. **Layout: option (a), (b) or (c)?** Recommendation is (c) — see §2.
+2. **Layout: option (a), (b) or (c)?** Recommendation is now (b) — see §2; it changed once the shared migration landed.
 3. **Where does translated page content live?** GeoWiki's `translation/` is
    pure functions with no persistence; this repo would need a table and an
    Alembic revision in `host/migrations/versions/` under a `pagebuilder` branch
@@ -235,7 +235,50 @@ does move the `Columns`→slots port from "cleanup" to "the thing that unblocks
 this." The tests assert the current limitation explicitly rather than skipping
 it, so whoever does Phase 3 gets a failing expectation pointing at the work.
 
-## 10. Measurement
+## 10. `Columns` on slot fields, and the rendering-mode decision
+
+`Columns` now declares its slot *inside* its array field —
+`columns: { width: number; content: Slot }[]` — so the column count stays
+author-controlled. A top-level slot per column would have capped the block at
+however many were declared.
+
+Puck's built-in zone→slot conversion can't reach a slot nested in an array: it
+only matches a zone against a top-level field of the same name. The escape
+hatch is `migrateDynamicZonesForComponent`, which hands the block its props
+plus its zones (keyed `col-0`, `col-1`, …) and takes whatever props come back.
+`migrateColumnsZones` in `migrateContent.ts` does that fold, and §9's failing
+expectation is now a passing one.
+
+One deliberate choice inside it: the result is sized to cover **both** the
+stored `columns` array and the zone indices. A page saved after a column was
+deleted still carries that column's zone, and silently dropping author content
+during a migration is the one failure here that can't be undone — so the
+orphan resurfaces in a real column instead. There's a test for exactly that.
+
+### Rendering mode: staying client-only
+
+Switching the public viewer to Puck's `@puckeditor/core/rsc` entry was measured
+and then **reverted on your instruction** to keep everything client-rendered:
+
+| | root entry (current) | `/rsc` entry |
+|---|---|---|
+| public `/p/{slug}` | 1115 kB | 600 kB (**−46%**) |
+| editor | 1132 kB | 1134 kB |
+| shared | 478 kB | 478 kB |
+
+Worth recording accurately for whenever this is revisited: `/rsc` is **not** a
+server-rendering mode. It is a render-only entry that runs client-side exactly
+like the root one — the name means it is *compatible* with server components
+(it pulls in no editor hooks), not that it requires them. The saving is pure
+tree-shaking: drag-and-drop, the field inspector and tiptap are dropped from a
+page a visitor cannot edit. Nothing about the app's rendering model changes.
+
+The `Columns`→slots port was the prerequisite either way, and it has landed —
+so the switch is now a two-line change (`PublicPage`'s `Render` import and
+`migrateContent`'s `migrate` import) whenever it's wanted. Both were verified
+green on the full 46-test e2e suite before reverting.
+
+## 11. Measurement
 
 Re-run the parity count with:
 
