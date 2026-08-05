@@ -1,6 +1,6 @@
 /** Site header for the layout's header slot: utility bar + primary nav bar. */
 
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 import { Menu, X } from 'lucide-react';
 import { useId, useState } from 'react';
 

@@ -1,4 +1,4 @@
-import type { Config } from '@measured/puck';
+import type { Config } from '@puckeditor/core';
 
 import { registeredBlocks, registryVersion } from './blockRegistry';
 import { basePageConfig, getPuckConfig } from './puckConfig';

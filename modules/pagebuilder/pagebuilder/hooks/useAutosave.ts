@@ -1,6 +1,6 @@
 /** Dirty tracking, debounced autosave, and the unsaved-changes guard. */
 
-import type { Data } from '@measured/puck';
+import type { Data } from '@puckeditor/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { savePage } from '../utils/api';

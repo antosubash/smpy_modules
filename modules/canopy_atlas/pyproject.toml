@@ -10,9 +10,13 @@ keywords = ["simple-module", "canopy-atlas", "design-pack", "seed"]
 # Ranges, never `==`: an exact framework pin makes a published module
 # uninstallable in any host running a newer framework build.
 dependencies = [
-    "simple_module_core>=0.0.25,<0.1",
+    # 0.0.26 floor: this module imports `simple_module_core.design_packs` and
+    # relies on the host calling `register_design_packs`, neither of which
+    # exists in 0.0.25. Installing it against 0.0.25 fails at import, not at
+    # first render, so the floor has to say so.
+    "simple_module_core>=0.0.26,<0.1",
     "simple_module_db>=0.0.25,<0.1",
-    "simple_module_hosting>=0.0.25,<0.1",
+    "simple_module_hosting>=0.0.26,<0.1",
     "simple_module_pagebuilder>=0.1,<0.2",
     "httpx>=0.27",
     "pydantic-settings>=2.0",

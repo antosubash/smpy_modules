@@ -5,7 +5,7 @@
  * visitors see on the published page.
  */
 
-import type { Config } from '@measured/puck';
+import type { Config } from '@puckeditor/core';
 
 import {
   type BlockRegistration,
@@ -46,15 +46,26 @@ export interface PageRootProps {
   width: 'contained' | 'full';
 }
 
-type WidgetProps<T extends { render: (props: never) => unknown }> = Parameters<T['render']>[0];
+/**
+ * A block's own props, recovered from its render signature.
+ *
+ * Puck calls `render` with the props wrapped as `WithId<WithPuckProps<P>>`,
+ * but `Config` is keyed by the *unwrapped* P — it applies that wrapper itself.
+ * Feeding it the render params instead double-wraps every entry, which is why
+ * the three injected keys come off here.
+ */
+type WidgetProps<T extends { render: (props: never) => unknown }> = Omit<
+  Parameters<T['render']>[0],
+  'id' | 'puck' | 'editMode'
+>;
 
 type PuckComponents = {
-  Heading: Parameters<typeof HeadingBlock.render>[0];
-  Text: Parameters<typeof TextBlock.render>[0];
-  Image: Parameters<typeof ImageBlock.render>[0];
-  Button: Parameters<typeof ButtonBlock.render>[0];
-  Columns: Parameters<typeof ColumnsBlock.render>[0];
-  Spacer: Parameters<typeof SpacerBlock.render>[0];
+  Heading: WidgetProps<typeof HeadingBlock>;
+  Text: WidgetProps<typeof TextBlock>;
+  Image: WidgetProps<typeof ImageBlock>;
+  Button: WidgetProps<typeof ButtonBlock>;
+  Columns: WidgetProps<typeof ColumnsBlock>;
+  Spacer: WidgetProps<typeof SpacerBlock>;
   PageHeader: WidgetProps<typeof PageHeaderWidget>;
   Hero: WidgetProps<typeof HeroWidget>;
   EyebrowSection: WidgetProps<typeof EyebrowSectionWidget>;
@@ -71,7 +82,14 @@ type PuckComponents = {
   Divider: WidgetProps<typeof DividerWidget>;
 };
 
-export const basePageConfig: Config<PuckComponents, PageRootProps> = {
+/**
+ * Puck 0.20 replaced the positional generics (`Config<Components, Root>`) with
+ * a single params object. The old form still resolves, but only the new one
+ * carries the category and field slots, so this is the shape to extend.
+ */
+type PageConfig = Config<{ components: PuckComponents; root: PageRootProps }>;
+
+export const basePageConfig: PageConfig = {
   root: {
     fields: {
       title: { type: 'text' },
@@ -107,11 +125,11 @@ export const basePageConfig: Config<PuckComponents, PageRootProps> = {
     },
     forms: { title: 'Forms', components: ['ContactForm', 'Tags'] },
   },
-  // Puck's Config expects each entry as ComponentConfig<WithId<WithPuckProps<P>>>
-  // while a widget declares ComponentConfig<P>. Its `defaultProps` makes the
-  // generic invariant, so every entry fails to assign even though the runtime
-  // shape is right. Upstream hits this too and casts the same way. One cast
-  // here keeps the per-widget types honest.
+  // This map used to need a blanket cast: `PuckComponents` was keyed by each
+  // block's *render* params, which Puck then wrapped a second time, and the
+  // resulting mismatch was invariant so no entry would assign. Keying it by
+  // the unwrapped props (see `WidgetProps`) makes every entry check on its
+  // own, so a widget whose config drifts from its props now fails here.
   components: {
     Heading: HeadingBlock,
     Text: TextBlock,
@@ -133,7 +151,7 @@ export const basePageConfig: Config<PuckComponents, PageRootProps> = {
     LogoCloud: LogoCloudWidget,
     Tags: TagsWidget,
     Divider: DividerWidget,
-  } as unknown as Config<PuckComponents, PageRootProps>['components'],
+  },
 };
 
 // Names pagebuilder itself ships. Declared rather than duplicated in the
@@ -156,7 +174,7 @@ function applyRegistration(
   };
 }
 
-let cachedConfig: Config<PuckComponents, PageRootProps> | null = null;
+let cachedConfig: PageConfig | null = null;
 let cachedVersion = -1;
 
 /**
@@ -166,7 +184,7 @@ let cachedVersion = -1;
  * first call would silently drop any block registered after the first render.
  * Call it inside a component, never at module scope.
  */
-export function getPuckConfig(): Config<PuckComponents, PageRootProps> {
+export function getPuckConfig(): PageConfig {
   if (cachedConfig && cachedVersion === registryVersion()) return cachedConfig;
   const components: Record<string, unknown> = { ...basePageConfig.components };
   const categories = { ...basePageConfig.categories } as Record<
@@ -176,10 +194,7 @@ export function getPuckConfig(): Config<PuckComponents, PageRootProps> {
   for (const registration of registeredBlocks()) {
     applyRegistration(components, categories, registration);
   }
-  cachedConfig = { ...basePageConfig, categories, components } as Config<
-    PuckComponents,
-    PageRootProps
-  >;
+  cachedConfig = { ...basePageConfig, categories, components } as PageConfig;
   cachedVersion = registryVersion();
   return cachedConfig;
 }

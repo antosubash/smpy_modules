@@ -1,4 +1,4 @@
-import type { CustomField } from "@measured/puck";
+import type { CustomField } from "@puckeditor/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/widgetUtils";
 import { FileGallery } from "./file-gallery";

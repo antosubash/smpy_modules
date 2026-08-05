@@ -1,7 +1,7 @@
 /** Save, publish, and approval-workflow actions for the page editor. */
 
 import { router } from '@inertiajs/react';
-import type { Data } from '@measured/puck';
+import type { Data } from '@puckeditor/core';
 
 import {
   approvePage,

@@ -1,6 +1,6 @@
 /** Field state for the page editor, plus the derived write payload. */
 
-import type { Data } from '@measured/puck';
+import type { Data } from '@puckeditor/core';
 import { useState } from 'react';
 
 import { emptyData } from '../components/puckConfig';

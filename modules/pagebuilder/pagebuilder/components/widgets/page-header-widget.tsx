@@ -1,4 +1,4 @@
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock } from './_internal/rich-text';
 import { CTAButton, EyebrowText, Heading, Section } from './_shared';

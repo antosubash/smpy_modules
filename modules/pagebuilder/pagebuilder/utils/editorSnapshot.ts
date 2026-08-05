@@ -1,6 +1,6 @@
 /** Dirty-tracking primitives for the page editor's autosave. */
 
-import type { Data } from '@measured/puck';
+import type { Data } from '@puckeditor/core';
 
 export const AUTOSAVE_DEBOUNCE_MS = 2000;
 

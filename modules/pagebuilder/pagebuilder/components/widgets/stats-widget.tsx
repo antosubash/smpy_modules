@@ -1,4 +1,4 @@
-import type { ComponentConfig } from '@measured/puck';
+import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { cn } from '../../utils/widgetUtils';

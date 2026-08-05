@@ -1,5 +1,5 @@
 import { Head, usePage } from '@inertiajs/react';
-import { type Data, Render } from '@measured/puck';
+import { type Data, Render } from '@puckeditor/core';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import type { SharedProps } from '@simple-module-py/ui/types';
 

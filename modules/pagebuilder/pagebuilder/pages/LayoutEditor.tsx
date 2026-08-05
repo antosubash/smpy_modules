@@ -1,5 +1,5 @@
-import { type Data, Puck } from '@measured/puck';
-import '@measured/puck/puck.css';
+import { type Data, Puck } from '@puckeditor/core';
+import '@puckeditor/core/puck.css';
 import { router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useState } from 'react';
