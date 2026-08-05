@@ -197,8 +197,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Release v$RELEASE_VERSION"
-          git tag "v$RELEASE_VERSION"
-          git push origin HEAD:main --follow-tags
+          # The tag must be annotated and pushed by explicit refspec.
+          # `--follow-tags` silently skips lightweight tags, so it pushed the
+          # commit and nothing else, and `gh release create` then refused to
+          # act on a tag origin had never seen.
+          git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION"
+          git push --atomic origin HEAD:main "refs/tags/v$RELEASE_VERSION"
 
       - name: Create GitHub release
         env:
