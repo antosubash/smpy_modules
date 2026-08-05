@@ -147,6 +147,36 @@ suite. The e2e specs exercise the happy path through a browser; nothing
 exercises the service or endpoint contracts directly, which is why a 404 on
 successful creation and a date-clearing PUT both survived review.
 
+### F8 — editors never see draft articles
+
+`endpoints/api.py:29` decides draft visibility like this:
+
+```python
+user = getattr(request.state, "user", None)
+return PERM_EDIT in (getattr(user, "permissions", None) or [])
+```
+
+`UserContext` (`auth/contracts/schemas.py:15`) carries `id`, `email`, `name`,
+`roles` and `tenant_id`. There is no `permissions` attribute, and nothing in
+the framework adds one — resolved permissions are stashed on
+`request.state.resolved_permissions` by `simple_module_hosting/middleware.py:253`
+and by `RequiresPermission` itself.
+
+So `getattr(user, "permissions", None)` is always `None`, the expression is
+always `PERM_EDIT in []`, and `_may_see_drafts` always returns `False`. An
+editor looking at the admin list sees only articles whose page is already
+published, which is the opposite of the documented intent ("an editor
+additionally sees articles whose page is still a draft" — `README.md:54`).
+
+Two things hid this. `_read_one_by_page` passes `include_drafts=True`
+explicitly, so create and update still read back correctly. And both e2e specs
+publish the page before attaching the article, so no test ever asks for a draft
+to be visible.
+
+The fix must also handle the wildcard: an admin resolves to `WILDCARD`, not to
+a literal `news.edit`, so a naive membership test against the resolved set
+would still exclude administrators.
+
 ## Design
 
 ### D1 — read the article back by the key that identifies it
@@ -329,6 +359,42 @@ Three comments assert behaviour the code will no longer have, or never had:
 - `endpoints/api.py:41` — the "Drafts are included" rationale survives, but the
   reference to listing-then-scanning does not.
 
+### D8 — resolve draft visibility the way the framework does
+
+`_may_see_drafts` reads the resolved permission set rather than an attribute
+that does not exist, and mirrors `RequiresPermission.__call__`'s own resolution
+so the two cannot disagree:
+
+```python
+def _may_see_drafts(request: Request) -> bool:
+    """Only an editor sees articles whose page is still a draft.
+
+    Reads `request.state.resolved_permissions` — the framework's canonical
+    location, set by the hosting middleware and by RequiresPermission — rather
+    than a `permissions` attribute on the user, which UserContext does not
+    have. WILDCARD is checked because an administrator resolves to it instead
+    of to a literal `news.edit`.
+    """
+    resolved = getattr(request.state, "resolved_permissions", None)
+    if resolved is None:
+        user = getattr(request.state, "user", None)
+        if user is None:
+            return False
+        sm = getattr(getattr(request.app, "state", None), "sm", None)
+        registry = getattr(sm, "permissions", None) if sm is not None else None
+        resolved = resolve_permissions(
+            getattr(user, "roles", None) or [],
+            role_map=registry.role_map if registry is not None else None,
+        )
+    return WILDCARD in resolved or PERM_EDIT in resolved
+```
+
+The fallback branch matters for the same reason it does in the framework: a
+`GET` on a public-route prefix never runs `RequiresPermission`, so nothing has
+populated `resolved_permissions` by the time the listing endpoint asks. An
+anonymous request has no user and returns `False` immediately, which keeps the
+public feed showing published articles only.
+
 ### D6 — release plumbing
 
 1. Add `simple_module_news` to the `publish-pypi` matrix in `release.yml`.
@@ -374,6 +440,9 @@ Minimum cases, each mapped to a finding:
 | `reconcile_orphans` deletes a row whose page is gone | F4 |
 | `reconcile_orphans` leaves a row whose page exists | F4 |
 | listing still hides an orphan before the sweep runs | F4 |
+| an editor sees an article whose page is a draft | F8 |
+| an admin (wildcard) sees an article whose page is a draft | F8 |
+| an anonymous visitor does not see a draft article | F8 |
 
 The first case is the important one and needs the fixture to create enough
 dated pages to push an undated article past the first page of results. It fails

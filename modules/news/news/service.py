@@ -1,10 +1,21 @@
-"""Queries joining article metadata to the pages that hold the articles."""
+"""Queries joining article metadata to the pages that hold the articles.
+
+Writes ``flush`` rather than ``commit``: in a request the framework's ``get_db``
+owns the transaction and commits on the way out, so committing here would take
+that decision away from the endpoint and leave a row behind when the handler
+goes on to raise. The two callers outside a request — the ``PageDeleted``
+subscription and the startup sweep, both in :mod:`news.module` — open their own
+session and commit it themselves.
+"""
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
+from typing import Final
 
 from pagebuilder.models import Page, PageStatus
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +23,24 @@ from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.models import NewsArticle
 
+logger = logging.getLogger(__name__)
+
 PUBLIC_PAGE_URL = "/p/{slug}"
+
+
+class _Unset:
+    """Sentinel type — a field the caller omitted, as distinct from a null."""
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "UNSET"
+
+
+UNSET: Final = _Unset()
+"""Passed for ``published_at`` when the caller did not send the field.
+
+A typed singleton rather than a bare ``object()`` so ``datetime | None | _Unset``
+stays a real union that a type checker can narrow with ``isinstance``.
+"""
 
 
 def _visible(stmt, *, include_drafts: bool):
@@ -90,6 +118,47 @@ async def list_categories(
     return [CategoryCount(category=name, count=int(count)) for name, count in rows]
 
 
+async def get_read_by_page(
+    db: AsyncSession, page_id: int, *, include_drafts: bool = True
+) -> ArticleRead | None:
+    """One article in listing shape, found by page rather than by scanning.
+
+    Shares ``_base`` with the listing, so the response shape and the join
+    semantics stay identical by construction rather than by convention. This
+    exists because reading a just-written article back out of the first page of
+    ``list_articles`` cannot work: a new article is undated and undated sorts
+    last, so past a hundred dated articles it is simply not in that page.
+    """
+    stmt = _base(include_drafts, None).where(NewsArticle.page_id == page_id)
+    row = (await db.execute(stmt)).first()
+    return _to_read(row[0], row[1]) if row is not None else None
+
+
+async def reconcile_orphans(db: AsyncSession) -> int:
+    """Delete article rows whose page is gone. Returns how many.
+
+    The ``PageDeleted`` subscription is the fast path, but it is best-effort:
+    ``EventBus.publish`` gathers handlers with ``return_exceptions=True`` and
+    logs a failure instead of raising, and pagebuilder commits the page deletion
+    *before* publishing. A dropped event therefore leaves the row behind
+    permanently, with nothing to retry it.
+
+    That is not merely untidy. Every listing inner-joins the page, so the orphan
+    is invisible — until SQLite reuses the deleted page's id, at which point the
+    row re-attaches to whatever page is created next and the feed renders one
+    article's category and date against another article's page.
+
+    The caller owns the transaction; this does not commit.
+    """
+    orphaned = select(NewsArticle.id).where(
+        ~select(Page.id).where(Page.id == NewsArticle.page_id).exists()
+    )
+    result = await db.execute(
+        sa_delete(NewsArticle).where(NewsArticle.id.in_(orphaned))
+    )
+    return result.rowcount or 0
+
+
 async def page_exists(db: AsyncSession, page_id: int) -> bool:
     """Whether the page an article would attach to is actually there.
 
@@ -113,7 +182,7 @@ async def create(
 ) -> NewsArticle:
     article = NewsArticle(page_id=page_id, category=category, published_at=published_at)
     db.add(article)
-    await db.commit()
+    await db.flush()
     await db.refresh(article)
     return article
 
@@ -122,16 +191,18 @@ async def update(
     db: AsyncSession,
     article: NewsArticle,
     *,
-    category: str | None,
-    published_at: datetime | None,
+    category: str | None = None,
+    published_at: datetime | None | _Unset = UNSET,
 ) -> NewsArticle:
     if category is not None:
         article.category = category
-    # `published_at=None` is a real value (an undated article), so it is only
-    # applied when the caller sent the field — the endpoint decides that.
-    article.published_at = published_at
+    # `published_at=None` is a real value — it undates the article — so it is
+    # applied only when the caller actually sent the field. The endpoint reads
+    # `model_fields_set` to tell the two apart and passes UNSET otherwise.
+    if not isinstance(published_at, _Unset):
+        article.published_at = published_at
     db.add(article)
-    await db.commit()
+    await db.flush()
     await db.refresh(article)
     return article
 
@@ -139,4 +210,4 @@ async def update(
 async def delete(db: AsyncSession, article: NewsArticle) -> None:
     """Detach the article. The page itself is untouched."""
     await db.delete(article)
-    await db.commit()
+    await db.flush()

@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from simple_module_db import get_db
-from simple_module_hosting.permissions import RequiresPermission
+from simple_module_hosting.permissions import (
+    WILDCARD,
+    RequiresPermission,
+    resolve_permissions,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
@@ -31,9 +35,31 @@ def _may_see_drafts(request: Request) -> bool:
 
     Everyone else gets the published site, which is what the public feed block
     must show.
+
+    Reads ``request.state.resolved_permissions`` — where the hosting middleware
+    and ``RequiresPermission`` both put the resolved set — rather than a
+    ``permissions`` attribute on the user. ``UserContext`` has no such
+    attribute, so testing it always yielded an empty list and no editor ever
+    saw a draft.
+
+    The fallback mirrors ``RequiresPermission.__call__``: these listings are
+    registered as public routes, so on an anonymous-readable GET nothing has
+    populated ``resolved_permissions`` by the time we are asked. ``WILDCARD`` is
+    checked because an administrator resolves to it rather than to a literal
+    ``news.edit``.
     """
-    user = getattr(request.state, "user", None)
-    return PERM_EDIT in (getattr(user, "permissions", None) or [])
+    resolved = getattr(request.state, "resolved_permissions", None)
+    if resolved is None:
+        user = getattr(request.state, "user", None)
+        if user is None:
+            return False
+        sm = getattr(getattr(request.app, "state", None), "sm", None)
+        registry = getattr(sm, "permissions", None) if sm is not None else None
+        resolved = resolve_permissions(
+            getattr(user, "roles", None) or [],
+            role_map=registry.role_map if registry is not None else None,
+        )
+    return WILDCARD in resolved or PERM_EDIT in resolved
 
 
 async def _read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
@@ -42,13 +68,12 @@ async def _read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
     Drafts are included: an editor has just written this row and must see it
     back whatever state its page is in.
     """
-    items, _ = await service.list_articles(db, limit=MAX_LIMIT, include_drafts=True)
-    for item in items:
-        if item.page_id == page_id:
-            return item
-    # The page is the only source of slug and title, so without it there is
-    # nothing to return.
-    raise HTTPException(status_code=404, detail="Article's page not found.")
+    article = await service.get_read_by_page(db, page_id, include_drafts=True)
+    if article is None:
+        # The page is the only source of slug and title, so without it there is
+        # nothing to return.
+        raise HTTPException(status_code=404, detail="Article's page not found.")
+    return article
 
 
 @router.get("/articles", response_model=ArticleListResponse)
@@ -108,8 +133,18 @@ async def update_article(
     article = await service.get(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
+    # A partial update: an omitted `published_at` leaves the date alone, while
+    # an explicit null undates the article. Only `model_fields_set` can tell
+    # those apart, and the distinction is the endpoint's to make.
     await service.update(
-        db, article, category=body.category, published_at=body.published_at
+        db,
+        article,
+        category=body.category,
+        published_at=(
+            body.published_at
+            if "published_at" in body.model_fields_set
+            else service.UNSET
+        ),
     )
     return await _read_one_by_page(db, article.page_id)
 
