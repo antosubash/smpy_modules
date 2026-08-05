@@ -30,6 +30,7 @@ function resolveSizes(srcset: string, sizes: string): string | undefined {
 }
 
 export const ImageBlock: ComponentConfig<ImageProps> = {
+  label: 'Image',
   fields: {
     src: {
       type: 'custom',
