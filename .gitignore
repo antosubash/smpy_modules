@@ -35,3 +35,7 @@ test-results/
 
 # macOS
 .DS_Store
+
+# QA / verify pipeline artifacts (/qa, /vf)
+.qa/
+.verify/
