@@ -1,4 +1,5 @@
 import { cn, decorativeAriaProps } from '../../../utils/widgetUtils';
+import { srcsetAttrs } from './image-srcset';
 
 export type ContentMediaAspect = 'square' | 'video' | 'portrait';
 
@@ -6,6 +7,10 @@ export type ContentMediaProps = {
   imageUrl: string;
   imageAlt: string;
   aspect?: ContentMediaAspect;
+  /** Variant srcset recorded at pick time (see _shared/image-srcset.ts). */
+  imageSrcset?: string;
+  /** `sizes` for the srcset; callers in split layouts pass SIZES_HALF. */
+  sizes?: string;
 };
 
 const ASPECT_CLASSES: Record<ContentMediaAspect, string> = {
@@ -23,13 +28,20 @@ const DOTTED_STYLE = {
   backgroundSize: '16px 16px, 100% 100%',
 } as const;
 
-export function ContentMedia({ imageUrl, imageAlt, aspect = 'video' }: ContentMediaProps) {
+export function ContentMedia({
+  imageUrl,
+  imageAlt,
+  aspect = 'video',
+  imageSrcset,
+  sizes = '100vw',
+}: ContentMediaProps) {
   const wrapperCls = cn('w-full rounded-xl overflow-hidden', ASPECT_CLASSES[aspect], 'shadow-xl');
   if (imageUrl) {
     return (
       <div className={wrapperCls}>
         <img
           src={imageUrl}
+          {...srcsetAttrs(imageSrcset, sizes)}
           alt={imageAlt ?? ''}
           {...decorativeAriaProps(imageAlt)}
           loading="lazy"

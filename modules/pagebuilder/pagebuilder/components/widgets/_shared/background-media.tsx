@@ -1,4 +1,5 @@
 import { cn, decorativeAriaProps } from '../../../utils/widgetUtils';
+import { SIZES_FULL, srcsetAttrs } from './image-srcset';
 
 export type BackgroundMediaOverlay = 'none' | 'subtle' | 'dark';
 export type BackgroundMediaFallback = 'gradient-mesh' | 'solid';
@@ -15,6 +16,8 @@ export type BackgroundMediaProps = {
    * anchors to the top; centered, the sky is cut away). Omitted = centered.
    */
   objectPosition?: string;
+  /** Variant srcset recorded at pick time (see _shared/image-srcset.ts). */
+  imageSrcset?: string;
 };
 
 // The "dark" scrim strength is tenant-tunable: GCA's Figma hero is nearly
@@ -41,6 +44,7 @@ export function BackgroundMedia({
   overlay = 'none',
   fallback = 'gradient-mesh',
   objectPosition,
+  imageSrcset,
 }: BackgroundMediaProps) {
   // data-pb-* attributes are stable selectors for tests and CMS-side analytics.
   return (
@@ -48,6 +52,7 @@ export function BackgroundMedia({
       {imageUrl ? (
         <img
           src={imageUrl}
+          {...srcsetAttrs(imageSrcset, SIZES_FULL)}
           alt={imageAlt ?? ''}
           {...decorativeAriaProps(imageAlt)}
           loading="lazy"

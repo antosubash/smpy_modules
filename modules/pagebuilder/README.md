@@ -59,6 +59,38 @@ Once installed and migrated, sign in and open `/pagebuilder`:
 Every transition writes a revision, so `/pagebuilder/{id}/edit` can compare any
 two revisions and restore either one as a draft.
 
+## Contributing blocks from another module
+
+A module ships Puck blocks by calling `registerPuckBlocks` from its
+`puck-blocks.ts`; the host imports every module's registration eagerly at app
+start, so the registry is populated before the first render.
+
+Because registration is eager, a block that statically imports a heavy render
+component puts that component's whole dependency graph in the entry chunk —
+on every page of the site, for every visitor. Measured on a consuming site, a
+map block's static import put maplibre-gl (1 MB minified, 62% of the bundle)
+in front of visitors who never opened the map. Register heavy blocks with
+`lazyBlock` instead, which keeps fields and defaults eager but loads the
+component the first time a page actually renders the block:
+
+```tsx
+import { lazyBlock } from '@simple-module-py/pagebuilder/pagebuilder/components/lazyBlock';
+import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
+
+registerPuckBlocks({
+  blocks: {
+    AtlasMap: lazyBlock(
+      () => import('./components/AtlasMap').then((m) => m.AtlasMapEmbed),
+      { label: 'Atlas map', fields: { /* … */ }, defaultProps: { /* … */ } },
+      (props) => <div className={heightClass[props.height]} aria-busy="true" />,
+    ),
+  },
+});
+```
+
+Light blocks (text, cards, lists) can keep their static imports — the split
+only pays for itself when the component drags in something big.
+
 ## Migrations
 
 This module ships **no** migrations — that is the framework convention. Its

@@ -8,38 +8,17 @@ import {
   CTAButton,
   EyebrowText,
   Heading,
+  imageSrcsetField,
   maskStyle,
+  resolveImageSrcset,
   Section,
+  SIZES_HALF,
+  srcsetAttrs,
 } from './_shared';
 
-export type HeroWidgetProps = {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  logoUrl: string;
-  logoAlt: string;
-  imageUrl: string;
-  imageAlt: string;
-  /**
-   * Organic mask (SVG url, from the tenant's content) applied to the side
-   * image in the right/left layouts. Empty = the standard rounded media.
-   */
-  imageMaskUrl?: string;
-  /**
-   * "native" renders supplied transparent artwork exactly as-is — no mask, no
-   * crop — for a photo already cut to its final organic shape. Preferred over
-   * `imageMaskUrl`, which re-derives the silhouette from a hand-kept SVG.
-   */
-  imageShape?: 'rounded' | 'native';
-  imagePosition: 'background' | 'right' | 'left';
-  primaryLabel: string;
-  primaryHref: string;
-  secondaryLabel: string;
-  secondaryHref: string;
-  overlay: boolean;
-  align: 'left' | 'center';
-  surface: 'plain' | 'card';
-};
+import type { HeroWidgetProps } from './hero-widget-props';
+
+export type { HeroWidgetProps } from './hero-widget-props';
 
 // Exported so CenteredHeroWidget can render through it without smuggling
 // Puck's ComponentConfig.render signature past the type system.
@@ -51,6 +30,7 @@ export function renderHero({
   logoAlt,
   imageUrl,
   imageAlt,
+  imageSrcset = '',
   imageMaskUrl = '',
   imageShape = 'rounded',
   imagePosition,
@@ -120,6 +100,7 @@ export function renderHero({
         <BackgroundMedia
           imageUrl={imageUrl}
           imageAlt={imageAlt}
+          imageSrcset={imageSrcset}
           overlay={overlay ? 'dark' : 'none'}
           fallback="gradient-mesh"
           objectPosition="var(--pb-hero-image-position, 50% 50%)"
@@ -189,6 +170,7 @@ export function renderHero({
             // Figma's box width. No mask, no crop — the file IS the shape.
             <img
               src={imageUrl}
+              {...srcsetAttrs(imageSrcset, SIZES_HALF)}
               alt={imageAlt || title}
               loading="lazy"
               className="h-auto w-full max-w-[var(--pb-hero-media-max-w,none)]"
@@ -199,6 +181,7 @@ export function renderHero({
             // unset, the image keeps its previous free-flowing size.
             <img
               src={imageUrl}
+              {...srcsetAttrs(imageSrcset, SIZES_HALF)}
               alt={imageAlt || title}
               loading="lazy"
               className="h-auto w-full max-w-[var(--pb-hero-media-max-w,none)] object-cover"
@@ -208,7 +191,13 @@ export function renderHero({
               }}
             />
           ) : (
-            <ContentMedia imageUrl={imageUrl} imageAlt={imageAlt} aspect="square" />
+            <ContentMedia
+              imageUrl={imageUrl}
+              imageAlt={imageAlt}
+              imageSrcset={imageSrcset}
+              sizes={SIZES_HALF}
+              aspect="square"
+            />
           )}
         </div>
       </div>
@@ -226,6 +215,7 @@ export const HeroWidget: ComponentConfig<HeroWidgetProps> = {
     logoAlt: { type: 'text', label: 'Logo alt text' },
     imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
     imageAlt: { type: 'text', label: 'Image alt text' },
+    imageSrcset: imageSrcsetField,
     imageMaskUrl: {
       type: 'text',
       label: 'Image mask URL (organic shape, side layouts — optional)',
@@ -277,6 +267,7 @@ export const HeroWidget: ComponentConfig<HeroWidgetProps> = {
     logoAlt: '',
     imageUrl: '',
     imageAlt: '',
+    imageSrcset: '',
     imageMaskUrl: '',
     imageShape: 'rounded',
     imagePosition: 'background',
@@ -288,5 +279,6 @@ export const HeroWidget: ComponentConfig<HeroWidgetProps> = {
     align: 'center',
     surface: 'plain',
   },
+  resolveData: resolveImageSrcset,
   render: renderHero,
 };

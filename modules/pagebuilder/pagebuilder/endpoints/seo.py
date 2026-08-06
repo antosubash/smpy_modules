@@ -42,7 +42,10 @@ async def sitemap(
     if not settings.sitemap_enabled:
         return Response(status_code=404)
 
-    pages = await PagesService(db).list_indexable_published()
+    # Column-only query: at a few thousand pages, loading full entities
+    # (with both block-JSON columns) made every crawl a multi-second,
+    # tens-of-MB request (issue #11).
+    pages = await PagesService(db).list_sitemap_entries()
     origin = _public_origin(request, settings)
     prefix = settings.public_route_prefix
 
