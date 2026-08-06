@@ -43,15 +43,17 @@ set its category filter and item count.
 
 | Route | Access |
 |---|---|
-| `GET /api/news/articles?limit&offset&category` | anonymous; published only |
+| `GET /api/news/articles?limit&offset&category&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
 | `PUT /api/news/articles/{id}` | `news.edit` |
 | `DELETE /api/news/articles/{id}` | `news.edit` |
 
 Reads are anonymous because the feed block runs on public pages. Listing is
-ordered newest first with undated articles last, and an editor additionally
-sees articles whose page is still a draft. Each item carries `page_status` —
+ordered newest first with undated articles last; `undated_first=true` flips
+the undated to the front, which is what the admin list uses so work in
+progress is not buried on the last page. An editor additionally sees
+articles whose page is still a draft. Each item carries `page_status` —
 the workflow state of the page behind it, which the admin list renders as a
 badge; without `news.edit` it is always `published`.
 

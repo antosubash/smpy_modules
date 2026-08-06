@@ -226,6 +226,26 @@ class TestListing:
 
         assert titles == ["New", "Old", "Undated"]
 
+    async def test_undated_first_puts_work_in_progress_up_front(
+        self, editor_client
+    ) -> None:
+        # The admin list's ordering: an undated article is work in progress,
+        # and with pagination the default would bury it on the last page.
+        async with editor_client.db_state.session_factory() as db:
+            old = await make_page(db, slug="old", title="Old")
+            new = await make_page(db, slug="new", title="New")
+            undated = await make_page(db, slug="undated", title="Undated")
+            await service.create(
+                db, page_id=old.id, category="", published_at=datetime(2025, 1, 1, tzinfo=UTC)
+            )
+            await service.create(db, page_id=new.id, category="", published_at=DATED)
+            await service.create(db, page_id=undated.id, category="", published_at=None)
+            await db.commit()
+
+        body = (await editor_client.get(f"{ARTICLES}?undated_first=true")).json()
+
+        assert [item["title"] for item in body["items"]] == ["Undated", "New", "Old"]
+
     async def test_filters_by_category(self, editor_client) -> None:
         async with editor_client.db_state.session_factory() as db:
             wanted = await make_page(db, slug="wanted", title="Wanted")

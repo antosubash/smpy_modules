@@ -37,12 +37,16 @@ export async function listArticles(params: {
   limit?: number;
   offset?: number;
   category?: string;
+  /** Sort undated (work-in-progress) articles first — the admin list's view.
+   *  Public feeds keep the default, which pushes undated to the end. */
+  undated_first?: boolean;
   signal?: AbortSignal;
 }): Promise<ArticleListResponse> {
   const query = new URLSearchParams();
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.offset !== undefined) query.set('offset', String(params.offset));
   if (params.category) query.set('category', params.category);
+  if (params.undated_first) query.set('undated_first', 'true');
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',

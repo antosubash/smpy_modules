@@ -1,5 +1,6 @@
 import { Head, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import {
   Table,
@@ -22,7 +23,7 @@ import {
   updateArticle,
 } from '../utils/api';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 25;
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
 export default function NewsList() {
@@ -33,17 +34,30 @@ export default function NewsList() {
   const [categories, setCategories] = useState<string[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const refresh = useCallback(() => {
-    listArticles({ limit: PAGE_SIZE })
-      .then((response) => setArticles(response.items))
+    // Undated first: an undated article is work in progress — with the
+    // default (public-feed) order it would sit on the last page, burying
+    // exactly the row its author just created.
+    listArticles({ limit: PAGE_SIZE, offset, undated_first: true })
+      .then((response) => {
+        setArticles(response.items);
+        setTotal(response.total);
+        // Detaching the last row of the last page leaves the offset past the
+        // end; step back rather than showing an empty page with a total.
+        if (response.items.length === 0 && offset > 0) {
+          setOffset(Math.max(0, offset - PAGE_SIZE));
+        }
+      })
       .catch((e) => setError((e as Error).message));
     // Suggestions only — a failure here just means no autocompletion, which
     // is not worth an error banner over a perfectly usable list.
     listCategories()
       .then((response) => setCategories(response.items.map((c) => c.category)))
       .catch(() => setCategories([]));
-  }, []);
+  }, [offset]);
 
   useEffect(refresh, [refresh]);
 
@@ -77,7 +91,7 @@ export default function NewsList() {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-      ) : articles.length === 0 ? (
+      ) : articles.length === 0 && offset === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           No articles yet. "New article" creates a page and opens it in the editor.
         </div>
@@ -111,6 +125,34 @@ export default function NewsList() {
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {articles !== null && total > PAGE_SIZE && (
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Showing {Math.min(offset + 1, total)}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+          </span>
+          <div className="space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={offset === 0}
+              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={offset + PAGE_SIZE >= total}
+              onClick={() => setOffset(offset + PAGE_SIZE)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
 
       <datalist id={CATEGORY_SUGGESTIONS_ID}>

@@ -84,20 +84,29 @@ async def list_articles(
     offset: int = 0,
     category: str | None = None,
     include_drafts: bool = False,
+    undated_first: bool = False,
 ) -> tuple[list[ArticleRead], int]:
-    """Newest first, undated last. Returns (items, total-before-paging)."""
+    """Newest first, undated last. Returns (items, total-before-paging).
+
+    ``undated_first`` flips where the undated land: the admin list asks for
+    them up front because an undated article is by definition work in
+    progress — with pagination it would otherwise sit on the *last* page,
+    burying exactly the row its author is about to set a date on.
+    """
     stmt = _base(include_drafts, category)
 
     total = await db.scalar(
         select(func.count()).select_from(stmt.subquery())
     )
 
-    # NULLS LAST explicitly: SQLite sorts NULL first by default and Postgres
-    # sorts it last on DESC, so without this the two databases disagree about
-    # where an undated article lands.
-    stmt = stmt.order_by(
-        NewsArticle.published_at.desc().nullslast(), NewsArticle.id.desc()
-    ).limit(min(limit, MAX_LIMIT)).offset(offset)
+    # NULLS placement is explicit either way: SQLite and Postgres disagree
+    # about where NULL lands on a DESC sort, so without this the two databases
+    # disagree about where an undated article goes.
+    order = NewsArticle.published_at.desc()
+    order = order.nullsfirst() if undated_first else order.nullslast()
+    stmt = stmt.order_by(order, NewsArticle.id.desc()).limit(
+        min(limit, MAX_LIMIT)
+    ).offset(offset)
 
     rows = (await db.execute(stmt)).all()
     return [_to_read(article, page) for article, page in rows], int(total or 0)
