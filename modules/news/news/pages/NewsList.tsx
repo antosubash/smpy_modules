@@ -1,16 +1,21 @@
-import { Head, router, usePage } from '@inertiajs/react';
-import { slugify } from '@simple-module-py/pagebuilder/pagebuilder/utils/slugify';
+import { Head, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { Button } from '@simple-module-py/ui/components/ui/button';
+import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ArticleRow } from '../components/ArticleRow';
+import { NewArticleDialog } from '../components/NewArticleDialog';
 import {
   type ArticleRead,
-  attachArticle,
-  createArticlePage,
   detachArticle,
   listArticles,
   listCategories,
@@ -26,7 +31,7 @@ export default function NewsList() {
 
   const [articles, setArticles] = useState<ArticleRead[] | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -42,8 +47,10 @@ export default function NewsList() {
 
   useEffect(refresh, [refresh]);
 
-  const run = async (work: () => Promise<unknown>) => {
-    setBusy(true);
+  // Busy is per row, so saving one article does not lock every other row's
+  // inputs while the request is in flight.
+  const runRow = async (id: number, work: () => Promise<unknown>) => {
+    setBusyId(id);
     setError(null);
     try {
       await work();
@@ -51,55 +58,41 @@ export default function NewsList() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
-
-  const handleNew = () =>
-    run(async () => {
-      const title = prompt('Article title');
-      if (!title) return;
-      // Create the page first: the article row is metadata *about* a page, so
-      // there is nothing to attach to until one exists.
-      const pageId = await createArticlePage(title, `${slugify(title)}-${Date.now()}`);
-      await attachArticle({ page_id: pageId, category: '', published_at: null });
-      router.visit(`/pagebuilder/${pageId}`);
-    });
 
   return (
     <PageShell
       title="News"
       description="Articles are page-builder pages. Edit the body in the page editor; set the category and date here."
+      actions={canEdit ? <NewArticleDialog /> : undefined}
     >
       <Head title="News" />
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
-      {canEdit && (
-        <div className="mb-4">
-          <Button type="button" disabled={busy} onClick={handleNew}>
-            New article
-          </Button>
-        </div>
-      )}
+      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
       {articles === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div role="status" aria-label="Loading articles" className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
       ) : articles.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           No articles yet. "New article" creates a page and opens it in the editor.
-        </p>
+        </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="py-2 pr-4 font-medium">Article</th>
-              <th className="py-2 pr-4 font-medium">Status</th>
-              <th className="py-2 pr-4 font-medium">Category</th>
-              <th className="py-2 pr-4 font-medium">Date</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Article</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {articles.map((article) => (
               <ArticleRow
                 // Keyed on the server state, not just the id: ArticleRow holds
@@ -108,21 +101,16 @@ export default function NewsList() {
                 // author typed rather than what was saved.
                 key={`${article.id}:${article.category}:${article.published_at ?? ''}`}
                 article={article}
-                busy={busy || !canEdit}
+                busy={busyId === article.id || !canEdit}
                 suggestionsId={CATEGORY_SUGGESTIONS_ID}
                 onSave={(id, category, publishedAt) =>
-                  run(() => updateArticle(id, { category, published_at: publishedAt }))
+                  runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
                 }
-                onDetach={(id) =>
-                  run(async () => {
-                    if (!confirm('Detach this article? The page and its body stay.')) return;
-                    await detachArticle(id);
-                  })
-                }
+                onDetach={(id) => runRow(id, () => detachArticle(id))}
               />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
 
       <datalist id={CATEGORY_SUGGESTIONS_ID}>

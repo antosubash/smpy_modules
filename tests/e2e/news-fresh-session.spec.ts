@@ -32,11 +32,9 @@ test.describe('News — first visit of a session', () => {
     expect(cookieBefore, 'precondition: the CSRF cookie must not be primed yet').toBeUndefined();
 
     const title = `Fresh session ${Date.now().toString(36)}`;
-    page.once('dialog', (dialog) => {
-      expect(dialog.type()).toBe('prompt');
-      dialog.accept(title);
-    });
     await page.getByRole('button', { name: 'New article' }).click();
+    await page.getByLabel('Title').fill(title);
+    await page.getByRole('button', { name: 'Create article' }).click();
 
     // Success is landing in the editor for the page that was just created.
     await page.waitForURL(/\/pagebuilder\/\d+$/, { timeout: 15_000 });
