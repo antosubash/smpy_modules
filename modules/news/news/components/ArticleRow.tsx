@@ -44,7 +44,7 @@ export function ArticleRow({
   return (
     <TableRow>
       <TableCell>
-        <a href={`/pagebuilder/${article.page_id}`} className="font-medium hover:underline">
+        <a href={`/pagebuilder/${article.page_id}/edit`} className="font-medium hover:underline">
           {article.title}
         </a>
         <div className="text-xs text-muted-foreground">{article.url}</div>

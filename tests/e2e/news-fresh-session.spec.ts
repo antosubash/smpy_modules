@@ -37,7 +37,10 @@ test.describe('News — first visit of a session', () => {
     await page.getByRole('button', { name: 'Create article' }).click();
 
     // Success is landing in the editor for the page that was just created.
-    await page.waitForURL(/\/pagebuilder\/\d+$/, { timeout: 15_000 });
+    // The /edit suffix matters: /pagebuilder/{id} without it is a 404 — the
+    // old flow navigated there and this pattern let it pass unnoticed.
+    await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
+    await expect(page.getByText('Not Found')).toHaveCount(0);
 
     // And the article row exists, rather than a page with no metadata attached.
     await page.goto('/news/');

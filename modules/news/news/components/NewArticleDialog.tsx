@@ -41,7 +41,7 @@ export function NewArticleDialog() {
       // there is nothing to attach to until one exists.
       const pageId = await createArticlePage(title, `${slugify(title)}-${Date.now()}`);
       await attachArticle({ page_id: pageId, category: '', published_at: null });
-      router.visit(`/pagebuilder/${pageId}`);
+      router.visit(`/pagebuilder/${pageId}/edit`);
       // No cleanup: the visit unmounts this component.
     } catch (e) {
       setError((e as Error).message);
