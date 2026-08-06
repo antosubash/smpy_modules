@@ -51,7 +51,9 @@ set its category filter and item count.
 
 Reads are anonymous because the feed block runs on public pages. Listing is
 ordered newest first with undated articles last, and an editor additionally
-sees articles whose page is still a draft.
+sees articles whose page is still a draft. Each item carries `page_status` —
+the workflow state of the page behind it, which the admin list renders as a
+badge; without `news.edit` it is always `published`.
 
 `PUT` is a **partial** update: a field you omit is left alone. Sending
 `published_at` as an explicit `null` is different from omitting it — that

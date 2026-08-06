@@ -72,6 +72,7 @@ def _to_read(article: NewsArticle, page: Page) -> ArticleRead:
         cover_image_url=page.og_image or "",
         category=article.category,
         published_at=article.published_at,
+        page_status=page.status,
         url=PUBLIC_PAGE_URL.format(slug=page.slug),
     )
 

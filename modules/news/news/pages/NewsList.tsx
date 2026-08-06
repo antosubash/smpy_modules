@@ -1,4 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { slugify } from '@simple-module-py/pagebuilder/pagebuilder/utils/slugify';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
@@ -12,17 +13,19 @@ import {
   createArticlePage,
   detachArticle,
   listArticles,
-  slugify,
+  listCategories,
   updateArticle,
 } from '../utils/api';
 
 const PAGE_SIZE = 100;
+const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
 export default function NewsList() {
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   const canEdit = auth?.permissions?.includes('news.edit');
 
   const [articles, setArticles] = useState<ArticleRead[] | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +33,11 @@ export default function NewsList() {
     listArticles({ limit: PAGE_SIZE })
       .then((response) => setArticles(response.items))
       .catch((e) => setError((e as Error).message));
+    // Suggestions only — a failure here just means no autocompletion, which
+    // is not worth an error banner over a perfectly usable list.
+    listCategories()
+      .then((response) => setCategories(response.items.map((c) => c.category)))
+      .catch(() => setCategories([]));
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -85,6 +93,7 @@ export default function NewsList() {
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="py-2 pr-4 font-medium">Article</th>
+              <th className="py-2 pr-4 font-medium">Status</th>
               <th className="py-2 pr-4 font-medium">Category</th>
               <th className="py-2 pr-4 font-medium">Date</th>
               <th className="py-2" />
@@ -100,6 +109,7 @@ export default function NewsList() {
                 key={`${article.id}:${article.category}:${article.published_at ?? ''}`}
                 article={article}
                 busy={busy || !canEdit}
+                suggestionsId={CATEGORY_SUGGESTIONS_ID}
                 onSave={(id, category, publishedAt) =>
                   run(() => updateArticle(id, { category, published_at: publishedAt }))
                 }
@@ -114,6 +124,12 @@ export default function NewsList() {
           </tbody>
         </table>
       )}
+
+      <datalist id={CATEGORY_SUGGESTIONS_ID}>
+        {categories.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
     </PageShell>
   );
 }

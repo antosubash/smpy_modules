@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pagebuilder.models import PageStatus
 from pydantic import BaseModel, Field
 
 from news.constants import MAX_CATEGORY_LEN
@@ -20,6 +21,14 @@ class ArticleRead(BaseModel):
     cover_image_url: str = ""
     category: str = ""
     published_at: datetime | None = None
+    page_status: PageStatus
+    """Workflow state of the page behind the article.
+
+    Lets the admin list mark a draft without a second request per row. Anyone
+    without ``news.edit`` only ever sees ``PUBLISHED`` — drafts are filtered
+    out of the listing before this field is set.
+    """
+
     url: str
     """Where the article actually serves.
 

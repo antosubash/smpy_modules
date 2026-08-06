@@ -1,3 +1,4 @@
+import { StatusBadge } from '@simple-module-py/pagebuilder/pagebuilder/components/StatusBadge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
@@ -12,11 +13,14 @@ function toDateInput(iso: string | null): string {
 export function ArticleRow({
   article,
   busy,
+  suggestionsId,
   onSave,
   onDetach,
 }: {
   article: ArticleRead;
   busy: boolean;
+  /** id of a <datalist> of existing category names, offered while typing. */
+  suggestionsId?: string;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
   onDetach: (id: number) => void;
 }) {
@@ -34,10 +38,14 @@ export function ArticleRow({
         <div className="text-xs text-muted-foreground">{article.url}</div>
       </td>
       <td className="py-2 pr-4">
+        <StatusBadge status={article.page_status} />
+      </td>
+      <td className="py-2 pr-4">
         <Input
           aria-label={`Category for ${article.title}`}
           value={category}
           disabled={busy}
+          list={suggestionsId}
           onChange={(e) => setCategory(e.target.value)}
           className="w-40"
         />

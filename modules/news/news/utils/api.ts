@@ -1,5 +1,7 @@
 /** Client for the news read API. */
 
+import type { PageStatus } from '@simple-module-py/pagebuilder/pagebuilder/utils/types';
+
 export interface ArticleRead {
   id: number;
   page_id: number;
@@ -9,12 +11,24 @@ export interface ArticleRead {
   cover_image_url: string;
   category: string;
   published_at: string | null;
+  /** Workflow state of the page behind the article. Always `published` for
+   *  anyone without `news.edit` — drafts are filtered out server-side. */
+  page_status: PageStatus;
   url: string;
 }
 
 export interface ArticleListResponse {
   items: ArticleRead[];
   total: number;
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+}
+
+export interface CategoryListResponse {
+  items: CategoryCount[];
 }
 
 const BASE = '/api/news';
@@ -38,12 +52,35 @@ export async function listArticles(params: {
   return (await response.json()) as ArticleListResponse;
 }
 
-/** `2026-01-01T00:00:00` -> `Jan 1, 2026`. Empty for an undated article. */
+/** Existing category names with usage counts — feeds the admin list's
+ *  suggestions so one category is not spelled three ways. */
+export async function listCategories(signal?: AbortSignal): Promise<CategoryListResponse> {
+  const response = await fetch(`${BASE}/categories`, {
+    headers: { Accept: 'application/json' },
+    credentials: 'same-origin',
+    signal,
+  });
+  if (!response.ok) throw new Error(`News request failed (${response.status})`);
+  return (await response.json()) as CategoryListResponse;
+}
+
+/** `2026-01-01T00:00:00Z` -> `Jan 1, 2026`. Empty for an undated article.
+ *
+ * Only the date part is read, and it is rendered in UTC. `published_at` is a
+ * display date stored as midnight UTC, so handing the full timestamp to
+ * `toLocaleDateString` in the viewer's own timezone would show everyone west
+ * of UTC the previous day.
+ */
 export function formatArticleDate(iso: string | null, locale?: string): string {
   if (!iso) return '';
-  const date = new Date(iso);
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 const CSRF_COOKIE = 'news_csrf';
@@ -149,13 +186,4 @@ export async function createArticlePage(title: string, slug: string): Promise<nu
   if (!response.ok) throw await errorFrom(response);
   const { id } = (await response.json()) as { id: number };
   return id;
-}
-
-/** `Field campaign in Estonia` -> `field-campaign-in-estonia`. */
-export function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 200);
 }

@@ -156,6 +156,9 @@ class TestDraftVisibility:
 
         assert body["total"] == 1
         assert body["items"][0]["title"] == "Work in progress"
+        # And the listing says *that* it is a draft — the admin list badges
+        # rows with this rather than making a second request per page.
+        assert body["items"][0]["page_status"] == "draft"
 
     async def test_an_admin_sees_a_draft(self, admin_client) -> None:
         # An admin resolves to WILDCARD rather than to a literal `news.edit`,
@@ -182,7 +185,9 @@ class TestDraftVisibility:
         page = await _seed_page(anon_client, slug="live", title="Live")
         await _seed_article(anon_client, page_id=page.id, category="News")
 
-        assert (await anon_client.get(ARTICLES)).json()["total"] == 1
+        body = (await anon_client.get(ARTICLES)).json()
+        assert body["total"] == 1
+        assert body["items"][0]["page_status"] == "published"
 
     async def test_categories_follow_the_same_rule(self, anon_client) -> None:
         await self._draft_article(anon_client)
