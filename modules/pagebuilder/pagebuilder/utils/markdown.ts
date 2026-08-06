@@ -134,7 +134,14 @@ export function parseInlineTokens(text: string): InlineToken[] {
   return tokens;
 }
 
-function inlineMarkdownToHtml(text: string): string {
+/**
+ * One line of inline markdown → HTML, with no block wrapper.
+ *
+ * Exported for the places that need the emphasis but must not gain a `<p>`:
+ * an image's `<figcaption>` is phrasing content the block renders inline, so
+ * `markdownToHtml` would wrap it in a paragraph the page never had.
+ */
+export function inlineMarkdownToHtml(text: string): string {
   return parseInlineTokens(text)
     .map((token) => {
       const escaped = escapeHtml(token.content);

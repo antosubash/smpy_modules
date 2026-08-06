@@ -51,21 +51,32 @@ describe('ImageBlock caption', () => {
     expect(markup).toContain('>Figure 1</figcaption>');
   });
 
+  it('renders the caption as light markdown, like every other copy field', () => {
+    // Table, Carousel and CallToAction captions all go through renderRichText,
+    // so `**bold**` cannot mean one thing in one caption and another here.
+    expect(html({ caption: '**Figure 1** — the map' })).toContain('<strong');
+  });
+
   it('escapes caption text rather than emitting it as markup', () => {
     expect(html({ caption: '<b>bold</b>' })).not.toContain('<b>bold</b>');
   });
 
   it('emits a bare <img> when no caption is set', () => {
-    // Existing pages carry no caption prop at all and must render exactly as
-    // they did before the field existed.
-    const markup = html();
+    // Existing pages carry no caption prop at all — `undefined`, not `''`, is
+    // what Puck hands the block for them — and must render exactly as they did
+    // before the field existed.
+    const markup = html({ caption: undefined });
     expect(markup).not.toContain('figure');
     expect(markup.startsWith('<img')).toBe(true);
     expect(markup).toContain('class="my-3"');
   });
 
-  it('treats an empty caption as no caption', () => {
-    expect(html({ caption: '' })).toBe(html());
+  it('treats an empty or blank caption as no caption', () => {
+    // Whitespace-only would otherwise be truthy and render an empty caption
+    // box under the image.
+    const bare = html({ caption: undefined });
+    expect(html({ caption: '' })).toBe(bare);
+    expect(html({ caption: '   ' })).toBe(bare);
   });
 
   it('leaves the empty-src placeholder alone', () => {

@@ -105,6 +105,27 @@ jobs:
       - name: Build frontend (typecheck + vite build)
         run: npm run build
 
+  frontend-unit:
+    name: Frontend unit tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install npm workspace
+        run: npm ci
+
+      # `vitest.config.ts` covers modules/**/*.test.ts(x). These ran only via
+      # `make test-js` locally, so nothing stopped a regression they catch from
+      # merging — the e2e job is the slow, partial backstop.
+      - name: Run vitest
+        run: npx vitest run
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest

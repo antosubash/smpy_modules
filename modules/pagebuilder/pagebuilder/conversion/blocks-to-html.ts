@@ -8,7 +8,7 @@
  * then say exactly what didn't come across.
  */
 
-import { escapeHtml, markdownToHtml } from '../utils/markdown';
+import { escapeHtml, inlineMarkdownToHtml, markdownToHtml } from '../utils/markdown';
 import type { PuckBlock } from './types';
 
 export type BlocksToHtmlResult = { html: string; lossyTypes: string[] };
@@ -83,7 +83,15 @@ function blockToHtml(block: PuckBlock, options: BlocksToHtmlOptions): string | n
       const dims = ['width', 'height']
         .map((key) => (typeof props[key] === 'number' ? ` ${key}="${props[key]}"` : ''))
         .join('');
-      return `<img src="${escapeHtml(props.src)}" alt="${escapeHtml(alt)}"${dims}>`;
+      const img = `<img src="${escapeHtml(props.src)}" alt="${escapeHtml(alt)}"${dims}>`;
+      // The caption is authored copy, not a rendering detail — dropping it
+      // here would lose it silently, and `lossyTypes` couldn't name it either
+      // because the rest of the block converts fine. Same `<figure>` shape the
+      // block renders, so an export reads the way the page does. Inline
+      // markdown, as the block treats it; the converter escapes as it goes.
+      const caption = typeof props.caption === 'string' ? props.caption.trim() : '';
+      if (!caption) return img;
+      return `<figure>${img}<figcaption>${inlineMarkdownToHtml(caption)}</figcaption></figure>`;
     }
 
     case 'Quote': {

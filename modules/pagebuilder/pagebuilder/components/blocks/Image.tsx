@@ -6,6 +6,7 @@ import {
   lookupAsset,
   type MediaAssetRead,
 } from '../../utils/api';
+import { renderRichText } from '../widgets/_internal/rich-text';
 import { MediaPicker } from './MediaPicker';
 
 type AltKind = 'meaningful' | 'decorative';
@@ -14,8 +15,9 @@ interface ImageProps {
   src: string;
   alt: string;
   altKind: AltKind;
-  /** Visible prose under the image. Distinct from `alt`, which describes the
-   *  image to a screen reader — the two are rarely the same sentence. */
+  /** Visible prose under the image, as light markdown. Distinct from `alt`,
+   *  which describes the image to a screen reader — the two are rarely the
+   *  same sentence. */
   caption?: string;
   width: number | null;
   height: number | null;
@@ -118,6 +120,10 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
       );
     }
     const decorative = altKind === 'decorative';
+    // Trimmed, so a caption of nothing but spaces is no caption: it would
+    // otherwise render an empty <figcaption> box under the image. Same rule
+    // the translation extractor applies to every other copy field.
+    const hasCaption = Boolean(caption?.trim());
     const image = (
       <img
         src={src}
@@ -134,15 +140,18 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
         // Inside a <figure> the margin belongs to the figure, and `block`
         // drops the inline descender gap above the caption. Uncaptioned
         // images keep the exact markup they had before the field existed.
-        className={caption ? 'block' : 'my-3'}
+        className={hasCaption ? 'block' : 'my-3'}
       />
     );
-    if (!caption) return image;
+    if (!hasCaption) return image;
     return (
       <figure className="my-3">
         {image}
         <figcaption className={CAPTION_CLASS} style={CAPTION_STYLE}>
-          {caption}
+          {/* Light markdown, like every other copy field in the module — the
+              Table/Carousel/CallToAction captions all render this way, so
+              `**Figure 1**` can't work in one caption and not another. */}
+          {renderRichText(caption)}
         </figcaption>
       </figure>
     );
