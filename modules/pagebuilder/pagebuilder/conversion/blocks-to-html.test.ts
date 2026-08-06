@@ -58,6 +58,30 @@ describe('blocksToHtml', () => {
     ).toBe('<img src="/a.png" alt="" width="800" height="600">');
   });
 
+  it('carries an image caption across as a figure, so it is not lost silently', () => {
+    // The caption is authored copy. Emitting the bare <img> would drop it with
+    // no `lossyTypes` entry to warn the caller, because the block itself
+    // converts fine — the quiet loss this module exists to avoid.
+    expect(
+      blocksToHtml([b('Image', { src: '/a.png', alt: 'A map', caption: 'Figure 1' })]).html,
+    ).toBe('<figure><img src="/a.png" alt="A map"><figcaption>Figure 1</figcaption></figure>');
+    // Inline markdown, matching what the block renders, escaped as it goes.
+    expect(
+      blocksToHtml([b('Image', { src: '/a.png', alt: '', caption: '**Fig 1** <b>' })]).html,
+    ).toBe(
+      '<figure><img src="/a.png" alt=""><figcaption><strong>Fig 1</strong> &lt;b&gt;</figcaption></figure>',
+    );
+  });
+
+  it('emits a bare img for a missing or blank caption', () => {
+    expect(blocksToHtml([b('Image', { src: '/a.png', alt: '' })]).html).toBe(
+      '<img src="/a.png" alt="">',
+    );
+    expect(blocksToHtml([b('Image', { src: '/a.png', alt: '', caption: '   ' })]).html).toBe(
+      '<img src="/a.png" alt="">',
+    );
+  });
+
   it('treats Html as lossy unless raw markup is explicitly asked for', () => {
     // The Html widget renders its markup inside `<iframe sandbox>` because a
     // ContentEditor's input isn't fully trusted. This function's output has no

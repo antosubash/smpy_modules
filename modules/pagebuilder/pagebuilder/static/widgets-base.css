@@ -36,6 +36,13 @@
 	   EYEBROW_CASE_STYLE's fallbacks in _shared/mask.ts, so removing them
 	   changes nothing for the sentence-case eyebrows and lets each call site
 	   state its own prior literal. Tenants still override via their design pack. */
+	/* Image-block captions. Deliberately NOT defaulted here, for the same
+	   reason as the eyebrow tokens above: `--pb-caption-color` is read as
+	   `var(--pb-caption-color, var(--pb-body-color))` and `--pb-caption-size`
+	   as `var(--pb-caption-size, 0.875rem)`, and declaring either globally
+	   would make the call site's own fallback unreachable. Listed here so a
+	   pack author can find them — set them in the design pack to restyle
+	   captions without touching the block. */
 	/* Hero geometry (consumed by the Hero/PageHeader widgets). */
 	--pb-hero-min-h: 560px;
 	--pb-hero-logo-max-h: 14rem;

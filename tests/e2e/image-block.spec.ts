@@ -201,6 +201,44 @@ test.describe('Image block + media picker', () => {
       .click();
   });
 
+  test('a caption typed in the inspector reaches the published page', async ({ page }) => {
+    const slug = uniqueSlug('img-caption');
+    const pageId = await createPageWithImage(page, `Caption page ${slug}`, slug);
+
+    await page.goto(`/pagebuilder/${pageId}/edit`);
+    await selectBlockFromOutline(page, 'Image');
+
+    // An external URL keeps this test off the upload pipeline — the caption
+    // is what's under test, and it renders whatever the src resolves to.
+    await page
+      .getByRole('textbox', { name: 'Pick from library or paste a URL' })
+      .fill('https://example.com/external.png');
+    await page.getByRole('textbox', { name: 'alt' }).fill('An external image');
+    await page.getByRole('textbox', { name: 'Caption' }).fill('Caption goes here');
+    // Blur so the last field commits into Puck state before saving.
+    await page.getByRole('textbox', { name: 'alt' }).click();
+
+    await page.getByRole('button', { name: /save draft/i }).click();
+    await expect(page.getByText('Draft saved.')).toBeVisible();
+    page.once('dialog', (d) => d.accept(''));
+    await page.getByRole('button', { name: /^publish$/i }).click();
+    await expect(page.getByText('Published.')).toBeVisible();
+
+    await page.goto(`/p/${slug}`);
+    await expect(page.locator('main figure figcaption')).toHaveText('Caption goes here');
+    // alt describes the image to a screen reader, caption is visible prose —
+    // neither may stand in for the other.
+    await expect(page.locator('main figure img')).toHaveAttribute('alt', 'An external image');
+
+    // Cleanup.
+    await page.goto('/pagebuilder/');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('tr', { hasText: `Caption page ${slug}` })
+      .getByRole('button', { name: /^delete$/i })
+      .click();
+  });
+
   test('picker fallback: manually typed URLs are accepted without auto-fill', async ({ page }) => {
     const slug = uniqueSlug('img-manual');
     const pageId = await createPageWithImage(page, `Manual page ${slug}`, slug);
