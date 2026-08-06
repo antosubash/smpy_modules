@@ -1,4 +1,5 @@
 import { Head, usePage } from '@inertiajs/react';
+import { FilterPills } from '@simple-module-py/ui/components/FilterPills';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
@@ -17,6 +18,7 @@ import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
 import {
   type ArticleRead,
+  type CategoryCount,
   detachArticle,
   listArticles,
   listCategories,
@@ -31,17 +33,23 @@ export default function NewsList() {
   const canEdit = auth?.permissions?.includes('news.edit');
 
   const [articles, setArticles] = useState<ArticleRead[] | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<CategoryCount[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  const [category, setCategory] = useState('');
 
   const refresh = useCallback(() => {
     // Undated first: an undated article is work in progress — with the
     // default (public-feed) order it would sit on the last page, burying
     // exactly the row its author just created.
-    listArticles({ limit: PAGE_SIZE, offset, undated_first: true })
+    listArticles({
+      limit: PAGE_SIZE,
+      offset,
+      category: category || undefined,
+      undated_first: true,
+    })
       .then((response) => {
         setArticles(response.items);
         setTotal(response.total);
@@ -52,12 +60,20 @@ export default function NewsList() {
         }
       })
       .catch((e) => setError((e as Error).message));
-    // Suggestions only — a failure here just means no autocompletion, which
-    // is not worth an error banner over a perfectly usable list.
+    // Pills and suggestions only — a failure here just means no filter row,
+    // which is not worth an error banner over a perfectly usable list.
     listCategories()
-      .then((response) => setCategories(response.items.map((c) => c.category)))
+      .then((response) => {
+        setCategories(response.items);
+        // Editing the last row out of the filtered category empties the
+        // filter; fall back to All rather than pinning an orphaned pill.
+        if (category && !response.items.some((c) => c.category === category)) {
+          setCategory('');
+          setOffset(0);
+        }
+      })
       .catch(() => setCategories([]));
-  }, [offset]);
+  }, [offset, category]);
 
   useEffect(refresh, [refresh]);
 
@@ -84,6 +100,24 @@ export default function NewsList() {
     >
       <Head title="News" />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+
+      {categories.length > 0 && (
+        <FilterPills
+          className="mb-4"
+          value={category}
+          onChange={(next) => {
+            setCategory(next);
+            setOffset(0);
+          }}
+          options={[
+            { value: '', label: 'All' },
+            ...categories.map((c) => ({
+              value: c.category,
+              label: `${c.category} (${c.count})`,
+            })),
+          ]}
+        />
+      )}
 
       {articles === null ? (
         <div role="status" aria-label="Loading articles" className="space-y-2">
@@ -156,8 +190,8 @@ export default function NewsList() {
       )}
 
       <datalist id={CATEGORY_SUGGESTIONS_ID}>
-        {categories.map((name) => (
-          <option key={name} value={name} />
+        {categories.map((c) => (
+          <option key={c.category} value={c.category} />
         ))}
       </datalist>
     </PageShell>
