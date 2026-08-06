@@ -11,6 +11,11 @@
 #   Environment       = pypi
 #
 # Every new module must be added to the `publish-pypi` matrix below.
+#
+# `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
+# steps which float on their major. That is deliberate: setup-uv stopped
+# publishing major/minor tags at v8 (as a supply-chain hardening measure), so
+# `@v9` does not resolve. Bump it by hand when a new release lands.
 
 name: release
 
@@ -42,7 +47,7 @@ jobs:
     outputs:
       version: ${{ steps.compute.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # Inputs reach the shell as environment variables, never as ${{ }}
@@ -85,12 +90,12 @@ jobs:
     needs: resolve
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           version: latest
           enable-cache: true
@@ -99,7 +104,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -124,7 +129,7 @@ jobs:
       - name: Build wheels + sdists
         run: uv build --all-packages --out-dir dist-py
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-py
           path: dist-py/
@@ -143,7 +148,7 @@ jobs:
           - simple_module_pagebuilder
           - simple_module_news
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist-py
           path: dist-py
@@ -172,12 +177,12 @@ jobs:
     needs: [resolve, publish-pypi]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           version: latest
 
