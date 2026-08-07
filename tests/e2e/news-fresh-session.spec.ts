@@ -40,7 +40,12 @@ test.describe('News — first visit of a session', () => {
     // The /edit suffix matters: /pagebuilder/{id} without it is a 404 — the
     // old flow navigated there and this pattern let it pass unnoticed.
     await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
-    await expect(page.getByText('Not Found')).toHaveCount(0);
+    // Assert on the editor itself, not on the absence of "Not Found": a
+    // toHaveCount(0) passes on its first poll and so cannot catch an error
+    // page that renders a moment after the URL settles. The toolbar's title
+    // field carries the page title, so this proves both that the editor
+    // mounted and that it opened the page just created.
+    await expect(page.getByPlaceholder('Page title')).toHaveValue(title);
 
     // And the article row exists, rather than a page with no metadata attached.
     await page.goto('/news/');

@@ -41,8 +41,14 @@ export function NewArticleDialog() {
       // there is nothing to attach to until one exists.
       const pageId = await createArticlePage(title, `${slugify(title)}-${Date.now()}`);
       await attachArticle({ page_id: pageId, category: '', published_at: null });
-      router.visit(`/pagebuilder/${pageId}/edit`);
-      // No cleanup: the visit unmounts this component.
+      router.visit(`/pagebuilder/${pageId}/edit`, {
+        // A visit that lands unmounts this component, so this only fires when
+        // one does not. Without it a failed navigation leaves the dialog on
+        // "Creating…" with both buttons disabled, permanently — closing and
+        // reopening does not clear it either, since the page and the article
+        // both already exist by then.
+        onFinish: () => setPending(false),
+      });
     } catch (e) {
       setError((e as Error).message);
       setPending(false);

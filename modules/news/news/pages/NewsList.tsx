@@ -40,42 +40,66 @@ export default function NewsList() {
   const [total, setTotal] = useState(0);
   const [category, setCategory] = useState('');
 
-  const refresh = useCallback(() => {
-    // Undated first: an undated article is work in progress — with the
-    // default (public-feed) order it would sit on the last page, burying
-    // exactly the row its author just created.
-    listArticles({
-      limit: PAGE_SIZE,
-      offset,
-      category: category || undefined,
-      undated_first: true,
-    })
-      .then((response) => {
-        setArticles(response.items);
-        setTotal(response.total);
-        // Detaching the last row of the last page leaves the offset past the
-        // end; step back rather than showing an empty page with a total.
-        if (response.items.length === 0 && offset > 0) {
-          setOffset(Math.max(0, offset - PAGE_SIZE));
-        }
+  // Abortable, and awaited by its callers. Clicking Next twice in a row would
+  // otherwise let the first response land last, painting page 1's rows under
+  // page 2's pager with nothing left to re-fetch and correct it.
+  const refresh = useCallback(
+    async (signal?: AbortSignal) => {
+      // Undated first: an undated article is work in progress — with the
+      // default (public-feed) order it would sit on the last page, burying
+      // exactly the row its author just created.
+      const articlesLoaded = listArticles({
+        limit: PAGE_SIZE,
+        offset,
+        category: category || undefined,
+        undated_first: true,
+        signal,
       })
-      .catch((e) => setError((e as Error).message));
-    // Pills and suggestions only — a failure here just means no filter row,
-    // which is not worth an error banner over a perfectly usable list.
-    listCategories()
-      .then((response) => {
-        setCategories(response.items);
-        // Editing the last row out of the filtered category empties the
-        // filter; fall back to All rather than pinning an orphaned pill.
-        if (category && !response.items.some((c) => c.category === category)) {
-          setCategory('');
-          setOffset(0);
-        }
-      })
-      .catch(() => setCategories([]));
-  }, [offset, category]);
+        .then((response) => {
+          // Detaching the last row of the last page leaves the offset past the
+          // end. Step back and let the re-fetch fill the list; writing the
+          // empty response first would flash the "no articles yet" box over a
+          // list that still holds a full page.
+          if (response.items.length === 0 && offset > 0) {
+            setOffset(Math.max(0, offset - PAGE_SIZE));
+            return;
+          }
+          setArticles(response.items);
+          setTotal(response.total);
+        })
+        .catch((e) => {
+          if (signal?.aborted) return;
+          setError((e as Error).message);
+        });
 
-  useEffect(refresh, [refresh]);
+      // Pills and suggestions only — a failure here just means no filter row,
+      // which is not worth an error banner over a perfectly usable list.
+      const categoriesLoaded = listCategories(signal)
+        .then((response) => {
+          setCategories(response.items);
+          // Editing the last row out of the filtered category empties the
+          // filter; fall back to All rather than pinning an orphaned pill.
+          if (category && !response.items.some((c) => c.category === category)) {
+            setCategory('');
+            setOffset(0);
+          }
+        })
+        .catch(() => {
+          // Deliberately keep the last known list: emptying it unmounts the
+          // pill row, which would strand an active filter with no control
+          // left to clear it.
+        });
+
+      await Promise.all([articlesLoaded, categoriesLoaded]);
+    },
+    [offset, category],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh]);
 
   // Busy is per row, so saving one article does not lock every other row's
   // inputs while the request is in flight.
@@ -84,7 +108,9 @@ export default function NewsList() {
     setError(null);
     try {
       await work();
-      refresh();
+      // Awaited: clearing busy before the new rows land re-enables a row that
+      // is about to disappear, and a second Detach on it answers 404.
+      await refresh();
     } catch (e) {
       setError((e as Error).message);
     } finally {
