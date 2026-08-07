@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_news"
-version = "0.0.3"
+version = "0.0.4"
 description = "News articles backed by page-builder pages"
 requires-python = ">=3.12"
 readme = "README.md"

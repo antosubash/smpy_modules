@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_pagebuilder"
-version = "0.0.3"
+version = "0.0.4"
 description = "Drag-and-drop visual page builder for simple_module apps"
 readme = "README.md"
 license = "MIT"
