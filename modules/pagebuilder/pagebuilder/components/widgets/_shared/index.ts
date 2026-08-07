@@ -27,6 +27,13 @@ export type {
 } from './heading';
 export { Heading } from './heading';
 export {
+  imageSrcsetField,
+  resolveImageSrcset,
+  SIZES_FULL,
+  SIZES_HALF,
+  srcsetAttrs,
+} from './image-srcset';
+export {
   EYEBROW_CASE_STYLE,
   eyebrowTextStyle,
   maskStyle,

@@ -9,7 +9,7 @@ import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { LinkArrow } from './_internal/link-arrow';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
-import { CTAButton, eyebrowTextStyle, maskStyle } from './_shared';
+import { CTAButton, eyebrowTextStyle, maskStyle, SIZES_HALF, srcsetAttrs } from './_shared';
 
 import { GRID_IMAGE, GRID_TEXT, type MediaObjectWidgetProps } from './media-object-layout';
 import { MediaObjectText } from './media-object-text';
@@ -19,6 +19,7 @@ export type { MediaObjectWidgetProps } from './media-object-layout';
 export const MediaObjectWidgetRender = ({
   imageUrl,
   imageAlt,
+  imageSrcset = '',
   imageMaskUrl = '',
   imageShape = 'rounded',
   imageTag = '',
@@ -86,6 +87,7 @@ export const MediaObjectWidgetRender = ({
   const imageEl = imageUrl ? (
     <img
       src={imageUrl}
+      {...srcsetAttrs(imageSrcset, SIZES_HALF)}
       alt={imageAlt || heading}
       loading="lazy"
       className={cn('w-full h-auto', !masked && !native && 'rounded-lg')}
@@ -196,6 +198,8 @@ export const MediaObjectWidgetRender = ({
             {imageUrl && (
               <img
                 src={imageUrl}
+                // Rendered 68px tall — the smallest variant is plenty.
+                {...srcsetAttrs(imageSrcset, '320px')}
                 alt={imageAlt || heading}
                 loading="lazy"
                 className="mt-8 h-[68px] w-auto max-w-full object-contain object-left"

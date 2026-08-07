@@ -24,6 +24,7 @@ from sqlmodel import select
 
 from pagebuilder import media_queries
 from pagebuilder.contracts.schemas import MediaAssetRead, MediaAssetVariant
+from pagebuilder.media_files import resolve_media_root
 from pagebuilder.media_images import (
     CONTENT_TYPE_EXTENSIONS,
     SNIFF_BYTES,
@@ -49,7 +50,9 @@ class MediaService:
 
     @property
     def storage_root(self) -> Path:
-        return Path(self.settings.media_root).resolve()
+        # Same anchoring as the serving mount in module.py — writes and
+        # reads must never resolve to different directories (issue #14).
+        return resolve_media_root(self.settings.media_root)
 
     def url_for(self, filename: str) -> str:
         return f"{self.settings.media_url_prefix.rstrip('/')}/{filename}"

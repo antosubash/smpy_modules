@@ -5,6 +5,8 @@ import type { CSSProperties } from 'react';
 export type MediaObjectWidgetProps = {
   imageUrl: string;
   imageAlt: string;
+  /** Variant srcset recorded at pick time (see _shared/image-srcset.ts). */
+  imageSrcset?: string;
   imagePosition: 'left' | 'right';
   heading: string;
   body: string;

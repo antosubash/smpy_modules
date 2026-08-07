@@ -19,8 +19,11 @@ class PagebuilderSettings(BaseSettings):
     media_root: Path = Path("var/pagebuilder/media")
     """Filesystem directory where uploaded media is stored.
 
-    Resolved against the host's working directory on startup; created if
-    it doesn't exist.
+    Relative paths are anchored to the project root (``SM_PROJECT_ROOT``
+    when set, else the nearest directory holding a ``pyproject.toml``,
+    ``.env`` or ``alembic.ini``) — never the bare process cwd, which made
+    two differently-launched processes read and write different media
+    directories against one database. Created if it doesn't exist.
     """
 
     media_url_prefix: str = "/media/pagebuilder"

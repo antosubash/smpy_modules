@@ -11,6 +11,9 @@ whole surface: :mod:`._workflow` holds the status transitions and
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import NamedTuple
+
 from fastapi import HTTPException
 from simple_module_core.events import EventBus
 from sqlalchemy import delete as sa_delete
@@ -26,7 +29,14 @@ from pagebuilder.service._revisions import RevisionsMixin
 from pagebuilder.service._workflow import WorkflowMixin
 
 # _UNSET is re-exported: endpoints import it to express "field absent".
-__all__ = ["_UNSET", "PagesService"]
+__all__ = ["_UNSET", "PagesService", "SitemapEntry"]
+
+
+class SitemapEntry(NamedTuple):
+    """The two fields a sitemap URL needs — deliberately not a ``Page``."""
+
+    slug: str
+    updated_at: datetime | None
 
 
 class PagesService(WorkflowMixin, RevisionsMixin):
@@ -70,7 +80,9 @@ class PagesService(WorkflowMixin, RevisionsMixin):
         Excludes ``index_in_search=False`` (used both by the sitemap
         generator and any external indexing job). Ordered by ``updated_at``
         descending so the freshest content surfaces first when a consumer
-        only reads the head of the list.
+        only reads the head of the list. Loads full entities — the sitemap
+        itself uses :meth:`list_sitemap_entries`, which skips the block
+        JSON.
         """
         result = await self.db.execute(
             select(Page)
@@ -81,6 +93,24 @@ class PagesService(WorkflowMixin, RevisionsMixin):
             .order_by(Page.updated_at.desc())
         )
         return list(result.scalars().all())
+
+    async def list_sitemap_entries(self) -> list[SitemapEntry]:
+        """Slug + last-modified of published, indexable pages — nothing else.
+
+        The sitemap needs two columns; loading full entities dragged both
+        block-JSON columns through the ORM on every crawl, which at a few
+        thousand pages meant tens of MB per request and multi-second
+        responses under concurrent crawlers (issue #11).
+        """
+        result = await self.db.execute(
+            select(Page.slug, Page.updated_at)
+            .where(
+                Page.status == PageStatus.PUBLISHED,
+                Page.index_in_search.is_(True),  # type: ignore[union-attr]
+            )
+            .order_by(Page.updated_at.desc())
+        )
+        return [SitemapEntry(slug, updated_at) for slug, updated_at in result.all()]
 
     async def create(self, data: PageCreate) -> Page:
         page = Page(

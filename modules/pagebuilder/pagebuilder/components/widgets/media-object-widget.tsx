@@ -5,6 +5,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 
+import { imageSrcsetField, resolveImageSrcset } from './_shared';
 import { type MediaObjectWidgetProps, MediaObjectWidgetRender } from './media-object-render';
 
 export type * from './media-object-render';
@@ -14,6 +15,7 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
   fields: {
     imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
     imageAlt: { type: 'text', label: 'Image alt text' },
+    imageSrcset: imageSrcsetField,
     imageMaskUrl: {
       type: 'text',
       label: 'Image mask URL (organic shape — optional)',
@@ -145,6 +147,7 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
   defaultProps: {
     imageUrl: '',
     imageAlt: '',
+    imageSrcset: '',
     imageMaskUrl: '',
     imageShape: 'rounded',
     imageTag: '',
@@ -172,5 +175,6 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
     surface: 'default',
     surfaceColor: '',
   },
+  resolveData: resolveImageSrcset,
   render: (props) => <MediaObjectWidgetRender {...props} />,
 };

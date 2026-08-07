@@ -11,15 +11,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
-from fastapi.staticfiles import StaticFiles
 from simple_module_core import ModuleBase, ModuleMeta
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
+from pagebuilder.media_files import MediaFiles, resolve_media_root, warn_on_orphaned_media
 from pagebuilder.settings import PagebuilderSettings
 
 _scheduler_log = logging.getLogger("simple_module.pagebuilder.scheduler")
+_log = logging.getLogger("simple_module.pagebuilder")
 
 # Sidebar entries. Grouped under "Content" so an app that installs several
 # content modules clusters them together rather than scattering them.
@@ -178,13 +179,17 @@ class PagebuilderModule(ModuleBase):
         if settings.sitemap_enabled or settings.robots_enabled:
             app.include_router(seo_router)
 
-        media_root = Path(settings.media_root).resolve()
+        media_root = resolve_media_root(settings.media_root)
         media_root.mkdir(parents=True, exist_ok=True)
+        _log.info("pagebuilder.media_root: %s", media_root)
         app.mount(
             settings.media_url_prefix,
-            StaticFiles(directory=media_root),
+            MediaFiles(directory=media_root),
             name="pagebuilder_media",
         )
+        sm = getattr(app.state, "sm", None)
+        if sm is not None:
+            await warn_on_orphaned_media(sm.db.session_factory, media_root)
 
         if settings.scheduler_enabled:
             self._scheduler_task = asyncio.create_task(

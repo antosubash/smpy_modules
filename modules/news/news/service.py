@@ -18,6 +18,7 @@ from pagebuilder.models import Page, PageStatus
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Load
 
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
@@ -55,7 +56,21 @@ def _base(include_drafts: bool, category: str | None):
     # show, and this is what keeps such an orphan invisible rather than
     # rendering a card that links nowhere. There is no database foreign key —
     # see NewsArticle.page_id.
-    stmt = select(NewsArticle, Page).join(Page, Page.id == NewsArticle.page_id)
+    #
+    # load_only: the card serializer reads four Page columns; without it the
+    # join dragged both block-JSON columns through the ORM for every row, so
+    # list cost scaled with page *content* size instead of card count
+    # (issue #12). Anything outside this list raises on access — loudly, in
+    # tests — rather than silently re-widening the query.
+    stmt = (
+        select(NewsArticle, Page)
+        .join(Page, Page.id == NewsArticle.page_id)
+        .options(
+            Load(Page).load_only(
+                Page.slug, Page.title, Page.meta_description, Page.og_image
+            )
+        )
+    )
     stmt = _visible(stmt, include_drafts=include_drafts)
     if category:
         stmt = stmt.where(NewsArticle.category == category)
