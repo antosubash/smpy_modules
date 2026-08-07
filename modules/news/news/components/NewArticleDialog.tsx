@@ -24,12 +24,16 @@ export function NewArticleDialog() {
   const [title, setTitle] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The page a failed attempt already committed, kept so a retry adopts it
+   *  instead of creating another. */
+  const [created, setCreated] = useState<{ id: number; title: string } | null>(null);
 
   const reset = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) {
       setTitle('');
       setError(null);
+      setCreated(null);
     }
   };
 
@@ -39,7 +43,18 @@ export function NewArticleDialog() {
     try {
       // Create the page first: the article row is metadata *about* a page, so
       // there is nothing to attach to until one exists.
-      const pageId = await createArticlePage(title, `${slugify(title)}-${Date.now()}`);
+      //
+      // Reuse the page a previous attempt committed. If `attachArticle` below
+      // fails, the page it was attaching to already exists — and the slug
+      // carries `Date.now()`, so nothing collides to stop a retry creating a
+      // second one. Every press of "Create article" would otherwise strand
+      // another empty, articleless page in pagebuilder. An edited title has
+      // nothing to adopt, since the committed page carries the old one.
+      const pageId =
+        created?.title === title
+          ? created.id
+          : await createArticlePage(title, `${slugify(title)}-${Date.now()}`);
+      setCreated({ id: pageId, title });
       await attachArticle({ page_id: pageId, category: '', published_at: null });
       router.visit(`/pagebuilder/${pageId}/edit`, {
         // A visit that lands unmounts this component, so this only fires when

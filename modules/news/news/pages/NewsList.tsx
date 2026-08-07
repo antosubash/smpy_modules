@@ -12,7 +12,7 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
@@ -40,11 +40,18 @@ export default function NewsList() {
   const [total, setTotal] = useState(0);
   const [category, setCategory] = useState('');
 
-  // Abortable, and awaited by its callers. Clicking Next twice in a row would
-  // otherwise let the first response land last, painting page 1's rows under
-  // page 2's pager with nothing left to re-fetch and correct it.
+  // Only the newest refresh may write state. An AbortSignal alone does not
+  // cover this: `runRow` refreshes without one, so a save's re-fetch could
+  // still land after a page change and paint the old page's rows under the new
+  // pager, with nothing left to re-fetch and correct it. The signal still
+  // earns its place — it cancels the request the effect is walking away from.
+  const latestRequest = useRef(0);
+
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
+      const request = ++latestRequest.current;
+      const superseded = () => request !== latestRequest.current;
+
       // Undated first: an undated article is work in progress — with the
       // default (public-feed) order it would sit on the last page, burying
       // exactly the row its author just created.
@@ -56,6 +63,10 @@ export default function NewsList() {
         signal,
       })
         .then((response) => {
+          if (superseded()) return;
+          // A load that worked clears a banner left by one that did not;
+          // otherwise a transient failure sticks around until the next write.
+          setError(null);
           // Detaching the last row of the last page leaves the offset past the
           // end. Step back and let the re-fetch fill the list; writing the
           // empty response first would flash the "no articles yet" box over a
@@ -68,7 +79,7 @@ export default function NewsList() {
           setTotal(response.total);
         })
         .catch((e) => {
-          if (signal?.aborted) return;
+          if (superseded() || signal?.aborted) return;
           setError((e as Error).message);
         });
 
@@ -76,6 +87,7 @@ export default function NewsList() {
       // which is not worth an error banner over a perfectly usable list.
       const categoriesLoaded = listCategories(signal)
         .then((response) => {
+          if (superseded()) return;
           setCategories(response.items);
           // Editing the last row out of the filtered category empties the
           // filter; fall back to All rather than pinning an orphaned pill.
@@ -153,7 +165,28 @@ export default function NewsList() {
         </div>
       ) : articles.length === 0 && offset === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          No articles yet. "New article" creates a page and opens it in the editor.
+          {category ? (
+            // An active filter is the likelier reason for an empty list, and
+            // saying "no articles yet" here is simply false. The button also
+            // covers the case where the pill row is gone because the category
+            // request failed — otherwise the filter cannot be cleared at all.
+            <>
+              No articles in "{category}".{' '}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => {
+                  setCategory('');
+                  setOffset(0);
+                }}
+              >
+                Show all articles
+              </Button>
+            </>
+          ) : (
+            'No articles yet. "New article" creates a page and opens it in the editor.'
+          )}
         </div>
       ) : (
         <Table>

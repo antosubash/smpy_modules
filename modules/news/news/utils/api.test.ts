@@ -1,11 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { formatArticleDate } from './api';
 
 // A timezone west of UTC, where midnight UTC is still the previous evening.
 // Against the pre-fix implementation (local-time rendering) every assertion
 // on the date below would come out one day early.
-process.env.TZ = 'America/New_York';
+//
+// Restored afterwards: vitest does not reset `process.env` between files that
+// share a worker, so setting this at module scope leaks the timezone into
+// whichever file runs next.
+const TZ = 'America/New_York';
+const originalTz = process.env.TZ;
+
+beforeAll(() => {
+  process.env.TZ = TZ;
+});
+
+afterAll(() => {
+  process.env.TZ = originalTz;
+});
 
 describe('formatArticleDate', () => {
   it('renders the stored date, not the viewer-local one', () => {
