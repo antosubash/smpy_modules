@@ -32,14 +32,20 @@ test.describe('News — first visit of a session', () => {
     expect(cookieBefore, 'precondition: the CSRF cookie must not be primed yet').toBeUndefined();
 
     const title = `Fresh session ${Date.now().toString(36)}`;
-    page.once('dialog', (dialog) => {
-      expect(dialog.type()).toBe('prompt');
-      dialog.accept(title);
-    });
     await page.getByRole('button', { name: 'New article' }).click();
+    await page.getByLabel('Title').fill(title);
+    await page.getByRole('button', { name: 'Create article' }).click();
 
     // Success is landing in the editor for the page that was just created.
-    await page.waitForURL(/\/pagebuilder\/\d+$/, { timeout: 15_000 });
+    // The /edit suffix matters: /pagebuilder/{id} without it is a 404 — the
+    // old flow navigated there and this pattern let it pass unnoticed.
+    await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
+    // Assert on the editor itself, not on the absence of "Not Found": a
+    // toHaveCount(0) passes on its first poll and so cannot catch an error
+    // page that renders a moment after the URL settles. The toolbar's title
+    // field carries the page title, so this proves both that the editor
+    // mounted and that it opened the page just created.
+    await expect(page.getByPlaceholder('Page title')).toHaveValue(title);
 
     // And the article row exists, rather than a page with no metadata attached.
     await page.goto('/news/');

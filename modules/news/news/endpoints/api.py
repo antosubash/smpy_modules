@@ -82,6 +82,12 @@ async def list_articles(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(0, ge=0),
     category: str | None = Query(None),
+    undated_first: bool = Query(
+        False,
+        description="Sort undated (work-in-progress) articles before dated "
+        "ones — what the admin list wants. Public feeds keep the default, "
+        "which pushes undated articles to the end.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     items, total = await service.list_articles(
@@ -90,6 +96,7 @@ async def list_articles(
         offset=offset,
         category=category,
         include_drafts=_may_see_drafts(request),
+        undated_first=undated_first,
     )
     return ArticleListResponse(items=items, total=total)
 

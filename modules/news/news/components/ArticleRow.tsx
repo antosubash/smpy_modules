@@ -1,5 +1,18 @@
+import { StatusBadge } from '@simple-module-py/pagebuilder/pagebuilder/components/StatusBadge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@simple-module-py/ui/components/ui/alert-dialog';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
+import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 import { useState } from 'react';
 
 import type { ArticleRead } from '../utils/api';
@@ -12,11 +25,14 @@ function toDateInput(iso: string | null): string {
 export function ArticleRow({
   article,
   busy,
+  suggestionsId,
   onSave,
   onDetach,
 }: {
   article: ArticleRead;
   busy: boolean;
+  /** id of a <datalist> of existing category names, offered while typing. */
+  suggestionsId?: string;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
   onDetach: (id: number) => void;
 }) {
@@ -26,23 +42,27 @@ export function ArticleRow({
   const dirty = category !== article.category || date !== toDateInput(article.published_at);
 
   return (
-    <tr className="border-b last:border-b-0">
-      <td className="py-2 pr-4">
-        <a href={`/pagebuilder/${article.page_id}`} className="font-medium hover:underline">
+    <TableRow>
+      <TableCell>
+        <a href={`/pagebuilder/${article.page_id}/edit`} className="font-medium hover:underline">
           {article.title}
         </a>
         <div className="text-xs text-muted-foreground">{article.url}</div>
-      </td>
-      <td className="py-2 pr-4">
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={article.page_status} />
+      </TableCell>
+      <TableCell>
         <Input
           aria-label={`Category for ${article.title}`}
           value={category}
           disabled={busy}
+          list={suggestionsId}
           onChange={(e) => setCategory(e.target.value)}
           className="w-40"
         />
-      </td>
-      <td className="py-2 pr-4">
+      </TableCell>
+      <TableCell>
         <Input
           type="date"
           aria-label={`Date for ${article.title}`}
@@ -51,8 +71,18 @@ export function ArticleRow({
           onChange={(e) => setDate(e.target.value)}
           className="w-40"
         />
-      </td>
-      <td className="py-2 text-right whitespace-nowrap">
+      </TableCell>
+      <TableCell className="text-right whitespace-nowrap">
+        {article.page_status === 'published' && (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mr-2 text-sm text-primary hover:underline"
+          >
+            View
+          </a>
+        )}
         <Button
           type="button"
           size="sm"
@@ -63,16 +93,27 @@ export function ArticleRow({
         >
           Save
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => onDetach(article.id)}
-        >
-          Detach
-        </Button>
-      </td>
-    </tr>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" size="sm" variant="ghost" disabled={busy}>
+              Detach
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Detach "{article.title}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The page and its body stay. Only the category and date attached to it are removed,
+                and it stops appearing in news feeds.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDetach(article.id)}>Detach</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TableCell>
+    </TableRow>
   );
 }

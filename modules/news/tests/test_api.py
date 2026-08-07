@@ -156,6 +156,9 @@ class TestDraftVisibility:
 
         assert body["total"] == 1
         assert body["items"][0]["title"] == "Work in progress"
+        # And the listing says *that* it is a draft — the admin list badges
+        # rows with this rather than making a second request per page.
+        assert body["items"][0]["page_status"] == "draft"
 
     async def test_an_admin_sees_a_draft(self, admin_client) -> None:
         # An admin resolves to WILDCARD rather than to a literal `news.edit`,
@@ -182,7 +185,9 @@ class TestDraftVisibility:
         page = await _seed_page(anon_client, slug="live", title="Live")
         await _seed_article(anon_client, page_id=page.id, category="News")
 
-        assert (await anon_client.get(ARTICLES)).json()["total"] == 1
+        body = (await anon_client.get(ARTICLES)).json()
+        assert body["total"] == 1
+        assert body["items"][0]["page_status"] == "published"
 
     async def test_categories_follow_the_same_rule(self, anon_client) -> None:
         await self._draft_article(anon_client)
@@ -220,6 +225,26 @@ class TestListing:
         titles = [item["title"] for item in (await editor_client.get(ARTICLES)).json()["items"]]
 
         assert titles == ["New", "Old", "Undated"]
+
+    async def test_undated_first_puts_work_in_progress_up_front(
+        self, editor_client
+    ) -> None:
+        # The admin list's ordering: an undated article is work in progress,
+        # and with pagination the default would bury it on the last page.
+        async with editor_client.db_state.session_factory() as db:
+            old = await make_page(db, slug="old", title="Old")
+            new = await make_page(db, slug="new", title="New")
+            undated = await make_page(db, slug="undated", title="Undated")
+            await service.create(
+                db, page_id=old.id, category="", published_at=datetime(2025, 1, 1, tzinfo=UTC)
+            )
+            await service.create(db, page_id=new.id, category="", published_at=DATED)
+            await service.create(db, page_id=undated.id, category="", published_at=None)
+            await db.commit()
+
+        body = (await editor_client.get(f"{ARTICLES}?undated_first=true")).json()
+
+        assert [item["title"] for item in body["items"]] == ["Undated", "New", "Old"]
 
     async def test_filters_by_category(self, editor_client) -> None:
         async with editor_client.db_state.session_factory() as db:
