@@ -70,6 +70,9 @@ jobs:
       - name: Run pytest (pagebuilder)
         run: cd modules/pagebuilder && uv run pytest
 
+      - name: Run pytest (news)
+        run: cd modules/news && uv run pytest
+
       - name: Run pytest (host)
         run: uv run pytest host/tests
 
