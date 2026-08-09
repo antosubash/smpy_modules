@@ -51,6 +51,25 @@ class TestAttach:
         assert body["title"] == "Attach me"
         assert body["url"] == "/p/attach-me"
 
+    async def test_read_back_serializes_page_status(self, editor_client) -> None:
+        """Regression (#20): the attach read-back must not lazy-load
+        ``Page.status``.
+
+        The listing's ``load_only`` (issue #12) omitted ``status`` while
+        ``_to_read`` serializes ``page_status`` (issue #17). The page is created
+        on another session, so ``get_read_by_page`` loads it fresh, and reading
+        the un-loaded ``status`` raised ``MissingGreenlet`` under the async
+        session — a 500 for a row it had just written.
+        """
+        page = await _seed_page(editor_client, slug="status-me", title="Status me")
+
+        response = await editor_client.post(
+            ARTICLES, json={"page_id": page.id, "category": "News"}
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["page_status"] == PageStatus.PUBLISHED.value
+
     async def test_succeeds_behind_a_full_page_of_dated_articles(
         self, editor_client
     ) -> None:
