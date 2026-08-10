@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { clickAndConfirm, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, publishWithNote, uniqueSlug } from './helpers';
 
 /**
  * Issues #6 (CSP) + #26 (Cache-Control + ETag) — exercised end-to-end
@@ -23,8 +23,7 @@ test.describe('Public viewer headers', () => {
     await page.getByPlaceholder('slug').fill(slug);
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     const response = await page.request.get(`/p/${slug}`);
@@ -62,8 +61,7 @@ test.describe('Public viewer headers', () => {
     await page.getByPlaceholder('slug').fill(slug);
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     const first = await page.request.get(`/p/${slug}`);

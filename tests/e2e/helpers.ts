@@ -34,6 +34,28 @@ export async function csrfHeader(page: Page): Promise<Record<string, string>> {
   return { 'X-CSRF-Token': decodeURIComponent(token!) };
 }
 
+/**
+ * Publish from the editor through the note dialog that replaced the
+ * publish prompt. An empty `note` publishes without recording one.
+ */
+export async function publishWithNote(page: Page, note = '') {
+  await page.getByRole('button', { name: /^publish$/i }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  if (note) await dialog.getByRole('textbox').fill(note);
+  await dialog.getByRole('button', { name: /^publish$/i }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
+/** Open the publish dialog and back out of it — nothing should be published. */
+export async function cancelPublish(page: Page) {
+  await page.getByRole('button', { name: /^publish$/i }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: /^cancel$/i }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 export const ADMIN_EMAIL = TEST_ADMIN_EMAIL;
 export const ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
 

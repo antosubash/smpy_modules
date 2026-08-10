@@ -7,6 +7,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import type { PageDetail } from '../../utils/api';
 import { formatSaveLabel, type SaveState } from '../../utils/editorSnapshot';
 import { slugify } from '../../utils/slugify';
+import { NoteDialog } from '../NoteDialog';
 import { ScheduledBadge } from '../ScheduledBadge';
 import { StatusBadge } from '../StatusBadge';
 
@@ -29,11 +30,12 @@ interface Props {
   onToggleSettings: () => void;
   onToggleHistory: () => void;
   onSave: () => void;
-  onPublish: () => void;
+  /** `null` means "publish, no note". Rejects surface in the note dialog. */
+  onPublish: (note: string | null) => Promise<void>;
   onUnpublish: () => void;
   onSubmitForReview: () => void;
   onApprove: () => void;
-  onReject: () => void;
+  onReject: (note: string) => Promise<void>;
 }
 
 export function PageEditorToolbar({
@@ -129,15 +131,26 @@ export function PageEditorToolbar({
         )}
         {status === 'submitted_for_review' && (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-destructive text-destructive hover:bg-destructive/10"
-              disabled={busy}
-              onClick={onReject}
-            >
-              Reject
-            </Button>
+            <NoteDialog
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive text-destructive hover:bg-destructive/10"
+                  disabled={busy}
+                >
+                  Reject
+                </Button>
+              }
+              title="Send this page back to draft?"
+              description="The reason reaches the editor in the page header and the revision history, so say what needs to change."
+              label="Reason for rejection"
+              placeholder="The hero image is still a placeholder."
+              submitLabel="Reject"
+              required
+              destructive
+              onSubmit={onReject}
+            />
             <Button
               size="sm"
               className="bg-green-600 text-white hover:bg-green-700"
@@ -148,9 +161,28 @@ export function PageEditorToolbar({
             </Button>
           </>
         )}
-        <Button size="sm" disabled={busy} onClick={onPublish}>
-          Publish
-        </Button>
+        {/* An unsaved page has nothing to publish yet — "Publish" saves it and
+            navigates into the editor, so asking for a revision note first
+            would be asking about a revision that does not exist. */}
+        {pageId === null ? (
+          <Button size="sm" disabled={busy} onClick={() => void onPublish(null)}>
+            Publish
+          </Button>
+        ) : (
+          <NoteDialog
+            trigger={
+              <Button size="sm" disabled={busy}>
+                Publish
+              </Button>
+            }
+            title="Publish this page?"
+            description="It goes live immediately. The note is recorded against the revision this publish creates, and is shown in the History panel."
+            label="Describe this publish"
+            placeholder="Rewrote the intro and swapped the hero image."
+            submitLabel="Publish"
+            onSubmit={(note) => onPublish(note || null)}
+          />
+        )}
         {/* Stays an <a>: the e2e selects it with getByRole('link', {name: /^view$/i}). */}
         {status === 'published' && pageId !== null && (
           <a

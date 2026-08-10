@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { clickAndConfirm, csrfHeader, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
 
 const FIXTURE_PATH = fileURLToPath(new URL('./fixtures/hero-1024x768.png', import.meta.url));
 
@@ -164,8 +164,7 @@ test.describe('Image block + media picker', () => {
     // 6) Save + publish so the public viewer carries the same metadata.
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page.getByText('Draft saved.')).toBeVisible();
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     // 7) Public view: assert the rendered `<img>` has every responsive
@@ -221,8 +220,7 @@ test.describe('Image block + media picker', () => {
 
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page.getByText('Draft saved.')).toBeVisible();
-    page.once('dialog', (d) => d.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     await page.goto(`/p/${slug}`);

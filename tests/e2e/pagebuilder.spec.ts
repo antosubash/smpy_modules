@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { clickAndConfirm, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, publishWithNote, uniqueSlug } from './helpers';
 
 test.describe('PageBuilder admin', () => {
   test.beforeEach(async ({ page }) => {
@@ -40,10 +40,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page.getByText('Draft saved.')).toBeVisible();
 
     // ── Publish ───────────────────────────────────────────────
-    // Publish opens an optional-note prompt (#16); accept with no text
-    // so we get the equivalent of the pre-#16 behaviour.
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    // Publish opens a dialog asking for an optional revision note; submit it
+    // empty for the equivalent of the pre-#16 behaviour.
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
     // After publishing, an "Unpublish" button + "View" link both appear.
     await expect(page.getByRole('button', { name: /unpublish/i })).toBeVisible();

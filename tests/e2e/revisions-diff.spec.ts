@@ -1,5 +1,5 @@
 /**
- * Exercises the publish-note prompt + History "Compare" diff toggle
+ * Exercises the publish-note dialog + History "Compare" diff toggle
  * landed for issue #16. Drives the real editor through two publishes
  * with a metadata change between them so the diff has something to
  * report without us needing to interact with the Puck canvas.
@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { login, uniqueSlug } from './helpers';
+import { cancelPublish, login, publishWithNote, uniqueSlug } from './helpers';
 
 test.describe('Revisions: notes + compare diff', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,15 +28,13 @@ test.describe('Revisions: notes + compare diff', () => {
       timeout: 15_000,
     });
 
-    // Publish without a note (empty prompt input → no note recorded).
-    page.once('dialog', (d) => d.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    // Publish without a note (empty textarea → no note recorded).
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     // ── Rename + second publish (with note) ───────────────────
     await page.getByPlaceholder('Page title').fill(titleB);
-    page.once('dialog', (d) => d.accept('Rename v1 → v2'));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page, 'Rename v1 → v2');
     await expect(page.getByText('Published.')).toBeVisible();
 
     // ── History panel surfaces note ───────────────────────────
@@ -65,7 +63,7 @@ test.describe('Revisions: notes + compare diff', () => {
     await expect(diffSummary).toHaveCount(0);
   });
 
-  test('publish prompt Cancel aborts (no new revision)', async ({ page }) => {
+  test('publish dialog Cancel aborts (no new revision)', async ({ page }) => {
     const slug = uniqueSlug('rev-cancel');
     await page.goto('/pagebuilder/new');
     await page.getByPlaceholder('Page title').fill(`Cancel ${slug}`);
@@ -79,9 +77,8 @@ test.describe('Revisions: notes + compare diff', () => {
     // shows "History (N)" — should be 0 before publish.
     await expect(page.getByRole('button', { name: /history \(0\)/i })).toBeVisible();
 
-    // Dismiss the publish prompt → no publish happens.
-    page.once('dialog', (d) => d.dismiss());
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    // Back out of the publish dialog → no publish happens.
+    await cancelPublish(page);
 
     // Still 0 revisions, and no "Published." flash.
     await expect(page.getByRole('button', { name: /history \(0\)/i })).toBeVisible();
