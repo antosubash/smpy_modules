@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Request, status
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,7 @@ from pagebuilder.contracts.schemas import (
     PageListResponse,
     PageRead,
     PageUpdate,
+    StatusFilter,
 )
 from pagebuilder.endpoints.api._deps import require_approve, require_edit
 from pagebuilder.service import PagesService
@@ -20,9 +23,20 @@ router = APIRouter()
 
 
 @router.get("/pages", response_model=PageListResponse)
-async def list_pages(db: AsyncSession = Depends(get_db)) -> PageListResponse:
-    pages = await PagesService(db).list_pages()
-    return PageListResponse(items=[PageRead.model_validate(p) for p in pages])
+async def list_pages(
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
+    # Unbounded by default, deliberately: a seed reads this endpoint to build a
+    # slug-to-id map, and a default page size would make it recreate pages it
+    # already has. Callers that page ask for it.
+    limit: int | None = Query(default=None, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> PageListResponse:
+    pages, total = await PagesService(db).list_pages(
+        search=search, status=status_filter, limit=limit, offset=offset
+    )
+    return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
 
 
 # Declared before "/pages/{page_id}" so the literal path wins the match.
@@ -36,7 +50,7 @@ async def list_pages(db: AsyncSession = Depends(get_db)) -> PageListResponse:
 async def list_pending(db: AsyncSession = Depends(get_db)) -> PageListResponse:
     """Approver queue — pages currently in ``submitted_for_review``."""
     pages = await PagesService(db).list_pending()
-    return PageListResponse(items=[PageRead.model_validate(p) for p in pages])
+    return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
 
 
 @router.post(

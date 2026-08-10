@@ -13,16 +13,38 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import type React from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
 import { ScheduledBadge } from '../components/ScheduledBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { deletePage, type PageRead } from '../utils/api';
 
 interface Props {
-  pages: { items: PageRead[] };
+  pages: { items: PageRead[]; total: number };
+  filters: PageListFilterState;
 }
 
 export default function PageList() {
-  const { pages } = usePage<{ props: Props }>().props as unknown as Props;
+  const { pages, filters } = usePage<{ props: Props }>().props as unknown as Props;
+  const { limit, offset } = filters;
+  const filtering = filters.search !== '' || filters.status !== '';
+
+  /**
+   * Re-ask the server for a slice. `preserveState` keeps the component — and
+   * so the focus and caret in the search box — alive across the round trip;
+   * `replace` keeps one history entry per search rather than one per
+   * keystroke, so Back leaves the list instead of retyping it backwards.
+   */
+  const go = (next: { search?: string; status?: string; offset?: number }) => {
+    const merged = { ...filters, ...next };
+    // Any filter change invalidates the offset: page 3 of the previous filter
+    // is not page 3 of this one.
+    const nextOffset = next.offset ?? 0;
+    router.get(
+      '/pagebuilder/',
+      { search: merged.search, status: merged.status, offset: nextOffset },
+      { only: ['pages', 'filters'], preserveState: true, preserveScroll: true, replace: true },
+    );
+  };
 
   // Deliberately not caught here: ConfirmDialog keeps itself open and shows
   // the message. This used to be a bare try/finally, so a delete refused by
@@ -30,7 +52,7 @@ export default function PageList() {
   // identical to a delete that had not been confirmed yet.
   const handleDelete = async (id: number) => {
     await deletePage(id);
-    router.reload({ only: ['pages'] });
+    router.reload({ only: ['pages', 'filters'] });
   };
 
   return (
@@ -52,9 +74,28 @@ export default function PageList() {
         </>
       }
     >
+      {/* Hidden only on a genuinely empty site: with no pages at all there is
+          nothing to search, and the controls would just be noise above the
+          "create your first one" prompt. */}
+      {(filtering || pages.total > 0) && <PageListFilters filters={filters} onChange={go} />}
+
       {pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          No pages yet. Click "New page" to create your first one.
+          {filtering ? (
+            <>
+              No pages match this filter.{' '}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => go({ search: '', status: '' })}
+              >
+                Clear filters
+              </Button>
+            </>
+          ) : (
+            'No pages yet. Click "New page" to create your first one.'
+          )}
         </div>
       ) : (
         <Table>
@@ -128,6 +169,35 @@ export default function PageList() {
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {pages.total > limit && (
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Showing {Math.min(offset + 1, pages.total)}–{Math.min(offset + limit, pages.total)} of{' '}
+            {pages.total}
+          </span>
+          <div className="space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={offset === 0}
+              onClick={() => go({ offset: Math.max(0, offset - limit) })}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={offset + limit >= pages.total}
+              onClick={() => go({ offset: offset + limit })}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
     </PageShell>
   );

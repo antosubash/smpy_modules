@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { clickAndConfirm, login, publishWithNote, uniqueSlug } from './helpers';
+import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
 
 test.describe('PageBuilder admin', () => {
   test.beforeEach(async ({ page }) => {
@@ -117,5 +117,56 @@ test.describe('PageBuilder admin', () => {
     await page.goto('/pagebuilder/');
     await page.getByRole('button', { name: /media library/i }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/media$/);
+  });
+
+  test('search and status filter narrow the list, and survive a reload', async ({ page }) => {
+    const tag = uniqueSlug('filter');
+    const headers = await csrfHeader(page);
+    const created: number[] = [];
+    for (const name of ['Alpha', 'Beta']) {
+      const res = await page.request.post('/api/pagebuilder/pages', {
+        headers,
+        data: {
+          title: `${name} ${tag}`,
+          slug: `${name.toLowerCase()}-${tag}`,
+          draft_data: { content: [] },
+        },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+      created.push((await res.json()).id as number);
+    }
+    // Publish Alpha so the two differ by status as well as by title.
+    await page.request.post(`/api/pagebuilder/pages/${created[0]}/publish`, { headers, data: {} });
+
+    await page.goto('/pagebuilder/');
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+
+    // ── Search narrows to one row ─────────────────────────────
+    await page.getByRole('searchbox', { name: /search pages/i }).fill(`Beta ${tag}`);
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
+
+    // The filter is in the URL, so reloading keeps it rather than resetting.
+    await expect(page).toHaveURL(/[?&]search=Beta/);
+    await page.reload();
+    await expect(page.getByRole('searchbox', { name: /search pages/i })).toHaveValue(`Beta ${tag}`);
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
+
+    // ── Status pills filter independently ─────────────────────
+    await page.goto('/pagebuilder/');
+    await page.getByRole('button', { name: 'Published' }).click();
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toHaveCount(0);
+
+    // ── A filter matching nothing offers a way out ────────────
+    await page.getByRole('searchbox', { name: /search pages/i }).fill('no-such-page-anywhere');
+    await expect(page.getByText(/no pages match this filter/i)).toBeVisible();
+    await page.getByRole('button', { name: /clear filters/i }).click();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+
+    for (const id of created) {
+      await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
+    }
   });
 });

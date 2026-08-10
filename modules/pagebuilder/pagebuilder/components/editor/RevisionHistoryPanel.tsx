@@ -79,7 +79,13 @@ export function RevisionHistoryPanel({
                   {RESTORABLE_EVENTS.has(r.event) && (
                     <ConfirmDialog
                       trigger={
-                        <Button type="button" variant="link" size="sm" className="h-auto p-0">
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0"
+                          disabled={busy}
+                        >
                           Restore as draft
                         </Button>
                       }

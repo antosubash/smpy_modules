@@ -20,7 +20,7 @@ async def _create(client: AsyncClient, *, slug: str = "about", title: str = "Abo
 async def test_list_pages_starts_empty(authed_client: AsyncClient) -> None:
     response = await authed_client.get("/api/pagebuilder/pages")
     assert response.status_code == 200
-    assert response.json() == {"items": []}
+    assert response.json() == {"items": [], "total": 0}
 
 
 async def test_create_and_get_page(authed_client: AsyncClient) -> None:
