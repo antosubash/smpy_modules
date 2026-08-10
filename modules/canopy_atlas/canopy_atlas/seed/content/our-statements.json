@@ -11,7 +11,9 @@
         "title": "Our policies & statements",
         "description": "Nunc tristique turpis justo, nec semper mi volutpat id. Quisque at magna id ipsum malesuada sodales sit amet ut ipsum. Morbi sodales tincidunt volutpat.",
         "ctaLabel": "",
-        "ctaHref": ""
+        "ctaHref": "",
+        "align": "left",
+        "indent": "4"
       }
     },
     {
@@ -60,15 +62,15 @@
         "links": [
           {
             "label": "Our process",
-            "href": "/gca/our-process"
+            "href": "/p/our-process"
           },
           {
             "label": "Who we are",
-            "href": "/gca/who-we-are"
+            "href": "/p/who-we-are"
           },
           {
             "label": "Get in touch",
-            "href": "/gca/contact"
+            "href": "/p/contact"
           }
         ],
         "images": []

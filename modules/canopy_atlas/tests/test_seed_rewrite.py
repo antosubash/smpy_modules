@@ -27,8 +27,12 @@ def test_svg_marks_move_to_the_module_static_mount() -> None:
 
 
 def test_in_site_links_are_left_alone() -> None:
-    # "/gca/contact" is a page route, not a file — rewriting it would break
-    # every link in the seeded navigation.
+    # The rewriter resolves asset paths and nothing else. Page routes are
+    # stored the way they are served — "/p/<slug>" — so there is nothing here
+    # to translate. "/gca/contact" is GeoWiki's old route for the same page and
+    # is *not* rewritten into a working one: content carrying it would 404, so
+    # it is caught in the content itself (see test_seed_content.py) rather than
+    # papered over at seed time.
     assert rewrite_asset_paths("/p/contact", UPLOADS) == "/p/contact"
     assert rewrite_asset_paths("/gca/contact", UPLOADS) == "/gca/contact"
 

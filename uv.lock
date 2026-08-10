@@ -1271,7 +1271,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-canopy-atlas"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "modules/canopy_atlas" }
 dependencies = [
     { name = "httpx" },
@@ -1405,7 +1405,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-news"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "modules/news" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -1439,7 +1439,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-pagebuilder"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "modules/pagebuilder" }
 dependencies = [
     { name = "pillow" },
@@ -1490,7 +1490,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-python-modules"
-version = "0.0.4"
+version = "0.0.5"
 source = { virtual = "." }
 
 [package.dev-dependencies]
