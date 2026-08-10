@@ -113,14 +113,11 @@ export default function MediaLibrary() {
     return Array.from(set).sort();
   }, [folders, uploadFolder]);
 
+  // Errors propagate: the confirmation dialog stays open and shows them,
+  // which is closer to the failure than the banner at the top of the page.
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this asset? Pages using its URL will break.')) return;
-    try {
-      await deleteMedia(id);
-      setAssets((prev) => prev.filter((a) => a.id !== id));
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Delete failed');
-    }
+    await deleteMedia(id);
+    setAssets((prev) => prev.filter((a) => a.id !== id));
   };
 
   const handleCopy = async (asset: MediaAssetRead) => {

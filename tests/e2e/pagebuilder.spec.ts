@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, uniqueSlug } from './helpers';
 
 test.describe('PageBuilder admin', () => {
   test.beforeEach(async ({ page }) => {
@@ -75,11 +75,10 @@ test.describe('PageBuilder admin', () => {
 
     // ── Delete ────────────────────────────────────────────────
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: title })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: title }).getByRole('button', { name: /^delete$/i }),
+    );
     await expect(page.locator('tr', { hasText: title })).toHaveCount(0);
   });
 
@@ -107,11 +106,12 @@ test.describe('PageBuilder admin', () => {
 
     // Clean up so this test doesn't leave a draft behind.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: `SEO page ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('tr', { hasText: `SEO page ${slug}` })
+        .getByRole('button', { name: /^delete$/i }),
+    );
   });
 
   test('media library page is reachable from the page list', async ({ page }) => {

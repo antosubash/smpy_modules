@@ -11,8 +11,8 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
-import { useState } from 'react';
 
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ScheduledBadge } from '../components/ScheduledBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { deletePage, type PageRead } from '../utils/api';
@@ -23,17 +23,14 @@ interface Props {
 
 export default function PageList() {
   const { pages } = usePage<{ props: Props }>().props as unknown as Props;
-  const [busy, setBusy] = useState<number | null>(null);
 
+  // Deliberately not caught here: ConfirmDialog keeps itself open and shows
+  // the message. This used to be a bare try/finally, so a delete refused by
+  // the server cleared the busy flag and left the row sitting there — visually
+  // identical to a delete that had not been confirmed yet.
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this page?')) return;
-    setBusy(id);
-    try {
-      await deletePage(id);
-      router.reload({ only: ['pages'] });
-    } finally {
-      setBusy(null);
-    }
+    await deletePage(id);
+    router.reload({ only: ['pages'] });
   };
 
   return (
@@ -107,15 +104,25 @@ export default function PageList() {
                   >
                     Edit
                   </Button>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="text-destructive"
-                    disabled={busy === p.id}
-                    onClick={() => handleDelete(p.id)}
-                  >
-                    Delete
-                  </Button>
+                  <ConfirmDialog
+                    trigger={
+                      <Button variant="link" size="sm" className="text-destructive">
+                        Delete
+                      </Button>
+                    }
+                    title={`Delete "${p.title}"?`}
+                    description={
+                      <>
+                        The page and its revision history are removed for good.
+                        {p.status === 'published' && (
+                          <> It is published, so {`/p/${p.slug}`} starts answering 404.</>
+                        )}
+                      </>
+                    }
+                    confirmLabel="Delete"
+                    destructive
+                    onConfirm={() => handleDelete(p.id)}
+                  />
                 </TableCell>
               </TableRow>
             ))}

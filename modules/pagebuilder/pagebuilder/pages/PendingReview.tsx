@@ -11,9 +11,10 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
-import { useState } from 'react';
 
-import { approvePage, type PageRead, promptAndReject } from '../utils/api';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { NoteDialog } from '../components/NoteDialog';
+import { approvePage, type PageRead, rejectPage } from '../utils/api';
 
 interface Props {
   pages: { items: PageRead[] };
@@ -27,32 +28,18 @@ interface Props {
  */
 export default function PendingReview() {
   const { pages } = usePage<{ props: Props }>().props as unknown as Props;
-  const [busy, setBusy] = useState<number | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
+  // Both handlers let their error escape into the dialog that triggered them,
+  // which keeps the message next to the row it belongs to. The page-level
+  // banner these used to write to sat above a queue of near-identical rows and
+  // never said which one had failed.
   const handleApprove = async (id: number) => {
-    if (!confirm('Approve and publish this page?')) return;
-    setBusy(id);
-    setMessage(null);
-    try {
-      await approvePage(id);
-      router.reload({ only: ['pages'] });
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Approve failed');
-    } finally {
-      setBusy(null);
-    }
+    await approvePage(id);
+    router.reload({ only: ['pages'] });
   };
 
-  const handleReject = async (id: number) => {
-    setBusy(id);
-    setMessage(null);
-    const result = await promptAndReject(id);
-    setBusy(null);
-    if ('skipped' in result) {
-      if (result.skipped !== 'cancelled') setMessage(result.skipped);
-      return;
-    }
+  const handleReject = async (id: number, note: string) => {
+    await rejectPage(id, note);
     router.reload({ only: ['pages'] });
   };
 
@@ -66,8 +53,6 @@ export default function PendingReview() {
         </Button>
       }
     >
-      {message && <p className="mb-4 text-sm text-destructive">{message}</p>}
-
       {pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           No pages are awaiting review.
@@ -98,23 +83,32 @@ export default function PendingReview() {
                   >
                     Review
                   </Button>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    disabled={busy === p.id}
-                    onClick={() => handleApprove(p.id)}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="text-destructive"
-                    disabled={busy === p.id}
-                    onClick={() => handleReject(p.id)}
-                  >
-                    Reject
-                  </Button>
+                  <ConfirmDialog
+                    trigger={
+                      <Button variant="link" size="sm">
+                        Approve
+                      </Button>
+                    }
+                    title={`Publish "${p.title}"?`}
+                    description={`Approving publishes it immediately at /p/${p.slug}.`}
+                    confirmLabel="Approve"
+                    onConfirm={() => handleApprove(p.id)}
+                  />
+                  <NoteDialog
+                    trigger={
+                      <Button variant="link" size="sm" className="text-destructive">
+                        Reject
+                      </Button>
+                    }
+                    title={`Reject "${p.title}"?`}
+                    description="It goes back to draft. The reason is shown to the editor in the page header and the revision history, so say what needs to change."
+                    label="Reason for rejection"
+                    placeholder="The hero image is still a placeholder."
+                    submitLabel="Reject"
+                    required
+                    destructive
+                    onSubmit={(note) => handleReject(p.id, note)}
+                  />
                 </TableCell>
               </TableRow>
             ))}

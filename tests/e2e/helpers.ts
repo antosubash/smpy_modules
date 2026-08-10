@@ -1,6 +1,25 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from '../../playwright.config';
+
+/**
+ * Click an action guarded by `ConfirmDialog` and confirm it.
+ *
+ * These used to be `window.confirm`, driven with `page.once('dialog', …)`.
+ * They are Radix alert dialogs now: the trigger and the confirm button carry
+ * the same label, so the confirm has to be scoped to the dialog itself.
+ */
+export async function clickAndConfirm(
+  page: Page,
+  trigger: Locator,
+  label: RegExp | string = /^delete$/i,
+) {
+  await trigger.click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: label }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 /**
  * Read the pagebuilder CSRF cookie the admin middleware mirrors for

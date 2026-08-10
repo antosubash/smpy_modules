@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, uniqueSlug } from './helpers';
 
 /**
  * Issues #6 (CSP) + #26 (Cache-Control + ETag) — exercised end-to-end
@@ -49,11 +49,10 @@ test.describe('Public viewer headers', () => {
 
     // Cleanup.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: `Headers ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: `Headers ${slug}` }).getByRole('button', { name: /^delete$/i }),
+    );
   });
 
   test('conditional GET with If-None-Match returns 304', async ({ page }) => {
@@ -81,10 +80,9 @@ test.describe('Public viewer headers', () => {
 
     // Cleanup.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: `Cond ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: `Cond ${slug}` }).getByRole('button', { name: /^delete$/i }),
+    );
   });
 });
