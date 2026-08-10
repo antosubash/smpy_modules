@@ -57,17 +57,25 @@ def _base(include_drafts: bool, category: str | None):
     # rendering a card that links nowhere. There is no database foreign key —
     # see NewsArticle.page_id.
     #
-    # load_only: the card serializer reads four Page columns; without it the
+    # load_only: the card serializer reads five Page columns; without it the
     # join dragged both block-JSON columns through the ORM for every row, so
     # list cost scaled with page *content* size instead of card count
     # (issue #12). Anything outside this list raises on access — loudly, in
     # tests — rather than silently re-widening the query.
+    #
+    # ``status`` is in the set because ``_to_read`` serializes ``page_status``;
+    # leaving it out lazy-loads on access, which raises MissingGreenlet under
+    # the async session (issue #20).
     stmt = (
         select(NewsArticle, Page)
         .join(Page, Page.id == NewsArticle.page_id)
         .options(
             Load(Page).load_only(
-                Page.slug, Page.title, Page.meta_description, Page.og_image
+                Page.slug,
+                Page.title,
+                Page.meta_description,
+                Page.og_image,
+                Page.status,
             )
         )
     )
