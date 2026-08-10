@@ -1,5 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
 import {
@@ -197,13 +198,13 @@ export default function MediaLibrary() {
         <section>
           <MediaFilters filters={filters} onChange={setFilters} />
 
-          <div className="text-sm text-gray-500 mb-2">
+          <div className="mb-2 text-sm text-muted-foreground">
             Browsing <strong>{activeFolderLabel}</strong>
             {loading && <span className="ml-2">Loading…</span>}
           </div>
 
           {message && (
-            <div className="mb-4 text-sm text-gray-700 bg-yellow-50 border border-yellow-200 px-3 py-2 rounded">
+            <div className="mb-4 rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {message}
             </div>
           )}
@@ -227,14 +228,14 @@ export default function MediaLibrary() {
 
           {nextCursor !== null && (
             <div className="mt-6 flex justify-center">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 disabled={loadingMore}
                 onClick={() => void refresh('append', nextCursor)}
-                className="px-4 py-2 rounded border hover:bg-gray-50 text-sm disabled:opacity-50"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
+              </Button>
             </div>
           )}
         </section>

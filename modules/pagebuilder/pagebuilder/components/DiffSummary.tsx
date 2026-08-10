@@ -15,6 +15,12 @@ function renderValue(value: unknown): string {
  * Compact, scannable diff: metadata table (only changed fields) plus
  * three lists of blocks (added / removed / changed). Designed to fit
  * inside the editor's history panel without a separate page.
+ *
+ * The added/removed greens and reds below are deliberately literal rather than
+ * theme tokens. They are a matched pair carrying meaning, and the token set has
+ * `--destructive` but no success counterpart — converting only the red half
+ * would leave the pair mismatched. Give the design system a success token and
+ * both sides can move together.
  */
 export function DiffSummary({ diff }: Props): React.JSX.Element {
   const { metadata, blocks } = diff;
@@ -25,7 +31,7 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
   if (totalChanges === 0) {
     return (
       <div
-        className="mt-3 rounded border border-gray-200 bg-white p-3 text-xs text-gray-500"
+        className="mt-3 rounded border bg-card p-3 text-xs text-muted-foreground"
         data-testid="diff-summary"
       >
         No changes between these revisions.
@@ -34,13 +40,10 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
   }
 
   return (
-    <div
-      className="mt-3 rounded border border-gray-200 bg-white p-3 text-xs space-y-2"
-      data-testid="diff-summary"
-    >
+    <div className="mt-3 space-y-2 rounded border bg-card p-3 text-xs" data-testid="diff-summary">
       {metaKeys.length > 0 && (
         <div>
-          <div className="font-semibold text-gray-700">Metadata</div>
+          <div className="font-semibold">Metadata</div>
           <ul className="ml-3 list-disc">
             {metaKeys.map((key) => (
               <li key={key}>
@@ -61,7 +64,7 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
             {blocks.added.map((b) => (
               <li key={b.id}>
                 <span className="font-mono">{b.type ?? '?'}</span>{' '}
-                <span className="text-gray-500">({b.id})</span>
+                <span className="text-muted-foreground">({b.id})</span>
               </li>
             ))}
           </ul>
@@ -74,7 +77,7 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
             {blocks.removed.map((b) => (
               <li key={b.id}>
                 <span className="font-mono">{b.type ?? '?'}</span>{' '}
-                <span className="text-gray-500">({b.id})</span>
+                <span className="text-muted-foreground">({b.id})</span>
               </li>
             ))}
           </ul>
@@ -87,16 +90,14 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
             {blocks.changed.map((b) => (
               <li key={b.id}>
                 <span className="font-mono">{b.type ?? '?'}</span>{' '}
-                <span className="text-gray-500">({b.id})</span>
+                <span className="text-muted-foreground">({b.id})</span>
                 {b.type_before && (
-                  <span className="text-gray-500">
+                  <span className="text-muted-foreground">
                     {' '}
                     — was <span className="font-mono">{b.type_before}</span>
                   </span>
                 )}
-                {b.fields.length > 0 && (
-                  <span className="text-gray-700">: {b.fields.join(', ')}</span>
-                )}
+                {b.fields.length > 0 && <span>: {b.fields.join(', ')}</span>}
               </li>
             ))}
           </ul>

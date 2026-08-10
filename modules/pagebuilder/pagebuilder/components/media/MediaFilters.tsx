@@ -21,7 +21,7 @@ export function MediaFilters({ filters, onChange }: Props) {
   return (
     <div className="flex flex-wrap gap-3 items-end mb-4">
       <div className="flex-1 min-w-[200px]">
-        <label htmlFor="media-filter-search" className="block text-xs text-gray-500 mb-1">
+        <label htmlFor="media-filter-search" className="mb-1 block text-xs text-muted-foreground">
           Search
         </label>
         <Input
@@ -34,7 +34,7 @@ export function MediaFilters({ filters, onChange }: Props) {
         />
       </div>
       <div>
-        <label htmlFor="media-filter-type" className="block text-xs text-gray-500 mb-1">
+        <label htmlFor="media-filter-type" className="mb-1 block text-xs text-muted-foreground">
           Type
         </label>
         <select
@@ -51,7 +51,7 @@ export function MediaFilters({ filters, onChange }: Props) {
         </select>
       </div>
       <div>
-        <label htmlFor="media-filter-min-kb" className="block text-xs text-gray-500 mb-1">
+        <label htmlFor="media-filter-min-kb" className="mb-1 block text-xs text-muted-foreground">
           Min KB
         </label>
         <Input
@@ -65,7 +65,7 @@ export function MediaFilters({ filters, onChange }: Props) {
         />
       </div>
       <div>
-        <label htmlFor="media-filter-max-kb" className="block text-xs text-gray-500 mb-1">
+        <label htmlFor="media-filter-max-kb" className="mb-1 block text-xs text-muted-foreground">
           Max KB
         </label>
         <Input
