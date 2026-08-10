@@ -1,6 +1,6 @@
 {
   "name": "@simple-module-py/news",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Frontend assets for the News module",
   "peerDependencies": {
