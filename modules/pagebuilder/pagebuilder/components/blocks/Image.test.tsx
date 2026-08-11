@@ -65,10 +65,14 @@ describe('ImageBlock caption', () => {
     // Existing pages carry no caption prop at all — `undefined`, not `''`, is
     // what Puck hands the block for them — and must render exactly as they did
     // before the field existed.
+    //
+    // `max-w-full` is the class form of the `max-width: 100%` this block used
+    // to write into the style attribute, so the cap is the same one it always
+    // had; it just stopped outranking every stylesheet on the page.
     const markup = html({ caption: undefined });
     expect(markup).not.toContain('figure');
     expect(markup.startsWith('<img')).toBe(true);
-    expect(markup).toContain('class="my-3"');
+    expect(markup).toContain('class="my-3 max-w-full"');
   });
 
   it('treats an empty or blank caption as no caption', () => {
@@ -90,5 +94,73 @@ describe('ImageBlock caption', () => {
     expect(markup).toContain('alt=""');
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain('<figcaption');
+  });
+});
+
+describe('ImageBlock measure', () => {
+  // A page that uses the section widgets has to set its root to `full`, because
+  // those widgets bring their own container and a `contained` root crushes
+  // them. Image is a primitive: it brings no container, so on such a page it
+  // spanned the whole viewport and sat flush against the window edge, with the
+  // caption dragged out there with it. `maxWidth` is the measure it never had.
+
+  it('offers a Max width field on the prose scale the widgets measure in', () => {
+    // Not Container's `max-w-screen-*` scale: this caps prose-adjacent content
+    // inside an article, and the article measure across this module is
+    // `max-w-3xl`/`4xl`, not a viewport breakpoint.
+    const field = ImageBlock.fields?.maxWidth as { options?: { value: string }[] };
+    expect(field?.options?.map((o) => o.value)).toEqual(['2xl', '3xl', '4xl', '5xl', 'full']);
+  });
+
+  it('defaults to full width, so existing pages do not move', () => {
+    expect(ImageBlock.defaultProps?.maxWidth).toBe('full');
+    expect(ImageBlock.defaultProps?.rounded).toBe('none');
+  });
+
+  it('renders an unconstrained image exactly as it did before the field existed', () => {
+    // `full` has to be a true no-op: every Image block already published
+    // carries no maxWidth at all and must not shift by a pixel.
+    const markup = html({ caption: undefined, maxWidth: 'full' });
+    expect(markup.startsWith('<img')).toBe(true);
+    expect(markup).toContain('class="my-3 max-w-full"');
+    expect(markup).not.toContain('mx-auto');
+  });
+
+  it('caps and centres a constrained bare image', () => {
+    const markup = html({ caption: undefined, maxWidth: '4xl' });
+    expect(markup).toContain('max-w-4xl');
+    expect(markup).toContain('mx-auto');
+  });
+
+  it('caps the figure, not the image, so the caption tracks the image width', () => {
+    // Constraining the <img> alone would leave the <figcaption> as wide as the
+    // viewport — which is the bug, just moved down one element.
+    const markup = html({ caption: 'A caption', maxWidth: '4xl' });
+    expect(markup).toMatch(/<figure class="[^"]*max-w-4xl[^"]*mx-auto/);
+    // The image gets `max-w-full` and nothing narrower: two `max-w-*` classes
+    // on one element resolve by stylesheet order, not attribute order, so the
+    // measure lives on exactly one of the two elements.
+    expect(markup).toMatch(/<img[^>]*class="block max-w-full"/);
+  });
+
+  it('caps through a class rather than an inline max-width', () => {
+    // The block used to hard-code `max-width: 100%` in the style attribute,
+    // which outranks any stylesheet and made the measure unsettable from CSS.
+    expect(html({ maxWidth: '4xl' })).not.toContain('max-width:100%');
+  });
+
+  it('rounds the image when asked, mirroring Container’s scale', () => {
+    expect(html({ caption: undefined, rounded: 'xl' })).toContain('rounded-xl');
+    expect(html({ caption: undefined, rounded: 'none' })).not.toContain('rounded-');
+  });
+
+  it('rounds the image itself, not the figure, so corners clip the picture', () => {
+    const markup = html({ caption: 'A caption', rounded: 'xl' });
+    expect(markup).toMatch(/<img[^>]*rounded-xl/);
+    expect(markup).not.toMatch(/<figure[^>]*rounded-xl/);
+  });
+
+  it('leaves the empty-src placeholder alone', () => {
+    expect(html({ src: '', maxWidth: '4xl' })).toContain('No image selected');
   });
 });
