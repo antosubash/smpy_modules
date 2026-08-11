@@ -61,6 +61,46 @@ test.describe('News admin', () => {
       })
       .toBe('After');
   });
+
+  test('the category filter is in the URL and survives a reload', async ({ page }) => {
+    await login(page);
+    const headers = await csrfHeader(page);
+
+    // Two articles in different categories, so a filter has something to hide.
+    const made: Record<string, string> = {};
+    for (const category of ['Alpha', 'Beta']) {
+      const slug = uniqueSlug(`filt-${category.toLowerCase()}`);
+      made[category] = slug;
+      const created = await page.request.post('/api/pagebuilder/pages', {
+        headers,
+        data: { title: `${category} ${slug}`, slug, draft_data: { content: [] } },
+      });
+      const { id } = await created.json();
+      await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
+      await page.request.post('/api/news/articles', {
+        headers,
+        data: { page_id: id, category, published_at: null },
+      });
+    }
+
+    await page.goto('/news/');
+    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toBeVisible();
+
+    await page.getByRole('button', { name: /^Alpha \(\d+\)$/ }).click();
+    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toHaveCount(0);
+    await expect(page).toHaveURL(/[?&]category=Alpha/);
+
+    // The point of putting it in the URL: reloading keeps the filter instead
+    // of silently dropping the user back into the unfiltered list.
+    await page.reload();
+    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toBeVisible();
+    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toHaveCount(0);
+
+    // And it is linkable, not just sticky.
+    await page.goto('/news/?category=Beta');
+    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toBeVisible();
+    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toHaveCount(0);
+  });
 });
 
 test.describe('Article lifecycle', () => {

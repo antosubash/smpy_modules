@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
+import { useUrlFilters } from '../hooks/useUrlFilters';
 import {
   type ArticleRead,
   type CategoryCount,
@@ -36,9 +37,10 @@ export default function NewsList() {
   const [categories, setCategories] = useState<CategoryCount[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const [category, setCategory] = useState('');
+  // Category and paging live in the query string, matching the page list: a
+  // filtered view survives a reload and can be linked to.
+  const [{ category, offset }, setFilters] = useUrlFilters();
 
   // Only the newest refresh may write state. An AbortSignal alone does not
   // cover this: `runRow` refreshes without one, so a save's re-fetch could
@@ -72,7 +74,7 @@ export default function NewsList() {
           // empty response first would flash the "no articles yet" box over a
           // list that still holds a full page.
           if (response.items.length === 0 && offset > 0) {
-            setOffset(Math.max(0, offset - PAGE_SIZE));
+            setFilters({ offset: Math.max(0, offset - PAGE_SIZE) });
             return;
           }
           setArticles(response.items);
@@ -92,8 +94,7 @@ export default function NewsList() {
           // Editing the last row out of the filtered category empties the
           // filter; fall back to All rather than pinning an orphaned pill.
           if (category && !response.items.some((c) => c.category === category)) {
-            setCategory('');
-            setOffset(0);
+            setFilters({ category: '', offset: 0 });
           }
         })
         .catch(() => {
@@ -104,7 +105,10 @@ export default function NewsList() {
 
       await Promise.all([articlesLoaded, categoriesLoaded]);
     },
-    [offset, category],
+    // `setFilters` is stable; listed because it is called above and the effect
+    // below re-runs on `refresh`, so a silently-changing identity here would
+    // mean an extra fetch per render.
+    [offset, category, setFilters],
   );
 
   useEffect(() => {
@@ -144,8 +148,7 @@ export default function NewsList() {
           className="mb-4"
           value={category}
           onChange={(next) => {
-            setCategory(next);
-            setOffset(0);
+            setFilters({ category: next, offset: 0 });
           }}
           options={[
             { value: '', label: 'All' },
@@ -177,8 +180,7 @@ export default function NewsList() {
                 variant="link"
                 className="h-auto p-0"
                 onClick={() => {
-                  setCategory('');
-                  setOffset(0);
+                  setFilters({ category: '', offset: 0 });
                 }}
               >
                 Show all articles
@@ -231,7 +233,7 @@ export default function NewsList() {
               variant="outline"
               size="sm"
               disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+              onClick={() => setFilters({ offset: Math.max(0, offset - PAGE_SIZE) })}
             >
               Previous
             </Button>
@@ -240,7 +242,7 @@ export default function NewsList() {
               variant="outline"
               size="sm"
               disabled={offset + PAGE_SIZE >= total}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
+              onClick={() => setFilters({ offset: offset + PAGE_SIZE })}
             >
               Next
             </Button>
