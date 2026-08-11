@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
 
 const FIXTURE_PATH = fileURLToPath(new URL('./fixtures/hero-1024x768.png', import.meta.url));
 
@@ -112,8 +112,7 @@ test.describe('Image block + media picker', () => {
     expect(Object.keys(asset.variants).sort()).toEqual(['w320', 'w640']);
 
     // Cleanup so we leave a clean slate.
-    page.once('dialog', (d) => d.accept());
-    await card.getByRole('button', { name: /^delete$/i }).click();
+    await clickAndConfirm(page, card.getByRole('button', { name: /^delete$/i }));
     await expect(card).toHaveCount(0);
   });
 
@@ -165,8 +164,7 @@ test.describe('Image block + media picker', () => {
     // 6) Save + publish so the public viewer carries the same metadata.
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page.getByText('Draft saved.')).toBeVisible();
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     // 7) Public view: assert the rendered `<img>` has every responsive
@@ -188,17 +186,19 @@ test.describe('Image block + media picker', () => {
 
     // 8) Cleanup.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('tr', { hasText: `Picker page ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('tr', { hasText: `Picker page ${slug}` })
+        .getByRole('button', { name: /^delete$/i }),
+    );
     await page.goto('/pagebuilder/media');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('li', { hasText: 'hero-1024x768.png' })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('li', { hasText: 'hero-1024x768.png' })
+        .getByRole('button', { name: /^delete$/i }),
+    );
   });
 
   test('a caption typed in the inspector reaches the published page', async ({ page }) => {
@@ -220,8 +220,7 @@ test.describe('Image block + media picker', () => {
 
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page.getByText('Draft saved.')).toBeVisible();
-    page.once('dialog', (d) => d.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
     await page.goto(`/p/${slug}`);
@@ -232,11 +231,12 @@ test.describe('Image block + media picker', () => {
 
     // Cleanup.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('tr', { hasText: `Caption page ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('tr', { hasText: `Caption page ${slug}` })
+        .getByRole('button', { name: /^delete$/i }),
+    );
   });
 
   test('picker fallback: manually typed URLs are accepted without auto-fill', async ({ page }) => {
@@ -261,10 +261,11 @@ test.describe('Image block + media picker', () => {
 
     // Cleanup.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('tr', { hasText: `Manual page ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('tr', { hasText: `Manual page ${slug}` })
+        .getByRole('button', { name: /^delete$/i }),
+    );
   });
 });

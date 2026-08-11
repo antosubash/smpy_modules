@@ -79,7 +79,7 @@
         "heading": "Changing the way we map the Earth's vital forest canopy",
         "body": "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes.",
         "linkLabel": "Learn about our process",
-        "linkHref": "/gca/our-process"
+        "linkHref": "/p/our-process"
       }
     },
     {
@@ -142,7 +142,7 @@
         "heading": "Championing collaboration, open science and accessibility",
         "body": "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus.",
         "linkLabel": "Read our statements & policies",
-        "linkHref": "/gca/our-statements"
+        "linkHref": "/p/our-statements"
       }
     },
     {
@@ -153,7 +153,7 @@
         "title": "A unified canopy atlas with multiple practical research applications",
         "subtitle": "",
         "linkLabel": "Learn more",
-        "linkHref": "/gca/outputs",
+        "linkHref": "/p/outputs",
         "surface": "muted",
         "columns": "3",
         "items": [
@@ -214,7 +214,7 @@
         "id": "sites",
         "title": "Data highlights from selected GCA sites",
         "viewAllLabel": "View all",
-        "viewAllHref": "/gca/news",
+        "viewAllHref": "/p/news-index",
         "columns": "3",
         "items": [
           {
@@ -224,7 +224,7 @@
             "date": "Mar 12, 2025",
             "title": "Data story title goes here and may be on two lines",
             "body": "",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           },
           {
             "imageUrl": "/gca/images/canopy-aerial.jpg",
@@ -233,7 +233,7 @@
             "date": "Feb 28, 2025",
             "title": "Data story title goes here and may be on two lines",
             "body": "",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           },
           {
             "imageUrl": "/gca/images/canopy-up.jpg",
@@ -242,7 +242,7 @@
             "date": "Jan 09, 2025",
             "title": "Data story title goes here and may be on two lines",
             "body": "",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           }
         ]
       }
@@ -253,7 +253,7 @@
         "id": "news",
         "title": "Latest news, updates & events",
         "viewAllLabel": "View all",
-        "viewAllHref": "/gca/news",
+        "viewAllHref": "/p/news-index",
         "columns": "4",
         "items": [
           {
@@ -263,7 +263,7 @@
             "date": "Aug 5, 2025",
             "title": "Social distancing of trees ensures biodiversity in tropical forests, finds study",
             "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           },
           {
             "imageUrl": "/gca/images/collaboration.jpg",
@@ -272,7 +272,7 @@
             "date": "Jul 22, 2025",
             "title": "Social distancing of trees ensures biodiversity in tropical forests, finds study",
             "body": "Aost tropical trees might harbon diseases from other members of the same species in a kind of 'social distancing'.",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           },
           {
             "imageUrl": "/gca/images/forest-aerial-river.jpg",
@@ -281,7 +281,7 @@
             "date": "Jun 30, 2025",
             "title": "Citizen science in action at the arboretum",
             "body": "University of Guelph Arboretum's iNaturalist project recently reached its 10,000th observation, a social network.",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           },
           {
             "imageUrl": "/gca/images/canopy-aerial.jpg",
@@ -290,7 +290,7 @@
             "date": "Jun 02, 2025",
             "title": "Areas with lower bird diversity have more mental health hospital admissions",
             "body": "Research findings show a complex relationship between anxiety and mood disorders and biodiversity cities.",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           }
         ]
       }
@@ -318,7 +318,7 @@
           },
           {
             "label": "News",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           }
         ],
         "images": []
@@ -333,7 +333,7 @@
         "heading": "Get involved",
         "subheading": "Join an international community of ecologists, remote sensing engineers, and foresters using open data to understand earth's woody ecosystems.",
         "primaryLabel": "Contact us",
-        "primaryHref": "/gca/contact",
+        "primaryHref": "/p/contact",
         "secondaryLabel": "",
         "secondaryHref": "",
         "links": [],

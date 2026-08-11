@@ -32,7 +32,7 @@ export function MediaDropzone({
       }}
       onDrop={onDrop}
       className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center text-sm transition-colors ${
-        dragActive ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-500'
+        dragActive ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground'
       }`}
       data-testid="media-dropzone"
     >
@@ -61,14 +61,17 @@ export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
             <div className="font-medium truncate" title={u.file.name}>
               {u.file.name}
             </div>
-            <div className="h-1.5 bg-gray-100 rounded overflow-hidden mt-1">
+            {/* done/in-progress keep literal colours: the token set has
+                --destructive but no success, and half-converting a
+                red/green pair reads worse than leaving it alone. */}
+            <div className="mt-1 h-1.5 overflow-hidden rounded bg-muted">
               <div
                 className={`h-full transition-all ${
                   u.status === 'error'
-                    ? 'bg-red-500'
+                    ? 'bg-destructive'
                     : u.status === 'done'
                       ? 'bg-green-500'
-                      : 'bg-blue-500'
+                      : 'bg-primary'
                 }`}
                 style={{
                   width: u.total
@@ -77,9 +80,9 @@ export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
                 }}
               />
             </div>
-            {u.error && <div className="text-red-600 mt-1">{u.error}</div>}
+            {u.error && <div className="mt-1 text-destructive">{u.error}</div>}
           </div>
-          <div className="w-16 text-right tabular-nums text-gray-500">
+          <div className="w-16 text-right tabular-nums text-muted-foreground">
             {u.status === 'done'
               ? 'Done'
               : u.status === 'error'
@@ -90,7 +93,7 @@ export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
             <button
               type="button"
               onClick={() => onDismiss(u.id)}
-              className="text-gray-400 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
               aria-label="Dismiss"
             >
               ×

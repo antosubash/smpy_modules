@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, uniqueSlug } from './helpers';
 
 /**
  * Issue #10 — CSRF protection.
@@ -111,10 +111,9 @@ test.describe('CSRF protection', () => {
 
     // Clean up.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: `CSRF UI ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: `CSRF UI ${slug}` }).getByRole('button', { name: /^delete$/i }),
+    );
   });
 });

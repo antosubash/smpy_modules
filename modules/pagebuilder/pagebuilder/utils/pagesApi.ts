@@ -63,26 +63,6 @@ export const schedulePage = (id: number, body: ScheduleRequest) =>
     body: JSON.stringify(body),
   });
 
-/**
- * Drive a rejection prompt → reject API round-trip. Returns the
- * updated page on success, or a string describing why the call was
- * skipped (cancelled / empty note / API error).
- *
- * Shared by the editor and the pending-review queue so both surfaces
- * stay in sync on prompt copy + empty-note handling.
- */
-export async function promptAndReject(id: number): Promise<PageRead | { skipped: string }> {
-  const note = window.prompt('Reason for rejection (shown to the editor):');
-  if (note === null) return { skipped: 'cancelled' };
-  const trimmed = note.trim();
-  if (!trimmed) return { skipped: 'A rejection note is required.' };
-  try {
-    return await rejectPage(id, trimmed);
-  } catch (e) {
-    return { skipped: e instanceof Error ? e.message : 'Reject failed' };
-  }
-}
-
 export const listRevisions = (id: number) =>
   request<{ items: PageRevisionRead[] }>(`/pages/${id}/revisions`);
 

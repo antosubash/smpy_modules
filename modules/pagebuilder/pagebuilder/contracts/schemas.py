@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from pagebuilder.models import PageStatus, RevisionEvent
 
 PuckData = dict[str, Any]
+
+
+def _blank_to_none(value: Any) -> Any:
+    return None if value == "" else value
+
+
+# A status filter read off a query string. "?status=" — what an unset filter
+# control serialises to, and what a hand-edited URL naturally produces — means
+# "no filter", not "the empty status", which would otherwise 422. A non-empty
+# value that is not a status still fails validation.
+StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
 
 
 class PageCreate(BaseModel):
@@ -78,6 +89,10 @@ class PageDetail(PageRead):
 
 class PageListResponse(BaseModel):
     items: list[PageRead]
+    # Matches before paging, so a caller showing one page at a time can size
+    # its pager. Equal to len(items) whenever the whole result set was asked
+    # for, which is the default.
+    total: int = 0
 
 
 class PageRevisionRead(BaseModel):

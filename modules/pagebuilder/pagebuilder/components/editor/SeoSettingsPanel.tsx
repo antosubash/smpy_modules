@@ -33,9 +33,9 @@ export function SeoSettingsPanel({
   schedule,
 }: Props) {
   return (
-    <div className="border-b bg-gray-50 px-4 py-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+    <div className="border-b bg-muted px-4 py-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
       <label className="flex flex-col gap-1">
-        <span className="font-medium text-gray-700">Meta description</span>
+        <span className="font-medium">Meta description</span>
         <textarea
           value={metaDescription}
           onChange={(e) => onMetaDescriptionChange(e.target.value)}
@@ -44,10 +44,10 @@ export function SeoSettingsPanel({
           placeholder="Shown in search results and link previews."
           className="border rounded px-2 py-1"
         />
-        <span className="text-xs text-gray-500">{metaDescription.length}/500</span>
+        <span className="text-xs text-muted-foreground">{metaDescription.length}/500</span>
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-medium text-gray-700">Open Graph image URL</span>
+        <span className="font-medium">Open Graph image URL</span>
         <input
           type="text"
           value={ogImage}
@@ -56,16 +56,16 @@ export function SeoSettingsPanel({
           placeholder="https://… or /media/pagebuilder/…"
           className="border rounded px-2 py-1 font-mono"
         />
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           Paste a URL from the{' '}
-          <a href="/pagebuilder/media" className="text-blue-600 hover:underline">
+          <a href="/pagebuilder/media" className="text-primary hover:underline">
             media library
           </a>
           .
         </span>
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-medium text-gray-700">Canonical URL</span>
+        <span className="font-medium">Canonical URL</span>
         <input
           type="text"
           value={canonicalUrl}
@@ -74,7 +74,7 @@ export function SeoSettingsPanel({
           placeholder="Defaults to this page's own URL."
           className="border rounded px-2 py-1 font-mono"
         />
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           Override when this page is a duplicate of content hosted elsewhere.
         </span>
       </label>
@@ -86,14 +86,14 @@ export function SeoSettingsPanel({
           className="mt-1"
         />
         <span className="flex flex-col">
-          <span className="font-medium text-gray-700">Allow search engines to index this page</span>
-          <span className="text-xs text-gray-500">
+          <span className="font-medium">Allow search engines to index this page</span>
+          <span className="text-xs text-muted-foreground">
             Uncheck to emit <code>noindex,nofollow</code> and exclude from sitemap.
           </span>
         </span>
       </label>
       <label className="flex flex-col gap-1 md:col-span-2">
-        <span className="font-medium text-gray-700">JSON-LD structured data</span>
+        <span className="font-medium">JSON-LD structured data</span>
         <textarea
           value={jsonLdText}
           onChange={(e) => onJsonLdChange(e.target.value)}
@@ -102,11 +102,11 @@ export function SeoSettingsPanel({
           className="border rounded px-2 py-1 font-mono text-xs"
         />
         {jsonLdError ? (
-          <span className="text-xs text-red-600" data-testid="json-ld-error">
+          <span className="text-xs text-destructive" data-testid="json-ld-error">
             {jsonLdError}
           </span>
         ) : (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             Embedded inside <code>&lt;script type="application/ld+json"&gt;</code>. Leave blank to
             omit.
           </span>

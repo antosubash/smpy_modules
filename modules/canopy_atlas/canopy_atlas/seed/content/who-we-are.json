@@ -25,7 +25,7 @@
         "heading": "How it all started",
         "body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
         "linkLabel": "Read our story",
-        "linkHref": "/gca/our-process"
+        "linkHref": "/p/our-process"
       }
     },
     {
@@ -39,7 +39,7 @@
         "heading": "Governance and how we operate",
         "body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
         "linkLabel": "Our policies & statements",
-        "linkHref": "/gca/our-statements"
+        "linkHref": "/p/our-statements"
       }
     },
     {
@@ -53,7 +53,7 @@
         "heading": "How we are funded",
         "body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.",
         "linkLabel": "Support our work",
-        "linkHref": "/gca/contact"
+        "linkHref": "/p/contact"
       }
     },
     {
@@ -200,7 +200,7 @@
         "heading": "Get involved",
         "subheading": "Join an international community of ecologists, remote sensing engineers, and foresters using open data to understand earth's woody ecosystems.",
         "primaryLabel": "Contact us",
-        "primaryHref": "/gca/contact",
+        "primaryHref": "/p/contact",
         "secondaryLabel": "",
         "secondaryHref": "",
         "links": [],

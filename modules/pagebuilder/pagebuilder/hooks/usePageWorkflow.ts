@@ -6,8 +6,8 @@ import type { Data } from '@puckeditor/core';
 import {
   approvePage,
   createPage,
-  promptAndReject,
   publishPage,
+  rejectPage,
   savePage,
   submitPage,
   unpublishPage,
@@ -24,11 +24,14 @@ interface Params {
 
 export interface PageWorkflow {
   handleSave: (newData: Data) => Promise<void>;
-  handlePublish: () => Promise<void>;
+  /** *note* is `null` for "publish, no note". Rejects on failure so the
+   *  dialog that collected the note can show why. */
+  handlePublish: (note: string | null) => Promise<void>;
   handleUnpublish: () => Promise<void>;
   handleSubmitForReview: () => Promise<void>;
   handleApprove: () => Promise<void>;
-  handleReject: () => Promise<void>;
+  /** Rejects on failure, as `handlePublish` does. */
+  handleReject: (note: string) => Promise<void>;
 }
 
 export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params): PageWorkflow {
@@ -66,19 +69,15 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     }
   };
 
-  const handlePublish = async () => {
+  // Aborting is the dialog's job now — it simply never calls this. That also
+  // retires the `null` vs `''` distinction the prompt forced on us: cancelling
+  // and publishing without a note are different code paths rather than two
+  // readings of one return value.
+  const handlePublish = async (note: string | null) => {
     if (form.pageId === null) {
       await handleSave(form.data);
       return;
     }
-    // Prompt returns `null` on Cancel, `''` on bare-press Enter — only
-    // ``null`` should abort. An empty string means "publish, no note".
-    const noteInput = window.prompt(
-      'Optional message describing this publish (leave blank to skip):',
-      '',
-    );
-    if (noteInput === null) return;
-    const note = noteInput.trim() || null;
     setBusy(true);
     setMessage(null);
     try {
@@ -88,8 +87,6 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
       form.setStatus(result.status);
       setMessage('Published.');
       router.reload({ only: ['revisions'] });
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Publish failed');
     } finally {
       setBusy(false);
     }
@@ -147,19 +144,18 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = async (note: string) => {
     if (form.pageId === null) return;
     setBusy(true);
     setMessage(null);
-    const result = await promptAndReject(form.pageId);
-    setBusy(false);
-    if ('skipped' in result) {
-      if (result.skipped !== 'cancelled') setMessage(result.skipped);
-      return;
+    try {
+      const result = await rejectPage(form.pageId, note);
+      form.setStatus(result.status);
+      setMessage('Sent back to draft.');
+      router.reload({ only: ['revisions', 'page'] });
+    } finally {
+      setBusy(false);
     }
-    form.setStatus(result.status);
-    setMessage('Sent back to draft.');
-    router.reload({ only: ['revisions', 'page'] });
   };
 
   return {

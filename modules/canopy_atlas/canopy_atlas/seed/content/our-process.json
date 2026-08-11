@@ -117,19 +117,19 @@
         "links": [
           {
             "label": "Our people & collaborators",
-            "href": "/gca/who-we-are"
+            "href": "/p/who-we-are"
           },
           {
             "label": "A global network of research sites",
-            "href": "/gca/data-map"
+            "href": "/p/data-map"
           },
           {
             "label": "Funders & supporters",
-            "href": "/gca/who-we-are"
+            "href": "/p/who-we-are"
           },
           {
             "label": "Our vision for the future",
-            "href": "/gca/our-statements"
+            "href": "/p/our-statements"
           }
         ],
         "images": []
@@ -169,7 +169,7 @@
         "title": "Explore the project's outputs and peer-reviewed publications",
         "subtitle": "",
         "linkLabel": "View all",
-        "linkHref": "/gca/outputs",
+        "linkHref": "/p/outputs",
         "columns": "4",
         "items": [
           {
@@ -178,7 +178,7 @@
             "icon": "chart",
             "iconBg": "#1a7a6b",
             "iconUrl": "",
-            "href": "/gca/outputs"
+            "href": "/p/outputs"
           },
           {
             "title": "Publications",
@@ -186,7 +186,7 @@
             "icon": "search",
             "iconBg": "#8b7fd6",
             "iconUrl": "",
-            "href": "/gca/outputs"
+            "href": "/p/outputs"
           },
           {
             "title": "Tools",
@@ -194,7 +194,7 @@
             "icon": "waves",
             "iconBg": "#2e6fb5",
             "iconUrl": "",
-            "href": "/gca/outputs"
+            "href": "/p/outputs"
           },
           {
             "title": "Data stories",
@@ -202,7 +202,7 @@
             "icon": "tree",
             "iconBg": "#6aa84f",
             "iconUrl": "",
-            "href": "/gca/news"
+            "href": "/p/news-index"
           }
         ]
       }
@@ -216,7 +216,7 @@
         "heading": "Get involved",
         "subheading": "Join an international community of ecologists, remote sensing engineers, and foresters using open data to understand earth's woody ecosystems.",
         "primaryLabel": "Contact us",
-        "primaryHref": "/gca/contact",
+        "primaryHref": "/p/contact",
         "secondaryLabel": "",
         "secondaryHref": "",
         "links": [],

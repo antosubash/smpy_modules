@@ -4,13 +4,15 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { MediaAssetRead } from '../../utils/api';
 import { formatBytes } from '../../utils/mediaFormat';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 interface Props {
   assets: MediaAssetRead[];
   loading: boolean;
   copiedId: number | null;
   onCopy: (asset: MediaAssetRead) => void;
-  onDelete: (id: number) => void;
+  /** Rejecting surfaces the message inside the confirmation dialog. */
+  onDelete: (id: number) => Promise<unknown>;
 }
 
 export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props) {
@@ -59,14 +61,18 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
               >
                 {copiedId === a.id ? 'Copied!' : 'Copy URL'}
               </Button>
-              <Button
-                variant="link"
-                size="sm"
-                className="ml-auto h-auto p-0 text-destructive"
-                onClick={() => onDelete(a.id)}
-              >
-                Delete
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button variant="link" size="sm" className="ml-auto h-auto p-0 text-destructive">
+                    Delete
+                  </Button>
+                }
+                title={`Delete ${a.original_filename}?`}
+                description="Any page still pointing at this URL will show a broken image. The library cannot tell you which pages those are, so check before deleting."
+                confirmLabel="Delete"
+                destructive
+                onConfirm={() => onDelete(a.id)}
+              />
             </div>
           </div>
         </li>

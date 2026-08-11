@@ -15,7 +15,7 @@ function FolderItem({ label, active, onClick }: FolderItemProps) {
         type="button"
         onClick={onClick}
         className={`w-full text-left px-2 py-1 rounded truncate ${
-          active ? 'bg-blue-100 text-blue-900 font-medium' : 'hover:bg-gray-100 text-gray-700'
+          active ? 'bg-accent font-medium text-accent-foreground' : 'hover:bg-accent/50'
         }`}
         title={label}
       >
@@ -45,7 +45,7 @@ export function MediaFolderSidebar({
   return (
     <aside className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Folders
         </h2>
         <ul className="space-y-1 text-sm">
@@ -72,7 +72,7 @@ export function MediaFolderSidebar({
       <div>
         <label
           htmlFor="media-upload-folder"
-          className="block text-sm font-semibold text-gray-600 mb-1"
+          className="mb-1 block text-sm font-semibold text-muted-foreground"
         >
           Upload to folder
         </label>
@@ -90,7 +90,7 @@ export function MediaFolderSidebar({
             <option key={name} value={name} />
           ))}
         </datalist>
-        <p className="text-xs text-gray-500 mt-1">Leave blank to upload into Unfiled.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Leave blank to upload into Unfiled.</p>
       </div>
     </aside>
   );

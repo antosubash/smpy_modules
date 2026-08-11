@@ -17,6 +17,7 @@ from typing import NamedTuple
 from fastapi import HTTPException
 from simple_module_core.events import EventBus
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -46,9 +47,43 @@ class PagesService(WorkflowMixin, RevisionsMixin):
         # only the delete path uses it.
         self.event_bus = event_bus
 
-    async def list_pages(self) -> list[Page]:
-        result = await self.db.execute(select(Page).order_by(Page.id.desc()))
-        return list(result.scalars().all())
+    async def list_pages(
+        self,
+        *,
+        search: str | None = None,
+        status: PageStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[Page], int]:
+        """Pages newest-first, plus how many match before paging.
+
+        ``limit=None`` means "every match", which is what
+        ``GET /api/pagebuilder/pages`` still defaults to: a seed builds its
+        slug-to-id map from that response, and silently truncating it would
+        make the seed recreate pages it already has. The admin list asks for a
+        page at a time instead.
+        """
+        filters = []
+        if search and search.strip():
+            # Escape the wildcards so a title containing "%" or "_" is searched
+            # for literally rather than matching everything.
+            term = search.strip().translate(str.maketrans({"%": r"\%", "_": r"\_", "\\": "\\\\"}))
+            pattern = f"%{term}%"
+            filters.append(
+                Page.title.ilike(pattern, escape="\\") | Page.slug.ilike(pattern, escape="\\")
+            )
+        if status is not None:
+            filters.append(Page.status == status)
+
+        total = await self.db.scalar(
+            select(func.count()).select_from(Page).where(*filters)
+        )
+
+        query = select(Page).where(*filters).order_by(Page.id.desc()).offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+        result = await self.db.execute(query)
+        return list(result.scalars().all()), int(total or 0)
 
     async def list_pending(self) -> list[Page]:
         """Pages in ``submitted_for_review`` — the approver queue."""

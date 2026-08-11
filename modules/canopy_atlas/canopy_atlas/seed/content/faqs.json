@@ -10,9 +10,10 @@
         "eyebrow": "",
         "title": "Frequently asked questions",
         "description": "Nunc tristique turpis justo, nec semper mi volutpat id. Quisque at magna id ipsum malesuada sodales sit amet ut ipsum. Morbi sodales tincidunt volutpat. Etiam purus nisi, ornare in ipsum a, iaculis sollicitudin velit. Nulla ut erat non augue ornare rhoncus a a mi.",
-        "align": "center",
+        "align": "left",
         "ctaLabel": "",
-        "ctaHref": ""
+        "ctaHref": "",
+        "indent": "4"
       }
     },
     {
@@ -73,15 +74,15 @@
         "links": [
           {
             "label": "Our process",
-            "href": "/gca/our-process"
+            "href": "/p/our-process"
           },
           {
             "label": "Who we are",
-            "href": "/gca/who-we-are"
+            "href": "/p/who-we-are"
           },
           {
             "label": "Get in touch",
-            "href": "/gca/contact"
+            "href": "/p/contact"
           }
         ],
         "images": []

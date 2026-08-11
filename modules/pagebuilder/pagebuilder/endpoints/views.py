@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from inertia import InertiaResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -27,6 +28,7 @@ from pagebuilder.contracts.schemas import (
     PageRead,
     PageRevisionListResponse,
     PageRevisionRead,
+    StatusFilter,
 )
 from pagebuilder.deps import get_media_service, get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
@@ -86,14 +88,48 @@ _PAGE_PENDING = "PageBuilder/PendingReview"
 _PAGE_LAYOUT_EDITOR = "PageBuilder/LayoutEditor"
 
 
+PAGE_LIST_LIMIT = 25
+
+
 @router.get("/", response_model=None)
 async def admin_list(
     inertia: InertiaDep,
     db: AsyncSession = Depends(get_db),
+    search: str = "",
+    status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
+    offset: int = Query(default=0, ge=0),
 ) -> InertiaResponse:
-    pages = await PagesService(db).list_pages()
-    payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages])
-    return await inertia.render(_PAGE_LIST, {"pages": payload.model_dump(mode="json")})
+    """Page list, filtered server-side.
+
+    The filter lives in the query string rather than in component state so a
+    filtered list is a URL: it survives a reload, it can be linked to, and the
+    browser's back button steps through the filters the way a user expects it
+    to.
+    """
+    pages, total = await PagesService(db).list_pages(
+        search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
+    )
+    # Deleting the last row of the last page leaves the offset past the end.
+    # Re-ask for the final page rather than rendering an empty table under a
+    # pager that says there are results.
+    if not pages and total:
+        offset = max(0, ((total - 1) // PAGE_LIST_LIMIT) * PAGE_LIST_LIMIT)
+        pages, total = await PagesService(db).list_pages(
+            search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
+        )
+    payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
+    return await inertia.render(
+        _PAGE_LIST,
+        {
+            "pages": payload.model_dump(mode="json"),
+            "filters": {
+                "search": search,
+                "status": status_filter.value if status_filter else "",
+                "offset": offset,
+                "limit": PAGE_LIST_LIMIT,
+            },
+        },
+    )
 
 
 @router.get("/pending", response_model=None)
@@ -103,7 +139,7 @@ async def admin_pending(
 ) -> InertiaResponse:
     """Approver queue view — pages awaiting review."""
     pages = await PagesService(db).list_pending()
-    payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages])
+    payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
     return await inertia.render(
         _PAGE_PENDING, {"pages": payload.model_dump(mode="json")}
     )

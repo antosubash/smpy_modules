@@ -1,5 +1,9 @@
 /** Scheduled publish / unpublish controls inside the settings drawer. */
 
+import { Button } from '@simple-module-py/ui/components/ui/button';
+import { Input } from '@simple-module-py/ui/components/ui/input';
+import { useId } from 'react';
+
 import { fromLocalInput, toLocalInput } from '../../utils/datetime';
 
 interface Props {
@@ -25,57 +29,70 @@ export function SchedulePanel({
   clearDisabled,
   error,
 }: Props) {
+  const publishId = useId();
+  const unpublishId = useId();
   return (
-    <fieldset className="md:col-span-2 border rounded p-3 bg-white">
-      <legend className="px-1 text-sm font-medium text-gray-700">Schedule</legend>
+    <fieldset className="md:col-span-2 rounded border bg-card p-3">
+      <legend className="px-1 text-sm font-medium">Schedule</legend>
+      {/* Explicit htmlFor rather than wrapping: the control is a component, so
+          nesting it no longer associates the two — for a screen reader or for
+          `getByLabelText`. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-700">Publish at</span>
-          <input
+        <div className="flex flex-col gap-1">
+          <label className="text-xs" htmlFor={publishId}>
+            Publish at
+          </label>
+          <Input
+            id={publishId}
             type="datetime-local"
             value={toLocalInput(publishAt)}
             onChange={(e) => onPublishAtChange(fromLocalInput(e.target.value))}
-            className="border rounded px-2 py-1"
+            className="h-9"
             data-testid="schedule-publish-at"
           />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             Draft auto-publishes at this time. Cleared after the flip.
           </span>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-700">Unpublish at</span>
-          <input
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs" htmlFor={unpublishId}>
+            Unpublish at
+          </label>
+          <Input
+            id={unpublishId}
             type="datetime-local"
             value={toLocalInput(unpublishAt)}
             onChange={(e) => onUnpublishAtChange(fromLocalInput(e.target.value))}
-            className="border rounded px-2 py-1"
+            className="h-9"
             data-testid="schedule-unpublish-at"
           />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             Published page reverts to draft at this time.
           </span>
-        </label>
+        </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onSave}
           disabled={saveDisabled}
-          className="px-3 py-1 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
           data-testid="schedule-save"
         >
           Save schedule
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onClear}
           disabled={clearDisabled}
-          className="px-3 py-1 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
         >
           Clear
-        </button>
+        </Button>
         {error && (
-          <span className="text-xs text-red-600" data-testid="schedule-error">
+          <span className="text-xs text-destructive" data-testid="schedule-error">
             {error}
           </span>
         )}

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login, uniqueSlug } from './helpers';
+import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
 
 test.describe('PageBuilder admin', () => {
   test.beforeEach(async ({ page }) => {
@@ -40,10 +40,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page.getByText('Draft saved.')).toBeVisible();
 
     // ── Publish ───────────────────────────────────────────────
-    // Publish opens an optional-note prompt (#16); accept with no text
-    // so we get the equivalent of the pre-#16 behaviour.
-    page.once('dialog', (dialog) => dialog.accept(''));
-    await page.getByRole('button', { name: /^publish$/i }).click();
+    // Publish opens a dialog asking for an optional revision note; submit it
+    // empty for the equivalent of the pre-#16 behaviour.
+    await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
     // After publishing, an "Unpublish" button + "View" link both appear.
     await expect(page.getByRole('button', { name: /unpublish/i })).toBeVisible();
@@ -75,11 +74,10 @@ test.describe('PageBuilder admin', () => {
 
     // ── Delete ────────────────────────────────────────────────
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: title })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: title }).getByRole('button', { name: /^delete$/i }),
+    );
     await expect(page.locator('tr', { hasText: title })).toHaveCount(0);
   });
 
@@ -107,16 +105,68 @@ test.describe('PageBuilder admin', () => {
 
     // Clean up so this test doesn't leave a draft behind.
     await page.goto('/pagebuilder/');
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .locator('tr', { hasText: `SEO page ${slug}` })
-      .getByRole('button', { name: /^delete$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page
+        .locator('tr', { hasText: `SEO page ${slug}` })
+        .getByRole('button', { name: /^delete$/i }),
+    );
   });
 
   test('media library page is reachable from the page list', async ({ page }) => {
     await page.goto('/pagebuilder/');
     await page.getByRole('button', { name: /media library/i }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/media$/);
+  });
+
+  test('search and status filter narrow the list, and survive a reload', async ({ page }) => {
+    const tag = uniqueSlug('filter');
+    const headers = await csrfHeader(page);
+    const created: number[] = [];
+    for (const name of ['Alpha', 'Beta']) {
+      const res = await page.request.post('/api/pagebuilder/pages', {
+        headers,
+        data: {
+          title: `${name} ${tag}`,
+          slug: `${name.toLowerCase()}-${tag}`,
+          draft_data: { content: [] },
+        },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+      created.push((await res.json()).id as number);
+    }
+    // Publish Alpha so the two differ by status as well as by title.
+    await page.request.post(`/api/pagebuilder/pages/${created[0]}/publish`, { headers, data: {} });
+
+    await page.goto('/pagebuilder/');
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+
+    // ── Search narrows to one row ─────────────────────────────
+    await page.getByRole('searchbox', { name: /search pages/i }).fill(`Beta ${tag}`);
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
+
+    // The filter is in the URL, so reloading keeps it rather than resetting.
+    await expect(page).toHaveURL(/[?&]search=Beta/);
+    await page.reload();
+    await expect(page.getByRole('searchbox', { name: /search pages/i })).toHaveValue(`Beta ${tag}`);
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
+
+    // ── Status pills filter independently ─────────────────────
+    await page.goto('/pagebuilder/');
+    await page.getByRole('button', { name: 'Published' }).click();
+    await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toHaveCount(0);
+
+    // ── A filter matching nothing offers a way out ────────────
+    await page.getByRole('searchbox', { name: /search pages/i }).fill('no-such-page-anywhere');
+    await expect(page.getByText(/no pages match this filter/i)).toBeVisible();
+    await page.getByRole('button', { name: /clear filters/i }).click();
+    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+
+    for (const id of created) {
+      await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
+    }
   });
 });

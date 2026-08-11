@@ -19,7 +19,7 @@
       "props": {
         "id": "h0",
         "text": "1. Introduction",
-        "level": "3",
+        "level": "h3",
         "align": "left"
       }
     },
@@ -37,7 +37,7 @@
       "props": {
         "id": "h1",
         "text": "2. Use of the Global Canopy Atlas",
-        "level": "3",
+        "level": "h3",
         "align": "left"
       }
     },
@@ -55,7 +55,7 @@
       "props": {
         "id": "h2",
         "text": "3. Data and licensing",
-        "level": "3",
+        "level": "h3",
         "align": "left"
       }
     },
@@ -73,7 +73,7 @@
       "props": {
         "id": "h3",
         "text": "4. Liability",
-        "level": "3",
+        "level": "h3",
         "align": "left"
       }
     },
@@ -91,7 +91,7 @@
       "props": {
         "id": "h4",
         "text": "5. Changes to this notice",
-        "level": "3",
+        "level": "h3",
         "align": "left"
       }
     },

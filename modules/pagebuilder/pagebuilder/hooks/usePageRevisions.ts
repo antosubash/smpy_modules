@@ -39,17 +39,16 @@ export function usePageRevisions({ form, setBusy, setMessage, markSaved }: Param
     }
   };
 
+  // Confirmation lives in the panel's dialog, which also shows a failure —
+  // closer to the row than the toolbar message this used to write to.
   const handleRestore = async (revisionId: number) => {
     if (form.pageId === null) return;
-    if (!confirm('Replace the current draft with this revision?')) return;
     setBusy(true);
     setMessage(null);
     try {
       const restored = await restoreRevision(form.pageId, revisionId);
       markSaved(form.applyRestored(restored));
       setMessage('Revision restored to draft.');
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Restore failed');
     } finally {
       setBusy(false);
     }
