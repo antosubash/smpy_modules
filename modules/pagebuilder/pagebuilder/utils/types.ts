@@ -26,6 +26,8 @@ export interface PageRead {
   parent_id: number | null;
   /** Offered as a starting point in the New page dialog. */
   is_template: boolean;
+  /** When the page was moved to trash; null while it is live. */
+  deleted_at: string | null;
   created_at: string;
   updated_at: string | null;
 }

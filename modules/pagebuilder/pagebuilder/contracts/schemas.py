@@ -92,6 +92,7 @@ class PageRead(BaseModel):
     unpublish_at: datetime | None = None
     parent_id: int | None = None
     is_template: bool = False
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime | None
 

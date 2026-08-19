@@ -93,6 +93,22 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     deleting a parent must not delete its children.
     """
 
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    """When the page was moved to trash. ``None`` means it is live.
+
+    A soft delete rather than a row removal, so a mistake is recoverable for the
+    retention window. Every listing filters on this — see ``NOT_TRASHED`` — and
+    the public viewer does too, so a trashed page answers 404 the moment it is
+    binned rather than lingering until it is purged.
+
+    The slug stays claimed while a page is in the trash. That is deliberate:
+    releasing it would let a new page take the URL, and restoring the old one
+    would then either collide or silently steal the address back.
+    """
+
     is_template: bool = Field(default=False, index=True)
     """Offer this page as a starting point in the New page dialog.
 
@@ -226,3 +242,11 @@ class MediaAsset(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
         default_factory=dict,
         sa_column=Column(JSON, nullable=False, default=dict),
     )
+
+
+NOT_TRASHED = Page.deleted_at.is_(None)
+"""Every listing's filter. Named once so a new query cannot quietly omit it.
+
+A trashed page is invisible everywhere except the trash screen itself, which
+asks for the complement.
+"""

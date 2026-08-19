@@ -84,6 +84,7 @@ public_router = APIRouter()
 _PAGE_LIST = "PageBuilder/PageList"
 _VIEW_BOARD = "board"
 _VIEW_LIST = "list"
+_PAGE_TRASH = "PageBuilder/Trash"
 _PAGE_EDITOR = "PageBuilder/PageEditor"
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 _PAGE_MEDIA = "PageBuilder/MediaLibrary"
@@ -128,23 +129,10 @@ async def admin_list(
     # exact status, and those are real jobs the columns cannot do.
     board: list[dict] | None = None
     if view != _VIEW_LIST:
-        stages = await board_query.load(db, search=search)
-        board = [
-            {
-                "key": stage.key,
-                "label": stage.label,
-                "total": stage.total,
-                "items": [
-                    PageRead.model_validate(item).model_dump(mode="json")
-                    for item in stage.items
-                ],
-            }
-            for stage in stages
-            # An empty review column would advertise a workflow this site may
-            # not use; a non-empty one must never be hidden, or its pages are
-            # stranded with no route to them.
-            if stage.key != board_query.IN_REVIEW or stage.total
-        ]
+        board = board_query.to_payload(
+            await board_query.load(db, search=search),
+            lambda item: PageRead.model_validate(item).model_dump(mode="json"),
+        )
 
     return await inertia.render(
         _PAGE_LIST,
@@ -160,6 +148,17 @@ async def admin_list(
             },
         },
     )
+
+
+@router.get("/trash", response_model=None)
+async def admin_trash(inertia: InertiaDep) -> InertiaResponse:
+    """Pages waiting out the retention window.
+
+    Fetched client-side: restore and purge both change the list under the
+    cursor, and an Inertia round trip per row would discard the scroll position
+    every time.
+    """
+    return await inertia.render(_PAGE_TRASH)
 
 
 @router.get("/pending", response_model=None)

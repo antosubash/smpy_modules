@@ -19,6 +19,7 @@ interface Props {
   newPageSlot?: React.ReactNode;
   onDelete: (page: PageRead) => Promise<unknown>;
   onPublish: (page: PageRead) => Promise<unknown>;
+  onUnpublish: (page: PageRead) => Promise<unknown>;
 }
 
 /** The pages board: one column per pipeline stage.
@@ -32,7 +33,14 @@ interface Props {
  * worse: "Published 31" over eight cards has to be explained on the card list,
  * not left for the reader to notice.
  */
-export function PageBoard({ stages, search, newPageSlot, onDelete, onPublish }: Props) {
+export function PageBoard({
+  stages,
+  search,
+  newPageSlot,
+  onDelete,
+  onPublish,
+  onUnpublish,
+}: Props) {
   const empty = stages.every((stage) => stage.total === 0);
 
   if (empty) {
@@ -77,6 +85,7 @@ export function PageBoard({ stages, search, newPageSlot, onDelete, onPublish }: 
                   stage={stage.key}
                   onDelete={onDelete}
                   onPublish={onPublish}
+                  onUnpublish={onUnpublish}
                 />
               ))}
             </ul>

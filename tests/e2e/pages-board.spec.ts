@@ -92,7 +92,9 @@ test.describe('Pages board', () => {
 
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toContainText('starts answering 404');
-    const confirm = dialog.getByRole('button', { name: /delete forever/i });
+    // "Delete forever" belongs to purge now — this sends the page to the trash,
+    // so the button says what it does.
+    const confirm = dialog.getByRole('button', { name: /^delete$/i });
     // Locked until the slug is typed exactly — the delay is the safeguard.
     await expect(confirm).toBeDisabled();
     await dialog.getByRole('textbox').fill(slug.slice(0, -1));

@@ -131,13 +131,33 @@ class TestParent:
 
         assert (await authed_client.get("/p/c2")).status_code == 200
 
-    async def test_deleting_a_parent_orphans_rather_than_cascades(
+    async def test_trashing_a_parent_keeps_the_link(
         self, authed_client: AsyncClient
     ) -> None:
+        """Deleting is reversible, so the relationship has to be too.
+
+        Nulling children on a soft delete would mean a restore brought the page
+        back without them.
+        """
         parent = await _create(authed_client, slug="p3", title="Parent")
         child = await _create(authed_client, slug="c3", title="Child", parent_id=parent["id"])
 
         await authed_client.delete(f"/api/pagebuilder/pages/{parent['id']}")
+
+        back = await authed_client.get(f"/api/pagebuilder/pages/{child['id']}")
+        assert back.status_code == 200
+        assert back.json()["parent_id"] == parent["id"]
+
+    async def test_purging_a_parent_orphans_rather_than_cascades(
+        self, authed_client: AsyncClient
+    ) -> None:
+        """A parent_id pointing at a removed page is not inert — SQLite reuses
+        the id, so the child would re-parent itself under the next page."""
+        parent = await _create(authed_client, slug="p4", title="Parent")
+        child = await _create(authed_client, slug="c4", title="Child", parent_id=parent["id"])
+
+        await authed_client.delete(f"/api/pagebuilder/pages/{parent['id']}")
+        await authed_client.delete(f"/api/pagebuilder/pages/{parent['id']}/purge")
 
         back = await authed_client.get(f"/api/pagebuilder/pages/{child['id']}")
         assert back.status_code == 200

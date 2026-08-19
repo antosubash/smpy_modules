@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 from typing import Final
 
-from pagebuilder.models import Page, PageStatus
+from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,11 @@ def _base(include_drafts: bool, category: str | None):
     # the async session (issue #20).
     stmt = (
         select(NewsArticle, Page)
-        .join(Page, Page.id == NewsArticle.page_id)
+        # An article whose page is in the trash disappears with it, and comes
+        # back if the page is restored. The article row is deliberately left
+        # alone: pagebuilder only announces PageDeleted on a *purge*, so
+        # nothing here has to guess whether a deletion is reversible.
+        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
         .options(
             Load(Page).load_only(
                 Page.slug,
@@ -166,7 +170,7 @@ async def list_categories(
     """
     stmt = (
         select(NewsArticle.category, func.count(), NewsCategory.position)
-        .join(Page, Page.id == NewsArticle.page_id)
+        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
         .outerjoin(NewsCategory, NewsCategory.name == NewsArticle.category)
         .where(NewsArticle.category != "")
         .group_by(NewsArticle.category, NewsCategory.position)
@@ -224,8 +228,14 @@ async def page_exists(db: AsyncSession, page_id: int) -> bool:
     Checked explicitly because there is no foreign key to do it — and an
     article pointing at a missing page is not inert: SQLite reuses the id, so
     the row re-attaches to whatever page is created next.
+
+    A *trashed* page counts as missing. It is invisible everywhere else, so
+    letting one be attached would create an article that cannot be seen, cannot
+    be found, and springs into the feed if the page is ever restored.
     """
-    return await db.scalar(select(Page.id).where(Page.id == page_id)) is not None
+    return (
+        await db.scalar(select(Page.id).where(NOT_TRASHED, Page.id == page_id))
+    ) is not None
 
 
 async def get_by_page(db: AsyncSession, page_id: int) -> NewsArticle | None:

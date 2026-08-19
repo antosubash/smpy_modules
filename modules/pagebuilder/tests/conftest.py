@@ -16,9 +16,9 @@ also override settings.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 from fastapi import APIRouter, FastAPI, Request

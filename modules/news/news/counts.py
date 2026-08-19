@@ -9,7 +9,7 @@ same on every pill.
 
 from __future__ import annotations
 
-from pagebuilder.models import Page, PageStatus
+from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +37,9 @@ async def count_by_status(
     stmt = (
         select(Page.status, NewsArticle.published_at.is_(None), func.count())
         .select_from(NewsArticle)
-        .join(Page, Page.id == NewsArticle.page_id)
+        # Same trash rule as the listing: the pills must count what the
+        # list would actually show.
+        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
         .group_by(Page.status, NewsArticle.published_at.is_(None))
     )
     stmt = query_filters.visible(stmt, include_drafts=include_drafts)

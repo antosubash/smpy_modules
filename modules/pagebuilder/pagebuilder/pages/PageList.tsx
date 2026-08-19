@@ -11,7 +11,7 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
-
+import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NewPageDialog } from '../components/NewPageDialog';
 import { type BoardStage, PageBoard } from '../components/PageBoard';
@@ -19,7 +19,7 @@ import { type PageListFilterState, PageListFilters } from '../components/PageLis
 import { ScheduledBadge } from '../components/ScheduledBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { deletePage, type PageRead } from '../utils/api';
-import { publishPage } from '../utils/pagesApi';
+import { publishPage, restorePage, unpublishPage } from '../utils/pagesApi';
 
 interface Props {
   pages: { items: PageRead[]; total: number };
@@ -62,9 +62,41 @@ export default function PageList() {
   // the message. This used to be a bare try/finally, so a delete refused by
   // the server cleared the busy flag and left the row sitting there — visually
   // identical to a delete that had not been confirmed yet.
-  const handleDelete = async (id: number) => {
-    await deletePage(id);
-    router.reload({ only: ['pages', 'board', 'filters'] });
+  const reload = () => router.reload({ only: ['pages', 'board', 'filters'] });
+
+  /** Delete, then offer the way back.
+   *
+   * The toast is the reason the confirmations can stay as light as they do: a
+   * deletion is recoverable for 30 days, and the ten seconds after the click is
+   * when someone actually notices they hit the wrong row.
+   */
+  const handleDelete = async (page: PageRead) => {
+    await deletePage(page.id);
+    reload();
+    toast(`“${page.title}” deleted`, {
+      duration: 10_000,
+      description: 'It is in the trash for 30 days.',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          void restorePage(page.id)
+            .then(() => {
+              reload();
+              toast.success(`“${page.title}” restored as a draft`);
+            })
+            .catch((e: Error) => toast.error(e.message));
+        },
+      },
+    });
+  };
+
+  /** Take a published page offline. The content stays; only its status moves. */
+  const handleUnpublish = async (page: PageRead) => {
+    await unpublishPage(page.id);
+    reload();
+    toast(`“${page.title}” is offline`, {
+      description: 'It is a draft again. Publish it to put it back.',
+    });
   };
 
   /** Publish from a board card. Reloads rather than patching state: the card
@@ -72,7 +104,8 @@ export default function PageList() {
    *  what else moved with it. */
   const handlePublish = async (page: PageRead) => {
     await publishPage(page.id);
-    router.reload({ only: ['pages', 'board', 'filters'] });
+    reload();
+    toast.success(`“${page.title}” published`);
   };
 
   return (
@@ -83,6 +116,9 @@ export default function PageList() {
         <>
           <Button variant="outline" onClick={() => go({ view: boardView ? 'list' : 'board' })}>
             {boardView ? 'List view' : 'Board view'}
+          </Button>
+          <Button variant="outline" onClick={() => router.visit('/pagebuilder/trash')}>
+            Trash
           </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/pending')}>
             Pending review
@@ -107,8 +143,9 @@ export default function PageList() {
           stages={board}
           search={filters.search}
           newPageSlot={<NewPageDialog />}
-          onDelete={(page) => handleDelete(page.id)}
+          onDelete={handleDelete}
           onPublish={handlePublish}
+          onUnpublish={handleUnpublish}
         />
       ) : pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -193,7 +230,7 @@ export default function PageList() {
                     }
                     confirmLabel="Delete"
                     destructive
-                    onConfirm={() => handleDelete(p.id)}
+                    onConfirm={() => handleDelete(p)}
                   />
                 </TableCell>
               </TableRow>

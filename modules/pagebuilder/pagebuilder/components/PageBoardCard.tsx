@@ -32,12 +32,13 @@ interface Props {
   stage: string;
   onDelete: (page: PageRead) => Promise<unknown>;
   onPublish: (page: PageRead) => Promise<unknown>;
+  onUnpublish: (page: PageRead) => Promise<unknown>;
 }
 
 /** One page on the board. The line under the title says the thing that stage
  *  actually cares about — when a scheduled page fires, when a draft was last
  *  touched, whether a published page has unpublished edits waiting. */
-export function PageBoardCard({ page, stage, onDelete, onPublish }: Props) {
+export function PageBoardCard({ page, stage, onDelete, onPublish, onUnpublish }: Props) {
   const scheduled = stage === 'scheduled';
   const published = page.status === 'published';
 
@@ -84,6 +85,29 @@ export function PageBoardCard({ page, stage, onDelete, onPublish }: Props) {
           </Button>
         )}
 
+        {published && (
+          <ConfirmDialog
+            // Medium: it takes effect publicly and at once, but nothing is
+            // lost — which is the distinction the copy has to carry, or people
+            // read "unpublish" as "delete".
+            level="medium"
+            title={`Take “${page.title}” offline?`}
+            description={
+              <>
+                <code>/p/{page.slug}</code> starts answering 404 immediately. Your content is kept —
+                this becomes a draft you can republish.
+              </>
+            }
+            confirmLabel="Unpublish"
+            onConfirm={() => onUnpublish(page)}
+            trigger={
+              <Button type="button" size="sm" variant="ghost">
+                Unpublish
+              </Button>
+            }
+          />
+        )}
+
         <ConfirmDialog
           // Deleting a published page is the design's high blast radius: it is
           // live, it is linked, and the URL starts answering 404 immediately.
@@ -96,13 +120,16 @@ export function PageBoardCard({ page, stage, onDelete, onPublish }: Props) {
             published ? (
               <>
                 This page is published. <code>/p/{page.slug}</code> starts answering 404 the moment
-                you confirm, and its revision history goes with it.
+                you confirm. It goes to the trash for 30 days, and after that it is gone.
               </>
             ) : (
-              <>It was never published, so nothing on the site changes. Its revisions go with it.</>
+              <>
+                It was never published, so nothing on the site changes. It goes to the trash for 30
+                days.
+              </>
             )
           }
-          confirmLabel={published ? 'Delete forever' : 'Delete'}
+          confirmLabel="Delete"
           onConfirm={() => onDelete(page)}
           trigger={
             <Button type="button" size="sm" variant="ghost" className="text-destructive">
