@@ -74,7 +74,13 @@ export default function NewsList() {
           // empty response first would flash the "no articles yet" box over a
           // list that still holds a full page.
           if (response.items.length === 0 && offset > 0) {
-            setFilters({ offset: Math.max(0, offset - PAGE_SIZE) });
+            // Jump straight to the last real page: the offset comes from the
+            // URL now, so a stale or hand-edited `?offset=100000` would
+            // otherwise walk down one page — two fetches — at a time. `min`
+            // keeps the step strictly decreasing even if `total` is stale,
+            // so the recovery always terminates.
+            const lastPage = Math.max(0, Math.ceil(response.total / PAGE_SIZE) - 1) * PAGE_SIZE;
+            setFilters({ offset: Math.min(lastPage, offset - PAGE_SIZE) });
             return;
           }
           setArticles(response.items);

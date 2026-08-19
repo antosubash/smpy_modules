@@ -35,13 +35,17 @@ export default function PageList() {
    * keystroke, so Back leaves the list instead of retyping it backwards.
    */
   const go = (next: { search?: string; status?: string; offset?: number }) => {
-    const merged = { ...filters, ...next };
-    // Any filter change invalidates the offset: page 3 of the previous filter
-    // is not page 3 of this one.
-    const nextOffset = next.offset ?? 0;
+    // Built field by field, not `{ ...filters, ...next }`: a merged object
+    // would carry a stale `offset` a reader must know to ignore. Any filter
+    // change invalidates the offset — page 3 of the previous filter is not
+    // page 3 of this one — so it defaults to 0, not to the current one.
     router.get(
       '/pagebuilder/',
-      { search: merged.search, status: merged.status, offset: nextOffset },
+      {
+        search: next.search ?? filters.search,
+        status: next.status ?? filters.status,
+        offset: next.offset ?? 0,
+      },
       { only: ['pages', 'filters'], preserveState: true, preserveScroll: true, replace: true },
     );
   };

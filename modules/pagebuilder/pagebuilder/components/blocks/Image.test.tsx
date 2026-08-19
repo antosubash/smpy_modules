@@ -130,6 +130,11 @@ describe('ImageBlock measure', () => {
     const markup = html({ caption: undefined, maxWidth: '4xl' });
     expect(markup).toContain('max-w-4xl');
     expect(markup).toContain('mx-auto');
+    // The measure lives on a wrapper; the <img> keeps `max-w-full` so a wide
+    // image cannot overflow a column narrower than the measure (a `max-w-4xl`
+    // directly on the image would outrank the 100% cap).
+    expect(markup).toMatch(/<div class="[^"]*max-w-4xl[^"]*"/);
+    expect(markup).toMatch(/<img[^>]*class="block max-w-full"/);
   });
 
   it('caps the figure, not the image, so the caption tracks the image width', () => {
