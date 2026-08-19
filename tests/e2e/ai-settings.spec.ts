@@ -44,9 +44,7 @@ test.describe('AI settings', () => {
     );
   });
 
-  test('test connection surfaces an unreachable endpoint as an inline error', async ({
-    page,
-  }) => {
+  test('test connection surfaces an unreachable endpoint as an inline error', async ({ page }) => {
     await page.locator('#ai-chat-provider').selectOption('openai_compatible');
     await page.locator('#ai-chat-model').fill('some-model');
     await page.locator('#ai-chat-url').fill('http://127.0.0.1:1/v1');
