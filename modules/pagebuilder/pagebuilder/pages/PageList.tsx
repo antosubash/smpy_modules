@@ -13,20 +13,26 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import type React from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { type BoardStage, PageBoard } from '../components/PageBoard';
 import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
 import { ScheduledBadge } from '../components/ScheduledBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { deletePage, type PageRead } from '../utils/api';
+import { publishPage } from '../utils/pagesApi';
 
 interface Props {
   pages: { items: PageRead[]; total: number };
-  filters: PageListFilterState;
+  /** Null in list view — the board query is skipped rather than computed and
+   *  thrown away. */
+  board: BoardStage[] | null;
+  filters: PageListFilterState & { view: string };
 }
 
 export default function PageList() {
-  const { pages, filters } = usePage<{ props: Props }>().props as unknown as Props;
+  const { pages, board, filters } = usePage<{ props: Props }>().props as unknown as Props;
   const { limit, offset } = filters;
   const filtering = filters.search !== '' || filters.status !== '';
+  const boardView = filters.view !== 'list' && board !== null;
 
   /**
    * Re-ask the server for a slice. `preserveState` keeps the component — and
@@ -34,15 +40,20 @@ export default function PageList() {
    * `replace` keeps one history entry per search rather than one per
    * keystroke, so Back leaves the list instead of retyping it backwards.
    */
-  const go = (next: { search?: string; status?: string; offset?: number }) => {
+  const go = (next: { search?: string; status?: string; offset?: number; view?: string }) => {
     const merged = { ...filters, ...next };
     // Any filter change invalidates the offset: page 3 of the previous filter
     // is not page 3 of this one.
     const nextOffset = next.offset ?? 0;
     router.get(
       '/pagebuilder/',
-      { search: merged.search, status: merged.status, offset: nextOffset },
-      { only: ['pages', 'filters'], preserveState: true, preserveScroll: true, replace: true },
+      { search: merged.search, status: merged.status, offset: nextOffset, view: merged.view },
+      {
+        only: ['pages', 'board', 'filters'],
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+      },
     );
   };
 
@@ -52,15 +63,26 @@ export default function PageList() {
   // identical to a delete that had not been confirmed yet.
   const handleDelete = async (id: number) => {
     await deletePage(id);
-    router.reload({ only: ['pages', 'filters'] });
+    router.reload({ only: ['pages', 'board', 'filters'] });
+  };
+
+  /** Publish from a board card. Reloads rather than patching state: the card
+   *  has to leave one column and appear in another, and only the server knows
+   *  what else moved with it. */
+  const handlePublish = async (page: PageRead) => {
+    await publishPage(page.id);
+    router.reload({ only: ['pages', 'board', 'filters'] });
   };
 
   return (
     <PageShell
       title="Pages"
-      description="Compose, review, and publish site pages."
+      description="Drafts, scheduled drafts, published · public at /p/:slug"
       actions={
         <>
+          <Button variant="outline" onClick={() => go({ view: boardView ? 'list' : 'board' })}>
+            {boardView ? 'List view' : 'Board view'}
+          </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/pending')}>
             Pending review
           </Button>
@@ -79,7 +101,14 @@ export default function PageList() {
           "create your first one" prompt. */}
       {(filtering || pages.total > 0) && <PageListFilters filters={filters} onChange={go} />}
 
-      {pages.items.length === 0 ? (
+      {boardView ? (
+        <PageBoard
+          stages={board}
+          search={filters.search}
+          onDelete={(page) => handleDelete(page.id)}
+          onPublish={handlePublish}
+        />
+      ) : pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           {filtering ? (
             <>
@@ -171,7 +200,7 @@ export default function PageList() {
         </Table>
       )}
 
-      {pages.total > limit && (
+      {!boardView && pages.total > limit && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
           <span>
             Showing {Math.min(offset + 1, pages.total)}–{Math.min(offset + limit, pages.total)} of{' '}

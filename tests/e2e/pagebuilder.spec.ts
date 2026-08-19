@@ -53,7 +53,9 @@ test.describe('PageBuilder admin', () => {
     expect(publicResponse.ok()).toBeTruthy();
 
     // ── List shows the published page ─────────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto('/pagebuilder/?view=list');
     const row = page.locator('tr', { hasText: title });
     await expect(row).toBeVisible();
     await expect(row.getByText('published', { exact: true })).toBeVisible();
@@ -73,7 +75,9 @@ test.describe('PageBuilder admin', () => {
     expect(after404.status()).toBe(404);
 
     // ── Delete ────────────────────────────────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: title }).getByRole('button', { name: /^delete$/i }),
@@ -104,7 +108,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
 
     // Clean up so this test doesn't leave a draft behind.
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page
@@ -138,7 +144,9 @@ test.describe('PageBuilder admin', () => {
     // Publish Alpha so the two differ by status as well as by title.
     await page.request.post(`/api/pagebuilder/pages/${created[0]}/publish`, { headers, data: {} });
 
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto('/pagebuilder/?view=list');
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
 
@@ -154,7 +162,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
 
     // ── Status pills filter independently ─────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto('/pagebuilder/?view=list');
     await page.getByRole('button', { name: 'Published' }).click();
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toHaveCount(0);

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news import counts as counts_module
 from news import service, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import (
@@ -49,6 +50,7 @@ async def list_articles(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
+    may_draft = may_see_drafts(request)
     items, total = await service.list_articles(
         db,
         limit=limit,
@@ -56,10 +58,22 @@ async def list_articles(
         category=category,
         q=q,
         status=status,
-        include_drafts=may_see_drafts(request),
+        include_drafts=may_draft,
         undated_first=undated_first,
     )
-    return ArticleListResponse(items=items, total=total)
+    # Resolved once here rather than inside the count query: the listing
+    # already turned a slug into a name, and counting against the raw slug
+    # would report zero for every pill on a slug-filtered view.
+    resolved = (
+        await service.resolve_category_slug(db, category) or category if category else None
+    )
+    return ArticleListResponse(
+        items=items,
+        total=total,
+        counts=await counts_module.count_by_status(
+            db, category=resolved, q=q, include_drafts=may_draft
+        ),
+    )
 
 
 @router.get("/categories", response_model=CategoryListResponse)

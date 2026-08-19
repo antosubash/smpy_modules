@@ -30,6 +30,7 @@ from pagebuilder.contracts.schemas import (
     PageRevisionRead,
     StatusFilter,
 )
+from pagebuilder import board as board_query
 from pagebuilder.deps import get_media_service, get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
@@ -81,6 +82,8 @@ router = APIRouter()
 public_router = APIRouter()
 
 _PAGE_LIST = "PageBuilder/PageList"
+_VIEW_BOARD = "board"
+_VIEW_LIST = "list"
 _PAGE_EDITOR = "PageBuilder/PageEditor"
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 _PAGE_MEDIA = "PageBuilder/MediaLibrary"
@@ -98,6 +101,7 @@ async def admin_list(
     search: str = "",
     status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
     offset: int = Query(default=0, ge=0),
+    view: str = Query(default=_VIEW_BOARD),
 ) -> InertiaResponse:
     """Page list, filtered server-side.
 
@@ -118,15 +122,41 @@ async def admin_list(
             search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
         )
     payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
+
+    # The board is the default view. The table stays a click away rather than
+    # being replaced: it is the only view that can sort, page and filter by an
+    # exact status, and those are real jobs the columns cannot do.
+    board: list[dict] | None = None
+    if view != _VIEW_LIST:
+        stages = await board_query.load(db, search=search)
+        board = [
+            {
+                "key": stage.key,
+                "label": stage.label,
+                "total": stage.total,
+                "items": [
+                    PageRead.model_validate(item).model_dump(mode="json")
+                    for item in stage.items
+                ],
+            }
+            for stage in stages
+            # An empty review column would advertise a workflow this site may
+            # not use; a non-empty one must never be hidden, or its pages are
+            # stranded with no route to them.
+            if stage.key != board_query.IN_REVIEW or stage.total
+        ]
+
     return await inertia.render(
         _PAGE_LIST,
         {
             "pages": payload.model_dump(mode="json"),
+            "board": board,
             "filters": {
                 "search": search,
                 "status": status_filter.value if status_filter else "",
                 "offset": offset,
                 "limit": PAGE_LIST_LIMIT,
+                "view": _VIEW_LIST if view == _VIEW_LIST else _VIEW_BOARD,
             },
         },
     )

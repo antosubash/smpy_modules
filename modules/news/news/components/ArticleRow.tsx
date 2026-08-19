@@ -1,119 +1,219 @@
-import { StatusBadge } from '@simple-module-py/pagebuilder/pagebuilder/components/StatusBadge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@simple-module-py/ui/components/ui/alert-dialog';
+import { ConfirmDialog } from '@simple-module-py/pagebuilder/pagebuilder/components/ConfirmDialog';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@simple-module-py/ui/components/ui/dropdown-menu';
 import { Input } from '@simple-module-py/ui/components/ui/input';
-import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 import { useState } from 'react';
 
-import type { ArticleRead } from '../utils/api';
+import { type ArticleRead, articleEditUrl, formatArticleDate, relativeDay } from '../utils/api';
 
 /** `2026-02-01T00:00:00` -> `2026-02-01`, which is what <input type=date> wants. */
 function toDateInput(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '';
 }
 
-export function ArticleRow({
-  article,
-  busy,
-  suggestionsId,
-  onSave,
-  onDetach,
-}: {
+/** The one-line status the card carries under its metadata.
+ *
+ * A future date on a draft is the design's "scheduled": there is no third
+ * status, just a draft that will flip itself, and saying so is the only way
+ * the list can be honest about a two-state pipeline.
+ */
+function statusLine(article: ArticleRead): string {
+  const when = article.published_at;
+  const ahead = when ? new Date(`${when.slice(0, 10)}T00:00:00Z`).getTime() > Date.now() : false;
+
+  if (article.page_status === 'published') {
+    return when ? `Published · ${relativeDay(when)}` : 'Published · no date';
+  }
+  if (article.page_status === 'submitted_for_review') return 'Pending review';
+  if (!when) return 'Draft · undated';
+  return ahead ? `Draft · publishes ${relativeDay(when)}` : `Draft · dated ${relativeDay(when)}`;
+}
+
+interface Props {
   article: ArticleRead;
   busy: boolean;
   /** id of a <datalist> of existing category names, offered while typing. */
   suggestionsId?: string;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
   onDetach: (id: number) => void;
-}) {
+  onPublish: (article: ArticleRead) => Promise<unknown>;
+}
+
+/** One article as a card row: title carries the weight, metadata sits quiet
+ *  underneath, and the actions live on the row rather than behind a menu.
+ *
+ *  Category and date edit in place. Opening a whole editor to change a chip is
+ *  the thing this list exists to avoid — the body is edited in pagebuilder, so
+ *  if these two fields also needed a round trip the list would have no job.
+ */
+export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onPublish }: Props) {
+  const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(article.category);
   const [date, setDate] = useState(toDateInput(article.published_at));
 
   const dirty = category !== article.category || date !== toDateInput(article.published_at);
+  const isDraft = article.page_status === 'draft';
+  const dateLabel = formatArticleDate(article.published_at) || 'no date';
+
+  const save = () => {
+    onSave(article.id, category, date ? `${date}T00:00:00Z` : null);
+    setEditing(false);
+  };
 
   return (
-    <TableRow>
-      <TableCell>
-        <a href={`/pagebuilder/${article.page_id}/edit`} className="font-medium hover:underline">
-          {article.title}
-        </a>
-        <div className="text-xs text-muted-foreground">{article.url}</div>
-      </TableCell>
-      <TableCell>
-        <StatusBadge status={article.page_status} />
-      </TableCell>
-      <TableCell>
-        <Input
-          aria-label={`Category for ${article.title}`}
-          value={category}
-          disabled={busy}
-          list={suggestionsId}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-40"
+    <li
+      data-testid="article-row"
+      data-slug={article.slug}
+      className="flex items-start gap-4 rounded-lg border bg-card p-3"
+    >
+      {article.cover_image_url ? (
+        <img
+          src={article.cover_image_url}
+          alt=""
+          className="h-14 w-20 shrink-0 rounded object-cover"
         />
-      </TableCell>
-      <TableCell>
-        <Input
-          type="date"
-          aria-label={`Date for ${article.title}`}
-          value={date}
-          disabled={busy}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-40"
-        />
-      </TableCell>
-      <TableCell className="text-right whitespace-nowrap">
-        {article.page_status === 'published' && (
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mr-2 text-sm text-primary hover:underline"
-          >
-            View
-          </a>
-        )}
-        <Button
-          type="button"
-          size="sm"
-          // Enabled only when something changed, so the row never fires a
-          // no-op PUT that bumps updated_at for nothing.
-          disabled={busy || !dirty}
-          onClick={() => onSave(article.id, category, date ? `${date}T00:00:00Z` : null)}
+      ) : (
+        <div
+          aria-hidden
+          className="flex h-14 w-20 shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
         >
-          Save
+          no image
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <a
+          href={articleEditUrl(article.page_id)}
+          className="font-medium hover:underline"
+          data-testid="article-title"
+        >
+          {article.title || 'Untitled article'}
+        </a>
+
+        {editing ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Input
+              aria-label={`Category for ${article.title}`}
+              value={category}
+              disabled={busy}
+              list={suggestionsId}
+              placeholder="Uncategorised"
+              onChange={(e) => setCategory(e.target.value)}
+              className="h-8 w-44"
+            />
+            <Input
+              type="date"
+              aria-label={`Date for ${article.title}`}
+              value={date}
+              disabled={busy}
+              onChange={(e) => setDate(e.target.value)}
+              className="h-8 w-40"
+            />
+            <Button type="button" size="sm" disabled={busy || !dirty} onClick={save}>
+              Save
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setCategory(article.category);
+                setDate(toDateInput(article.published_at));
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            {/* The accessible name starts with the visible text on purpose.
+                An aria-label that replaced it would satisfy a screen reader
+                and break voice control — "click Research" would match nothing
+                (WCAG 2.5.3, label in name). */}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(true)}
+              aria-label={`${article.category || 'Uncategorised'} — edit category and date`}
+              className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
+            >
+              {article.category || 'Uncategorised'}
+            </button>
+            <span>·</span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(true)}
+              aria-label={`${dateLabel} — edit category and date`}
+              className="hover:underline"
+            >
+              {dateLabel}
+            </button>
+            <span>·</span>
+            <span className="truncate">{article.url}</span>
+          </div>
+        )}
+
+        <p className="mt-1 text-xs text-muted-foreground">{statusLine(article)}</p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <Button type="button" size="sm" variant="outline" asChild>
+          <a href={articleEditUrl(article.page_id)}>Edit</a>
         </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              aria-label={`More actions for ${article.title}`}
+            >
+              ···
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {isDraft && (
+              <DropdownMenuItem onSelect={() => void onPublish(article).catch(() => {})}>
+                Publish now
+              </DropdownMenuItem>
+            )}
+            {article.page_status === 'published' && (
+              <DropdownMenuItem asChild>
+                <a href={article.url} target="_blank" rel="noopener noreferrer">
+                  View on the site
+                </a>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => setEditing(true)}>
+              Edit category and date
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <ConfirmDialog
+          // Low: the page and its body survive; only the news metadata goes.
+          level="low"
+          title={`Detach "${article.title}"?`}
+          description="The page and its body stay. Only the category and date attached to it are removed, and it stops appearing in news feeds."
+          confirmLabel="Detach"
+          onConfirm={async () => onDetach(article.id)}
+          trigger={
             <Button type="button" size="sm" variant="ghost" disabled={busy}>
               Detach
             </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Detach "{article.title}"?</AlertDialogTitle>
-              <AlertDialogDescription>
-                The page and its body stay. Only the category and date attached to it are removed,
-                and it stops appearing in news feeds.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onDetach(article.id)}>Detach</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </TableCell>
-    </TableRow>
+          }
+        />
+      </div>
+    </li>
   );
 }

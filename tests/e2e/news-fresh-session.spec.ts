@@ -48,8 +48,11 @@ test.describe('News — first visit of a session', () => {
     await expect(page.getByPlaceholder('Page title')).toHaveValue(title);
 
     // And the article row exists, rather than a page with no metadata attached.
+    // Rows are cards now, not table rows.
     await page.goto('/news/');
-    await expect(page.getByRole('row', { name: new RegExp(title) })).toBeVisible();
+    await expect(
+      page.locator('[data-testid="article-row"]').filter({ hasText: title }),
+    ).toBeVisible();
   });
 
   test('shows a readable message when a write fails, not an HTML document', async ({ page }) => {

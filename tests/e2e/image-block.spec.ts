@@ -185,7 +185,9 @@ test.describe('Image block + media picker', () => {
     expect(currentSrc).toMatch(/\.webp$/);
 
     // 8) Cleanup.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page
@@ -230,7 +232,9 @@ test.describe('Image block + media picker', () => {
     await expect(page.locator('main figure img')).toHaveAttribute('alt', 'An external image');
 
     // Cleanup.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page
@@ -260,7 +264,9 @@ test.describe('Image block + media picker', () => {
     await expect(page.getByRole('textbox', { name: 'srcset' })).toHaveValue('');
 
     // Cleanup.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page

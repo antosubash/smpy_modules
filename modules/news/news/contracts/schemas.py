@@ -38,9 +38,28 @@ class ArticleRead(BaseModel):
     """
 
 
+class ArticleCounts(BaseModel):
+    """How many articles each status pill would show.
+
+    Scoped by the current search and category but *not* by the active status —
+    otherwise every pill but the selected one reads zero. ``undated`` cuts
+    across draft and published rather than being a third status, so the four
+    numbers deliberately do not sum to ``all``.
+    """
+
+    all: int = 0
+    draft: int = 0
+    published: int = 0
+    undated: int = 0
+
+
 class ArticleListResponse(BaseModel):
     items: list[ArticleRead]
     total: int
+    """How many matched the *whole* filter, including status — what the pager
+    counts against."""
+
+    counts: ArticleCounts = Field(default_factory=ArticleCounts)
 
 
 class CategoryCount(BaseModel):

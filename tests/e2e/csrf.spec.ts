@@ -110,7 +110,9 @@ test.describe('CSRF protection', () => {
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
 
     // Clean up.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    await page.goto('/pagebuilder/?view=list');
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: `CSRF UI ${slug}` }).getByRole('button', { name: /^delete$/i }),

@@ -43,8 +43,18 @@ test.describe('News admin', () => {
     });
 
     await page.goto('/news/');
-    const row = page.getByRole('row', { name: new RegExp(`Admin ${slug}`) });
+    // Rows are cards now, not table rows — located by the slug they carry so
+    // the locator does not depend on which strings the card happens to render.
+    const row = page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
     await expect(row).toContainText(`/p/${slug}`);
+
+    // Category and date edit in place, but behind a click: the chip is the
+    // affordance, and the inputs only appear once it is pressed.
+    // The chip's accessible name starts with the category it shows, so this
+    // asserts the visible value and the affordance in one locator.
+    const chip = row.getByRole('button', { name: /^Before — edit category and date$/ });
+    await expect(chip).toBeVisible();
+    await chip.click();
 
     const category = row.getByLabel(`Category for Admin ${slug}`);
     await expect(category).toHaveValue('Before');
@@ -86,23 +96,27 @@ test.describe('News admin', () => {
       });
     }
 
-    await page.goto('/news/');
-    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toBeVisible();
+    const card = (slug: string) => page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
 
-    await page.getByRole('button', { name: /^Alpha \(\d+\)$/ }).click();
-    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toHaveCount(0);
+    await page.goto('/news/');
+    await expect(card(made.Alpha)).toBeVisible();
+
+    // The category filter is a select now — there can be far more categories
+    // than fit in a pill row once they are administered rather than typed.
+    await page.getByLabel('Filter by category').selectOption('Alpha');
+    await expect(card(made.Beta)).toHaveCount(0);
     await expect(page).toHaveURL(/[?&]category=Alpha/);
 
     // The point of putting it in the URL: reloading keeps the filter instead
     // of silently dropping the user back into the unfiltered list.
     await page.reload();
-    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toBeVisible();
-    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toHaveCount(0);
+    await expect(card(made.Alpha)).toBeVisible();
+    await expect(card(made.Beta)).toHaveCount(0);
 
     // And it is linkable, not just sticky.
     await page.goto('/news/?category=Beta');
-    await expect(page.getByRole('row', { name: new RegExp(made.Beta) })).toBeVisible();
-    await expect(page.getByRole('row', { name: new RegExp(made.Alpha) })).toHaveCount(0);
+    await expect(card(made.Beta)).toBeVisible();
+    await expect(card(made.Alpha)).toHaveCount(0);
   });
 });
 

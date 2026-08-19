@@ -19,9 +19,20 @@ export interface ArticleRead {
   url: string;
 }
 
+export interface ArticleCounts {
+  all: number;
+  draft: number;
+  published: number;
+  undated: number;
+}
+
 export interface ArticleListResponse {
   items: ArticleRead[];
+  /** Matched the whole filter, status included — what the pager counts. */
   total: number;
+  /** What each status pill would show. `undated` overlaps draft and
+   *  published, so these deliberately do not sum to `all`. */
+  counts: ArticleCounts;
 }
 
 export interface CategoryCount {
@@ -155,4 +166,48 @@ export async function createArticlePage(title: string, slug: string): Promise<nu
   if (!response.ok) throw await errorFrom(response);
   const { id } = (await response.json()) as { id: number };
   return id;
+}
+
+/** Publish the page behind an article, from the list's row menu.
+ *
+ * Goes through pagebuilder because the body, slug and workflow all live on the
+ * page — this module owns only the category and the display date.
+ */
+export async function publishArticlePage(pageId: number): Promise<void> {
+  const token = await pagebuilderCsrfToken();
+  const response = await fetch(`/api/pagebuilder/pages/${pageId}/publish`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await errorFrom(response);
+}
+
+/** Where an article's body is actually edited — a pagebuilder route, because
+ *  the body belongs to the page rather than to this module. */
+export function articleEditUrl(pageId: number): string {
+  return `/pagebuilder/${pageId}/edit`;
+}
+
+/** "2d ago", "in 15d", "today" — the list's relative time.
+ *
+ * Rendered from the date part only, in UTC, for the same reason
+ * `formatArticleDate` is: `published_at` is a display date stored at midnight
+ * UTC, so reading it in the viewer's own timezone shifts it a day for everyone
+ * west of UTC.
+ */
+export function relativeDay(iso: string | null, now = new Date()): string {
+  if (!iso) return '';
+  const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(then.getTime())) return '';
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = Math.round((then.getTime() - today) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days > 0) return `in ${days}d`;
+  return `${-days}d ago`;
 }
