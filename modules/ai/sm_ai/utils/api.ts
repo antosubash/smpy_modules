@@ -1,6 +1,8 @@
 /** Client for the AI settings API. */
 
 export type AiSettingsOut = {
+  chat_providers: string[];
+  embedding_providers: string[];
   chat_provider: string;
   chat_model: string;
   chat_base_url: string;

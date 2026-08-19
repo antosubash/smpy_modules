@@ -35,15 +35,9 @@ class AiService:
     def current(self) -> AiSettingsOut:
         s = services.current_settings()
         return AiSettingsOut(
-            chat_provider=s.chat_provider,
-            chat_model=s.chat_model,
-            chat_base_url=s.chat_base_url,
+            **s.model_dump(exclude=set(constants.SECRET_FIELDS)),
             has_chat_api_key=bool(s.chat_api_key),
-            embedding_provider=s.embedding_provider,
-            embedding_model=s.embedding_model,
-            embedding_base_url=s.embedding_base_url,
             has_embedding_api_key=bool(s.embedding_api_key),
-            embedding_dim=s.embedding_dim,
         )
 
     @staticmethod
@@ -51,7 +45,9 @@ class AiService:
         """Translate an update payload into settings-store changes.
 
         Secret fields: omitted or blank = keep the stored key; a value is
-        encrypted; ``clear_*`` wins and empties the field.
+        stripped (keys pasted from clipboards grow trailing newlines that
+        would round-trip into provider 401s) and encrypted; ``clear_*`` wins
+        and empties the field.
         """
         payload = data.model_dump(exclude_unset=True)
         changes: dict[str, Any] = {}
@@ -61,6 +57,7 @@ class AiService:
             if value is None:
                 continue
             if field in constants.SECRET_FIELDS:
+                value = value.strip()
                 if value == "":
                     continue
                 changes[field] = crypto.encrypt_value(value)

@@ -6,8 +6,9 @@ retries, streaming). Two slots because real deployments run chat and
 embeddings as separate endpoints (e.g. two vLLM processes on one GPU host).
 
 Values persist in the shared settings store at SYSTEM scope and hot-swap on
-save. Unset fields fall back to ``SM_AI_*`` environment variables — dev, CI
-and e2e configure with zero DB rows; DB values win when present.
+save. Unset fields fall back to ``SM_AI_*`` environment variables or the root
+``.env`` (the same sources the host's BootstrapSettings reads) — dev, CI and
+e2e configure with zero DB rows; DB values win when present.
 
 API keys are stored as ``enc:v1:<fernet>`` — see ``sm_ai.crypto``.
 """
@@ -22,7 +23,9 @@ from sm_ai import constants
 class AiSettings(BaseSettings):
     """Connection configuration for the chat and embedding slots."""
 
-    model_config = SettingsConfigDict(env_prefix="SM_AI_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="SM_AI_", env_file=".env", extra="ignore"
+    )
 
     # --- chat slot ---
     chat_provider: str = constants.PROVIDER_ANTHROPIC

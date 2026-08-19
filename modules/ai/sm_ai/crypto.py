@@ -1,8 +1,11 @@
 """Fernet encryption for stored provider keys.
 
 The key derives from ``SM_SECRET_KEY`` (SHA-256 → urlsafe base64), read
-straight from the environment through a private BaseSettings — no coupling to
-app.state or hosting internals. Stored format is ``enc:v1:<fernet token>``:
+through a private BaseSettings from the environment or the root ``.env`` —
+the same two sources the host's own BootstrapSettings uses, and no coupling
+to app.state or hosting internals. The Fernet is cached for the process
+lifetime (rotating the secret requires a restart, matching the session
+middleware). Stored format is ``enc:v1:<fernet token>``:
 
 - prefix present and decrypts        → plaintext key
 - prefix present, decryption fails   → AiKeyUnreadableError (secret key changed)
@@ -14,6 +17,7 @@ from __future__ import annotations
 
 import logging
 from base64 import urlsafe_b64encode
+from functools import lru_cache
 from hashlib import sha256
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -31,11 +35,17 @@ _warned_plaintext: set[str] = set()
 
 
 class _CryptoEnv(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="SM_", extra="ignore")
+    # ``env_file=".env"`` mirrors the host's BootstrapSettings: in the
+    # documented dev flow the secret lives only in the root .env and is never
+    # exported, so reading process env alone would 500 every key save.
+    model_config = SettingsConfigDict(
+        env_prefix="SM_", env_file=".env", extra="ignore"
+    )
 
     secret_key: str = ""
 
 
+@lru_cache(maxsize=1)
 def _fernet() -> Fernet:
     secret = _CryptoEnv().secret_key
     if not secret:

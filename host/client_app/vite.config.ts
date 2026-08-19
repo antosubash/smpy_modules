@@ -135,6 +135,8 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
+const uiPort = Number(process.env.SM_UI_PORT) || 5050;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: import.meta.dirname,
@@ -154,10 +156,11 @@ export default defineConfig({
   },
   server: {
     // Overridable so a second checkout (e.g. a worktree running e2e) can
-    // boot beside a dev stack that already holds the default port.
-    port: Number(process.env.SM_UI_PORT ?? 5050),
+    // boot beside a dev stack that already holds the default port. `|| 5050`
+    // (not ??) so an exported-but-empty SM_UI_PORT can't yield port 0/NaN.
+    port: uiPort,
     strictPort: true,
-    origin: `http://localhost:${Number(process.env.SM_UI_PORT ?? 5050)}`,
+    origin: `http://localhost:${uiPort}`,
     fs: {
       allow: [fsRoot, ...moduleFsAllow],
     },

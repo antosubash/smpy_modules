@@ -18,10 +18,10 @@ export function SlotCard({
   description,
   idPrefix,
   providers,
-  allowEmptyProvider,
+  optionalSlot,
   values,
   hasStoredKey,
-  showDim,
+  dirty,
   busy,
   testResult,
   onChange,
@@ -31,10 +31,12 @@ export function SlotCard({
   description: string;
   idPrefix: string;
   providers: string[];
-  allowEmptyProvider: boolean;
+  /** Embedding-style slot: may be left unconfigured and carries a vector dim. */
+  optionalSlot: boolean;
   values: SlotValues;
   hasStoredKey: boolean;
-  showDim: boolean;
+  /** Unsaved edits present — the probe would test the old saved settings. */
+  dirty: boolean;
   busy: boolean;
   testResult: TestResult | null;
   onChange: (next: SlotValues) => void;
@@ -59,7 +61,7 @@ export function SlotCard({
             onChange={(e) => set({ provider: e.target.value })}
             disabled={busy}
           >
-            {allowEmptyProvider && <option value="">Not configured</option>}
+            {optionalSlot && <option value="">Not configured</option>}
             {providers.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -113,7 +115,7 @@ export function SlotCard({
             )}
           </div>
         </div>
-        {showDim && (
+        {optionalSlot && (
           <div className="space-y-2">
             <Label htmlFor={`${idPrefix}-dim`}>Vector dimension</Label>
             <Input
@@ -129,10 +131,21 @@ export function SlotCard({
           </div>
         )}
         <div className="flex items-center gap-3">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onTest}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy || dirty}
+            onClick={onTest}
+          >
             Test connection
           </Button>
-          {testResult && (
+          {dirty && (
+            <span className="text-xs text-muted-foreground">
+              Save your changes first — the test runs against saved settings.
+            </span>
+          )}
+          {!dirty && testResult && (
             <span
               data-testid={`${idPrefix}-test-result`}
               className={testResult.ok ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}

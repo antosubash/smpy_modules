@@ -21,8 +21,10 @@ MENU_ORDER: Final = 116  # just after Branding's 115
 # Modules this one depends on (value = that module's ModuleMeta.name).
 _MODULE_SETTINGS: Final = "Settings"
 
-# Inertia page identifier. Inlined as a literal at the view (framework SM003/
-# SM004 static-AST pairing); a unit test asserts the literal matches this.
+# Inertia page identifier, rendered via this constant at the view (the
+# in-repo check_hardcoded_strings convention; the framework's SM003/SM004
+# literal-pairing convention loses that tie-break — see endpoints/views.py).
+# A unit test pins the value to pages/Settings.tsx.
 _PAGE_SETTINGS: Final = f"{MODULE_NAME}/Settings"
 
 PERM_MANAGE: Final = "ai.manage"

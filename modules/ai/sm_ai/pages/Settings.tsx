@@ -15,9 +15,6 @@ import {
   testSlot,
 } from '../utils/api';
 
-const CHAT_PROVIDERS = ['anthropic', 'openai', 'google', 'openai_compatible'];
-const EMBEDDING_PROVIDERS = ['openai', 'google', 'openai_compatible'];
-
 const emptySlot = (): SlotValues => ({
   provider: '',
   model: '',
@@ -84,8 +81,17 @@ export default function Settings() {
       const slots = fromSettings(next);
       setChat(slots.chat);
       setEmbedding(slots.embedding);
+      // Results describe the previous configuration — drop them.
+      setChatTest(null);
+      setEmbeddingTest(null);
       toast.success('AI settings saved');
     }, 'Save failed');
+
+  // The probe runs against *saved* settings; testing with unsaved edits
+  // would report on the old configuration and mislead either way.
+  const isDirty = (slot: SlotValues, saved: SlotValues) =>
+    JSON.stringify(slot) !== JSON.stringify(saved);
+  const savedSlots = loaded ? fromSettings(loaded) : null;
 
   const test = (slot: 'chat' | 'embedding') =>
     run(async () => {
@@ -108,11 +114,11 @@ export default function Settings() {
               title="Chat"
               description="The model modules use for text generation."
               idPrefix="ai-chat"
-              providers={CHAT_PROVIDERS}
-              allowEmptyProvider={false}
+              providers={loaded.chat_providers}
+              optionalSlot={false}
               values={chat}
               hasStoredKey={loaded.has_chat_api_key}
-              showDim={false}
+              dirty={savedSlots ? isDirty(chat, savedSlots.chat) : false}
               busy={busy}
               testResult={chatTest}
               onChange={setChat}
@@ -122,11 +128,11 @@ export default function Settings() {
               title="Embeddings"
               description="Optional second endpoint for vector embeddings."
               idPrefix="ai-embedding"
-              providers={EMBEDDING_PROVIDERS}
-              allowEmptyProvider={true}
+              providers={loaded.embedding_providers}
+              optionalSlot={true}
               values={embedding}
               hasStoredKey={loaded.has_embedding_api_key}
-              showDim={true}
+              dirty={savedSlots ? isDirty(embedding, savedSlots.embedding) : false}
               busy={busy}
               testResult={embeddingTest}
               onChange={setEmbedding}

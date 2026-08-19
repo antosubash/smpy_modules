@@ -11,8 +11,15 @@ from sm_ai import constants
 
 
 class AiSettingsOut(SQLModel):
-    """Current AI settings with secrets reduced to presence flags."""
+    """Current AI settings with secrets reduced to presence flags.
 
+    Carries the allowed provider ids so the settings page renders its
+    dropdowns from the same tuples the validators enforce — the frontend
+    holds no provider list of its own.
+    """
+
+    chat_providers: list[str] = list(constants.CHAT_PROVIDERS)
+    embedding_providers: list[str] = list(constants.EMBEDDING_PROVIDERS)
     chat_provider: str
     chat_model: str
     chat_base_url: str

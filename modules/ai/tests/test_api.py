@@ -88,6 +88,12 @@ class TestGetSettings:
         assert body["chat_provider"] == constants.PROVIDER_ANTHROPIC
         assert body["embedding_provider"] == ""
 
+    async def test_provider_lists_served(self, client):
+        # The dropdowns render from these; the frontend holds no copy.
+        body = (await client.get("/api/ai/settings")).json()
+        assert body["chat_providers"] == list(constants.CHAT_PROVIDERS)
+        assert body["embedding_providers"] == list(constants.EMBEDDING_PROVIDERS)
+
 
 class TestBuildChanges:
     def test_blank_key_keeps_stored(self):
@@ -101,6 +107,15 @@ class TestBuildChanges:
         changes = AiService.build_changes(AiSettingsUpdate(chat_api_key="sk-new"))
         assert changes["chat_api_key"].startswith(crypto.ENC_PREFIX)
         assert crypto.decrypt_value(changes["chat_api_key"], "chat_api_key") == "sk-new"
+
+    def test_key_is_stripped_before_encryption(self, monkeypatch):
+        monkeypatch.setenv("SM_SECRET_KEY", SECRET)
+        changes = AiService.build_changes(AiSettingsUpdate(chat_api_key="sk-new\n "))
+        assert crypto.decrypt_value(changes["chat_api_key"], "chat_api_key") == "sk-new"
+
+    def test_whitespace_only_key_keeps_stored(self):
+        changes = AiService.build_changes(AiSettingsUpdate(chat_api_key="  \n"))
+        assert changes == {}
 
     def test_clear_wins(self):
         changes = AiService.build_changes(

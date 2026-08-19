@@ -20,6 +20,9 @@ dev: gen-pages
 # Overridable so a second checkout (e.g. a worktree running e2e) can boot
 # beside a dev stack that already holds the default ports.
 API_PORT ?= 8000
+# vite reads SM_UI_PORT (see host/client_app/vite.config.ts); fall back to it
+# here so `make kill` targets whatever port the UI actually took.
+UI_PORT ?= $(if $(SM_UI_PORT),$(SM_UI_PORT),5050)
 
 dev-api:
 	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
@@ -123,8 +126,9 @@ new-module:
 	@echo "Now add simple_module_$(name) to host/pyproject.toml dependencies and"
 	@echo "[tool.uv.sources] simple_module_$(name) = { workspace = true }"
 
+# Scoped to this checkout's ports so it never kills the neighboring dev
+# stack the port overrides exist to coexist with.
 kill:
-	@-pkill -f "uvicorn main:app" 2>/dev/null
-	@-pkill -f vite 2>/dev/null
-	@-lsof -ti:8000,5050 | xargs kill -9 2>/dev/null
-	@echo "Ports 8000, 5050 freed."
+	@-pkill -f "uvicorn main:app.*--port $(API_PORT)" 2>/dev/null
+	@-lsof -ti:$(API_PORT),$(UI_PORT) | xargs kill -9 2>/dev/null
+	@echo "Ports $(API_PORT), $(UI_PORT) freed."
