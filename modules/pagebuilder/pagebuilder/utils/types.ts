@@ -86,6 +86,21 @@ export interface MediaAssetVariant {
   size_bytes: number;
 }
 
+export interface MediaUsage {
+  page_id: number;
+  title: string;
+  slug: string;
+  status: string;
+  /** True when only the draft references it — the live page does not. */
+  draft_only: boolean;
+}
+
+export interface MediaAssetDetail {
+  asset: MediaAssetRead;
+  used_in: MediaUsage[];
+  used_in_total: number;
+}
+
 export interface MediaAssetRead {
   id: number;
   filename: string;
@@ -96,6 +111,9 @@ export interface MediaAssetRead {
   width: number | null;
   height: number | null;
   folder: string | null;
+  alt_text: string;
+  caption: string;
+  credit: string;
   variants: Record<string, MediaAssetVariant>;
   created_at: string;
 }

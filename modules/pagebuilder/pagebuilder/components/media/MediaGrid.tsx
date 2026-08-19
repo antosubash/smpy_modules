@@ -52,6 +52,13 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
               </div>
             )}
             <div className="flex gap-2 pt-1 flex-wrap">
+              {/* The detail screen is where alt text, credit and the list of
+                  pages depending on this asset live. */}
+              <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                <a href={`/pagebuilder/media/${a.id}`} data-testid="media-details-link">
+                  Details
+                </a>
+              </Button>
               <Button
                 variant="link"
                 size="sm"
