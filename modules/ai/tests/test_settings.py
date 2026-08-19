@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from sm_ai import services
-from sm_ai.contracts.errors import AiNotConfigured
+from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.settings import AiSettings
 
 
@@ -47,7 +47,7 @@ class TestEnvSeeding:
 
 class TestHolder:
     def test_current_settings_before_install_raises(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             services.current_settings()
         assert exc.value.field == "module"
 

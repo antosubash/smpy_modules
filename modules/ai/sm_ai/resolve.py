@@ -12,7 +12,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from sm_ai import constants, crypto
-from sm_ai.contracts.errors import AiNotConfigured
+from sm_ai.contracts.errors import AiNotConfiguredError
 
 if TYPE_CHECKING:
     from pydantic_ai import Embedder
@@ -32,27 +32,27 @@ def build_chat_model(settings: AiSettings, model_name: str | None = None) -> Mod
     provider_id = settings.chat_provider.strip().lower()
     name = (model_name or settings.chat_model).strip()
     if provider_id not in constants.CHAT_PROVIDERS:
-        raise AiNotConfigured(
+        raise AiNotConfiguredError(
             "chat_provider",
             f"Unknown provider {provider_id!r}; expected one of "
             f"{', '.join(constants.CHAT_PROVIDERS)}.",
         )
     if not name:
-        raise AiNotConfigured("chat_model")
+        raise AiNotConfiguredError("chat_model")
 
     key = crypto.decrypt_value(settings.chat_api_key, "chat_api_key")
     base_url = settings.chat_base_url.strip()
 
     if provider_id == constants.PROVIDER_OPENAI_COMPATIBLE:
         if not base_url:
-            raise AiNotConfigured(
+            raise AiNotConfiguredError(
                 "chat_base_url",
                 "The openai_compatible provider needs the server's /v1 URL.",
             )
         return _openai_chat(name, base_url, key or constants.PLACEHOLDER_API_KEY)
 
     if not key:
-        raise AiNotConfigured("chat_api_key")
+        raise AiNotConfiguredError("chat_api_key")
 
     if provider_id == constants.PROVIDER_ANTHROPIC:
         from pydantic_ai.models.anthropic import AnthropicModel
@@ -89,7 +89,7 @@ def build_embedder(settings: AiSettings) -> Embedder:
     provider_id = settings.embedding_provider.strip().lower()
     name = settings.embedding_model.strip()
     if not provider_id:
-        raise AiNotConfigured(
+        raise AiNotConfiguredError(
             "embedding_provider", "The embedding slot is not configured."
         )
     if provider_id not in constants.EMBEDDING_PROVIDERS:
@@ -98,16 +98,16 @@ def build_embedder(settings: AiSettings) -> Embedder:
             if provider_id == constants.PROVIDER_ANTHROPIC
             else f"Expected one of {', '.join(constants.EMBEDDING_PROVIDERS)}."
         )
-        raise AiNotConfigured("embedding_provider", hint)
+        raise AiNotConfiguredError("embedding_provider", hint)
     if not name:
-        raise AiNotConfigured("embedding_model")
+        raise AiNotConfiguredError("embedding_model")
 
     key = crypto.decrypt_value(settings.embedding_api_key, "embedding_api_key")
     base_url = settings.embedding_base_url.strip()
 
     if provider_id == constants.PROVIDER_OPENAI_COMPATIBLE:
         if not base_url:
-            raise AiNotConfigured(
+            raise AiNotConfiguredError(
                 "embedding_base_url",
                 "The openai_compatible provider needs the server's /v1 URL.",
             )
@@ -116,7 +116,7 @@ def build_embedder(settings: AiSettings) -> Embedder:
         )
 
     if not key:
-        raise AiNotConfigured("embedding_api_key")
+        raise AiNotConfiguredError("embedding_api_key")
 
     if provider_id == constants.PROVIDER_OPENAI:
         return Embedder(_openai_embedding(name, base_url, key))

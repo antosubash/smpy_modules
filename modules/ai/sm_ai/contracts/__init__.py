@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sm_ai.contracts.errors import AiError, AiKeyUnreadable, AiNotConfigured
+from sm_ai.contracts.errors import AiError, AiKeyUnreadableError, AiNotConfiguredError
 
 if TYPE_CHECKING:
     from pydantic_ai import Embedder
@@ -40,14 +40,14 @@ def embedding_dim() -> int:
 
     dim = services.current_settings().embedding_dim
     if dim <= 0:
-        raise AiNotConfigured("embedding_dim", "Set the vector width in AI settings.")
+        raise AiNotConfiguredError("embedding_dim", "Set the vector width in AI settings.")
     return dim
 
 
 __all__ = [
     "AiError",
-    "AiKeyUnreadable",
-    "AiNotConfigured",
+    "AiKeyUnreadableError",
+    "AiNotConfiguredError",
     "embedding_dim",
     "resolve_embedder",
     "resolve_model",

@@ -152,11 +152,13 @@ class TestTestEndpoint:
         assert res.status_code == 422
 
 
-class TestViewLiteral:
-    def test_render_literal_matches_constant(self):
-        # The view inlines the page name for the framework's static-AST
-        # diagnostics; this pins it to the constant.
+class TestViewPageName:
+    def test_view_renders_the_settings_page_constant(self):
+        # The view renders via the constant (repo linter convention); pin the
+        # constant's value so the page key stays aligned with pages/Settings.tsx
+        # and the manifest prefix derived from ModuleMeta.name.
         from sm_ai.endpoints import views
 
         source = inspect.getsource(views)
-        assert f'"{constants._PAGE_SETTINGS}"' in source
+        assert "constants._PAGE_SETTINGS" in source
+        assert f"{constants.MODULE_NAME}/Settings" == constants._PAGE_SETTINGS

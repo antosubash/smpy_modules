@@ -9,7 +9,7 @@ from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from sm_ai import constants, crypto, resolve, services
 from sm_ai.contracts import embedding_dim, resolve_model
-from sm_ai.contracts.errors import AiNotConfigured
+from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.settings import AiSettings
 
 SECRET = "test-secret-key-for-resolve"
@@ -71,22 +71,22 @@ class TestChatProviders:
 
 class TestChatErrors:
     def test_unknown_provider(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_chat_model(_chat(chat_provider="watsonx"))
         assert exc.value.field == "chat_provider"
 
     def test_empty_model(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_chat_model(_chat(chat_model=""))
         assert exc.value.field == "chat_model"
 
     def test_missing_key_for_hosted_provider(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_chat_model(_chat(chat_api_key=""))
         assert exc.value.field == "chat_api_key"
 
     def test_openai_compatible_needs_base_url(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_chat_model(
                 _chat(chat_provider=constants.PROVIDER_OPENAI_COMPATIBLE, chat_base_url="")
             )
@@ -120,12 +120,12 @@ class TestEmbeddings:
         assert isinstance(embedder, Embedder)
 
     def test_unconfigured(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_embedder(_embed(embedding_provider=""))
         assert exc.value.field == "embedding_provider"
 
     def test_anthropic_unsupported(self):
-        with pytest.raises(AiNotConfigured) as exc:
+        with pytest.raises(AiNotConfiguredError) as exc:
             resolve.build_embedder(_embed(embedding_provider=constants.PROVIDER_ANTHROPIC))
         assert exc.value.field == "embedding_provider"
 
@@ -141,5 +141,5 @@ class TestContractsFacade:
 
     def test_embedding_dim_unset_raises(self):
         services.install(services.AiServices(settings=_embed(embedding_dim=0)))
-        with pytest.raises(AiNotConfigured):
+        with pytest.raises(AiNotConfiguredError):
             embedding_dim()

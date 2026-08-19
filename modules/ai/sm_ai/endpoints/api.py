@@ -65,7 +65,7 @@ async def test_connection(data: AiTestRequest) -> AiTestResult:
             model=label,
             error=f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s.",
         )
-    except Exception as exc:  # noqa: BLE001 — a failed probe is a result, not a bug
+    except Exception as exc:  # a failed probe is a result, not a bug
         return AiTestResult(ok=False, model=label, error=str(exc) or type(exc).__name__)
     return AiTestResult(
         ok=True, model=label, latency_ms=int((time.monotonic() - started) * 1000)

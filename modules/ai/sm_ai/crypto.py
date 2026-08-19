@@ -5,7 +5,7 @@ straight from the environment through a private BaseSettings — no coupling to
 app.state or hosting internals. Stored format is ``enc:v1:<fernet token>``:
 
 - prefix present and decrypts        → plaintext key
-- prefix present, decryption fails   → AiKeyUnreadable (secret key changed)
+- prefix present, decryption fails   → AiKeyUnreadableError (secret key changed)
 - no prefix                          → treated as plaintext, warned once
   (covers keys pasted through the generic settings UI or seeded from env)
 """
@@ -19,7 +19,7 @@ from hashlib import sha256
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from sm_ai.contracts.errors import AiKeyUnreadable
+from sm_ai.contracts.errors import AiKeyUnreadableError
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def decrypt_value(stored: str, field: str) -> str:
         try:
             return _fernet().decrypt(stored[len(ENC_PREFIX) :].encode()).decode()
         except InvalidToken as exc:
-            raise AiKeyUnreadable(field) from exc
+            raise AiKeyUnreadableError(field) from exc
     if field not in _warned_plaintext:
         _warned_plaintext.add(field)
         logger.warning(

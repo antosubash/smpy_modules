@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from sm_ai import crypto
-from sm_ai.contracts.errors import AiKeyUnreadable
+from sm_ai.contracts.errors import AiKeyUnreadableError
 
 SECRET = "test-secret-key-for-crypto"
 
@@ -38,12 +38,12 @@ class TestDecrypt:
     def test_wrong_secret_raises_unreadable(self, monkeypatch):
         stored = crypto.encrypt_value("sk-123")
         monkeypatch.setenv("SM_SECRET_KEY", "a-different-secret")
-        with pytest.raises(AiKeyUnreadable) as exc:
+        with pytest.raises(AiKeyUnreadableError) as exc:
             crypto.decrypt_value(stored, "chat_api_key")
         assert exc.value.field == "chat_api_key"
 
     def test_garbage_after_prefix_raises_unreadable(self):
-        with pytest.raises(AiKeyUnreadable):
+        with pytest.raises(AiKeyUnreadableError):
             crypto.decrypt_value(crypto.ENC_PREFIX + "not-a-token", "chat_api_key")
 
     def test_plaintext_passes_through_with_warning(self, caplog):

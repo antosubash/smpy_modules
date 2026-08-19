@@ -8,7 +8,7 @@ class AiError(Exception):
     """Base class for AI module errors."""
 
 
-class AiNotConfigured(AiError):
+class AiNotConfiguredError(AiError):
     """A required connection setting is missing or invalid."""
 
     def __init__(self, field: str, hint: str = "") -> None:
@@ -19,7 +19,7 @@ class AiNotConfigured(AiError):
         super().__init__(message)
 
 
-class AiKeyUnreadable(AiError):
+class AiKeyUnreadableError(AiError):
     """A stored key has the enc:v1: prefix but cannot be decrypted."""
 
     def __init__(self, field: str) -> None:

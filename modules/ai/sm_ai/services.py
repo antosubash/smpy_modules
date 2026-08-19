@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sm_ai.contracts.errors import AiNotConfigured
+from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.settings import AiSettings
 
 
@@ -45,7 +45,7 @@ def reset() -> None:
 def current_settings() -> AiSettings:
     """The hydrated settings of the running host."""
     if _current is None:
-        raise AiNotConfigured(
+        raise AiNotConfiguredError(
             "module",
             "The AI module is not initialised — is a host running with "
             "simple_module_ai installed?",
