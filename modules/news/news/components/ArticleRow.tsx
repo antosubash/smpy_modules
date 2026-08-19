@@ -1,4 +1,3 @@
-import { StatusBadge } from '@simple-module-py/pagebuilder/pagebuilder/components/StatusBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +15,7 @@ import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 import { useState } from 'react';
 
 import type { ArticleRead } from '../utils/api';
+import { StatusBadge } from './StatusBadge';
 
 /** `2026-02-01T00:00:00` -> `2026-02-01`, which is what <input type=date> wants. */
 function toDateInput(iso: string | null): string {
@@ -44,7 +44,7 @@ export function ArticleRow({
   return (
     <TableRow>
       <TableCell>
-        <a href={`/pagebuilder/${article.page_id}/edit`} className="font-medium hover:underline">
+        <a href={article.edit_url} className="font-medium hover:underline">
           {article.title}
         </a>
         <div className="text-xs text-muted-foreground">{article.url}</div>

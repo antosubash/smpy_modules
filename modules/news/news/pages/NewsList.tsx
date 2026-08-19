@@ -23,6 +23,7 @@ import {
   detachArticle,
   listArticles,
   listCategories,
+  UNCATEGORISED,
   updateArticle,
 } from '../utils/api';
 
@@ -35,6 +36,9 @@ export default function NewsList() {
 
   const [articles, setArticles] = useState<ArticleRead[] | null>(null);
   const [categories, setCategories] = useState<CategoryCount[]>([]);
+  // Articles with no category at all. Counted separately because a blank name
+  // cannot be a pill value — that is what "All" uses.
+  const [uncategorised, setUncategorised] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -91,9 +95,17 @@ export default function NewsList() {
         .then((response) => {
           if (superseded()) return;
           setCategories(response.items);
+          setUncategorised(response.uncategorised);
           // Editing the last row out of the filtered category empties the
           // filter; fall back to All rather than pinning an orphaned pill.
-          if (category && !response.items.some((c) => c.category === category)) {
+          // The uncategorised filter is checked against its own count for the
+          // same reason — categorising the last such article should not leave
+          // a pill selected that no longer exists.
+          const stillThere =
+            category === UNCATEGORISED
+              ? response.uncategorised > 0
+              : response.items.some((c) => c.category === category);
+          if (category && !stillThere) {
             setFilters({ category: '', offset: 0 });
           }
         })
@@ -143,7 +155,7 @@ export default function NewsList() {
       <Head title="News" />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {categories.length > 0 && (
+      {(categories.length > 0 || uncategorised > 0) && (
         <FilterPills
           className="mb-4"
           value={category}
@@ -156,6 +168,13 @@ export default function NewsList() {
               value: c.category,
               label: `${c.category} (${c.count})`,
             })),
+            // Last, and only when there are any: an uncategorised article is
+            // usually one somebody forgot to finish, and until this pill
+            // existed there was no way to list for it — the API reads a blank
+            // category as "no filter" rather than as a filter for blanks.
+            ...(uncategorised > 0
+              ? [{ value: UNCATEGORISED, label: `Uncategorised (${uncategorised})` }]
+              : []),
           ]}
         />
       )}
@@ -174,7 +193,9 @@ export default function NewsList() {
             // covers the case where the pill row is gone because the category
             // request failed — otherwise the filter cannot be cleared at all.
             <>
-              No articles in "{category}".{' '}
+              {category === UNCATEGORISED
+                ? 'Every article has a category.'
+                : `No articles in "${category}".`}{' '}
               <Button
                 type="button"
                 variant="link"

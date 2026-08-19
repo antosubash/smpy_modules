@@ -11,11 +11,17 @@ import { login } from './helpers';
  * readable cookie — so every other spec primes the cookie before it does
  * anything, and none of them can see it missing.
  *
- * Creating an article posts to pagebuilder's CSRF-protected page API. A user
- * who clicks News in the sidebar and then "New article" has never requested a
- * pagebuilder path, so the cookie is unset and the POST used to come back 403
- * with no page and no article — the module's documented primary flow, broken
- * on a fresh login.
+ * Creating an article used to POST to pagebuilder's CSRF-protected page API
+ * from the browser. A user who clicks News in the sidebar and then "New
+ * article" has never requested a pagebuilder path, so the cookie was unset and
+ * the POST came back 403 with no page and no article — the module's documented
+ * primary flow, broken on a fresh login.
+ *
+ * It is now one request to news' own API, which creates the page and attaches
+ * the article server-side in a single transaction, so no pagebuilder cookie is
+ * involved at any point. The precondition below therefore asserts something
+ * stronger than it used to: not merely that the cookie is unset when the flow
+ * starts, but that a flow which never needs it still works.
  */
 test.describe('News — first visit of a session', () => {
   test('creates an article without having visited Pages first', async ({ page }) => {

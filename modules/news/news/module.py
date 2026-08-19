@@ -16,7 +16,6 @@ import importlib.metadata
 import logging
 
 from fastapi import APIRouter, FastAPI
-from pagebuilder.contracts.events import PageDeleted
 from simple_module_core import ModuleBase, ModuleMeta
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuItem, MenuRegistry
@@ -24,6 +23,7 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
 from news import constants
+from news.integrations.pagebuilder import PageDeleted
 
 logger = logging.getLogger(__name__)
 

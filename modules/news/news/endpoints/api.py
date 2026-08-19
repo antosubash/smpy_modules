@@ -6,22 +6,31 @@ session has to be able to list articles. Writes require ``news.edit``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from simple_module_db import get_db
 from simple_module_hosting.permissions import (
     WILDCARD,
     RequiresPermission,
     resolve_permissions,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
-from news.constants import DEFAULT_LIMIT, MAX_LIMIT, PERM_EDIT
+from news.constants import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    PERM_EDIT,
+    PRIVATE_CACHE_CONTROL,
+    PUBLIC_CACHE_CONTROL,
+    UNCATEGORISED,
+)
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleListResponse,
     ArticleRead,
     ArticleUpdate,
+    ArticleWithPageCreate,
     CategoryListResponse,
 )
 
@@ -62,6 +71,19 @@ def _may_see_drafts(request: Request) -> bool:
     return WILDCARD in resolved or PERM_EDIT in resolved
 
 
+def _cache(response: Response, *, include_drafts: bool) -> None:
+    """Let a shared cache hold the public answer, and never the editor's.
+
+    The feed block runs on every public page carrying it, so an uncacheable
+    listing costs a database round trip per page view. The editor's listing
+    differs by permission — it includes drafts — so it must not be stored
+    anywhere another visitor could be served it from.
+    """
+    response.headers["Cache-Control"] = (
+        PRIVATE_CACHE_CONTROL if include_drafts else PUBLIC_CACHE_CONTROL
+    )
+
+
 async def _read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
     """Re-read through the listing join so every response has one shape.
 
@@ -76,12 +98,22 @@ async def _read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
     return article
 
 
+def _already_an_article(page_id: int) -> HTTPException:
+    return HTTPException(status_code=409, detail=f"Page {page_id} is already an article.")
+
+
 @router.get("/articles", response_model=ArticleListResponse)
 async def list_articles(
     request: Request,
+    response: Response,
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(0, ge=0),
-    category: str | None = Query(None),
+    category: str | None = Query(
+        None,
+        description=f"Exact category name, or {UNCATEGORISED!r} for the articles "
+        "that carry no category at all. An omitted or blank value means no "
+        "category filter, which is why the latter needs a spelling of its own.",
+    ),
     undated_first: bool = Query(
         False,
         description="Sort undated (work-in-progress) articles before dated "
@@ -90,23 +122,28 @@ async def list_articles(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
+    include_drafts = _may_see_drafts(request)
     items, total = await service.list_articles(
         db,
         limit=limit,
         offset=offset,
         category=category,
-        include_drafts=_may_see_drafts(request),
+        uncategorised=category == UNCATEGORISED,
+        include_drafts=include_drafts,
         undated_first=undated_first,
     )
+    _cache(response, include_drafts=include_drafts)
     return ArticleListResponse(items=items, total=total)
 
 
 @router.get("/categories", response_model=CategoryListResponse)
 async def list_categories(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ) -> CategoryListResponse:
-    items = await service.list_categories(db, include_drafts=_may_see_drafts(request))
-    return CategoryListResponse(items=items)
+    include_drafts = _may_see_drafts(request)
+    items, uncategorised = await service.list_categories(db, include_drafts=include_drafts)
+    _cache(response, include_drafts=include_drafts)
+    return CategoryListResponse(items=items, uncategorised=uncategorised)
 
 
 @router.post(
@@ -122,13 +159,46 @@ async def attach_article(
     if not await service.page_exists(db, body.page_id):
         raise HTTPException(status_code=404, detail=f"Page {body.page_id} does not exist.")
     if await service.get_by_page(db, body.page_id) is not None:
-        raise HTTPException(
-            status_code=409, detail=f"Page {body.page_id} is already an article."
+        raise _already_an_article(body.page_id)
+    try:
+        await service.create(
+            db,
+            page_id=body.page_id,
+            category=body.category,
+            published_at=body.published_at,
         )
-    await service.create(
-        db, page_id=body.page_id, category=body.category, published_at=body.published_at
-    )
+    except IntegrityError as exc:
+        # The check above is not a lock: two requests attaching the same page at
+        # once both pass it, and the loser meets the unique index on `page_id`
+        # instead. That is the same conflict the check reports, so it gets the
+        # same status rather than the 500 an unhandled database error produced.
+        await db.rollback()
+        raise _already_an_article(body.page_id) from exc
     return await _read_one_by_page(db, body.page_id)
+
+
+@router.post(
+    "/articles/with-page",
+    response_model=ArticleRead,
+    status_code=201,
+    dependencies=[require_edit],
+)
+async def create_article_with_page(
+    body: ArticleWithPageCreate, db: AsyncSession = Depends(get_db)
+) -> ArticleRead:
+    """Create the page and attach the article to it, in one transaction.
+
+    This is what "New article" calls. It used to be two calls made by the
+    browser — one to pagebuilder's page API, one back here — which meant the
+    frontend had to know another module's CSRF cookie and prime it with a
+    throwaway request, and which stranded an empty page whenever the second
+    call failed. Doing both here under news' own token removes the first
+    problem, and the shared transaction removes the second.
+    """
+    article = await service.create_page_and_article(
+        db, title=body.title, category=body.category, published_at=body.published_at
+    )
+    return await _read_one_by_page(db, article.page_id)
 
 
 @router.put(

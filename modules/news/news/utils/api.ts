@@ -1,6 +1,13 @@
 /** Client for the news read API. */
 
-import type { PageStatus } from '@simple-module-py/pagebuilder/pagebuilder/utils/types';
+/** Workflow state of the page behind an article.
+ *
+ * News' own type, mirroring `contracts.schemas.ArticleStatus`. It used to be
+ * imported from pagebuilder, which made a news component's type-check depend
+ * on another package's file layout to name three strings news is perfectly
+ * able to name itself.
+ */
+export type ArticleStatus = 'draft' | 'submitted_for_review' | 'published';
 
 export interface ArticleRead {
   id: number;
@@ -13,8 +20,11 @@ export interface ArticleRead {
   published_at: string | null;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
-  page_status: PageStatus;
+  page_status: ArticleStatus;
   url: string;
+  /** Where an author edits the body. Served rather than assembled here, so
+   *  this module holds no opinion about how another routes its editor. */
+  edit_url: string;
 }
 
 export interface ArticleListResponse {
@@ -29,9 +39,20 @@ export interface CategoryCount {
 
 export interface CategoryListResponse {
   items: CategoryCount[];
+  /** How many articles carry no category at all. Its own field rather than a
+   *  blank-named item, which would be indistinguishable from "All". */
+  uncategorised: number;
 }
 
 const BASE = '/api/news';
+
+/** Ask for the articles with no category at all.
+ *
+ * A blank string cannot mean this — the listing reads it as "no category
+ * filter" — so the two states need distinct spellings on the wire. Matches
+ * `constants.UNCATEGORISED`.
+ */
+export const UNCATEGORISED = '__none__';
 
 export async function listArticles(params: {
   limit?: number;
@@ -88,15 +109,6 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
 }
 
 const CSRF_COOKIE = 'news_csrf';
-const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
-/** A pagebuilder *view* route, deliberately not one of its API routes.
- *
- *  Only the view router carries the dependency that mints the CSRF token into
- *  the session; the API router merely validates one. Its cookie middleware can
- *  therefore only mirror a token that a view request already created, so
- *  priming against `/api/pagebuilder/...` returns 200 and sets nothing.
- */
-const PAGEBUILDER_CSRF_PRIMER = '/pagebuilder/';
 
 function readCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -151,43 +163,21 @@ export const updateArticle = (
 
 export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
 
-/** Read pagebuilder's CSRF cookie, priming it first if this session has never
- *  touched a pagebuilder route.
+/** Create an article and the page its body lives in, in one request.
  *
- *  Its middleware only mirrors the token on requests under pagebuilder's own
- *  admin prefixes, so arriving at News straight from the sidebar leaves the
- *  cookie unset — and the page-creating POST below is CSRF-protected. Without
- *  this, "New article" 403s for anyone who has not already visited Pages this
- *  session, which is the common path rather than the rare one.
+ *  This was two calls made from here — one to pagebuilder's page API, one back
+ *  to news — and both of its problems were caused by that split. The first
+ *  call was CSRF-protected by *another module's* cookie, which is unset for
+ *  anyone who has not visited Pages this session, so the documented primary
+ *  flow 403'd on a fresh login until a throwaway priming request was added.
+ *  And the two calls committed separately, so any failure of the second left
+ *  an empty, articleless page behind that nothing would ever clean up.
+ *
+ *  Server-side both writes share one transaction, and the request carries
+ *  news' own token like every other write here.
  */
-async function pagebuilderCsrfToken(): Promise<string | null> {
-  const existing = readCookie(PAGEBUILDER_CSRF_COOKIE);
-  if (existing) return existing;
-  await fetch(PAGEBUILDER_CSRF_PRIMER, {
-    credentials: 'same-origin',
-    headers: { Accept: 'text/html' },
-  });
-  return readCookie(PAGEBUILDER_CSRF_COOKIE);
-}
-
-/** Create the page an article's body lives in, through pagebuilder's API. */
-export async function createArticlePage(title: string, slug: string): Promise<number> {
-  const token = await pagebuilderCsrfToken();
-  const response = await fetch('/api/pagebuilder/pages', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
-    },
-    body: JSON.stringify({
-      title,
-      slug,
-      draft_data: { root: { props: { title, width: 'full' } }, content: [], zones: {} },
-    }),
-  });
-  if (!response.ok) throw await errorFrom(response);
-  const { id } = (await response.json()) as { id: number };
-  return id;
-}
+export const createArticleWithPage = (data: {
+  title: string;
+  category?: string;
+  published_at?: string | null;
+}) => write<ArticleRead>('/articles/with-page', 'POST', data);
