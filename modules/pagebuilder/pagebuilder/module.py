@@ -24,7 +24,9 @@ _log = logging.getLogger("simple_module.pagebuilder")
 
 # Sidebar entries. Grouped under "Content" so an app that installs several
 # content modules clusters them together rather than scattering them.
-_MENU_GROUP = "Content"
+# Paired with the news module's own group: the rail reads News / Site, so a
+# screen's section is visible before you click it.
+_MENU_GROUP = "Site"
 _URL_PAGES = "/pagebuilder/"
 _URL_LAYOUT = "/pagebuilder/layout"
 _URL_MEDIA = "/pagebuilder/media"

@@ -22,7 +22,8 @@ from sqlalchemy.orm import Load
 
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
-from news.models import NewsArticle
+from news import query_filters
+from news.models import NewsArticle, NewsCategory
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +43,6 @@ UNSET: Final = _Unset()
 A typed singleton rather than a bare ``object()`` so ``datetime | None | _Unset``
 stays a real union that a type checker can narrow with ``isinstance``.
 """
-
-
-def _visible(stmt, *, include_drafts: bool):
-    """Restrict to published pages unless the caller may see drafts."""
-    if include_drafts:
-        return stmt
-    return stmt.where(Page.status == PageStatus.PUBLISHED)
 
 
 def _base(include_drafts: bool, category: str | None):
@@ -79,7 +73,7 @@ def _base(include_drafts: bool, category: str | None):
             )
         )
     )
-    stmt = _visible(stmt, include_drafts=include_drafts)
+    stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     if category:
         stmt = stmt.where(NewsArticle.category == category)
     return stmt
@@ -106,6 +100,8 @@ async def list_articles(
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
     category: str | None = None,
+    q: str | None = None,
+    status: str | None = None,
     include_drafts: bool = False,
     undated_first: bool = False,
 ) -> tuple[list[ArticleRead], int]:
@@ -116,7 +112,18 @@ async def list_articles(
     progress — with pagination it would otherwise sit on the *last* page,
     burying exactly the row its author is about to set a date on.
     """
+    # A category arrives from the UI as a name and from a public link as a
+    # slug. Resolving here rather than at each call site is what lets
+    # /news?category=field-notes and the admin pill both filter the same rows.
+    if category:
+        category = await resolve_category_slug(db, category) or category
+
     stmt = _base(include_drafts, category)
+    stmt = query_filters.search(stmt, q)
+    # A draft filter from someone who may not see drafts must not widen the
+    # base query — `visible` has already restricted it, and `status` only
+    # narrows, so the two compose safely in either order.
+    stmt = query_filters.status(stmt, status)
 
     total = await db.scalar(
         select(func.count()).select_from(stmt.subquery())
@@ -135,20 +142,39 @@ async def list_articles(
     return [_to_read(article, page) for article, page in rows], int(total or 0)
 
 
+async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
+    """Category name for a slug, or ``None`` when no managed row matches.
+
+    Kept here rather than imported from ``category_service`` so the listing
+    path does not depend on the management module.
+    """
+    return await db.scalar(select(NewsCategory.name).where(NewsCategory.slug == slug))
+
+
 async def list_categories(
     db: AsyncSession, *, include_drafts: bool = False
 ) -> list[CategoryCount]:
-    """Distinct categories with counts, ordered by name. Blanks are omitted."""
+    """Counts per category, in the order the categories screen set. Blanks omitted.
+
+    The order is the whole point: the categories screen exists to arrange the
+    public filter bar, and that promise is only kept if this listing — the one
+    the filter bar and the feed block actually call — reads the positions back.
+
+    An outer join, because a category that has never been formalised on the
+    management screen has no row to order by. Those keep sorting by name, after
+    every ordered one, rather than vanishing from the filter bar.
+    """
     stmt = (
-        select(NewsArticle.category, func.count())
+        select(NewsArticle.category, func.count(), NewsCategory.position)
         .join(Page, Page.id == NewsArticle.page_id)
+        .outerjoin(NewsCategory, NewsCategory.name == NewsArticle.category)
         .where(NewsArticle.category != "")
-        .group_by(NewsArticle.category)
-        .order_by(NewsArticle.category)
+        .group_by(NewsArticle.category, NewsCategory.position)
+        .order_by(NewsCategory.position.nullslast(), NewsArticle.category)
     )
-    stmt = _visible(stmt, include_drafts=include_drafts)
+    stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     rows = (await db.execute(stmt)).all()
-    return [CategoryCount(category=name, count=int(count)) for name, count in rows]
+    return [CategoryCount(category=name, count=int(count)) for name, count, _ in rows]
 
 
 async def get_read_by_page(

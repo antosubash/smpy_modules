@@ -1,0 +1,59 @@
+"""Composable ``WHERE`` fragments for the article listing.
+
+Separated from :mod:`news.service` so the listing module stays inside the
+repo's 300-line cap, and so each rule is stated once. Every function here only
+ever *narrows* a statement, which is what lets ``service.list_articles`` apply
+them in any order without widening what a caller is allowed to see.
+"""
+
+from __future__ import annotations
+
+from typing import Final
+
+from pagebuilder.models import Page, PageStatus
+
+from news.models import NewsArticle
+
+STATUS_DRAFT: Final = "draft"
+STATUS_PUBLISHED: Final = "published"
+STATUS_UNDATED: Final = "undated"
+
+
+def visible(stmt, *, include_drafts: bool):
+    """Restrict to published pages unless the caller may see drafts."""
+    if include_drafts:
+        return stmt
+    return stmt.where(Page.status == PageStatus.PUBLISHED)
+
+
+def search(stmt, q: str | None):
+    """Filter on headline or slug.
+
+    Both columns live on the joined page, which is why this cannot be pushed
+    into the sidecar table's own query. ``ilike`` rather than ``like`` so the
+    match is case-insensitive on Postgres as well as SQLite — SQLite's ``LIKE``
+    already ignores case for ASCII, so without this the two databases would
+    disagree about what the same search finds.
+    """
+    if not q or not q.strip():
+        return stmt
+    pattern = f"%{q.strip()}%"
+    return stmt.where(Page.title.ilike(pattern) | Page.slug.ilike(pattern))
+
+
+def status(stmt, value: str | None):
+    """Narrow to one pipeline state.
+
+    ``undated`` is not a page status — it is an article with no display date,
+    which the list treats as its own bucket because that is the work-in-progress
+    pile. An unrecognised value is ignored rather than rejected: the filter
+    arrives from a query string, and a stale link should show the list, not a
+    validation error.
+    """
+    if value == STATUS_DRAFT:
+        return stmt.where(Page.status == PageStatus.DRAFT)
+    if value == STATUS_PUBLISHED:
+        return stmt.where(Page.status == PageStatus.PUBLISHED)
+    if value == STATUS_UNDATED:
+        return stmt.where(NewsArticle.published_at.is_(None))
+    return stmt

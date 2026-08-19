@@ -9,7 +9,11 @@ export const TEST_ADMIN_PASSWORD = 'changeme1';
 const REPO_ROOT = dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = resolve(REPO_ROOT, 'host', 'test.db');
 
-const APP_URL = 'http://localhost:8000';
+// Ports follow the Makefile's SM_API_PORT / SM_VITE_PORT so a second checkout
+// can run its own e2e pass without colliding with the primary dev server.
+const API_PORT = process.env.SM_API_PORT ?? '8000';
+const VITE_PORT = process.env.SM_VITE_PORT ?? '5050';
+const APP_URL = `http://localhost:${API_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -54,7 +58,9 @@ export default defineConfig({
       SM_DATABASE_URL: `sqlite+aiosqlite:///${TEST_DB_PATH}`,
       SM_USERS_BOOTSTRAP_EMAIL: TEST_ADMIN_EMAIL,
       SM_USERS_BOOTSTRAP_PASSWORD: TEST_ADMIN_PASSWORD,
-      SM_VITE_DEV_URL: 'http://localhost:5050',
+      SM_VITE_DEV_URL: `http://localhost:${VITE_PORT}`,
+      SM_API_PORT: API_PORT,
+      SM_VITE_PORT: VITE_PORT,
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
     },

@@ -12,9 +12,12 @@ test.describe('News admin', () => {
   test('is reachable from the sidebar', async ({ page }) => {
     await login(page);
     await page.goto('/dashboard/');
-    await page.getByRole('link', { name: 'News', exact: true }).click();
+    // "News" is the sidebar *group* now, holding Articles and Categories —
+    // the rail splits by section rather than lumping both modules under
+    // "Content". The link to click is therefore the leaf, not the group.
+    await page.getByRole('link', { name: 'Articles', exact: true }).click();
     await expect(page).toHaveURL(/\/news\/?$/);
-    await expect(page.getByRole('heading', { name: 'News' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'News', level: 1 })).toBeVisible();
   });
 
   test('lists an article with its public URL and lets its category be edited', async ({ page }) => {

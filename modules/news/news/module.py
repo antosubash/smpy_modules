@@ -57,13 +57,23 @@ class NewsModule(ModuleBase):
     def register_menu_items(self, registry: MenuRegistry) -> None:
         # Roles stay empty: filtering is a plain intersection with no admin
         # bypass, so a non-empty list hides the entry from everyone outside it.
-        registry.add(
-            MenuItem(
-                label="News",
-                url=constants.MENU_URL,
-                icon=constants.MENU_ICON,
-                group=constants.MENU_GROUP,
-            )
+        registry.add_many(
+            [
+                MenuItem(
+                    label=constants.MENU_LABEL_ARTICLES,
+                    url=constants.MENU_URL,
+                    icon=constants.MENU_ICON,
+                    order=100,
+                    group=constants.MENU_GROUP,
+                ),
+                MenuItem(
+                    label=constants.MENU_LABEL_CATEGORIES,
+                    url=constants.MENU_URL_CATEGORIES,
+                    icon=constants.MENU_ICON_CATEGORIES,
+                    order=110,
+                    group=constants.MENU_GROUP,
+                ),
+            ]
         )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:

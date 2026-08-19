@@ -2,6 +2,12 @@
         migrate migration downgrade test test-py test-js e2e lint kill \
         link-framework unlink-framework new-module env
 
+# Ports are overridable so a second checkout (worktree, parallel review) can
+# run its own pair of dev servers without colliding with the primary one.
+SM_API_PORT ?= 8000
+SM_VITE_PORT ?= 5050
+export SM_VITE_PORT
+
 install: install-py install-js sync-module-deps
 
 install-py:
@@ -18,7 +24,7 @@ dev: gen-pages
 # single source of truth for settings. `--app-dir host` puts host/main.py on
 # sys.path without changing cwd.
 dev-api:
-	uv run --project host uvicorn main:app --app-dir host --reload --port 8000
+	uv run --project host uvicorn main:app --app-dir host --reload --port $(SM_API_PORT)
 
 dev-ui:
 	npm run dev

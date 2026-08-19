@@ -1,4 +1,4 @@
-"""REST API for News.
+"""Article endpoints.
 
 Reads are anonymous: the feed block runs on public pages, so a visitor with no
 session has to be able to list articles. Writes require ``news.edit``.
@@ -8,72 +8,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from simple_module_db import get_db
-from simple_module_hosting.permissions import (
-    WILDCARD,
-    RequiresPermission,
-    resolve_permissions,
-)
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import service
-from news.constants import DEFAULT_LIMIT, MAX_LIMIT, PERM_EDIT
+from news import service, tag_service
+from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleListResponse,
     ArticleRead,
+    ArticleTagsUpdate,
     ArticleUpdate,
     CategoryListResponse,
 )
+from news.endpoints.api._deps import may_see_drafts, read_one_by_page, require_edit
 
 router = APIRouter()
-
-require_edit = Depends(RequiresPermission(PERM_EDIT))
-
-
-def _may_see_drafts(request: Request) -> bool:
-    """Only an editor sees articles whose page is still a draft.
-
-    Everyone else gets the published site, which is what the public feed block
-    must show.
-
-    Reads ``request.state.resolved_permissions`` — where the hosting middleware
-    and ``RequiresPermission`` both put the resolved set — rather than a
-    ``permissions`` attribute on the user. ``UserContext`` has no such
-    attribute, so testing it always yielded an empty list and no editor ever
-    saw a draft.
-
-    The fallback mirrors ``RequiresPermission.__call__``: these listings are
-    registered as public routes, so on an anonymous-readable GET nothing has
-    populated ``resolved_permissions`` by the time we are asked. ``WILDCARD`` is
-    checked because an administrator resolves to it rather than to a literal
-    ``news.edit``.
-    """
-    resolved = getattr(request.state, "resolved_permissions", None)
-    if resolved is None:
-        user = getattr(request.state, "user", None)
-        if user is None:
-            return False
-        sm = getattr(getattr(request.app, "state", None), "sm", None)
-        registry = getattr(sm, "permissions", None) if sm is not None else None
-        resolved = resolve_permissions(
-            getattr(user, "roles", None) or [],
-            role_map=registry.role_map if registry is not None else None,
-        )
-    return WILDCARD in resolved or PERM_EDIT in resolved
-
-
-async def _read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
-    """Re-read through the listing join so every response has one shape.
-
-    Drafts are included: an editor has just written this row and must see it
-    back whatever state its page is in.
-    """
-    article = await service.get_read_by_page(db, page_id, include_drafts=True)
-    if article is None:
-        # The page is the only source of slug and title, so without it there is
-        # nothing to return.
-        raise HTTPException(status_code=404, detail="Article's page not found.")
-    return article
 
 
 @router.get("/articles", response_model=ArticleListResponse)
@@ -82,6 +31,16 @@ async def list_articles(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(0, ge=0),
     category: str | None = Query(None),
+    q: str | None = Query(
+        None,
+        description="Free-text filter over headline and slug. Applied before "
+        "paging, so `total` reflects the search rather than the whole list.",
+    ),
+    status: str | None = Query(
+        None,
+        description="`draft`, `published` or `undated`. Anyone who may not see "
+        "drafts gets the published set whatever they ask for.",
+    ),
     undated_first: bool = Query(
         False,
         description="Sort undated (work-in-progress) articles before dated "
@@ -95,7 +54,9 @@ async def list_articles(
         limit=limit,
         offset=offset,
         category=category,
-        include_drafts=_may_see_drafts(request),
+        q=q,
+        status=status,
+        include_drafts=may_see_drafts(request),
         undated_first=undated_first,
     )
     return ArticleListResponse(items=items, total=total)
@@ -105,7 +66,13 @@ async def list_articles(
 async def list_categories(
     request: Request, db: AsyncSession = Depends(get_db)
 ) -> CategoryListResponse:
-    items = await service.list_categories(db, include_drafts=_may_see_drafts(request))
+    """Counts per category, for the filter pills and the public feed block.
+
+    Deliberately still the narrow ``{category, count}`` shape. The richer
+    management view lives at ``/categories/manage`` so this published,
+    anonymously-readable contract does not change under its consumers.
+    """
+    items = await service.list_categories(db, include_drafts=may_see_drafts(request))
     return CategoryListResponse(items=items)
 
 
@@ -128,7 +95,7 @@ async def attach_article(
     await service.create(
         db, page_id=body.page_id, category=body.category, published_at=body.published_at
     )
-    return await _read_one_by_page(db, body.page_id)
+    return await read_one_by_page(db, body.page_id)
 
 
 @router.put(
@@ -153,7 +120,28 @@ async def update_article(
             else service.UNSET
         ),
     )
-    return await _read_one_by_page(db, article.page_id)
+    return await read_one_by_page(db, article.page_id)
+
+
+@router.get("/articles/{article_id}/tags", response_model=list[str])
+async def list_article_tags(
+    article_id: int, db: AsyncSession = Depends(get_db)
+) -> list[str]:
+    return await tag_service.list_for_article(db, article_id)
+
+
+@router.put(
+    "/articles/{article_id}/tags",
+    response_model=list[str],
+    dependencies=[require_edit],
+)
+async def set_article_tags(
+    article_id: int, body: ArticleTagsUpdate, db: AsyncSession = Depends(get_db)
+) -> list[str]:
+    """Replace the article's tags, creating any name that is new."""
+    if await service.get(db, article_id) is None:
+        raise HTTPException(status_code=404, detail="Article not found.")
+    return await tag_service.set_for_article(db, article_id, body.tags)
 
 
 @router.delete("/articles/{article_id}", status_code=204, dependencies=[require_edit])

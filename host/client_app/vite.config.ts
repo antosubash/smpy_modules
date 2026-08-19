@@ -135,6 +135,8 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
+const VITE_PORT = Number(process.env.SM_VITE_PORT ?? 5050);
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: import.meta.dirname,
@@ -153,9 +155,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5050,
+    // Overridable so a second checkout (worktree, parallel review) can run its
+    // own dev server without colliding on 5050. `origin` has to move with the
+    // port: it is what Vite prefixes dev asset URLs with, so a mismatch serves
+    // the page from one port and its assets from another.
+    port: VITE_PORT,
     strictPort: true,
-    origin: 'http://localhost:5050',
+    origin: `http://localhost:${VITE_PORT}`,
     fs: {
       allow: [fsRoot, ...moduleFsAllow],
     },
