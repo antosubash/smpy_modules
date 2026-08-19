@@ -5,9 +5,11 @@ running app's secret wins when the module is registered normally — hosts may
 inject ``secret_key`` programmatically via ``create_app(settings=...)``, see
 ``set_secret_provider`` — and a private BaseSettings reading the environment
 or the root ``.env`` (the same two sources the host's own BootstrapSettings
-uses) is the fallback. The secret is re-resolved on every call and the
-derived Fernet cached per secret, so an early call (before the app's live
-secret is available) can never pin the fallback secret for the process.
+uses) is the fallback. The provider and process env are re-consulted on
+every call (only the ``.env`` file read is cached — it cannot change without
+a restart) and the derived Fernet cached per secret, so an early call
+(before the app's live secret is available) can never pin the fallback
+secret for the process.
 Stored format is ``enc:v1:<fernet token>``:
 
 - prefix present and decrypts        → plaintext key
@@ -19,6 +21,7 @@ Stored format is ``enc:v1:<fernet token>``:
 from __future__ import annotations
 
 import logging
+import os
 from base64 import urlsafe_b64encode
 from collections.abc import Callable
 from functools import lru_cache
@@ -62,13 +65,21 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
 
 def _fernet() -> Fernet:
     secret = _secret_provider() if _secret_provider is not None else ""
-    secret = secret or _CryptoEnv().secret_key
+    # Process env first (free), then the cached .env read: the file cannot
+    # change without a restart, and an uncached BaseSettings would re-open
+    # and re-parse it on every encrypt/decrypt inside async handlers.
+    secret = secret or os.environ.get("SM_SECRET_KEY", "") or _dotenv_secret()
     if not secret:
         raise RuntimeError(
             "SM_SECRET_KEY is not set — the AI module needs it to encrypt "
             "stored provider keys."
         )
     return _fernet_for(secret)
+
+
+@lru_cache(maxsize=1)
+def _dotenv_secret() -> str:
+    return _CryptoEnv().secret_key
 
 
 @lru_cache(maxsize=4)

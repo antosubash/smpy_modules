@@ -160,8 +160,9 @@ export default defineConfig({
   },
   server: {
     // Overridable so a second checkout (e.g. a worktree running e2e) can
-    // boot beside a dev stack that already holds the default port. `|| 5050`
-    // (not ??) so an exported-but-empty SM_UI_PORT can't yield port 0/NaN.
+    // boot beside a dev stack that already holds the default port. `uiPort`
+    // is regex-guarded above, so an exported-but-empty or garbage SM_UI_PORT
+    // falls back to 5050 rather than yielding port 0/NaN.
     port: uiPort,
     strictPort: true,
     origin: `http://localhost:${uiPort}`,

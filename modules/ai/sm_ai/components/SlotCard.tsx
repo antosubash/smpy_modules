@@ -62,6 +62,16 @@ export function SlotCard({
             disabled={busy}
           >
             {optionalSlot && <option value="">Not configured</option>}
+            {/* An env-seeded value can fall outside the served list; without
+                its own option the select would render unselected while every
+                save 422s with no visible cause. Showing it makes the fix —
+                re-picking a real provider — obvious. */}
+            {values.provider !== '' && !providers.includes(values.provider) && (
+              <option value={values.provider}>{values.provider} (unknown provider)</option>
+            )}
+            {!optionalSlot && values.provider === '' && (
+              <option value="">— pick a provider —</option>
+            )}
             {providers.map((p) => (
               <option key={p} value={p}>
                 {p}

@@ -8,7 +8,6 @@ settings save applies on the very next call.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from sm_ai import constants, crypto
@@ -19,9 +18,6 @@ if TYPE_CHECKING:
     from pydantic_ai.models import Model
 
     from sm_ai.settings import AiSettings
-
-logger = logging.getLogger(__name__)
-
 
 def _slot_inputs(
     settings: AiSettings,
@@ -89,14 +85,14 @@ def build_chat_model(settings: AiSettings, model_name: str | None = None) -> Mod
         kwargs = {"base_url": base_url} if base_url else {}
         return AnthropicModel(name, provider=AnthropicProvider(api_key=key, **kwargs))
 
-    # google — the genai client has no plain base_url knob; ignore with a
-    # warning rather than fail a working configuration.
-    if base_url:
-        logger.warning("chat_base_url is ignored for the google provider.")
+    # google — GoogleProvider wires base_url into the genai client's
+    # http_options, so a gateway override routes exactly like the other
+    # providers' plain kwarg.
     from pydantic_ai.models.google import GoogleModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    return GoogleModel(name, provider=GoogleProvider(api_key=key))
+    kwargs = {"base_url": base_url} if base_url else {}
+    return GoogleModel(name, provider=GoogleProvider(api_key=key, **kwargs))
 
 
 def _openai_chat(name: str, base_url: str, key: str) -> Model:
@@ -118,12 +114,13 @@ def build_embedder(settings: AiSettings) -> Embedder:
     if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
         return Embedder(_openai_embedding(name, base_url, key))
 
-    if base_url:
-        logger.warning("embedding_base_url is ignored for the google provider.")
     from pydantic_ai.embeddings.google import GoogleEmbeddingModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    return Embedder(GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key)))
+    kwargs = {"base_url": base_url} if base_url else {}
+    return Embedder(
+        GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key, **kwargs))
+    )
 
 
 def _openai_embedding(name: str, base_url: str, key: str):

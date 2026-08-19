@@ -23,4 +23,7 @@ def _hermetic_env(monkeypatch, tmp_path):
     monkeypatch.delenv("SM_SECRET_KEY", raising=False)
     monkeypatch.setattr(crypto, "_secret_provider", None)
     monkeypatch.chdir(tmp_path)
+    # The .env fallback is cached per process; each test gets its own cwd, so
+    # a value cached under another test's tmp dir must not leak in.
+    crypto._dotenv_secret.cache_clear()
     yield

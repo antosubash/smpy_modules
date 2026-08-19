@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SlotCard } from '../components/SlotCard';
@@ -52,16 +52,20 @@ export default function Settings() {
   const [embeddingTest, setEmbeddingTest] = useState<TestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // One hydration path for both the initial load and the post-save read-back,
+  // so the editable state cannot drift from `loaded` in just one of them.
+  const hydrate = useCallback((s: AiSettingsOut) => {
+    setLoaded(s);
+    const slots = fromSettings(s);
+    setChat(slots.chat);
+    setEmbedding(slots.embedding);
+  }, []);
+
   useEffect(() => {
     loadSettings()
-      .then((s) => {
-        setLoaded(s);
-        const slots = fromSettings(s);
-        setChat(slots.chat);
-        setEmbedding(slots.embedding);
-      })
+      .then(hydrate)
       .catch((err) => setError((err as Error).message));
-  }, []);
+  }, [hydrate]);
 
   async function run(work: () => Promise<void>, errorMsg: string) {
     setBusy(true);
@@ -76,11 +80,7 @@ export default function Settings() {
 
   const save = () =>
     run(async () => {
-      const next = await saveSettings(chat, embedding);
-      setLoaded(next);
-      const slots = fromSettings(next);
-      setChat(slots.chat);
-      setEmbedding(slots.embedding);
+      hydrate(await saveSettings(chat, embedding));
       // Results describe the previous configuration — drop them.
       setChatTest(null);
       setEmbeddingTest(null);

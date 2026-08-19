@@ -53,6 +53,19 @@ class TestChatProviders:
         )
         assert isinstance(model, GoogleModel)
 
+    def test_google_base_url_passthrough(self):
+        # A gateway override must reach the genai client — it used to be
+        # silently dropped for google, sending keys to the public endpoint.
+        model = resolve.build_chat_model(
+            _chat(
+                chat_provider=constants.PROVIDER_GOOGLE,
+                chat_model="gemini-3-pro",
+                chat_base_url="https://gw.example/genai",
+            )
+        )
+        assert isinstance(model, GoogleModel)
+        assert model.base_url == "https://gw.example/genai"
+
     def test_openai_compatible_with_base_url(self):
         model = resolve.build_chat_model(
             _chat(
