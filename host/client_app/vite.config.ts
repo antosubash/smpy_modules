@@ -135,7 +135,11 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
-const uiPort = Number(process.env.SM_UI_PORT) || 5050;
+// Same guard playwright.config.ts and the Makefile apply, so every consumer
+// agrees on which port the UI actually took (Number() would also accept
+// hex/exponent/leading-zero forms the other two reject).
+const rawUiPort = process.env.SM_UI_PORT;
+const uiPort = rawUiPort && /^[1-9][0-9]*$/.test(rawUiPort) ? Number(rawUiPort) : 5050;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

@@ -30,6 +30,15 @@ class AiSettingsOut(SQLModel):
     has_embedding_api_key: bool
     embedding_dim: int
 
+    @field_validator("chat_provider", "embedding_provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        # Env-seeded values may be mixed-case ("Anthropic"): resolve.py and
+        # the update validator both accept them via strip().lower(), so the
+        # read path must normalize the same way or the settings dropdown
+        # renders no selection against the lowercase option ids.
+        return value.strip().lower()
+
 
 class AiSettingsUpdate(SQLModel):
     """Partial update. Key fields: blank/omitted = keep the stored key."""

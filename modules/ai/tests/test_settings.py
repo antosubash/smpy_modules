@@ -61,3 +61,23 @@ class TestHolder:
         installed = services.install(services.AiServices(settings=AiSettings()))
         installed.settings = AiSettings(chat_model="swapped")
         assert services.current_settings().chat_model == "swapped"
+class TestReadDto:
+    def test_out_normalizes_env_seeded_provider_case(self):
+        # SM_AI_CHAT_PROVIDER=Anthropic works at runtime (resolve.py lowers
+        # it); the read DTO must serve the lowercase id or the settings
+        # dropdown renders no selection.
+        from sm_ai.contracts.schemas import AiSettingsOut
+
+        out = AiSettingsOut(
+            chat_provider=" Anthropic ",
+            chat_model="claude-opus-5",
+            chat_base_url="",
+            has_chat_api_key=False,
+            embedding_provider="",
+            embedding_model="",
+            embedding_base_url="",
+            has_embedding_api_key=False,
+            embedding_dim=0,
+        )
+        assert out.chat_provider == "anthropic"
+        assert out.embedding_provider == ""

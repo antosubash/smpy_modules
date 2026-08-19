@@ -28,7 +28,6 @@ class TestEncrypt:
     def test_missing_secret_key_raises(self, monkeypatch):
         # conftest moved cwd to an empty tmp dir, so no .env can supply it.
         monkeypatch.delenv("SM_SECRET_KEY", raising=False)
-        crypto._fernet.cache_clear()
         with pytest.raises(RuntimeError, match="SM_SECRET_KEY"):
             crypto.encrypt_value("x")
 
@@ -39,10 +38,9 @@ class TestDecrypt:
 
     def test_wrong_secret_raises_unreadable(self, monkeypatch):
         stored = crypto.encrypt_value("sk-123")
+        # The secret is re-resolved per call, so the rotation applies to the
+        # very next decrypt — no restart needed.
         monkeypatch.setenv("SM_SECRET_KEY", "a-different-secret")
-        # The Fernet is process-cached; a rotated secret takes effect on
-        # restart. Simulate the restarted process.
-        crypto._fernet.cache_clear()
         with pytest.raises(AiKeyUnreadableError) as exc:
             crypto.decrypt_value(stored, "chat_api_key")
         assert exc.value.field == "chat_api_key"

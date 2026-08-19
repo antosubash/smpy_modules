@@ -9,6 +9,7 @@ migrations: configuration lives in the shared settings store.
 from __future__ import annotations
 
 import importlib.metadata
+import weakref
 
 from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
@@ -52,9 +53,16 @@ class AiModule(ModuleBase):
         # (``create_app(settings=...)``) rather than via env/.env; crypto must
         # encrypt under the secret the running app actually holds or stored
         # keys become unreadable. app.state.sm is assigned after this phase,
-        # so resolve lazily.
+        # so resolve lazily — through a weakref, because the provider is a
+        # process-global and a strong closure would keep a discarded app's
+        # whole object graph alive (app-factory test suites build many).
+        app_ref = weakref.ref(app)
+
         def _live_secret() -> str:
-            sm = getattr(app.state, "sm", None)
+            live_app = app_ref()
+            if live_app is None:
+                return ""
+            sm = getattr(live_app.state, "sm", None)
             return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
 
         crypto.set_secret_provider(_live_secret)

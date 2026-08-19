@@ -21,12 +21,15 @@ dev: gen-pages
 # beside a dev stack that already holds the default ports.
 # e2e runs name their overrides E2E_* (see playwright.config.ts); honor them
 # too so `make kill` after an aborted e2e run targets the right orphans.
-API_PORT ?= $(or $(E2E_API_PORT),8000)
-# vite reads SM_UI_PORT (see host/client_app/vite.config.ts) and coerces
-# empty/zero/non-numeric values to 5050 (`|| 5050`); mirror that coercion so
-# `make kill` targets whatever port the UI actually took (a raw bad value
-# would also make lsof abort the whole sweep and free neither port).
-_UI_PORT_RAW = $(or $(SM_UI_PORT),$(E2E_UI_PORT))
+# Both ports pass the same guard playwright.config.ts and vite.config.ts
+# apply (`^[1-9][0-9]*$`, else the default): a raw bad value would make lsof
+# abort the whole sweep (freeing neither port) and would be interpolated
+# unescaped into the pkill regex below. E2E_* wins over SM_UI_PORT because an
+# e2e run overrides SM_UI_PORT only inside its own subprocess env — after an
+# aborted run the orphan sits on the E2E_* port, not the shell's SM_UI_PORT.
+_API_PORT_RAW = $(E2E_API_PORT)
+API_PORT ?= $(if $(shell echo '$(_API_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_API_PORT_RAW),8000)
+_UI_PORT_RAW = $(or $(E2E_UI_PORT),$(SM_UI_PORT))
 UI_PORT ?= $(if $(shell echo '$(_UI_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_UI_PORT_RAW),5050)
 
 dev-api:

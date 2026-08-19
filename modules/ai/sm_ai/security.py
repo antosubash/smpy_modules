@@ -17,6 +17,7 @@ without a session there is nothing to bind the token to.
 
 from __future__ import annotations
 
+import logging
 import secrets
 
 from fastapi import HTTPException, Request
@@ -25,7 +26,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from sm_ai import constants
 
+logger = logging.getLogger(__name__)
+
 _CSRF_SESSION_KEY = "sm_ai_csrf_token"
+_warned_no_session = False
 _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
@@ -48,6 +52,17 @@ async def verify_csrf(request: Request) -> None:
         return
     session = request.scope.get("session")
     if session is None:
+        # Fail-open by design (no session, nothing to bind a token to — see
+        # module docstring), but never silently: a host that mounts these
+        # routers without SessionMiddleware should know writes are unguarded.
+        global _warned_no_session
+        if not _warned_no_session:
+            _warned_no_session = True
+            logger.warning(
+                "CSRF enforcement skipped: no session middleware is mounted, "
+                "so the AI settings write API is unprotected against "
+                "cross-site requests."
+            )
         return
     expected = session.get(_CSRF_SESSION_KEY)
     received = request.headers.get(constants.CSRF_HEADER)

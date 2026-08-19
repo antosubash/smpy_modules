@@ -3,9 +3,9 @@
 ``AiSettings`` and ``_CryptoEnv`` read ``SM_AI_*`` / ``SM_SECRET_KEY`` from
 the process environment *and* a ``.env`` in the working directory. A
 developer dogfooding this module will have both, so every test runs with the
-host env scrubbed and cwd moved to an empty tmp dir. The Fernet cache and
-the live-secret provider are cleared around each test because several tests
-rotate the secret.
+host env scrubbed and cwd moved to an empty tmp dir. The live-secret
+provider is reset per test; the Fernet cache is keyed by secret, so rotated
+secrets never see stale entries.
 """
 
 from __future__ import annotations
@@ -23,6 +23,4 @@ def _hermetic_env(monkeypatch, tmp_path):
     monkeypatch.delenv("SM_SECRET_KEY", raising=False)
     monkeypatch.setattr(crypto, "_secret_provider", None)
     monkeypatch.chdir(tmp_path)
-    crypto._fernet.cache_clear()
     yield
-    crypto._fernet.cache_clear()

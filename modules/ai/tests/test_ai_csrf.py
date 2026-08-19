@@ -105,3 +105,17 @@ class TestCsrf:
         await _bootstrap_csrf(csrf_client)
         res = await csrf_client.get(f"{constants.ROUTE_PREFIX_API}/settings")
         assert res.status_code == 200
+class TestClientConstantsPinned:
+    def test_ts_client_matches_python_csrf_constants(self):
+        # utils/api.ts cannot import constants.py, so its cookie and header
+        # literals are pinned here (same convention as the _PAGE_SETTINGS
+        # pin in test_ai_api.py) — a rename in constants.py must fail a
+        # Python test, not silently 403 every save in the browser.
+        from pathlib import Path
+
+        import sm_ai
+
+        source = (Path(sm_ai.__file__).parent / "utils" / "api.ts").read_text()
+        assert f"const CSRF_COOKIE = '{constants.CSRF_COOKIE}'" in source
+        assert "'X-CSRF-Token'" in source
+        assert constants.CSRF_HEADER == "x-csrf-token"  # header match is case-insensitive
