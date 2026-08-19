@@ -1,9 +1,11 @@
 import { type Data, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useState } from 'react';
 
+import { PageActions } from '../components/editor/PageActions';
 import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { PageSettingsPanel } from '../components/editor/PageSettingsPanel';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
@@ -174,6 +176,17 @@ export default function PageEditor() {
               indexInSearch={form.indexInSearch}
               onIndexInSearchChange={form.setIndexInSearch}
               publicPrefix={PUBLIC_PREFIX}
+              actions={
+                <PageActions
+                  pageId={form.pageId}
+                  title={form.title}
+                  slug={form.effectiveSlug}
+                  status={form.status}
+                  publicPrefix={PUBLIC_PREFIX}
+                  onError={setMessage}
+                  onNotice={setMessage}
+                />
+              }
             />
           ) : (
             <SeoSettingsPanel

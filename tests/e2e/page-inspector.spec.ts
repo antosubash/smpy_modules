@@ -86,6 +86,33 @@ test.describe('Page inspector', () => {
     expect(body.meta_title).toBe('Saved title');
   });
 
+  test('the Page tab duplicates, templates and deletes', async ({ page }) => {
+    await login(page);
+    const slug = uniqueSlug('actions');
+    const id = await openEditor(page, slug);
+
+    await page.getByRole('button', { name: /save as template/i }).click();
+    await expect
+      .poll(
+        async () =>
+          (await (await page.request.get(`/api/pagebuilder/pages/${id}`)).json()).is_template,
+      )
+      .toBe(true);
+
+    await page.getByRole('button', { name: /duplicate page/i }).click();
+    await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
+    const copyId = Number(page.url().match(/\/pagebuilder\/(\d+)\/edit/)?.[1]);
+    expect(copyId).not.toBe(id);
+
+    // The copy deletes to the trash rather than vanishing.
+    await page.getByRole('button', { name: /^settings$/i }).click();
+    await page.getByRole('button', { name: /delete page/i }).click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText('trash for 30 days');
+    await dialog.getByRole('button', { name: /^delete$/i }).click();
+    await expect(page).toHaveURL(/\/pagebuilder\/?(\?.*)?$/);
+  });
+
   test('renaming the URL leaves a working redirect', async ({ page }) => {
     await login(page);
     const slug = uniqueSlug('renamed');
