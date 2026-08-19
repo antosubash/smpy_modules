@@ -22,6 +22,14 @@ MENU_URL_CATEGORIES: Final = f"{VIEW_PREFIX}/categories"
 MENU_GROUP: Final = "News"
 MENU_ICON: Final = "newspaper"
 MENU_ICON_CATEGORIES: Final = "tags"
+MENU_ICON_SEARCH: Final = "search"
+MENU_LABEL_SEARCH: Final = "Search everything"
+MENU_GROUP_SEARCH: Final = "Find"
+
+# Mounted at the app root rather than under VIEW_PREFIX: the screen spans
+# articles, pages and media, so filing it under /news would misdescribe it.
+ADMIN_SEARCH_PREFIX: Final = "/admin"
+ADMIN_SEARCH_URL: Final = f"{ADMIN_SEARCH_PREFIX}/search"
 MENU_LABEL_ARTICLES: Final = "Articles"
 MENU_LABEL_CATEGORIES: Final = "Categories"
 
@@ -33,6 +41,7 @@ _MODULE_PAGEBUILDER: Final = "PageBuilder"
 _PAGE_LIST: Final = "News/NewsList"
 _PAGE_CATEGORIES: Final = "News/Categories"
 _PAGE_ARTICLE_EDITOR: Final = "News/ArticleEditor"
+_PAGE_SEARCH: Final = "News/Search"
 
 PERM_VIEW: Final = "news.view"
 PERM_EDIT: Final = "news.edit"

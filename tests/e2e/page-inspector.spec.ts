@@ -100,6 +100,10 @@ test.describe('Page inspector', () => {
       .toBe(true);
 
     await page.getByRole('button', { name: /duplicate page/i }).click();
+    // Waits for a *different* id: the editor URL already matches the generic
+    // /pagebuilder/<n>/edit pattern, so asserting that would pass instantly
+    // and read the id of the page we started on.
+    await expect(page).not.toHaveURL(new RegExp(`/pagebuilder/${id}/edit$`));
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
     const copyId = Number(page.url().match(/\/pagebuilder\/(\d+)\/edit/)?.[1]);
     expect(copyId).not.toBe(id);

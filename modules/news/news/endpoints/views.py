@@ -11,6 +11,29 @@ from news import constants
 
 router = APIRouter()
 
+admin_router = APIRouter()
+"""Routes mounted at the app root rather than under ``VIEW_PREFIX``.
+
+The search screen spans articles, pages and media, so filing it under ``/news``
+would misdescribe what it searches. Mounted in ``on_startup`` the same way
+pagebuilder mounts its public viewer — routes are protected by default, so this
+is behind the session like every other admin screen.
+"""
+
+
+@admin_router.get(
+    "/search",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
+)
+async def admin_search(inertia: InertiaDep) -> InertiaResponse:
+    """Search across articles, pages and media.
+
+    Behind ``news.edit`` because it reaches into drafts and unpublished pages —
+    the results are not the public site.
+    """
+    return await inertia.render(constants._PAGE_SEARCH)
+
 
 @router.get(
     "/",
