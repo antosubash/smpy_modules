@@ -153,9 +153,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5050,
+    // Overridable so a second checkout (e.g. a worktree running e2e) can
+    // boot beside a dev stack that already holds the default port.
+    port: Number(process.env.SM_UI_PORT ?? 5050),
     strictPort: true,
-    origin: 'http://localhost:5050',
+    origin: `http://localhost:${Number(process.env.SM_UI_PORT ?? 5050)}`,
     fs: {
       allow: [fsRoot, ...moduleFsAllow],
     },

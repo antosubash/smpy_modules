@@ -17,8 +17,12 @@ dev: gen-pages
 # Every Python entry point runs from the repo root so the root .env is the
 # single source of truth for settings. `--app-dir host` puts host/main.py on
 # sys.path without changing cwd.
+# Overridable so a second checkout (e.g. a worktree running e2e) can boot
+# beside a dev stack that already holds the default ports.
+API_PORT ?= 8000
+
 dev-api:
-	uv run --project host uvicorn main:app --app-dir host --reload --port 8000
+	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
 
 dev-ui:
 	npm run dev

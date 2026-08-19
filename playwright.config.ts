@@ -9,7 +9,11 @@ export const TEST_ADMIN_PASSWORD = 'changeme1';
 const REPO_ROOT = dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = resolve(REPO_ROOT, 'host', 'test.db');
 
-const APP_URL = 'http://localhost:8000';
+// Overridable so a worktree can run e2e beside a dev stack holding the
+// default ports (E2E_API_PORT / E2E_UI_PORT; defaults unchanged).
+const API_PORT = process.env.E2E_API_PORT ?? '8000';
+const UI_PORT = process.env.E2E_UI_PORT ?? '5050';
+const APP_URL = `http://localhost:${API_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -54,9 +58,12 @@ export default defineConfig({
       SM_DATABASE_URL: `sqlite+aiosqlite:///${TEST_DB_PATH}`,
       SM_USERS_BOOTSTRAP_EMAIL: TEST_ADMIN_EMAIL,
       SM_USERS_BOOTSTRAP_PASSWORD: TEST_ADMIN_PASSWORD,
-      SM_VITE_DEV_URL: 'http://localhost:5050',
+      SM_VITE_DEV_URL: `http://localhost:${UI_PORT}`,
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
+      // Consumed by Makefile dev-api and vite.config.ts respectively.
+      API_PORT,
+      SM_UI_PORT: UI_PORT,
     },
   },
 });
