@@ -155,7 +155,7 @@ test.describe('Empty states', () => {
 
     // Search for it, but filtered to drafts — it is published, so nothing matches.
     await page.goto(`/news/?q=${slug}&status=draft`);
-    await expect(page.getByText(/No draft match|No drafts match/)).toBeVisible();
+    await expect(page.getByText(/No drafts match/)).toBeVisible();
     await expect(page.getByText(/match across all statuses/)).toBeVisible();
 
     await page.getByRole('button', { name: /search all statuses/i }).click();

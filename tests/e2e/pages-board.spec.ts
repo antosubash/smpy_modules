@@ -122,6 +122,30 @@ test.describe('Pages board', () => {
     await expect(cardIn(page, 'draft', slug)).toHaveCount(0);
   });
 
+  test('a template is not listed as a draft', async ({ page }) => {
+    await login(page);
+    const headers = await csrfHeader(page);
+    const slug = uniqueSlug('tpl');
+    await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: {
+        title: `Template ${slug}`,
+        slug,
+        is_template: true,
+        draft_data: { root: { props: { title: slug, width: 'full' } }, content: [], zones: {} },
+      },
+    });
+
+    await page.goto('/pagebuilder/');
+    // Nobody publishes a template, so it is not in the pipeline — a column
+    // meant to read as a queue must not collect permanent residents.
+    await expect(cardIn(page, 'draft', slug)).toHaveCount(0);
+
+    // It is still an ordinary page, and the list view still shows it.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
+    await expect(page.locator('tr', { hasText: `Template ${slug}` })).toBeVisible();
+  });
+
   test('the view toggle swaps the board for the table and back', async ({ page }) => {
     await login(page);
     await makePage(page);

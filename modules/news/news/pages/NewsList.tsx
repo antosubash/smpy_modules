@@ -14,6 +14,14 @@ import { detachArticle, publishArticlePage, updateArticle } from '../utils/api';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
+/** Plural nouns for the empty state, so it reads "No drafts match" rather than
+ *  splicing the raw status value in and producing "No draft match". */
+const STATUS_NOUN: Record<string, string> = {
+  draft: 'drafts',
+  published: 'published articles',
+  undated: 'undated articles',
+};
+
 /** The article list: search, two-state pipeline filters, and card rows.
  *
  * Rows are cards rather than table cells because the metadata is a sentence
@@ -77,7 +85,7 @@ export default function NewsList() {
           {filtered ? (
             <>
               <p className="font-medium">
-                No {filters.status || 'articles'} match
+                No {STATUS_NOUN[filters.status] ?? 'articles'} match
                 {filters.q ? ` “${filters.q}”` : ' this filter'}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
