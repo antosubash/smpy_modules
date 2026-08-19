@@ -1,11 +1,4 @@
-"""SQLModel tables for the pagebuilder module.
-
-The page document itself is stored as opaque JSON; only the slug,
-title, status, SEO fields, and timestamps are queried. ``draft_data`` is
-what the editor saves; ``published_data`` is the immutable snapshot
-served at ``/p/{slug}`` until a new publish overwrites it. Each publish
-also appends a row to ``PageRevision`` so the history is recoverable.
-"""
+"""Pages, their revisions, and the filter every listing applies."""
 
 from __future__ import annotations
 
@@ -13,19 +6,14 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from simple_module_db.base import create_module_base
 from simple_module_db.mixins import AuditMixin
 from sqlalchemy import JSON, Column, DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-Base = create_module_base("pagebuilder")
+from pagebuilder.models._base import Base
 
 
-# Deliberately (str, Enum) rather than enum.StrEnum: these values are persisted
-# and serialised, and StrEnum changes what str()/f-strings produce for a member
-# ("draft" instead of "PageStatus.DRAFT"). Switching is a data-format change,
-# not a style fix.
 class PageStatus(str, enum.Enum):  # noqa: UP042
     DRAFT = "draft"
     SUBMITTED_FOR_REVIEW = "submitted_for_review"
@@ -200,85 +188,6 @@ class PageRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base
     note: str | None = Field(default=None, max_length=2000)
 
 
-class Layout(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
-    """Singleton — :meth:`LayoutService.get` creates the row on first read."""
-
-    __tablename__ = "pagebuilder_layout"
-
-    id: int | None = Field(default=None, primary_key=True)
-    header_data: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-    footer_data: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-
-
-class LayoutRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
-    __tablename__ = "pagebuilder_layout_revisions"
-
-    id: int | None = Field(default=None, primary_key=True)
-    layout_id: int = Field(foreign_key="pagebuilder_layout.id", index=True)
-    header_data: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-    footer_data: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-    note: str | None = Field(default=None, max_length=2000)
-
-
-class MediaAsset(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
-    """An uploaded media file stored on local disk.
-
-    The bytes themselves live under :attr:`PagebuilderSettings.media_root`;
-    this row holds the metadata + sanitized filename used to build the
-    public URL.
-
-    ``width`` / ``height`` are populated for raster images so the Image
-    block can emit them on ``<img>`` and avoid layout shift; ``variants``
-    lists server-generated thumbnails / webp transcodes keyed by a stable
-    label (e.g. ``"w640"``, ``"webp"``) — each entry stores at minimum
-    ``{filename, width, height, content_type}``.
-    """
-
-    __tablename__ = "pagebuilder_media"
-
-    id: int | None = Field(default=None, primary_key=True)
-    filename: str = Field(max_length=300, unique=True, index=True)
-    original_filename: str = Field(max_length=300)
-    content_type: str = Field(max_length=120)
-    size_bytes: int = Field(default=0)
-    width: int | None = Field(default=None)
-    height: int | None = Field(default=None)
-    folder: str | None = Field(default=None, max_length=300, index=True)
-    variants: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-
-
-class PageRedirect(Base, table=True):  # ty: ignore[unsupported-base]
-    """An old slug that should now send visitors to a page's current one.
-
-    Written whenever a slug changes, because the old URL is already out in the
-    world — in someone's bookmarks, in a link from another site, in a search
-    index that has not recrawled. Losing it silently turns an edit into a broken
-    link that nobody notices until traffic drops.
-
-    ``from_slug`` is unique: one old address resolves to exactly one page, and
-    the row is replaced rather than duplicated when a slug is reused.
-    """
-
-    __tablename__ = "pagebuilder_page_redirects"
-
-    id: int | None = Field(default=None, primary_key=True)
-    from_slug: str = Field(max_length=200, unique=True, index=True)
-    page_id: int = Field(foreign_key="pagebuilder_pages.id", index=True, ondelete="CASCADE")
 
 
 NOT_TRASHED = Page.deleted_at.is_(None)

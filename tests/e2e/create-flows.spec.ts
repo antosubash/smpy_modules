@@ -125,7 +125,13 @@ test.describe('New article', () => {
     const slug = uniqueSlug('cat');
     await dialog.getByLabel('Headline').fill(headline);
     await dialog.getByLabel('URL').fill(slug);
-    await dialog.getByLabel('Category').selectOption(category);
+    // Wait for the option itself, not just the select: the dialog fetches its
+    // categories when it opens, and `selectOption` only auto-waits for the
+    // <select>. On a database with a few hundred categories that fetch is slow
+    // enough to lose the race.
+    const categorySelect = dialog.getByLabel('Category');
+    await expect(categorySelect.locator(`option[value="${category}"]`)).toBeAttached();
+    await categorySelect.selectOption(category);
     await dialog.getByRole('button', { name: 'Create draft' }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
 
