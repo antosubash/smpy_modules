@@ -83,7 +83,9 @@ test.describe('Article list', () => {
     // The distinction the design draws: a filtered-to-nothing list is not the
     // same message as an empty archive.
     await expect(page.getByText(/No articles match/)).toBeVisible();
-    await page.getByRole('button', { name: /clear filters/i }).click();
+    // "Clear" drops every filter; "Search all statuses" only widens the
+    // status, and is offered separately when one is active.
+    await page.getByRole('button', { name: /^clear$/i }).click();
 
     await expect(page.getByText(/No articles match/)).toHaveCount(0);
     await expect(page).not.toHaveURL(/[?&]q=/);

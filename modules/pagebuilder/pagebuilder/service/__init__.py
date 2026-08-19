@@ -14,9 +14,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import NamedTuple
 
+from copy import deepcopy
+
 from fastapi import HTTPException
 from simple_module_core.events import EventBus
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import update as sa_update
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,6 +88,16 @@ class PagesService(WorkflowMixin, RevisionsMixin):
         result = await self.db.execute(query)
         return list(result.scalars().all()), int(total or 0)
 
+    async def list_templates(self) -> list[Page]:
+        """Pages flagged as templates — the New page dialog's starting points.
+
+        Ordinary pages with a flag, so the set grows without a developer.
+        """
+        result = await self.db.execute(
+            select(Page).where(Page.is_template.is_(True)).order_by(Page.title)
+        )
+        return list(result.scalars().all())
+
     async def list_pending(self) -> list[Page]:
         """Pages in ``submitted_for_review`` — the approver queue."""
         result = await self.db.execute(
@@ -148,6 +161,16 @@ class PagesService(WorkflowMixin, RevisionsMixin):
         return [SitemapEntry(slug, updated_at) for slug, updated_at in result.all()]
 
     async def create(self, data: PageCreate) -> Page:
+        draft_data = data.draft_data
+        if data.copy_from_page_id is not None:
+            # "Start from" in the New page dialog: a template and "copy a page"
+            # are the same operation, because a template *is* a page carrying a
+            # flag. The source's draft is copied — not its published data, since
+            # what a starting point offers is the work in progress, and not by
+            # reference, so editing the copy never touches the original.
+            source = await self.get_page(data.copy_from_page_id)
+            draft_data = deepcopy(source.draft_data or {})
+
         page = Page(
             title=data.title,
             slug=data.slug,
@@ -156,9 +179,11 @@ class PagesService(WorkflowMixin, RevisionsMixin):
             canonical_url=data.canonical_url,
             index_in_search=data.index_in_search,
             json_ld=data.json_ld,
-            draft_data=data.draft_data,
+            draft_data=draft_data,
             publish_at=_normalize_to_utc(data.publish_at),
             unpublish_at=_normalize_to_utc(data.unpublish_at),
+            parent_id=data.parent_id,
+            is_template=data.is_template,
             status=PageStatus.DRAFT,
         )
         self.db.add(page)
@@ -189,6 +214,15 @@ class PagesService(WorkflowMixin, RevisionsMixin):
         slug = page.slug
         await self.db.execute(
             sa_delete(PageRevision).where(PageRevision.page_id == page_id)
+        )
+        # Orphan the children explicitly rather than trusting ON DELETE SET
+        # NULL. SQLite does not enforce foreign keys unless `PRAGMA
+        # foreign_keys=ON` is set on every connection, so the constraint is
+        # advisory there — and a `parent_id` left pointing at a deleted page is
+        # not inert: SQLite reuses the id, so the child's breadcrumb silently
+        # re-parents itself under whatever page is created next.
+        await self.db.execute(
+            sa_update(Page).where(Page.parent_id == page_id).values(parent_id=None)
         )
         await self.db.delete(page)
         await self.db.flush()

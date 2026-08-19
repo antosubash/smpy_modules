@@ -22,6 +22,10 @@ export interface PageRead {
   rejection_note: string | null;
   publish_at: string | null;
   unpublish_at: string | null;
+  /** Breadcrumb parent. Deliberately does not affect the public URL. */
+  parent_id: number | null;
+  /** Offered as a starting point in the New page dialog. */
+  is_template: boolean;
   created_at: string;
   updated_at: string | null;
 }
@@ -126,6 +130,11 @@ export interface PageWritePayload {
   draft_data?: Record<string, unknown>;
   publish_at?: string | null;
   unpublish_at?: string | null;
+  parent_id?: number | null;
+  is_template?: boolean;
+  /** Seed `draft_data` from an existing page — the New page dialog's
+   *  templates and its "copy a page" are the same operation. Write-only. */
+  copy_from_page_id?: number | null;
 }
 
 /**

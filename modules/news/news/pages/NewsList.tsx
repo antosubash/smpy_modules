@@ -77,22 +77,37 @@ export default function NewsList() {
           {filtered ? (
             <>
               <p className="font-medium">
-                No articles match{filters.q ? ` “${filters.q}”` : ' this filter'}
+                No {filters.status || 'articles'} match
+                {filters.q ? ` “${filters.q}”` : ' this filter'}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
+                {/* Say what a wider filter would find. "No results" alone
+                    leaves the reader guessing whether the search or the
+                    status pill is the thing that is too narrow. */}
                 {counts.all > 0
-                  ? `${counts.all} article${counts.all === 1 ? '' : 's'} match the search across all statuses.`
+                  ? `${counts.all} article${counts.all === 1 ? '' : 's'} match across all statuses. Widen the filter or clear the search.`
                   : 'Nothing in the archive matches. Try a shorter search.'}
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => setFilters({ q: '', status: '', category: '', offset: 0 })}
-              >
-                Clear filters
-              </Button>
+              <div className="mt-3 flex justify-center gap-2">
+                {filters.status && counts.all > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilters({ status: '', offset: 0 })}
+                  >
+                    Search all statuses
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilters({ q: '', status: '', category: '', offset: 0 })}
+                >
+                  Clear
+                </Button>
+              </div>
             </>
           ) : (
             <>

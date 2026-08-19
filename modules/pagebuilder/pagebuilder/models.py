@@ -82,6 +82,25 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     ``PagebuilderSettings.public_base_url`` + ``public_route_prefix`` +
     ``slug``) when unset, so the most common case requires no input.
     """
+    parent_id: int | None = Field(
+        default=None, foreign_key="pagebuilder_pages.id", index=True, ondelete="SET NULL"
+    )
+    """Optional parent, for breadcrumbs only.
+
+    Deliberately does *not* affect the URL: a page's public address is its slug
+    and nothing else, so re-parenting for navigation never breaks a link that
+    already exists. ``SET NULL`` rather than cascade for the same reason —
+    deleting a parent must not delete its children.
+    """
+
+    is_template: bool = Field(default=False, index=True)
+    """Offer this page as a starting point in the New page dialog.
+
+    A template is an ordinary page carrying a flag rather than a separate kind
+    of record, which is what lets the set of starting points grow without a
+    developer. A template is never published; it is copied.
+    """
+
     index_in_search: bool = Field(default=True)
     """When ``False``, emit ``<meta name="robots" content="noindex,nofollow">``
     on the public page and exclude it from the sitemap."""

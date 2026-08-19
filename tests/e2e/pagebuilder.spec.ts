@@ -19,9 +19,10 @@ test.describe('PageBuilder admin', () => {
     const title = `E2E page ${slug}`;
 
     // ── Create ────────────────────────────────────────────────
-    await page.goto('/pagebuilder/');
-    await page.getByRole('button', { name: /new page/i }).click();
-    await expect(page).toHaveURL(/\/pagebuilder\/new$/);
+    // "New page" opens the create dialog now — that flow has its own spec in
+    // create-flows.spec.ts. This case is about the editor's own
+    // create-and-save path, so it goes straight to the blank-editor route.
+    await page.goto('/pagebuilder/new');
 
     // PageEditor's title field has no associated label — it's an
     // <input placeholder="Page title">. Match by placeholder.

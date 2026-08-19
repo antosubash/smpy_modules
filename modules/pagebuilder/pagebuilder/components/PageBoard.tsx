@@ -14,6 +14,9 @@ export interface BoardStage {
 interface Props {
   stages: BoardStage[];
   search: string;
+  /** The create control, passed in so the empty state offers the same dialog
+   *  the header does rather than a second, divergent path to a new page. */
+  newPageSlot?: React.ReactNode;
   onDelete: (page: PageRead) => Promise<unknown>;
   onPublish: (page: PageRead) => Promise<unknown>;
 }
@@ -29,7 +32,7 @@ interface Props {
  * worse: "Published 31" over eight cards has to be explained on the card list,
  * not left for the reader to notice.
  */
-export function PageBoard({ stages, search, onDelete, onPublish }: Props) {
+export function PageBoard({ stages, search, newPageSlot, onDelete, onPublish }: Props) {
   const empty = stages.every((stage) => stage.total === 0);
 
   if (empty) {
@@ -41,11 +44,7 @@ export function PageBoard({ stages, search, onDelete, onPublish }: Props) {
             ? 'Try a shorter search, or switch to the list view to filter by status.'
             : "Pages are the site's own content — everything outside the news feed. Nothing is published, so /p/* returns 404 for now."}
         </p>
-        {!search && (
-          <Button className="mt-3" onClick={() => router.visit('/pagebuilder/new')}>
-            New page
-          </Button>
-        )}
+        {!search && newPageSlot && <div className="mt-3 flex justify-center">{newPageSlot}</div>}
       </div>
     );
   }

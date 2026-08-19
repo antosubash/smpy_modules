@@ -112,7 +112,9 @@ test.describe('CSRF protection', () => {
     // Clean up.
     // Teardown deletes through the table, so ask for it —
     // the board is the default view now.
-    await page.goto('/pagebuilder/?view=list');
+    // Search for it: the table pages at 20 rows, so on a database with any
+    // history the row would not be on the first page.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: `CSRF UI ${slug}` }).getByRole('button', { name: /^delete$/i }),

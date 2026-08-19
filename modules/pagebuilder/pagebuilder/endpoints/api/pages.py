@@ -39,6 +39,17 @@ async def list_pages(
     return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
 
 
+@router.get("/pages/templates", response_model=PageListResponse)
+async def list_templates(db: AsyncSession = Depends(get_db)) -> PageListResponse:
+    """Starting points offered by the New page dialog.
+
+    Declared with the other literal paths, above "/pages/{page_id}", or
+    "templates" is parsed as a page id and answers 422.
+    """
+    pages = await PagesService(db).list_templates()
+    return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
+
+
 # Declared before "/pages/{page_id}" so the literal path wins the match.
 # Keep these two adjacent — separating them across modules would make the
 # ordering depend on router include order instead of being visible here.

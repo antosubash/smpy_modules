@@ -13,6 +13,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import type React from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { NewPageDialog } from '../components/NewPageDialog';
 import { type BoardStage, PageBoard } from '../components/PageBoard';
 import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
 import { ScheduledBadge } from '../components/ScheduledBadge';
@@ -92,7 +93,7 @@ export default function PageList() {
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
             Media library
           </Button>
-          <Button onClick={() => router.visit('/pagebuilder/new')}>New page</Button>
+          <NewPageDialog />
         </>
       }
     >
@@ -105,6 +106,7 @@ export default function PageList() {
         <PageBoard
           stages={board}
           search={filters.search}
+          newPageSlot={<NewPageDialog />}
           onDelete={(page) => handleDelete(page.id)}
           onPublish={handlePublish}
         />

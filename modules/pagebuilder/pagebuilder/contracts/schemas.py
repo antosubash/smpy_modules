@@ -34,6 +34,17 @@ class PageCreate(BaseModel):
     draft_data: PuckData = Field(default_factory=dict)
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+    parent_id: int | None = None
+    """Breadcrumb parent. Deliberately does not affect the public URL."""
+
+    is_template: bool = False
+    copy_from_page_id: int | None = None
+    """Start from an existing page's content — the New page dialog's
+    "Copy a page" and its template list are the same operation.
+
+    Write-only: it seeds ``draft_data`` at creation and is not stored, so a
+    later edit of the source never reaches back into the copy.
+    """
 
 
 class PageUpdate(BaseModel):
@@ -47,6 +58,8 @@ class PageUpdate(BaseModel):
     index_in_search: bool | None = None
     json_ld: dict[str, Any] | None = None
     draft_data: PuckData | None = None
+    parent_id: int | None = None
+    is_template: bool | None = None
 
 
 class PageScheduleRequest(BaseModel):
@@ -77,6 +90,8 @@ class PageRead(BaseModel):
     rejection_note: str | None
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+    parent_id: int | None = None
+    is_template: bool = False
     created_at: datetime
     updated_at: datetime | None
 

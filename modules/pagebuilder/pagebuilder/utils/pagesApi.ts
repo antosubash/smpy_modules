@@ -16,6 +16,12 @@ import type {
 export const createPage = (data: PageWritePayload & { title: string; slug: string }) =>
   request<PageDetail>('/pages', { method: 'POST', body: JSON.stringify(data) });
 
+/** Pages offered as starting points by the New page dialog. */
+export const listTemplates = () => request<{ items: PageRead[] }>('/pages/templates');
+
+/** Every page, for the "copy a page" and parent selects. */
+export const listPages = () => request<{ items: PageRead[] }>('/pages');
+
 export const savePage = (id: number, data: PageWritePayload) =>
   request<PageDetail>(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 

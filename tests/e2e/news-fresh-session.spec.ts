@@ -33,8 +33,12 @@ test.describe('News — first visit of a session', () => {
 
     const title = `Fresh session ${Date.now().toString(36)}`;
     await page.getByRole('button', { name: 'New article' }).click();
-    await page.getByLabel('Title').fill(title);
-    await page.getByRole('button', { name: 'Create article' }).click();
+    // The dialog asks for four fields now; the other three carry defaults.
+    // Scoped to the dialog — the list's "Search headline or slug" box would
+    // otherwise also match getByLabel('Headline').
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Headline').fill(title);
+    await dialog.getByRole('button', { name: 'Create draft' }).click();
 
     // Success is landing in the editor for the page that was just created.
     // The /edit suffix matters: /pagebuilder/{id} without it is a 404 — the
