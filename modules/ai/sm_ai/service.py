@@ -32,7 +32,10 @@ class AiService:
         self.app = app
         self.db = db
 
-    def current(self) -> AiSettingsOut:
+    @staticmethod
+    def current() -> AiSettingsOut:
+        # Static: reads only the module-global holder, so callers that never
+        # write (GET /settings) can use it without resolving app/db deps.
         s = services.current_settings()
         return AiSettingsOut(
             **s.model_dump(exclude=set(constants.SECRET_FIELDS)),

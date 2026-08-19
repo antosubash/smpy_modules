@@ -25,11 +25,15 @@ test.describe('AI settings', () => {
   });
 
   test('saving the chat model persists across reload', async ({ page }) => {
-    await page.locator('#ai-chat-model').fill('claude-sonnet-5');
+    // Unique per run: with reuseExistingServer the DB survives between local
+    // runs, and re-asserting a value a previous run already persisted would
+    // pass even if this run's save silently failed.
+    const model = `claude-sonnet-5-${Date.now()}`;
+    await page.locator('#ai-chat-model').fill(model);
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('AI settings saved')).toBeVisible();
     await page.reload();
-    await expect(page.locator('#ai-chat-model')).toHaveValue('claude-sonnet-5');
+    await expect(page.locator('#ai-chat-model')).toHaveValue(model);
   });
 
   test('saved key is masked, never echoed', async ({ page }) => {

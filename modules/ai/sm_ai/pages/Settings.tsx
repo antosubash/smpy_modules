@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SlotCard } from '../components/SlotCard';
@@ -89,9 +89,17 @@ export default function Settings() {
 
   // The probe runs against *saved* settings; testing with unsaved edits
   // would report on the old configuration and mislead either way.
+  // Field-by-field, not JSON.stringify: serialized equality is key-order and
+  // missing-vs-undefined sensitive (chat slots carry no `dim`), so equal
+  // states could compare unequal and disable Test with no visible reason.
   const isDirty = (slot: SlotValues, saved: SlotValues) =>
-    JSON.stringify(slot) !== JSON.stringify(saved);
-  const savedSlots = loaded ? fromSettings(loaded) : null;
+    slot.provider !== saved.provider ||
+    slot.model !== saved.model ||
+    slot.base_url !== saved.base_url ||
+    slot.api_key !== '' ||
+    slot.clear_key ||
+    (slot.dim ?? 0) !== (saved.dim ?? 0);
+  const savedSlots = useMemo(() => (loaded ? fromSettings(loaded) : null), [loaded]);
 
   const test = (slot: 'chat' | 'embedding') =>
     run(async () => {

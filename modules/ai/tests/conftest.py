@@ -1,4 +1,4 @@
-"""Hermetic environment and shared stubs for the module suite.
+"""Hermetic environment for the module suite (stubs live in ai_test_stubs).
 
 ``AiSettings`` and ``_CryptoEnv`` read ``SM_AI_*`` / ``SM_SECRET_KEY`` from
 the process environment *and* a ``.env`` in the working directory. A
@@ -11,22 +11,9 @@ rotate the secret.
 from __future__ import annotations
 
 import os
-from types import SimpleNamespace
 
 import pytest
-from sm_ai import constants, crypto
-from starlette.middleware.base import BaseHTTPMiddleware
-
-
-class GrantAll(BaseHTTPMiddleware):
-    """Auth stub: every request is an admin holding ``ai.manage``."""
-
-    async def dispatch(self, request, call_next):
-        request.state.user = SimpleNamespace(
-            id="test-user", email="t@example.com", name="T", roles=["admin"]
-        )
-        request.state.resolved_permissions = {constants.PERM_MANAGE}
-        return await call_next(request)
+from sm_ai import crypto
 
 
 @pytest.fixture(autouse=True)

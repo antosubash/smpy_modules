@@ -11,8 +11,14 @@ const TEST_DB_PATH = resolve(REPO_ROOT, 'host', 'test.db');
 
 // Overridable so a worktree can run e2e beside a dev stack holding the
 // default ports (E2E_API_PORT / E2E_UI_PORT; defaults unchanged).
-const API_PORT = process.env.E2E_API_PORT ?? '8000';
-const UI_PORT = process.env.E2E_UI_PORT ?? '5050';
+// Normalized here, once: `??` alone would pass a set-but-empty or garbage
+// value through, and the Makefile ($(or ...)) and vite (Number(x) || 5050)
+// would each coerce it differently — three consumers disagreeing on which
+// port the stack is on.
+const numericPort = (raw: string | undefined, fallback: string): string =>
+  raw && /^[1-9][0-9]*$/.test(raw) ? raw : fallback;
+const API_PORT = numericPort(process.env.E2E_API_PORT, '8000');
+const UI_PORT = numericPort(process.env.E2E_UI_PORT, '5050');
 const APP_URL = `http://localhost:${API_PORT}`;
 
 export default defineConfig({

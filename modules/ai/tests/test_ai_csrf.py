@@ -9,7 +9,7 @@ mint → cookie-mirror → verify chain end to end. The bare app used in
 from __future__ import annotations
 
 import pytest_asyncio
-from conftest import GrantAll
+from ai_test_stubs import GrantAll
 from fastapi import APIRouter, Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from sm_ai import constants, services

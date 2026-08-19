@@ -49,17 +49,36 @@ class AiSettingsUpdate(SQLModel):
     @field_validator("chat_provider")
     @classmethod
     def _chat_provider_known(cls, value: str | None) -> str | None:
-        if value is not None and value not in constants.CHAT_PROVIDERS:
+        # Normalize the same way resolve.py reads (strip().lower()): an
+        # env-seeded "Anthropic" works at runtime and must not brick every
+        # save on the settings page until the provider is re-picked.
+        if value is None:
+            return value
+        value = value.strip().lower()
+        if value not in constants.CHAT_PROVIDERS:
             raise ValueError(f"chat_provider must be one of {constants.CHAT_PROVIDERS}")
         return value
 
     @field_validator("embedding_provider")
     @classmethod
     def _embedding_provider_known(cls, value: str | None) -> str | None:
-        if value is not None and value != "" and value not in constants.EMBEDDING_PROVIDERS:
+        if value is None:
+            return value
+        value = value.strip().lower()
+        if value != "" and value not in constants.EMBEDDING_PROVIDERS:
             raise ValueError(
                 f"embedding_provider must be empty or one of {constants.EMBEDDING_PROVIDERS}"
             )
+        return value
+
+    @field_validator("chat_model")
+    @classmethod
+    def _chat_model_not_blank(cls, value: str | None) -> str | None:
+        # The chat slot is required: without this, a whitespace-only value
+        # strips to "" in build_changes and silently wipes the model, failing
+        # every consumer resolve_model() until an admin re-enters it.
+        if value is not None and not value.strip():
+            raise ValueError("chat_model must not be blank")
         return value
 
     @field_validator("embedding_dim")

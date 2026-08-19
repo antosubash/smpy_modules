@@ -12,7 +12,7 @@ import inspect
 
 import pytest
 import pytest_asyncio
-from conftest import GrantAll
+from ai_test_stubs import GrantAll
 from fastapi import APIRouter, FastAPI
 from httpx import ASGITransport, AsyncClient
 from pydantic_ai.models.test import TestModel
@@ -129,6 +129,19 @@ class TestPutSettings:
         res = await client.put("/api/ai/settings", json={"chat_provider": "watsonx"})
         assert res.status_code == 422
 
+    async def test_blank_chat_model_rejected(self, client):
+        # A whitespace-only value would strip to "" in build_changes and
+        # silently wipe the required chat model.
+        res = await client.put("/api/ai/settings", json={"chat_model": "   "})
+        assert res.status_code == 422
+
+    async def test_provider_case_normalized(self, client):
+        # resolve.py accepts env-seeded "Anthropic"; the API must too, or the
+        # settings page cannot save anything until the provider is re-picked.
+        res = await client.put("/api/ai/settings", json={"chat_provider": "Anthropic"})
+        assert res.status_code == 200
+        assert client.applied == [{"chat_provider": "anthropic"}]
+
     async def test_noop_put_does_not_apply(self, client):
         res = await client.put("/api/ai/settings", json={})
         assert res.status_code == 200
@@ -144,9 +157,11 @@ class TestTestEndpoint:
         assert "embedding_provider" in body["error"]
 
     async def test_chat_ok_with_test_model(self, client, monkeypatch):
-        from sm_ai import contracts
+        from sm_ai import resolve
 
-        monkeypatch.setattr(contracts, "resolve_model", lambda model_name=None: TestModel())
+        monkeypatch.setattr(
+            resolve, "build_chat_model", lambda settings, model_name=None: TestModel()
+        )
         res = await client.post("/api/ai/test", json={"slot": constants.SLOT_CHAT})
         body = res.json()
         assert body["ok"] is True
