@@ -26,7 +26,10 @@ StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
 class PageCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     slug: str = Field(min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    meta_title: str | None = Field(default=None, max_length=200)
     meta_description: str | None = Field(default=None, max_length=500)
+    show_in_header_nav: bool = False
+    show_in_footer: bool = False
     og_image: str | None = Field(default=None, max_length=500)
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool = True
@@ -52,7 +55,10 @@ class PageUpdate(BaseModel):
     slug: str | None = Field(
         default=None, min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$"
     )
+    meta_title: str | None = Field(default=None, max_length=200)
     meta_description: str | None = Field(default=None, max_length=500)
+    show_in_header_nav: bool | None = None
+    show_in_footer: bool | None = None
     og_image: str | None = Field(default=None, max_length=500)
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool | None = None
@@ -83,6 +89,7 @@ class PageRead(BaseModel):
     title: str
     status: PageStatus
     has_published: bool
+    meta_title: str | None = None
     meta_description: str | None
     og_image: str | None
     canonical_url: str | None = None
@@ -92,6 +99,8 @@ class PageRead(BaseModel):
     unpublish_at: datetime | None = None
     parent_id: int | None = None
     is_template: bool = False
+    show_in_header_nav: bool = False
+    show_in_footer: bool = False
     deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime | None

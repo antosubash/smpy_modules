@@ -95,7 +95,10 @@ test.describe('PageBuilder admin', () => {
     // Panel is collapsed by default — fields not in the DOM yet.
     await expect(page.getByPlaceholder(/Shown in search results/i)).toHaveCount(0);
 
-    await page.getByRole('button', { name: /^seo$/i }).click();
+    // The drawer is tabbed now and opens on Page; the SEO fields are one
+    // click further in.
+    await page.getByRole('button', { name: /^settings$/i }).click();
+    await page.getByTestId('inspector-tab-seo').click();
     const metaDesc = page.getByPlaceholder(/Shown in search results/i);
     const ogImage = page.getByPlaceholder(/https:\/\/.*media\/pagebuilder/i);
     await expect(metaDesc).toBeVisible();

@@ -104,8 +104,11 @@ export function PageEditorToolbar({
         </span>
       )}
       <div className="ml-auto flex gap-2">
+        {/* "Settings" rather than "SEO": the drawer carries the Page tab as
+            well now, and opening something labelled SEO onto page settings is
+            its own small lie. */}
         <Button variant="outline" size="sm" onClick={onToggleSettings}>
-          SEO
+          Settings
         </Button>
         <Button variant="outline" size="sm" disabled={pageId === null} onClick={onToggleHistory}>
           History ({revisionCount})

@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder import redirects
 from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.contracts.schemas import PageCreate, PageUpdate
 from pagebuilder.models import NOT_TRASHED, Page, PageRevision, PageStatus
@@ -210,6 +211,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
     async def update(self, page_id: int, data: PageUpdate) -> Page:
         page = await self.get_page(page_id)
         update = data.model_dump(exclude_unset=True)
+        # Captured before the loop: once the slug is overwritten there is
+        # nothing left to redirect *from*.
+        previous_slug = page.slug
         for field, value in update.items():
             setattr(page, field, value)
         self.db.add(page)
@@ -218,6 +222,11 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=409, detail="Slug already in use") from exc
+        # Recorded after the flush, so a rename the database rejected leaves no
+        # redirect pointing at an address the page never took.
+        await redirects.record(
+            self.db, page_id=page_id, old_slug=previous_slug, new_slug=page.slug
+        )
         await self.db.refresh(page)
         return page
 

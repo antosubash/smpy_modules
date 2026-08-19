@@ -82,6 +82,24 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     ``PagebuilderSettings.public_base_url`` + ``public_route_prefix`` +
     ``slug``) when unset, so the most common case requires no input.
     """
+    meta_title: str | None = Field(default=None, max_length=200)
+    """Title for search results and link previews.
+
+    Separate from ``title`` because they answer different questions: the page
+    title names the page inside the site, while this one has to work as a
+    standalone line in a result list, usually with the site name appended. When
+    unset the page title is used, which is right far more often than not.
+    """
+
+    show_in_header_nav: bool = Field(default=False, index=True)
+    show_in_footer: bool = Field(default=False, index=True)
+    """Whether the site layout's nav lists this page.
+
+    Only membership lives here. The *order* is the layout's, set in the layout
+    editor — a page deciding where it sits in someone else's list is how nav
+    ordering becomes unexplainable.
+    """
+
     parent_id: int | None = Field(
         default=None, foreign_key="pagebuilder_pages.id", index=True, ondelete="SET NULL"
     )
@@ -242,6 +260,25 @@ class MediaAsset(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
         default_factory=dict,
         sa_column=Column(JSON, nullable=False, default=dict),
     )
+
+
+class PageRedirect(Base, table=True):  # ty: ignore[unsupported-base]
+    """An old slug that should now send visitors to a page's current one.
+
+    Written whenever a slug changes, because the old URL is already out in the
+    world — in someone's bookmarks, in a link from another site, in a search
+    index that has not recrawled. Losing it silently turns an edit into a broken
+    link that nobody notices until traffic drops.
+
+    ``from_slug`` is unique: one old address resolves to exactly one page, and
+    the row is replaced rather than duplicated when a slug is reused.
+    """
+
+    __tablename__ = "pagebuilder_page_redirects"
+
+    id: int | None = Field(default=None, primary_key=True)
+    from_slug: str = Field(max_length=200, unique=True, index=True)
+    page_id: int = Field(foreign_key="pagebuilder_pages.id", index=True, ondelete="CASCADE")
 
 
 NOT_TRASHED = Page.deleted_at.is_(None)

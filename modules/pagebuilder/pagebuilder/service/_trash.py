@@ -26,6 +26,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder import redirects
 from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.models import Page, PageRevision, PageStatus
 
@@ -96,6 +97,10 @@ class TrashMixin:
         await self.db.execute(
             sa_update(Page).where(Page.parent_id == page_id).values(parent_id=None)
         )
+        # The rows cascade on Postgres, but SQLite does not enforce the
+        # constraint unless PRAGMA foreign_keys is on — and a redirect left
+        # pointing at a reused id would send visitors to a stranger's page.
+        await redirects.clear_for_page(self.db, page_id)
         await self.db.delete(page)
         await self.db.flush()
         if self.event_bus is None:

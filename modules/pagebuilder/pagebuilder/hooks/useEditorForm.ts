@@ -18,8 +18,20 @@ export interface EditorForm {
   slugTouched: boolean;
   setSlugTouched: (v: boolean) => void;
   effectiveSlug: string;
+  metaTitle: string;
+  setMetaTitle: (v: string) => void;
   metaDescription: string;
   setMetaDescription: (v: string) => void;
+  parentId: number | null;
+  setParentId: (v: number | null) => void;
+  showInHeaderNav: boolean;
+  setShowInHeaderNav: (v: boolean) => void;
+  showInFooter: boolean;
+  setShowInFooter: (v: boolean) => void;
+  /** The slug the page was loaded with — null for a page that has never been
+   *  saved, which is how the settings panel knows whether a rename can strand
+   *  a link that already exists. */
+  savedSlug: string | null;
   ogImage: string;
   setOgImage: (v: string) => void;
   canonicalUrl: string;
@@ -47,7 +59,13 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
   const [title, setTitle] = useState(page?.title ?? 'Untitled page');
   const [slug, setSlug] = useState(page?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(Boolean(page?.slug));
+  const [metaTitle, setMetaTitle] = useState(page?.meta_title ?? '');
   const [metaDescription, setMetaDescription] = useState(page?.meta_description ?? '');
+  const [parentId, setParentId] = useState<number | null>(page?.parent_id ?? null);
+  const [showInHeaderNav, setShowInHeaderNav] = useState<boolean>(
+    page?.show_in_header_nav ?? false,
+  );
+  const [showInFooter, setShowInFooter] = useState<boolean>(page?.show_in_footer ?? false);
   const [ogImage, setOgImage] = useState(page?.og_image ?? '');
   const [canonicalUrl, setCanonicalUrl] = useState(page?.canonical_url ?? '');
   const [indexInSearch, setIndexInSearch] = useState<boolean>(page?.index_in_search ?? true);
@@ -109,7 +127,11 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
     return {
       title,
       slug: effectiveSlug || slugify(title) || 'untitled',
+      meta_title: metaTitle.trim() ? metaTitle.trim() : null,
       meta_description: metaDescription.trim() ? metaDescription.trim() : null,
+      parent_id: parentId,
+      show_in_header_nav: showInHeaderNav,
+      show_in_footer: showInFooter,
       og_image: ogImage.trim() ? ogImage.trim() : null,
       canonical_url: canonicalUrl.trim() ? canonicalUrl.trim() : null,
       index_in_search: indexInSearch,
@@ -167,8 +189,17 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
     slugTouched,
     setSlugTouched,
     effectiveSlug,
+    savedSlug: page?.slug ?? null,
+    metaTitle,
+    setMetaTitle,
     metaDescription,
     setMetaDescription,
+    parentId,
+    setParentId,
+    showInHeaderNav,
+    setShowInHeaderNav,
+    showInFooter,
+    setShowInFooter,
     ogImage,
     setOgImage,
     canonicalUrl,

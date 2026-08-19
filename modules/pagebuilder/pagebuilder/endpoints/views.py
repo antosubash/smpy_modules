@@ -31,6 +31,7 @@ from pagebuilder.contracts.schemas import (
     StatusFilter,
 )
 from pagebuilder import board as board_query
+from pagebuilder import redirects
 from pagebuilder.deps import get_media_service, get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
@@ -253,6 +254,10 @@ async def public_view(
 ) -> Response:
     page = await PagesService(db).get_by_slug_published(slug)
     if page is None or page.published_data is None:
+        # Before giving up: this may be an address the page used to live at.
+        moved = await redirects.response_for(db, slug, prefix=settings.public_route_prefix)
+        if moved is not None:
+            return moved
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
