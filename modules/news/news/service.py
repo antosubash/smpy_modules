@@ -22,6 +22,7 @@ from sqlalchemy.orm import Load
 
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
+from news.maintenance import reconcile_orphans as reconcile_orphans
 from news import query_filters
 from news.models import NewsArticle, NewsCategory
 
@@ -83,7 +84,9 @@ def _base(include_drafts: bool, category: str | None):
     return stmt
 
 
-def _to_read(article: NewsArticle, page: Page) -> ArticleRead:
+def _to_read(
+    article: NewsArticle, page: Page, tags: list[str] | None = None
+) -> ArticleRead:
     return ArticleRead(
         id=article.id or 0,
         page_id=article.page_id,
@@ -92,6 +95,10 @@ def _to_read(article: NewsArticle, page: Page) -> ArticleRead:
         excerpt=page.meta_description or "",
         cover_image_url=page.og_image or "",
         category=article.category,
+        tags=tags or [],
+        pinned=article.pinned,
+        show_in_feed=article.show_in_feed,
+        author=article.author,
         published_at=article.published_at,
         page_status=page.status,
         url=PUBLIC_PAGE_URL.format(slug=page.slug),
@@ -106,6 +113,7 @@ async def list_articles(
     category: str | None = None,
     q: str | None = None,
     status: str | None = None,
+    in_feed_only: bool = False,
     include_drafts: bool = False,
     undated_first: bool = False,
 ) -> tuple[list[ArticleRead], int]:
@@ -123,6 +131,11 @@ async def list_articles(
         category = await resolve_category_slug(db, category) or category
 
     stmt = _base(include_drafts, category)
+    if in_feed_only:
+        # Only the feed block asks for this. The admin list must keep showing
+        # everything that exists, or an article hidden from the feed becomes
+        # unreachable from the one screen that could un-hide it.
+        stmt = stmt.where(NewsArticle.show_in_feed.is_(True))
     stmt = query_filters.search(stmt, q)
     # A draft filter from someone who may not see drafts must not widen the
     # base query — `visible` has already restricted it, and `status` only
@@ -136,9 +149,18 @@ async def list_articles(
     # NULLS placement is explicit either way: SQLite and Postgres disagree
     # about where NULL lands on a DESC sort, so without this the two databases
     # disagree about where an undated article goes.
-    order = NewsArticle.published_at.desc()
-    order = order.nullsfirst() if undated_first else order.nullslast()
-    stmt = stmt.order_by(order, NewsArticle.id.desc()).limit(
+    #
+    # Pinning sorts *before* the date rather than rewriting it, so an article
+    # held at the top still reports honestly when it was published — unpin it
+    # and the archive reads correctly again. The two orders differ on purpose:
+    # a reader wants the pinned pieces first, while an editor wants the
+    # work-in-progress pile first, because that is the row they came to finish.
+    dated = NewsArticle.published_at.desc()
+    if undated_first:
+        clauses = (dated.nullsfirst(), NewsArticle.pinned.desc())
+    else:
+        clauses = (NewsArticle.pinned.desc(), dated.nullslast())
+    stmt = stmt.order_by(*clauses, NewsArticle.id.desc()).limit(
         min(limit, MAX_LIMIT)
     ).offset(offset)
 
@@ -197,31 +219,6 @@ async def get_read_by_page(
     return _to_read(row[0], row[1]) if row is not None else None
 
 
-async def reconcile_orphans(db: AsyncSession) -> int:
-    """Delete article rows whose page is gone. Returns how many.
-
-    The ``PageDeleted`` subscription is the fast path, but it is best-effort:
-    ``EventBus.publish`` gathers handlers with ``return_exceptions=True`` and
-    logs a failure instead of raising, and pagebuilder commits the page deletion
-    *before* publishing. A dropped event therefore leaves the row behind
-    permanently, with nothing to retry it.
-
-    That is not merely untidy. Every listing inner-joins the page, so the orphan
-    is invisible — until SQLite reuses the deleted page's id, at which point the
-    row re-attaches to whatever page is created next and the feed renders one
-    article's category and date against another article's page.
-
-    The caller owns the transaction; this does not commit.
-    """
-    orphaned = select(NewsArticle.id).where(
-        ~select(Page.id).where(Page.id == NewsArticle.page_id).exists()
-    )
-    result = await db.execute(
-        sa_delete(NewsArticle).where(NewsArticle.id.in_(orphaned))
-    )
-    return result.rowcount or 0
-
-
 async def page_exists(db: AsyncSession, page_id: int) -> bool:
     """Whether the page an article would attach to is actually there.
 
@@ -247,9 +244,16 @@ async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:
 
 
 async def create(
-    db: AsyncSession, *, page_id: int, category: str, published_at: datetime | None
+    db: AsyncSession,
+    *,
+    page_id: int,
+    category: str,
+    published_at: datetime | None,
+    author: str = "",
 ) -> NewsArticle:
-    article = NewsArticle(page_id=page_id, category=category, published_at=published_at)
+    article = NewsArticle(
+        page_id=page_id, category=category, published_at=published_at, author=author
+    )
     db.add(article)
     await db.flush()
     await db.refresh(article)
@@ -262,9 +266,18 @@ async def update(
     *,
     category: str | None = None,
     published_at: datetime | _Unset | None = UNSET,
+    pinned: bool | None = None,
+    show_in_feed: bool | None = None,
+    author: str | None = None,
 ) -> NewsArticle:
     if category is not None:
         article.category = category
+    if pinned is not None:
+        article.pinned = pinned
+    if show_in_feed is not None:
+        article.show_in_feed = show_in_feed
+    if author is not None:
+        article.author = author
     # `published_at=None` is a real value — it undates the article — so it is
     # applied only when the caller actually sent the field. The endpoint reads
     # `model_fields_set` to tell the two apart and passes UNSET otherwise.

@@ -44,3 +44,26 @@ async def category_list(inertia: InertiaDep) -> InertiaResponse:
     Inertia page after each would throw away the drag position.
     """
     return await inertia.render(constants._PAGE_CATEGORIES)
+
+
+@router.get(
+    "/articles/{article_id}/edit",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
+)
+async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+    """Everything about an article except its body.
+
+    The body is a page-builder document and is edited in the page editor — an
+    article *is* a page here, so duplicating that canvas would mean duplicating
+    the block library, the autosave and the revision handling with it. This
+    screen owns what the page has no concept of: category, tags, display date,
+    byline and how the article behaves in feeds.
+
+    Only the id is rendered; the article itself is fetched client-side, because
+    every field on this screen saves independently and a full Inertia round trip
+    per keystroke would be absurd.
+    """
+    return await inertia.render(
+        constants._PAGE_ARTICLE_EDITOR, {"article_id": article_id}
+    )

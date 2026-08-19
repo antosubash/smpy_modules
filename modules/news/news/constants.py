@@ -32,6 +32,7 @@ _MODULE_PAGEBUILDER: Final = "PageBuilder"
 # static-AST diagnostics can pair it with pages/NewsList.tsx.
 _PAGE_LIST: Final = "News/NewsList"
 _PAGE_CATEGORIES: Final = "News/Categories"
+_PAGE_ARTICLE_EDITOR: Final = "News/ArticleEditor"
 
 PERM_VIEW: Final = "news.view"
 PERM_EDIT: Final = "news.edit"

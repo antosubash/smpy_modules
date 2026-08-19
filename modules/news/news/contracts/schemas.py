@@ -20,6 +20,10 @@ class ArticleRead(BaseModel):
     excerpt: str = ""
     cover_image_url: str = ""
     category: str = ""
+    tags: list[str] = Field(default_factory=list)
+    pinned: bool = False
+    show_in_feed: bool = True
+    author: str = ""
     published_at: datetime | None = None
     page_status: PageStatus
     """Workflow state of the page behind the article.
@@ -77,11 +81,15 @@ class ArticleCreate(BaseModel):
     page_id: int
     category: str = Field(default="", max_length=MAX_CATEGORY_LEN)
     published_at: datetime | None = None
+    author: str = Field(default="", max_length=120)
 
 
 class ArticleUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=MAX_CATEGORY_LEN)
     published_at: datetime | None = None
+    pinned: bool | None = None
+    show_in_feed: bool | None = None
+    author: str | None = Field(default=None, max_length=120)
 
 
 class CategoryRead(BaseModel):

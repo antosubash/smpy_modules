@@ -60,6 +60,31 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     category: str = Field(default="", max_length=80, index=True)
     """Free-text grouping. Empty means uncategorised, which still lists."""
 
+    pinned: bool = Field(default=False, index=True)
+    """Hold this article at the top of /news and of every feed block.
+
+    Sorted on before the date rather than by faking one, so pinning does not
+    rewrite when the article says it was published — un-pin it and the archive
+    reads correctly again.
+    """
+
+    show_in_feed: bool = Field(default=True, index=True)
+    """Whether feed blocks may list this article.
+
+    An article can be published, reachable at its own URL and linked from
+    elsewhere, without belonging in the chronological feed — a standing "about
+    this project" piece, say. Deliberately does not affect the admin list, which
+    has to show everything that exists.
+    """
+
+    author: str = Field(default="", max_length=120)
+    """Byline. Free text, not a user reference.
+
+    A byline outlives the account: contributors leave, and an article credited
+    to a deleted user row would either break or silently lose its author. It is
+    seeded from whoever created the article and editable afterwards.
+    """
+
     published_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),

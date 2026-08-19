@@ -12,6 +12,12 @@ export interface ArticleRead {
   excerpt: string;
   cover_image_url: string;
   category: string;
+  tags: string[];
+  /** Held at the top of /news and of every feed block. */
+  pinned: boolean;
+  /** Whether feed blocks may list it. Does not affect the admin list. */
+  show_in_feed: boolean;
+  author: string;
   published_at: string | null;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
@@ -52,6 +58,8 @@ export async function listArticles(params: {
   q?: string;
   /** `draft`, `published` or `undated`. */
   status?: string;
+  /** Only articles allowed in feed blocks — the feed block's own filter. */
+  in_feed?: boolean;
   /** Sort undated (work-in-progress) articles first — the admin list's view.
    *  Public feeds keep the default, which pushes undated to the end. */
   undated_first?: boolean;
@@ -63,6 +71,7 @@ export async function listArticles(params: {
   if (params.category) query.set('category', params.category);
   if (params.q) query.set('q', params.q);
   if (params.status) query.set('status', params.status);
+  if (params.in_feed) query.set('in_feed', 'true');
   if (params.undated_first) query.set('undated_first', 'true');
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
@@ -122,7 +131,13 @@ export const attachArticle = (data: {
 
 export const updateArticle = (
   id: number,
-  data: { category?: string; published_at?: string | null },
+  data: {
+    category?: string;
+    published_at?: string | null;
+    pinned?: boolean;
+    show_in_feed?: boolean;
+    author?: string;
+  },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
 export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');

@@ -11,6 +11,10 @@ import { useState } from 'react';
 
 import { type ArticleRead, articleEditUrl, formatArticleDate, relativeDay } from '../utils/api';
 
+/** The article editor — category, tags, date, byline and feed behaviour. The
+ *  body is a page, so it is edited one link further in. */
+const articleSettingsUrl = (id: number) => `/news/articles/${id}/edit`;
+
 /** `2026-02-01T00:00:00` -> `2026-02-01`, which is what <input type=date> wants. */
 function toDateInput(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '';
@@ -88,7 +92,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
 
       <div className="min-w-0 flex-1">
         <a
-          href={articleEditUrl(article.page_id)}
+          href={articleSettingsUrl(article.id)}
           className="font-medium hover:underline"
           data-testid="article-title"
         >
@@ -166,7 +170,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
 
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" size="sm" variant="outline" asChild>
-          <a href={articleEditUrl(article.page_id)}>Edit</a>
+          <a href={articleSettingsUrl(article.id)}>Edit</a>
         </Button>
 
         <DropdownMenu>
@@ -194,6 +198,9 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
                 </a>
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem asChild>
+              <a href={articleEditUrl(article.page_id)}>Edit the body</a>
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setEditing(true)}>
               Edit category and date
             </DropdownMenuItem>

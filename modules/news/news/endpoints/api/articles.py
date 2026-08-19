@@ -42,6 +42,12 @@ async def list_articles(
         description="`draft`, `published` or `undated`. Anyone who may not see "
         "drafts gets the published set whatever they ask for.",
     ),
+    in_feed: bool = Query(
+        False,
+        description="Only articles allowed in feed blocks. The admin list "
+        "never sets this — hiding an article there would leave it unreachable "
+        "from the one screen that can un-hide it.",
+    ),
     undated_first: bool = Query(
         False,
         description="Sort undated (work-in-progress) articles before dated "
@@ -58,9 +64,15 @@ async def list_articles(
         category=category,
         q=q,
         status=status,
+        in_feed_only=in_feed,
         include_drafts=may_draft,
         undated_first=undated_first,
     )
+    # Tags in one query for the whole page rather than one per row — the list
+    # renders 20 at a time, and per-row would make that 21 round trips.
+    by_article = await tag_service.names_for_articles(db, [i.id for i in items])
+    for item in items:
+        item.tags = by_article.get(item.id, [])
     # Resolved once here rather than inside the count query: the listing
     # already turned a slug into a name, and counting against the raw slug
     # would report zero for every pill on a slug-filtered view.
@@ -107,7 +119,11 @@ async def attach_article(
             status_code=409, detail=f"Page {body.page_id} is already an article."
         )
     await service.create(
-        db, page_id=body.page_id, category=body.category, published_at=body.published_at
+        db,
+        page_id=body.page_id,
+        category=body.category,
+        published_at=body.published_at,
+        author=body.author,
     )
     return await read_one_by_page(db, body.page_id)
 
@@ -133,8 +149,13 @@ async def update_article(
             if "published_at" in body.model_fields_set
             else service.UNSET
         ),
+        pinned=body.pinned,
+        show_in_feed=body.show_in_feed,
+        author=body.author,
     )
-    return await read_one_by_page(db, article.page_id)
+    read = await read_one_by_page(db, article.page_id)
+    read.tags = await tag_service.list_for_article(db, article.id or 0)
+    return read
 
 
 @router.get("/articles/{article_id}/tags", response_model=list[str])
