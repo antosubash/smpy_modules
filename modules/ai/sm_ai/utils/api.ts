@@ -31,6 +31,15 @@ export type SlotValues = {
 };
 
 const BASE = '/api/ai';
+const CSRF_COOKIE = 'sm_ai_csrf';
+
+/** The admin view mints the token into the session; middleware mirrors it to
+ * this JS-readable cookie. Tolerant when absent (e.g. session not mounted) —
+ * the server skips enforcement in exactly that case. */
+function csrfHeader(): Record<string, string> {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
+  return match ? { 'X-CSRF-Token': decodeURIComponent(match[1]) } : {};
+}
 
 /** Turn a failed response into something worth showing a person — our own
  * JSON `detail` when present, the status line otherwise (never raw HTML). */
@@ -76,7 +85,7 @@ export async function saveSettings(
     await fetch(`${BASE}/settings`, {
       method: 'PUT',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       body: JSON.stringify(payload),
     }),
   );
@@ -87,7 +96,7 @@ export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> 
     await fetch(`${BASE}/test`, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       body: JSON.stringify({ slot }),
     }),
   );

@@ -65,8 +65,19 @@ class AiModule(ModuleBase):
         )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
+        from fastapi import Depends
+
         from sm_ai.endpoints.api import router as api
         from sm_ai.endpoints.views import router as views
+        from sm_ai.security import mint_csrf_token, verify_csrf
 
-        api_router.include_router(api)
-        view_router.include_router(views)
+        # The write surface can redirect chat_base_url and thereby point the
+        # stored provider key at an attacker's server — CSRF is enforced on
+        # the API (unsafe methods) and the token minted on the admin view.
+        api_router.include_router(api, dependencies=[Depends(verify_csrf)])
+        view_router.include_router(views, dependencies=[Depends(mint_csrf_token)])
+
+    def register_middleware(self, app: FastAPI) -> None:
+        from sm_ai.security import CsrfCookieMiddleware
+
+        app.add_middleware(CsrfCookieMiddleware)

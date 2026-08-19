@@ -29,6 +29,11 @@ _PAGE_SETTINGS: Final = f"{MODULE_NAME}/Settings"
 
 PERM_MANAGE: Final = "ai.manage"
 
+# CSRF channel between the view (mints into the session), the middleware
+# (mirrors to this JS-readable cookie) and the API (verifies this header).
+CSRF_COOKIE: Final = "sm_ai_csrf"
+CSRF_HEADER: Final = "x-csrf-token"
+
 # Provider identifiers (stored values — changing them breaks existing rows).
 PROVIDER_ANTHROPIC: Final = "anthropic"
 PROVIDER_OPENAI: Final = "openai"
