@@ -108,7 +108,7 @@ export default function Settings() {
       >
         {error && <p className="text-sm text-destructive">{error}</p>}
         {!loaded && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
-        {loaded && (
+        {loaded && savedSlots && (
           <div className="space-y-6">
             <SlotCard
               title="Chat"
@@ -118,7 +118,7 @@ export default function Settings() {
               optionalSlot={false}
               values={chat}
               hasStoredKey={loaded.has_chat_api_key}
-              dirty={savedSlots ? isDirty(chat, savedSlots.chat) : false}
+              dirty={isDirty(chat, savedSlots.chat)}
               busy={busy}
               testResult={chatTest}
               onChange={setChat}
@@ -132,7 +132,7 @@ export default function Settings() {
               optionalSlot={true}
               values={embedding}
               hasStoredKey={loaded.has_embedding_api_key}
-              dirty={savedSlots ? isDirty(embedding, savedSlots.embedding) : false}
+              dirty={isDirty(embedding, savedSlots.embedding)}
               busy={busy}
               testResult={embeddingTest}
               onChange={setEmbedding}

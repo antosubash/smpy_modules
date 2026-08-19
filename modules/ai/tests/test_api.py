@@ -9,10 +9,10 @@ framework code with its own tests upstream.
 from __future__ import annotations
 
 import inspect
-from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
+from conftest import GrantAll
 from fastapi import APIRouter, FastAPI
 from httpx import ASGITransport, AsyncClient
 from pydantic_ai.models.test import TestModel
@@ -20,18 +20,8 @@ from sm_ai import constants, crypto, services
 from sm_ai.contracts.schemas import AiSettingsUpdate
 from sm_ai.service import AiService
 from sm_ai.settings import AiSettings
-from starlette.middleware.base import BaseHTTPMiddleware
 
 SECRET = "test-secret-key-for-api"
-
-
-class _GrantAll(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request.state.user = SimpleNamespace(
-            id="test-user", email="t@example.com", name="T", roles=["admin"]
-        )
-        request.state.resolved_permissions = {constants.PERM_MANAGE}
-        return await call_next(request)
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +49,7 @@ async def client(monkeypatch):
     monkeypatch.setattr(AiService, "apply", _fake_apply)
 
     app = FastAPI()
-    app.add_middleware(_GrantAll)
+    app.add_middleware(GrantAll)
     # apply() is stubbed above, so no endpoint touches the session — but the
     # get_db dependency still resolves, and without a host there is no
     # app.state.sm to build one from.

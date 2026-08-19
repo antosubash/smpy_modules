@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import importlib.metadata
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
@@ -35,7 +35,7 @@ class AiModule(ModuleBase):
     def register_settings(self, app: FastAPI) -> None:
         from settings.registration import register_module_settings
 
-        from sm_ai import services
+        from sm_ai import crypto, services
         from sm_ai.settings import AiSettings
 
         # The factory installs the instance in the module-global holder AND
@@ -47,6 +47,17 @@ class AiModule(ModuleBase):
             AiSettings,
             lambda s: services.install(services.AiServices(settings=s)),
         )
+
+        # Hosts may inject ``secret_key`` programmatically
+        # (``create_app(settings=...)``) rather than via env/.env; crypto must
+        # encrypt under the secret the running app actually holds or stored
+        # keys become unreadable. app.state.sm is assigned after this phase,
+        # so resolve lazily.
+        def _live_secret() -> str:
+            sm = getattr(app.state, "sm", None)
+            return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
+
+        crypto.set_secret_provider(_live_secret)
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(constants.MODULE_NAME, [constants.PERM_MANAGE])
@@ -65,8 +76,6 @@ class AiModule(ModuleBase):
         )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
-        from fastapi import Depends
-
         from sm_ai.endpoints.api import router as api
         from sm_ai.endpoints.views import router as views
         from sm_ai.security import mint_csrf_token, verify_csrf

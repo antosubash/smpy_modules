@@ -19,10 +19,15 @@ dev: gen-pages
 # sys.path without changing cwd.
 # Overridable so a second checkout (e.g. a worktree running e2e) can boot
 # beside a dev stack that already holds the default ports.
-API_PORT ?= 8000
-# vite reads SM_UI_PORT (see host/client_app/vite.config.ts); fall back to it
-# here so `make kill` targets whatever port the UI actually took.
-UI_PORT ?= $(if $(SM_UI_PORT),$(SM_UI_PORT),5050)
+# e2e runs name their overrides E2E_* (see playwright.config.ts); honor them
+# too so `make kill` after an aborted e2e run targets the right orphans.
+API_PORT ?= $(or $(E2E_API_PORT),8000)
+# vite reads SM_UI_PORT (see host/client_app/vite.config.ts) and coerces
+# empty/zero/non-numeric values to 5050 (`|| 5050`); mirror that coercion so
+# `make kill` targets whatever port the UI actually took (a raw bad value
+# would also make lsof abort the whole sweep and free neither port).
+_UI_PORT_RAW = $(or $(SM_UI_PORT),$(E2E_UI_PORT))
+UI_PORT ?= $(if $(shell echo '$(_UI_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_UI_PORT_RAW),5050)
 
 dev-api:
 	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
@@ -129,6 +134,6 @@ new-module:
 # Scoped to this checkout's ports so it never kills the neighboring dev
 # stack the port overrides exist to coexist with.
 kill:
-	@-pkill -f "uvicorn main:app.*--port $(API_PORT)" 2>/dev/null
+	@-pkill -f "uvicorn main:app.*--port $(API_PORT)( |$$)" 2>/dev/null
 	@-lsof -ti:$(API_PORT),$(UI_PORT) | xargs kill -9 2>/dev/null
 	@echo "Ports $(API_PORT), $(UI_PORT) freed."

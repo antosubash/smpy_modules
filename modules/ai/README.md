@@ -55,8 +55,9 @@ required; a blank key is replaced by a protocol-satisfying placeholder).
 Configure at `/ai/` (permission `ai.manage`) or seed via `SM_AI_*` env vars
 (e.g. `SM_AI_CHAT_MODEL`); DB values win over env. API keys are encrypted at
 rest with a key derived from `SM_SECRET_KEY` — rotating that secret means
-re-entering provider keys. A settings save hot-reloads the worker that
-handled it; other workers pick the change up on restart.
+re-entering provider keys, and the derived Fernet is built once per process,
+so a rotation takes effect on restart. A settings save hot-reloads the
+worker that handled it; other workers pick the change up on restart.
 
 ## Routes
 

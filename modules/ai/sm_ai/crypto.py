@@ -1,11 +1,13 @@
 """Fernet encryption for stored provider keys.
 
-The key derives from ``SM_SECRET_KEY`` (SHA-256 → urlsafe base64), read
-through a private BaseSettings from the environment or the root ``.env`` —
-the same two sources the host's own BootstrapSettings uses, and no coupling
-to app.state or hosting internals. The Fernet is cached for the process
-lifetime (rotating the secret requires a restart, matching the session
-middleware). Stored format is ``enc:v1:<fernet token>``:
+The key derives from ``SM_SECRET_KEY`` (SHA-256 → urlsafe base64). The
+running app's secret wins when the module is registered normally — hosts may
+inject ``secret_key`` programmatically via ``create_app(settings=...)``, see
+``set_secret_provider`` — and a private BaseSettings reading the environment
+or the root ``.env`` (the same two sources the host's own BootstrapSettings
+uses) is the fallback. The Fernet is cached for the process lifetime
+(rotating the secret requires a restart, matching the session middleware).
+Stored format is ``enc:v1:<fernet token>``:
 
 - prefix present and decrypts        → plaintext key
 - prefix present, decryption fails   → AiKeyUnreadableError (secret key changed)
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from base64 import urlsafe_b64encode
+from collections.abc import Callable
 from functools import lru_cache
 from hashlib import sha256
 
@@ -45,9 +48,22 @@ class _CryptoEnv(BaseSettings):
     secret_key: str = ""
 
 
+# Installed at module registration: returns the running app's live secret so
+# encryption always matches the app; empty/None falls back to the env read.
+_secret_provider: Callable[[], str] | None = None
+
+
+def set_secret_provider(provider: Callable[[], str]) -> None:
+    """Install the live-secret source; clears the cached Fernet."""
+    global _secret_provider
+    _secret_provider = provider
+    _fernet.cache_clear()
+
+
 @lru_cache(maxsize=1)
 def _fernet() -> Fernet:
-    secret = _CryptoEnv().secret_key
+    secret = _secret_provider() if _secret_provider is not None else ""
+    secret = secret or _CryptoEnv().secret_key
     if not secret:
         raise RuntimeError(
             "SM_SECRET_KEY is not set — the AI module needs it to encrypt "

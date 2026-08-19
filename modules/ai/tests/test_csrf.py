@@ -8,28 +8,17 @@ mint → cookie-mirror → verify chain end to end. The bare app used in
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest_asyncio
+from conftest import GrantAll
 from fastapi import APIRouter, Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from sm_ai import constants, services
 from sm_ai.security import CsrfCookieMiddleware, mint_csrf_token, verify_csrf
 from sm_ai.service import AiService
 from sm_ai.settings import AiSettings
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 SECRET = "test-secret-key-for-csrf"
-
-
-class _GrantAll(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request.state.user = SimpleNamespace(
-            id="test-user", email="t@example.com", name="T", roles=["admin"]
-        )
-        request.state.resolved_permissions = {constants.PERM_MANAGE}
-        return await call_next(request)
 
 
 @pytest_asyncio.fixture
@@ -47,7 +36,7 @@ async def csrf_client(monkeypatch):
 
     app = FastAPI()
     # Middleware runs bottom-up: session first, then the cookie mirror, then auth.
-    app.add_middleware(_GrantAll)
+    app.add_middleware(GrantAll)
     app.add_middleware(CsrfCookieMiddleware)
     app.add_middleware(SessionMiddleware, secret_key=SECRET)
     app.dependency_overrides[get_db] = lambda: None

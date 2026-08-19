@@ -54,7 +54,12 @@ async def verify_csrf(request: Request) -> None:
     if (
         not expected
         or not received
-        or not secrets.compare_digest(str(expected), str(received))
+        # Bytes, not str: compare_digest raises TypeError on non-ASCII str
+        # (headers decode as latin-1), which would turn a bad token into a
+        # 500 instead of this 403.
+        or not secrets.compare_digest(
+            str(expected).encode(), received.encode("latin-1")
+        )
     ):
         raise HTTPException(status_code=403, detail="Invalid or missing CSRF token")
 
@@ -75,8 +80,11 @@ class CsrfCookieMiddleware:
         self._cookie_attr = f"{constants.CSRF_COOKIE}="
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
+        # Segment boundary, not bare startswith - "/ai" must not claim a
+        # future "/ai-other" route's responses.
         if scope["type"] != "http" or not any(
-            scope["path"].startswith(p) for p in self._prefixes
+            path == p or path.startswith(p + "/") for p in self._prefixes
         ):
             await self.app(scope, receive, send)
             return
@@ -89,10 +97,11 @@ class CsrfCookieMiddleware:
                 )
                 if token and _request_cookie_value(scope, self._cookie_attr) != token:
                     headers = MutableHeaders(scope=message)
-                    headers.append(
-                        "set-cookie",
-                        f"{constants.CSRF_COOKIE}={token}; Path=/; SameSite=Strict",
-                    )
+                    cookie = f"{constants.CSRF_COOKIE}={token}; Path=/; SameSite=Strict"
+                    if scope.get("scheme") == "https":
+                        # Not unconditional: dev runs plain HTTP on loopback.
+                        cookie += "; Secure"
+                    headers.append("set-cookie", cookie)
             await send(message)
 
         await self.app(scope, receive, send_wrapper)
