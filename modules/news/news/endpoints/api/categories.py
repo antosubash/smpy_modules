@@ -75,6 +75,16 @@ async def update_category(
     """Rename, re-slug, or both. Renaming carries the articles with it."""
     category = await _load(db, category_id)
     if body.name is not None and body.name != category.name:
+        if body.name.strip().lower() == UNCATEGORISED_LABEL.lower():
+            # The same rule `create_category` enforces. Without it here, the
+            # name is reachable by the back door: rename any category into it
+            # and the screen shows two Uncategorised rows — a real one holding
+            # these articles, and the synthetic bucket `list_categories`
+            # always appends.
+            raise HTTPException(
+                status_code=409,
+                detail=f"{UNCATEGORISED_LABEL} is a system category and always exists.",
+            )
         clash = await category_service.get_by_name(db, body.name)
         if clash is not None:
             raise HTTPException(
@@ -114,11 +124,14 @@ async def delete_category(
     is ever deleted here — that is the promise the screen makes before asking.
     """
     category = await _load(db, category_id)
-    if reassign_to and reassign_to != category.name:
-        if await category_service.get_by_name(db, reassign_to) is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Cannot reassign to {reassign_to!r}: no such category.",
-            )
+    if (
+        reassign_to
+        and reassign_to != category.name
+        and await category_service.get_by_name(db, reassign_to) is None
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Cannot reassign to {reassign_to!r}: no such category.",
+        )
     moved = await category_service.delete(db, category, reassign_to=reassign_to)
     return CategoryDeleteResult(reassigned=moved)

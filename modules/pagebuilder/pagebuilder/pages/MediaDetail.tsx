@@ -141,8 +141,10 @@ export default function MediaDetail() {
             </p>
           ) : (
             <ConfirmDialog
-              // Low: nothing references it, so nothing on the site changes.
-              level="low"
+              // Medium, not low: nothing references it so nothing on the site
+              // changes, but there is no trash for media — the file is gone for
+              // good. `low` promises reversibility this cannot offer.
+              level="medium"
               title={`Delete “${asset.original_filename}”?`}
               description="No page references this asset, so nothing on the site changes. The file itself is removed for good."
               confirmLabel="Delete"

@@ -33,6 +33,19 @@ class Usage:
     draft_only: bool
 
 
+def _like_literal(value: str) -> str:
+    """Escape LIKE's wildcards so ``value`` is matched literally.
+
+    Same rule as ``list_pages`` and ``board._search_filter``. It matters more
+    here than in a search box: an uploaded filename almost always contains
+    ``_``, which LIKE reads as "any single character", so ``hero_1.png`` would
+    also match ``heroX1.png`` — and this query decides whether an asset is safe
+    to delete. The failure is a spurious refusal, never a missed reference: a
+    stray wildcard can only widen the match.
+    """
+    return value.translate(str.maketrans({"%": r"\%", "_": r"\_", "\\": "\\\\"}))
+
+
 def _references(column, needle: str):
     """A LIKE against the block JSON cast to text.
 
@@ -43,7 +56,7 @@ def _references(column, needle: str):
     The cast is explicit because SQLAlchemy compiles an untyped ``func.cast`` to
     NullType and the whole statement fails at compile time.
     """
-    return cast(column, Text).like(f"%{needle}%")
+    return cast(column, Text).like(f"%{_like_literal(needle)}%", escape="\\")
 
 
 async def find(db: AsyncSession, url: str, *, limit: int = 20) -> tuple[list[Usage], int]:

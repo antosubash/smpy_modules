@@ -14,16 +14,15 @@ import logging
 from datetime import datetime
 from typing import Final
 
-from pagebuilder.models import NOT_TRASHED, Page, PageStatus
-from sqlalchemy import delete as sa_delete
+from pagebuilder.models import NOT_TRASHED, Page
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Load
 
+from news import query_filters
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.maintenance import reconcile_orphans as reconcile_orphans
-from news import query_filters
 from news.models import NewsArticle, NewsCategory
 
 logger = logging.getLogger(__name__)

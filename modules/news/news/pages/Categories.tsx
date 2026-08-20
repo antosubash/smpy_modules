@@ -47,6 +47,15 @@ export default function Categories() {
   }, [refresh]);
 
   const managed = categories.filter(isManaged);
+  /** The managed ids in the order currently on screen.
+   *
+   * Every index handed to `moveTo` has to come from this array. `managed` is
+   * frozen for the whole drag — it only changes once the drop persists and the
+   * list refetches — so an index taken from it names where a row *started*,
+   * not where it is now. Mixing the two spaces silently drops the row next to
+   * the wrong neighbour as soon as a drag reverses over a row it crossed.
+   */
+  const liveOrder = order ?? managed.map((c) => c.id);
   const shown =
     order === null
       ? categories
@@ -65,9 +74,8 @@ export default function Categories() {
   }, [order, persistOrder]);
 
   const moveTo = (from: number, to: number) => {
-    const current = order ?? managed.map((c) => c.id);
     if (from === to || from < 0 || to < 0) return;
-    const next = [...current];
+    const next = [...liveOrder];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     setOrder(next);
@@ -121,7 +129,10 @@ export default function Categories() {
           ) : (
             <ul className="space-y-2">
               {shown.map((category) => {
-                const position = managed.findIndex((c) => c.id === category.id);
+                // Live index, not `managed.findIndex` — see `liveOrder`. Stays
+                // -1 for the free-text and system rows, which is what keeps
+                // them out of the drag.
+                const position = isManaged(category) ? liveOrder.indexOf(category.id) : -1;
                 return (
                   <CategoryRow
                     key={category.is_system ? 'system' : `${category.id}:${category.name}`}

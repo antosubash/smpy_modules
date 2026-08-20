@@ -15,7 +15,9 @@ everything below:
 
 from __future__ import annotations
 
-from sqlalchemy import func, select, update as sa_update
+from pagebuilder.models import NOT_TRASHED, Page
+from sqlalchemy import func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.constants import MAX_CATEGORY_LEN, UNCATEGORISED_LABEL
@@ -36,14 +38,22 @@ async def _taken_slugs(db: AsyncSession, *, excluding: int | None = None) -> set
 
 
 async def _counts(db: AsyncSession) -> dict[str, int]:
-    """Article count per category name, drafts included.
+    """Article count per category name, drafts included but trash excluded.
 
     This is the editor's screen: a category holding nothing but drafts still
     has to show its true weight, or deleting it looks free when it is not.
+
+    Trashed pages are the other half of that. Their articles are deliberately
+    left in place — see ``service._base`` — so counting the raw rows reports
+    articles no listing will show, and the editor deciding whether a category
+    is safe to delete reads a number nothing on screen can account for.
     """
     rows = (
         await db.execute(
-            select(NewsArticle.category, func.count()).group_by(NewsArticle.category)
+            select(NewsArticle.category, func.count())
+            .select_from(NewsArticle)
+            .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
+            .group_by(NewsArticle.category)
         )
     ).all()
     return {name: int(count) for name, count in rows}

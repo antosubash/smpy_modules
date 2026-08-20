@@ -27,10 +27,12 @@ export const restorePage = (id: number) =>
 export const purgePage = (id: number) => request<void>(`/pages/${id}/purge`, { method: 'DELETE' });
 
 /** Pages offered as starting points by the New page dialog. */
-export const listTemplates = () => request<{ items: PageRead[] }>('/pages/templates');
+export const listTemplates = (signal?: AbortSignal) =>
+  request<{ items: PageRead[] }>('/pages/templates', { signal });
 
 /** Every page, for the "copy a page" and parent selects. */
-export const listPages = () => request<{ items: PageRead[] }>('/pages');
+export const listPages = (signal?: AbortSignal) =>
+  request<{ items: PageRead[] }>('/pages', { signal });
 
 export const savePage = (id: number, data: PageWritePayload) =>
   request<PageDetail>(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) });

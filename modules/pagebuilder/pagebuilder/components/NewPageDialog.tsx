@@ -55,7 +55,9 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    void Promise.all([listTemplates(), listPages()])
+    // The signal is threaded into the requests, not just checked afterwards:
+    // without it, closing the dialog left both fetches running to completion.
+    void Promise.all([listTemplates(controller.signal), listPages(controller.signal)])
       .then(([t, p]) => {
         if (controller.signal.aborted) return;
         setTemplates(t.items);

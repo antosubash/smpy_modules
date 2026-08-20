@@ -10,9 +10,12 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  * but changes nothing has not done its job.
  */
 
-async function makeArticle(page: Page, { publish = true }: { publish?: boolean } = {}) {
+async function makeArticle(
+  page: Page,
+  { publish = true, prefix = 'editor' }: { publish?: boolean; prefix?: string } = {},
+) {
   const headers = await csrfHeader(page);
-  const slug = uniqueSlug('editor');
+  const slug = uniqueSlug(prefix);
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {
@@ -128,8 +131,14 @@ test.describe('Article editor', () => {
 
   test('pinning lifts the article above newer ones in the feed order', async ({ page }) => {
     await login(page);
-    const older = await makeArticle(page);
-    const newer = await makeArticle(page);
+    // Their own slug prefix, so the feed reads below can be scoped to exactly
+    // these two. Unscoped, the assertion is "the pinned one leads the whole
+    // feed", which only holds while no other spec has left a pinned article
+    // with a later date behind it.
+    const prefix = uniqueSlug('pinning');
+    const older = await makeArticle(page, { prefix });
+    const newer = await makeArticle(page, { prefix });
+    const feed = `/api/news/articles?in_feed=true&limit=100&q=${prefix}`;
 
     // Give them dates so the order is unambiguous.
     await page.goto(`/news/articles/${older.articleId}/edit`);
@@ -143,11 +152,13 @@ test.describe('Article editor', () => {
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     // Unpinned, the newer one leads.
-    const before = await page.request.get('/api/news/articles?in_feed=true&limit=100');
+    const before = await page.request.get(feed);
     const beforeSlugs = ((await before.json()) as { items: { slug: string }[] }).items.map(
       (i) => i.slug,
     );
-    expect(beforeSlugs.indexOf(newer.slug)).toBeLessThan(beforeSlugs.indexOf(older.slug));
+    // Exact, not indexOf-vs-indexOf: with only one slug missing that
+    // comparison reads -1 < n and passes for the wrong reason.
+    expect(beforeSlugs).toEqual([newer.slug, older.slug]);
 
     // Pin the older one and it goes first — without its date changing.
     await page.goto(`/news/articles/${older.articleId}/edit`);
@@ -155,7 +166,7 @@ test.describe('Article editor', () => {
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
-    const after = await page.request.get('/api/news/articles?in_feed=true&limit=100');
+    const after = await page.request.get(feed);
     const items = (
       (await after.json()) as {
         items: { slug: string; published_at: string }[];

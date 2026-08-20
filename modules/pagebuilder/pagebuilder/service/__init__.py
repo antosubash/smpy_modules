@@ -11,24 +11,20 @@ whole surface: :mod:`._workflow` holds the status transitions and
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime
 from typing import NamedTuple
 
-from copy import deepcopy
-
 from fastapi import HTTPException
 from simple_module_core.events import EventBus
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import update as sa_update
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder import redirects
-from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.contracts.schemas import PageCreate, PageUpdate
-from pagebuilder.models import NOT_TRASHED, Page, PageRevision, PageStatus
+from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 from pagebuilder.service._common import _UNSET, _normalize_to_utc
 from pagebuilder.service._revisions import RevisionsMixin
 from pagebuilder.service._trash import TrashMixin

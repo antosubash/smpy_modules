@@ -30,13 +30,20 @@ interface Props {
 
 function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
   return {
+    // Every default here must match `useEditorForm`'s corresponding useState
+    // exactly. A mismatch does not fail loudly — it just makes a freshly
+    // opened page report unsaved changes it does not have.
     title: page?.title ?? 'Untitled page',
     slug: page?.slug ?? '',
+    metaTitle: page?.meta_title ?? '',
     metaDescription: page?.meta_description ?? '',
     ogImage: page?.og_image ?? '',
     canonicalUrl: page?.canonical_url ?? '',
     indexInSearch: page?.index_in_search ?? true,
     jsonLdText: page?.json_ld ? JSON.stringify(page.json_ld, null, 2) : '',
+    parentId: page?.parent_id ?? null,
+    showInHeaderNav: page?.show_in_header_nav ?? false,
+    showInFooter: page?.show_in_footer ?? false,
     // Migrated on the way in rather than on save: a draft the author never
     // touches is never rewritten, so the stored payload only changes shape
     // once they actually edit it.

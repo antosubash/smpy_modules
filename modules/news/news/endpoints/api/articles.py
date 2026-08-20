@@ -160,8 +160,32 @@ async def update_article(
 
 @router.get("/articles/{article_id}/tags", response_model=list[str])
 async def list_article_tags(
-    article_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> list[str]:
+    """Tags on one article, under the same visibility rule as the listing.
+
+    The gate is not optional here. ``PUBLIC_READ_PREFIXES`` is matched with
+    ``str.startswith``, so this path is exempt from auth exactly like
+    ``GET /articles`` is — and unlike that route it used to answer from
+    ``NewsArticleTag`` alone, which never joins ``Page``. An anonymous visitor
+    who guessed an id read the tags of an article nobody had published yet, and
+    of one whose page was in the trash.
+
+    Resolving through ``get_read_by_page`` rather than re-deriving the rule
+    keeps it in one place: that query is the listing's own, so "visible" means
+    the same thing here as it does there, including the trashed-page join.
+    """
+    article = await service.get(db, article_id)
+    if article is not None:
+        visible = await service.get_read_by_page(
+            db, article.page_id, include_drafts=may_see_drafts(request)
+        )
+    # One message for both misses on purpose: a distinguishable "exists but is
+    # hidden" would answer the question the 404 is there to refuse.
+    if article is None or visible is None:
+        raise HTTPException(status_code=404, detail="Article not found.")
     return await tag_service.list_for_article(db, article_id)
 
 

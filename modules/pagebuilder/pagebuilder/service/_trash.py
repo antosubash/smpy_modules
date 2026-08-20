@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,25 @@ class TrashMixin:
     """Soft-delete behaviour for :class:`PagesService`."""
 
     db: AsyncSession
+
+    async def _trashed_or_404(self, page_id: int) -> Page:
+        """The page, but only if it is actually in the trash.
+
+        ``get_page(include_trashed=True)`` suppresses the rule that a trashed
+        page 404s — it does not assert that the page *is* trashed. Both callers
+        below are destructive and are only ever reached from the trash screen,
+        so a page that was never binned has to be refused here: without this,
+        ``purge`` permanently deletes live pages and ``restore`` quietly
+        unpublishes them, from nothing more than a mistyped id.
+
+        404 rather than 409 so the two misses are indistinguishable — "no such
+        page" and "that page is not in the trash" are the same answer to
+        someone asking the trash about a page it does not hold.
+        """
+        page = await self.get_page(page_id, include_trashed=True)
+        if page.deleted_at is None:
+            raise HTTPException(status_code=404, detail="Page not found")
+        return page
 
     async def delete(self, page_id: int) -> None:
         """Move the page to trash. Reversible for ``RETENTION_DAYS``.
@@ -60,7 +80,7 @@ class TrashMixin:
         returning it to the live site is not a decision restore should make on
         someone's behalf. Publishing it again is one click.
         """
-        page = await self.get_page(page_id, include_trashed=True)
+        page = await self._trashed_or_404(page_id)
         page.deleted_at = None
         # `published_data` is left intact, so republishing is one click — what
         # changes is only that the decision to be live is taken again, by a
@@ -89,7 +109,7 @@ class TrashMixin:
         removed page is not inert — SQLite reuses the id, so the child would
         silently re-parent itself under whatever page is created next.
         """
-        page = await self.get_page(page_id, include_trashed=True)
+        page = await self._trashed_or_404(page_id)
         slug = page.slug
         await self.db.execute(
             sa_delete(PageRevision).where(PageRevision.page_id == page_id)

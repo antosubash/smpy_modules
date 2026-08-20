@@ -173,8 +173,8 @@ class PagebuilderModule(ModuleBase):
         ``/robots.txt`` routes are mounted at the root so crawlers find
         them at the conventional location.
         """
-        from pagebuilder.endpoints.seo import seo_router
         from pagebuilder.endpoints.public_views import public_router
+        from pagebuilder.endpoints.seo import seo_router
 
         settings = self._resolved_settings()
         app.include_router(public_router, prefix=settings.public_route_prefix)

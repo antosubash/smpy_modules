@@ -8,16 +8,15 @@ namespaced under the admin prefix.
 
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Query
 from inertia import InertiaResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder import board as board_query
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
@@ -30,14 +29,11 @@ from pagebuilder.contracts.schemas import (
     PageRevisionRead,
     StatusFilter,
 )
-from pagebuilder import board as board_query
-from pagebuilder import redirects
 from pagebuilder.deps import get_media_service, get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-
 
 router = APIRouter()
 

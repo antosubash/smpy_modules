@@ -20,8 +20,14 @@ import { type ReactNode, useEffect, useState } from 'react';
  * click through the expensive one exactly the same way.
  *
  * - `low` — reversible; nothing is public. A plain button.
- * - `medium` — takes effect publicly at once, but the content survives.
+ * - `medium` — this screen cannot undo it, but nothing live is lost: either it
+ *   changes the public site while the content survives (unpublish), or it
+ *   removes something for good that nothing references (an unused asset).
  * - `high` — irreversible past the retention window. Requires typing a phrase.
+ *
+ * The axis is how hard the result is to walk back, not whether the public site
+ * changes. An irreversible delete does not get `low` because it happens to be
+ * invisible from outside.
  */
 export type ConfirmLevel = 'low' | 'medium' | 'high';
 

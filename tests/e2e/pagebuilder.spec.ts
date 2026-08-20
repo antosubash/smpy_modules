@@ -56,7 +56,7 @@ test.describe('PageBuilder admin', () => {
     // ── List shows the published page ─────────────────────────
     // The board is the default view now; these assertions are about the
     // table, which is what `view=list` selects.
-    await page.goto('/pagebuilder/?view=list');
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     const row = page.locator('tr', { hasText: title });
     await expect(row).toBeVisible();
     await expect(row.getByText('published', { exact: true })).toBeVisible();
@@ -78,7 +78,7 @@ test.describe('PageBuilder admin', () => {
     // ── Delete ────────────────────────────────────────────────
     // The board is the default view now; these assertions are about the
     // table, which is what `view=list` selects.
-    await page.goto('/pagebuilder/?view=list');
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: title }).getByRole('button', { name: /^delete$/i }),
@@ -114,7 +114,7 @@ test.describe('PageBuilder admin', () => {
     // Clean up so this test doesn't leave a draft behind.
     // The board is the default view now; these assertions are about the
     // table, which is what `view=list` selects.
-    await page.goto('/pagebuilder/?view=list');
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page
@@ -150,7 +150,7 @@ test.describe('PageBuilder admin', () => {
 
     // The board is the default view now; these assertions are about the
     // table, which is what `view=list` selects.
-    await page.goto('/pagebuilder/?view=list');
+    await page.goto(`/pagebuilder/?view=list&search=${tag}`);
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
 
@@ -168,7 +168,7 @@ test.describe('PageBuilder admin', () => {
     // ── Status pills filter independently ─────────────────────
     // The board is the default view now; these assertions are about the
     // table, which is what `view=list` selects.
-    await page.goto('/pagebuilder/?view=list');
+    await page.goto(`/pagebuilder/?view=list&search=${tag}`);
     await page.getByRole('button', { name: 'Published' }).click();
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toHaveCount(0);
@@ -177,7 +177,12 @@ test.describe('PageBuilder admin', () => {
     await page.getByRole('searchbox', { name: /search pages/i }).fill('no-such-page-anywhere');
     await expect(page.getByText(/no pages match this filter/i)).toBeVisible();
     await page.getByRole('button', { name: /clear filters/i }).click();
-    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+    // What clearing does, rather than which rows come back: an unfiltered table
+    // pages at 25, so "Beta is visible" would be asserting that this run's rows
+    // are still among the newest 25 in the database.
+    await expect(page.getByRole('searchbox', { name: /search pages/i })).toHaveValue('');
+    await expect(page.getByText(/no pages match this filter/i)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/[?&](search=[^&]|status=[^&])/);
 
     for (const id of created) {
       await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });

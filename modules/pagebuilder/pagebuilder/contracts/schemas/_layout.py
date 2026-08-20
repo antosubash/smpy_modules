@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
-
-from pagebuilder.models import PageStatus, RevisionEvent
+from pydantic import BaseModel, ConfigDict, Field
 
 PuckData = dict[str, Any]
 

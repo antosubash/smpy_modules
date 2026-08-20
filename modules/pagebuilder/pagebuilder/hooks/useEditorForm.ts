@@ -145,11 +145,15 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
   const snapshotPayload: EditorSnapshot = {
     title,
     slug: effectiveSlug,
+    metaTitle,
     metaDescription,
     ogImage,
     canonicalUrl,
     indexInSearch,
     jsonLdText,
+    parentId,
+    showInHeaderNav,
+    showInFooter,
     data,
   };
 
@@ -175,6 +179,15 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
       canonicalUrl: restoredCanonical,
       indexInSearch: restoredIndex,
       jsonLdText: restoredJsonLd,
+      // Carried from the form, not from `restored`: `restore_revision` writes
+      // only title, meta_description, og_image and draft_data, so these four
+      // are untouched by the restore and the form already holds the server's
+      // values. Reading them off `restored` would work too — reading anything
+      // else would make the page dirty the instant a revision is restored.
+      metaTitle,
+      parentId,
+      showInHeaderNav,
+      showInFooter,
       data: restoredData,
     };
   };
