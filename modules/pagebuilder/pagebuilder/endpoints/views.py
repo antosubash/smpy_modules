@@ -50,6 +50,8 @@ _PAGE_MEDIA = "PageBuilder/MediaLibrary"
 _PAGE_MEDIA_DETAIL = "PageBuilder/MediaDetail"
 _PAGE_PENDING = "PageBuilder/PendingReview"
 _PAGE_LAYOUT_EDITOR = "PageBuilder/LayoutEditor"
+# The draft preview deliberately reuses the public component — see admin_preview.
+_PAGE_PUBLIC = "PageBuilder/PublicPage"
 
 
 PAGE_LIST_LIMIT = 25
@@ -156,6 +158,45 @@ async def admin_edit(
         {
             "page": PageDetail.model_validate(page).model_dump(mode="json"),
             "revisions": revisions_payload.model_dump(mode="json")["items"],
+        },
+    )
+
+
+@router.get("/{page_id}/preview", response_model=None)
+async def admin_preview(
+    page_id: int,
+    inertia: InertiaDep,
+    db: AsyncSession = Depends(get_db),
+    settings: PagebuilderSettings = Depends(get_settings),
+) -> InertiaResponse:
+    """The draft as a visitor would see it.
+
+    Rendered through the *public* page component rather than a preview-only
+    one: a preview built from a second renderer is a preview that can disagree
+    with the published page, which makes it worse than no preview at all.
+
+    It reads ``draft_data``, so it answers the question the published URL
+    cannot — what the unsaved-to-live version looks like. This is an admin
+    route and stays behind the session, and it is marked noindex whatever the
+    page's own setting says, because a preview URL that gets indexed in place
+    of the real one is the one failure here that would be hard to undo.
+    """
+    page = await PagesService(db).get_page(page_id)
+    layout = await LayoutService(db).get()
+    return await inertia.render(
+        _PAGE_PUBLIC,
+        {
+            "title": page.title,
+            "data": page.draft_data or {},
+            "meta_description": page.meta_description,
+            "og_image": page.og_image,
+            "canonical_url": None,
+            "og_url": None,
+            "index_in_search": False,
+            "json_ld": page.json_ld,
+            "site_name": settings.site_name,
+            "twitter_handle": settings.twitter_handle,
+            **public_layout_props(layout),
         },
     )
 

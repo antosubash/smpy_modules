@@ -73,7 +73,12 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
     <li
       data-testid="article-row"
       data-slug={article.slug}
-      className="flex items-start gap-4 rounded-lg border bg-card p-3"
+      // Wraps rather than squeezing: below `sm` the actions take their own
+      // line instead of competing with the headline for the same 360px. The
+      // design moves them to a swipe or long-press there, which is smaller but
+      // reachable by neither keyboard nor screen reader — and undiscoverable
+      // for everyone else.
+      className="flex flex-wrap items-start gap-x-4 gap-y-3 rounded-lg border bg-card p-3"
     >
       {article.cover_image_url ? (
         <img
@@ -168,7 +173,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
         <p className="mt-1 text-xs text-muted-foreground">{statusLine(article)}</p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
         <Button type="button" size="sm" variant="outline" asChild>
           <a href={articleSettingsUrl(article.id)}>Edit</a>
         </Button>

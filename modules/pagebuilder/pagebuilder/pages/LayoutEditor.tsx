@@ -6,13 +6,16 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { BlockOutline } from '../components/editor/BlockOutline';
 import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
+import { useIsNarrow } from '../hooks/useIsNarrow';
 import {
   type LayoutDetail,
   type LayoutRevisionRead,
   restoreLayoutRevision,
   saveLayout,
 } from '../utils/api';
+import { blockLabels, moveBlock, outlineOf } from '../utils/blockOutline';
 
 interface Props {
   layout: LayoutDetail;
@@ -33,6 +36,10 @@ export default function LayoutEditor() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const isNarrow = useIsNarrow();
+  // The layout palette, not the page one: a header holds a different set of
+  // blocks and naming them from the wrong config would miss half of them.
+  const layoutLabels = blockLabels(getLayoutPuckConfig().components);
 
   const handleSave = async () => {
     setBusy(true);
@@ -134,42 +141,85 @@ export default function LayoutEditor() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y">
-        <section className="min-h-0 flex flex-col" data-testid="layout-header-slot">
-          <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
-            Header
+      {isNarrow ? (
+        // Two stacked drag canvases at phone width is the page editor's problem
+        // twice over: each gets half a short screen. The outlines fit, and
+        // reordering the header's links is the edit most likely to be wanted
+        // from a phone anyway.
+        <div className="flex-1 min-h-0 overflow-auto">
+          <div className="mx-auto flex max-w-2xl flex-col gap-5 p-4">
+            <p className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+              Drag-and-drop layout needs width, so the canvases are read-only at this size. You can
+              still reorder what is already in the header and footer, and save.
+            </p>
+            <section data-testid="layout-header-slot">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Header
+              </h2>
+              <BlockOutline
+                entries={outlineOf(headerData, layoutLabels)}
+                label="Header outline"
+                disabled={busy}
+                emptyHint="The header is empty. Add blocks to it on a wider screen."
+                onMove={(index, direction) =>
+                  setHeaderData(moveBlock(headerData, index, direction))
+                }
+              />
+            </section>
+            <section data-testid="layout-footer-slot">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Footer
+              </h2>
+              <BlockOutline
+                entries={outlineOf(footerData, layoutLabels)}
+                label="Footer outline"
+                disabled={busy}
+                emptyHint="The footer is empty. Add blocks to it on a wider screen."
+                onMove={(index, direction) =>
+                  setFooterData(moveBlock(footerData, index, direction))
+                }
+              />
+            </section>
           </div>
-          <div className="flex-1 min-h-0">
-            <Puck
-              config={getLayoutPuckConfig()}
-              data={headerData}
-              iframe={{ enabled: false }}
-              onChange={setHeaderData}
-              onPublish={(d) => {
-                setHeaderData(d);
-                void handleSave();
-              }}
-            />
-          </div>
-        </section>
-        <section className="min-h-0 flex flex-col" data-testid="layout-footer-slot">
-          <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
-            Footer
-          </div>
-          <div className="flex-1 min-h-0">
-            <Puck
-              config={getLayoutPuckConfig()}
-              data={footerData}
-              iframe={{ enabled: false }}
-              onChange={setFooterData}
-              onPublish={(d) => {
-                setFooterData(d);
-                void handleSave();
-              }}
-            />
-          </div>
-        </section>
-      </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 grid grid-rows-2 divide-y">
+          <section className="min-h-0 flex flex-col" data-testid="layout-header-slot">
+            <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Header
+            </div>
+            <div className="flex-1 min-h-0">
+              <Puck
+                config={getLayoutPuckConfig()}
+                data={headerData}
+                iframe={{ enabled: false }}
+                onChange={setHeaderData}
+                onPublish={(d) => {
+                  setHeaderData(d);
+                  void handleSave();
+                }}
+              />
+            </div>
+          </section>
+          <section className="min-h-0 flex flex-col" data-testid="layout-footer-slot">
+            <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Footer
+            </div>
+            <div className="flex-1 min-h-0">
+              <Puck
+                config={getLayoutPuckConfig()}
+                data={footerData}
+                iframe={{ enabled: false }}
+                onChange={setFooterData}
+                onPublish={(d) => {
+                  setFooterData(d);
+                  void handleSave();
+                }}
+              />
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

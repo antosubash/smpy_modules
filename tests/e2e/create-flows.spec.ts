@@ -135,7 +135,9 @@ test.describe('New article', () => {
     await dialog.getByRole('button', { name: 'Create draft' }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
 
-    await page.goto('/news/');
+    // Searched, not scrolled to: the list pages at 25, and by the time the
+    // whole suite has run there are more articles than that ahead of this one.
+    await page.goto(`/news/?q=${slug}`);
     const row = page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
     await expect(row).toBeVisible();
     await expect(row).toContainText(category);
