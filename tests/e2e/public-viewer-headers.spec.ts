@@ -47,7 +47,11 @@ test.describe('Public viewer headers', () => {
     expect(csp).toContain("default-src 'self'");
 
     // Cleanup.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    // Search for it: the table pages at 20 rows, so on a database with any
+    // history the row would not be on the first page.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: `Headers ${slug}` }).getByRole('button', { name: /^delete$/i }),
@@ -77,7 +81,11 @@ test.describe('Public viewer headers', () => {
     expect(second.headers()['etag']).toBe(etag);
 
     // Cleanup.
-    await page.goto('/pagebuilder/');
+    // Teardown deletes through the table, so ask for it —
+    // the board is the default view now.
+    // Search for it: the table pages at 20 rows, so on a database with any
+    // history the row would not be on the first page.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: `Cond ${slug}` }).getByRole('button', { name: /^delete$/i }),

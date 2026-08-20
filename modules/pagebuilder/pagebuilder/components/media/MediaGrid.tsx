@@ -52,6 +52,13 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
               </div>
             )}
             <div className="flex gap-2 pt-1 flex-wrap">
+              {/* The detail screen is where alt text, credit and the list of
+                  pages depending on this asset live. */}
+              <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                <a href={`/pagebuilder/media/${a.id}`} data-testid="media-details-link">
+                  Details
+                </a>
+              </Button>
               <Button
                 variant="link"
                 size="sm"
@@ -68,7 +75,7 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
                   </Button>
                 }
                 title={`Delete ${a.original_filename}?`}
-                description="Any page still pointing at this URL will show a broken image. The library cannot tell you which pages those are, so check before deleting."
+                description="If a page still uses this asset the delete is refused, and the pages using it are named. Open the asset to see them."
                 confirmLabel="Delete"
                 destructive
                 onConfirm={() => onDelete(a.id)}

@@ -9,7 +9,17 @@ export const TEST_ADMIN_PASSWORD = 'changeme1';
 const REPO_ROOT = dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = resolve(REPO_ROOT, 'host', 'test.db');
 
-const APP_URL = 'http://localhost:8000';
+// Overridable so a worktree can run e2e beside a dev stack holding the
+// default ports (E2E_API_PORT / E2E_UI_PORT; defaults unchanged).
+// Normalized here, once: `??` alone would pass a set-but-empty or garbage
+// value through, and the Makefile and vite each apply the same regex guard
+// to their own env inputs — all three agreeing on which port the stack is
+// on only because the guards stay identical.
+const numericPort = (raw: string | undefined, fallback: string): string =>
+  raw && /^[1-9][0-9]*$/.test(raw) ? raw : fallback;
+const API_PORT = numericPort(process.env.E2E_API_PORT, '8000');
+const UI_PORT = numericPort(process.env.E2E_UI_PORT, '5050');
+const APP_URL = `http://localhost:${API_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -36,8 +46,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    // `make dev` already orchestrates the API (uvicorn on 8000) and the
-    // Vite dev server (5050). Our wrapper resets the test SQLite DB and
+    // `make dev` already orchestrates the API (uvicorn on API_PORT) and the
+    // Vite dev server (UI_PORT). Our wrapper resets the test SQLite DB and
     // runs migrations before `make dev` boots so the host's bootstrap
     // logic can seed the admin user on first start.
     command: './tests/e2e/start-test-server.sh',
@@ -54,9 +64,12 @@ export default defineConfig({
       SM_DATABASE_URL: `sqlite+aiosqlite:///${TEST_DB_PATH}`,
       SM_USERS_BOOTSTRAP_EMAIL: TEST_ADMIN_EMAIL,
       SM_USERS_BOOTSTRAP_PASSWORD: TEST_ADMIN_PASSWORD,
-      SM_VITE_DEV_URL: 'http://localhost:5050',
+      SM_VITE_DEV_URL: `http://localhost:${UI_PORT}`,
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
+      // Consumed by Makefile dev-api and vite.config.ts respectively.
+      API_PORT,
+      SM_UI_PORT: UI_PORT,
     },
   },
 });

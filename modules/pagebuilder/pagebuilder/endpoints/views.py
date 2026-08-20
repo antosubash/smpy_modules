@@ -8,16 +8,15 @@ namespaced under the admin prefix.
 
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Query
 from inertia import InertiaResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder import board as board_query
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
@@ -36,56 +35,19 @@ from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 
-
-def _etag_for(
-    page_id: int,
-    updated_at: datetime | None,
-    layout_updated_at: datetime | None = None,
-) -> str:
-    """Stable, short ETag derived from page identity + last-modified time.
-
-    ``layout_updated_at`` participates so a site-wide header / footer
-    edit invalidates every page's cached chrome — without it, clients
-    keep serving stale layout from cache until the page itself changes.
-    """
-    stamp = updated_at.isoformat() if updated_at is not None else ""
-    layout_stamp = (
-        layout_updated_at.isoformat() if layout_updated_at is not None else ""
-    )
-    digest = hashlib.sha1(f"{page_id}:{stamp}:{layout_stamp}".encode()).hexdigest()[:16]
-    return f'W/"{digest}"'
-
-
-def _public_base_url(request: Request, settings: PagebuilderSettings) -> str:
-    """Resolve the public origin used to build absolute URLs.
-
-    Prefer the explicit setting (the deployment knows its public host)
-    and only fall back to the inbound request for local dev / scenarios
-    where the host header is trustworthy. Always returned without a
-    trailing slash so callers can concatenate path segments directly.
-    """
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
-
-
-def _absolute_page_url(
-    request: Request, settings: PagebuilderSettings, slug: str
-) -> str:
-    base = _public_base_url(request, settings)
-    prefix = settings.public_route_prefix.rstrip("/")
-    return f"{base}{prefix}/{slug}"
-
-
 router = APIRouter()
-public_router = APIRouter()
 
 _PAGE_LIST = "PageBuilder/PageList"
+_VIEW_BOARD = "board"
+_VIEW_LIST = "list"
+_PAGE_TRASH = "PageBuilder/Trash"
 _PAGE_EDITOR = "PageBuilder/PageEditor"
-_PAGE_PUBLIC = "PageBuilder/PublicPage"
 _PAGE_MEDIA = "PageBuilder/MediaLibrary"
+_PAGE_MEDIA_DETAIL = "PageBuilder/MediaDetail"
 _PAGE_PENDING = "PageBuilder/PendingReview"
 _PAGE_LAYOUT_EDITOR = "PageBuilder/LayoutEditor"
+# The draft preview deliberately reuses the public component — see admin_preview.
+_PAGE_PUBLIC = "PageBuilder/PublicPage"
 
 
 PAGE_LIST_LIMIT = 25
@@ -98,6 +60,7 @@ async def admin_list(
     search: str = "",
     status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
     offset: int = Query(default=0, ge=0),
+    view: str = Query(default=_VIEW_BOARD),
 ) -> InertiaResponse:
     """Page list, filtered server-side.
 
@@ -118,18 +81,42 @@ async def admin_list(
             search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
         )
     payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
+
+    # The board is the default view. The table stays a click away rather than
+    # being replaced: it is the only view that can sort, page and filter by an
+    # exact status, and those are real jobs the columns cannot do.
+    board: list[dict] | None = None
+    if view != _VIEW_LIST:
+        board = board_query.to_payload(
+            await board_query.load(db, search=search),
+            lambda item: PageRead.model_validate(item).model_dump(mode="json"),
+        )
+
     return await inertia.render(
         _PAGE_LIST,
         {
             "pages": payload.model_dump(mode="json"),
+            "board": board,
             "filters": {
                 "search": search,
                 "status": status_filter.value if status_filter else "",
                 "offset": offset,
                 "limit": PAGE_LIST_LIMIT,
+                "view": _VIEW_LIST if view == _VIEW_LIST else _VIEW_BOARD,
             },
         },
     )
+
+
+@router.get("/trash", response_model=None)
+async def admin_trash(inertia: InertiaDep) -> InertiaResponse:
+    """Pages waiting out the retention window.
+
+    Fetched client-side: restore and purge both change the list under the
+    cursor, and an Inertia round trip per row would discard the scroll position
+    every time.
+    """
+    return await inertia.render(_PAGE_TRASH)
 
 
 @router.get("/pending", response_model=None)
@@ -167,6 +154,45 @@ async def admin_edit(
         {
             "page": PageDetail.model_validate(page).model_dump(mode="json"),
             "revisions": revisions_payload.model_dump(mode="json")["items"],
+        },
+    )
+
+
+@router.get("/{page_id}/preview", response_model=None)
+async def admin_preview(
+    page_id: int,
+    inertia: InertiaDep,
+    db: AsyncSession = Depends(get_db),
+    settings: PagebuilderSettings = Depends(get_settings),
+) -> InertiaResponse:
+    """The draft as a visitor would see it.
+
+    Rendered through the *public* page component rather than a preview-only
+    one: a preview built from a second renderer is a preview that can disagree
+    with the published page, which makes it worse than no preview at all.
+
+    It reads ``draft_data``, so it answers the question the published URL
+    cannot — what the unsaved-to-live version looks like. This is an admin
+    route and stays behind the session, and it is marked noindex whatever the
+    page's own setting says, because a preview URL that gets indexed in place
+    of the real one is the one failure here that would be hard to undo.
+    """
+    page = await PagesService(db).get_page(page_id)
+    layout = await LayoutService(db).get()
+    return await inertia.render(
+        _PAGE_PUBLIC,
+        {
+            "title": page.title,
+            "data": page.draft_data or {},
+            "meta_description": page.meta_description,
+            "og_image": page.og_image,
+            "canonical_url": None,
+            "og_url": None,
+            "index_in_search": False,
+            "json_ld": page.json_ld,
+            "site_name": settings.site_name,
+            "twitter_handle": settings.twitter_handle,
+            **public_layout_props(layout),
         },
     )
 
@@ -214,51 +240,12 @@ async def admin_media(
     )
 
 
-@public_router.get("/{slug}", response_model=None)
-async def public_view(
-    slug: str,
-    request: Request,
-    inertia: InertiaDep,
-    db: AsyncSession = Depends(get_db),
-    settings: PagebuilderSettings = Depends(get_settings),
-) -> Response:
-    page = await PagesService(db).get_by_slug_published(slug)
-    if page is None or page.published_data is None:
-        raise HTTPException(status_code=404, detail="Page not found")
+@router.get("/media/{asset_id}", response_model=None)
+async def admin_media_detail(asset_id: int, inertia: InertiaDep) -> InertiaResponse:
+    """One asset: what it shows, who credited it, and which pages depend on it.
 
-    layout = await LayoutService(db).get()
-    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at)
-    cache_parts = [f"max-age={settings.public_cache_max_age}"]
-    if settings.public_cache_swr > 0:
-        cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
-    cache_control = "public, " + ", ".join(cache_parts)
-
-    def apply_headers(response: Response) -> Response:
-        response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = cache_control
-        if settings.public_csp:
-            response.headers["Content-Security-Policy"] = settings.public_csp
-        return response
-
-    if request.headers.get("if-none-match") == etag:
-        return apply_headers(Response(status_code=304))
-
-    canonical = page.canonical_url or _absolute_page_url(request, settings, slug)
-    return apply_headers(
-        await inertia.render(
-            _PAGE_PUBLIC,
-            {
-                "title": page.title,
-                "data": page.published_data,
-                "meta_description": page.meta_description,
-                "og_image": page.og_image,
-                "canonical_url": canonical,
-                "og_url": canonical,
-                "index_in_search": page.index_in_search,
-                "json_ld": page.json_ld,
-                "site_name": settings.site_name,
-                "twitter_handle": settings.twitter_handle,
-                **public_layout_props(layout),
-            },
-        )
-    )
+    Only the id is rendered. The asset and its usage list are fetched
+    client-side because editing the alt text has to re-check the usage — the
+    two travel together, and a full Inertia round trip per keystroke would not.
+    """
+    return await inertia.render(_PAGE_MEDIA_DETAIL, {"asset_id": asset_id})

@@ -12,6 +12,8 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type ReactNode, useId, useState } from 'react';
 
+import { usePendingDialog } from '../hooks/usePendingDialog';
+
 /**
  * Collect a note — a rejection reason, a publish message — before running an
  * action.
@@ -46,33 +48,18 @@ export function NoteDialog({
   onSubmit: (note: string) => Promise<unknown>;
 }) {
   const fieldId = useId();
-  const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The open/pending/error lifecycle is shared with ConfirmDialog — see the
+  // hook. The note clears on every close path so a reopened dialog starts
+  // blank rather than carrying a half-typed message.
+  const { open, pending, error, change, run } = usePendingDialog(`${submitLabel} failed`, () =>
+    setNote(''),
+  );
 
-  const change = (next: boolean) => {
-    if (pending) return;
-    setOpen(next);
-    if (!next) {
-      setNote('');
-      setError(null);
-    }
-  };
-
-  const submit = async () => {
+  const submit = () => {
     const trimmed = note.trim();
     if (required && !trimmed) return;
-    setPending(true);
-    setError(null);
-    try {
-      await onSubmit(trimmed);
-      change(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `${submitLabel} failed`);
-    } finally {
-      setPending(false);
-    }
+    void run(() => onSubmit(trimmed));
   };
 
   return (

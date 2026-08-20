@@ -1,0 +1,10 @@
+{
+  "extends": "@simple-module-py/tsconfig/base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./sm_ai/*"],
+      "@simple-module-py/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["sm_ai/**/*.ts", "sm_ai/**/*.tsx"]
+}

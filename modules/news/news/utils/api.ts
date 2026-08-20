@@ -1,13 +1,8 @@
 /** Client for the news read API. */
 
-/** Workflow state of the page behind an article.
- *
- * News' own type, mirroring `contracts.schemas.ArticleStatus`. It used to be
- * imported from pagebuilder, which made a news component's type-check depend
- * on another package's file layout to name three strings news is perfectly
- * able to name itself.
- */
-export type ArticleStatus = 'draft' | 'submitted_for_review' | 'published';
+import type { PageStatus } from '@simple-module-py/pagebuilder/pagebuilder/utils/types';
+
+import { BASE, errorFrom, readCookie, write } from './http';
 
 export interface ArticleRead {
   id: number;
@@ -17,19 +12,33 @@ export interface ArticleRead {
   excerpt: string;
   cover_image_url: string;
   category: string;
+  tags: string[];
+  /** Held at the top of /news and of every feed block. */
+  pinned: boolean;
+  /** Whether feed blocks may list it. Does not affect the admin list. */
+  show_in_feed: boolean;
+  author: string;
   published_at: string | null;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
-  page_status: ArticleStatus;
+  page_status: PageStatus;
   url: string;
-  /** Where an author edits the body. Served rather than assembled here, so
-   *  this module holds no opinion about how another routes its editor. */
-  edit_url: string;
+}
+
+export interface ArticleCounts {
+  all: number;
+  draft: number;
+  published: number;
+  undated: number;
 }
 
 export interface ArticleListResponse {
   items: ArticleRead[];
+  /** Matched the whole filter, status included — what the pager counts. */
   total: number;
+  /** What each status pill would show. `undated` overlaps draft and
+   *  published, so these deliberately do not sum to `all`. */
+  counts: ArticleCounts;
 }
 
 export interface CategoryCount {
@@ -39,25 +48,18 @@ export interface CategoryCount {
 
 export interface CategoryListResponse {
   items: CategoryCount[];
-  /** How many articles carry no category at all. Its own field rather than a
-   *  blank-named item, which would be indistinguishable from "All". */
-  uncategorised: number;
 }
-
-const BASE = '/api/news';
-
-/** Ask for the articles with no category at all.
- *
- * A blank string cannot mean this — the listing reads it as "no category
- * filter" — so the two states need distinct spellings on the wire. Matches
- * `constants.UNCATEGORISED`.
- */
-export const UNCATEGORISED = '__none__';
 
 export async function listArticles(params: {
   limit?: number;
   offset?: number;
   category?: string;
+  /** Free-text filter over headline and slug. */
+  q?: string;
+  /** `draft`, `published` or `undated`. */
+  status?: string;
+  /** Only articles allowed in feed blocks — the feed block's own filter. */
+  in_feed?: boolean;
   /** Sort undated (work-in-progress) articles first — the admin list's view.
    *  Public feeds keep the default, which pushes undated to the end. */
   undated_first?: boolean;
@@ -67,6 +69,9 @@ export async function listArticles(params: {
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.offset !== undefined) query.set('offset', String(params.offset));
   if (params.category) query.set('category', params.category);
+  if (params.q) query.set('q', params.q);
+  if (params.status) query.set('status', params.status);
+  if (params.in_feed) query.set('in_feed', 'true');
   if (params.undated_first) query.set('undated_first', 'true');
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
@@ -108,47 +113,15 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
   });
 }
 
-const CSRF_COOKIE = 'news_csrf';
-
-function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-/** Turn a failed response into something worth showing a person.
+const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
+/** A pagebuilder *view* route, deliberately not one of its API routes.
  *
- * The body is only useful when it is our own JSON `detail`. An HTML error page
- * — which is what an auth or CSRF failure returns — would otherwise be thrown
- * verbatim and rendered as a wall of markup, leaking the whole Inertia payload
- * into the DOM.
+ *  Only the view router carries the dependency that mints the CSRF token into
+ *  the session; the API router merely validates one. Its cookie middleware can
+ *  therefore only mirror a token that a view request already created, so
+ *  priming against `/api/pagebuilder/...` returns 200 and sets nothing.
  */
-async function errorFrom(response: Response): Promise<Error> {
-  const text = await response.text();
-  try {
-    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-    if (typeof detail === 'string') return new Error(detail);
-    if (detail) return new Error(JSON.stringify(detail));
-  } catch {
-    // Not JSON — fall through to the status line rather than echo markup.
-  }
-  return new Error(`Request failed (${response.status} ${response.statusText})`.trim());
-}
-
-async function write<T>(path: string, method: string, body?: unknown): Promise<T | null> {
-  const token = readCookie(CSRF_COOKIE);
-  const response = await fetch(`${BASE}${path}`, {
-    method,
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) throw await errorFrom(response);
-  return response.status === 204 ? null : ((await response.json()) as T);
-}
+const PAGEBUILDER_CSRF_PRIMER = '/pagebuilder/';
 
 export const attachArticle = (data: {
   page_id: number;
@@ -158,26 +131,98 @@ export const attachArticle = (data: {
 
 export const updateArticle = (
   id: number,
-  data: { category?: string; published_at?: string | null },
+  data: {
+    category?: string;
+    published_at?: string | null;
+    pinned?: boolean;
+    show_in_feed?: boolean;
+    author?: string;
+  },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
 export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
 
-/** Create an article and the page its body lives in, in one request.
+/** Read pagebuilder's CSRF cookie, priming it first if this session has never
+ *  touched a pagebuilder route.
  *
- *  This was two calls made from here — one to pagebuilder's page API, one back
- *  to news — and both of its problems were caused by that split. The first
- *  call was CSRF-protected by *another module's* cookie, which is unset for
- *  anyone who has not visited Pages this session, so the documented primary
- *  flow 403'd on a fresh login until a throwaway priming request was added.
- *  And the two calls committed separately, so any failure of the second left
- *  an empty, articleless page behind that nothing would ever clean up.
- *
- *  Server-side both writes share one transaction, and the request carries
- *  news' own token like every other write here.
+ *  Its middleware only mirrors the token on requests under pagebuilder's own
+ *  admin prefixes, so arriving at News straight from the sidebar leaves the
+ *  cookie unset — and the page-creating POST below is CSRF-protected. Without
+ *  this, "New article" 403s for anyone who has not already visited Pages this
+ *  session, which is the common path rather than the rare one.
  */
-export const createArticleWithPage = (data: {
-  title: string;
-  category?: string;
-  published_at?: string | null;
-}) => write<ArticleRead>('/articles/with-page', 'POST', data);
+async function pagebuilderCsrfToken(): Promise<string | null> {
+  const existing = readCookie(PAGEBUILDER_CSRF_COOKIE);
+  if (existing) return existing;
+  await fetch(PAGEBUILDER_CSRF_PRIMER, {
+    credentials: 'same-origin',
+    headers: { Accept: 'text/html' },
+  });
+  return readCookie(PAGEBUILDER_CSRF_COOKIE);
+}
+
+/** Create the page an article's body lives in, through pagebuilder's API. */
+export async function createArticlePage(title: string, slug: string): Promise<number> {
+  const token = await pagebuilderCsrfToken();
+  const response = await fetch('/api/pagebuilder/pages', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({
+      title,
+      slug,
+      draft_data: { root: { props: { title, width: 'full' } }, content: [], zones: {} },
+    }),
+  });
+  if (!response.ok) throw await errorFrom(response);
+  const { id } = (await response.json()) as { id: number };
+  return id;
+}
+
+/** Publish the page behind an article, from the list's row menu.
+ *
+ * Goes through pagebuilder because the body, slug and workflow all live on the
+ * page — this module owns only the category and the display date.
+ */
+export async function publishArticlePage(pageId: number): Promise<void> {
+  const token = await pagebuilderCsrfToken();
+  const response = await fetch(`/api/pagebuilder/pages/${pageId}/publish`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await errorFrom(response);
+}
+
+/** Where an article's body is actually edited — a pagebuilder route, because
+ *  the body belongs to the page rather than to this module. */
+export function articleEditUrl(pageId: number): string {
+  return `/pagebuilder/${pageId}/edit`;
+}
+
+/** "2d ago", "in 15d", "today" — the list's relative time.
+ *
+ * Rendered from the date part only, in UTC, for the same reason
+ * `formatArticleDate` is: `published_at` is a display date stored at midnight
+ * UTC, so reading it in the viewer's own timezone shifts it a day for everyone
+ * west of UTC.
+ */
+export function relativeDay(iso: string | null, now = new Date()): string {
+  if (!iso) return '';
+  const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(then.getTime())) return '';
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = Math.round((then.getTime() - today) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days > 0) return `in ${days}d`;
+  return `${-days}d ago`;
+}

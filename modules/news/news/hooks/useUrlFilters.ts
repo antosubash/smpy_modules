@@ -2,26 +2,41 @@ import { useCallback, useEffect, useState } from 'react';
 
 export interface NewsFilters {
   category: string;
+  /** Free-text search over headline and slug. */
+  q: string;
+  /** '', 'draft', 'published' or 'undated'. Empty is the All pill. */
+  status: string;
   offset: number;
 }
 
-const EMPTY: NewsFilters = { category: '', offset: 0 };
+const EMPTY: NewsFilters = { category: '', q: '', status: '', offset: 0 };
 
 function fromSearch(search: string): NewsFilters {
   const params = new URLSearchParams(search);
   const offset = Number.parseInt(params.get('offset') ?? '', 10);
   return {
     category: params.get('category') ?? '',
+    q: params.get('q') ?? '',
+    status: params.get('status') ?? '',
     // A hand-edited or stale "?offset=abc" should land on page one rather than
     // NaN its way into the request.
     offset: Number.isFinite(offset) && offset > 0 ? offset : 0,
   };
 }
 
-function toSearch({ category, offset }: NewsFilters): string {
-  const params = new URLSearchParams();
+function toSearch({ category, q, status, offset }: NewsFilters, current: string): string {
+  // Start from the current query string, not a fresh one: this hook owns only
+  // its own keys, and rebuilding from scratch would silently strip params
+  // other features (or analytics links) put there.
+  const params = new URLSearchParams(current);
   if (category) params.set('category', category);
+  else params.delete('category');
+  if (q) params.set('q', q);
+  else params.delete('q');
+  if (status) params.set('status', status);
+  else params.delete('status');
   if (offset > 0) params.set('offset', String(offset));
+  else params.delete('offset');
   const query = params.toString();
   return query ? `?${query}` : '';
 }
@@ -43,7 +58,7 @@ export function useUrlFilters(): [NewsFilters, (next: Partial<NewsFilters>) => v
   );
 
   useEffect(() => {
-    const url = `${window.location.pathname}${toSearch(filters)}`;
+    const url = `${window.location.pathname}${toSearch(filters, window.location.search)}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(window.history.state, '', url);
     }

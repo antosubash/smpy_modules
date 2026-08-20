@@ -9,13 +9,22 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from pagebuilder.endpoints.api import layout, pages, revisions, uploads, workflow
+from pagebuilder.endpoints.api import (
+    layout,
+    media_detail,
+    pages,
+    revisions,
+    uploads,
+    workflow,
+)
 
 router = APIRouter()
 router.include_router(pages.router)
 router.include_router(workflow.router)
 router.include_router(revisions.router)
 router.include_router(layout.router)
+# Before uploads so its literal `/uploads/{id}/checked` wins the match.
+router.include_router(media_detail.router)
 router.include_router(uploads.router)
 
 __all__ = ["router"]

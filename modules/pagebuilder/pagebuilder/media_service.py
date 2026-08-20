@@ -79,6 +79,9 @@ class MediaService:
             width=asset.width,
             height=asset.height,
             folder=asset.folder,
+            alt_text=asset.alt_text,
+            caption=asset.caption,
+            credit=asset.credit,
             variants=variants,
             created_at=asset.created_at,
         )

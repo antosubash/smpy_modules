@@ -1,273 +1,163 @@
 import { Head, usePage } from '@inertiajs/react';
-import { FilterPills } from '@simple-module-py/ui/components/FilterPills';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 
+import { ArticleFilters } from '../components/ArticleFilters';
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
-import { useUrlFilters } from '../hooks/useUrlFilters';
-import {
-  type ArticleRead,
-  type CategoryCount,
-  detachArticle,
-  listArticles,
-  listCategories,
-  UNCATEGORISED,
-  updateArticle,
-} from '../utils/api';
+import { useArticleList } from '../hooks/useArticleList';
+import { detachArticle, publishArticlePage, updateArticle } from '../utils/api';
 
-const PAGE_SIZE = 25;
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
+/** Plural nouns for the empty state, so it reads "No drafts match" rather than
+ *  splicing the raw status value in and producing "No draft match". */
+const STATUS_NOUN: Record<string, string> = {
+  draft: 'drafts',
+  published: 'published articles',
+  undated: 'undated articles',
+};
+
+/** The article list: search, two-state pipeline filters, and card rows.
+ *
+ * Rows are cards rather than table cells because the metadata is a sentence
+ * about state ("Draft · publishes in 15d"), not a set of comparable columns —
+ * a table would line up four values nobody scans vertically.
+ */
 export default function NewsList() {
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   const canEdit = auth?.permissions?.includes('news.edit');
 
-  const [articles, setArticles] = useState<ArticleRead[] | null>(null);
-  const [categories, setCategories] = useState<CategoryCount[]>([]);
-  // Articles with no category at all. Counted separately because a blank name
-  // cannot be a pill value — that is what "All" uses.
-  const [uncategorised, setUncategorised] = useState(0);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  // Category and paging live in the query string, matching the page list: a
-  // filtered view survives a reload and can be linked to.
-  const [{ category, offset }, setFilters] = useUrlFilters();
-
-  // Only the newest refresh may write state. An AbortSignal alone does not
-  // cover this: `runRow` refreshes without one, so a save's re-fetch could
-  // still land after a page change and paint the old page's rows under the new
-  // pager, with nothing left to re-fetch and correct it. The signal still
-  // earns its place — it cancels the request the effect is walking away from.
-  const latestRequest = useRef(0);
-
-  const refresh = useCallback(
-    async (signal?: AbortSignal) => {
-      const request = ++latestRequest.current;
-      const superseded = () => request !== latestRequest.current;
-
-      // Undated first: an undated article is work in progress — with the
-      // default (public-feed) order it would sit on the last page, burying
-      // exactly the row its author just created.
-      const articlesLoaded = listArticles({
-        limit: PAGE_SIZE,
-        offset,
-        category: category || undefined,
-        undated_first: true,
-        signal,
-      })
-        .then((response) => {
-          if (superseded()) return;
-          // A load that worked clears a banner left by one that did not;
-          // otherwise a transient failure sticks around until the next write.
-          setError(null);
-          // Detaching the last row of the last page leaves the offset past the
-          // end. Step back and let the re-fetch fill the list; writing the
-          // empty response first would flash the "no articles yet" box over a
-          // list that still holds a full page.
-          if (response.items.length === 0 && offset > 0) {
-            setFilters({ offset: Math.max(0, offset - PAGE_SIZE) });
-            return;
-          }
-          setArticles(response.items);
-          setTotal(response.total);
-        })
-        .catch((e) => {
-          if (superseded() || signal?.aborted) return;
-          setError((e as Error).message);
-        });
-
-      // Pills and suggestions only — a failure here just means no filter row,
-      // which is not worth an error banner over a perfectly usable list.
-      const categoriesLoaded = listCategories(signal)
-        .then((response) => {
-          if (superseded()) return;
-          setCategories(response.items);
-          setUncategorised(response.uncategorised);
-          // Editing the last row out of the filtered category empties the
-          // filter; fall back to All rather than pinning an orphaned pill.
-          // The uncategorised filter is checked against its own count for the
-          // same reason — categorising the last such article should not leave
-          // a pill selected that no longer exists.
-          const stillThere =
-            category === UNCATEGORISED
-              ? response.uncategorised > 0
-              : response.items.some((c) => c.category === category);
-          if (category && !stillThere) {
-            setFilters({ category: '', offset: 0 });
-          }
-        })
-        .catch(() => {
-          // Deliberately keep the last known list: emptying it unmounts the
-          // pill row, which would strand an active filter with no control
-          // left to clear it.
-        });
-
-      await Promise.all([articlesLoaded, categoriesLoaded]);
-    },
-    // `setFilters` is stable; listed because it is called above and the effect
-    // below re-runs on `refresh`, so a silently-changing identity here would
-    // mean an extra fetch per render.
-    [offset, category, setFilters],
-  );
+  const {
+    articles,
+    categories,
+    counts,
+    total,
+    shown,
+    busy,
+    busyId,
+    error,
+    filters,
+    setFilters,
+    load,
+    loadMore,
+    runRow,
+  } = useArticleList();
 
   useEffect(() => {
     const controller = new AbortController();
-    void refresh(controller.signal);
+    void load(controller.signal);
     return () => controller.abort();
-  }, [refresh]);
+  }, [load]);
 
-  // Busy is per row, so saving one article does not lock every other row's
-  // inputs while the request is in flight.
-  const runRow = async (id: number, work: () => Promise<unknown>) => {
-    setBusyId(id);
-    setError(null);
-    try {
-      await work();
-      // Awaited: clearing busy before the new rows land re-enables a row that
-      // is about to disappear, and a second Detach on it answers 404.
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const filtered = !!(filters.q || filters.status || filters.category);
 
   return (
     <PageShell
       title="News"
-      description="Articles are page-builder pages. Edit the body in the page editor; set the category and date here."
+      description={`${counts.published} published · ${counts.draft} drafts · public at /p/:slug`}
       actions={canEdit ? <NewArticleDialog /> : undefined}
     >
       <Head title="News" />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {(categories.length > 0 || uncategorised > 0) && (
-        <FilterPills
-          className="mb-4"
-          value={category}
-          onChange={(next) => {
-            setFilters({ category: next, offset: 0 });
-          }}
-          options={[
-            { value: '', label: 'All' },
-            ...categories.map((c) => ({
-              value: c.category,
-              label: `${c.category} (${c.count})`,
-            })),
-            // Last, and only when there are any: an uncategorised article is
-            // usually one somebody forgot to finish, and until this pill
-            // existed there was no way to list for it — the API reads a blank
-            // category as "no filter" rather than as a filter for blanks.
-            ...(uncategorised > 0
-              ? [{ value: UNCATEGORISED, label: `Uncategorised (${uncategorised})` }]
-              : []),
-          ]}
-        />
-      )}
+      <ArticleFilters
+        q={filters.q}
+        status={filters.status}
+        category={filters.category}
+        counts={counts}
+        categories={categories}
+        onChange={(next) => setFilters({ ...next, offset: 0 })}
+      />
 
       {articles === null ? (
         <div role="status" aria-label="Loading articles" className="space-y-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
         </div>
-      ) : articles.length === 0 && offset === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          {category ? (
-            // An active filter is the likelier reason for an empty list, and
-            // saying "no articles yet" here is simply false. The button also
-            // covers the case where the pill row is gone because the category
-            // request failed — otherwise the filter cannot be cleared at all.
+      ) : articles.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          {filtered ? (
             <>
-              {category === UNCATEGORISED
-                ? 'Every article has a category.'
-                : `No articles in "${category}".`}{' '}
-              <Button
-                type="button"
-                variant="link"
-                className="h-auto p-0"
-                onClick={() => {
-                  setFilters({ category: '', offset: 0 });
-                }}
-              >
-                Show all articles
-              </Button>
+              <p className="font-medium">
+                No {STATUS_NOUN[filters.status] ?? 'articles'} match
+                {filters.q ? ` “${filters.q}”` : ' this filter'}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {/* Say what a wider filter would find. "No results" alone
+                    leaves the reader guessing whether the search or the
+                    status pill is the thing that is too narrow. */}
+                {counts.all > 0
+                  ? `${counts.all} article${counts.all === 1 ? '' : 's'} match across all statuses. Widen the filter or clear the search.`
+                  : 'Nothing in the archive matches. Try a shorter search.'}
+              </p>
+              <div className="mt-3 flex justify-center gap-2">
+                {filters.status && counts.all > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilters({ status: '', offset: 0 })}
+                  >
+                    Search all statuses
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilters({ q: '', status: '', category: '', offset: 0 })}
+                >
+                  Clear
+                </Button>
+              </div>
             </>
           ) : (
-            'No articles yet. "New article" creates a page and opens it in the editor.'
+            <>
+              <p className="font-medium">No articles yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                “New article” creates a page and opens it in the editor. Set the category and date
+                back here afterwards.
+              </p>
+            </>
           )}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Article</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {articles.map((article) => (
-              <ArticleRow
-                // Keyed on the server state, not just the id: ArticleRow holds
-                // the inputs' values in local state seeded from its props, so
-                // a row reused across a refresh would keep showing what the
-                // author typed rather than what was saved.
-                key={`${article.id}:${article.category}:${article.published_at ?? ''}`}
-                article={article}
-                busy={busyId === article.id || !canEdit}
-                suggestionsId={CATEGORY_SUGGESTIONS_ID}
-                onSave={(id, category, publishedAt) =>
-                  runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
-                }
-                onDetach={(id) => runRow(id, () => detachArticle(id))}
-              />
-            ))}
-          </TableBody>
-        </Table>
+        <ul className="space-y-2">
+          {articles.map((article) => (
+            <ArticleRow
+              // Keyed on the server state, not just the id: the row seeds its
+              // inputs from its props, so a row reused across a refresh would
+              // keep showing what the author typed rather than what was saved.
+              key={`${article.id}:${article.category}:${article.published_at ?? ''}`}
+              article={article}
+              busy={busyId === article.id || busy || !canEdit}
+              suggestionsId={CATEGORY_SUGGESTIONS_ID}
+              onSave={(id, category, publishedAt) =>
+                runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
+              }
+              onDetach={(id) => runRow(id, () => detachArticle(id))}
+              onPublish={(target) => runRow(target.id, () => publishArticlePage(target.page_id))}
+            />
+          ))}
+        </ul>
       )}
 
-      {articles !== null && total > PAGE_SIZE && (
+      {articles !== null && articles.length > 0 && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {Math.min(offset + 1, total)}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+            Showing {shown} of {total}
           </span>
-          <div className="space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={offset === 0}
-              onClick={() => setFilters({ offset: Math.max(0, offset - PAGE_SIZE) })}
-            >
-              Previous
+          {shown < total && (
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={loadMore}>
+              Load more
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={offset + PAGE_SIZE >= total}
-              onClick={() => setFilters({ offset: offset + PAGE_SIZE })}
-            >
-              Next
-            </Button>
-          </div>
+          )}
         </div>
       )}
 

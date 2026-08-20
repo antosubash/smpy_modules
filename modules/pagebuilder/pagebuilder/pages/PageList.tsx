@@ -11,22 +11,29 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
-
+import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { NewPageDialog } from '../components/NewPageDialog';
+import { type BoardStage, PageBoard } from '../components/PageBoard';
 import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
 import { ScheduledBadge } from '../components/ScheduledBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { deletePage, type PageRead } from '../utils/api';
+import { publishPage, restorePage, unpublishPage } from '../utils/pagesApi';
 
 interface Props {
   pages: { items: PageRead[]; total: number };
-  filters: PageListFilterState;
+  /** Null in list view — the board query is skipped rather than computed and
+   *  thrown away. */
+  board: BoardStage[] | null;
+  filters: PageListFilterState & { view: string };
 }
 
 export default function PageList() {
-  const { pages, filters } = usePage<{ props: Props }>().props as unknown as Props;
+  const { pages, board, filters } = usePage<{ props: Props }>().props as unknown as Props;
   const { limit, offset } = filters;
   const filtering = filters.search !== '' || filters.status !== '';
+  const boardView = filters.view !== 'list' && board !== null;
 
   /**
    * Re-ask the server for a slice. `preserveState` keeps the component — and
@@ -34,15 +41,27 @@ export default function PageList() {
    * `replace` keeps one history entry per search rather than one per
    * keystroke, so Back leaves the list instead of retyping it backwards.
    */
-  const go = (next: { search?: string; status?: string; offset?: number }) => {
-    const merged = { ...filters, ...next };
-    // Any filter change invalidates the offset: page 3 of the previous filter
-    // is not page 3 of this one.
-    const nextOffset = next.offset ?? 0;
+  const go = (next: { search?: string; status?: string; offset?: number; view?: string }) => {
+    // Built field by field, not `{ ...filters, ...next }`: a merged object
+    // would carry a stale `offset` a reader must know to ignore. Any filter
+    // change invalidates the offset — page 3 of the previous filter is not
+    // page 3 of this one — so it defaults to 0, not to the current one.
+    // `view` is the exception that proves it: the board/list choice is not a
+    // filter, so it carries forward rather than resetting.
     router.get(
       '/pagebuilder/',
-      { search: merged.search, status: merged.status, offset: nextOffset },
-      { only: ['pages', 'filters'], preserveState: true, preserveScroll: true, replace: true },
+      {
+        search: next.search ?? filters.search,
+        status: next.status ?? filters.status,
+        offset: next.offset ?? 0,
+        view: next.view ?? filters.view,
+      },
+      {
+        only: ['pages', 'board', 'filters'],
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+      },
     );
   };
 
@@ -50,17 +69,64 @@ export default function PageList() {
   // the message. This used to be a bare try/finally, so a delete refused by
   // the server cleared the busy flag and left the row sitting there — visually
   // identical to a delete that had not been confirmed yet.
-  const handleDelete = async (id: number) => {
-    await deletePage(id);
-    router.reload({ only: ['pages', 'filters'] });
+  const reload = () => router.reload({ only: ['pages', 'board', 'filters'] });
+
+  /** Delete, then offer the way back.
+   *
+   * The toast is the reason the confirmations can stay as light as they do: a
+   * deletion is recoverable for 30 days, and the ten seconds after the click is
+   * when someone actually notices they hit the wrong row.
+   */
+  const handleDelete = async (page: PageRead) => {
+    await deletePage(page.id);
+    reload();
+    toast(`“${page.title}” deleted`, {
+      duration: 10_000,
+      description: 'It is in the trash for 30 days.',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          void restorePage(page.id)
+            .then(() => {
+              reload();
+              toast.success(`“${page.title}” restored as a draft`);
+            })
+            .catch((e: Error) => toast.error(e.message));
+        },
+      },
+    });
+  };
+
+  /** Take a published page offline. The content stays; only its status moves. */
+  const handleUnpublish = async (page: PageRead) => {
+    await unpublishPage(page.id);
+    reload();
+    toast(`“${page.title}” is offline`, {
+      description: 'It is a draft again. Publish it to put it back.',
+    });
+  };
+
+  /** Publish from a board card. Reloads rather than patching state: the card
+   *  has to leave one column and appear in another, and only the server knows
+   *  what else moved with it. */
+  const handlePublish = async (page: PageRead) => {
+    await publishPage(page.id);
+    reload();
+    toast.success(`“${page.title}” published`);
   };
 
   return (
     <PageShell
       title="Pages"
-      description="Compose, review, and publish site pages."
+      description="Drafts, scheduled drafts, published · public at /p/:slug"
       actions={
         <>
+          <Button variant="outline" onClick={() => go({ view: boardView ? 'list' : 'board' })}>
+            {boardView ? 'List view' : 'Board view'}
+          </Button>
+          <Button variant="outline" onClick={() => router.visit('/pagebuilder/trash')}>
+            Trash
+          </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/pending')}>
             Pending review
           </Button>
@@ -70,7 +136,7 @@ export default function PageList() {
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
             Media library
           </Button>
-          <Button onClick={() => router.visit('/pagebuilder/new')}>New page</Button>
+          <NewPageDialog />
         </>
       }
     >
@@ -79,7 +145,16 @@ export default function PageList() {
           "create your first one" prompt. */}
       {(filtering || pages.total > 0) && <PageListFilters filters={filters} onChange={go} />}
 
-      {pages.items.length === 0 ? (
+      {boardView ? (
+        <PageBoard
+          stages={board}
+          search={filters.search}
+          newPageSlot={<NewPageDialog />}
+          onDelete={handleDelete}
+          onPublish={handlePublish}
+          onUnpublish={handleUnpublish}
+        />
+      ) : pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           {filtering ? (
             <>
@@ -151,18 +226,28 @@ export default function PageList() {
                         Delete
                       </Button>
                     }
+                    // The same gate the board card applies, because it is the
+                    // same deletion: the row you happen to be looking at must
+                    // not decide how much friction a live URL going dark gets.
+                    level={p.status === 'published' ? 'high' : 'low'}
+                    confirmPhrase={p.status === 'published' ? p.slug : undefined}
                     title={`Delete "${p.title}"?`}
                     description={
-                      <>
-                        The page and its revision history are removed for good.
-                        {p.status === 'published' && (
-                          <> It is published, so {`/p/${p.slug}`} starts answering 404.</>
-                        )}
-                      </>
+                      p.status === 'published' ? (
+                        <>
+                          This page is published. <code>{`/p/${p.slug}`}</code> starts answering 404
+                          the moment you confirm. It goes to the trash for 30 days, and after that
+                          it is gone.
+                        </>
+                      ) : (
+                        <>
+                          It was never published, so nothing on the site changes. It goes to the
+                          trash for 30 days.
+                        </>
+                      )
                     }
                     confirmLabel="Delete"
-                    destructive
-                    onConfirm={() => handleDelete(p.id)}
+                    onConfirm={() => handleDelete(p)}
                   />
                 </TableCell>
               </TableRow>
@@ -171,7 +256,7 @@ export default function PageList() {
         </Table>
       )}
 
-      {pages.total > limit && (
+      {!boardView && pages.total > limit && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
           <span>
             Showing {Math.min(offset + 1, pages.total)}–{Math.min(offset + limit, pages.total)} of{' '}

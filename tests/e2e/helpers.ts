@@ -13,10 +13,32 @@ export async function clickAndConfirm(
   page: Page,
   trigger: Locator,
   label: RegExp | string = /^delete$/i,
+  /** Runs against the open dialog before confirming — content assertions. */
+  assertDialog?: (dialog: Locator) => Promise<void>,
 ) {
   await trigger.click();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog).toBeVisible();
+
+  // Runs against the dialog as it first appears — before any phrase is typed,
+  // so an assertion about the locked state still sees it locked.
+  await assertDialog?.(dialog);
+
+  // A high-blast-radius confirmation asks for a phrase to be typed before it
+  // unlocks. This helper is used for teardown, where the friction is not what
+  // is under test, so it reads the phrase the dialog is asking for and types
+  // it. That the gate EXISTS is asserted directly by the tests that care —
+  // trash.spec.ts for purge, qa-findings.spec.ts for a published delete — so
+  // satisfying it here cannot hide its absence.
+  //
+  // Scoped to the phrase label, not just any <code>: the published-delete
+  // description carries a <code>/p/{slug}</code> of its own, and typing that
+  // would never unlock anything.
+  const phrase = dialog.locator('label[for="confirm-dialog-phrase"] code');
+  if (await phrase.count()) {
+    await dialog.locator('#confirm-dialog-phrase').fill((await phrase.innerText()).trim());
+  }
+
   await dialog.getByRole('button', { name: label }).click();
   await expect(dialog).toHaveCount(0);
 }

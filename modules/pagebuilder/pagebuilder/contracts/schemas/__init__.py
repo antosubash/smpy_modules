@@ -1,0 +1,74 @@
+"""DTOs for the pagebuilder module — the public surface.
+
+A package rather than one file, for the same reason ``models`` is: it crossed
+the repo's 300-line cap. Import from ``pagebuilder.contracts.schemas`` exactly
+as before; the split is not part of the contract.
+"""
+
+from __future__ import annotations
+
+from pagebuilder.contracts.schemas._layout import (
+    LayoutDetail,
+    LayoutRead,
+    LayoutRevisionDetail,
+    LayoutRevisionListResponse,
+    LayoutRevisionRead,
+    LayoutUpdate,
+)
+from pagebuilder.contracts.schemas._media import (
+    MediaAssetDetail,
+    MediaAssetListResponse,
+    MediaAssetRead,
+    MediaAssetUpdate,
+    MediaAssetVariant,
+    MediaUsage,
+)
+from pagebuilder.contracts.schemas._pages import (
+    BlockChange,
+    MetadataChange,
+    PageCreate,
+    PageDetail,
+    PageListResponse,
+    PageNoteRequest,
+    PageRead,
+    PageRejectRequest,
+    PageRevisionDetail,
+    PageRevisionListResponse,
+    PageRevisionRead,
+    PageScheduleRequest,
+    PageUpdate,
+    PuckData,
+    RevisionDiffResponse,
+    StatusFilter,
+)
+
+__all__ = [
+    "BlockChange",
+    "LayoutDetail",
+    "LayoutRead",
+    "LayoutRevisionDetail",
+    "LayoutRevisionListResponse",
+    "LayoutRevisionRead",
+    "LayoutUpdate",
+    "MediaAssetDetail",
+    "MediaAssetListResponse",
+    "MediaAssetRead",
+    "MediaAssetUpdate",
+    "MediaAssetVariant",
+    "MediaUsage",
+    "MetadataChange",
+    "PageCreate",
+    "PageDetail",
+    "PageListResponse",
+    "PageNoteRequest",
+    "PageRead",
+    "PageRejectRequest",
+    "PageRevisionDetail",
+    "PageRevisionListResponse",
+    "PageRevisionRead",
+    "PageScheduleRequest",
+    "PageUpdate",
+    "PuckData",
+    "RevisionDiffResponse",
+    "StatusFilter",
+]
