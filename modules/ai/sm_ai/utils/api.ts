@@ -42,12 +42,24 @@ function csrfHeader(): Record<string, string> {
 }
 
 /** Turn a failed response into something worth showing a person — our own
- * JSON `detail` when present, the status line otherwise (never raw HTML). */
+ * JSON `detail` when present, the status line otherwise (never raw HTML).
+ * FastAPI 422s carry a Pydantic error array; render it as "field: message"
+ * lines instead of dumping the serialized structure into a toast. */
 async function errorFrom(response: Response): Promise<Error> {
   const text = await response.text();
   try {
     const detail = (JSON.parse(text) as { detail?: unknown }).detail;
     if (typeof detail === 'string') return new Error(detail);
+    if (Array.isArray(detail)) {
+      const lines = detail
+        .map((item) => {
+          const entry = item as { loc?: unknown[]; msg?: string };
+          const field = Array.isArray(entry.loc) ? String(entry.loc[entry.loc.length - 1]) : '';
+          return entry.msg ? (field ? `${field}: ${entry.msg}` : entry.msg) : '';
+        })
+        .filter(Boolean);
+      if (lines.length) return new Error(lines.join('; '));
+    }
     if (detail) return new Error(JSON.stringify(detail));
   } catch {
     // Not JSON — fall through to the status line rather than echo markup.
