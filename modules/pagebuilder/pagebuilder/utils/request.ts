@@ -34,7 +34,7 @@ const MAX_BODY_SNIPPET = 200;
  * `detail` is a list of Pydantic errors there. `loc` reads ["body", "<field>"];
  * the wrapper is noise to whoever is reading the message.
  */
-function fromValidationErrors(detail: unknown): string | null {
+export function fromValidationErrors(detail: unknown): string | null {
   if (!Array.isArray(detail) || detail.length === 0) return null;
   const parts: string[] = [];
   for (const entry of detail) {
@@ -59,26 +59,27 @@ function fromValidationErrors(detail: unknown): string | null {
  *
  * So: prefer the API's own `detail`, fall back to the status, and never render
  * a markup body as prose.
+ *
+ * The parse is attempted whatever the content-type claims, matching
+ * `news/utils/http.ts`. Gating on `application/json` first would throw away a
+ * perfectly good `detail` from a response that merely mislabelled itself, and
+ * the try/catch plus the markup guard below already make the attempt safe.
  */
-async function errorMessage(response: Response): Promise<string> {
+export async function errorMessage(response: Response): Promise<string> {
   const fallback = `Request failed (${response.status} ${response.statusText})`.trim();
   const body = await response.text().catch(() => '');
   if (!body) return fallback;
 
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
-    try {
-      const parsed = JSON.parse(body) as { detail?: unknown; message?: unknown };
-      const detail = parsed.detail ?? parsed.message;
-      if (typeof detail === 'string' && detail.trim()) return detail;
-      // FastAPI's 422 sends a *list* of Pydantic errors. Without this the
-      // author who typed a space into a URL field got "Request failed (422
-      // Unprocessable Entity)" and no clue which field or why.
-      const validation = fromValidationErrors(detail);
-      if (validation) return validation;
-    } catch {
-      // Mislabelled as JSON. Fall through to the text handling below.
-    }
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown };
+    if (typeof parsed.detail === 'string' && parsed.detail.trim()) return parsed.detail;
+    // FastAPI's 422 sends a *list* of Pydantic errors. Without this the author
+    // who typed a space into a URL field got "Request failed (422
+    // Unprocessable Entity)" and no clue which field or why.
+    const validation = fromValidationErrors(parsed.detail);
+    if (validation) return validation;
+  } catch {
+    // Not JSON at all. Fall through to the text handling below.
   }
 
   // Anything that looks like a document is structure, not a message.
