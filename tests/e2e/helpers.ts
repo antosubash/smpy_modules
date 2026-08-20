@@ -13,10 +13,13 @@ export async function clickAndConfirm(
   page: Page,
   trigger: Locator,
   label: RegExp | string = /^delete$/i,
+  /** Runs against the open dialog before confirming — content assertions. */
+  assertDialog?: (dialog: Locator) => Promise<void>,
 ) {
   await trigger.click();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog).toBeVisible();
+  await assertDialog?.(dialog);
   await dialog.getByRole('button', { name: label }).click();
   await expect(dialog).toHaveCount(0);
 }

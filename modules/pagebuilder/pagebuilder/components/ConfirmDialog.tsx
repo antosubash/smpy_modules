@@ -9,7 +9,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@simple-module-py/ui/components/ui/alert-dialog';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+
+import { usePendingDialog } from '../hooks/usePendingDialog';
 
 /**
  * Confirm a consequential action without handing the page to the browser.
@@ -37,30 +39,10 @@ export function ConfirmDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const change = (next: boolean) => {
-    // A request in flight owns the dialog: closing it here would strand the
-    // pending state and drop the error the call is about to produce.
-    if (pending) return;
-    setOpen(next);
-    if (!next) setError(null);
-  };
-
-  const run = async () => {
-    setPending(true);
-    setError(null);
-    try {
-      await onConfirm();
-      setOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `${confirmLabel} failed`);
-    } finally {
-      setPending(false);
-    }
-  };
+  // The open/pending/error lifecycle is shared with NoteDialog — see the
+  // hook for the invariants (in-flight request owns the dialog, failure
+  // keeps it open, closing clears the error).
+  const { open, pending, error, change, run } = usePendingDialog(`${confirmLabel} failed`);
 
   return (
     <AlertDialog open={open} onOpenChange={change}>
@@ -80,7 +62,7 @@ export function ConfirmDialog({
             // a failure stays on screen.
             onClick={(e) => {
               e.preventDefault();
-              void run();
+              void run(onConfirm);
             }}
           >
             {pending ? 'Working…' : confirmLabel}

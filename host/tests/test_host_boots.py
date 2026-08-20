@@ -45,3 +45,13 @@ def test_pagebuilder_routes_mounted(app):
     paths = set(app.openapi()["paths"])
     assert "/api/pagebuilder/pages" in paths
     assert "/pagebuilder/media" in paths
+
+
+def test_ai_registered(app):
+    assert "Ai" in _module_names(app)
+
+
+def test_ai_routes_mounted(app):
+    paths = set(app.openapi()["paths"])
+    assert "/api/ai/settings" in paths
+    assert "/api/ai/test" in paths

@@ -135,6 +135,12 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
+// Same guard playwright.config.ts and the Makefile apply, so every consumer
+// agrees on which port the UI actually took (Number() would also accept
+// hex/exponent/leading-zero forms the other two reject).
+const rawUiPort = process.env.SM_UI_PORT;
+const uiPort = rawUiPort && /^[1-9][0-9]*$/.test(rawUiPort) ? Number(rawUiPort) : 5050;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: import.meta.dirname,
@@ -153,9 +159,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5050,
+    // Overridable so a second checkout (e.g. a worktree running e2e) can
+    // boot beside a dev stack that already holds the default port. `uiPort`
+    // is regex-guarded above, so an exported-but-empty or garbage SM_UI_PORT
+    // falls back to 5050 rather than yielding port 0/NaN.
+    port: uiPort,
     strictPort: true,
-    origin: 'http://localhost:5050',
+    origin: `http://localhost:${uiPort}`,
     fs: {
       allow: [fsRoot, ...moduleFsAllow],
     },

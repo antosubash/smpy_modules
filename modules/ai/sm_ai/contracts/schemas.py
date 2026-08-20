@@ -1,0 +1,120 @@
+"""DTOs for the AI settings API. Secrets never travel outward — reads carry
+``has_*_api_key`` booleans; writes treat blank as "keep" and ``clear_*`` as
+explicit removal."""
+
+from __future__ import annotations
+
+from pydantic import field_validator
+from sqlmodel import SQLModel
+
+from sm_ai import constants
+
+
+class AiSettingsOut(SQLModel):
+    """Current AI settings with secrets reduced to presence flags.
+
+    Carries the allowed provider ids so the settings page renders its
+    dropdowns from the same tuples the validators enforce — the frontend
+    holds no provider list of its own.
+    """
+
+    chat_providers: list[str] = list(constants.CHAT_PROVIDERS)
+    embedding_providers: list[str] = list(constants.EMBEDDING_PROVIDERS)
+    chat_provider: str
+    chat_model: str
+    chat_base_url: str
+    has_chat_api_key: bool
+    embedding_provider: str
+    embedding_model: str
+    embedding_base_url: str
+    has_embedding_api_key: bool
+    embedding_dim: int
+
+    @field_validator("chat_provider", "embedding_provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        # Env-seeded values may be mixed-case ("Anthropic"): resolve.py and
+        # the update validator both accept them via strip().lower(), so the
+        # read path must normalize the same way or the settings dropdown
+        # renders no selection against the lowercase option ids.
+        return value.strip().lower()
+
+
+class AiSettingsUpdate(SQLModel):
+    """Partial update. Key fields: blank/omitted = keep the stored key."""
+
+    chat_provider: str | None = None
+    chat_model: str | None = None
+    chat_base_url: str | None = None
+    chat_api_key: str | None = None
+    clear_chat_api_key: bool = False
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_base_url: str | None = None
+    embedding_api_key: str | None = None
+    clear_embedding_api_key: bool = False
+    embedding_dim: int | None = None
+
+    @field_validator("chat_provider")
+    @classmethod
+    def _chat_provider_known(cls, value: str | None) -> str | None:
+        # Normalize the same way resolve.py reads (strip().lower()): an
+        # env-seeded "Anthropic" works at runtime and must not brick every
+        # save on the settings page until the provider is re-picked.
+        if value is None:
+            return value
+        value = value.strip().lower()
+        if value not in constants.CHAT_PROVIDERS:
+            raise ValueError(f"chat_provider must be one of {constants.CHAT_PROVIDERS}")
+        return value
+
+    @field_validator("embedding_provider")
+    @classmethod
+    def _embedding_provider_known(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip().lower()
+        if value != "" and value not in constants.EMBEDDING_PROVIDERS:
+            raise ValueError(
+                f"embedding_provider must be empty or one of {constants.EMBEDDING_PROVIDERS}"
+            )
+        return value
+
+    @field_validator("chat_model")
+    @classmethod
+    def _chat_model_not_blank(cls, value: str | None) -> str | None:
+        # The chat slot is required: without this, a whitespace-only value
+        # strips to "" in build_changes and silently wipes the model, failing
+        # every consumer resolve_model() until an admin re-enters it.
+        if value is not None and not value.strip():
+            raise ValueError("chat_model must not be blank")
+        return value
+
+    @field_validator("embedding_dim")
+    @classmethod
+    def _dim_non_negative(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError("embedding_dim must be >= 0")
+        return value
+
+
+class AiTestRequest(SQLModel):
+    """Which slot to test."""
+
+    slot: str
+
+    @field_validator("slot")
+    @classmethod
+    def _slot_known(cls, value: str) -> str:
+        if value not in constants.TEST_SLOTS:
+            raise ValueError(f"slot must be one of {constants.TEST_SLOTS}")
+        return value
+
+
+class AiTestResult(SQLModel):
+    """Outcome of one test call. Failure is a result, never a 500."""
+
+    ok: bool
+    model: str = ""
+    latency_ms: int = 0
+    error: str = ""

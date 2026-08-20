@@ -171,6 +171,11 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
     // the translation extractor applies to every other copy field.
     const hasCaption = Boolean(caption?.trim());
     const measure = measureClass(maxWidth);
+    // A non-full measure always lives on a wrapper, never on the <img>
+    // itself: `.max-w-2xl` on the image would outrank the 100% cap and let a
+    // wide image overflow a column narrower than the measure. The image
+    // keeps `max-w-full` so it can never escape whichever box holds it.
+    const wrapped = hasCaption || maxWidth !== 'full';
     const image = (
       <img
         src={src}
@@ -188,17 +193,17 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
         // tenant's design pack. As a class it is settable and still caps at the
         // container when `maxWidth` is `full`.
         style={{ objectFit }}
-        // Inside a <figure> the margin belongs to the figure, and `block`
-        // drops the inline descender gap above the caption. The measure goes on
-        // whichever element is outermost — two `max-w-*` classes on one element
+        // Inside a wrapper the margin belongs to the wrapper, and `block`
+        // drops the inline descender gap above a caption. The measure goes on
+        // the outermost element only — two `max-w-*` classes on one element
         // would resolve by stylesheet order, not by which one was meant.
-        className={cn(
-          hasCaption ? 'block max-w-full' : cn('my-3', measure),
-          ROUNDED_CLASS[rounded],
-        )}
+        className={cn(wrapped ? 'block max-w-full' : cn('my-3', measure), ROUNDED_CLASS[rounded])}
       />
     );
-    if (!hasCaption) return image;
+    if (!wrapped) return image;
+    if (!hasCaption) {
+      return <div className={cn('my-3', measure)}>{image}</div>;
+    }
     return (
       // Capping the figure rather than the image keeps the caption the same
       // width as the picture it describes.

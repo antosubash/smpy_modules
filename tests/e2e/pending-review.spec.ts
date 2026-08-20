@@ -9,7 +9,7 @@
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, csrfHeader, login, uniqueSlug } from './helpers';
 
 /** A page sitting in `submitted_for_review`, which is what the queue lists. */
 async function submitForReview(page: Page, title: string): Promise<{ id: number; slug: string }> {
@@ -104,21 +104,19 @@ test.describe('Pending review queue', () => {
     const { id, slug } = await submitForReview(page, title);
 
     await page.goto('/pagebuilder/pending');
-    await page
-      .locator('tr', { hasText: title })
-      .getByRole('button', { name: /^approve$/i })
-      .click();
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: title }).getByRole('button', { name: /^approve$/i }),
+      /^approve$/i,
+      async (dialog) => {
+        // The dialog names the page and the URL it is about to go live at —
+        // the `confirm()` it replaced said "Approve and publish this page?"
+        // for every row in the queue.
+        await expect(dialog).toContainText(title);
+        await expect(dialog).toContainText(`/p/${slug}`);
+      },
+    );
 
-    const dialog = page.getByRole('alertdialog');
-    await expect(dialog).toBeVisible();
-    // The dialog names the page and the URL it is about to go live at — the
-    // `confirm()` it replaced said "Approve and publish this page?" for every
-    // row in the queue.
-    await expect(dialog).toContainText(title);
-    await expect(dialog).toContainText(`/p/${slug}`);
-    await dialog.getByRole('button', { name: /^approve$/i }).click();
-
-    await expect(dialog).toHaveCount(0);
     await expect(page.locator('tr', { hasText: title })).toHaveCount(0);
     expect(await statusOf(page, id)).toBe('published');
 
