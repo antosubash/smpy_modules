@@ -74,4 +74,15 @@ test.describe('Autosave sees every Page-tab field', () => {
     // own defaults, or adding fields to it makes every page load dirty.
     await expect(page.getByTestId('autosave-status')).not.toHaveText(/unsaved changes/i);
   });
+
+  /*
+   * Not covered here: `initialSnapshotFor` used to default a new page's slug to
+   * '' while the live snapshot derived `slugify('Untitled page')`, so a new
+   * editor was dirty from mount. That is fixed in `PageEditor.tsx`, but it has
+   * no assertable symptom in this suite — the autosave status line is not
+   * rendered until a page has an id, and the beforeunload prompt does not
+   * surface to Playwright here (a version of this test asserting on it passed
+   * just as happily with the fix reverted, so it was removed rather than kept
+   * as decoration).
+   */
 });

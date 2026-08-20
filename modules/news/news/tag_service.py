@@ -139,6 +139,33 @@ async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
     return tag
 
 
+async def delete(db: AsyncSession, tag: NewsTag) -> None:
+    """Remove the tag and its links. The articles are untouched.
+
+    The links are deleted explicitly even though ``NewsArticleTag`` declares
+    ``ondelete="CASCADE"``: that is enforced by the database, and SQLite only
+    enforces foreign keys when the connection has run ``PRAGMA
+    foreign_keys=ON``, which nothing in this stack does. A surviving link is not
+    inert — SQLite reuses ids, so it re-attaches to the next tag created and an
+    article silently acquires a tag nobody applied.
+
+    ``merge`` already does this for the same reason; this is the other path.
+    """
+    await db.execute(sa_delete(NewsArticleTag).where(NewsArticleTag.tag_id == tag.id))
+    await db.delete(tag)
+    await db.flush()
+
+
+async def unlink_article(db: AsyncSession, article_id: int) -> None:
+    """Drop every link belonging to an article that is going away.
+
+    Same reasoning as :func:`delete`, from the other side of the join.
+    """
+    await db.execute(
+        sa_delete(NewsArticleTag).where(NewsArticleTag.article_id == article_id)
+    )
+
+
 async def merge(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> int:
     """Fold ``source`` into ``target`` and delete it. Returns articles moved.
 

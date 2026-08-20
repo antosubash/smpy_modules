@@ -12,6 +12,7 @@ from typing import Final
 
 from pagebuilder.models import Page, PageStatus
 
+from news.like import like_pattern
 from news.models import NewsArticle
 
 STATUS_DRAFT: Final = "draft"
@@ -37,8 +38,12 @@ def search(stmt, q: str | None):
     """
     if not q or not q.strip():
         return stmt
-    pattern = f"%{q.strip()}%"
-    return stmt.where(Page.title.ilike(pattern) | Page.slug.ilike(pattern))
+    # Escaped, and with the ESCAPE clause: `_` is a single-character
+    # wildcard, so an unescaped search for `hero_1` also returned `heroX1`.
+    pattern = like_pattern(q)
+    return stmt.where(
+        Page.title.ilike(pattern, escape="\\") | Page.slug.ilike(pattern, escape="\\")
+    )
 
 
 def status(stmt, value: str | None):

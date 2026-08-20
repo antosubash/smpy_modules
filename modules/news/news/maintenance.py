@@ -12,7 +12,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news.models import NewsArticle
+from news.models import NewsArticle, NewsArticleTag
 
 
 async def reconcile_orphans(db: AsyncSession) -> int:
@@ -33,6 +33,15 @@ async def reconcile_orphans(db: AsyncSession) -> int:
     """
     orphaned = select(NewsArticle.id).where(
         ~select(Page.id).where(Page.id == NewsArticle.page_id).exists()
+    )
+    # The tag links go first, and explicitly. ``NewsArticleTag`` declares
+    # ``ondelete="CASCADE"`` but SQLite only honours it with
+    # ``PRAGMA foreign_keys=ON``, which nothing here sets — so a sweep that
+    # removed only the article rows would trade one class of orphan for
+    # another, and this function exists precisely because orphans re-attach
+    # when an id is reused.
+    await db.execute(
+        sa_delete(NewsArticleTag).where(NewsArticleTag.article_id.in_(orphaned))
     )
     result = await db.execute(
         sa_delete(NewsArticle).where(NewsArticle.id.in_(orphaned))

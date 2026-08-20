@@ -21,6 +21,7 @@ from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.contracts.schemas import SearchHit, SearchResults
+from news.like import like_pattern
 from news.models import NewsArticle, NewsArticleTag, NewsTag
 
 #: Rows shown per section before the "N more" line takes over.
@@ -28,13 +29,6 @@ PER_SECTION = 5
 
 #: Characters of body text either side of a match in the excerpt.
 _SNIPPET_PADDING = 60
-
-
-def _like(q: str) -> str:
-    """Escape the wildcards so a search for ``100%`` is not a search for
-    everything."""
-    escaped = q.strip().translate(str.maketrans({"%": r"\%", "_": r"\_", "\\": "\\\\"}))
-    return f"%{escaped}%"
 
 
 def excerpt(blocks: dict | None, q: str) -> str:
@@ -67,7 +61,7 @@ async def _article_ids_by_tag(db: AsyncSession, pattern: str) -> set[int]:
     rows = await db.execute(
         select(NewsArticleTag.article_id)
         .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
-        .where(NewsTag.name.ilike(pattern))
+        .where(NewsTag.name.ilike(pattern, escape="\\"))
     )
     return set(rows.scalars().all())
 
@@ -84,14 +78,14 @@ async def search(
     if not q.strip():
         return results
 
-    pattern = _like(q)
+    pattern = like_pattern(q)
     tagged = await _article_ids_by_tag(db, pattern)
 
     # ── Articles ──────────────────────────────────────────────────────
     article_match = or_(
-        Page.title.ilike(pattern),
-        Page.slug.ilike(pattern),
-        NewsArticle.category.ilike(pattern),
+        Page.title.ilike(pattern, escape="\\"),
+        Page.slug.ilike(pattern, escape="\\"),
+        NewsArticle.category.ilike(pattern, escape="\\"),
         NewsArticle.id.in_(tagged) if tagged else False,
     )
     article_base = (
@@ -126,14 +120,14 @@ async def search(
         NOT_TRASHED,
         ~is_article,
         or_(
-            Page.title.ilike(pattern),
-            Page.slug.ilike(pattern),
+            Page.title.ilike(pattern, escape="\\"),
+            Page.slug.ilike(pattern, escape="\\"),
             # The body. A LIKE against the JSON column cast to text, evaluated
             # in the database — loading the blocks to search them in Python is
             # what made listings scale with content size rather than row count.
             # The cast is explicit: `func.cast` with an untyped target compiles
             # to NullType and the whole statement fails at DDL generation.
-            cast(Page.draft_data, Text).ilike(pattern),
+            cast(Page.draft_data, Text).ilike(pattern, escape="\\"),
         ),
     )
     if not include_drafts:
@@ -158,8 +152,8 @@ async def search(
     # ── Media ─────────────────────────────────────────────────────────
     media_base = select(MediaAsset).where(
         or_(
-            MediaAsset.original_filename.ilike(pattern),
-            MediaAsset.filename.ilike(pattern),
+            MediaAsset.original_filename.ilike(pattern, escape="\\"),
+            MediaAsset.filename.ilike(pattern, escape="\\"),
         )
     )
     results.media_total = int(

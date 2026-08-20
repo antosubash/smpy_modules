@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Load
 
-from news import query_filters
+from news import query_filters, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.maintenance import reconcile_orphans as reconcile_orphans
@@ -289,6 +289,11 @@ async def update(
 
 
 async def delete(db: AsyncSession, article: NewsArticle) -> None:
-    """Detach the article. The page itself is untouched."""
+    """Detach the article. The page itself is untouched.
+
+    Tag links go explicitly, not by ``ondelete="CASCADE"`` — see
+    :func:`news.tag_service.delete` for why that never fires here.
+    """
+    await tag_service.unlink_article(db, article.id or 0)
     await db.delete(article)
     await db.flush()

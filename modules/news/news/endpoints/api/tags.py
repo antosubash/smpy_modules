@@ -73,5 +73,4 @@ async def merge_tag(
 async def delete_tag(tag_id: int, db: AsyncSession = Depends(get_db)) -> None:
     """Remove the tag. Its links go with it; the articles do not."""
     tag = await _load(db, tag_id)
-    await db.delete(tag)
-    await db.flush()
+    await tag_service.delete(db, tag)

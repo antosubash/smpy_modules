@@ -18,6 +18,7 @@ import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
 import type { PageDetail, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { slugify } from '../utils/slugify';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`
  *  — the editor only needs it to show the URL, not to build one. */
@@ -29,12 +30,17 @@ interface Props {
 }
 
 function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
+  const title = page?.title ?? 'Untitled page';
   return {
     // Every default here must match `useEditorForm`'s corresponding useState
     // exactly. A mismatch does not fail loudly — it just makes a freshly
     // opened page report unsaved changes it does not have.
-    title: page?.title ?? 'Untitled page',
-    slug: page?.slug ?? '',
+    title,
+    // Derived, not `?? ''`: on a new page the form has no saved slug, so
+    // `effectiveSlug` is `slugify(title)`. Comparing that against an empty
+    // string made every new page dirty from mount, which armed the
+    // beforeunload guard on an editor nobody had typed into yet.
+    slug: page?.slug ?? slugify(title),
     metaTitle: page?.meta_title ?? '',
     metaDescription: page?.meta_description ?? '',
     ogImage: page?.og_image ?? '',

@@ -103,6 +103,15 @@ class TrashMixin:
     async def purge(self, page_id: int) -> None:
         """Remove the page for good. Not reversible.
 
+        **This is the one method in the service that owns its own transaction
+        boundary.** Everywhere else the framework's ``get_db`` dependency
+        decides when to commit; here the ``PageDeleted`` publish below forces a
+        commit first, for the reason given at that line. Two consequences for
+        anyone composing this with other writes: work staged on ``self.db``
+        earlier in the same request or scheduler tick is committed along with
+        it, and a failure after that point cannot be rolled back by the caller.
+        ``purge_expired`` calls this in a loop and is written to tolerate that.
+
         Children are orphaned explicitly rather than by ``ON DELETE SET NULL``:
         SQLite does not enforce foreign keys unless ``PRAGMA foreign_keys=ON``
         is set on every connection, and a ``parent_id`` left pointing at a
