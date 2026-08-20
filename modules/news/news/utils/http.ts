@@ -13,24 +13,39 @@ export function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/** How many characters of an unrecognised error body are worth showing. */
+const MAX_BODY_SNIPPET = 200;
+
 /** Turn a failed response into something worth showing a person.
  *
  * The body is only useful when it is our own JSON `detail`. An HTML error page
  * — which is what an auth or CSRF failure returns — would otherwise be thrown
  * verbatim and rendered as a wall of markup, leaking the whole Inertia payload
  * into the DOM.
+ *
+ * Deliberately a sibling of `pagebuilder/utils/request.ts`'s `errorMessage`,
+ * and the two must be changed together: they answer the same question for the
+ * same backend, and a difference between them shows up as one module
+ * explaining a failure while the other shrugs at it.
  */
 export async function errorFrom(response: Response): Promise<Error> {
-  const text = await response.text();
+  const body = await response.text().catch(() => '');
+  const fallback = `Request failed (${response.status} ${response.statusText})`.trim();
+  if (!body) return new Error(fallback);
+
   try {
-    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-    if (typeof detail === 'string') return new Error(detail);
+    const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    if (typeof detail === 'string' && detail.trim()) return new Error(detail);
     const validation = fromValidationErrors(detail);
     if (validation) return new Error(validation);
   } catch {
-    // Not JSON — fall through to the status line rather than echo markup.
+    // Not JSON — fall through rather than echo markup.
   }
-  return new Error(`Request failed (${response.status} ${response.statusText})`.trim());
+
+  // Anything that looks like a document is structure, not a message.
+  if (/^\s*[<{[]/.test(body)) return new Error(fallback);
+  const snippet = body.trim().slice(0, MAX_BODY_SNIPPET);
+  return new Error(snippet ? `${fallback}: ${snippet}` : fallback);
 }
 
 /**

@@ -60,10 +60,16 @@ export function fromValidationErrors(detail: unknown): string | null {
  * So: prefer the API's own `detail`, fall back to the status, and never render
  * a markup body as prose.
  *
- * The parse is attempted whatever the content-type claims, matching
- * `news/utils/http.ts`. Gating on `application/json` first would throw away a
- * perfectly good `detail` from a response that merely mislabelled itself, and
- * the try/catch plus the markup guard below already make the attempt safe.
+ * The parse is attempted whatever the content-type claims. Gating on
+ * `application/json` first would throw away a perfectly good `detail` from a
+ * response that merely mislabelled itself, and the try/catch plus the markup
+ * guard below already make the attempt safe.
+ *
+ * Deliberately a sibling of `news/utils/http.ts`'s `errorFrom`, and the two
+ * must be changed together: they answer the same question for the same
+ * backend, and a difference between them shows up as one module explaining a
+ * failure while the other shrugs at it. Both are covered by unit tests that
+ * assert the same six cases.
  */
 export async function errorMessage(response: Response): Promise<string> {
   const fallback = `Request failed (${response.status} ${response.statusText})`.trim();
