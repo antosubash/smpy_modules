@@ -18,9 +18,13 @@ const CREDIT_ID = 'media-credit';
 
 /** One asset: what it shows, who to credit, and which pages depend on it.
  *
- * Alt text sits on the asset rather than on each placement because it describes
- * the picture, not the layout — so editing it here fixes every page using the
- * image at once, which is the thing worth saying on the screen.
+ * Alt text sits on the asset because it describes the picture rather than the
+ * layout — but it does not reach back into pages already using the image. The
+ * Image block copies an alt into its own props when the asset is placed (see
+ * `blocks/Image.tsx`), so what is saved here is the starting value for the
+ * next placement, and existing blocks keep whatever they were given. The
+ * screen says exactly that; it used to claim it fixed every page at once,
+ * which was pleasant and untrue.
  */
 export default function MediaDetail() {
   const { asset_id } = usePage<{ props: { asset_id: number } }>().props as unknown as {
@@ -114,8 +118,9 @@ export default function MediaDetail() {
               onChange={(e) => patch({ alt_text: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Describes the picture, not the placement — editing it here updates every page using
-              this image at once.
+              Describes the picture, not the placement, so it is the starting alt text wherever this
+              image is placed next. Pages already using it keep the alt text saved on the block —
+              change those where they are.
             </p>
           </div>
 

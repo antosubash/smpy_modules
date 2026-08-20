@@ -25,11 +25,34 @@ export async function errorFrom(response: Response): Promise<Error> {
   try {
     const detail = (JSON.parse(text) as { detail?: unknown }).detail;
     if (typeof detail === 'string') return new Error(detail);
-    if (detail) return new Error(JSON.stringify(detail));
+    const validation = fromValidationErrors(detail);
+    if (validation) return new Error(validation);
   } catch {
     // Not JSON — fall through to the status line rather than echo markup.
   }
   return new Error(`Request failed (${response.status} ${response.statusText})`.trim());
+}
+
+/**
+ * FastAPI's 422 body, as a sentence rather than as its wire format.
+ *
+ * ``detail`` is a *list* of Pydantic errors there, not a string, so stringifying
+ * it put `[{"type":"string_pattern_mismatch","loc":["body","slug"],…}]` in front
+ * of an author who had simply typed a space into a URL field.
+ */
+export function fromValidationErrors(detail: unknown): string | null {
+  if (!Array.isArray(detail) || detail.length === 0) return null;
+  const parts: string[] = [];
+  for (const entry of detail) {
+    const item = entry as { loc?: unknown; msg?: unknown };
+    // `loc` is ["body", "<field>"]; the wrapper is noise to the reader.
+    const field = Array.isArray(item.loc)
+      ? item.loc.filter((p) => p !== 'body' && typeof p !== 'number').join('.')
+      : '';
+    const message = typeof item.msg === 'string' && item.msg ? item.msg : 'is not valid';
+    parts.push(field ? `${field}: ${message}` : message);
+  }
+  return parts.join('; ');
 }
 
 /** GET returning JSON, with the abort signal the callers all need. */

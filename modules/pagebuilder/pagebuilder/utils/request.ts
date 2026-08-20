@@ -29,6 +29,26 @@ export function readCookie(name: string): string | null {
 const MAX_BODY_SNIPPET = 200;
 
 /**
+ * FastAPI's 422 body, as a sentence rather than as its wire format.
+ *
+ * `detail` is a list of Pydantic errors there. `loc` reads ["body", "<field>"];
+ * the wrapper is noise to whoever is reading the message.
+ */
+function fromValidationErrors(detail: unknown): string | null {
+  if (!Array.isArray(detail) || detail.length === 0) return null;
+  const parts: string[] = [];
+  for (const entry of detail) {
+    const item = entry as { loc?: unknown; msg?: unknown };
+    const field = Array.isArray(item.loc)
+      ? item.loc.filter((p) => p !== 'body' && typeof p !== 'number').join('.')
+      : '';
+    const message = typeof item.msg === 'string' && item.msg ? item.msg : 'is not valid';
+    parts.push(field ? `${field}: ${message}` : message);
+  }
+  return parts.join('; ');
+}
+
+/**
  * A message a person can read, from whatever the server actually sent.
  *
  * The old version interpolated the whole response body. When a route answers
@@ -51,6 +71,11 @@ async function errorMessage(response: Response): Promise<string> {
       const parsed = JSON.parse(body) as { detail?: unknown; message?: unknown };
       const detail = parsed.detail ?? parsed.message;
       if (typeof detail === 'string' && detail.trim()) return detail;
+      // FastAPI's 422 sends a *list* of Pydantic errors. Without this the
+      // author who typed a space into a URL field got "Request failed (422
+      // Unprocessable Entity)" and no clue which field or why.
+      const validation = fromValidationErrors(detail);
+      if (validation) return validation;
     } catch {
       // Mislabelled as JSON. Fall through to the text handling below.
     }
