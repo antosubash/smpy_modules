@@ -219,17 +219,27 @@ export default function PageList() {
                         Delete
                       </Button>
                     }
+                    // The same gate the board card applies, because it is the
+                    // same deletion: the row you happen to be looking at must
+                    // not decide how much friction a live URL going dark gets.
+                    level={p.status === 'published' ? 'high' : 'low'}
+                    confirmPhrase={p.status === 'published' ? p.slug : undefined}
                     title={`Delete "${p.title}"?`}
                     description={
-                      <>
-                        The page and its revision history are removed for good.
-                        {p.status === 'published' && (
-                          <> It is published, so {`/p/${p.slug}`} starts answering 404.</>
-                        )}
-                      </>
+                      p.status === 'published' ? (
+                        <>
+                          This page is published. <code>{`/p/${p.slug}`}</code> starts answering 404
+                          the moment you confirm. It goes to the trash for 30 days, and after that
+                          it is gone.
+                        </>
+                      ) : (
+                        <>
+                          It was never published, so nothing on the site changes. It goes to the
+                          trash for 30 days.
+                        </>
+                      )
                     }
                     confirmLabel="Delete"
-                    destructive
                     onConfirm={() => handleDelete(p)}
                   />
                 </TableCell>

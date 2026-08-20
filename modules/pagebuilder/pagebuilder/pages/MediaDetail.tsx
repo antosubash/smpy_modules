@@ -36,9 +36,21 @@ export default function MediaDetail() {
   }, [load]);
 
   if (!detail || !draft) {
+    // Once the load has failed the header must stop claiming to be loading —
+    // an asset id that does not exist is a permanent answer, not a slow one.
     return (
-      <PageShell title="Asset" description="Loading…">
-        <Head title="Asset" />
+      <PageShell
+        title={error ? 'Asset not found' : 'Asset'}
+        description={error ? 'It may have been deleted.' : 'Loading…'}
+        actions={
+          error ? (
+            <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
+              Media library
+            </Button>
+          ) : undefined
+        }
+      >
+        <Head title={error ? 'Asset not found' : 'Asset'} />
         {error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : (

@@ -25,6 +25,43 @@ export function readCookie(name: string): string | null {
   return null;
 }
 
+/** How many characters of an unrecognised error body are worth showing. */
+const MAX_BODY_SNIPPET = 200;
+
+/**
+ * A message a person can read, from whatever the server actually sent.
+ *
+ * The old version interpolated the whole response body. When a route answers
+ * 404 with the Inertia *HTML shell* rather than JSON — which the admin routes
+ * do — that put the entire document on screen: the permissions list, the i18n
+ * catalogue and the sidebar menu JSON, rendered as the error text of a media
+ * asset that simply did not exist.
+ *
+ * So: prefer the API's own `detail`, fall back to the status, and never render
+ * a markup body as prose.
+ */
+async function errorMessage(response: Response): Promise<string> {
+  const fallback = `Request failed (${response.status} ${response.statusText})`.trim();
+  const body = await response.text().catch(() => '');
+  if (!body) return fallback;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(body) as { detail?: unknown; message?: unknown };
+      const detail = parsed.detail ?? parsed.message;
+      if (typeof detail === 'string' && detail.trim()) return detail;
+    } catch {
+      // Mislabelled as JSON. Fall through to the text handling below.
+    }
+  }
+
+  // Anything that looks like a document is structure, not a message.
+  if (/^\s*[<{[]/.test(body)) return fallback;
+  const snippet = body.trim().slice(0, MAX_BODY_SNIPPET);
+  return snippet ? `${fallback}: ${snippet}` : fallback;
+}
+
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = init.body instanceof FormData;
   const method = (init.method ?? 'GET').toUpperCase();
@@ -44,8 +81,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     ...init,
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Request failed (${response.status}): ${text}`);
+    throw new Error(await errorMessage(response));
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
