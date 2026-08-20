@@ -48,6 +48,21 @@ async function outlineOrder(page: Page): Promise<string[]> {
   return items.evaluateAll((rows) => rows.map((li) => li.getAttribute('data-block-type') ?? ''));
 }
 
+/**
+ * Nothing may push the document sideways at phone width.
+ *
+ * Worth asserting per screen rather than once: the first version of this
+ * screen passed every other check while the editor's toolbar quietly held a
+ * 535px minimum, because a nested flex row cannot wrap just because its
+ * parent does.
+ */
+async function expectNoSidewaysScroll(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
 /** The block types actually stored on the page's draft. */
 async function storedOrder(page: Page, id: number): Promise<string[]> {
   const response = await page.request.get(`/api/pagebuilder/pages/${id}`);
@@ -70,6 +85,7 @@ test.describe('The page editor below 900px', () => {
     // Puck mounts the canvas in an iframe. Not rendering it at all is the
     // point — a hidden one would still load the whole drag surface.
     await expect(page.locator('iframe')).toHaveCount(0);
+    await expectNoSidewaysScroll(page);
   });
 
   test('names each block the way the palette does', async ({ page }) => {
@@ -100,9 +116,7 @@ test.describe('The page editor below 900px', () => {
 
     // Polled rather than waiting on one PUT: autosave fires its own, so the
     // first response to arrive is not necessarily the one carrying this edit.
-    await expect
-      .poll(() => storedOrder(page, id))
-      .toEqual(['Text', 'Heading', 'Quote']);
+    await expect.poll(() => storedOrder(page, id)).toEqual(['Text', 'Heading', 'Quote']);
 
     await page.reload();
     expect(await outlineOrder(page)).toEqual(['Text', 'Heading', 'Quote']);
@@ -179,6 +193,7 @@ test.describe('The layout editor below 900px', () => {
     await expect(page.locator('iframe')).toHaveCount(0);
     await expect(page.getByTestId('layout-header-slot')).toBeVisible();
     await expect(page.getByTestId('layout-footer-slot')).toBeVisible();
+    await expectNoSidewaysScroll(page);
   });
 });
 
@@ -215,9 +230,6 @@ test.describe('The article list below 900px', () => {
     await page.goto('/news/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
+    await expectNoSidewaysScroll(page);
   });
 });
