@@ -7,14 +7,11 @@ the two should not have to import the higher to get it.
 
 from __future__ import annotations
 
-#: Passed as ``escape=`` alongside every pattern this module builds.
-LIKE_ESCAPE = "\\"
-
 
 def like_pattern(q: str) -> str:
-    """A LIKE pattern matching ``q`` literally, wildcards and all.
+    r"""A LIKE pattern matching ``q`` literally, wildcards and all.
 
-    Every caller must also pass ``escape=LIKE_ESCAPE`` to the ``like``/``ilike``
+    Every caller must also pass ``escape="\\"`` to the ``like``/``ilike``
     that consumes this. Without the ESCAPE clause SQLite reads the backslashes
     below as ordinary characters, so the pattern demands a literal backslash
     that real content never contains and the search returns nothing at all —
