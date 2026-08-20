@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from pagebuilder.endpoints.views import _etag_for
+from pagebuilder.endpoints.public_views import _etag_for
 from pagebuilder.settings import PagebuilderSettings
 
 

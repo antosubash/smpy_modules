@@ -52,3 +52,7 @@ artifacts = ["pagebuilder/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# `db_fixture` holds the bare-session fixture. Registered here rather than
+# imported from conftest.py, which sits exactly on the repo's 300-line cap.
+pythonpath = ["tests"]
+addopts = "-p db_fixture"

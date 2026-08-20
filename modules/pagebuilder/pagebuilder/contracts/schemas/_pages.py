@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas for the pagebuilder API."""
+"""Page create/read/update, revisions and diffs."""
 
 from __future__ import annotations
 
@@ -26,7 +26,10 @@ StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
 class PageCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     slug: str = Field(min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    meta_title: str | None = Field(default=None, max_length=200)
     meta_description: str | None = Field(default=None, max_length=500)
+    show_in_header_nav: bool = False
+    show_in_footer: bool = False
     og_image: str | None = Field(default=None, max_length=500)
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool = True
@@ -34,6 +37,17 @@ class PageCreate(BaseModel):
     draft_data: PuckData = Field(default_factory=dict)
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+    parent_id: int | None = None
+    """Breadcrumb parent. Deliberately does not affect the public URL."""
+
+    is_template: bool = False
+    copy_from_page_id: int | None = None
+    """Start from an existing page's content — the New page dialog's
+    "Copy a page" and its template list are the same operation.
+
+    Write-only: it seeds ``draft_data`` at creation and is not stored, so a
+    later edit of the source never reaches back into the copy.
+    """
 
 
 class PageUpdate(BaseModel):
@@ -41,12 +55,17 @@ class PageUpdate(BaseModel):
     slug: str | None = Field(
         default=None, min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$"
     )
+    meta_title: str | None = Field(default=None, max_length=200)
     meta_description: str | None = Field(default=None, max_length=500)
+    show_in_header_nav: bool | None = None
+    show_in_footer: bool | None = None
     og_image: str | None = Field(default=None, max_length=500)
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool | None = None
     json_ld: dict[str, Any] | None = None
     draft_data: PuckData | None = None
+    parent_id: int | None = None
+    is_template: bool | None = None
 
 
 class PageScheduleRequest(BaseModel):
@@ -70,6 +89,7 @@ class PageRead(BaseModel):
     title: str
     status: PageStatus
     has_published: bool
+    meta_title: str | None = None
     meta_description: str | None
     og_image: str | None
     canonical_url: str | None = None
@@ -77,6 +97,11 @@ class PageRead(BaseModel):
     rejection_note: str | None
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+    parent_id: int | None = None
+    is_template: bool = False
+    show_in_header_nav: bool = False
+    show_in_footer: bool = False
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime | None
 
@@ -163,92 +188,3 @@ class RevisionDiffResponse(BaseModel):
     blocks: dict[str, list[BlockChange]] = Field(default_factory=dict)
 
 
-class LayoutUpdate(BaseModel):
-    """``None`` leaves a slot alone; an empty Puck doc clears it."""
-
-    header_data: PuckData | None = None
-    footer_data: PuckData | None = None
-    note: str | None = Field(default=None, max_length=2000)
-
-
-class LayoutRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    created_at: datetime
-    updated_at: datetime | None
-
-
-class LayoutDetail(LayoutRead):
-    header_data: PuckData
-    footer_data: PuckData
-
-
-class LayoutRevisionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    layout_id: int
-    note: str | None
-    created_at: datetime
-    created_by: str | None
-
-
-class LayoutRevisionDetail(LayoutRevisionRead):
-    header_data: PuckData
-    footer_data: PuckData
-
-
-class LayoutRevisionListResponse(BaseModel):
-    items: list[LayoutRevisionRead]
-
-
-class MediaAssetVariant(BaseModel):
-    """One server-generated derivative of an uploaded image.
-
-    Width is the canonical key for ``srcset`` so it's required; height is
-    optional because some derivatives (e.g. a same-size webp transcode of
-    a non-decodable input) may not carry it back.
-    """
-
-    filename: str
-    url: str
-    content_type: str
-    width: int
-    height: int | None = None
-    size_bytes: int
-
-
-class MediaAssetRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    filename: str
-    original_filename: str
-    content_type: str
-    size_bytes: int
-    url: str
-    width: int | None = None
-    height: int | None = None
-    folder: str | None = None
-    variants: dict[str, MediaAssetVariant] = Field(default_factory=dict)
-    created_at: datetime
-
-
-class MediaAssetListResponse(BaseModel):
-    """Cursor-paginated page of media assets.
-
-    ``next_cursor`` is the ``id`` to pass back as the ``cursor`` query
-    param to fetch the next page (assets are returned newest-first, so
-    the cursor advances toward smaller ids). ``None`` when there are no
-    more rows. ``folders`` is the full set of distinct folder names in
-    the library — independent of the current filter so the sidebar
-    doesn't disappear when the user drills in.
-    """
-
-    items: list[MediaAssetRead]
-    next_cursor: int | None = None
-    folders: list[str] = Field(default_factory=list)
-    total: int | None = None
-    """Row count matching the filters. Only set for offset paging — cursor
-    paging deliberately avoids the extra COUNT query."""

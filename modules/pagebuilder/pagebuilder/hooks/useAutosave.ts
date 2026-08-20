@@ -39,18 +39,31 @@ export function useAutosave({
   // Memoize the stringify — Puck ``data`` can be hundreds of KB on a
   // populated page, and the component re-renders on every keystroke.
   // Depending on the `snapshotPayload` object itself would defeat the memo —
-  // the caller rebuilds it every render. The fields listed are its full contents.
+  // the caller rebuilds it every render.
+  //
+  // THIS LIST MUST NAME EVERY FIELD OF `EditorSnapshot`. A field added to the
+  // snapshot but not here is worse than one left out of the snapshot entirely,
+  // because everything else looks right: the type checks, the field is in the
+  // write payload, and a manual Save persists it — but the memo never
+  // recomputes, so `isDirty` stays false, the status line goes on saying
+  // "Saved", the unload guard never arms, and an edit to that field alone is
+  // silently dropped on navigation. Adding the four Page-tab fields to
+  // `EditorSnapshot` without touching this list is exactly that bug.
   // biome-ignore lint/correctness/useExhaustiveDependencies: listed fields are the object's full contents
   const currentSnapshot = useMemo(
     () => snapshotKey(snapshotPayload),
     [
       snapshotPayload.title,
       snapshotPayload.slug,
+      snapshotPayload.metaTitle,
       snapshotPayload.metaDescription,
       snapshotPayload.ogImage,
       snapshotPayload.canonicalUrl,
       snapshotPayload.indexInSearch,
       snapshotPayload.jsonLdText,
+      snapshotPayload.parentId,
+      snapshotPayload.showInHeaderNav,
+      snapshotPayload.showInFooter,
       snapshotPayload.data,
     ],
   );

@@ -43,9 +43,9 @@ def test_no_orphan_can_be_created_through_the_api() -> None:
     import inspect
 
     from news import service
-    from news.endpoints import api
+    from news.endpoints.api import articles
     from news.module import NewsModule
 
-    assert "page_exists" in inspect.getsource(api.attach_article)
+    assert "page_exists" in inspect.getsource(articles.attach_article)
     assert "PageDeleted" in inspect.getsource(NewsModule.register_event_handlers)
     assert hasattr(service, "page_exists")

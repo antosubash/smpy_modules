@@ -41,7 +41,9 @@ export function NewsFeedRender({
 
   useEffect(() => {
     const controller = new AbortController();
-    listArticles({ limit, category, signal: controller.signal })
+    // `in_feed` is the block's own filter: an article can be published and
+    // linked to without belonging in the chronological feed.
+    listArticles({ limit, category, in_feed: true, signal: controller.signal })
       .then((response) => setItems(response.items.map(toCard)))
       // An empty feed and a failed fetch look the same to a visitor on
       // purpose: a broken API must not put an error box on a public page.

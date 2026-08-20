@@ -21,7 +21,7 @@ import { MediaDropzone, MediaUploadQueue } from '../components/media/MediaUpload
 import type { ListFilters } from '../components/media/types';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import {
-  deleteMedia,
+  deleteAssetIfUnused,
   listMedia,
   type MediaAssetRead,
   type MediaListResponse,
@@ -114,10 +114,16 @@ export default function MediaLibrary() {
     return Array.from(set).sort();
   }, [folders, uploadFolder]);
 
+  // The *checked* delete, the same one the asset detail screen uses. The
+  // library was calling the unchecked endpoint, which meant the whole
+  // "refuses while in use" guarantee could be sidestepped by deleting from
+  // here instead of from the detail page.
+  //
   // Errors propagate: the confirmation dialog stays open and shows them,
-  // which is closer to the failure than the banner at the top of the page.
+  // which is closer to the failure than the banner at the top of the page —
+  // and it is how the 409 naming the dependent pages reaches the person.
   const handleDelete = async (id: number) => {
-    await deleteMedia(id);
+    await deleteAssetIfUnused(id);
     setAssets((prev) => prev.filter((a) => a.id !== id));
   };
 

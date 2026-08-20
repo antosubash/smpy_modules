@@ -19,9 +19,10 @@ test.describe('PageBuilder admin', () => {
     const title = `E2E page ${slug}`;
 
     // ── Create ────────────────────────────────────────────────
-    await page.goto('/pagebuilder/');
-    await page.getByRole('button', { name: /new page/i }).click();
-    await expect(page).toHaveURL(/\/pagebuilder\/new$/);
+    // "New page" opens the create dialog now — that flow has its own spec in
+    // create-flows.spec.ts. This case is about the editor's own
+    // create-and-save path, so it goes straight to the blank-editor route.
+    await page.goto('/pagebuilder/new');
 
     // PageEditor's title field has no associated label — it's an
     // <input placeholder="Page title">. Match by placeholder.
@@ -53,7 +54,9 @@ test.describe('PageBuilder admin', () => {
     expect(publicResponse.ok()).toBeTruthy();
 
     // ── List shows the published page ─────────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     const row = page.locator('tr', { hasText: title });
     await expect(row).toBeVisible();
     await expect(row.getByText('published', { exact: true })).toBeVisible();
@@ -73,7 +76,9 @@ test.describe('PageBuilder admin', () => {
     expect(after404.status()).toBe(404);
 
     // ── Delete ────────────────────────────────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: title }).getByRole('button', { name: /^delete$/i }),
@@ -90,7 +95,10 @@ test.describe('PageBuilder admin', () => {
     // Panel is collapsed by default — fields not in the DOM yet.
     await expect(page.getByPlaceholder(/Shown in search results/i)).toHaveCount(0);
 
-    await page.getByRole('button', { name: /^seo$/i }).click();
+    // The drawer is tabbed now and opens on Page; the SEO fields are one
+    // click further in.
+    await page.getByRole('button', { name: /^settings$/i }).click();
+    await page.getByTestId('inspector-tab-seo').click();
     const metaDesc = page.getByPlaceholder(/Shown in search results/i);
     const ogImage = page.getByPlaceholder(/https:\/\/.*media\/pagebuilder/i);
     await expect(metaDesc).toBeVisible();
@@ -104,7 +112,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
 
     // Clean up so this test doesn't leave a draft behind.
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page
@@ -138,7 +148,9 @@ test.describe('PageBuilder admin', () => {
     // Publish Alpha so the two differ by status as well as by title.
     await page.request.post(`/api/pagebuilder/pages/${created[0]}/publish`, { headers, data: {} });
 
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto(`/pagebuilder/?view=list&search=${tag}`);
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
 
@@ -154,7 +166,9 @@ test.describe('PageBuilder admin', () => {
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toHaveCount(0);
 
     // ── Status pills filter independently ─────────────────────
-    await page.goto('/pagebuilder/');
+    // The board is the default view now; these assertions are about the
+    // table, which is what `view=list` selects.
+    await page.goto(`/pagebuilder/?view=list&search=${tag}`);
     await page.getByRole('button', { name: 'Published' }).click();
     await expect(page.locator('tr', { hasText: `Alpha ${tag}` })).toBeVisible();
     await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toHaveCount(0);
@@ -163,7 +177,12 @@ test.describe('PageBuilder admin', () => {
     await page.getByRole('searchbox', { name: /search pages/i }).fill('no-such-page-anywhere');
     await expect(page.getByText(/no pages match this filter/i)).toBeVisible();
     await page.getByRole('button', { name: /clear filters/i }).click();
-    await expect(page.locator('tr', { hasText: `Beta ${tag}` })).toBeVisible();
+    // What clearing does, rather than which rows come back: an unfiltered table
+    // pages at 25, so "Beta is visible" would be asserting that this run's rows
+    // are still among the newest 25 in the database.
+    await expect(page.getByRole('searchbox', { name: /search pages/i })).toHaveValue('');
+    await expect(page.getByText(/no pages match this filter/i)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/[?&](search=[^&]|status=[^&])/);
 
     for (const id of created) {
       await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });

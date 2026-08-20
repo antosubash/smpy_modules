@@ -141,7 +141,10 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
         srcset: buildSrcset(asset),
         // Don't clobber values the author has set by hand.
         sizes: props.sizes || DEFAULT_IMAGE_SIZES,
-        alt: props.alt || asset.original_filename.replace(/\.[^.]+$/, ''),
+        // The asset's own alt text first: it is a description of the picture
+        // written by a person, which a filename is not. The filename stays as
+        // the last resort so an undescribed asset still yields something.
+        alt: props.alt || asset.alt_text || asset.original_filename.replace(/\.[^.]+$/, ''),
       },
     };
   },

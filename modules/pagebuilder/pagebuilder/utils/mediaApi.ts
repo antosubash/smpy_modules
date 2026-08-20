@@ -2,6 +2,7 @@
 
 import { BASE, CSRF_COOKIE, readCookie, request } from './request';
 import type {
+  MediaAssetDetail,
   MediaAssetRead,
   MediaListQuery,
   MediaListResponse,
@@ -110,3 +111,19 @@ export async function lookupAsset(url: string): Promise<MediaAssetRead | undefin
   for (const item of items) pickedAssetCache.set(item.url, item);
   return pickedAssetCache.get(url);
 }
+
+/** One asset with the pages that reference it. */
+export const getAssetDetail = (id: number, signal?: AbortSignal) =>
+  request<MediaAssetDetail>(`/uploads/${id}`, { signal });
+
+/** Describe the asset. Alt text edited here changes every page using it. */
+export const updateAsset = (
+  id: number,
+  body: { alt_text?: string; caption?: string; credit?: string },
+) => request<MediaAssetDetail>(`/uploads/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+/** Delete, but 409 with the page names while the asset is still in use. */
+export const deleteAssetIfUnused = (id: number) =>
+  request<void>(`/uploads/${id}/checked`, { method: 'DELETE' });
+
+export type { MediaAssetDetail, MediaUsage } from './types';

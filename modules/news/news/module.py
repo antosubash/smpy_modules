@@ -57,13 +57,33 @@ class NewsModule(ModuleBase):
     def register_menu_items(self, registry: MenuRegistry) -> None:
         # Roles stay empty: filtering is a plain intersection with no admin
         # bypass, so a non-empty list hides the entry from everyone outside it.
-        registry.add(
-            MenuItem(
-                label="News",
-                url=constants.MENU_URL,
-                icon=constants.MENU_ICON,
-                group=constants.MENU_GROUP,
-            )
+        registry.add_many(
+            [
+                MenuItem(
+                    label=constants.MENU_LABEL_ARTICLES,
+                    url=constants.MENU_URL,
+                    icon=constants.MENU_ICON,
+                    order=100,
+                    group=constants.MENU_GROUP,
+                ),
+                MenuItem(
+                    label=constants.MENU_LABEL_CATEGORIES,
+                    url=constants.MENU_URL_CATEGORIES,
+                    icon=constants.MENU_ICON_CATEGORIES,
+                    order=110,
+                    group=constants.MENU_GROUP,
+                ),
+                # Its own group: the screen searches pages and media as well,
+                # so listing it under News would say something untrue about
+                # what it covers.
+                MenuItem(
+                    label=constants.MENU_LABEL_SEARCH,
+                    url=constants.ADMIN_SEARCH_URL,
+                    icon=constants.MENU_ICON_SEARCH,
+                    order=10,
+                    group=constants.MENU_GROUP_SEARCH,
+                ),
+            ]
         )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
@@ -109,6 +129,12 @@ class NewsModule(ModuleBase):
         the repair should be visible, not silent.
         """
         from news import service
+        from news.endpoints.views import admin_router
+
+        # Mounted here rather than through ``register_routes`` because that
+        # router is hard-prefixed with ``view_prefix``; this screen belongs at
+        # the app root, for the same reason pagebuilder's public viewer does.
+        app.include_router(admin_router, prefix=constants.ADMIN_SEARCH_PREFIX)
 
         async with app.state.sm.db.session_factory() as db:
             dropped = await service.reconcile_orphans(db)

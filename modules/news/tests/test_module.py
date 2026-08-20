@@ -62,9 +62,21 @@ class TestMenu:
     def test_lists_under_content(self):
         registry = MenuRegistry()
         NewsModule().register_menu_items(registry)
-        item = registry.all_items[0]
-        assert item.url == constants.MENU_URL
+        # Found by URL rather than by position: the module registers three
+        # entries across two groups now, and the registry orders them by
+        # `order`, not by registration.
+        item = next(i for i in registry.all_items if i.url == constants.MENU_URL)
         assert item.group == constants.MENU_GROUP
+
+    def test_search_sits_outside_the_news_group(self):
+        """It searches pages and media too, so filing it under News would say
+        something untrue about what it covers."""
+        registry = MenuRegistry()
+        NewsModule().register_menu_items(registry)
+        item = next(
+            i for i in registry.all_items if i.url == constants.ADMIN_SEARCH_URL
+        )
+        assert item.group != constants.MENU_GROUP
 
     def test_menu_url_ends_in_a_slash(self):
         # The list route is registered at "/" under the view prefix, so the

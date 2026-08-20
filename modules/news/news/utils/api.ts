@@ -2,6 +2,8 @@
 
 import type { PageStatus } from '@simple-module-py/pagebuilder/pagebuilder/utils/types';
 
+import { BASE, errorFrom, readCookie, write } from './http';
+
 export interface ArticleRead {
   id: number;
   page_id: number;
@@ -10,6 +12,12 @@ export interface ArticleRead {
   excerpt: string;
   cover_image_url: string;
   category: string;
+  tags: string[];
+  /** Held at the top of /news and of every feed block. */
+  pinned: boolean;
+  /** Whether feed blocks may list it. Does not affect the admin list. */
+  show_in_feed: boolean;
+  author: string;
   published_at: string | null;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
@@ -17,9 +25,20 @@ export interface ArticleRead {
   url: string;
 }
 
+export interface ArticleCounts {
+  all: number;
+  draft: number;
+  published: number;
+  undated: number;
+}
+
 export interface ArticleListResponse {
   items: ArticleRead[];
+  /** Matched the whole filter, status included — what the pager counts. */
   total: number;
+  /** What each status pill would show. `undated` overlaps draft and
+   *  published, so these deliberately do not sum to `all`. */
+  counts: ArticleCounts;
 }
 
 export interface CategoryCount {
@@ -31,12 +50,16 @@ export interface CategoryListResponse {
   items: CategoryCount[];
 }
 
-const BASE = '/api/news';
-
 export async function listArticles(params: {
   limit?: number;
   offset?: number;
   category?: string;
+  /** Free-text filter over headline and slug. */
+  q?: string;
+  /** `draft`, `published` or `undated`. */
+  status?: string;
+  /** Only articles allowed in feed blocks — the feed block's own filter. */
+  in_feed?: boolean;
   /** Sort undated (work-in-progress) articles first — the admin list's view.
    *  Public feeds keep the default, which pushes undated to the end. */
   undated_first?: boolean;
@@ -46,6 +69,9 @@ export async function listArticles(params: {
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.offset !== undefined) query.set('offset', String(params.offset));
   if (params.category) query.set('category', params.category);
+  if (params.q) query.set('q', params.q);
+  if (params.status) query.set('status', params.status);
+  if (params.in_feed) query.set('in_feed', 'true');
   if (params.undated_first) query.set('undated_first', 'true');
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
@@ -87,7 +113,6 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
   });
 }
 
-const CSRF_COOKIE = 'news_csrf';
 const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
 /** A pagebuilder *view* route, deliberately not one of its API routes.
  *
@@ -98,46 +123,6 @@ const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
  */
 const PAGEBUILDER_CSRF_PRIMER = '/pagebuilder/';
 
-function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-/** Turn a failed response into something worth showing a person.
- *
- * The body is only useful when it is our own JSON `detail`. An HTML error page
- * — which is what an auth or CSRF failure returns — would otherwise be thrown
- * verbatim and rendered as a wall of markup, leaking the whole Inertia payload
- * into the DOM.
- */
-async function errorFrom(response: Response): Promise<Error> {
-  const text = await response.text();
-  try {
-    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-    if (typeof detail === 'string') return new Error(detail);
-    if (detail) return new Error(JSON.stringify(detail));
-  } catch {
-    // Not JSON — fall through to the status line rather than echo markup.
-  }
-  return new Error(`Request failed (${response.status} ${response.statusText})`.trim());
-}
-
-async function write<T>(path: string, method: string, body?: unknown): Promise<T | null> {
-  const token = readCookie(CSRF_COOKIE);
-  const response = await fetch(`${BASE}${path}`, {
-    method,
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) throw await errorFrom(response);
-  return response.status === 204 ? null : ((await response.json()) as T);
-}
-
 export const attachArticle = (data: {
   page_id: number;
   category?: string;
@@ -146,7 +131,13 @@ export const attachArticle = (data: {
 
 export const updateArticle = (
   id: number,
-  data: { category?: string; published_at?: string | null },
+  data: {
+    category?: string;
+    published_at?: string | null;
+    pinned?: boolean;
+    show_in_feed?: boolean;
+    author?: string;
+  },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
 export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
@@ -190,4 +181,48 @@ export async function createArticlePage(title: string, slug: string): Promise<nu
   if (!response.ok) throw await errorFrom(response);
   const { id } = (await response.json()) as { id: number };
   return id;
+}
+
+/** Publish the page behind an article, from the list's row menu.
+ *
+ * Goes through pagebuilder because the body, slug and workflow all live on the
+ * page — this module owns only the category and the display date.
+ */
+export async function publishArticlePage(pageId: number): Promise<void> {
+  const token = await pagebuilderCsrfToken();
+  const response = await fetch(`/api/pagebuilder/pages/${pageId}/publish`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw await errorFrom(response);
+}
+
+/** Where an article's body is actually edited — a pagebuilder route, because
+ *  the body belongs to the page rather than to this module. */
+export function articleEditUrl(pageId: number): string {
+  return `/pagebuilder/${pageId}/edit`;
+}
+
+/** "2d ago", "in 15d", "today" — the list's relative time.
+ *
+ * Rendered from the date part only, in UTC, for the same reason
+ * `formatArticleDate` is: `published_at` is a display date stored at midnight
+ * UTC, so reading it in the viewer's own timezone shifts it a day for everyone
+ * west of UTC.
+ */
+export function relativeDay(iso: string | null, now = new Date()): string {
+  if (!iso) return '';
+  const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(then.getTime())) return '';
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = Math.round((then.getTime() - today) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days > 0) return `in ${days}d`;
+  return `${-days}d ago`;
 }

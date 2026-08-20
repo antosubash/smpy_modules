@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder.models import Page, PageStatus, RevisionEvent
+from pagebuilder.models import NOT_TRASHED, Page, PageStatus, RevisionEvent
 from pagebuilder.service._common import _UNSET, _normalize_to_utc, _Unset
 from pagebuilder.service._revisions import RevisionsMixin
 
@@ -112,6 +112,9 @@ class WorkflowMixin(RevisionsMixin):
 
         pub_due = await self.db.execute(
             select(Page).where(
+                # A page in the trash must not flip itself live on a schedule
+                # it was carrying when it was binned.
+                NOT_TRASHED,
                 Page.status == PageStatus.DRAFT,
                 Page.publish_at.is_not(None),  # type: ignore[union-attr]
                 Page.publish_at <= now,  # type: ignore[operator]
@@ -126,6 +129,7 @@ class WorkflowMixin(RevisionsMixin):
 
         unpub_due = await self.db.execute(
             select(Page).where(
+                NOT_TRASHED,
                 Page.status == PageStatus.PUBLISHED,
                 Page.unpublish_at.is_not(None),  # type: ignore[union-attr]
                 Page.unpublish_at <= now,  # type: ignore[operator]

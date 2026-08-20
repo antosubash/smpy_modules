@@ -16,6 +16,24 @@ import type {
 export const createPage = (data: PageWritePayload & { title: string; slug: string }) =>
   request<PageDetail>('/pages', { method: 'POST', body: JSON.stringify(data) });
 
+/** Pages waiting out the retention window. */
+export const listTrash = () => request<{ items: PageRead[] }>('/pages/trash');
+
+/** Bring a trashed page back. It returns as a draft, never straight to live. */
+export const restorePage = (id: number) =>
+  request<PageDetail>(`/pages/${id}/restore`, { method: 'POST' });
+
+/** Remove a trashed page for good. Not reversible. */
+export const purgePage = (id: number) => request<void>(`/pages/${id}/purge`, { method: 'DELETE' });
+
+/** Pages offered as starting points by the New page dialog. */
+export const listTemplates = (signal?: AbortSignal) =>
+  request<{ items: PageRead[] }>('/pages/templates', { signal });
+
+/** Every page, for the "copy a page" and parent selects. */
+export const listPages = (signal?: AbortSignal) =>
+  request<{ items: PageRead[] }>('/pages', { signal });
+
 export const savePage = (id: number, data: PageWritePayload) =>
   request<PageDetail>(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 

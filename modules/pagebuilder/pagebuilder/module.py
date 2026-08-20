@@ -24,7 +24,9 @@ _log = logging.getLogger("simple_module.pagebuilder")
 
 # Sidebar entries. Grouped under "Content" so an app that installs several
 # content modules clusters them together rather than scattering them.
-_MENU_GROUP = "Content"
+# Paired with the news module's own group: the rail reads News / Site, so a
+# screen's section is visible before you click it.
+_MENU_GROUP = "Site"
 _URL_PAGES = "/pagebuilder/"
 _URL_LAYOUT = "/pagebuilder/layout"
 _URL_MEDIA = "/pagebuilder/media"
@@ -171,8 +173,8 @@ class PagebuilderModule(ModuleBase):
         ``/robots.txt`` routes are mounted at the root so crawlers find
         them at the conventional location.
         """
+        from pagebuilder.endpoints.public_views import public_router
         from pagebuilder.endpoints.seo import seo_router
-        from pagebuilder.endpoints.views import public_router
 
         settings = self._resolved_settings()
         app.include_router(public_router, prefix=settings.public_route_prefix)
@@ -217,14 +219,18 @@ class PagebuilderModule(ModuleBase):
                 await asyncio.sleep(interval)
                 async with factory() as session:
                     try:
-                        flipped = await PagesService(session).process_due(
-                            datetime.now(UTC)
-                        )
-                        if flipped:
+                        service = PagesService(session)
+                        flipped = await service.process_due(datetime.now(UTC))
+                        # The trash promises to empty itself after the retention
+                        # window. Swept on the same tick as the flips rather than
+                        # only at startup, so the promise holds for a process that
+                        # stays up for months as well as one that restarts nightly.
+                        purged = await service.purge_expired()
+                        if flipped or purged:
                             await session.commit()
                             _scheduler_log.info(
                                 "pagebuilder.scheduler.flipped",
-                                extra={"count": len(flipped)},
+                                extra={"count": len(flipped), "purged": purged},
                             )
                         else:
                             await session.rollback()
