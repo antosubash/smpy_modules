@@ -2,12 +2,6 @@
         migrate migration downgrade test test-py test-js e2e lint kill \
         link-framework unlink-framework new-module env
 
-# Ports are overridable so a second checkout (worktree, parallel review) can
-# run its own pair of dev servers without colliding with the primary one.
-SM_API_PORT ?= 8000
-SM_VITE_PORT ?= 5050
-export SM_VITE_PORT
-
 install: install-py install-js sync-module-deps
 
 install-py:
@@ -23,8 +17,28 @@ dev: gen-pages
 # Every Python entry point runs from the repo root so the root .env is the
 # single source of truth for settings. `--app-dir host` puts host/main.py on
 # sys.path without changing cwd.
+# Overridable so a second checkout (e.g. a worktree running e2e) can boot
+# beside a dev stack that already holds the default ports.
+# e2e runs name their overrides E2E_* (see playwright.config.ts); honor them
+# too so `make kill` after an aborted e2e run targets the right orphans —
+# provided E2E_* (or API_PORT/UI_PORT) is still set when `make kill` runs; an
+# inline env on the aborted command line is gone with its shell.
+# Every source — including a direct API_PORT/UI_PORT from the environment,
+# which `?=` alone would let straight through — passes the same guard
+# playwright.config.ts and vite.config.ts apply (`^[1-9][0-9]*$`, else the
+# default): a raw bad value would make lsof abort the whole sweep (freeing
+# neither port) and would be interpolated unescaped into the pkill regex
+# below. `override` re-assigns even env/command-line values, so the guarded
+# result always wins. E2E_* wins over SM_UI_PORT because an e2e run
+# overrides SM_UI_PORT only inside its own subprocess env — after an aborted
+# run the orphan sits on the E2E_* port, not the shell's SM_UI_PORT.
+_API_PORT_RAW = $(or $(API_PORT),$(E2E_API_PORT))
+override API_PORT := $(if $(shell echo '$(_API_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_API_PORT_RAW),8000)
+_UI_PORT_RAW = $(or $(UI_PORT),$(E2E_UI_PORT),$(SM_UI_PORT))
+override UI_PORT := $(if $(shell echo '$(_UI_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_UI_PORT_RAW),5050)
+
 dev-api:
-	uv run --project host uvicorn main:app --app-dir host --reload --port $(SM_API_PORT)
+	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
 
 dev-ui:
 	npm run dev
@@ -125,8 +139,9 @@ new-module:
 	@echo "Now add simple_module_$(name) to host/pyproject.toml dependencies and"
 	@echo "[tool.uv.sources] simple_module_$(name) = { workspace = true }"
 
+# Scoped to this checkout's ports so it never kills the neighboring dev
+# stack the port overrides exist to coexist with.
 kill:
-	@-pkill -f "uvicorn main:app" 2>/dev/null
-	@-pkill -f vite 2>/dev/null
-	@-lsof -ti:8000,5050 | xargs kill -9 2>/dev/null
-	@echo "Ports 8000, 5050 freed."
+	@-pkill -f "uvicorn main:app.*--port $(API_PORT)( |$$)" 2>/dev/null
+	@-lsof -ti:$(API_PORT),$(UI_PORT) | xargs kill -9 2>/dev/null
+	@echo "Ports $(API_PORT), $(UI_PORT) freed."

@@ -24,12 +24,19 @@ function fromSearch(search: string): NewsFilters {
   };
 }
 
-function toSearch({ category, q, status, offset }: NewsFilters): string {
-  const params = new URLSearchParams();
+function toSearch({ category, q, status, offset }: NewsFilters, current: string): string {
+  // Start from the current query string, not a fresh one: this hook owns only
+  // its own keys, and rebuilding from scratch would silently strip params
+  // other features (or analytics links) put there.
+  const params = new URLSearchParams(current);
   if (category) params.set('category', category);
+  else params.delete('category');
   if (q) params.set('q', q);
+  else params.delete('q');
   if (status) params.set('status', status);
+  else params.delete('status');
   if (offset > 0) params.set('offset', String(offset));
+  else params.delete('offset');
   const query = params.toString();
   return query ? `?${query}` : '';
 }
@@ -51,7 +58,7 @@ export function useUrlFilters(): [NewsFilters, (next: Partial<NewsFilters>) => v
   );
 
   useEffect(() => {
-    const url = `${window.location.pathname}${toSearch(filters)}`;
+    const url = `${window.location.pathname}${toSearch(filters, window.location.search)}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(window.history.state, '', url);
     }

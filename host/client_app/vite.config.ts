@@ -135,7 +135,11 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
-const VITE_PORT = Number(process.env.SM_VITE_PORT ?? 5050);
+// Same guard playwright.config.ts and the Makefile apply, so every consumer
+// agrees on which port the UI actually took (Number() would also accept
+// hex/exponent/leading-zero forms the other two reject).
+const rawUiPort = process.env.SM_UI_PORT;
+const uiPort = rawUiPort && /^[1-9][0-9]*$/.test(rawUiPort) ? Number(rawUiPort) : 5050;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -155,13 +159,13 @@ export default defineConfig({
     },
   },
   server: {
-    // Overridable so a second checkout (worktree, parallel review) can run its
-    // own dev server without colliding on 5050. `origin` has to move with the
-    // port: it is what Vite prefixes dev asset URLs with, so a mismatch serves
-    // the page from one port and its assets from another.
-    port: VITE_PORT,
+    // Overridable so a second checkout (e.g. a worktree running e2e) can
+    // boot beside a dev stack that already holds the default port. `uiPort`
+    // is regex-guarded above, so an exported-but-empty or garbage SM_UI_PORT
+    // falls back to 5050 rather than yielding port 0/NaN.
+    port: uiPort,
     strictPort: true,
-    origin: `http://localhost:${VITE_PORT}`,
+    origin: `http://localhost:${uiPort}`,
     fs: {
       allow: [fsRoot, ...moduleFsAllow],
     },

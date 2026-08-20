@@ -67,6 +67,9 @@ jobs:
 
       # Run pytest from within each module so each picks up its own
       # `[tool.pytest.ini_options]` (e.g. `asyncio_mode = "auto"`).
+      - name: Run pytest (ai)
+        run: cd modules/ai && uv run pytest
+
       - name: Run pytest (pagebuilder)
         run: cd modules/pagebuilder && uv run pytest
 

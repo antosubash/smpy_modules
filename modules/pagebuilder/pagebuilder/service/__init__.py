@@ -76,15 +76,22 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
         if status is not None:
             filters.append(Page.status == status)
 
-        total = await self.db.scalar(
-            select(func.count()).select_from(Page).where(*filters)
-        )
-
         query = select(Page).where(*filters).order_by(Page.id.desc()).offset(offset)
         if limit is not None:
             query = query.limit(limit)
         result = await self.db.execute(query)
-        return list(result.scalars().all()), int(total or 0)
+        rows = list(result.scalars().all())
+
+        if limit is None and offset == 0:
+            # The unbounded default already holds every match — a COUNT would
+            # re-run the same filter scan for a number we can read off. The
+            # offset guard matters: past-the-end paging returns no rows, and
+            # `offset + 0` would under-report.
+            return rows, len(rows)
+        total = await self.db.scalar(
+            select(func.count()).select_from(Page).where(*filters)
+        )
+        return rows, int(total or 0)
 
     async def list_templates(self) -> list[Page]:
         """Pages flagged as templates — the New page dialog's starting points.

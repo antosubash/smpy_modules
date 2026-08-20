@@ -11,7 +11,9 @@ import {
 } from '@simple-module-py/ui/components/ui/alert-dialog';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
+
+import { usePendingDialog } from '../hooks/usePendingDialog';
 
 /** How much a confirmation is allowed to cost the person clicking it.
  *
@@ -70,9 +72,6 @@ export function ConfirmDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
 
   const resolvedLevel: ConfirmLevel = level ?? (destructive ? 'medium' : 'low');
@@ -82,32 +81,15 @@ export function ConfirmDialog({
   const needsPhrase = resolvedLevel === 'high' && !!confirmPhrase;
   const unlocked = !needsPhrase || typed === confirmPhrase;
 
-  // Reopening must not inherit the phrase typed last time, or a second delete
-  // is one click from confirmed — the exact property this level removes.
-  useEffect(() => {
-    if (!open) setTyped('');
-  }, [open]);
-
-  const change = (next: boolean) => {
-    // A request in flight owns the dialog: closing it here would strand the
-    // pending state and drop the error the call is about to produce.
-    if (pending) return;
-    setOpen(next);
-    if (!next) setError(null);
-  };
-
-  const run = async () => {
-    setPending(true);
-    setError(null);
-    try {
-      await onConfirm();
-      setOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `${confirmLabel} failed`);
-    } finally {
-      setPending(false);
-    }
-  };
+  // The open/pending/error lifecycle is shared with NoteDialog — see the hook
+  // for the invariants (in-flight request owns the dialog, failure keeps it
+  // open, closing clears the error). The `onClose` callback clears the typed
+  // phrase, because reopening must not inherit the one typed last time: that
+  // would put a second delete one click from confirmed, which is the exact
+  // property this level exists to remove.
+  const { open, pending, error, change, run } = usePendingDialog(`${confirmLabel} failed`, () =>
+    setTyped(''),
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={change}>
@@ -144,7 +126,7 @@ export function ConfirmDialog({
             // a failure stays on screen.
             onClick={(e) => {
               e.preventDefault();
-              void run();
+              void run(onConfirm);
             }}
           >
             {pending ? 'Working…' : confirmLabel}
