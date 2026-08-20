@@ -7,7 +7,7 @@ would drift.
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, Response
 from simple_module_hosting.permissions import (
     WILDCARD,
     RequiresPermission,
@@ -16,7 +16,7 @@ from simple_module_hosting.permissions import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
-from news.constants import PERM_EDIT
+from news.constants import PERM_EDIT, PRIVATE_CACHE_CONTROL, PUBLIC_CACHE_CONTROL
 from news.contracts.schemas import ArticleRead
 
 require_edit = Depends(RequiresPermission(PERM_EDIT))
@@ -53,6 +53,32 @@ def may_see_drafts(request: Request) -> bool:
         )
     return WILDCARD in resolved or PERM_EDIT in resolved
 
+
+
+def already_an_article(page_id: int) -> HTTPException:
+    """One spelling of the conflict, raised from both places that find it.
+
+    ``attach`` checks first and catches the unique-index violation second — the
+    check is not a lock — and the two have to answer identically or a client
+    would have to handle a race differently from the ordinary case.
+    """
+    return HTTPException(
+        status_code=409, detail=f"Page {page_id} is already an article."
+    )
+
+
+def cache(response: Response, *, include_drafts: bool) -> None:
+    """Let a shared cache hold the public answer, and never the editor's.
+
+    The feed block runs on every public page carrying it, so an uncacheable
+    listing costs a database round trip per page view. The editor's listing
+    differs by permission — it includes drafts — so it must not be stored
+    anywhere another visitor could be served it from, which is why the two
+    answers cannot share one header.
+    """
+    response.headers["Cache-Control"] = (
+        PRIVATE_CACHE_CONTROL if include_drafts else PUBLIC_CACHE_CONTROL
+    )
 
 
 async def read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:

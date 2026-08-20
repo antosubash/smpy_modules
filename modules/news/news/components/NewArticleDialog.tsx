@@ -1,5 +1,4 @@
 import { router } from '@inertiajs/react';
-import { slugify } from '@simple-module-py/pagebuilder/pagebuilder/utils/slugify';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Dialog,
@@ -15,7 +14,8 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
-import { articleEditUrl, attachArticle, createArticlePage } from '../utils/api';
+import { createArticleWithPage } from '../utils/api';
+import { slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
 
 const HEADLINE_ID = 'news-new-article-headline';
@@ -45,9 +45,6 @@ export function NewArticleDialog() {
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** The page a failed attempt already committed, kept so a retry adopts it
-   *  instead of stranding another empty, articleless page in pagebuilder. */
-  const [created, setCreated] = useState<{ id: number; slug: string } | null>(null);
 
   const slug = slugOverride ?? slugify(headline);
 
@@ -74,7 +71,6 @@ export function NewArticleDialog() {
       setCategory('');
       setDate(todayUtc());
       setError(null);
-      setCreated(null);
     }
   };
 
@@ -82,19 +78,20 @@ export function NewArticleDialog() {
     setPending(true);
     setError(null);
     try {
-      // The page first: an article row is metadata *about* a page, so there is
-      // nothing to attach to until one exists. A previous attempt's page is
-      // adopted when the slug still matches — retrying otherwise creates a
-      // second page and leaves the first orphaned.
-      const pageId =
-        created?.slug === slug ? created.id : await createArticlePage(headline.trim(), slug);
-      setCreated({ id: pageId, slug });
-      await attachArticle({
-        page_id: pageId,
+      // One request: the server creates the page and attaches the article in a
+      // single transaction. This used to be two calls from here — creating the
+      // page through pagebuilder's API and then attaching — which needed both a
+      // borrowed CSRF cookie and a `created` state to remember the page a
+      // failed attempt had already committed, so a retry could adopt it instead
+      // of stranding another empty one. Neither is reachable any more: a
+      // failure now leaves nothing behind to adopt.
+      const article = await createArticleWithPage({
+        title: headline.trim(),
+        slug,
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });
-      router.visit(articleEditUrl(pageId), {
+      router.visit(article.edit_url, {
         // A visit that lands unmounts this component, so this only fires when
         // one does not. Without it a failed navigation leaves the dialog on
         // "Creating…" with both buttons disabled, permanently.

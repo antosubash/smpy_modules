@@ -53,8 +53,36 @@ PUBLIC_READ_PREFIXES: Final = (
     f"{ROUTE_PREFIX_API}/categories",
 )
 
+# Routes owned by pagebuilder. Spelled here, resolved in
+# ``news.integrations.pagebuilder``, so no other module in news — and nothing
+# in its frontend — has to know how the neighbour routes its own screens.
+PAGEBUILDER_EDITOR_PATH: Final = "/pagebuilder/{page_id}/edit"
+PAGEBUILDER_MEDIA_PATH: Final = "/pagebuilder/media"
+PAGEBUILDER_PAGES_PATH: Final = "/pagebuilder/?view=list&search={query}"
+
 MAX_CATEGORY_LEN: Final = 80
 MAX_TAG_LEN: Final = 60
+MAX_TITLE_LEN: Final = 300
+# Pagebuilder's own bound on ``Page.slug``. Derived slugs are cut to it here so
+# a long headline cannot produce a slug the column rejects.
+MAX_SLUG_LEN: Final = 200
+# And its shape. Restated on this module's own DTO so an author who types a
+# space into the URL field gets a 422 naming the field, rather than the 500 a
+# ValidationError raised from inside the handler produces.
+SLUG_PATTERN: Final = r"^[a-z0-9][a-z0-9-]*$"
+# How many ``-2``, ``-3``… variants to try before giving up on deriving a slug
+# and asking the author for one. Far past any honest collision; it exists so a
+# pathological title cannot spin.
+MAX_SLUG_ATTEMPTS: Final = 20
+
+# The feed block runs on every public page carrying one, so an uncacheable
+# listing costs a database round trip per page view. Short enough that a newly
+# published article appears within a minute.
+PUBLIC_CACHE_SECONDS: Final = 60
+PUBLIC_CACHE_CONTROL: Final = f"public, max-age={PUBLIC_CACHE_SECONDS}"
+# An editor's listing includes drafts, so it differs by permission and must
+# never be held anywhere another visitor could be served it from.
+PRIVATE_CACHE_CONTROL: Final = "private, no-store"
 # Shown on the categories screen as the system row. Articles in it carry an
 # empty ``category``; there is no table row, so it cannot be renamed or
 # deleted — which is exactly what the screen promises.

@@ -6,7 +6,7 @@ import {
   type ArticleRead,
   detachArticle,
   listArticles,
-  publishArticlePage,
+  publishArticle,
   updateArticle,
 } from '../utils/api';
 import {
@@ -130,7 +130,7 @@ export function useArticleEditor(articleId: number) {
     setBusy(true);
     setError(null);
     try {
-      await publishArticlePage(article.page_id);
+      await publishArticle(article.id);
       await load();
       toast.success('Published');
     } catch (e) {

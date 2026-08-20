@@ -10,12 +10,14 @@ from fastapi import APIRouter
 
 from news.endpoints.api.articles import router as articles_router
 from news.endpoints.api.categories import router as categories_router
+from news.endpoints.api.pages import router as pages_router
 from news.endpoints.api.search import router as search_router
 from news.endpoints.api.tags import router as tags_router
 
 router = APIRouter()
 router.include_router(articles_router)
 router.include_router(categories_router)
+router.include_router(pages_router)
 router.include_router(search_router)
 router.include_router(tags_router)
 

@@ -1,8 +1,16 @@
 /** Client for the news read API. */
 
-import type { PageStatus } from '@simple-module-py/pagebuilder/pagebuilder/utils/types';
+import { BASE, write } from './http';
 
-import { BASE, errorFrom, readCookie, write } from './http';
+/** Workflow state of the page behind an article.
+ *
+ * News' own union, deliberately, even though the values are pagebuilder's
+ * `PageStatus` verbatim: this is what the news API sends, and typing it against
+ * a neighbour's module made every consumer of this client depend on that
+ * module's file layout to name a value news is perfectly able to name itself.
+ * `test_integrations` fails if the two vocabularies ever drift.
+ */
+export type ArticleStatus = 'draft' | 'submitted_for_review' | 'published';
 
 export interface ArticleRead {
   id: number;
@@ -21,8 +29,11 @@ export interface ArticleRead {
   published_at: string | null;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
-  page_status: PageStatus;
+  page_status: ArticleStatus;
   url: string;
+  /** Where the body is edited. Sent by the server rather than assembled here,
+   *  so this list holds no opinion about how pagebuilder routes its editor. */
+  edit_url: string;
 }
 
 export interface ArticleCounts {
@@ -113,16 +124,6 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
   });
 }
 
-const PAGEBUILDER_CSRF_COOKIE = 'pagebuilder_csrf';
-/** A pagebuilder *view* route, deliberately not one of its API routes.
- *
- *  Only the view router carries the dependency that mints the CSRF token into
- *  the session; the API router merely validates one. Its cookie middleware can
- *  therefore only mirror a token that a view request already created, so
- *  priming against `/api/pagebuilder/...` returns 200 and sets nothing.
- */
-const PAGEBUILDER_CSRF_PRIMER = '/pagebuilder/';
-
 export const attachArticle = (data: {
   page_id: number;
   category?: string;
@@ -142,72 +143,35 @@ export const updateArticle = (
 
 export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
 
-/** Read pagebuilder's CSRF cookie, priming it first if this session has never
- *  touched a pagebuilder route.
+/** Create the page *and* attach the article, in one request.
  *
- *  Its middleware only mirrors the token on requests under pagebuilder's own
- *  admin prefixes, so arriving at News straight from the sidebar leaves the
- *  cookie unset — and the page-creating POST below is CSRF-protected. Without
- *  this, "New article" 403s for anyone who has not already visited Pages this
- *  session, which is the common path rather than the rare one.
+ * One call, under news' own CSRF token. This used to be two from here — a POST
+ * to pagebuilder's page API, then one back to news — which meant knowing
+ * another module's cookie name and priming it with a throwaway GET, and which
+ * stranded an empty articleless page whenever the second call failed. The
+ * server does both writes in one transaction now, so a failure leaves nothing
+ * behind.
+ *
+ * An omitted `slug` is derived from the title, server-side, and given the first
+ * free variant. One the author typed is used verbatim, and a collision is a 409
+ * rather than a silent rename.
  */
-async function pagebuilderCsrfToken(): Promise<string | null> {
-  const existing = readCookie(PAGEBUILDER_CSRF_COOKIE);
-  if (existing) return existing;
-  await fetch(PAGEBUILDER_CSRF_PRIMER, {
-    credentials: 'same-origin',
-    headers: { Accept: 'text/html' },
-  });
-  return readCookie(PAGEBUILDER_CSRF_COOKIE);
-}
-
-/** Create the page an article's body lives in, through pagebuilder's API. */
-export async function createArticlePage(title: string, slug: string): Promise<number> {
-  const token = await pagebuilderCsrfToken();
-  const response = await fetch('/api/pagebuilder/pages', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
-    },
-    body: JSON.stringify({
-      title,
-      slug,
-      draft_data: { root: { props: { title, width: 'full' } }, content: [], zones: {} },
-    }),
-  });
-  if (!response.ok) throw await errorFrom(response);
-  const { id } = (await response.json()) as { id: number };
-  return id;
-}
+export const createArticleWithPage = (data: {
+  title: string;
+  slug?: string;
+  category?: string;
+  published_at?: string | null;
+  author?: string;
+}) => write<ArticleRead>('/articles/with-page', 'POST', data);
 
 /** Publish the page behind an article, from the list's row menu.
  *
- * Goes through pagebuilder because the body, slug and workflow all live on the
- * page — this module owns only the category and the display date.
+ * Also news' own route: the body belongs to the page, but routing this through
+ * pagebuilder's API from the browser was the last thing that made that
+ * module's CSRF cookie news' business.
  */
-export async function publishArticlePage(pageId: number): Promise<void> {
-  const token = await pagebuilderCsrfToken();
-  const response = await fetch(`/api/pagebuilder/pages/${pageId}/publish`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
-    },
-    body: JSON.stringify({}),
-  });
-  if (!response.ok) throw await errorFrom(response);
-}
-
-/** Where an article's body is actually edited — a pagebuilder route, because
- *  the body belongs to the page rather than to this module. */
-export function articleEditUrl(pageId: number): string {
-  return `/pagebuilder/${pageId}/edit`;
-}
+export const publishArticle = (id: number) =>
+  write<ArticleRead>(`/articles/${id}/publish`, 'POST', {});
 
 /** "2d ago", "in 15d", "today" — the list's relative time.
  *

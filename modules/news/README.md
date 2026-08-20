@@ -47,6 +47,7 @@ set its category filter and item count.
 | `GET /api/news/categories` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
 | `POST /api/news/articles/with-page` | `news.edit` |
+| `POST /api/news/articles/{id}/publish` | `news.edit` |
 | `PUT /api/news/articles/{id}` | `news.edit` |
 | `DELETE /api/news/articles/{id}` | `news.edit` |
 
@@ -60,15 +61,12 @@ badge; without `news.edit` it is always `published`.
 
 `POST /articles` attaches metadata to a page that already exists.
 `POST /articles/with-page` is the "New article" flow: it creates the page *and*
-attaches the article in one transaction, so a failure leaves neither behind. It
-picks the first free readable slug — `my-title`, then `my-title-2` — rather
-than the timestamped one the old browser-side flow was forced to use.
-
-`category` accepts one value that is not a category name: `__none__` asks for
-the articles that have no category at all. An omitted or blank `category` means
-*no filter*, so that state needed a spelling of its own. `GET /categories`
-returns those separately too, as `uncategorised`, rather than as an item with a
-blank name.
+attaches the article in one transaction, so a failure leaves neither behind.
+Omit `slug` and the server derives one from the title and takes the first free
+variant — `my-title`, then `my-title-2`; send one and it is used verbatim, with
+a collision reported as a 409 rather than silently renamed.
+`POST /articles/{id}/publish` publishes the page behind an article, which is
+what the list's row menu calls.
 
 `published_at` is a **display date**, not a timestamp. Whatever instant you
 send, the day is taken as you wrote it and stored as midnight UTC — sending
@@ -89,20 +87,28 @@ drafts and so is `private, no-store`.
 
 An article *is* a page, so depending on `simple_module_pagebuilder` is the
 design rather than an accident. What is avoidable is that dependency being
-*spread*, and it was: the service, the contracts and the module registration
-each imported it, the DTO re-exported its `PageStatus` as part of news' own
-public contract, and the frontend hardcoded its CSRF cookie name, its page API
-route and its editor URL.
+*spread*, and it was: eight Python modules here imported it directly, the DTO
+re-exported its `PageStatus` as part of news' own public contract, and the
+frontend hardcoded its CSRF cookie name, its page API route, its editor URL and
+its media library path.
 
-It now arrives through `news/integrations/pagebuilder.py` — the only module
-here that imports that package. News names its own `ArticleStatus` (same
-values, so the wire format is unchanged), serves `edit_url` rather than having
-the browser assemble one, and creates pages through pagebuilder's *service* in
-its own transaction instead of through its HTTP API with a borrowed token.
+It now arrives through `news/integrations/pagebuilder.py`, the only module here
+that imports that package — asserted by a test, because a single convenient
+import is exactly the kind of thing that quietly undoes a rule like this.
+Concretely:
 
-Two frontend imports remain on purpose: the Puck block registry, which is how a
-block is contributed at all, and `ArticleCardsGrid`, which is the shared render
-kit a second copy of would only make inconsistent.
+- news names its own `ArticleStatus`. Same values, so the wire format is
+  unchanged; `test_integrations` fails if the two vocabularies ever drift.
+- `edit_url` and the search screen's "see all" links are **served**, so no TSX
+  spells out how the neighbouring module routes its own screens.
+- pages are created and published through pagebuilder's *service*, inside this
+  request's transaction, instead of through its HTTP API with a borrowed CSRF
+  token. That is what removed the throwaway priming GET, and what makes "new
+  article" atomic.
+
+Three frontend imports remain on purpose: the Puck block registry, which is how
+a block is contributed at all, and `ArticleCardsGrid` and `ConfirmDialog`,
+which are shared render kit a second copy of would only make inconsistent.
 
 ## Design note: no foreign key
 

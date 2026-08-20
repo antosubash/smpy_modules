@@ -16,11 +16,18 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 
-from pagebuilder.models import NOT_TRASHED, MediaAsset, Page
 from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.contracts.schemas import SearchHit, SearchResults
+from news.integrations.pagebuilder import (
+    NOT_TRASHED,
+    MediaAsset,
+    Page,
+    media_library_path,
+    page_editor_path,
+    page_search_path,
+)
 from news.like import like_pattern
 from news.models import NewsArticle, NewsArticleTag, NewsTag
 
@@ -89,6 +96,11 @@ async def search(
     editor sees work that is not published yet.
     """
     results = SearchResults(query=q)
+    # Where each section's "see all" goes. Set here rather than at the end so
+    # the shape is the same on the empty-query path, and so the screen never
+    # has to guess at a link this module has already resolved.
+    results.pages_more_url = page_search_path(q.strip())
+    results.media_more_url = media_library_path()
     if not q.strip():
         return results
 
@@ -158,7 +170,7 @@ async def search(
                 id=page.id or 0,
                 title=page.title,
                 subtitle=f"/p/{page.slug} · {page.status.value}",
-                url=f"/pagebuilder/{page.id}/edit",
+                url=page_editor_path(page.id or 0),
                 excerpt=excerpt(page.draft_data, q),
             )
         )
@@ -181,7 +193,7 @@ async def search(
                 id=asset.id or 0,
                 title=asset.original_filename,
                 subtitle=asset.content_type,
-                url="/pagebuilder/media",
+                url=media_library_path(),
                 excerpt="",
             )
         )

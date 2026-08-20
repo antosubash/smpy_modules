@@ -9,7 +9,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
 
-import { type ArticleRead, articleEditUrl, formatArticleDate, relativeDay } from '../utils/api';
+import { type ArticleRead, formatArticleDate, relativeDay } from '../utils/api';
 
 /** The article editor — category, tags, date, byline and feed behaviour. The
  *  body is a page, so it is edited one link further in. */
@@ -204,7 +204,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
               </DropdownMenuItem>
             )}
             <DropdownMenuItem asChild>
-              <a href={articleEditUrl(article.page_id)}>Edit the body</a>
+              <a href={article.edit_url}>Edit the body</a>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setEditing(true)}>
               Edit category and date
