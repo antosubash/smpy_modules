@@ -13,8 +13,8 @@ those or force every row into a shape none of them fit.
 
 from __future__ import annotations
 
-import json
 import re
+from collections.abc import Iterator
 
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page
 from sqlalchemy import Text, cast, func, or_, select
@@ -31,21 +31,35 @@ PER_SECTION = 5
 _SNIPPET_PADDING = 60
 
 
+def _string_values(value: object) -> Iterator[str]:
+    """Every string *value* in a block tree, ignoring the keys.
+
+    Generic rather than shape-aware on purpose: the block schema varies by type
+    and by Puck version, but prose is always stored as a string somewhere in
+    here, and a walk that only collects values needs to know none of that.
+    """
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _string_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _string_values(item)
+
+
 def excerpt(blocks: dict | None, q: str) -> str:
     """A window of body text around the first match, or ''.
 
-    Reads the block JSON as text rather than walking the tree: the shape varies
-    by block type and by Puck version, and every one of them ends up storing its
-    prose as a JSON string either way. What this needs is the sentence around
-    the hit, not a faithful render.
+    Values only. Stripping the JSON *punctuation* out of ``json.dumps`` was not
+    enough — it left the keys behind, so a page whose match sat near the start
+    produced "root : props : title : … width : full content : zones :" on the
+    search screen, which reads as a dump of the data structure rather than as a
+    sentence from the page.
     """
     if not blocks or not q.strip():
         return ""
-    haystack = json.dumps(blocks)
-    # Collapse the JSON punctuation so the excerpt reads as prose rather than
-    # as a fragment of a data structure.
-    text = re.sub(r'["\{\}\[\],]|\\[a-z]', " ", haystack)
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+", " ", " ".join(_string_values(blocks)))
     at = text.lower().find(q.strip().lower())
     if at == -1:
         return ""
