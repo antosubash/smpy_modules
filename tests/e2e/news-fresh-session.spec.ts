@@ -29,7 +29,7 @@ test.describe('News — first visit of a session', () => {
 
     // Straight to News. Nothing above may request a /pagebuilder path, or the
     // cookie gets primed and this test stops testing anything.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(page.getByRole('heading', { name: 'News' })).toBeVisible();
 
     const cookieBefore = (await page.context().cookies()).find(
@@ -59,7 +59,7 @@ test.describe('News — first visit of a session', () => {
 
     // And the article row exists, rather than a page with no metadata attached.
     // Rows are cards now, not table rows.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(
       page.locator('[data-testid="article-row"]').filter({ hasText: title }),
     ).toBeVisible();
@@ -71,12 +71,12 @@ test.describe('News — first visit of a session', () => {
     // preview turned this into a "Slug already in use" dead end: the server
     // can only pick the next free variant for a slug nobody asked for by name.
     await login(page);
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
 
     const headline = `Repeat headline ${Date.now().toString(36)}`;
     const slugs: string[] = [];
     for (let i = 0; i < 2; i++) {
-      await page.goto('/news/');
+      await page.goto('/admin/news/');
       await page.getByRole('button', { name: 'New article' }).click();
       const dialog = page.getByRole('dialog');
       await dialog.getByLabel('Headline').fill(headline);
@@ -104,7 +104,7 @@ test.describe('News — first visit of a session', () => {
     // including the i18n catalogue and the user's resolved permissions — into
     // the DOM as text.
     await login(page);
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
 
     const message = await page.evaluate(async () => {
       const r = await fetch('/api/news/articles/999999', {

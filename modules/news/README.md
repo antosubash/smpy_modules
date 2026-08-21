@@ -2,14 +2,25 @@
 
 News articles for SimpleModule hosts, backed by page-builder pages.
 
-An article **is** a page. Its title, slug, body, approval workflow, revisions
-and public URL all belong to `simple_module_pagebuilder`; this module adds only
-the two things a page has no concept of — the category it belongs to and the
-date it should be listed under — plus the listing API and a feed block.
+An article **is** a page. Its title, slug, body, approval workflow and
+revisions all belong to `simple_module_pagebuilder`; this module adds only the
+things a page has no concept of — the category it belongs to, the date it
+should be listed under — plus the listing API and a feed block.
 
-That is why there is no public route here. An article serves at `/p/{slug}`
-with the existing ETag, cache, CSP, SEO and site-layout handling; a second
-viewer would mean duplicating all of it.
+The one thing it does own is the article's **public address**. Articles serve
+at `/news/{slug}` (`SM_NEWS_PUBLIC_ROUTE_PREFIX`), not at pagebuilder's generic
+`/p/{slug}`, so an article is distinguishable from a contact page in a URL, a
+log line and an analytics report. The *rendering* is still pagebuilder's: news
+resolves the slug and hands off to that module's viewer, keeping the ETag,
+cache, CSP, canonical and site-layout handling in one place.
+
+Claiming an address means giving it up elsewhere. `/p/{slug}` **404s** for an
+article, and the sitemap advertises the news URL — see
+`pagebuilder.public_claims`, the generic hook that makes this possible without
+pagebuilder learning anything about news.
+
+The admin console is at `/admin/news`, not `/news`: one prefix cannot be both
+a reader-facing URL and a permission-gated console.
 
 ## Installation
 
@@ -43,6 +54,7 @@ set its category filter and item count.
 
 | Route | Access |
 |---|---|
+| `GET /news/{slug}` | anonymous; published articles only |
 | `GET /api/news/articles?limit&offset&category&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |

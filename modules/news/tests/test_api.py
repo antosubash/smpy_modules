@@ -49,7 +49,7 @@ class TestAttach:
         body = response.json()
         assert body["page_id"] == page.id
         assert body["title"] == "Attach me"
-        assert body["url"] == "/p/attach-me"
+        assert body["url"] == "/news/attach-me"
 
     async def test_read_back_serializes_page_status(self, editor_client) -> None:
         """Regression (#20): the attach read-back must not lazy-load

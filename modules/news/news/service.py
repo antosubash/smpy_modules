@@ -29,10 +29,10 @@ from news.integrations.pagebuilder import (
 )
 from news.maintenance import reconcile_orphans as reconcile_orphans
 from news.models import NewsArticle, NewsCategory
+from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
 
-PUBLIC_PAGE_URL = "/p/{slug}"
 
 
 class _Unset:
@@ -90,7 +90,9 @@ def _to_read(
         author=article.author,
         published_at=article.published_at,
         page_status=article_status(page.status),
-        url=PUBLIC_PAGE_URL.format(slug=page.slug),
+        # News' own prefix, not pagebuilder's generic one: an article no
+        # longer answers at /p/{slug} at all.
+        url=public_article_path(page.slug),
         # Served rather than assembled in the browser: the admin list then
         # holds no opinion about how pagebuilder routes its editor.
         edit_url=page_editor_path(article.page_id),

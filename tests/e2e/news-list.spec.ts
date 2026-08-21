@@ -45,7 +45,7 @@ test.describe('Article list', () => {
     const wanted = await makeArticle(page, { publish: true });
     const other = await makeArticle(page, { publish: true });
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(card(page, wanted.slug)).toBeVisible();
 
     await page.getByLabel('Search headline or slug').fill(wanted.slug);
@@ -63,7 +63,7 @@ test.describe('Article list', () => {
     const draft = await makeArticle(page);
     const live = await makeArticle(page, { publish: true });
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(card(page, draft.slug)).toBeVisible();
     await expect(card(page, live.slug)).toBeVisible();
 
@@ -79,7 +79,7 @@ test.describe('Article list', () => {
     await login(page);
     await makeArticle(page, { publish: true });
 
-    await page.goto('/news/?q=zzz-nothing-matches-this-zzz');
+    await page.goto('/admin/news/?q=zzz-nothing-matches-this-zzz');
     // The distinction the design draws: a filtered-to-nothing list is not the
     // same message as an empty archive.
     await expect(page.getByText(/No articles match/)).toBeVisible();
@@ -95,7 +95,7 @@ test.describe('Article list', () => {
     await login(page);
     const { slug } = await makeArticle(page);
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     const row = card(page, slug);
     await expect(row).toContainText('Draft');
 
@@ -113,7 +113,7 @@ test.describe('Article list', () => {
     await login(page);
     const { slug } = await makeArticle(page, { publish: true });
 
-    await page.goto(`/news/?q=${slug}`);
+    await page.goto(`/admin/news/?q=${slug}`);
     // One article matches the search, and it is published — so All and
     // Published both read 1 while Draft reads 0.
     await expect(page.getByRole('button', { name: /^All 1$/ })).toBeVisible();

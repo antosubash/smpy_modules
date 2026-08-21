@@ -34,6 +34,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
+@pytest.fixture(autouse=True)
+def _no_leaked_module_state():
+    """Both registries the module writes to at startup are process-global.
+
+    ``on_startup`` registers news' slug claim with pagebuilder and publishes the
+    resolved settings; without this a test that boots the module changes the
+    answers of every later test in the same process.
+    """
+    from news import settings as news_settings
+    from pagebuilder import public_claims
+
+    public_claims.reset()
+    news_settings.reset()
+    yield
+    public_claims.reset()
+    news_settings.reset()
+
+
 ROLE_EDITOR = "news-editor"
 ROLE_VIEWER = "news-viewer"
 

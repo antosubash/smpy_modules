@@ -11,11 +11,12 @@ import hashlib
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import redirects
+from pagebuilder import public_claims, redirects
 from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.service import PagesService
@@ -59,28 +60,44 @@ def _public_base_url(request: Request, settings: PagebuilderSettings) -> str:
 
 
 def _absolute_page_url(
-    request: Request, settings: PagebuilderSettings, slug: str
+    request: Request, settings: PagebuilderSettings, slug: str, prefix: str
 ) -> str:
     base = _public_base_url(request, settings)
-    prefix = settings.public_route_prefix.rstrip("/")
-    return f"{base}{prefix}/{slug}"
+    return f"{base}{prefix.rstrip('/')}/{slug}"
 
 
 
-@public_router.get("/{slug}", response_model=None)
-async def public_view(
+async def render_public_page(
     slug: str,
     request: Request,
     inertia: InertiaDep,
-    db: AsyncSession = Depends(get_db),
-    settings: PagebuilderSettings = Depends(get_settings),
+    db: AsyncSession,
+    settings: PagebuilderSettings,
+    *,
+    url_prefix: str | None = None,
 ) -> Response:
+    """Serve a published page, with everything a public URL needs.
+
+    Exposed rather than kept inside the route so a module that claims a page's
+    public address (see :mod:`pagebuilder.public_claims`) serves it through the
+    same ETag, cache, CSP, canonical and old-slug handling instead of growing a
+    second viewer that drifts from this one.
+
+    ``url_prefix`` is the address the caller serves at, used for the canonical
+    URL and for old-slug redirects. It defaults to this module's own, which is
+    what the route below passes.
+    """
+    prefix = url_prefix if url_prefix is not None else settings.public_route_prefix
     page = await PagesService(db).get_by_slug_published(slug)
     if page is None or page.published_data is None:
         # Before giving up: this may be an address the page used to live at.
-        moved = await redirects.response_for(db, slug, prefix=settings.public_route_prefix)
-        if moved is not None:
-            return moved
+        moved_to = await redirects.resolve(db, slug)
+        if moved_to is not None and await public_claims.claimed_url(db, moved_to) is None:
+            # Only when the current address is still one this viewer serves. A
+            # page renamed *into* something another module claims has no address
+            # here any more, and forwarding to one that would itself 404 wastes
+            # a crawler's hop to say the same thing.
+            return RedirectResponse(f"{prefix.rstrip('/')}/{moved_to}", status_code=301)
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
@@ -100,7 +117,7 @@ async def public_view(
     if request.headers.get("if-none-match") == etag:
         return apply_headers(Response(status_code=304))
 
-    canonical = page.canonical_url or _absolute_page_url(request, settings, slug)
+    canonical = page.canonical_url or _absolute_page_url(request, settings, slug, prefix)
     return apply_headers(
         await inertia.render(
             _PAGE_PUBLIC,
@@ -119,3 +136,24 @@ async def public_view(
             },
         )
     )
+
+
+@public_router.get("/{slug}", response_model=None)
+async def public_view(
+    slug: str,
+    request: Request,
+    inertia: InertiaDep,
+    db: AsyncSession = Depends(get_db),
+    settings: PagebuilderSettings = Depends(get_settings),
+) -> Response:
+    """A published page at this module's own address.
+
+    A slug another module has claimed is *not* served here, even though the page
+    exists and is published: it answers at the claimant's address instead, and
+    serving it at both would put the same document at two URLs. 404 rather than
+    a redirect is deliberate — the two addresses were never equivalent, so
+    there is no old address to forward from.
+    """
+    if await public_claims.claimed_url(db, slug) is not None:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return await render_public_page(slug, request, inertia, db, settings)

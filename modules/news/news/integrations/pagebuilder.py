@@ -24,11 +24,15 @@ in ``pyproject.toml`` checkable by reading one file.
 
 from __future__ import annotations
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request, Response
+from pagebuilder import public_claims, redirects
 from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.contracts.schemas import PageCreate
+from pagebuilder.deps import get_settings as pagebuilder_settings
+from pagebuilder.endpoints.public_views import render_public_page
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 from pagebuilder.service import PagesService
+from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Load
@@ -51,12 +55,15 @@ __all__ = [
     "PageStatus",
     "article_status",
     "card_columns",
+    "claim_slugs",
     "create_article_page",
     "empty_puck_document",
     "media_library_path",
     "page_editor_path",
     "page_search_path",
     "publish_page",
+    "redirected_slug",
+    "render_article_page",
     "slug_for_title",
 ]
 
@@ -203,3 +210,52 @@ async def publish_page(db: AsyncSession, page_id: int) -> Page:
     which is the last thing that made that cookie's name news' business.
     """
     return await PagesService(db).publish(page_id)
+
+
+def claim_slugs(claim: public_claims.SlugClaim) -> None:
+    """Tell pagebuilder these slugs serve at news' address, not its own.
+
+    Registered at startup. Two things follow from it, both pagebuilder's doing:
+    ``/p/{slug}`` 404s for an article, and the sitemap advertises the news URL
+    instead of one the viewer would refuse.
+    """
+    public_claims.register(claim)
+
+
+async def render_article_page(
+    slug: str,
+    request: Request,
+    inertia: InertiaDep,
+    db: AsyncSession,
+    *,
+    url_prefix: str,
+) -> Response:
+    """Serve an article's body through pagebuilder's own public viewer.
+
+    News owns the *address*; it does not own page rendering. Reusing the viewer
+    is what keeps the ETag, cache headers, CSP, canonical tag, site layout and
+    old-slug redirects identical to every other published page — a second
+    viewer would start equal and drift.
+
+    ``url_prefix`` is news', so the canonical tag names the address the article
+    actually serves at rather than the one it no longer answers on.
+    """
+    return await render_public_page(
+        slug,
+        request,
+        inertia,
+        db,
+        pagebuilder_settings(request),
+        url_prefix=url_prefix,
+    )
+
+
+async def redirected_slug(db: AsyncSession, slug: str) -> str | None:
+    """The slug an old address now points at, or ``None``.
+
+    A rename is not a private edit — the old URL is in bookmarks, in links from
+    other sites and in a search index that has not recrawled — so pagebuilder
+    records one. News reads the same table rather than keeping its own, which
+    is what makes renaming an article behave like renaming any other page.
+    """
+    return await redirects.resolve(db, slug)

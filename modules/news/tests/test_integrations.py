@@ -16,10 +16,12 @@ import re
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
+from news import settings as news_settings
 from news.constants import MAX_SLUG_LEN
 from news.contracts.schemas import ArticleStatus
 from news.display_date import as_display_date
 from news.integrations import pagebuilder as pb
+from news.settings import NewsSettings, public_article_path
 from pagebuilder.contracts.schemas import PageCreate
 
 # Pagebuilder's own constraint on the field, read off the schema rather than
@@ -143,3 +145,25 @@ class TestDisplayDate:
         # An undated article is work in progress — a real value, not a missing
         # one, so it must not be turned into a date.
         assert as_display_date(None) is None
+
+
+class TestPublicArticlePath:
+    """Where an article serves. Its own prefix, not pagebuilder's generic one —
+    an article used to sit at ``/p/{slug}`` next to the contact page, so the
+    address said nothing about what the document was."""
+
+    def test_the_default_prefix_is_the_modules_own(self) -> None:
+        assert public_article_path("estonia") == "/news/estonia"
+
+    def test_a_deployment_can_move_it(self) -> None:
+        """A setting rather than a constant because it is the one thing here a
+        site owner has an opinion about — /news, /blog, or a word in their own
+        language."""
+        news_settings.use(NewsSettings(public_route_prefix="/aktuelles"))
+
+        assert public_article_path("estonia") == "/aktuelles/estonia"
+
+    def test_a_trailing_slash_does_not_double(self) -> None:
+        news_settings.use(NewsSettings(public_route_prefix="/blog/"))
+
+        assert public_article_path("estonia") == "/blog/estonia"

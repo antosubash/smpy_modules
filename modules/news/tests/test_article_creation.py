@@ -60,7 +60,7 @@ class TestCreateWithPage:
         body = (await editor_client.post(WITH_PAGE, json={"title": "Sensor rollout"})).json()
 
         assert body["slug"] == "sensor-rollout"
-        assert body["url"] == "/p/sensor-rollout"
+        assert body["url"] == "/news/sensor-rollout"
 
     async def test_a_second_article_of_the_same_name_gets_the_next_free_slug(
         self, editor_client

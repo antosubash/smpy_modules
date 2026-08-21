@@ -143,7 +143,7 @@ export function NewArticleDialog() {
             <div className="grid gap-2">
               <Label htmlFor={SLUG_ID}>URL</Label>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground">/p/</span>
+                <span className="text-sm text-muted-foreground">/news/</span>
                 <Input
                   id={SLUG_ID}
                   value={slug}

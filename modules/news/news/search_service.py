@@ -19,6 +19,7 @@ from collections.abc import Iterator
 from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news import constants
 from news.contracts.schemas import SearchHit, SearchResults
 from news.integrations.pagebuilder import (
     NOT_TRASHED,
@@ -133,7 +134,7 @@ async def search(
                 id=article.id or 0,
                 title=page.title,
                 subtitle=f"{article.category or 'Uncategorised'} · {page.status.value}",
-                url=f"/news/articles/{article.id}/edit",
+                url=constants.ARTICLE_EDITOR_URL.format(article_id=article.id or 0),
                 excerpt=excerpt(page.draft_data, q),
             )
         )
@@ -169,7 +170,7 @@ async def search(
             SearchHit(
                 id=page.id or 0,
                 title=page.title,
-                subtitle=f"/p/{page.slug} · {page.status.value}",
+                subtitle=f"{page.slug} · {page.status.value}",
                 url=page_editor_path(page.id or 0),
                 excerpt=excerpt(page.draft_data, q),
             )

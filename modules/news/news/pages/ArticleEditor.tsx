@@ -74,7 +74,7 @@ export default function ArticleEditor() {
       description={`${article.url} · ${status}`}
       actions={
         <>
-          <Button variant="outline" onClick={() => router.visit('/news/')}>
+          <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
             News / Articles
           </Button>
           {!isDraft && (
@@ -116,7 +116,7 @@ export default function ArticleEditor() {
             confirmLabel="Detach"
             onConfirm={async () => {
               await detach();
-              router.visit('/news/');
+              router.visit('/admin/news/');
             }}
             trigger={
               <Button variant="ghost" size="sm" className="text-destructive" disabled={busy}>

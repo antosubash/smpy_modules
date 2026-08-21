@@ -109,7 +109,7 @@ export function CategoryRow({
             <p className="truncate text-sm text-muted-foreground">
               {category.is_system
                 ? 'system category · cannot be deleted or renamed'
-                : `/news?category=${category.slug}`}
+                : `/admin/news/?category=${category.slug}`}
             </p>
           </>
         )}

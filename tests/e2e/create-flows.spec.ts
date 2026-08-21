@@ -89,7 +89,7 @@ test.describe('New page', () => {
 test.describe('New article', () => {
   test('asks for four fields and lands in the editor', async ({ page }) => {
     await login(page);
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await page.getByRole('button', { name: 'New article' }).click();
     // Scoped to the dialog: the list's own "Search headline or slug" box would
     // otherwise also match getByLabel('Headline').
@@ -108,7 +108,7 @@ test.describe('New article', () => {
   test('the category chosen at creation is the one the list shows', async ({ page }) => {
     await login(page);
     // A managed category so the select has something beyond Uncategorised.
-    await page.goto('/news/categories');
+    await page.goto('/admin/news/categories');
     const category = `Cat ${Date.now().toString(36)}`;
     await page.getByLabel('New category name').fill(category);
     await page.getByRole('button', { name: /^add$/i }).click();
@@ -118,7 +118,7 @@ test.describe('New article', () => {
 
     // The select reads the *managed* list, so a category that exists but has
     // not been used yet is still offered — which is exactly when you want it.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await page.getByRole('button', { name: 'New article' }).click();
     const dialog = page.getByRole('dialog');
     const headline = `Categorised ${Date.now().toString(36)}`;
@@ -137,7 +137,7 @@ test.describe('New article', () => {
 
     // Searched, not scrolled to: the list pages at 25, and by the time the
     // whole suite has run there are more articles than that ahead of this one.
-    await page.goto(`/news/?q=${slug}`);
+    await page.goto(`/admin/news/?q=${slug}`);
     const row = page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
     await expect(row).toBeVisible();
     await expect(row).toContainText(category);
@@ -162,7 +162,7 @@ test.describe('Empty states', () => {
     });
 
     // Search for it, but filtered to drafts — it is published, so nothing matches.
-    await page.goto(`/news/?q=${slug}&status=draft`);
+    await page.goto(`/admin/news/?q=${slug}&status=draft`);
     await expect(page.getByText(/No drafts match/)).toBeVisible();
     await expect(page.getByText(/match across all statuses/)).toBeVisible();
 

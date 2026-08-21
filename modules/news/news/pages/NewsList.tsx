@@ -59,7 +59,7 @@ export default function NewsList() {
   return (
     <PageShell
       title="News"
-      description={`${counts.published} published · ${counts.draft} drafts · public at /p/:slug`}
+      description={`${counts.published} published · ${counts.draft} drafts · public at /news/:slug`}
       actions={canEdit ? <NewArticleDialog /> : undefined}
     >
       <Head title="News" />

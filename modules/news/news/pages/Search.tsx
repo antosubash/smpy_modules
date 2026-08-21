@@ -113,7 +113,7 @@ export default function Search() {
               label="Articles"
               hits={results.articles}
               total={results.article_total}
-              moreHref={`/news/?q=${encodeURIComponent(q.trim())}`}
+              moreHref={`/admin/news/?q=${encodeURIComponent(q.trim())}`}
               moreLabel="articles"
             />
           )}

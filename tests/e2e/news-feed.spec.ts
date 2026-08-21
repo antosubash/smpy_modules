@@ -109,7 +109,7 @@ test.describe('News feed block', () => {
     const card = page.getByRole('link', { name: new RegExp(`Article ${articleSlug}`) });
     await expect(card).toBeVisible();
     // An article *is* a page, so the card links at the page's own URL.
-    await expect(card).toHaveAttribute('href', `/p/${articleSlug}`);
+    await expect(card).toHaveAttribute('href', `/news/${articleSlug}`);
     await expect(card).toContainText('The excerpt.');
     await expect(card).toContainText('Feb 1, 2026');
   });

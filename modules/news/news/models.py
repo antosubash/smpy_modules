@@ -1,8 +1,9 @@
 """SQLModel table for the news module.
 
 An article *is* a pagebuilder page — title, slug, body, approval workflow,
-revisions and SEO all live there, and it serves at ``/p/{slug}`` with the
-existing ETag, cache and CSP handling. This table adds only what a page has no
+revisions and SEO all live there, and it is rendered by that module's own
+viewer with the existing ETag, cache and CSP handling. Only the public
+address is news' — see ``news.settings``. This table adds only what a page has no
 concept of: the category it belongs to and the date it should be listed under.
 
 Keeping it a sidecar is what lets pagebuilder stay a generic CMS that knows
