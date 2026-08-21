@@ -34,8 +34,19 @@ _INERTIA = "inertia"
 
 
 def _representation_of(request: Request) -> str:
-    """Which of the two this request is asking for."""
-    return _INERTIA if request.headers.get("x-inertia") == "true" else _DOCUMENT
+    """Which of the two this request is asking for.
+
+    Mirrors ``Inertia._is_inertia_request`` (presence of the header, not its
+    value) on purpose: that check is what actually decides, inside
+    ``inertia.render()``, whether this request gets JSON or HTML back. Matching
+    on ``== "true"`` instead would disagree with it for any non-empty value
+    other than the literal string ``"true"`` (e.g. a client or proxy that
+    sends ``X-Inertia: 1``) -- the route would then cache the JSON payload,
+    auth block included, under the *document*'s public, shared validator.
+    That is the same crossover this module exists to close, just gated on
+    header value instead of header presence.
+    """
+    return _INERTIA if "x-inertia" in request.headers else _DOCUMENT
 
 
 def _etag_for(

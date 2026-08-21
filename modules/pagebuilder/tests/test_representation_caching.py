@@ -137,6 +137,26 @@ class TestOnlyTheDocumentIsShareable:
 
         assert response.headers["Cache-Control"] == "private, no-store"
 
+    async def test_a_non_true_x_inertia_value_still_counts_as_the_payload(
+        self, authed_client: AsyncClient
+    ) -> None:
+        """``inertia.render()`` decides JSON vs. HTML on header *presence*
+        (``Inertia._is_inertia_request``), not on the header equaling
+        ``"true"``. If this route classified representations by value
+        instead of presence, a header like ``X-Inertia: 1`` would still get
+        rendered as JSON by ``inertia.render()`` while being cached here as
+        the public document — reopening the exact crossover this module
+        exists to close.
+        """
+        await _publish(authed_client)
+
+        response = await authed_client.get(
+            f"/p/{_SLUG}", headers={"X-Inertia": "1", "X-Inertia-Version": "1.0"}
+        )
+
+        assert response.headers["content-type"].startswith("application/json")
+        assert response.headers["Cache-Control"] == "private, no-store"
+
     async def test_the_document_stays_publicly_cacheable(self, authed_client: AsyncClient) -> None:
         """Public page content caching was never the bug — keep it."""
         await _publish(authed_client)
