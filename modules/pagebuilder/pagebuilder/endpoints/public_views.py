@@ -26,22 +26,46 @@ public_router = APIRouter()
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
 
+#: The two things this route can return. Different bytes, different content
+#: types — so under RFC 9110 they are different representations and must not
+#: share a validator.
+_DOCUMENT = "doc"
+_INERTIA = "inertia"
+
+
+def _representation_of(request: Request) -> str:
+    """Which of the two this request is asking for."""
+    return _INERTIA if request.headers.get("x-inertia") == "true" else _DOCUMENT
+
+
 def _etag_for(
     page_id: int,
     updated_at: datetime | None,
     layout_updated_at: datetime | None = None,
+    representation: str = _DOCUMENT,
 ) -> str:
     """Stable, short ETag derived from page identity + last-modified time.
 
     ``layout_updated_at`` participates so a site-wide header / footer
     edit invalidates every page's cached chrome — without it, clients
     keep serving stale layout from cache until the page itself changes.
+
+    ``representation`` participates because this route answers the same URL
+    with an HTML document or an Inertia JSON payload, depending on the
+    request's ``X-Inertia`` header. One validator across both let a client
+    holding the payload revalidate a *document* request into a 304 and carry
+    on rendering JSON as the page — which is what visitors hit on a live site
+    after following a link to a page and then opening its URL directly.
+    Including it also retires every ETag issued before this fix, so a cache
+    already holding the wrong representation heals on its next revalidation
+    instead of having it confirmed for another cycle.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
     layout_stamp = (
         layout_updated_at.isoformat() if layout_updated_at is not None else ""
     )
-    digest = hashlib.sha1(f"{page_id}:{stamp}:{layout_stamp}".encode()).hexdigest()[:16]
+    seed = f"{page_id}:{stamp}:{layout_stamp}:{representation}"
+    digest = hashlib.sha1(seed.encode()).hexdigest()[:16]
     return f'W/"{digest}"'
 
 
@@ -84,15 +108,29 @@ async def public_view(
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
-    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at)
-    cache_parts = [f"max-age={settings.public_cache_max_age}"]
-    if settings.public_cache_swr > 0:
-        cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
-    cache_control = "public, " + ", ".join(cache_parts)
+    representation = _representation_of(request)
+    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at, representation)
+    # The page body is the same for every visitor, but the Inertia payload
+    # wrapped around it is not: the framework merges the signed-in user's auth
+    # block, permissions and menus into it. Only the document is public.
+    if representation == _INERTIA:
+        cache_control = "private, no-store"
+    else:
+        cache_parts = [f"max-age={settings.public_cache_max_age}"]
+        if settings.public_cache_swr > 0:
+            cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
+        cache_control = "public, " + ", ".join(cache_parts)
 
     def apply_headers(response: Response) -> Response:
         response.headers["ETag"] = etag
         response.headers["Cache-Control"] = cache_control
+        # Merged into the existing value rather than appended as a second
+        # `Vary` line: the Inertia render already set `Vary: Accept`, and
+        # `add_vary_header` is what every middleware downstream uses. One of
+        # those reading `vary`, extending it and assigning it back would drop
+        # a separate line — SessionMiddleware adding `Cookie` does exactly
+        # that, and silently took `X-Inertia` with it.
+        response.headers.add_vary_header("X-Inertia")
         if settings.public_csp:
             response.headers["Content-Security-Policy"] = settings.public_csp
         return response

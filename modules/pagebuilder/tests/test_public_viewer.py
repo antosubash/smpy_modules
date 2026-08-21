@@ -49,14 +49,27 @@ async def test_missing_slug_returns_404(authed_client: AsyncClient) -> None:
 
 
 async def test_published_page_renders_with_headers(authed_client: AsyncClient) -> None:
+    """The document is public content, and caches as such."""
     await _create_published(authed_client)
-    response = await authed_client.get("/p/hello", headers=_INERTIA_HEADERS)
+    response = await authed_client.get("/p/hello")
     assert response.status_code == 200
     assert response.headers.get("ETag", "").startswith('W/"')
     cache_control = response.headers["Cache-Control"]
     assert "public" in cache_control
     assert "max-age=" in cache_control
     assert response.headers.get("Content-Security-Policy", "").startswith("default-src 'self'")
+
+
+async def test_the_inertia_payload_is_not_public(authed_client: AsyncClient) -> None:
+    """It carries the viewer's auth block and menus, so it is not shared content.
+
+    This asserted ``public`` until the payload turned up being served as the
+    page itself on a live site — see ``test_representation_caching.py``.
+    """
+    await _create_published(authed_client)
+    response = await authed_client.get("/p/hello", headers=_INERTIA_HEADERS)
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "private, no-store"
 
 
 async def test_published_page_unpublishes_to_404(authed_client: AsyncClient) -> None:
