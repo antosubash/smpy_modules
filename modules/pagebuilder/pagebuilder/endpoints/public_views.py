@@ -92,12 +92,15 @@ async def render_public_page(
     if page is None or page.published_data is None:
         # Before giving up: this may be an address the page used to live at.
         moved_to = await redirects.resolve(db, slug)
-        if moved_to is not None and await public_claims.claimed_url(db, moved_to) is None:
-            # Only when the current address is still one this viewer serves. A
-            # page renamed *into* something another module claims has no address
-            # here any more, and forwarding to one that would itself 404 wastes
-            # a crawler's hop to say the same thing.
-            return RedirectResponse(f"{prefix.rstrip('/')}/{moved_to}", status_code=301)
+        if moved_to is not None:
+            # The page's current address, wherever that now is. When another
+            # module has claimed it, the old URL forwards *there* rather than
+            # to this module's version of it — that one 404s, and sending a
+            # visitor to it would turn a rename into a broken link, which is
+            # the exact thing recording a redirect exists to prevent.
+            claimed = await public_claims.claimed_url(db, moved_to)
+            target = claimed or f"{prefix.rstrip('/')}/{moved_to}"
+            return RedirectResponse(target, status_code=301)
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()

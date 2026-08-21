@@ -13,6 +13,11 @@ describe('slugify — matching news/slugify.py', () => {
     ['Ünïcodé folds', 'unicode-folds'],
     ['punctuation!!! -- everywhere', 'punctuation-everywhere'],
     ['--leading hyphens--', 'leading-hyphens'],
+    // NFKD leaves these whole, so the fold has to *drop* them rather than
+    // treat them as separators — `strae`, not `stra-e`, is what the Python
+    // derives and therefore what the article's URL will be.
+    ['Straße Festival', 'strae-festival'],
+    ['Zürich Æther', 'zurich-ther'],
   ])('folds %j to %j', (title, expected) => {
     expect(slugify(title)).toBe(expected);
   });

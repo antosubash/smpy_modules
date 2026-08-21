@@ -75,10 +75,16 @@ def cache(response: Response, *, include_drafts: bool) -> None:
     differs by permission — it includes drafts — so it must not be stored
     anywhere another visitor could be served it from, which is why the two
     answers cannot share one header.
+
+    ``Vary: Cookie`` is what keeps the two apart in a shared cache. The URL is
+    identical for both, so without it a proxy that stored the anonymous answer
+    would go on serving it to an editor for the whole max-age — the admin list
+    losing its drafts, and a just-created article, for up to a minute.
     """
     response.headers["Cache-Control"] = (
         PRIVATE_CACHE_CONTROL if include_drafts else PUBLIC_CACHE_CONTROL
     )
+    response.headers["Vary"] = "Cookie"
 
 
 async def read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:

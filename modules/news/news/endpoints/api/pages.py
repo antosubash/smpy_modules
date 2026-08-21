@@ -26,12 +26,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news import service
 from news.contracts.schemas import ArticleRead, ArticleWithPageCreate
 from news.endpoints.api._deps import read_one_by_page, require_edit
-from news.integrations.pagebuilder import create_article_page, publish_page
+from news.integrations.pagebuilder import (
+    create_article_page,
+    publish_page,
+    require_page_edit,
+    require_page_publish,
+)
 
 router = APIRouter(dependencies=[require_edit])
+"""``news.edit`` on every route here, plus pagebuilder's own permission for the
+page write each one performs — see ``news.integrations.pagebuilder``. Moving
+these writes server-side must not also move them past the editor → publisher
+separation the browser path went through."""
 
 
-@router.post("/articles/with-page", response_model=ArticleRead, status_code=201)
+@router.post(
+    "/articles/with-page",
+    response_model=ArticleRead,
+    status_code=201,
+    dependencies=[require_page_edit],
+)
 async def create_article_with_page(
     body: ArticleWithPageCreate, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
@@ -52,7 +66,11 @@ async def create_article_with_page(
     return await read_one_by_page(db, page.id or 0)
 
 
-@router.post("/articles/{article_id}/publish", response_model=ArticleRead)
+@router.post(
+    "/articles/{article_id}/publish",
+    response_model=ArticleRead,
+    dependencies=[require_page_publish],
+)
 async def publish_article(
     article_id: int, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:

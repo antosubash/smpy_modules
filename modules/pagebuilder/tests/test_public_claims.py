@@ -122,12 +122,13 @@ class TestSitemap:
         assert "/p/claimed-page" not in body
         assert "/p/ordinary-page" in body
 
-    async def test_an_old_address_does_not_forward_into_a_claim(
+    async def test_an_old_address_forwards_to_where_the_claimant_serves_it(
         self, authed_client: AsyncClient
     ) -> None:
-        """A page renamed *into* something another module claims has no address
-        here any more. Forwarding to one that would itself 404 wastes a
-        crawler's hop to say exactly what a 404 already says."""
+        """A page renamed *into* a claimed slug still has a live address — the
+        claimant's. Forwarding to this module's version of it would send the
+        visitor to a 404 and turn a rename into the broken link that recording
+        a redirect exists to prevent."""
         page_id = await _publish(authed_client, "before")
         renamed = await authed_client.put(
             f"/api/pagebuilder/pages/{page_id}", json={"slug": "after"}
@@ -139,7 +140,8 @@ class TestSitemap:
 
         old = await authed_client.get("/p/before", follow_redirects=False)
 
-        assert old.status_code == 404
+        assert old.status_code == 301
+        assert old.headers["location"] == "/elsewhere/after"
 
     async def test_an_ordinary_rename_still_forwards(
         self, authed_client: AsyncClient

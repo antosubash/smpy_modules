@@ -8,7 +8,6 @@ falls, which is why the editor promises a redirect and this records one.
 
 from __future__ import annotations
 
-from fastapi.responses import RedirectResponse
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -59,18 +58,3 @@ async def resolve(db: AsyncSession, slug: str) -> str | None:
 async def clear_for_page(db: AsyncSession, page_id: int) -> None:
     """Drop a page's redirects. Used when it is purged."""
     await db.execute(sa_delete(PageRedirect).where(PageRedirect.page_id == page_id))
-
-
-async def response_for(
-    db: AsyncSession, slug: str, *, prefix: str
-) -> RedirectResponse | None:
-    """A 301 to the page's current address, when ``slug`` is an old one.
-
-    301 rather than 302 on purpose: the move is permanent, and a temporary
-    redirect would leave search engines indexing the address the author
-    deliberately retired.
-    """
-    current = await resolve(db, slug)
-    if current is None:
-        return None
-    return RedirectResponse(f"{prefix.rstrip('/')}/{current}", status_code=301)

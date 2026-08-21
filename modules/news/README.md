@@ -58,8 +58,8 @@ set its category filter and item count.
 | `GET /api/news/articles?limit&offset&category&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
-| `POST /api/news/articles/with-page` | `news.edit` |
-| `POST /api/news/articles/{id}/publish` | `news.edit` |
+| `POST /api/news/articles/with-page` | `news.edit` **+ `pagebuilder.edit`** |
+| `POST /api/news/articles/{id}/publish` | `news.edit` **+ `pagebuilder.publish`** |
 | `PUT /api/news/articles/{id}` | `news.edit` |
 | `DELETE /api/news/articles/{id}` | `news.edit` |
 
@@ -79,6 +79,16 @@ variant — `my-title`, then `my-title-2`; send one and it is used verbatim, wit
 a collision reported as a 409 rather than silently renamed.
 `POST /articles/{id}/publish` publishes the page behind an article, which is
 what the list's row menu calls.
+
+Both of those write a **page**, so both require pagebuilder's own permission on
+top of `news.edit`. That module separates editor from publisher deliberately —
+so a host can run an editor → publisher workflow without granting every editor
+publish rights — and these routes replaced browser calls that went through
+pagebuilder's endpoints and met that gate. Requiring only `news.edit` would
+have handed every article author a way straight past it. A role that creates
+and publishes articles therefore needs `news.edit`, `pagebuilder.edit` and
+`pagebuilder.publish`; attaching metadata to a page somebody else made touches
+nothing of pagebuilder's and still needs only `news.edit`.
 
 `published_at` is a **display date**, not a timestamp. Whatever instant you
 send, the day is taken as you wrote it and stored as midnight UTC — sending

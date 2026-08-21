@@ -24,11 +24,15 @@ in ``pyproject.toml`` checkable by reading one file.
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import HTTPException, Request, Response
 from pagebuilder import public_claims, redirects
 from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.contracts.schemas import PageCreate
 from pagebuilder.deps import get_settings as pagebuilder_settings
+from pagebuilder.endpoints.api._deps import require_edit as require_page_edit
+from pagebuilder.endpoints.api._deps import require_publish as require_page_publish
 from pagebuilder.endpoints.public_views import render_public_page
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 from pagebuilder.service import PagesService
@@ -64,8 +68,19 @@ __all__ = [
     "publish_page",
     "redirected_slug",
     "render_article_page",
+    "require_page_edit",
+    "require_page_publish",
     "slug_for_title",
 ]
+
+
+# Re-exported so a news route can demand the same authority pagebuilder does
+# for the same write. Pagebuilder separates editor from publisher on purpose —
+# "let hosts run the editor → publisher workflow without granting every editor
+# publish rights" — and news creating and publishing pages under ``news.edit``
+# alone would hand every article author a way straight past that separation.
+# The article routes require both: news' own permission, and the neighbour's
+# for the page write they perform on its behalf.
 
 
 def page_editor_path(page_id: int) -> str:
@@ -82,8 +97,14 @@ def media_library_path() -> str:
 
 
 def page_search_path(query: str) -> str:
-    """Pagebuilder's own page list, pre-filtered — the "see all" of a search."""
-    return PAGEBUILDER_PAGES_PATH.format(query=query)
+    """Pagebuilder's own page list, pre-filtered — the "see all" of a search.
+
+    The query is percent-encoded because it goes into a query *value*: a search
+    for ``R&D`` would otherwise arrive as ``search=R`` plus a stray parameter,
+    and one containing ``#`` would truncate the URL at the fragment and land on
+    an unfiltered list.
+    """
+    return PAGEBUILDER_PAGES_PATH.format(query=quote(query, safe=""))
 
 
 def article_status(status: PageStatus) -> ArticleStatus:
@@ -154,9 +175,14 @@ async def _free_slug(db: AsyncSession, base: str) -> str:
     Returns ``""`` when even the suffixed candidates are all taken, which the
     caller turns into an error rather than guessing further.
     """
+    # The prefilter is the *stem* rather than ``base``: a base already at
+    # MAX_SLUG_LEN has to be cut to make room for the suffix, so its candidates
+    # do not start with ``base`` and a ``startswith(base)`` filter would never
+    # see them — handing back a candidate that is in fact taken.
+    stem = base[: _stem_length(base)]
     taken = set(
         (
-            await db.execute(select(Page.slug).where(Page.slug.startswith(base)))
+            await db.execute(select(Page.slug).where(Page.slug.startswith(stem)))
         ).scalars()
     )
     if base not in taken:
@@ -166,6 +192,16 @@ async def _free_slug(db: AsyncSession, base: str) -> str:
         if candidate not in taken:
             return candidate
     return ""
+
+
+def _stem_length(base: str) -> int:
+    """How much of ``base`` every candidate is guaranteed to share.
+
+    The longest suffix is the one that eats the most of the base, so cutting to
+    that leaves a prefix common to ``base`` and to all of its variants.
+    """
+    longest = len(str(MAX_SLUG_ATTEMPTS + 1))
+    return min(len(base), MAX_SLUG_LEN - longest - 1)
 
 
 async def create_article_page(
