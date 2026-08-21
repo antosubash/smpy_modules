@@ -87,7 +87,12 @@ export function NewArticleDialog() {
       // failure now leaves nothing behind to adopt.
       const article = await createArticleWithPage({
         title: headline.trim(),
-        slug,
+        // Only when the author actually typed one. While `slugOverride` is
+        // null the field is a *preview* of what the headline derives, and
+        // sending it would turn a second article of the same headline into a
+        // "Slug already in use" dead end — the server can only take the next
+        // free variant for a slug nobody asked for by name.
+        slug: slugOverride ?? undefined,
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });

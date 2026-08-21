@@ -65,6 +65,39 @@ test.describe('News — first visit of a session', () => {
     ).toBeVisible();
   });
 
+  test('a second article of the same headline takes the next free URL', async ({ page }) => {
+    // The dialog fills the URL field from the headline as a *preview*, and
+    // sends it only when the author has actually edited it. Sending the
+    // preview turned this into a "Slug already in use" dead end: the server
+    // can only pick the next free variant for a slug nobody asked for by name.
+    await login(page);
+    await page.goto('/news/');
+
+    const headline = `Repeat headline ${Date.now().toString(36)}`;
+    const slugs: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      await page.goto('/news/');
+      await page.getByRole('button', { name: 'New article' }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel('Headline').fill(headline);
+      slugs.push(await dialog.locator('#news-new-article-slug').inputValue());
+      await dialog.getByRole('button', { name: 'Create draft' }).click();
+      await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 20_000 });
+    }
+
+    // Same preview both times — the dialog has no idea the first one is taken.
+    expect(slugs[0]).toBe(slugs[1]);
+
+    // …and the server resolved the collision rather than refusing it. Read
+    // back over the API rather than the list: both creates already had to
+    // succeed for the loop above to finish, so this only needs the slugs.
+    const listed = await page.request.get(
+      `/api/news/articles?limit=20&q=${encodeURIComponent(headline)}`,
+    );
+    const body = (await listed.json()) as { items: { slug: string }[] };
+    expect(body.items.map((i) => i.slug).sort()).toEqual([slugs[0], `${slugs[0]}-2`].sort());
+  });
+
   test('shows a readable message when a write fails, not an HTML document', async ({ page }) => {
     // `write()` used to throw `response.text()` verbatim and the page renders
     // it, so an auth/CSRF failure painted the whole Inertia document —
