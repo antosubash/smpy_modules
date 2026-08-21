@@ -27,6 +27,8 @@ from news.models import Base as NewsBase
 from news.module import NewsModule
 from pagebuilder.models import Base as PagebuilderBase
 from pagebuilder.models import Page, PageStatus
+from pagebuilder.permissions import PERM_EDIT as PAGE_EDIT
+from pagebuilder.permissions import PERM_PUBLISH as PAGE_PUBLISH
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
@@ -34,7 +36,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
+@pytest.fixture(autouse=True)
+def _no_leaked_module_state():
+    """Both registries the module writes to at startup are process-global.
+
+    ``on_startup`` registers news' slug claim with pagebuilder and publishes the
+    resolved settings; without this a test that boots the module changes the
+    answers of every later test in the same process.
+    """
+    from news import settings as news_settings
+    from pagebuilder import public_claims
+
+    public_claims.reset()
+    news_settings.reset()
+    yield
+    public_claims.reset()
+    news_settings.reset()
+
+
 ROLE_EDITOR = "news-editor"
+#: ``news.edit`` and nothing of pagebuilder's — the case the page-writing
+#: routes must refuse.
+ROLE_NEWS_ONLY = "news-only"
 ROLE_VIEWER = "news-viewer"
 
 
@@ -89,7 +113,11 @@ async def _build_app(user: Any) -> tuple[FastAPI, Any]:
 
     registry = PermissionRegistry()
     registry.add_group("News", [PERM_VIEW, PERM_EDIT])
-    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT])
+    # An article author needs pagebuilder's permissions too: creating and
+    # publishing an article writes a *page*, and news does not get to route
+    # around the editor → publisher separation that module maintains.
+    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT, PAGE_EDIT, PAGE_PUBLISH])
+    registry.map_role(ROLE_NEWS_ONLY, [PERM_VIEW, PERM_EDIT])
     registry.map_role(ROLE_VIEWER, [PERM_VIEW])
     app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
 
@@ -137,6 +165,18 @@ async def admin_client() -> AsyncIterator[AsyncClient]:
     """Authenticated as `admin`, which resolves to WILDCARD rather than to
     a literal `news.edit` — the case a naive membership test would miss."""
     async for client in _client(_stub_user(("admin",))):
+        yield client
+
+
+@pytest_asyncio.fixture
+async def news_only_client() -> AsyncIterator[AsyncClient]:
+    """`news.edit`, but none of pagebuilder's permissions.
+
+    Everything that writes a page on the author's behalf has to refuse this
+    caller, or moving those writes server-side quietly widened what `news.edit`
+    grants.
+    """
+    async for client in _client(_stub_user((ROLE_NEWS_ONLY,))):
         yield client
 
 

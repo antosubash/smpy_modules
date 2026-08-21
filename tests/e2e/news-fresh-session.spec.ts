@@ -11,11 +11,17 @@ import { login } from './helpers';
  * readable cookie — so every other spec primes the cookie before it does
  * anything, and none of them can see it missing.
  *
- * Creating an article posts to pagebuilder's CSRF-protected page API. A user
- * who clicks News in the sidebar and then "New article" has never requested a
- * pagebuilder path, so the cookie is unset and the POST used to come back 403
- * with no page and no article — the module's documented primary flow, broken
- * on a fresh login.
+ * Creating an article used to POST to pagebuilder's CSRF-protected page API
+ * from the browser. A user who clicks News in the sidebar and then "New
+ * article" has never requested a pagebuilder path, so the cookie was unset and
+ * the POST came back 403 with no page and no article — the module's documented
+ * primary flow, broken on a fresh login.
+ *
+ * It is now one request to news' own API, which creates the page and attaches
+ * the article server-side in a single transaction, so no pagebuilder cookie is
+ * involved at any point. The precondition below therefore asserts something
+ * stronger than it used to: not merely that the cookie is unset when the flow
+ * starts, but that a flow which never needs it still works.
  */
 test.describe('News — first visit of a session', () => {
   test('creates an article without having visited Pages first', async ({ page }) => {
@@ -23,7 +29,7 @@ test.describe('News — first visit of a session', () => {
 
     // Straight to News. Nothing above may request a /pagebuilder path, or the
     // cookie gets primed and this test stops testing anything.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(page.getByRole('heading', { name: 'News' })).toBeVisible();
 
     const cookieBefore = (await page.context().cookies()).find(
@@ -53,10 +59,43 @@ test.describe('News — first visit of a session', () => {
 
     // And the article row exists, rather than a page with no metadata attached.
     // Rows are cards now, not table rows.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(
       page.locator('[data-testid="article-row"]').filter({ hasText: title }),
     ).toBeVisible();
+  });
+
+  test('a second article of the same headline takes the next free URL', async ({ page }) => {
+    // The dialog fills the URL field from the headline as a *preview*, and
+    // sends it only when the author has actually edited it. Sending the
+    // preview turned this into a "Slug already in use" dead end: the server
+    // can only pick the next free variant for a slug nobody asked for by name.
+    await login(page);
+    await page.goto('/admin/news/');
+
+    const headline = `Repeat headline ${Date.now().toString(36)}`;
+    const slugs: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      await page.goto('/admin/news/');
+      await page.getByRole('button', { name: 'New article' }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel('Headline').fill(headline);
+      slugs.push(await dialog.locator('#news-new-article-slug').inputValue());
+      await dialog.getByRole('button', { name: 'Create draft' }).click();
+      await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 20_000 });
+    }
+
+    // Same preview both times — the dialog has no idea the first one is taken.
+    expect(slugs[0]).toBe(slugs[1]);
+
+    // …and the server resolved the collision rather than refusing it. Read
+    // back over the API rather than the list: both creates already had to
+    // succeed for the loop above to finish, so this only needs the slugs.
+    const listed = await page.request.get(
+      `/api/news/articles?limit=20&q=${encodeURIComponent(headline)}`,
+    );
+    const body = (await listed.json()) as { items: { slug: string }[] };
+    expect(body.items.map((i) => i.slug).sort()).toEqual([slugs[0], `${slugs[0]}-2`].sort());
   });
 
   test('shows a readable message when a write fails, not an HTML document', async ({ page }) => {
@@ -65,7 +104,7 @@ test.describe('News — first visit of a session', () => {
     // including the i18n catalogue and the user's resolved permissions — into
     // the DOM as text.
     await login(page);
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
 
     const message = await page.evaluate(async () => {
       const r = await fetch('/api/news/articles/999999', {

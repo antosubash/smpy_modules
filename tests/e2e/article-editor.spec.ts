@@ -41,13 +41,13 @@ test.describe('Article editor', () => {
     await login(page);
     const { articleId, slug } = await makeArticle(page);
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await page
       .locator(`[data-testid="article-row"][data-slug="${slug}"]`)
       .getByRole('link', { name: /^edit$/i })
       .click();
 
-    await expect(page).toHaveURL(new RegExp(`/news/articles/${articleId}/edit$`));
+    await expect(page).toHaveURL(new RegExp(`/admin/news/articles/${articleId}/edit$`));
     await expect(page.getByRole('heading', { name: `Editor ${slug}`, level: 1 })).toBeVisible();
   });
 
@@ -55,10 +55,10 @@ test.describe('Article editor', () => {
     await login(page);
     const { articleId, slug } = await makeArticle(page);
 
-    await page.goto(`/news/articles/${articleId}/edit`);
+    await page.goto(`/admin/news/articles/${articleId}/edit`);
     await page.getByLabel('Author').fill('J. Okonkwo');
     await page.getByLabel('Publish date').fill('2026-03-12');
-    await page.getByLabel('Pin to top of /news').check();
+    await page.getByLabel('Pin to the top of listings').check();
     await page.getByLabel('Show in feed blocks').uncheck();
     await page.getByRole('button', { name: /^save$/i }).click();
 
@@ -77,7 +77,7 @@ test.describe('Article editor', () => {
     await login(page);
     const { articleId, slug } = await makeArticle(page);
 
-    await page.goto(`/news/articles/${articleId}/edit`);
+    await page.goto(`/admin/news/articles/${articleId}/edit`);
     await page.getByLabel('Show in feed blocks').uncheck();
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
@@ -87,7 +87,7 @@ test.describe('Article editor', () => {
     expect(((await feed.json()) as { total: number }).total).toBe(0);
 
     // …but still on the screen that can put it back.
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(page.locator(`[data-testid="article-row"][data-slug="${slug}"]`)).toBeVisible();
   });
 
@@ -95,7 +95,7 @@ test.describe('Article editor', () => {
     await login(page);
     const { articleId } = await makeArticle(page);
 
-    await page.goto(`/news/articles/${articleId}/edit`);
+    await page.goto(`/admin/news/articles/${articleId}/edit`);
     const field = page.getByLabel('Add a tag');
     await field.fill('canopy');
     await field.press('Enter');
@@ -117,7 +117,7 @@ test.describe('Article editor', () => {
     await login(page);
     const { articleId, slug } = await makeArticle(page, { publish: false });
 
-    await page.goto(`/news/articles/${articleId}/edit`);
+    await page.goto(`/admin/news/articles/${articleId}/edit`);
     await expect(page.getByText(/Draft/)).toBeVisible();
     await page.getByRole('button', { name: /publish now/i }).click();
 
@@ -141,12 +141,12 @@ test.describe('Article editor', () => {
     const feed = `/api/news/articles?in_feed=true&limit=100&q=${prefix}`;
 
     // Give them dates so the order is unambiguous.
-    await page.goto(`/news/articles/${older.articleId}/edit`);
+    await page.goto(`/admin/news/articles/${older.articleId}/edit`);
     await page.getByLabel('Publish date').fill('2026-01-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
-    await page.goto(`/news/articles/${newer.articleId}/edit`);
+    await page.goto(`/admin/news/articles/${newer.articleId}/edit`);
     await page.getByLabel('Publish date').fill('2026-06-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
@@ -161,8 +161,8 @@ test.describe('Article editor', () => {
     expect(beforeSlugs).toEqual([newer.slug, older.slug]);
 
     // Pin the older one and it goes first — without its date changing.
-    await page.goto(`/news/articles/${older.articleId}/edit`);
-    await page.getByLabel('Pin to top of /news').check();
+    await page.goto(`/admin/news/articles/${older.articleId}/edit`);
+    await page.getByLabel('Pin to the top of listings').check();
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 

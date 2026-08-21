@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from pagebuilder.models import Page, PageStatus
-
+from news.integrations.pagebuilder import Page, PageStatus
 from news.like import like_pattern
 from news.models import NewsArticle
 

@@ -212,7 +212,7 @@ test.describe('The article list below 900px', () => {
     expect(attached.ok(), await attached.text()).toBeTruthy();
 
     // Searched rather than trusting page 1 to still hold the newest row.
-    await page.goto(`/news/?q=${slug}`);
+    await page.goto(`/admin/news/?q=${slug}`);
     const row = page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
     await expect(row).toBeVisible();
 
@@ -227,7 +227,7 @@ test.describe('The article list below 900px', () => {
   test('does not push the page sideways', async ({ page }) => {
     await login(page);
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     await expectNoSidewaysScroll(page);

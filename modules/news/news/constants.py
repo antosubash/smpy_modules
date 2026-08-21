@@ -11,11 +11,19 @@ from typing import Final
 PACKAGE: Final = "news"
 
 ROUTE_PREFIX_API: Final = "/api/news"
-VIEW_PREFIX: Final = "/news"
+# The admin screens sit under /admin, not /news. /news is the *public* address
+# an article serves at now — see NewsSettings.public_route_prefix — and one
+# prefix cannot be both a reader-facing URL and a permission-gated console.
+# The search screen was already at /admin/search for its own reasons; this puts
+# the rest of the module's console beside it.
+VIEW_PREFIX: Final = "/admin/news"
 # Trailing slash: the list route is registered at "/" under VIEW_PREFIX, so
 # linking to the bare prefix costs a 307 round trip on every navigation.
 MENU_URL: Final = f"{VIEW_PREFIX}/"
 MENU_URL_CATEGORIES: Final = f"{VIEW_PREFIX}/categories"
+ARTICLE_EDITOR_URL: Final = f"{VIEW_PREFIX}/articles/{{article_id}}/edit"
+"""Where an article's metadata is edited. Served to the frontend rather than
+assembled there, so the console's own prefix is spelled once."""
 # The rail splits by section rather than lumping every content surface into
 # one "Content" group: which module a screen belongs to is then legible from
 # the sidebar as well as from the URL.
@@ -27,7 +35,8 @@ MENU_LABEL_SEARCH: Final = "Search everything"
 MENU_GROUP_SEARCH: Final = "Find"
 
 # Mounted at the app root rather than under VIEW_PREFIX: the screen spans
-# articles, pages and media, so filing it under /news would misdescribe it.
+# articles, pages and media, so filing it under the news console would
+# misdescribe what it searches.
 ADMIN_SEARCH_PREFIX: Final = "/admin"
 ADMIN_SEARCH_URL: Final = f"{ADMIN_SEARCH_PREFIX}/search"
 MENU_LABEL_ARTICLES: Final = "Articles"
@@ -53,8 +62,36 @@ PUBLIC_READ_PREFIXES: Final = (
     f"{ROUTE_PREFIX_API}/categories",
 )
 
+# Routes owned by pagebuilder. Spelled here, resolved in
+# ``news.integrations.pagebuilder``, so no other module in news — and nothing
+# in its frontend — has to know how the neighbour routes its own screens.
+PAGEBUILDER_EDITOR_PATH: Final = "/pagebuilder/{page_id}/edit"
+PAGEBUILDER_MEDIA_PATH: Final = "/pagebuilder/media"
+PAGEBUILDER_PAGES_PATH: Final = "/pagebuilder/?view=list&search={query}"
+
 MAX_CATEGORY_LEN: Final = 80
 MAX_TAG_LEN: Final = 60
+MAX_TITLE_LEN: Final = 300
+# Pagebuilder's own bound on ``Page.slug``. Derived slugs are cut to it here so
+# a long headline cannot produce a slug the column rejects.
+MAX_SLUG_LEN: Final = 200
+# And its shape. Restated on this module's own DTO so an author who types a
+# space into the URL field gets a 422 naming the field, rather than the 500 a
+# ValidationError raised from inside the handler produces.
+SLUG_PATTERN: Final = r"^[a-z0-9][a-z0-9-]*$"
+# How many ``-2``, ``-3``… variants to try before giving up on deriving a slug
+# and asking the author for one. Far past any honest collision; it exists so a
+# pathological title cannot spin.
+MAX_SLUG_ATTEMPTS: Final = 20
+
+# The feed block runs on every public page carrying one, so an uncacheable
+# listing costs a database round trip per page view. Short enough that a newly
+# published article appears within a minute.
+PUBLIC_CACHE_SECONDS: Final = 60
+PUBLIC_CACHE_CONTROL: Final = f"public, max-age={PUBLIC_CACHE_SECONDS}"
+# An editor's listing includes drafts, so it differs by permission and must
+# never be held anywhere another visitor could be served it from.
+PRIVATE_CACHE_CONTROL: Final = "private, no-store"
 # Shown on the categories screen as the system row. Articles in it carry an
 # empty ``category``; there is no table row, so it cannot be renamed or
 # deleted — which is exactly what the screen promises.

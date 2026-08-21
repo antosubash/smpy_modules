@@ -42,11 +42,11 @@ test.describe('News admin', () => {
       data: { page_id: id, category: 'Before', published_at: null },
     });
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     // Rows are cards now, not table rows — located by the slug they carry so
     // the locator does not depend on which strings the card happens to render.
     const row = page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
-    await expect(row).toContainText(`/p/${slug}`);
+    await expect(row).toContainText(`/news/${slug}`);
 
     // Category and date edit in place, but behind a click: the chip is the
     // affordance, and the inputs only appear once it is pressed.
@@ -98,7 +98,7 @@ test.describe('News admin', () => {
 
     const card = (slug: string) => page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
 
-    await page.goto('/news/');
+    await page.goto('/admin/news/');
     await expect(card(made.Alpha)).toBeVisible();
 
     // The category filter is a select now — there can be far more categories
@@ -114,7 +114,7 @@ test.describe('News admin', () => {
     await expect(card(made.Beta)).toHaveCount(0);
 
     // And it is linkable, not just sticky.
-    await page.goto('/news/?category=Beta');
+    await page.goto('/admin/news/?category=Beta');
     await expect(card(made.Beta)).toBeVisible();
     await expect(card(made.Alpha)).toHaveCount(0);
   });

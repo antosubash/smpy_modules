@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder import public_claims
 from pagebuilder.deps import get_settings
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
@@ -48,10 +49,17 @@ async def sitemap(
     pages = await PagesService(db).list_sitemap_entries()
     origin = _public_origin(request, settings)
     prefix = settings.public_route_prefix
+    # A page another module serves the public URL for is advertised at *that*
+    # address. Without this the sitemap would point a crawler at /p/{slug},
+    # which the viewer now refuses for exactly those pages.
+    claimed = await public_claims.resolve(db, [page.slug for page in pages])
 
     entries: list[str] = []
     for page in pages:
-        loc = xml_escape(_sitemap_url_for(origin, prefix, page.slug))
+        claim = claimed.get(page.slug)
+        loc = xml_escape(
+            f"{origin}{claim}" if claim else _sitemap_url_for(origin, prefix, page.slug)
+        )
         lastmod = page.updated_at.isoformat() if page.updated_at else None
         if lastmod is not None:
             entries.append(

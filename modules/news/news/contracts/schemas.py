@@ -2,12 +2,38 @@
 
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 
-from pagebuilder.models import PageStatus
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from news.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
+from news.constants import (
+    MAX_CATEGORY_LEN,
+    MAX_SLUG_LEN,
+    MAX_TAG_LEN,
+    MAX_TITLE_LEN,
+    SLUG_PATTERN,
+)
+from news.display_date import as_display_date
+
+
+class ArticleStatus(str, enum.Enum):  # noqa: UP042
+    """Workflow state of the page behind an article.
+
+    News' own enum, deliberately, even though the values are pagebuilder's
+    ``PageStatus`` verbatim. A DTO is a contract with this module's callers,
+    and re-exporting a neighbour's enum through it made every consumer — the
+    OpenAPI schema, the generated TypeScript client — depend on pagebuilder's
+    package layout to name a value news is perfectly able to name itself.
+
+    The values match, so the wire format is unchanged and the mapping in
+    ``integrations.pagebuilder.article_status`` is total by construction —
+    ``test_integrations`` fails if pagebuilder ever adds a fourth state.
+    """
+
+    DRAFT = "draft"
+    SUBMITTED_FOR_REVIEW = "submitted_for_review"
+    PUBLISHED = "published"
 
 
 class ArticleRead(BaseModel):
@@ -25,7 +51,7 @@ class ArticleRead(BaseModel):
     show_in_feed: bool = True
     author: str = ""
     published_at: datetime | None = None
-    page_status: PageStatus
+    page_status: ArticleStatus
     """Workflow state of the page behind the article.
 
     Lets the admin list mark a draft without a second request per row. Anyone
@@ -39,6 +65,13 @@ class ArticleRead(BaseModel):
     An article *is* a page, so this is the page's own public URL rather than a
     route this module owns — duplicating the public viewer would mean
     duplicating its ETag, cache, CSP, SEO and site-layout handling.
+    """
+
+    edit_url: str
+    """Where an author edits the body.
+
+    Served rather than assembled in the browser so the admin list holds no
+    opinion about how another module routes its editor.
     """
 
 
@@ -83,6 +116,35 @@ class ArticleCreate(BaseModel):
     published_at: datetime | None = None
     author: str = Field(default="", max_length=120)
 
+    _display_date = field_validator("published_at")(as_display_date)
+    """Truncate to the calendar day as sent — see ``news.display_date``."""
+
+
+class ArticleWithPageCreate(BaseModel):
+    """Create the page *and* attach the article to it, in one request.
+
+    The two-call version of this ran in the browser and could only ever be
+    half-done: if attaching failed after the page was created, an empty
+    articleless page was left behind with nothing to clean it up — which is why
+    the dialog had to remember the page a failed attempt had committed so a
+    retry could adopt it.
+
+    ``slug`` is optional. Omitted, the server derives a free one from the
+    title; supplied, it is used verbatim and a collision is a 409, because a
+    URL the author typed should not be silently changed under them.
+    """
+
+    title: str = Field(min_length=1, max_length=MAX_TITLE_LEN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
+    category: str = Field(default="", max_length=MAX_CATEGORY_LEN)
+    published_at: datetime | None = None
+    author: str = Field(default="", max_length=120)
+
+    _display_date = field_validator("published_at")(as_display_date)
+    """Truncate to the calendar day as sent — see ``news.display_date``."""
+
 
 class ArticleUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=MAX_CATEGORY_LEN)
@@ -90,6 +152,9 @@ class ArticleUpdate(BaseModel):
     pinned: bool | None = None
     show_in_feed: bool | None = None
     author: str | None = Field(default=None, max_length=120)
+
+    _display_date = field_validator("published_at")(as_display_date)
+    """Truncate to the calendar day as sent — see ``news.display_date``."""
 
 
 class CategoryRead(BaseModel):
@@ -206,6 +271,16 @@ class SearchResults(BaseModel):
     article_total: int = 0
     page_total: int = 0
     media_total: int = 0
+
+    pages_more_url: str = ""
+    media_more_url: str = ""
+    """Where each section's "see all" goes.
+
+    Sent rather than assembled in the screen because both land in pagebuilder,
+    and how that module routes its own list and its media library is not
+    something this one should be spelling out in TSX — see
+    ``news.integrations.pagebuilder``.
+    """
 
     @property
     def total(self) -> int:

@@ -1,22 +1,29 @@
 """News — articles backed by page-builder pages.
 
-An article *is* a page: the body, slug, approval workflow, revisions and public
-URL all belong to ``pagebuilder``. This module adds only the metadata a page
-has no concept of — category and display date — plus the listing API and the
-feed block that renders it.
+An article *is* a page: the body, slug, approval workflow and revisions all
+belong to ``pagebuilder``. This module adds only the metadata a page has no
+concept of — category and display date — plus the listing API and the feed
+block that renders it.
 
-There is therefore no public route here. An article serves at ``/p/{slug}``
-with the existing ETag, cache, CSP, SEO and site-layout handling; a second
-viewer would mean duplicating all of it.
+The one thing it does own is the article's public *address*.
+Articles used to share pagebuilder's generic page prefix, sitting at
+``/p/{slug}`` alongside the contact page, so the URL said nothing about what
+the document was. They serve at ``{NewsSettings.public_route_prefix}/{slug}``
+now, and pagebuilder is told so — the page stops answering at ``/p`` and the
+sitemap advertises the news address instead.
+
+The *rendering* is still pagebuilder's: the news route resolves the slug and
+hands off to its viewer, so the ETag, cache, CSP, canonical and site-layout
+handling stay in one place rather than being duplicated and left to drift.
 """
 
 from __future__ import annotations
 
 import importlib.metadata
 import logging
+from dataclasses import dataclass
 
 from fastapi import APIRouter, FastAPI
-from pagebuilder.contracts.events import PageDeleted
 from simple_module_core import ModuleBase, ModuleMeta
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuItem, MenuRegistry
@@ -24,8 +31,23 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
 from news import constants
+from news import settings as news_settings
+from news.integrations.pagebuilder import PageDeleted, claim_slugs
+from news.settings import NewsSettings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _NewsServices:
+    """Module-scoped state on ``app.state.news``, mirroring pagebuilder's."""
+
+    settings: NewsSettings
+
+
+def _dir_prefix(prefix: str) -> str:
+    """Normalise a route prefix to end in exactly one "/"."""
+    return f"{prefix.rstrip('/')}/"
 
 _VERSION = importlib.metadata.version("simple_module_news")
 
@@ -41,6 +63,25 @@ class NewsModule(ModuleBase):
         # package version (0.0.x) — this range is correct as written.
         requires_framework=">=1.0,<2.0",
     )
+
+    def __init__(self) -> None:
+        super().__init__()
+        # ``register_settings`` runs before routes and public-route rules, and
+        # populates this so every later hook reads one env-resolved instance —
+        # and so a test can pre-seed an override.
+        self.settings: NewsSettings | None = None
+
+    def _resolved_settings(self) -> NewsSettings:
+        if self.settings is None:
+            self.settings = NewsSettings()
+        return self.settings
+
+    def register_settings(self, app: FastAPI) -> None:
+        resolved = self._resolved_settings()
+        app.state.news = _NewsServices(settings=resolved)
+        # Also published process-wide: the article serializer builds the
+        # public URL and has no request to read app.state from.
+        news_settings.use(resolved)
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from news.endpoints.api import router as api
@@ -129,12 +170,21 @@ class NewsModule(ModuleBase):
         the repair should be visible, not silent.
         """
         from news import service
+        from news.endpoints.public_views import public_router, slug_claim
         from news.endpoints.views import admin_router
 
         # Mounted here rather than through ``register_routes`` because that
         # router is hard-prefixed with ``view_prefix``; this screen belongs at
         # the app root, for the same reason pagebuilder's public viewer does.
         app.include_router(admin_router, prefix=constants.ADMIN_SEARCH_PREFIX)
+
+        # The public viewer, mounted at the app root for the same reason and
+        # claimed with pagebuilder in the same breath: the prefix an article is
+        # served at and the prefix a crawler is sent to are one value, so they
+        # cannot drift apart.
+        prefix = self._resolved_settings().public_route_prefix
+        app.include_router(public_router, prefix=prefix)
+        claim_slugs(slug_claim())
 
         async with app.state.sm.db.session_factory() as db:
             dropped = await service.reconcile_orphans(db)
@@ -147,10 +197,19 @@ class NewsModule(ModuleBase):
             )
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
-        """Let the feed block list articles for an anonymous visitor.
+        """Let an anonymous visitor read an article, and the feed block list them.
 
-        Reads only, and by exact prefix: the same paths carry POST/PUT/DELETE,
-        which must stay behind ``news.edit``.
+        Reads only, and by exact prefix: the same API paths carry
+        POST/PUT/DELETE, which must stay behind ``news.edit``.
         """
         for prefix in constants.PUBLIC_READ_PREFIXES:
             registry.add_prefix(prefix, methods={"GET"})
+        # The public article viewer. Without this every article 302s an
+        # anonymous reader to the login screen, which is the whole point of a
+        # public address. The trailing slash is load-bearing — these are
+        # ``startswith`` prefixes, so a bare "/news" would also exempt anything
+        # that merely starts with those characters.
+        registry.add_prefix(
+            _dir_prefix(self._resolved_settings().public_route_prefix),
+            methods={"GET", "HEAD"},
+        )

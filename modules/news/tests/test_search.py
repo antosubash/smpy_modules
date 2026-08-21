@@ -102,3 +102,30 @@ class TestSections:
 
         assert len(results.pages) == 5
         assert results.page_total == 8
+
+
+class TestSeeAllLinks:
+    """Both "see all" links land in pagebuilder, so the server resolves them.
+
+    The screen used to build them itself, which meant a TSX file spelling out
+    how the neighbouring module routes its own page list and media library —
+    exactly what ``news.integrations.pagebuilder`` exists to keep in one place.
+    """
+
+    async def test_the_pages_link_carries_the_query(self, db) -> None:
+        results = await search_service.search(db, "canopy")
+
+        assert "canopy" in results.pages_more_url
+
+    async def test_the_media_link_is_the_library(self, db) -> None:
+        assert (await search_service.search(db, "canopy")).media_more_url
+
+    async def test_an_empty_query_still_answers_with_both_links(self, db) -> None:
+        """The early return short-circuits before any query runs, so the two
+        are set up front — a section that renders nothing must still not hand
+        the screen an empty href."""
+        results = await search_service.search(db, "")
+
+        assert results.pages_more_url
+        assert results.media_more_url
+        assert results.articles == []

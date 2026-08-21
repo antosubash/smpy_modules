@@ -12,7 +12,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  * the article list rather than against the dialog that triggered them.
  */
 
-const CATEGORIES_URL = '/news/categories';
+const CATEGORIES_URL = '/admin/news/categories';
 
 /** Create a published page with an article attached, in `category`. */
 async function makeArticle(page: import('@playwright/test').Page, category: string) {
@@ -74,7 +74,7 @@ test.describe('News categories', () => {
 
     const row = categoryRow(page, name);
     await expect(row).toBeVisible();
-    await expect(row).toContainText('/news?category=research-');
+    await expect(row).toContainText('/admin/news/?category=research-');
   });
 
   test('renaming a category carries its articles with it', async ({ page }) => {

@@ -15,13 +15,13 @@ everything below:
 
 from __future__ import annotations
 
-from pagebuilder.models import NOT_TRASHED, Page
 from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.constants import MAX_CATEGORY_LEN, UNCATEGORISED_LABEL
 from news.contracts.schemas import CategoryRead
+from news.integrations.pagebuilder import NOT_TRASHED, Page
 from news.models import NewsArticle, NewsCategory
 from news.slugify import slugify, unique_slug
 

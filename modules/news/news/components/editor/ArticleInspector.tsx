@@ -147,7 +147,7 @@ export function ArticleInspector({
             onCheckedChange={(checked) => onChange({ pinned: checked === true })}
           />
           <div className="grid gap-0.5">
-            <Label htmlFor={PIN_ID}>Pin to top of /news</Label>
+            <Label htmlFor={PIN_ID}>Pin to the top of listings</Label>
             <p className="text-xs text-muted-foreground">
               Sorts before the date rather than changing it, so the archive still reads correctly
               once it is unpinned.

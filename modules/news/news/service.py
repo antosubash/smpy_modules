@@ -14,20 +14,25 @@ import logging
 from datetime import datetime
 from typing import Final
 
-from pagebuilder.models import NOT_TRASHED, Page
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Load
 
 from news import query_filters, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
+from news.integrations.pagebuilder import (
+    NOT_TRASHED,
+    Page,
+    article_status,
+    card_columns,
+    page_editor_path,
+)
 from news.maintenance import reconcile_orphans as reconcile_orphans
 from news.models import NewsArticle, NewsCategory
+from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
 
-PUBLIC_PAGE_URL = "/p/{slug}"
 
 
 class _Unset:
@@ -51,15 +56,8 @@ def _base(include_drafts: bool, category: str | None):
     # rendering a card that links nowhere. There is no database foreign key —
     # see NewsArticle.page_id.
     #
-    # load_only: the card serializer reads five Page columns; without it the
-    # join dragged both block-JSON columns through the ORM for every row, so
-    # list cost scaled with page *content* size instead of card count
-    # (issue #12). Anything outside this list raises on access — loudly, in
-    # tests — rather than silently re-widening the query.
-    #
-    # ``status`` is in the set because ``_to_read`` serializes ``page_status``;
-    # leaving it out lazy-loads on access, which raises MissingGreenlet under
-    # the async session (issue #20).
+    # The column set is the seam's — see ``card_columns`` for why the listing
+    # must not load a Page whole.
     stmt = (
         select(NewsArticle, Page)
         # An article whose page is in the trash disappears with it, and comes
@@ -67,15 +65,7 @@ def _base(include_drafts: bool, category: str | None):
         # alone: pagebuilder only announces PageDeleted on a *purge*, so
         # nothing here has to guess whether a deletion is reversible.
         .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
-        .options(
-            Load(Page).load_only(
-                Page.slug,
-                Page.title,
-                Page.meta_description,
-                Page.og_image,
-                Page.status,
-            )
-        )
+        .options(card_columns())
     )
     stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     if category:
@@ -99,8 +89,13 @@ def _to_read(
         show_in_feed=article.show_in_feed,
         author=article.author,
         published_at=article.published_at,
-        page_status=page.status,
-        url=PUBLIC_PAGE_URL.format(slug=page.slug),
+        page_status=article_status(page.status),
+        # News' own prefix, not pagebuilder's generic one: an article no
+        # longer answers at /p/{slug} at all.
+        url=public_article_path(page.slug),
+        # Served rather than assembled in the browser: the admin list then
+        # holds no opinion about how pagebuilder routes its editor.
+        edit_url=page_editor_path(article.page_id),
     )
 
 

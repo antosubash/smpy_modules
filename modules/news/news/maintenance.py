@@ -7,11 +7,11 @@ what the database is left holding when an event goes missing.
 
 from __future__ import annotations
 
-from pagebuilder.models import Page
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from news.integrations.pagebuilder import Page
 from news.models import NewsArticle, NewsArticleTag
 
 

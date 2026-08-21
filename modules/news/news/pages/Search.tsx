@@ -113,7 +113,7 @@ export default function Search() {
               label="Articles"
               hits={results.articles}
               total={results.article_total}
-              moreHref={`/news/?q=${encodeURIComponent(q.trim())}`}
+              moreHref={`/admin/news/?q=${encodeURIComponent(q.trim())}`}
               moreLabel="articles"
             />
           )}
@@ -122,7 +122,7 @@ export default function Search() {
               label="Pages"
               hits={results.pages}
               total={results.page_total}
-              moreHref={`/pagebuilder/?view=list&search=${encodeURIComponent(q.trim())}`}
+              moreHref={results.pages_more_url}
               moreLabel="pages"
             />
           )}
@@ -131,7 +131,7 @@ export default function Search() {
               label="Media"
               hits={results.media}
               total={results.media_total}
-              moreHref="/pagebuilder/media"
+              moreHref={results.media_more_url}
               moreLabel="files"
             />
           )}

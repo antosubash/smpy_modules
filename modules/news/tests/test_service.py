@@ -34,7 +34,7 @@ class TestReadBackByPage:
         assert found is not None
         assert found.page_id == page.id
         assert found.title == "Solo"
-        assert found.url == "/p/solo"
+        assert found.url == "/news/solo"
 
     async def test_finds_an_undated_article_behind_a_full_page_of_dated_ones(
         self, db

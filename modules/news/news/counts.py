@@ -9,12 +9,12 @@ same on every pill.
 
 from __future__ import annotations
 
-from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import query_filters
 from news.contracts.schemas import ArticleCounts
+from news.integrations.pagebuilder import NOT_TRASHED, Page, PageStatus
 from news.models import NewsArticle
 
 

@@ -10,7 +10,7 @@ import { ArticleFilters } from '../components/ArticleFilters';
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
 import { useArticleList } from '../hooks/useArticleList';
-import { detachArticle, publishArticlePage, updateArticle } from '../utils/api';
+import { detachArticle, publishArticle, updateArticle } from '../utils/api';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
@@ -59,7 +59,7 @@ export default function NewsList() {
   return (
     <PageShell
       title="News"
-      description={`${counts.published} published · ${counts.draft} drafts · public at /p/:slug`}
+      description={`${counts.published} published · ${counts.draft} drafts · public at /news/:slug`}
       actions={canEdit ? <NewArticleDialog /> : undefined}
     >
       <Head title="News" />
@@ -142,7 +142,7 @@ export default function NewsList() {
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }
               onDetach={(id) => runRow(id, () => detachArticle(id))}
-              onPublish={(target) => runRow(target.id, () => publishArticlePage(target.page_id))}
+              onPublish={(target) => runRow(target.id, () => publishArticle(target.id))}
             />
           ))}
         </ul>

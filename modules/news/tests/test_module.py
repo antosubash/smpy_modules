@@ -101,9 +101,46 @@ class TestPublicRoutes:
         assert set(constants.PUBLIC_READ_PREFIXES) <= patterns
 
     def test_writes_stay_behind_auth(self):
-        # The same paths carry POST/PUT/DELETE. Exempting every method would
-        # let an anonymous caller attach and edit articles.
+        # The same API paths carry POST/PUT/DELETE. Exempting every method would
+        # let an anonymous caller attach and edit articles. HEAD rides with GET
+        # because the public article viewer answers it — a crawler's cheap
+        # freshness check, and it reads nothing GET does not.
         registry = PublicRouteRegistry()
         NewsModule().register_public_routes(registry)
         for route in registry.routes:
-            assert route.methods == {"GET"}
+            assert route.methods <= {"GET", "HEAD"}
+
+    def test_the_public_prefix_does_not_swallow_the_admin_console(self):
+        """The reason the console lives at /admin/news rather than /news.
+
+        Public-route rules match with ``str.startswith``, so a console sharing
+        the reader-facing prefix would be exempted from authentication wholesale
+        — every article list, every category rename, open to anyone. The two
+        prefixes must not be prefixes of each other.
+        """
+        registry = PublicRouteRegistry()
+        NewsModule().register_public_routes(registry)
+
+        # Asked through the registry's own matcher rather than by re-deriving
+        # the rule here, so this fails if the matching itself ever widens.
+        for path in (
+            f"{constants.VIEW_PREFIX}/",
+            f"{constants.VIEW_PREFIX}/categories",
+            f"{constants.VIEW_PREFIX}/articles/1/edit",
+        ):
+            for route in registry.routes:
+                assert not route.matches("GET", path), (
+                    f"{route.pattern!r} exempts the admin console at {path!r}"
+                )
+
+    def test_the_article_viewer_is_readable_without_a_session(self):
+        """Otherwise every article 302s a reader to the login screen, which
+        would make having a public address pointless."""
+        registry = PublicRouteRegistry()
+        module = NewsModule()
+        module.register_public_routes(registry)
+
+        prefix = module._resolved_settings().public_route_prefix
+        assert any(
+            route.matches("GET", f"{prefix}/some-article") for route in registry.routes
+        )

@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
 import { useArticleEditor } from '../hooks/useArticleEditor';
-import { articleEditUrl, formatArticleDate } from '../utils/api';
+import { formatArticleDate } from '../utils/api';
 
 /** The article editor — everything about an article except its body.
  *
@@ -74,7 +74,7 @@ export default function ArticleEditor() {
       description={`${article.url} · ${status}`}
       actions={
         <>
-          <Button variant="outline" onClick={() => router.visit('/news/')}>
+          <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
             News / Articles
           </Button>
           {!isDraft && (
@@ -103,7 +103,7 @@ export default function ArticleEditor() {
               An article is a page here, so its blocks, revisions and autosave are the page editor's
               — the same block library that every other page uses.
             </p>
-            <Button className="mt-3" onClick={() => router.visit(articleEditUrl(article.page_id))}>
+            <Button className="mt-3" onClick={() => router.visit(article.edit_url)}>
               Edit the body
             </Button>
           </div>
@@ -116,7 +116,7 @@ export default function ArticleEditor() {
             confirmLabel="Detach"
             onConfirm={async () => {
               await detach();
-              router.visit('/news/');
+              router.visit('/admin/news/');
             }}
             trigger={
               <Button variant="ghost" size="sm" className="text-destructive" disabled={busy}>

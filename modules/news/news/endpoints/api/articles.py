@@ -6,8 +6,9 @@ session has to be able to list articles. Writes require ``news.edit``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from simple_module_db import get_db
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import counts as counts_module
@@ -21,7 +22,13 @@ from news.contracts.schemas import (
     ArticleUpdate,
     CategoryListResponse,
 )
-from news.endpoints.api._deps import may_see_drafts, read_one_by_page, require_edit
+from news.endpoints.api._deps import (
+    already_an_article,
+    cache,
+    may_see_drafts,
+    read_one_by_page,
+    require_edit,
+)
 
 router = APIRouter()
 
@@ -29,6 +36,7 @@ router = APIRouter()
 @router.get("/articles", response_model=ArticleListResponse)
 async def list_articles(
     request: Request,
+    response: Response,
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(0, ge=0),
     category: str | None = Query(None),
@@ -79,6 +87,7 @@ async def list_articles(
     resolved = (
         await service.resolve_category_slug(db, category) or category if category else None
     )
+    cache(response, include_drafts=may_draft)
     return ArticleListResponse(
         items=items,
         total=total,
@@ -90,7 +99,7 @@ async def list_articles(
 
 @router.get("/categories", response_model=CategoryListResponse)
 async def list_categories(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ) -> CategoryListResponse:
     """Counts per category, for the filter pills and the public feed block.
 
@@ -98,7 +107,9 @@ async def list_categories(
     management view lives at ``/categories/manage`` so this published,
     anonymously-readable contract does not change under its consumers.
     """
-    items = await service.list_categories(db, include_drafts=may_see_drafts(request))
+    include_drafts = may_see_drafts(request)
+    items = await service.list_categories(db, include_drafts=include_drafts)
+    cache(response, include_drafts=include_drafts)
     return CategoryListResponse(items=items)
 
 
@@ -115,16 +126,23 @@ async def attach_article(
     if not await service.page_exists(db, body.page_id):
         raise HTTPException(status_code=404, detail=f"Page {body.page_id} does not exist.")
     if await service.get_by_page(db, body.page_id) is not None:
-        raise HTTPException(
-            status_code=409, detail=f"Page {body.page_id} is already an article."
+        raise already_an_article(body.page_id)
+    try:
+        await service.create(
+            db,
+            page_id=body.page_id,
+            category=body.category,
+            published_at=body.published_at,
+            author=body.author,
         )
-    await service.create(
-        db,
-        page_id=body.page_id,
-        category=body.category,
-        published_at=body.published_at,
-        author=body.author,
-    )
+    except IntegrityError as exc:
+        # The check above is not a lock: two requests attaching the same page
+        # at once both pass it, and the loser meets the unique index on
+        # `page_id` instead. That is the same conflict the check reports, so it
+        # gets the same status rather than the 500 an unhandled database error
+        # produced.
+        await db.rollback()
+        raise already_an_article(body.page_id) from exc
     return await read_one_by_page(db, body.page_id)
 
 
