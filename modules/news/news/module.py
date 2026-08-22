@@ -32,6 +32,11 @@ from simple_module_core.public_routes import PublicRouteRegistry
 
 from news import constants
 from news import settings as news_settings
+from news.integrations.locales import (
+    content_locales,
+    default_locale,
+    locale_path_prefix,
+)
 from news.integrations.pagebuilder import PageDeleted, claim_slugs
 from news.settings import NewsSettings
 
@@ -170,7 +175,11 @@ class NewsModule(ModuleBase):
         the repair should be visible, not silent.
         """
         from news import service
-        from news.endpoints.public_views import public_router, slug_claim
+        from news.endpoints.public_views import (
+            default_locale_alias_router,
+            locale_router,
+            slug_claim,
+        )
         from news.endpoints.views import admin_router
 
         # Mounted here rather than through ``register_routes`` because that
@@ -183,7 +192,19 @@ class NewsModule(ModuleBase):
         # served at and the prefix a crawler is sent to are one value, so they
         # cannot drift apart.
         prefix = self._resolved_settings().public_route_prefix
-        app.include_router(public_router, prefix=prefix)
+        locales = content_locales()
+        for locale in locales:
+            # The site's default language keeps the bare prefix so no article
+            # URL that already exists changes; every other one is prefixed with
+            # its tag, exactly as pagebuilder addresses pages.
+            app.include_router(
+                locale_router(locale), prefix=f"{locale_path_prefix(locale)}{prefix}"
+            )
+        if len(locales) > 1:
+            app.include_router(
+                default_locale_alias_router(prefix),
+                prefix=f"/{default_locale()}{prefix}",
+            )
         claim_slugs(slug_claim())
 
         async with app.state.sm.db.session_factory() as db:
@@ -209,7 +230,17 @@ class NewsModule(ModuleBase):
         # public address. The trailing slash is load-bearing — these are
         # ``startswith`` prefixes, so a bare "/news" would also exempt anything
         # that merely starts with those characters.
-        registry.add_prefix(
-            _dir_prefix(self._resolved_settings().public_route_prefix),
-            methods={"GET", "HEAD"},
-        )
+        prefix = self._resolved_settings().public_route_prefix
+        locales = content_locales()
+        for locale in locales:
+            registry.add_prefix(
+                _dir_prefix(f"{locale_path_prefix(locale)}{prefix}"),
+                methods={"GET", "HEAD"},
+            )
+        if len(locales) > 1:
+            # The default language's redundant prefix, which 301s to the bare
+            # address. Exempt too, or the redirect that exists to be forgiving
+            # answers with a login page.
+            registry.add_prefix(
+                _dir_prefix(f"/{default_locale()}{prefix}"), methods={"GET", "HEAD"}
+            )

@@ -22,6 +22,15 @@ against them. A module's first revision carries
 `branch_labels = ("<module>",)` so it can be removed on its own with
 `alembic downgrade <module>@base`.
 
+**A page's language is fixed for its lifetime.** Slugs are unique per
+`(locale, slug)`, and a rename records a redirect scoped to that locale.
+Moving a page between languages would strand its slug in the old one and
+orphan the redirect pointing at it, so there is no "change language" — there
+is `POST /pages/{id}/translations`, which creates a sibling sharing a
+`translation_group`. Every slug lookup, redirect and public claim takes a
+locale; adding one that does not is how `/de/p/x` starts serving the English
+page.
+
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
 stray `.tsx` there silently registers a new page. Extractions go to
@@ -73,12 +82,17 @@ venv and back. Neither touches a tracked file.
 
 - **UI i18n.** No module here is translated — pagebuilder, news and
   canopy_atlas all have hardcoded English TSX and no `locales/en.json`. The
-  framework's own modules do have one, but the convention depends on
-  `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`) and **this
-  repo's host does not wire i18n at all** — no dependency, no loader, no
-  generation step. So adding a `locales/en.json` to one module here does
-  nothing on its own; the host has to adopt the framework's i18n first, and
-  then all three modules convert together. Don't do it piecemeal during
-  unrelated work.
+  framework's own modules do have one, and the convention depends on
+  `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
+  *does* now wire it (`host/client_app/app.tsx` configures the catalog from
+  the `i18n` shared prop, and the framework mounts `LocaleMiddleware`), so the
+  blocker is gone — what remains is the conversion itself, and all three
+  modules should convert together rather than piecemeal during unrelated work.
+
+  Not to be confused with **content** i18n, which is done: pages and articles
+  can be published in several languages. That is `SM_PAGEBUILDER_CONTENT_LOCALES`
+  and `pagebuilder.locales`, deliberately separate from the host's
+  `SM_I18N_SUPPORTED_LOCALES` above — one decides what the site publishes, the
+  other what the console speaks.
 - **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
   repo is canonical; that one is frozen.

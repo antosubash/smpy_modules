@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import importlib.metadata
 import importlib.resources
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
@@ -16,10 +13,11 @@ from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
+from pagebuilder import locales
 from pagebuilder.media_files import MediaFiles, resolve_media_root, warn_on_orphaned_media
+from pagebuilder.scheduler import Scheduler
 from pagebuilder.settings import PagebuilderSettings
 
-_scheduler_log = logging.getLogger("simple_module.pagebuilder.scheduler")
 _log = logging.getLogger("simple_module.pagebuilder")
 
 # Sidebar entries. Grouped under "Content" so an app that installs several
@@ -68,11 +66,19 @@ class PagebuilderModule(ModuleBase):
         # this so later hooks read a single env-resolved settings
         # instance — and so tests can pre-seed an override.
         self.settings: PagebuilderSettings | None = None
-        self._scheduler_task: asyncio.Task[None] | None = None
+        self._scheduler = Scheduler()
 
     def _resolved_settings(self) -> PagebuilderSettings:
         if self.settings is None:
             self.settings = PagebuilderSettings()
+        # Published process-wide here rather than only from
+        # ``register_settings``: the model's column default and the public-URL
+        # builders are pure functions with no request to read ``app.state``
+        # from, and ``register_public_routes`` needs the locale list too. This
+        # is the one place settings are resolved, so hanging it here is what
+        # makes "the module knows its languages" true from the first hook that
+        # asks, in production and in a test that wires only some of them.
+        locales.use(self.settings)
         return self.settings
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
@@ -90,7 +96,29 @@ class PagebuilderModule(ModuleBase):
         read_only = {"GET", "HEAD"}
         # Trailing slash is load-bearing. These are startswith() prefixes, so a
         # bare "/p" would also exempt "/pagebuilder/" — the entire admin surface.
-        registry.add_prefix(_dir_prefix(settings.public_route_prefix), methods=read_only)
+        #
+        # One exemption per content locale, matching the mounts in
+        # ``on_startup``. Exempting a bare "/{locale}" instead would be shorter
+        # and wrong: it would open every path that happens to start with a
+        # language tag, admin screens included.
+        for locale in settings.content_locales:
+            registry.add_prefix(
+                _dir_prefix(
+                    f"{locales.path_prefix(locale)}{settings.public_route_prefix}"
+                ),
+                methods=read_only,
+            )
+        if len(settings.content_locales) > 1:
+            # The default locale's redundant prefix, which 301s to the bare
+            # address (see ``default_locale_alias_router``). Exempt too, or the
+            # redirect that exists to be forgiving answers with a login page.
+            registry.add_prefix(
+                _dir_prefix(
+                    f"/{settings.default_content_locale}"
+                    f"{settings.public_route_prefix}"
+                ),
+                methods=read_only,
+            )
         # Published pages reference uploaded images; without this the page
         # renders for an anonymous visitor but every image 302s to login.
         registry.add_prefix(_dir_prefix(settings.media_url_prefix), methods=read_only)
@@ -167,17 +195,39 @@ class PagebuilderModule(ModuleBase):
 
         The host's view_router is hard-prefixed with ``view_prefix`` so
         the public viewer can't live there — we attach it directly to
-        the app once boot has finished. The media directory is also
+        the app once boot has finished. One mount per content locale: the
+        default language at ``{public_route_prefix}/{slug}`` and every other
+        at ``/{locale}{public_route_prefix}/{slug}``. The media directory is also
         mounted here so uploaded files are served from
         ``{media_url_prefix}/{filename}``. The ``/sitemap.xml`` +
         ``/robots.txt`` routes are mounted at the root so crawlers find
         them at the conventional location.
         """
-        from pagebuilder.endpoints.public_views import public_router
+        from pagebuilder.endpoints.public_views import (
+            default_locale_alias_router,
+            locale_router,
+        )
         from pagebuilder.endpoints.seo import seo_router
 
         settings = self._resolved_settings()
-        app.include_router(public_router, prefix=settings.public_route_prefix)
+        for locale in settings.content_locales:
+            # The default language keeps the bare prefix so no address that
+            # already exists changes; every other one is prefixed with its tag.
+            app.include_router(
+                locale_router(locale),
+                prefix=f"{locales.path_prefix(locale)}{settings.public_route_prefix}",
+            )
+        if len(settings.content_locales) > 1:
+            # Only worth mounting on a multilingual site: with one language
+            # there is no /de/p/… for anyone to generalise from, so /en/p/…
+            # is just a URL nobody types.
+            app.include_router(
+                default_locale_alias_router(settings),
+                prefix=(
+                    f"/{settings.default_content_locale}"
+                    f"{settings.public_route_prefix}"
+                ),
+            )
         if settings.sitemap_enabled or settings.robots_enabled:
             app.include_router(seo_router)
 
@@ -194,63 +244,8 @@ class PagebuilderModule(ModuleBase):
             await warn_on_orphaned_media(sm.db.session_factory, media_root)
 
         if settings.scheduler_enabled:
-            self._scheduler_task = asyncio.create_task(
-                self._run_scheduler(app, settings)
-            )
-            # FastAPI 0.136 no longer exposes ``add_event_handler`` on the
-            # app itself; the router still carries it for ASGI lifespan
-            # hooks, which is what we want here — the task lives as long
-            # as the app does and gets cancelled on shutdown.
-            app.router.add_event_handler("shutdown", self._stop_scheduler)
+            self._scheduler.start(app, settings)
 
-    async def _run_scheduler(self, app: FastAPI, settings: PagebuilderSettings) -> None:
-        """Poll for scheduled publish / unpublish flips.
-
-        One DB session per tick — short, write-or-rollback. Errors on a
-        single tick are logged and the loop continues; cancellation
-        (shutdown) is propagated.
-        """
-        from pagebuilder.service import PagesService
-
-        factory = app.state.sm.db.session_factory
-        interval = max(1, settings.scheduler_interval_seconds)
-        while True:
-            try:
-                await asyncio.sleep(interval)
-                async with factory() as session:
-                    try:
-                        service = PagesService(session)
-                        flipped = await service.process_due(datetime.now(UTC))
-                        # The trash promises to empty itself after the retention
-                        # window. Swept on the same tick as the flips rather than
-                        # only at startup, so the promise holds for a process that
-                        # stays up for months as well as one that restarts nightly.
-                        purged = await service.purge_expired()
-                        if flipped or purged:
-                            await session.commit()
-                            _scheduler_log.info(
-                                "pagebuilder.scheduler.flipped",
-                                extra={"count": len(flipped), "purged": purged},
-                            )
-                        else:
-                            await session.rollback()
-                    except Exception:
-                        await session.rollback()
-                        raise
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                _scheduler_log.exception("pagebuilder.scheduler.tick_failed")
-
-    async def _stop_scheduler(self) -> None:
-        if self._scheduler_task is None:
-            return
-        self._scheduler_task.cancel()
-        # CancelledError is listed explicitly because it derives from
-        # BaseException, not Exception, so it isn't covered by the latter.
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await self._scheduler_task
-        self._scheduler_task = None
 
     def register_settings(self, app: FastAPI) -> None:
         from pagebuilder.services import PagebuilderServices

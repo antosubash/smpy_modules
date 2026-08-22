@@ -10,9 +10,17 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from news.integrations.locales import default_locale, locale_path_prefix
+
 
 class NewsSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="SM_NEWS_", extra="ignore")
+    # ``env_file`` for the same reason pagebuilder's settings carry it:
+    # pydantic-settings reads the file rather than exporting it, so without
+    # this an ``SM_NEWS_*`` line in the repo's root ``.env`` — which CLAUDE.md
+    # calls the single source of truth for settings — is silently ignored.
+    model_config = SettingsConfigDict(
+        env_prefix="SM_NEWS_", env_file=".env", extra="ignore"
+    )
 
     public_route_prefix: str = "/news"
     """Where an article serves publicly: ``{prefix}/{slug}``.
@@ -65,7 +73,14 @@ def active() -> NewsSettings:
     return _active
 
 
-def public_article_path(slug: str) -> str:
+def public_article_path(slug: str, locale: str | None = None) -> str:
     """Where an article serves. One spelling, shared by the serializer and the
-    claim news registers with pagebuilder."""
-    return f"{active().public_route_prefix.rstrip('/')}/{slug}"
+    claim news registers with pagebuilder.
+
+    Locale-prefixed for every language but the default one, matching how
+    pagebuilder addresses pages: ``/news/{slug}`` is the default language and
+    ``/de/news/{slug}`` is German. ``None`` means the default, so a caller with
+    no language in hand gets exactly the URL this function always returned.
+    """
+    prefix = locale_path_prefix(locale or default_locale())
+    return f"{prefix}{active().public_route_prefix.rstrip('/')}/{slug}"

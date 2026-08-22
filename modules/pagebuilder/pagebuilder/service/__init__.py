@@ -4,9 +4,11 @@ Service is constructed per-request from the injected ``AsyncSession``;
 the DB session's commit-on-write behavior is provided by the framework's
 ``get_db`` dependency.
 
-``PagesService`` is composed from two mixins so no single file carries the
-whole surface: :mod:`._workflow` holds the status transitions and
-:mod:`._revisions` the revision history. Page CRUD and queries stay here.
+``PagesService`` is composed from mixins so no single file carries the whole
+surface: :mod:`._workflow` holds the status transitions, :mod:`._revisions` the
+revision history, :mod:`._trash` the soft-delete lifecycle and
+:mod:`._translations` a page's counterparts in the site's other languages. Page
+CRUD and queries stay here.
 """
 
 from __future__ import annotations
@@ -22,11 +24,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder import redirects
+from pagebuilder import locales, redirects
 from pagebuilder.contracts.schemas import PageCreate, PageUpdate
 from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 from pagebuilder.service._common import _UNSET, _normalize_to_utc
 from pagebuilder.service._revisions import RevisionsMixin
+from pagebuilder.service._translations import TranslationsMixin
 from pagebuilder.service._trash import TrashMixin
 from pagebuilder.service._workflow import WorkflowMixin
 
@@ -35,13 +38,23 @@ __all__ = ["_UNSET", "PagesService", "SitemapEntry"]
 
 
 class SitemapEntry(NamedTuple):
-    """The two fields a sitemap URL needs — deliberately not a ``Page``."""
+    """The four fields a sitemap URL needs — deliberately not a ``Page``.
+
+    ``locale`` is one of them because the URL is locale-prefixed: without it
+    the sitemap would advertise every translation at the default language's
+    address, which is both wrong and a duplicate-content report.
+    ``translation_group`` is what lets each entry list its counterparts as
+    ``xhtml:link`` alternates, so a crawler learns the German page exists
+    without having to fetch the English one first.
+    """
 
     slug: str
     updated_at: datetime | None
+    locale: str
+    translation_group: str
 
 
-class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
+class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin):
     def __init__(self, db: AsyncSession, event_bus: EventBus | None = None) -> None:
         self.db = db
         # Optional so every existing caller — and every test — keeps working;
@@ -53,6 +66,7 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
         *,
         search: str | None = None,
         status: PageStatus | None = None,
+        locale: str | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Page], int]:
@@ -75,6 +89,8 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             )
         if status is not None:
             filters.append(Page.status == status)
+        if locale is not None:
+            filters.append(Page.locale == locale)
 
         query = select(Page).where(*filters).order_by(Page.id.desc()).offset(offset)
         if limit is not None:
@@ -126,11 +142,19 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             raise HTTPException(status_code=404, detail="Page not found")
         return page
 
-    async def get_by_slug_published(self, slug: str) -> Page | None:
+    async def get_by_slug_published(self, slug: str, locale: str) -> Page | None:
+        """The published page at ``slug`` *in ``locale``*.
+
+        Both halves are required. A slug identifies a page only within one
+        language now, so a lookup that ignored the locale would serve whichever
+        translation the database happened to return first — and would make
+        ``/de/p/about`` answer with the English page.
+        """
         result = await self.db.execute(
             select(Page).where(
                 NOT_TRASHED,
                 Page.slug == slug,
+                Page.locale == locale,
                 Page.status == PageStatus.PUBLISHED,
             )
         )
@@ -166,7 +190,7 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
         responses under concurrent crawlers (issue #11).
         """
         result = await self.db.execute(
-            select(Page.slug, Page.updated_at)
+            select(Page.slug, Page.updated_at, Page.locale, Page.translation_group)
             .where(
                 NOT_TRASHED,
                 Page.status == PageStatus.PUBLISHED,
@@ -174,7 +198,7 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             )
             .order_by(Page.updated_at.desc())
         )
-        return [SitemapEntry(slug, updated_at) for slug, updated_at in result.all()]
+        return [SitemapEntry(*row) for row in result.all()]
 
     async def create(self, data: PageCreate) -> Page:
         draft_data = data.draft_data
@@ -187,9 +211,22 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             source = await self.get_page(data.copy_from_page_id)
             draft_data = deepcopy(source.draft_data or {})
 
+        # An unspecified locale is the default one rather than an error: most
+        # pages are authored in the site's main language, and a required field
+        # would make every existing caller — seeds included — spell it out.
+        locale = locales.resolve(data.locale) if data.locale else locales.default()
+        if locale is None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{data.locale!r} is not a content locale. "
+                    f"Configured: {', '.join(locales.supported())}."
+                ),
+            )
         page = Page(
             title=data.title,
             slug=data.slug,
+            locale=locale,
             meta_description=data.meta_description,
             og_image=data.og_image,
             canonical_url=data.canonical_url,
@@ -207,7 +244,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             await self.db.flush()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Slug already in use") from exc
+            raise HTTPException(
+                status_code=409, detail=f"Slug already in use in {locale}"
+            ) from exc
         await self.db.refresh(page)
         return page
 
@@ -215,8 +254,12 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
         page = await self.get_page(page_id)
         update = data.model_dump(exclude_unset=True)
         # Captured before the loop: once the slug is overwritten there is
-        # nothing left to redirect *from*.
+        # nothing left to redirect *from*. The locale is read here too, and
+        # for a second reason — a rollback below expires the instance, so
+        # reading any column off it after that lazy-loads, which under the
+        # async session raises ``MissingGreenlet`` instead of the 409.
         previous_slug = page.slug
+        locale = page.locale
         for field, value in update.items():
             setattr(page, field, value)
         self.db.add(page)
@@ -224,11 +267,18 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin):
             await self.db.flush()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Slug already in use") from exc
+            raise HTTPException(
+                status_code=409, detail=f"Slug already in use in {locale}"
+            ) from exc
         # Recorded after the flush, so a rename the database rejected leaves no
-        # redirect pointing at an address the page never took.
+        # redirect pointing at an address the page never took. Scoped to the
+        # page's own language: an old German address is not an old French one.
         await redirects.record(
-            self.db, page_id=page_id, old_slug=previous_slug, new_slug=page.slug
+            self.db,
+            page_id=page_id,
+            old_slug=previous_slug,
+            new_slug=page.slug,
+            locale=locale,
         )
         await self.db.refresh(page)
         return page

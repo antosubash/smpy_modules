@@ -29,6 +29,7 @@ from news.endpoints.api._deps import (
     read_one_by_page,
     require_edit,
 )
+from news.integrations.locales import resolve_locale
 
 router = APIRouter()
 
@@ -62,6 +63,22 @@ async def list_articles(
         "ones — what the admin list wants. Public feeds keep the default, "
         "which pushes undated articles to the end.",
     ),
+    locale: str | None = Query(
+        None,
+        description="Only articles written in this language. A feed block on "
+        "a German page passes `de` so it lists German articles; the admin list "
+        "leaves it unset and shows every language, badged per row. An "
+        "unconfigured value is ignored rather than rejected — the filter "
+        "arrives from a query string, and a stale link should show the list.",
+    ),
+    group: str | None = Query(
+        None,
+        alias="translation_group",
+        description="One article and its counterparts in other languages — "
+        "what the editor's language switcher lists. Goes through this route "
+        "rather than one of its own so it inherits the same visibility rule: "
+        "a reader without `news.edit` sees the published translations only.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     may_draft = may_see_drafts(request)
@@ -72,6 +89,8 @@ async def list_articles(
         category=category,
         q=q,
         status=status,
+        locale=resolve_locale(locale),
+        group=group,
         in_feed_only=in_feed,
         include_drafts=may_draft,
         undated_first=undated_first,

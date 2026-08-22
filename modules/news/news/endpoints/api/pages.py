@@ -24,13 +24,18 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
-from news.contracts.schemas import ArticleRead, ArticleWithPageCreate
+from news.contracts.schemas import (
+    ArticleRead,
+    ArticleTranslationCreate,
+    ArticleWithPageCreate,
+)
 from news.endpoints.api._deps import read_one_by_page, require_edit
-from news.integrations.pagebuilder import (
+from news.integrations.locales import content_locales, resolve_locale
+from news.integrations.pagebuilder import require_page_edit, require_page_publish
+from news.integrations.pages import (
     create_article_page,
+    create_page_translation,
     publish_page,
-    require_page_edit,
-    require_page_publish,
 )
 
 router = APIRouter(dependencies=[require_edit])
@@ -55,13 +60,88 @@ async def create_article_with_page(
     the two writes share this request's transaction, so either both land or
     neither does. That is the whole difference from the two-call version.
     """
-    page = await create_article_page(db, title=body.title.strip(), slug=body.slug)
+    page = await create_article_page(
+        db,
+        title=body.title.strip(),
+        slug=body.slug,
+        locale=_checked_locale(body.locale),
+    )
     await service.create(
         db,
         page_id=page.id or 0,
         category=body.category,
         published_at=body.published_at,
         author=body.author,
+    )
+    return await read_one_by_page(db, page.id or 0)
+
+
+def _checked_locale(value: str | None) -> str | None:
+    """``value`` as a content locale, or a 422 naming the configured ones.
+
+    Rejected here rather than left to the page write so the error names the
+    field the author actually filled in — a 422 from inside pagebuilder would
+    talk about a page nobody in this request has seen.
+    """
+    if value is None:
+        return None
+    resolved = resolve_locale(value)
+    if resolved is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{value!r} is not a content locale. "
+                f"Configured: {', '.join(content_locales())}."
+            ),
+        )
+    return resolved
+
+
+@router.post(
+    "/articles/{article_id}/translations",
+    response_model=ArticleRead,
+    status_code=201,
+    dependencies=[require_page_edit],
+)
+async def translate_article(
+    article_id: int,
+    body: ArticleTranslationCreate,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleRead:
+    """Start this article's counterpart in another language.
+
+    Two writes in one transaction, for the same reason creating an article is:
+    the translated *page* is pagebuilder's, the sidecar row carrying category,
+    byline and date is news', and an article that exists as only one of those
+    is not something either module can repair on its own.
+
+    The sidecar is seeded from the source rather than left blank. A
+    translation belongs in the same category, under the same byline and on the
+    same date as what it translates — those are facts about the story, not
+    about the language it is told in. It is *undated* only if the source is.
+    ``show_in_feed`` and ``pinned`` come across too, so a pinned story stays
+    pinned in every language it is published in.
+    """
+    article = await service.get(db, article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found.")
+    locale = _checked_locale(body.locale)
+    page = await create_page_translation(
+        db,
+        article.page_id,
+        locale=locale or "",
+        slug=body.slug,
+        title=body.title,
+    )
+    translated = await service.create(
+        db,
+        page_id=page.id or 0,
+        category=article.category,
+        published_at=article.published_at,
+        author=article.author,
+    )
+    await service.update(
+        db, translated, pinned=article.pinned, show_in_feed=article.show_in_feed
     )
     return await read_one_by_page(db, page.id or 0)
 

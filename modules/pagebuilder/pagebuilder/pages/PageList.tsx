@@ -4,7 +4,6 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -12,14 +11,15 @@ import {
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type React from 'react';
 import { toast } from 'sonner';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NewPageDialog } from '../components/NewPageDialog';
 import { type BoardStage, PageBoard } from '../components/PageBoard';
 import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
-import { ScheduledBadge } from '../components/ScheduledBadge';
-import { StatusBadge } from '../components/StatusBadge';
+import { PageListRow } from '../components/PageListRow';
 import { deletePage, type PageRead } from '../utils/api';
 import { publishPage, restorePage, unpublishPage } from '../utils/pagesApi';
+
+/** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
+const PUBLIC_PREFIX = '/p';
 
 interface Props {
   pages: { items: PageRead[]; total: number };
@@ -27,12 +27,20 @@ interface Props {
    *  thrown away. */
   board: BoardStage[] | null;
   filters: PageListFilterState & { view: string };
+  /** Every language the site publishes in, and the one that serves at the
+   *  unprefixed public URL. Absent on a host that predates the setting. */
+  locales?: string[];
+  default_locale?: string;
 }
 
 export default function PageList() {
-  const { pages, board, filters } = usePage<{ props: Props }>().props as unknown as Props;
+  const props = usePage<{ props: Props }>().props as unknown as Props;
+  const { pages, board, filters } = props;
+  const locales = props.locales ?? [];
+  const defaultLocale = props.default_locale ?? 'en';
+  const multilingual = locales.length > 1;
   const { limit, offset } = filters;
-  const filtering = filters.search !== '' || filters.status !== '';
+  const filtering = filters.search !== '' || filters.status !== '' || filters.locale !== '';
   const boardView = filters.view !== 'list' && board !== null;
 
   /**
@@ -41,7 +49,13 @@ export default function PageList() {
    * `replace` keeps one history entry per search rather than one per
    * keystroke, so Back leaves the list instead of retyping it backwards.
    */
-  const go = (next: { search?: string; status?: string; offset?: number; view?: string }) => {
+  const go = (next: {
+    search?: string;
+    status?: string;
+    locale?: string;
+    offset?: number;
+    view?: string;
+  }) => {
     // Built field by field, not `{ ...filters, ...next }`: a merged object
     // would carry a stale `offset` a reader must know to ignore. Any filter
     // change invalidates the offset — page 3 of the previous filter is not
@@ -53,6 +67,7 @@ export default function PageList() {
       {
         search: next.search ?? filters.search,
         status: next.status ?? filters.status,
+        locale: next.locale ?? filters.locale,
         offset: next.offset ?? 0,
         view: next.view ?? filters.view,
       },
@@ -136,20 +151,22 @@ export default function PageList() {
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
             Media library
           </Button>
-          <NewPageDialog />
+          <NewPageDialog locales={locales} defaultLocale={defaultLocale} />
         </>
       }
     >
       {/* Hidden only on a genuinely empty site: with no pages at all there is
           nothing to search, and the controls would just be noise above the
           "create your first one" prompt. */}
-      {(filtering || pages.total > 0) && <PageListFilters filters={filters} onChange={go} />}
+      {(filtering || pages.total > 0) && (
+        <PageListFilters filters={filters} locales={locales} onChange={go} />
+      )}
 
       {boardView ? (
         <PageBoard
           stages={board}
           search={filters.search}
-          newPageSlot={<NewPageDialog />}
+          newPageSlot={<NewPageDialog locales={locales} defaultLocale={defaultLocale} />}
           onDelete={handleDelete}
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
@@ -163,7 +180,7 @@ export default function PageList() {
                 type="button"
                 variant="link"
                 className="h-auto p-0"
-                onClick={() => go({ search: '', status: '' })}
+                onClick={() => go({ search: '', status: '', locale: '' })}
               >
                 Clear filters
               </Button>
@@ -178,6 +195,9 @@ export default function PageList() {
             <TableRow>
               <TableHead>Title</TableHead>
               <TableHead>Slug</TableHead>
+              {/* Only on a multilingual site: a column reading "English" on
+                  every row is a column nobody reads twice. */}
+              {multilingual && <TableHead>Language</TableHead>}
               <TableHead>Status</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -185,72 +205,14 @@ export default function PageList() {
           </TableHeader>
           <TableBody>
             {pages.items.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.title}</TableCell>
-                <TableCell className="font-mono text-sm text-muted-foreground">{p.slug}</TableCell>
-                <TableCell>
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge status={p.status} />
-                    <ScheduledBadge
-                      status={p.status}
-                      publishAt={p.publish_at}
-                      unpublishAt={p.unpublish_at}
-                    />
-                  </span>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {p.updated_at ? new Date(p.updated_at).toLocaleString() : '—'}
-                </TableCell>
-                <TableCell className="space-x-1 text-right">
-                  {/* Stays an <a>: the e2e selects it with getByRole('link'). */}
-                  {p.status === 'published' && (
-                    <a
-                      href={`/p/${p.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      View
-                    </a>
-                  )}
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onClick={() => router.visit(`/pagebuilder/${p.id}/edit`)}
-                  >
-                    Edit
-                  </Button>
-                  <ConfirmDialog
-                    trigger={
-                      <Button variant="link" size="sm" className="text-destructive">
-                        Delete
-                      </Button>
-                    }
-                    // The same gate the board card applies, because it is the
-                    // same deletion: the row you happen to be looking at must
-                    // not decide how much friction a live URL going dark gets.
-                    level={p.status === 'published' ? 'high' : 'low'}
-                    confirmPhrase={p.status === 'published' ? p.slug : undefined}
-                    title={`Delete "${p.title}"?`}
-                    description={
-                      p.status === 'published' ? (
-                        <>
-                          This page is published. <code>{`/p/${p.slug}`}</code> starts answering 404
-                          the moment you confirm. It goes to the trash for 30 days, and after that
-                          it is gone.
-                        </>
-                      ) : (
-                        <>
-                          It was never published, so nothing on the site changes. It goes to the
-                          trash for 30 days.
-                        </>
-                      )
-                    }
-                    confirmLabel="Delete"
-                    onConfirm={() => handleDelete(p)}
-                  />
-                </TableCell>
-              </TableRow>
+              <PageListRow
+                key={p.id}
+                page={p}
+                showLocale={multilingual}
+                defaultLocale={defaultLocale}
+                publicPrefix={PUBLIC_PREFIX}
+                onDelete={handleDelete}
+              />
             ))}
           </TableBody>
         </Table>

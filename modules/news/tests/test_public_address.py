@@ -26,7 +26,9 @@ pytestmark = pytest.mark.asyncio
 async def _record_redirect(db, *, page_id: int, old: str, new: str) -> None:
     from pagebuilder import redirects
 
-    await redirects.record(db, page_id=page_id, old_slug=old, new_slug=new)
+    await redirects.record(
+        db, page_id=page_id, old_slug=old, new_slug=new, locale="en"
+    )
 
 
 async def _article(db, slug: str, *, status: PageStatus = PageStatus.PUBLISHED):
@@ -92,7 +94,7 @@ class TestSlugClaim:
         await make_page(db, slug="contact", title="Contact")
         await db.commit()
 
-        assert await slug_claim()(db, ["field-notes", "contact"]) == {
+        assert await slug_claim()(db, ["field-notes", "contact"], "en") == {
             "field-notes": "/news/field-notes"
         }
 
@@ -102,7 +104,7 @@ class TestSlugClaim:
         page = await _article(db, "field-notes")
         read = await service.get_read_by_page(db, page.id)
 
-        claimed = await slug_claim()(db, ["field-notes"])
+        claimed = await slug_claim()(db, ["field-notes"], "en")
 
         assert claimed["field-notes"] == read.url
 
@@ -110,7 +112,7 @@ class TestSlugClaim:
         await _article(db, "field-notes")
         news_settings.use(NewsSettings(public_route_prefix="/blog"))
 
-        assert await slug_claim()(db, ["field-notes"]) == {"field-notes": "/blog/field-notes"}
+        assert await slug_claim()(db, ["field-notes"], "en") == {"field-notes": "/blog/field-notes"}
 
 
 class TestRename:
@@ -131,11 +133,11 @@ class TestRename:
         await _record_redirect(db, page_id=page.id, old="old-name", new="new-name")
         await db.commit()
 
-        assert await redirected_slug(db, "old-name") == "new-name"
+        assert await redirected_slug(db, "old-name", "en") == "new-name"
 
     async def test_a_slug_nobody_renamed_forwards_nowhere(self, db) -> None:
         from news.integrations.pagebuilder import redirected_slug
 
         await _article(db, "steady")
 
-        assert await redirected_slug(db, "never-used") is None
+        assert await redirected_slug(db, "never-used", "en") is None

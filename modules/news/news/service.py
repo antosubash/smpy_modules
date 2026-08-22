@@ -18,18 +18,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import query_filters, tag_service
+from news.card import to_read as _to_read
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
-from news.integrations.pagebuilder import (
-    NOT_TRASHED,
-    Page,
-    article_status,
-    card_columns,
-    page_editor_path,
-)
+from news.integrations.pagebuilder import NOT_TRASHED, Page, card_columns
 from news.maintenance import reconcile_orphans as reconcile_orphans
 from news.models import NewsArticle, NewsCategory
-from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
 
@@ -73,32 +67,6 @@ def _base(include_drafts: bool, category: str | None):
     return stmt
 
 
-def _to_read(
-    article: NewsArticle, page: Page, tags: list[str] | None = None
-) -> ArticleRead:
-    return ArticleRead(
-        id=article.id or 0,
-        page_id=article.page_id,
-        slug=page.slug,
-        title=page.title,
-        excerpt=page.meta_description or "",
-        cover_image_url=page.og_image or "",
-        category=article.category,
-        tags=tags or [],
-        pinned=article.pinned,
-        show_in_feed=article.show_in_feed,
-        author=article.author,
-        published_at=article.published_at,
-        page_status=article_status(page.status),
-        # News' own prefix, not pagebuilder's generic one: an article no
-        # longer answers at /p/{slug} at all.
-        url=public_article_path(page.slug),
-        # Served rather than assembled in the browser: the admin list then
-        # holds no opinion about how pagebuilder routes its editor.
-        edit_url=page_editor_path(article.page_id),
-    )
-
-
 async def list_articles(
     db: AsyncSession,
     *,
@@ -107,6 +75,8 @@ async def list_articles(
     category: str | None = None,
     q: str | None = None,
     status: str | None = None,
+    locale: str | None = None,
+    group: str | None = None,
     in_feed_only: bool = False,
     include_drafts: bool = False,
     undated_first: bool = False,
@@ -131,6 +101,11 @@ async def list_articles(
         # unreachable from the one screen that could un-hide it.
         stmt = stmt.where(NewsArticle.show_in_feed.is_(True))
     stmt = query_filters.search(stmt, q)
+    # Public feeds pass the language the visitor is reading in, so a German
+    # page's feed block lists German articles. The admin list leaves it unset
+    # and shows every language, with a badge per row.
+    stmt = query_filters.locale(stmt, locale)
+    stmt = query_filters.translation_group(stmt, group)
     # A draft filter from someone who may not see drafts must not widen the
     # base query — `visible` has already restricted it, and `status` only
     # narrows, so the two compose safely in either order.

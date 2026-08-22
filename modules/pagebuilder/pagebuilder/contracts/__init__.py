@@ -12,6 +12,7 @@ from pagebuilder.contracts.schemas import (
     LayoutRevisionListResponse,
     LayoutRevisionRead,
     LayoutUpdate,
+    LocalesResponse,
     MediaAssetListResponse,
     MediaAssetRead,
     MediaAssetVariant,
@@ -26,6 +27,8 @@ from pagebuilder.contracts.schemas import (
     PageRevisionListResponse,
     PageRevisionRead,
     PageScheduleRequest,
+    PageTranslationCreate,
+    PageTranslationRead,
     PageUpdate,
     RevisionDiffResponse,
 )
@@ -38,6 +41,7 @@ __all__ = [
     "LayoutRevisionListResponse",
     "LayoutRevisionRead",
     "LayoutUpdate",
+    "LocalesResponse",
     "MediaAssetListResponse",
     "MediaAssetRead",
     "MediaAssetVariant",
@@ -52,6 +56,8 @@ __all__ = [
     "PageRevisionListResponse",
     "PageRevisionRead",
     "PageScheduleRequest",
+    "PageTranslationCreate",
+    "PageTranslationRead",
     "PageUpdate",
     "RevisionDiffResponse",
 ]

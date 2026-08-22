@@ -12,6 +12,11 @@ export type RevisionEvent = 'publish' | 'unpublish' | 'submit' | 'approve' | 're
 export interface PageRead {
   id: number;
   slug: string;
+  /** Which language the page is written in. Slugs are unique per language,
+   *  so this is half of what identifies a page's public address. */
+  locale: string;
+  /** What the page shares with its counterparts in other languages. */
+  translation_group: string;
   title: string;
   status: PageStatus;
   has_published: boolean;
@@ -37,10 +42,32 @@ export interface PageRead {
   updated_at: string | null;
 }
 
+/** One page of a translation group, as the language switcher needs it. */
+export interface PageTranslationRead {
+  id: number;
+  locale: string;
+  slug: string;
+  title: string;
+  status: PageStatus;
+}
+
 export interface PageDetail extends PageRead {
   draft_data: Record<string, unknown>;
   published_data: Record<string, unknown> | null;
   json_ld: Record<string, unknown> | null;
+  /** Every page in this one's group, itself included. Ordered by locale, so
+   *  the switcher does not reshuffle between two loads of the same page. */
+  translations: PageTranslationRead[];
+}
+
+/** The languages this deployment publishes in.
+ *
+ * Fetched rather than compiled in: a hardcoded list would offer a language the
+ * API then refuses. */
+export interface LocalesResponse {
+  locales: string[];
+  /** The one that serves at the unprefixed public URL. */
+  default: string;
 }
 
 export interface LayoutDetail {
@@ -142,6 +169,17 @@ export interface MediaListQuery {
    *  carry `total`; takes precedence over `cursor`. */
   offset?: number;
   limit?: number;
+}
+
+export interface PageTranslationPayload {
+  locale: string;
+  /** Defaults to the source page's slug, which is free unless an unrelated
+   *  page in that language already took it. */
+  slug?: string | null;
+  /** Defaults to the source's title, i.e. untranslated. */
+  title?: string | null;
+  /** Seed the draft from the source's blocks. On unless told otherwise. */
+  copy_content?: boolean;
 }
 
 export interface PageWritePayload {

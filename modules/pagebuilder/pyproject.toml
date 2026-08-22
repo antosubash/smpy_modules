@@ -52,7 +52,8 @@ artifacts = ["pagebuilder/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-# `db_fixture` holds the bare-session fixture. Registered here rather than
-# imported from conftest.py, which sits exactly on the repo's 300-line cap.
+# `db_fixture` holds the bare-session fixture and `locale_fixture` the
+# multilingual app. Registered here rather than imported from conftest.py,
+# which sits exactly on the repo's 300-line cap.
 pythonpath = ["tests"]
-addopts = "-p db_fixture"
+addopts = "-p db_fixture -p locale_fixture"

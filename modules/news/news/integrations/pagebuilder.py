@@ -17,6 +17,11 @@ Now the borrowing is declared once, in news' own vocabulary:
 * the service that creates and publishes the page an article's body lives in,
 * the admin routes a link has to point at.
 
+Two siblings carry the rest of the borrowing, because this file is at the
+repo's 300-line cap: :mod:`news.integrations.pages` holds the *writes* news
+performs on a page (create, translate, publish) and
+:mod:`news.integrations.locales` the site's content languages.
+
 Nothing outside this package imports ``pagebuilder``. The rule is worth keeping
 even where a re-export looks redundant, because it is what makes ``requires``
 in ``pyproject.toml`` checkable by reading one file.
@@ -26,30 +31,24 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
 from pagebuilder import public_claims, redirects
 from pagebuilder.contracts.events import PageDeleted
-from pagebuilder.contracts.schemas import PageCreate
 from pagebuilder.deps import get_settings as pagebuilder_settings
 from pagebuilder.endpoints.api._deps import require_edit as require_page_edit
 from pagebuilder.endpoints.api._deps import require_publish as require_page_publish
 from pagebuilder.endpoints.public_views import render_public_page
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
-from pagebuilder.service import PagesService
 from simple_module_hosting.inertia_deps import InertiaDep
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Load
 
 from news.constants import (
-    MAX_SLUG_ATTEMPTS,
-    MAX_SLUG_LEN,
     PAGEBUILDER_EDITOR_PATH,
     PAGEBUILDER_MEDIA_PATH,
     PAGEBUILDER_PAGES_PATH,
 )
 from news.contracts.schemas import ArticleStatus
-from news.slugify import slugify
 
 __all__ = [
     "NOT_TRASHED",
@@ -60,17 +59,13 @@ __all__ = [
     "article_status",
     "card_columns",
     "claim_slugs",
-    "create_article_page",
-    "empty_puck_document",
     "media_library_path",
     "page_editor_path",
     "page_search_path",
-    "publish_page",
     "redirected_slug",
     "render_article_page",
     "require_page_edit",
     "require_page_publish",
-    "slug_for_title",
 ]
 
 
@@ -135,117 +130,13 @@ def card_columns() -> Load:
         Page.meta_description,
         Page.og_image,
         Page.status,
+        # The card's public URL is locale-prefixed and its language switcher
+        # keys off the group, so both are read on every row. Left out, they
+        # lazy-load on access — which under the async session raises
+        # MissingGreenlet rather than working (issue #20 again).
+        Page.locale,
+        Page.translation_group,
     )
-
-
-def empty_puck_document(title: str) -> dict:
-    """What pagebuilder's editor expects to open for a page with no body yet.
-
-    The title is repeated into the root props because that is where the editor
-    reads the document heading from; the ``Page.title`` column drives the admin
-    list and the public ``<title>``.
-    """
-    return {
-        "root": {"props": {"title": title, "width": "full"}},
-        "content": [],
-        "zones": {},
-    }
-
-
-def slug_for_title(title: str) -> str:
-    """News' own slug rule, bounded by pagebuilder's ``slug`` column.
-
-    ``news.slugify`` already produces something ``PageCreate``'s
-    ``^[a-z0-9][a-z0-9-]*$`` accepts — it trims again after truncating, so the
-    cut cannot leave a trailing hyphen — and falls back rather than returning an
-    empty string. Both matter here: a slug that fails that pattern is a 422 the
-    author has no way to act on.
-    """
-    return slugify(title, max_length=MAX_SLUG_LEN)
-
-
-async def _free_slug(db: AsyncSession, base: str) -> str:
-    """``base``, or ``base-2``, ``base-3``… — the first nobody is using.
-
-    One query rather than one per candidate: the alternative is a
-    create-and-catch-409 loop, and ``PagesService.create`` rolls the session
-    back on conflict, which would discard anything the caller had already
-    written in the same transaction.
-
-    Returns ``""`` when even the suffixed candidates are all taken, which the
-    caller turns into an error rather than guessing further.
-    """
-    # The prefilter is the *stem* rather than ``base``: a base already at
-    # MAX_SLUG_LEN has to be cut to make room for the suffix, so its candidates
-    # do not start with ``base`` and a ``startswith(base)`` filter would never
-    # see them — handing back a candidate that is in fact taken.
-    stem = base[: _stem_length(base)]
-    taken = set(
-        (
-            await db.execute(select(Page.slug).where(Page.slug.startswith(stem)))
-        ).scalars()
-    )
-    if base not in taken:
-        return base
-    for suffix in range(2, MAX_SLUG_ATTEMPTS + 2):
-        candidate = f"{base[: MAX_SLUG_LEN - len(str(suffix)) - 1]}-{suffix}"
-        if candidate not in taken:
-            return candidate
-    return ""
-
-
-def _stem_length(base: str) -> int:
-    """How much of ``base`` every candidate is guaranteed to share.
-
-    The longest suffix is the one that eats the most of the base, so cutting to
-    that leaves a prefix common to ``base`` and to all of its variants.
-    """
-    longest = len(str(MAX_SLUG_ATTEMPTS + 1))
-    return min(len(base), MAX_SLUG_LEN - longest - 1)
-
-
-async def create_article_page(
-    db: AsyncSession, *, title: str, slug: str | None = None
-) -> Page:
-    """Create the page an article's body will live in.
-
-    This runs on the server so that creating an article is one request under
-    news' own CSRF token. The frontend used to POST to pagebuilder's page API
-    directly, which meant knowing pagebuilder's cookie name and priming it with
-    a throwaway GET — and left an orphaned, empty page behind whenever the
-    second call failed, because the two writes were in different transactions.
-
-    An author-supplied ``slug`` is used verbatim, and a collision is reported
-    rather than silently altered: the URL is a thing they typed and expect to
-    get. Only the derived default looks for a free variant, because there the
-    author expressed no preference beyond the headline.
-    """
-    if slug:
-        chosen = slug
-    else:
-        chosen = await _free_slug(db, slug_for_title(title))
-        if not chosen:
-            raise _slug_exhausted(title)
-    return await PagesService(db).create(
-        PageCreate(title=title, slug=chosen, draft_data=empty_puck_document(title))
-    )
-
-
-def _slug_exhausted(title: str) -> HTTPException:
-    return HTTPException(
-        status_code=409,
-        detail=f"Could not derive a free URL from {title!r}. Set one explicitly.",
-    )
-
-
-async def publish_page(db: AsyncSession, page_id: int) -> Page:
-    """Publish the page behind an article.
-
-    Here rather than in the browser for the same reason as ``create``: the row
-    menu's Publish used to POST to pagebuilder's API with a borrowed CSRF token,
-    which is the last thing that made that cookie's name news' business.
-    """
-    return await PagesService(db).publish(page_id)
 
 
 def claim_slugs(claim: public_claims.SlugClaim) -> None:
@@ -265,6 +156,7 @@ async def render_article_page(
     db: AsyncSession,
     *,
     url_prefix: str,
+    locale: str | None = None,
 ) -> Response:
     """Serve an article's body through pagebuilder's own public viewer.
 
@@ -274,7 +166,10 @@ async def render_article_page(
     viewer would start equal and drift.
 
     ``url_prefix`` is news', so the canonical tag names the address the article
-    actually serves at rather than the one it no longer answers on.
+    actually serves at rather than the one it no longer answers on. ``locale``
+    is which language's article to serve; the viewer builds the canonical tag
+    and the ``hreflang`` alternates from news' prefix and that language, so a
+    translated article advertises ``/de/news/…`` rather than ``/de/p/…``.
     """
     return await render_public_page(
         slug,
@@ -283,15 +178,16 @@ async def render_article_page(
         db,
         pagebuilder_settings(request),
         url_prefix=url_prefix,
+        locale=locale,
     )
 
 
-async def redirected_slug(db: AsyncSession, slug: str) -> str | None:
-    """The slug an old address now points at, or ``None``.
+async def redirected_slug(db: AsyncSession, slug: str, locale: str) -> str | None:
+    """The slug an old address now points at *within ``locale``*, or ``None``.
 
     A rename is not a private edit — the old URL is in bookmarks, in links from
     other sites and in a search index that has not recrawled — so pagebuilder
     records one. News reads the same table rather than keeping its own, which
     is what makes renaming an article behave like renaming any other page.
     """
-    return await redirects.resolve(db, slug)
+    return await redirects.resolve(db, slug, locale)

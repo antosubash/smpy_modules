@@ -12,8 +12,24 @@ and adds one dependency line, no registration code.
 
 | Directory | Package | Purpose |
 |---|---|---|
-| `modules/pagebuilder` | [`simple_module_pagebuilder`](https://pypi.org/project/simple_module_pagebuilder/) | Drag-and-drop visual page builder with revisions, approvals, media library, scheduling, and SEO |
-| `modules/news` | [`simple_module_news`](https://pypi.org/project/simple_module_news/) | News articles backed by page-builder pages — listing API, category/date metadata, and a live feed block |
+| `modules/pagebuilder` | [`simple_module_pagebuilder`](https://pypi.org/project/simple_module_pagebuilder/) | Drag-and-drop visual page builder with revisions, approvals, media library, scheduling, multilingual content, and SEO |
+| `modules/news` | [`simple_module_news`](https://pypi.org/project/simple_module_news/) | News articles backed by page-builder pages — listing API, category/date metadata, translations, and a live feed block |
+
+### Publishing in more than one language
+
+Pages and articles can exist in several languages, each with its own slug,
+draft and approval state. Off by default; turn it on in `.env`:
+
+```bash
+SM_PAGEBUILDER_CONTENT_LOCALES='["en","de"]'
+SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
+```
+
+The default language keeps its existing addresses (`/p/about`, `/news/x`) and
+every other one is prefixed (`/de/p/about`, `/de/news/x`), so switching this on
+strands no link that already exists. See
+[`modules/pagebuilder/README.md`](modules/pagebuilder/README.md#multilingual-content)
+for the model and the editor flow.
 
 ## Layout
 

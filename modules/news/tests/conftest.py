@@ -39,20 +39,45 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 @pytest.fixture(autouse=True)
 def _no_leaked_module_state():
-    """Both registries the module writes to at startup are process-global.
+    """Every registry the modules write to at startup is process-global.
 
-    ``on_startup`` registers news' slug claim with pagebuilder and publishes the
-    resolved settings; without this a test that boots the module changes the
-    answers of every later test in the same process.
+    ``on_startup`` registers news' slug claim with pagebuilder and publishes
+    the resolved settings; without this a test that boots the module changes
+    the answers of every later test in the same process.
+
+    Pagebuilder's content locales are the third: ``Page.locale``'s column
+    default reads them, so a multilingual test that left them behind would make
+    the *next* test's pages come out in whatever language it configured — an
+    order-dependent failure with no visible cause.
     """
     from news import settings as news_settings
-    from pagebuilder import public_claims
+    from pagebuilder import locales, public_claims
 
     public_claims.reset()
     news_settings.reset()
+    locales.reset()
     yield
     public_claims.reset()
     news_settings.reset()
+    locales.reset()
+
+
+@pytest.fixture
+def bilingual():
+    """Configure the site to publish in English (default) and German.
+
+    Set through ``pagebuilder.locales`` because that is where content languages
+    live — an article *is* a page, so a language news offered that pagebuilder
+    did not would be one no article could be written in. Reset by
+    ``_no_leaked_module_state`` above.
+    """
+    from pagebuilder import locales
+    from pagebuilder.settings import PagebuilderSettings
+
+    locales.use(
+        PagebuilderSettings(content_locales=("en", "de"), default_content_locale="en")
+    )
+    return ("en", "de")
 
 
 ROLE_EDITOR = "news-editor"
@@ -94,7 +119,7 @@ class _StubAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-async def _build_app(user: Any) -> tuple[FastAPI, Any]:
+async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI, Any]:
     module = NewsModule()
     app = FastAPI()
 
@@ -122,6 +147,12 @@ async def _build_app(user: Any) -> tuple[FastAPI, Any]:
     app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
 
     app.add_middleware(_StubAuthMiddleware, user=user)
+    if mount_public:
+        # Most fixtures skip this: the admin API is what they exercise, and
+        # ``on_startup`` also registers a process-global slug claim. The public
+        # viewer only exists once it has run, so the tests that are *about* the
+        # article's address ask for it.
+        await module.on_startup(app)
     return app, db_state
 
 
@@ -143,8 +174,8 @@ async def db(db_state) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-async def _client(user: Any) -> AsyncIterator[AsyncClient]:
-    app, state = await _build_app(user)
+async def _client(user: Any, *, mount_public: bool = False) -> AsyncIterator[AsyncClient]:
+    app, state = await _build_app(user, mount_public=mount_public)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]
@@ -194,6 +225,20 @@ async def anon_client() -> AsyncIterator[AsyncClient]:
         yield client
 
 
+@pytest_asyncio.fixture
+async def bilingual_public_client(bilingual) -> AsyncIterator[AsyncClient]:
+    """An anonymous reader on a two-language app with its public routes mounted.
+
+    ``on_startup`` is what mounts them — one router per content locale — so a
+    test about the address an article serves at has to boot through it rather
+    than around it. Depending on ``bilingual`` rather than taking it as a
+    second fixture argument is load-bearing: the locales have to be published
+    *before* the app is built, or the routers are mounted for one language.
+    """
+    async for client in _client(None, mount_public=True):
+        yield client
+
+
 async def make_page(
     db: AsyncSession,
     *,
@@ -202,9 +247,14 @@ async def make_page(
     status: PageStatus = PageStatus.PUBLISHED,
     meta_description: str | None = None,
     og_image: str | None = None,
+    locale: str | None = None,
 ) -> Page:
     """Insert a page for an article to hang off. Committed, so an API request
-    on another session sees it."""
+    on another session sees it.
+
+    ``locale`` defaults to whatever the model's own default resolves to, which
+    on a monolingual site is the only language there is.
+    """
     page = Page(
         slug=slug,
         title=title,
@@ -212,6 +262,7 @@ async def make_page(
         draft_data={},
         meta_description=meta_description,
         og_image=og_image,
+        **({"locale": locale} if locale is not None else {}),
     )
     db.add(page)
     await db.commit()

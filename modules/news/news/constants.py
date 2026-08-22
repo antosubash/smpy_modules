@@ -70,6 +70,10 @@ PAGEBUILDER_MEDIA_PATH: Final = "/pagebuilder/media"
 PAGEBUILDER_PAGES_PATH: Final = "/pagebuilder/?view=list&search={query}"
 
 MAX_CATEGORY_LEN: Final = 80
+# Pagebuilder's bound on ``Page.locale``. Restated here for the same reason
+# MAX_SLUG_LEN is: a DTO that accepted more would 500 inside the page write
+# instead of 422ing on the field the author filled in.
+MAX_LOCALE_LEN: Final = 12
 MAX_TAG_LEN: Final = 60
 MAX_TITLE_LEN: Final = 300
 # Pagebuilder's own bound on ``Page.slug``. Derived slugs are cut to it here so

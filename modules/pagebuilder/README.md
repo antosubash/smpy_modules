@@ -21,6 +21,8 @@ at `/p/{slug}`.
   poller flips status at the due time.
 - **SEO** — per-page meta description, canonical URL, OG image, JSON-LD, plus
   `/sitemap.xml` and `/robots.txt`.
+- **Multilingual content** — a page can exist in several languages, each with
+  its own slug, draft and approval state. See below.
 
 ## Installation
 
@@ -125,6 +127,8 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 | Setting | Default | Purpose |
 |---|---|---|
 | `public_route_prefix` | `/p` | Where published pages are served |
+| `content_locales` | `["en"]` | Languages a page may be authored in |
+| `default_content_locale` | `en` | The language served at the unprefixed URL |
 | `requires_auth` | `true` | Gate the admin surface behind authentication |
 | `csrf_protect` | `true` | Require a CSRF token on mutating admin requests |
 | `media_root` | `var/pagebuilder/media` | Upload storage directory |
@@ -149,7 +153,49 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 **Admin API** (under `/api/pagebuilder`): pages CRUD, workflow transitions,
 revisions and diffs, layout and its revisions, uploads.
 
-**Public**: `/p/{slug}`, `/sitemap.xml`, `/robots.txt`.
+**Public**: `/p/{slug}`, `/{locale}/p/{slug}` (one mount per non-default
+content locale), `/sitemap.xml`, `/robots.txt`.
+
+## Multilingual content
+
+Off by default: with one content locale nothing changes, no locale-prefixed
+route is mounted, and every existing URL is exactly what it was.
+
+```bash
+SM_PAGEBUILDER_CONTENT_LOCALES='["en","de","fr"]'
+SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
+```
+
+These are *content* languages, deliberately separate from the host's
+`SM_I18N_SUPPORTED_LOCALES`, which decides what language the admin console
+speaks. A site can translate its content without translating its console, or
+the reverse.
+
+**A translation is an ordinary page.** It has its own row, slug, draft,
+revisions, schedule and approval state; what makes two pages translations of
+each other is a shared `translation_group`. Publishing one never publishes
+another, and there is no "master" — deleting the English page leaves the German
+one intact.
+
+**Addresses.** The default locale keeps the bare prefix (`/p/about`) so adding
+a language strands no link that already exists; every other locale is prefixed
+(`/de/p/about`). `/{default}/p/{slug}` permanently redirects to the bare form,
+so one document never answers at two URLs. Slugs are unique *per language*, so
+`/p/about` and `/de/p/about` can both be "about".
+
+**Discovery.** A published page emits `hreflang` links for every published
+counterpart plus `x-default`, and the sitemap lists each language at its own
+address with `xhtml:link` alternates — so a crawler finds a translation nothing
+links to yet.
+
+**Authoring.** The editor's *Languages* tab lists the site's locales, shows
+which ones the page exists in, and starts the ones it does not
+(`POST /api/pagebuilder/pages/{id}/translations`). A new translation inherits
+the layout, nav membership and the source's title (untranslated, so what still
+needs doing is obvious), starts as a draft, and never inherits `canonical_url`.
+Its breadcrumb parent is the parent's own counterpart, so a trail never crosses
+languages. A page's own language is fixed for its lifetime — moving one would
+strand its slug and orphan the redirect pointing at it.
 
 ## Contracts
 

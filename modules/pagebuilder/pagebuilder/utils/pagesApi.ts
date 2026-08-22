@@ -5,16 +5,19 @@ import type {
   LayoutDetail,
   LayoutRevisionRead,
   LayoutUpdate,
+  LocalesResponse,
   PageDetail,
   PageRead,
   PageRevisionRead,
+  PageTranslationPayload,
   PageWritePayload,
   RevisionDiff,
   ScheduleRequest,
 } from './types';
 
-export const createPage = (data: PageWritePayload & { title: string; slug: string }) =>
-  request<PageDetail>('/pages', { method: 'POST', body: JSON.stringify(data) });
+export const createPage = (
+  data: PageWritePayload & { title: string; slug: string; locale?: string },
+) => request<PageDetail>('/pages', { method: 'POST', body: JSON.stringify(data) });
 
 /** Pages waiting out the retention window. */
 export const listTrash = () => request<{ items: PageRead[] }>('/pages/trash');
@@ -30,9 +33,28 @@ export const purgePage = (id: number) => request<void>(`/pages/${id}/purge`, { m
 export const listTemplates = (signal?: AbortSignal) =>
   request<{ items: PageRead[] }>('/pages/templates', { signal });
 
-/** Every page, for the "copy a page" and parent selects. */
-export const listPages = (signal?: AbortSignal) =>
-  request<{ items: PageRead[] }>('/pages', { signal });
+/** Every page, for the "copy a page" and parent selects.
+ *
+ * `locale` narrows to one language — what the parent select wants, since
+ * breadcrumbs must not cross languages. */
+export const listPages = (signal?: AbortSignal, locale?: string) =>
+  request<{ items: PageRead[] }>(
+    locale ? `/pages?locale=${encodeURIComponent(locale)}` : '/pages',
+    {
+      signal,
+    },
+  );
+
+/** Which languages a page may be authored in. */
+export const listLocales = (signal?: AbortSignal) =>
+  request<LocalesResponse>('/locales', { signal });
+
+/** Start this page's counterpart in another language. Returns the new page. */
+export const createTranslation = (id: number, body: PageTranslationPayload) =>
+  request<PageDetail>(`/pages/${id}/translations`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 export const savePage = (id: number, data: PageWritePayload) =>
   request<PageDetail>(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) });

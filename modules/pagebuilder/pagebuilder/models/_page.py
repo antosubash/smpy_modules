@@ -5,13 +5,19 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import JSON, Column, DateTime, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
+from pagebuilder import locales
 from pagebuilder.models._base import Base
+
+
+def _new_translation_group() -> str:
+    return uuid4().hex
 
 
 class PageStatus(str, enum.Enum):  # noqa: UP042
@@ -42,8 +48,59 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
 
     __tablename__ = "pagebuilder_pages"
 
+    __table_args__ = (
+        # Slugs are unique *per language*, not globally: /p/about and
+        # /de/p/about are two documents at two addresses, and forcing the
+        # German one to pick a different word would make the URL a workaround
+        # for a schema decision. Replaces the single-column unique index the
+        # slug column carried before there was such a thing as a locale.
+        Index("ix_pagebuilder_pages_locale_slug", "locale", "slug", unique=True),
+        # One page per language per group. Without it a second "add German"
+        # click — a double submit, a stale tab — produces two German siblings
+        # and every alternates list starts contradicting itself.
+        Index(
+            "ix_pagebuilder_pages_group_locale",
+            "translation_group",
+            "locale",
+            unique=True,
+        ),
+    )
+    # Neither column carries its own index: both composites lead with the one
+    # a single-column lookup would want, so a "locale = ?" or
+    # "translation_group = ?" scan already has one to use and a second would
+    # only cost writes.
+
     id: int | None = Field(default=None, primary_key=True)
-    slug: str = Field(max_length=200, unique=True, index=True)
+    slug: str = Field(max_length=200)
+    """The page's address within its language. Unique per ``locale``, not
+    globally — see ``__table_args__``."""
+
+    locale: str = Field(
+        default_factory=locales.default,
+        max_length=locales.MAX_LOCALE_LEN,
+    )
+    """Which language this page is written in.
+
+    Every page has one, including on a monolingual site: a nullable column
+    would mean every query had to spell "this locale or nothing", and the row
+    that predates the feature would be the one that behaves differently.
+    Existing rows are backfilled to the default locale, which is also the one
+    that keeps serving at the unprefixed URL.
+    """
+
+    translation_group: str = Field(
+        default_factory=_new_translation_group,
+        max_length=32,
+    )
+    """What a page and its translations share.
+
+    A generated key rather than a foreign key to the "original", because there
+    isn't one: translations are siblings, and pointing each at a source would
+    make deleting the English page orphan the German and French ones — or,
+    worse, quietly re-parent them. Every page gets its own group at creation
+    and joins another's only by being created as a translation of it.
+    """
+
     title: str = Field(max_length=300)
     meta_description: str | None = Field(default=None, max_length=500)
     og_image: str | None = Field(default=None, max_length=500)

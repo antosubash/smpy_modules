@@ -55,10 +55,12 @@ set its category filter and item count.
 | Route | Access |
 |---|---|
 | `GET /news/{slug}` | anonymous; published articles only |
-| `GET /api/news/articles?limit&offset&category&undated_first` | anonymous; published only |
+| `GET /{locale}/news/{slug}` | anonymous; one mount per non-default content locale |
+| `GET /api/news/articles?limit&offset&category&locale&translation_group&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
 | `POST /api/news/articles/with-page` | `news.edit` **+ `pagebuilder.edit`** |
+| `POST /api/news/articles/{id}/translations` | `news.edit` **+ `pagebuilder.edit`** |
 | `POST /api/news/articles/{id}/publish` | `news.edit` **+ `pagebuilder.publish`** |
 | `PUT /api/news/articles/{id}` | `news.edit` |
 | `DELETE /api/news/articles/{id}` | `news.edit` |
@@ -100,6 +102,36 @@ timestamp only because that is what the date is carried in.
 undates the article, which is a real state rather than an error.
 
 `DELETE` detaches the metadata; the page and its body stay.
+
+## Multilingual articles
+
+An article is a page, so its language is the page's language — configured in
+pagebuilder (`SM_PAGEBUILDER_CONTENT_LOCALES`), not here, because a language
+news offered that pagebuilder did not would be one no article could be written
+in. Off by default: with one content locale every article URL is exactly what
+it was.
+
+Articles in the default language keep `/news/{slug}`; every other language is
+prefixed, `/de/news/{slug}`. `ArticleRead.url` carries the prefix, so the admin
+list, the feed block and the slug news claims from pagebuilder all agree on
+one address. `/{default}/news/{slug}` permanently redirects to the bare form.
+
+`?locale=de` narrows a listing to one language — what a feed block on a German
+page passes, so a German list never shows an English card. The block reads the
+surrounding page's language rather than offering it as a field: a feed set to
+one language on a page written in another is a mistake nothing would catch.
+The admin list leaves it unset and shows every language, badged per row.
+
+`POST /articles/{id}/translations` starts the same story in another language:
+one request, one transaction, creating both the translated page and the sidecar
+row. Category, byline, date, pin and feed membership are copied from the source
+rather than asked for again — they are facts about the story, not about the
+language it is told in. The translation starts as a draft.
+
+`?translation_group=…` lists one article and its counterparts, which is what
+the editor's language switcher shows. It goes through the ordinary listing
+rather than a route of its own, so it inherits the same visibility rule: a
+reader without `news.edit` sees the published translations only.
 
 Anonymous listings carry `Cache-Control: public, max-age=60`, because the feed
 block runs on every public page that holds one. An editor's listing includes

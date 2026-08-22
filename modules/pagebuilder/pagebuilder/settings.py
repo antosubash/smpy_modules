@@ -7,14 +7,49 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class PagebuilderSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="SM_PAGEBUILDER_", extra="ignore")
+    # ``env_file`` mirrors the host's own BootstrapSettings (and sm_ai's
+    # settings): pydantic-settings reads the file itself rather than exporting
+    # it, so a module that omits this only ever sees real environment
+    # variables — and every ``SM_PAGEBUILDER_*`` line in the repo's root
+    # ``.env``, which CLAUDE.md calls the single source of truth for settings,
+    # would be silently ignored.
+    model_config = SettingsConfigDict(
+        env_prefix="SM_PAGEBUILDER_", env_file=".env", extra="ignore"
+    )
 
     public_route_prefix: str = "/p"
     """URL prefix used for public published pages: ``{prefix}/{slug}``."""
+
+    content_locales: tuple[str, ...] = ("en",)
+    """Languages a page may be authored in.
+
+    Distinct from the host's ``SM_I18N_SUPPORTED_LOCALES``, which decides what
+    language the *admin console* speaks. A site can translate its content
+    without translating its console, or the reverse, so the two are configured
+    separately — see :mod:`pagebuilder.locales`.
+
+    Set as a JSON array: ``SM_PAGEBUILDER_CONTENT_LOCALES='["en","de","fr"]'``.
+    A single-entry tuple (the default) leaves every public URL exactly as it
+    was, so this feature costs a monolingual site nothing.
+    """
+
+    default_content_locale: str = "en"
+    """The locale served at the *unprefixed* public URL.
+
+    ``/p/{slug}`` is this language; every other one is ``/{locale}/p/{slug}``.
+    Keeping the default unprefixed is what lets a site that already has pages
+    add a second language without rewriting a single address — and
+    ``/{default}/p/{slug}`` permanently redirects to the bare form so one
+    document never answers at two URLs.
+
+    Must appear in ``content_locales``; a mismatch fails at boot rather than
+    404ing the entire site at the first request.
+    """
 
     media_root: Path = Path("var/pagebuilder/media")
     """Filesystem directory where uploaded media is stored.
@@ -162,3 +197,14 @@ class PagebuilderSettings(BaseSettings):
 
     scheduler_interval_seconds: int = 30
     """How often the in-process scheduler wakes to look for due flips."""
+
+    @model_validator(mode="after")
+    def _check_locales(self) -> PagebuilderSettings:
+        if not self.content_locales:
+            raise ValueError("content_locales must list at least one locale")
+        if self.default_content_locale not in self.content_locales:
+            raise ValueError(
+                f"default_content_locale {self.default_content_locale!r} is not in "
+                f"content_locales {list(self.content_locales)}"
+            )
+        return self

@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
+from pagebuilder.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus, RevisionEvent
 
 PuckData = dict[str, Any]
@@ -26,6 +27,16 @@ StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
 class PageCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     slug: str = Field(min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    locale: str | None = Field(default=None, max_length=MAX_LOCALE_LEN)
+    """Language to author in. ``None`` means the default content locale.
+
+    A page created this way starts a translation group of its own. Joining an
+    existing one is ``POST /pages/{id}/translations`` and nothing else — a
+    group id on this schema would let any caller graft a page onto any other
+    page's language set, which is a data-integrity decision rather than a
+    field.
+    """
+
     meta_title: str | None = Field(default=None, max_length=200)
     meta_description: str | None = Field(default=None, max_length=500)
     show_in_header_nav: bool = False
@@ -86,6 +97,8 @@ class PageRead(BaseModel):
 
     id: int
     slug: str
+    locale: str
+    translation_group: str
     title: str
     status: PageStatus
     has_published: bool
@@ -106,10 +119,78 @@ class PageRead(BaseModel):
     updated_at: datetime | None
 
 
+class LocalesResponse(BaseModel):
+    """The languages this deployment publishes in.
+
+    Served to the admin client so the language switcher, the New page dialog
+    and news' own article screens offer exactly what the API will accept.
+    Hardcoding the list in the frontend is the failure this prevents: it shows
+    a language, the author picks it, and the create call 422s.
+    """
+
+    locales: list[str]
+    default: str
+    """The one that serves at the unprefixed public URL."""
+
+
+class PageTranslationRead(BaseModel):
+    """One page of a translation group, as its siblings need to see it.
+
+    Deliberately not a ``PageRead``: the language switcher needs a name, an
+    address and whether the translation is live, and shipping the whole read
+    model for every sibling would put N copies of every SEO field on a page
+    that renders one row per language.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    locale: str
+    slug: str
+    title: str
+    status: PageStatus
+
+
+class PageTranslationCreate(BaseModel):
+    """Start a page's counterpart in another language."""
+
+    locale: str = Field(min_length=2, max_length=MAX_LOCALE_LEN)
+
+    slug: str | None = Field(
+        default=None, min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$"
+    )
+    """Address within the new language. Defaults to the source page's own.
+
+    Reusing it is safe and usually right — slugs are unique per language, so
+    ``/p/about`` and ``/de/p/about`` do not collide — and a translator who
+    wants ``/de/p/ueber-uns`` says so here.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    """Defaults to the source's title, i.e. untranslated. That is deliberate:
+    an empty heading is not a better starting point than the original text,
+    and it makes what still needs translating obvious."""
+
+    copy_content: bool = True
+    """Seed the draft from the source page's blocks.
+
+    On by default because a translator's job is to replace copy, not to
+    rebuild a layout. Turn it off to start from an empty document.
+    """
+
+
 class PageDetail(PageRead):
     draft_data: PuckData
     published_data: PuckData | None
     json_ld: dict[str, Any] | None = None
+    translations: list[PageTranslationRead] = Field(default_factory=list)
+    """Every page in this one's translation group, itself included.
+
+    Populated by the caller rather than by ``from_attributes``: the siblings
+    are a separate query, and a lazy relationship would load them on attribute
+    access — under the async session, that raises ``MissingGreenlet`` rather
+    than working.
+    """
 
 
 class PageListResponse(BaseModel):

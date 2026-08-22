@@ -7,6 +7,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useEffect } from 'react';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
+import { ArticleTranslations } from '../components/editor/ArticleTranslations';
 import { useArticleEditor } from '../hooks/useArticleEditor';
 import { formatArticleDate } from '../utils/api';
 
@@ -20,9 +21,11 @@ import { formatArticleDate } from '../utils/api';
  * and how the article behaves in feeds.
  */
 export default function ArticleEditor() {
-  const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
-    article_id: number;
-  };
+  const props = usePage<{
+    props: { article_id: number; locales?: string[] };
+  }>().props as unknown as { article_id: number; locales?: string[] };
+  const { article_id } = props;
+  const locales = props.locales ?? [];
 
   const {
     article,
@@ -32,6 +35,7 @@ export default function ArticleEditor() {
     busy,
     dirty,
     error,
+    setError,
     saved,
     load,
     patch,
@@ -146,6 +150,12 @@ export default function ArticleEditor() {
           <Button className="w-full" disabled={busy || !dirty} onClick={() => void save()}>
             Save
           </Button>
+
+          {/* Only on a multilingual site: a panel listing one language is a
+              panel that answers a question nobody asked. */}
+          {locales.length > 1 && (
+            <ArticleTranslations article={article} locales={locales} onError={setError} />
+          )}
         </aside>
       </div>
     </PageShell>

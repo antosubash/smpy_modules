@@ -2,9 +2,15 @@ import { FilterPills } from '@simple-module-py/ui/components/FilterPills';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useRef, useState } from 'react';
 
+import { localeLabel } from '../utils/locale';
+
 export interface PageListFilterState {
   search: string;
   status: string;
+  /** Empty means every language, which is the list's default: an editor
+   *  looking for a page should not have to guess which translation of it
+   *  they are after. */
+  locale: string;
   offset: number;
   limit: number;
 }
@@ -27,11 +33,15 @@ const SEARCH_DEBOUNCE_MS = 250;
  */
 export function PageListFilters({
   filters,
+  locales = [],
   onChange,
 }: {
   filters: PageListFilterState;
+  /** Every language the site publishes in. One or none hides the pills — a
+   *  filter that cannot narrow anything is furniture. */
+  locales?: string[];
   /** Always resets paging: page 3 of the old filter is meaningless. */
-  onChange: (next: { search: string; status: string }) => void;
+  onChange: (next: { search: string; status: string; locale: string }) => void;
 }) {
   const [search, setSearch] = useState(filters.search);
 
@@ -41,7 +51,11 @@ export function PageListFilters({
   // trailing keystrokes when the "beta" response landed), and the debounce
   // must send the status we last picked, not a server echo a still-in-flight
   // pill click hasn't updated yet.
-  const sent = useRef({ search: filters.search, status: filters.status });
+  const sent = useRef({
+    search: filters.search,
+    status: filters.status,
+    locale: filters.locale,
+  });
 
   // Keep the box in step when the filter changes from outside it — the back
   // button, or "Clear filters" in the empty state. Our own echo matches
@@ -57,6 +71,11 @@ export function PageListFilters({
       sent.current.status = filters.status;
     }
   }, [filters.status]);
+  useEffect(() => {
+    if (filters.locale !== sent.current.locale) {
+      sent.current.locale = filters.locale;
+    }
+  }, [filters.locale]);
 
   // The parent redefines `onChange` every render. Held in a ref so the debounce
   // below can depend on the typed value alone: depending on the callback would
@@ -73,7 +92,11 @@ export function PageListFilters({
       // text already, making the pending request a duplicate.
       if (search === sent.current.search) return;
       sent.current.search = search;
-      latestOnChange.current({ search, status: sent.current.status });
+      latestOnChange.current({
+        search,
+        status: sent.current.status,
+        locale: sent.current.locale,
+      });
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [search]);
@@ -94,11 +117,24 @@ export function PageListFilters({
           // Send the live box text with the pill: the server-echoed
           // `filters.search` may not include text typed inside the debounce
           // window, and sending the stale value would drop it.
-          sent.current = { search, status };
-          onChange({ search, status });
+          sent.current = { search, status, locale: sent.current.locale };
+          onChange({ search, status, locale: sent.current.locale });
         }}
         options={STATUS_OPTIONS}
       />
+      {locales.length > 1 && (
+        <FilterPills
+          value={filters.locale}
+          onChange={(locale) => {
+            sent.current = { search, status: sent.current.status, locale };
+            onChange({ search, status: sent.current.status, locale });
+          }}
+          options={[
+            { value: '', label: 'All languages' },
+            ...locales.map((tag) => ({ value: tag, label: localeLabel(tag) })),
+          ]}
+        />
+      )}
     </div>
   );
 }
