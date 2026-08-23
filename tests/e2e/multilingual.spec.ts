@@ -37,12 +37,74 @@ function doc(heading: string, body: string) {
   };
 }
 
+/**
+ * Give the site a header and a footer.
+ *
+ * `PublicPage` only renders the `site-header` / `site-footer` landmarks when
+ * the site-wide layout record holds one, and that record starts empty on a
+ * fresh database. Set here rather than leaned on from `site-chrome.spec.ts`:
+ * the chrome is the thing this test is comparing across languages, so it has
+ * to be this file's own precondition, not another file's leftover.
+ */
+async function putLayout(page: Page, headers: Record<string, string>, chrome: boolean) {
+  // An empty `content` is how a slot reads as unset — `public_layout_props`
+  // drops the wrapper entirely rather than render an empty <header>.
+  const slot = (block: unknown) => ({
+    root: { props: {} },
+    zones: {},
+    content: chrome ? [block] : [],
+  });
+  const response = await page.request.put('/api/pagebuilder/layout', {
+    headers,
+    data: {
+      header_data: slot({
+        type: 'SiteHeader',
+        props: {
+          id: 'hdr',
+          logoUrl: '',
+          logoAlt: 'E2E Site',
+          homeHref: '/p/home',
+          utilityLinks: [],
+          navItems: [{ label: 'Atlas', href: '/p/atlas', children: [] }],
+          ctaLabel: 'Contact us',
+          ctaHref: '/p/contact',
+          sticky: false,
+        },
+      }),
+      footer_data: slot({
+        type: 'SiteFooter',
+        props: {
+          id: 'ftr',
+          logoUrl: '',
+          logoAlt: 'E2E Site',
+          homeHref: '/p/home',
+          links: [{ label: 'Privacy notice', href: '/p/privacy' }],
+          note: 'A small print line.',
+        },
+      }),
+      note: 'e2e multilingual chrome',
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
 test.describe('Multilingual pages', () => {
+  // The layout is one site-wide record shared by every spec, so put it back
+  // the way this file found it. Otherwise every later spec that loads a public
+  // page renders it with a header it did not ask for.
+  test.afterAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    await login(page);
+    await putLayout(page, await csrfHeader(page), false);
+    await page.close();
+  });
+
   test('a translation renders identically to its source, in the other language', async ({
     page,
   }) => {
     await login(page);
     const headers = await csrfHeader(page);
+    await putLayout(page, headers, true);
     const slug = uniqueSlug('e2e-lang');
 
     const en = await (
@@ -115,18 +177,25 @@ test.describe('Multilingual pages', () => {
       })
     ).json();
     for (const id of [en.id, de.id]) {
-      await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
+      const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
+        headers,
+        data: {},
+      });
+      expect(published.status(), await published.text()).toBe(200);
     }
 
     await page.goto(`/p/${slug}`);
-    const alternates = await page
-      .locator('link[rel="alternate"]')
-      .evaluateAll((links) =>
-        links.map((l) => [
-          l.getAttribute('hreflang'),
-          new URL(l.getAttribute('href') ?? '').pathname,
-        ]),
-      );
+    // Inertia writes the head client-side, so it is not there at `load`.
+    // `evaluateAll` does not retry — without a wait that resolves to `[]` and
+    // the assertion below reports "no alternates" for a page that has three.
+    const links = page.locator('link[rel="alternate"]');
+    await expect(links).toHaveCount(3);
+    const alternates = await links.evaluateAll((found) =>
+      found.map((l) => [
+        l.getAttribute('hreflang'),
+        new URL(l.getAttribute('href') ?? '').pathname,
+      ]),
+    );
     // Every member names every other, itself included, plus x-default —
     // an hreflang set is only honoured when it is reciprocal.
     expect(alternates).toEqual([
