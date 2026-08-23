@@ -9,7 +9,9 @@ SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
 
 The seed is one English page with a published German translation, one
 English-only page, and one news article with a German translation left as a
-draft — enough for each screen to show a mix rather than a uniform list.
+draft — enough for each screen to show a mix rather than a uniform list. A
+site header and footer are configured, so the public shots show the real
+chrome rather than a bare document.
 
 | File | Shows |
 |---|---|
@@ -19,6 +21,7 @@ draft — enough for each screen to show a mix rather than a uniform list.
 | `04-editor-languages.png` | The editor's Languages tab — which languages the page exists in, where each serves, and whether it is live |
 | `05-article-languages.png` | The article editor's Languages panel, with the German translation sitting at `/de/news/…` as a draft |
 | `06-news-list.png` | The article list, locale-prefixed URLs and the language filter |
+| `07-translate-dialog.png` | The page list's **Translate** row action — duplicating a page into a language it does not have yet |
 
 The `hreflang` set the German page emits, read out of the live DOM:
 

@@ -156,7 +156,8 @@ async def admin_pending(
     pages = await PagesService(db).list_pending()
     payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
     return await inertia.render(
-        _PAGE_PENDING, {"pages": payload.model_dump(mode="json")}
+        _PAGE_PENDING,
+        {"pages": payload.model_dump(mode="json"), **_locale_props()},
     )
 
 

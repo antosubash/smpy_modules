@@ -7,12 +7,16 @@ import { localeLabel, publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ScheduledBadge } from './ScheduledBadge';
 import { StatusBadge } from './StatusBadge';
+import { TranslatePageDialog } from './TranslatePageDialog';
 
 interface Props {
   page: PageRead;
-  /** Whether to render the Language cell. Off on a monolingual site, where a
-   *  column reading "English" on every row is one nobody reads twice. */
+  /** Whether to render the Language cell and the Translate action. Off on a
+   *  monolingual site, where a column reading "English" on every row is one
+   *  nobody reads twice and there is nothing to translate into. */
   showLocale: boolean;
+  /** Every language the site publishes in. */
+  locales: string[];
   defaultLocale: string;
   /** Where pages serve publicly, for the View link and the delete warning. */
   publicPrefix: string;
@@ -25,7 +29,14 @@ interface Props {
  * and because the row is the part that knows how a page's public address is
  * built — which is now a function of its language as well as its slug.
  */
-export function PageListRow({ page, showLocale, defaultLocale, publicPrefix, onDelete }: Props) {
+export function PageListRow({
+  page,
+  showLocale,
+  locales,
+  defaultLocale,
+  publicPrefix,
+  onDelete,
+}: Props) {
   const address = publicPath(publicPrefix, page.slug, page.locale, defaultLocale);
   return (
     <TableRow>
@@ -66,6 +77,16 @@ export function PageListRow({ page, showLocale, defaultLocale, publicPrefix, onD
         >
           Edit
         </Button>
+        {/* On the row rather than only inside the editor: "we need this in
+            German" is a thought an author has while looking at the list. */}
+        {showLocale && (
+          <TranslatePageDialog
+            page={page}
+            locales={locales}
+            defaultLocale={defaultLocale}
+            publicPrefix={publicPrefix}
+          />
+        )}
         <ConfirmDialog
           trigger={
             <Button variant="link" size="sm" className="text-destructive">

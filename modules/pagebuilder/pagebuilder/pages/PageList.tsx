@@ -166,6 +166,7 @@ export default function PageList() {
         <PageBoard
           stages={board}
           search={filters.search}
+          defaultLocale={defaultLocale}
           newPageSlot={<NewPageDialog locales={locales} defaultLocale={defaultLocale} />}
           onDelete={handleDelete}
           onPublish={handlePublish}
@@ -209,6 +210,7 @@ export default function PageList() {
                 key={p.id}
                 page={p}
                 showLocale={multilingual}
+                locales={locales}
                 defaultLocale={defaultLocale}
                 publicPrefix={PUBLIC_PREFIX}
                 onDelete={handleDelete}

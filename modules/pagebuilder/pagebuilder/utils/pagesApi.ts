@@ -45,6 +45,10 @@ export const listPages = (signal?: AbortSignal, locale?: string) =>
     },
   );
 
+/** One page with its translation group — what the language controls read. */
+export const getPage = (id: number, signal?: AbortSignal) =>
+  request<PageDetail>(`/pages/${id}`, { signal });
+
 /** Which languages a page may be authored in. */
 export const listLocales = (signal?: AbortSignal) =>
   request<LocalesResponse>('/locales', { signal });

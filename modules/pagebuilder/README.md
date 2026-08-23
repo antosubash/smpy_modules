@@ -188,9 +188,18 @@ counterpart plus `x-default`, and the sitemap lists each language at its own
 address with `xhtml:link` alternates — so a crawler finds a translation nothing
 links to yet.
 
-**Authoring.** The editor's *Languages* tab lists the site's locales, shows
-which ones the page exists in, and starts the ones it does not
-(`POST /api/pagebuilder/pages/{id}/translations`). A new translation inherits
+**Authoring.** Two ways in, because "we need this in German" is a thought an
+author has while scanning the page list as often as while editing the page:
+
+* the page list's **Translate** row action duplicates the page into a language
+  it does not have yet — it asks the server which languages are still free
+  (the list is paged, so a counterpart may be on a page the browser has not
+  loaded), offers a *Copy this page's content* choice, and opens the editor on
+  the result;
+* the editor's **Languages** tab lists the site's locales, shows which ones the
+  page exists in and where each serves, and starts the ones it does not.
+
+Both call `POST /api/pagebuilder/pages/{id}/translations`. A new translation inherits
 the layout, nav membership and the source's title (untranslated, so what still
 needs doing is obvious), starts as a draft, and never inherits `canonical_url`.
 Its breadcrumb parent is the parent's own counterpart, so a trail never crosses

@@ -67,6 +67,12 @@ export default defineConfig({
       SM_VITE_DEV_URL: `http://localhost:${UI_PORT}`,
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
+      // Two content locales, so the multilingual surface is exercised end to
+      // end rather than only in the module test suites. English stays the
+      // default, which is what keeps every other spec's URLs unchanged:
+      // /p/{slug} and /news/{slug} are still where an English page serves.
+      SM_PAGEBUILDER_CONTENT_LOCALES: '["en","de"]',
+      SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE: 'en',
       // Consumed by Makefile dev-api and vite.config.ts respectively.
       API_PORT,
       SM_UI_PORT: UI_PORT,
