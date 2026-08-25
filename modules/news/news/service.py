@@ -1,11 +1,14 @@
-"""Queries joining article metadata to the pages that hold the articles.
+"""Reading articles — the listing, the archive and the single-row read-back.
+
+Every query here used to be a join onto ``pagebuilder_pages``, because that is
+where an article's title, slug and status lived. They are columns on
+``NewsArticle`` now, so the listing is a single-table scan and an article can no
+longer be orphaned by something happening in another module.
 
 Writes ``flush`` rather than ``commit``: in a request the framework's ``get_db``
 owns the transaction and commits on the way out, so committing here would take
 that decision away from the endpoint and leave a row behind when the handler
-goes on to raise. The two callers outside a request — the ``PageDeleted``
-subscription and the startup sweep, both in :mod:`news.module` — open their own
-session and commit it themselves.
+goes on to raise.
 """
 
 from __future__ import annotations
@@ -18,21 +21,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import query_filters, tag_service
-from news.constants import DEFAULT_LIMIT, MAX_LIMIT
+from news.constants import ARTICLE_BODY_URL, DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
-from news.integrations.pagebuilder import (
-    NOT_TRASHED,
-    Page,
-    article_status,
-    card_columns,
-    page_editor_path,
-)
-from news.maintenance import reconcile_orphans as reconcile_orphans
-from news.models import NewsArticle, NewsCategory
+from news.models import NOT_TRASHED, NewsArticle, NewsCategory
 from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
-
 
 
 class _Unset:
@@ -49,53 +43,56 @@ A typed singleton rather than a bare ``object()`` so ``datetime | None | _Unset`
 stays a real union that a type checker can narrow with ``isinstance``.
 """
 
+_CARD_COLUMNS: Final = (
+    NewsArticle.id,
+    NewsArticle.slug,
+    NewsArticle.title,
+    NewsArticle.meta_description,
+    NewsArticle.og_image,
+    NewsArticle.status,
+    NewsArticle.category,
+    NewsArticle.pinned,
+    NewsArticle.show_in_feed,
+    NewsArticle.author,
+    NewsArticle.published_at,
+)
+"""The only columns a card reads.
+
+Named explicitly rather than selecting the entity: a whole ``NewsArticle``
+drags both block-JSON columns through the ORM for every row, so list cost would
+scale with article *content* size instead of card count — the regression that
+made this a rule for the sidecar's join (issue #12) and is now this module's own
+to keep.
+"""
+
 
 def _base(include_drafts: bool, category: str | None):
-    # INNER join, not outer: an article whose page was deleted has no row to
-    # show, and this is what keeps such an orphan invisible rather than
-    # rendering a card that links nowhere. There is no database foreign key —
-    # see NewsArticle.page_id.
-    #
-    # The column set is the seam's — see ``card_columns`` for why the listing
-    # must not load a Page whole.
-    stmt = (
-        select(NewsArticle, Page)
-        # An article whose page is in the trash disappears with it, and comes
-        # back if the page is restored. The article row is deliberately left
-        # alone: pagebuilder only announces PageDeleted on a *purge*, so
-        # nothing here has to guess whether a deletion is reversible.
-        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
-        .options(card_columns())
-    )
+    stmt = select(*_CARD_COLUMNS).where(NOT_TRASHED)
     stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     if category:
         stmt = stmt.where(NewsArticle.category == category)
     return stmt
 
 
-def _to_read(
-    article: NewsArticle, page: Page, tags: list[str] | None = None
-) -> ArticleRead:
+def _to_read(row) -> ArticleRead:
+    """One card row — the ``_CARD_COLUMNS`` tuple — as the published DTO."""
     return ArticleRead(
-        id=article.id or 0,
-        page_id=article.page_id,
-        slug=page.slug,
-        title=page.title,
-        excerpt=page.meta_description or "",
-        cover_image_url=page.og_image or "",
-        category=article.category,
-        tags=tags or [],
-        pinned=article.pinned,
-        show_in_feed=article.show_in_feed,
-        author=article.author,
-        published_at=article.published_at,
-        page_status=article_status(page.status),
-        # News' own prefix, not pagebuilder's generic one: an article no
-        # longer answers at /p/{slug} at all.
-        url=public_article_path(page.slug),
-        # Served rather than assembled in the browser: the admin list then
-        # holds no opinion about how pagebuilder routes its editor.
-        edit_url=page_editor_path(article.page_id),
+        id=row.id or 0,
+        slug=row.slug,
+        title=row.title,
+        excerpt=row.meta_description or "",
+        cover_image_url=row.og_image or "",
+        category=row.category,
+        tags=[],
+        pinned=row.pinned,
+        show_in_feed=row.show_in_feed,
+        author=row.author,
+        published_at=row.published_at,
+        status=row.status,
+        url=public_article_path(row.slug),
+        # Served rather than assembled in the browser, so the admin list holds
+        # no opinion about how this module routes its own body canvas.
+        edit_url=ARTICLE_BODY_URL.format(article_id=row.id or 0),
     )
 
 
@@ -136,9 +133,7 @@ async def list_articles(
     # narrows, so the two compose safely in either order.
     stmt = query_filters.status(stmt, status)
 
-    total = await db.scalar(
-        select(func.count()).select_from(stmt.subquery())
-    )
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
 
     # NULLS placement is explicit either way: SQLite and Postgres disagree
     # about where NULL lands on a DESC sort, so without this the two databases
@@ -154,12 +149,14 @@ async def list_articles(
         clauses = (dated.nullsfirst(), NewsArticle.pinned.desc())
     else:
         clauses = (NewsArticle.pinned.desc(), dated.nullslast())
-    stmt = stmt.order_by(*clauses, NewsArticle.id.desc()).limit(
-        min(limit, MAX_LIMIT)
-    ).offset(offset)
+    stmt = (
+        stmt.order_by(*clauses, NewsArticle.id.desc())
+        .limit(min(limit, MAX_LIMIT))
+        .offset(offset)
+    )
 
     rows = (await db.execute(stmt)).all()
-    return [_to_read(article, page) for article, page in rows], int(total or 0)
+    return [_to_read(row) for row in rows], int(total or 0)
 
 
 async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
@@ -186,9 +183,9 @@ async def list_categories(
     """
     stmt = (
         select(NewsArticle.category, func.count(), NewsCategory.position)
-        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
+        .select_from(NewsArticle)
         .outerjoin(NewsCategory, NewsCategory.name == NewsArticle.category)
-        .where(NewsArticle.category != "")
+        .where(NOT_TRASHED, NewsArticle.category != "")
         .group_by(NewsArticle.category, NewsCategory.position)
         .order_by(NewsCategory.position.nullslast(), NewsArticle.category)
     )
@@ -197,61 +194,38 @@ async def list_categories(
     return [CategoryCount(category=name, count=int(count)) for name, count, _ in rows]
 
 
-async def get_read_by_page(
-    db: AsyncSession, page_id: int, *, include_drafts: bool = True
+async def get_read(
+    db: AsyncSession, article_id: int, *, include_drafts: bool = True
 ) -> ArticleRead | None:
-    """One article in listing shape, found by page rather than by scanning.
+    """One article in listing shape.
 
-    Shares ``_base`` with the listing, so the response shape and the join
-    semantics stay identical by construction rather than by convention. This
-    exists because reading a just-written article back out of the first page of
+    Shares ``_base`` with the listing, so the response shape and the visibility
+    rule stay identical by construction rather than by convention. This exists
+    because reading a just-written article back out of the first page of
     ``list_articles`` cannot work: a new article is undated and undated sorts
     last, so past a hundred dated articles it is simply not in that page.
     """
-    stmt = _base(include_drafts, None).where(NewsArticle.page_id == page_id)
+    stmt = _base(include_drafts, None).where(NewsArticle.id == article_id)
     row = (await db.execute(stmt)).first()
-    return _to_read(row[0], row[1]) if row is not None else None
-
-
-async def page_exists(db: AsyncSession, page_id: int) -> bool:
-    """Whether the page an article would attach to is actually there.
-
-    Checked explicitly because there is no foreign key to do it — and an
-    article pointing at a missing page is not inert: SQLite reuses the id, so
-    the row re-attaches to whatever page is created next.
-
-    A *trashed* page counts as missing. It is invisible everywhere else, so
-    letting one be attached would create an article that cannot be seen, cannot
-    be found, and springs into the feed if the page is ever restored.
-    """
-    return (
-        await db.scalar(select(Page.id).where(NOT_TRASHED, Page.id == page_id))
-    ) is not None
-
-
-async def get_by_page(db: AsyncSession, page_id: int) -> NewsArticle | None:
-    return await db.scalar(select(NewsArticle).where(NewsArticle.page_id == page_id))
+    return _to_read(row) if row is not None else None
 
 
 async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:
-    return await db.scalar(select(NewsArticle).where(NewsArticle.id == article_id))
+    """The row itself, trashed ones excluded.
 
-
-async def create(
-    db: AsyncSession,
-    *,
-    page_id: int,
-    category: str,
-    published_at: datetime | None,
-    author: str = "",
-) -> NewsArticle:
-    article = NewsArticle(
-        page_id=page_id, category=category, published_at=published_at, author=author
+    ``ArticlesService.get_article`` is the write path's equivalent and raises;
+    this returns ``None`` because its callers turn the miss into their own 404
+    with their own wording.
+    """
+    return await db.scalar(
+        select(NewsArticle).where(NOT_TRASHED, NewsArticle.id == article_id)
     )
-    db.add(article)
-    await db.flush()
-    await db.refresh(article)
-    return article
+
+
+async def get_by_slug(db: AsyncSession, slug: str) -> NewsArticle | None:
+    return await db.scalar(
+        select(NewsArticle).where(NOT_TRASHED, NewsArticle.slug == slug)
+    )
 
 
 async def update(
@@ -264,6 +238,12 @@ async def update(
     show_in_feed: bool | None = None,
     author: str | None = None,
 ) -> NewsArticle:
+    """The listing metadata only — never the body, the slug or the status.
+
+    Those go through :class:`news.content.ArticlesService`, which records a
+    revision and a redirect where one is owed. Keeping them apart is what stops
+    an inline edit in the admin list from quietly renaming a published URL.
+    """
     if category is not None:
         article.category = category
     if pinned is not None:
@@ -284,7 +264,7 @@ async def update(
 
 
 async def delete(db: AsyncSession, article: NewsArticle) -> None:
-    """Detach the article. The page itself is untouched.
+    """Remove the article outright, tags and all.
 
     Tag links go explicitly, not by ``ondelete="CASCADE"`` — see
     :func:`news.tag_service.delete` for why that never fires here.

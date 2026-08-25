@@ -14,7 +14,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
-import { createArticleWithPage } from '../utils/api';
+import { createArticle } from '../utils/api';
 import { slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
 
@@ -85,7 +85,7 @@ export function NewArticleDialog() {
       // failed attempt had already committed, so a retry could adopt it instead
       // of stranding another empty one. Neither is reachable any more: a
       // failure now leaves nothing behind to adopt.
-      const article = await createArticleWithPage({
+      const article = await createArticle({
         title: headline.trim(),
         // Only when the author actually typed one. While `slugOverride` is
         // null the field is a *preview* of what the headline derives, and
@@ -96,6 +96,14 @@ export function NewArticleDialog() {
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });
+      // `write` types its result as `T | null` because a 204 carries no body.
+      // This route answers 201 with the article, so the null branch is
+      // unreachable — but saying so here is cheaper than widening the helper,
+      // and it fails loudly rather than navigating to `undefined`.
+      if (!article) throw new Error('The server created the article but returned nothing.');
+      // `edit_url` is the body canvas: creating an article and writing it are
+      // one motion. It used to be a pagebuilder editor URL, which is why this
+      // is served by the API rather than assembled here.
       router.visit(article.edit_url, {
         // A visit that lands unmounts this component, so this only fires when
         // one does not. Without it a failed navigation leaves the dialog on

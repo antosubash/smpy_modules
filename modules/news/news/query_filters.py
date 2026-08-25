@@ -10,9 +10,8 @@ from __future__ import annotations
 
 from typing import Final
 
-from news.integrations.pagebuilder import Page, PageStatus
 from news.like import like_pattern
-from news.models import NewsArticle
+from news.models import ArticleStatus, NewsArticle
 
 STATUS_DRAFT: Final = "draft"
 STATUS_PUBLISHED: Final = "published"
@@ -20,20 +19,19 @@ STATUS_UNDATED: Final = "undated"
 
 
 def visible(stmt, *, include_drafts: bool):
-    """Restrict to published pages unless the caller may see drafts."""
+    """Restrict to published articles unless the caller may see drafts."""
     if include_drafts:
         return stmt
-    return stmt.where(Page.status == PageStatus.PUBLISHED)
+    return stmt.where(NewsArticle.status == ArticleStatus.PUBLISHED)
 
 
 def search(stmt, q: str | None):
     """Filter on headline or slug.
 
-    Both columns live on the joined page, which is why this cannot be pushed
-    into the sidecar table's own query. ``ilike`` rather than ``like`` so the
-    match is case-insensitive on Postgres as well as SQLite — SQLite's ``LIKE``
-    already ignores case for ASCII, so without this the two databases would
-    disagree about what the same search finds.
+    ``ilike`` rather than ``like`` so the match is case-insensitive on Postgres
+    as well as SQLite — SQLite's ``LIKE`` already ignores case for ASCII, so
+    without this the two databases would disagree about what the same search
+    finds.
     """
     if not q or not q.strip():
         return stmt
@@ -41,23 +39,24 @@ def search(stmt, q: str | None):
     # wildcard, so an unescaped search for `hero_1` also returned `heroX1`.
     pattern = like_pattern(q)
     return stmt.where(
-        Page.title.ilike(pattern, escape="\\") | Page.slug.ilike(pattern, escape="\\")
+        NewsArticle.title.ilike(pattern, escape="\\")
+        | NewsArticle.slug.ilike(pattern, escape="\\")
     )
 
 
 def status(stmt, value: str | None):
     """Narrow to one pipeline state.
 
-    ``undated`` is not a page status — it is an article with no display date,
-    which the list treats as its own bucket because that is the work-in-progress
-    pile. An unrecognised value is ignored rather than rejected: the filter
-    arrives from a query string, and a stale link should show the list, not a
-    validation error.
+    ``undated`` is not a status — it is an article with no display date, which
+    the list treats as its own bucket because that is the work-in-progress pile.
+    An unrecognised value is ignored rather than rejected: the filter arrives
+    from a query string, and a stale link should show the list, not a validation
+    error.
     """
     if value == STATUS_DRAFT:
-        return stmt.where(Page.status == PageStatus.DRAFT)
+        return stmt.where(NewsArticle.status == ArticleStatus.DRAFT)
     if value == STATUS_PUBLISHED:
-        return stmt.where(Page.status == PageStatus.PUBLISHED)
+        return stmt.where(NewsArticle.status == ArticleStatus.PUBLISHED)
     if value == STATUS_UNDATED:
         return stmt.where(NewsArticle.published_at.is_(None))
     return stmt

@@ -1,64 +1,89 @@
 """Shared fixtures for the news integration tests.
 
-News is a sidecar over pagebuilder, so every meaningful query is a join and the
-harness has to create *both* modules' tables against one in-memory database.
-That is the only real difference from pagebuilder's own conftest; the rest
-mirrors it — ``StaticPool`` so every session sees the same ``:memory:``
-instance, ``register_listeners`` so ``get_db`` actually commits, and a stub auth
-middleware standing in for ``simple_module_auth``.
+News owns its content, so the harness creates exactly one module's tables. That
+is the headline change from the sidecar era, when every meaningful query was a
+join and the fixtures had to stand up pagebuilder's schema alongside news' own
+for any test to run at all.
 
-Pages are created directly through the ``Page`` model rather than through
-pagebuilder's API. These are news tests: what matters is the row the join finds,
-not the workflow that produced it.
+The rest mirrors the framework's house style — ``StaticPool`` so every session
+sees the same ``:memory:`` instance, ``register_listeners`` so ``get_db``
+actually commits, and a stub auth middleware standing in for
+``simple_module_auth``.
+
+Articles are created directly through the model rather than through the API.
+These are unit-ish integration tests: what matters is the row a query finds, not
+the workflow that produced it — ``test_workflow`` covers that separately.
+
+Pagebuilder's tables are created too, but only when it happens to be importable
+— which it is in this workspace, and is not on a host that installed news alone.
+That models the real dual-module deployment, where the optional extra is
+installed *and* migrated, so the admin search screen's Pages and Media sections
+have something to read. ``test_search`` covers the other shape by making
+``available()`` answer False.
 """
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import AsyncIterator
+from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import pytest_asyncio
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from news.constants import PERM_EDIT, PERM_VIEW
+from inertia import InertiaConfig, inertia_dependency_factory
+from news.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
+from news.models import ArticleStatus, NewsArticle
 from news.models import Base as NewsBase
 from news.module import NewsModule
-from pagebuilder.models import Base as PagebuilderBase
-from pagebuilder.models import Page, PageStatus
-from pagebuilder.permissions import PERM_EDIT as PAGE_EDIT
-from pagebuilder.permissions import PERM_PUBLISH as PAGE_PUBLISH
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+
+
+async def _create_tables(conn) -> None:
+    """News' own tables, plus the optional neighbour's where it is installed.
+
+    Only one ``create_all`` is required. The sidecar needed both or no test
+    could run at all, because every meaningful query was a join.
+    """
+    await conn.run_sync(NewsBase.metadata.create_all)
+    try:
+        from pagebuilder.models import Base as PagebuilderBase
+    except ImportError:  # pragma: no cover - the news-alone host
+        return
+    await conn.run_sync(PagebuilderBase.metadata.create_all)
 
 
 @pytest.fixture(autouse=True)
 def _no_leaked_module_state():
-    """Both registries the module writes to at startup are process-global.
+    """The settings the module publishes at startup are process-global.
 
-    ``on_startup`` registers news' slug claim with pagebuilder and publishes the
-    resolved settings; without this a test that boots the module changes the
-    answers of every later test in the same process.
+    Without this a test that boots the module changes the public URL every later
+    test in the same process reads back.
     """
     from news import settings as news_settings
-    from pagebuilder import public_claims
 
-    public_claims.reset()
     news_settings.reset()
     yield
-    public_claims.reset()
     news_settings.reset()
 
 
 ROLE_EDITOR = "news-editor"
-#: ``news.edit`` and nothing of pagebuilder's — the case the page-writing
-#: routes must refuse.
-ROLE_NEWS_ONLY = "news-only"
+#: ``news.edit`` without ``news.publish`` — the case every workflow route that
+#: puts something in front of readers has to refuse. This separation used to be
+#: pagebuilder's, enforced by requiring its permissions on the routes that wrote
+#: a page; owning the content means owning the separation.
+ROLE_AUTHOR = "news-author"
 ROLE_VIEWER = "news-viewer"
 
 
@@ -67,7 +92,7 @@ def _stub_user(roles: tuple[str, ...]) -> SimpleNamespace:
 
     Deliberately carries no ``permissions`` attribute — the real UserContext has
     none either, and a fixture that invented one would hide exactly the bug
-    ``_may_see_drafts`` used to have.
+    ``may_see_drafts`` used to have.
     """
     return SimpleNamespace(
         id="test-user",
@@ -107,32 +132,56 @@ async def _build_app(user: Any) -> tuple[FastAPI, Any]:
     db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
     register_listeners(db_state)
     async with db_state.engine.begin() as conn:
-        # Both metadatas: an article is only ever read through a join to a page.
-        await conn.run_sync(PagebuilderBase.metadata.create_all)
-        await conn.run_sync(NewsBase.metadata.create_all)
+        await _create_tables(conn)
 
     registry = PermissionRegistry()
-    registry.add_group("News", [PERM_VIEW, PERM_EDIT])
-    # An article author needs pagebuilder's permissions too: creating and
-    # publishing an article writes a *page*, and news does not get to route
-    # around the editor → publisher separation that module maintains.
-    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT, PAGE_EDIT, PAGE_PUBLISH])
-    registry.map_role(ROLE_NEWS_ONLY, [PERM_VIEW, PERM_EDIT])
+    registry.add_group("News", [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
+    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
+    registry.map_role(ROLE_AUTHOR, [PERM_VIEW, PERM_EDIT])
     registry.map_role(ROLE_VIEWER, [PERM_VIEW])
     app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
+    module.register_settings(app)
+
+    # Minimal Inertia config — enough to render without the real host
+    # templates. News needs this now: it serves its own public article viewer
+    # rather than handing the slug to pagebuilder's, so an Inertia render
+    # happens inside this app rather than inside the neighbour's.
+    templates_dir = Path(tempfile.mkdtemp()) / "templates"
+    templates_dir.mkdir(parents=True)
+    (templates_dir / "index.html").write_text("<html></html>")
+    app.state.inertia_dependency = inertia_dependency_factory(
+        InertiaConfig(
+            environment="development",
+            version="1.0",
+            dev_url="http://localhost:5050",
+            templates=Jinja2Templates(directory=str(templates_dir)),
+            root_template_filename="index.html",
+            entrypoint_filename="main.tsx",
+            root_directory=".",
+            use_flash_errors=True,
+        )
+    )
 
     app.add_middleware(_StubAuthMiddleware, user=user)
+    # Inertia reads flashed errors off the session on every render, so the
+    # public viewer cannot answer at all without this. Added last so it ends up
+    # outermost at runtime — Starlette runs the last-added middleware first on
+    # the way in — which matches the host's own order.
+    app.add_middleware(SessionMiddleware, secret_key="news-tests")
+
+    # Mounts the public viewer and the admin search screen — production calls
+    # this from the lifespan startup hook.
+    await module.on_startup(app)
     return app, db_state
 
 
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
-    """A bare database with both modules' tables, for direct service tests."""
+    """A bare database with the module's tables, for direct service tests."""
     state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
     register_listeners(state)
     async with state.engine.begin() as conn:
-        await conn.run_sync(PagebuilderBase.metadata.create_all)
-        await conn.run_sync(NewsBase.metadata.create_all)
+        await _create_tables(conn)
     yield state
     await state.engine.dispose()
 
@@ -155,7 +204,7 @@ async def _client(user: Any) -> AsyncIterator[AsyncClient]:
 
 @pytest_asyncio.fixture
 async def editor_client() -> AsyncIterator[AsyncClient]:
-    """Authenticated as a role that maps to `news.edit` — not to WILDCARD."""
+    """`news.edit` *and* `news.publish` — not WILDCARD."""
     async for client in _client(_stub_user((ROLE_EDITOR,))):
         yield client
 
@@ -169,14 +218,13 @@ async def admin_client() -> AsyncIterator[AsyncClient]:
 
 
 @pytest_asyncio.fixture
-async def news_only_client() -> AsyncIterator[AsyncClient]:
-    """`news.edit`, but none of pagebuilder's permissions.
+async def author_client() -> AsyncIterator[AsyncClient]:
+    """`news.edit`, but not `news.publish`.
 
-    Everything that writes a page on the author's behalf has to refuse this
-    caller, or moving those writes server-side quietly widened what `news.edit`
-    grants.
+    Everything that puts an article in front of readers has to refuse this
+    caller, or owning the workflow quietly widened what `news.edit` grants.
     """
-    async for client in _client(_stub_user((ROLE_NEWS_ONLY,))):
+    async for client in _client(_stub_user((ROLE_AUTHOR,))):
         yield client
 
 
@@ -194,31 +242,55 @@ async def anon_client() -> AsyncIterator[AsyncClient]:
         yield client
 
 
-async def make_page(
+async def make_article(
     db: AsyncSession,
     *,
     slug: str,
-    title: str = "A page",
-    status: PageStatus = PageStatus.PUBLISHED,
+    title: str = "An article",
+    status: ArticleStatus = ArticleStatus.PUBLISHED,
     meta_description: str | None = None,
     og_image: str | None = None,
-) -> Page:
-    """Insert a page for an article to hang off. Committed, so an API request
-    on another session sees it."""
-    page = Page(
+    category: str = "",
+    author: str = "",
+    published_at: datetime | None = None,
+    pinned: bool = False,
+    show_in_feed: bool = True,
+    draft_data: dict | None = None,
+    publish_body: bool = True,
+) -> NewsArticle:
+    """Insert an article. Committed, so an API request on another session sees it.
+
+    ``publish_body`` mirrors what publishing actually does — it snapshots the
+    draft — because the public viewer serves ``published_data`` and a fixture
+    that left it null would 404 on rows the test believes are live.
+    """
+    body = (
+        draft_data
+        if draft_data is not None
+        else {"root": {"props": {"title": title}}, "content": []}
+    )
+    article = NewsArticle(
         slug=slug,
         title=title,
         status=status,
-        draft_data={},
+        draft_data=body,
+        published_data=(
+            body if publish_body and status is ArticleStatus.PUBLISHED else None
+        ),
         meta_description=meta_description,
         og_image=og_image,
+        category=category,
+        author=author,
+        published_at=published_at,
+        pinned=pinned,
+        show_in_feed=show_in_feed,
     )
-    db.add(page)
+    db.add(article)
     await db.commit()
-    await db.refresh(page)
-    return page
+    await db.refresh(article)
+    return article
 
 
 @pytest.fixture
-def make_page_factory():
-    return make_page
+def make_article_factory():
+    return make_article

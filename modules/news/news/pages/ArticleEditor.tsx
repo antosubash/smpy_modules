@@ -1,10 +1,10 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { ConfirmDialog } from '@simple-module-py/pagebuilder/pagebuilder/components/ConfirmDialog';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useEffect } from 'react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
 import { useArticleEditor } from '../hooks/useArticleEditor';
@@ -12,12 +12,11 @@ import { formatArticleDate } from '../utils/api';
 
 /** The article editor — everything about an article except its body.
  *
- * The body is a page-builder document, so it is edited in the page editor and
- * linked to from here rather than re-hosted: an article *is* a page in this
- * codebase, and duplicating that canvas would mean duplicating the block
- * library, the autosave and the revision handling with it. What this screen
- * owns is what a page has no concept of — category, tags, display date, byline,
- * and how the article behaves in feeds.
+ * The body used to be a page-builder document, so this screen linked out to
+ * that module's canvas. News owns the document now and has a canvas of its own
+ * next door; the two stay separate because they are edited in genuinely
+ * different postures — a form full of short fields that each save
+ * independently, and a full-bleed editor.
  */
 export default function ArticleEditor() {
   const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
@@ -37,7 +36,7 @@ export default function ArticleEditor() {
     patch,
     save,
     publish,
-    detach,
+    remove,
   } = useArticleEditor(article_id);
 
   useEffect(() => {
@@ -62,7 +61,7 @@ export default function ArticleEditor() {
     );
   }
 
-  const isDraft = article.page_status === 'draft';
+  const isDraft = article.status === 'draft';
   const dated = formatArticleDate(article.published_at);
   const status = isDraft
     ? `Draft${dated ? ` · dated ${dated}` : ' · undated'}`
@@ -98,10 +97,10 @@ export default function ArticleEditor() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="space-y-3">
           <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="font-medium">The body lives in the page editor</p>
+            <p className="font-medium">The body has its own canvas</p>
             <p className="mx-auto mt-1 max-w-prose text-sm text-muted-foreground">
-              An article is a page here, so its blocks, revisions and autosave are the page editor's
-              — the same block library that every other page uses.
+              Blocks, autosave and revision history live there. This screen owns everything else —
+              category, tags, display date, byline and how the article behaves in feeds.
             </p>
             <Button className="mt-3" onClick={() => router.visit(article.edit_url)}>
               Edit the body
@@ -109,18 +108,19 @@ export default function ArticleEditor() {
           </div>
 
           <ConfirmDialog
-            // Low: the page and its body survive; only the news metadata goes.
-            level="low"
-            title={`Detach “${article.title}”?`}
-            description="The page and its body stay. Only the category, tags and date attached to it are removed, and it stops appearing in news feeds."
-            confirmLabel="Detach"
+            // Medium, where this used to be low — see ArticleRow for why the
+            // same button changed cost when the sidecar went away.
+            level="medium"
+            title={`Delete “${article.title}”?`}
+            description="The article, its body and its tags are removed, and its public URL stops working. This cannot be undone from here."
+            confirmLabel="Delete"
             onConfirm={async () => {
-              await detach();
+              await remove();
               router.visit('/admin/news/');
             }}
             trigger={
               <Button variant="ghost" size="sm" className="text-destructive" disabled={busy}>
-                Detach article
+                Delete article
               </Button>
             }
           />

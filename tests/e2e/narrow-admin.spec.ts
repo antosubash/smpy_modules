@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { seedArticle } from './article-helpers';
 import { csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
 
 /**
@@ -202,14 +203,10 @@ test.describe('The article list below 900px', () => {
 
   test('keeps every row action reachable without a gesture', async ({ page }) => {
     await login(page);
-    const slug = uniqueSlug('narrow-article');
-    const pageId = await makePage(page, slug);
-    const headers = await csrfHeader(page);
-    const attached = await page.request.post('/api/news/articles', {
-      headers,
-      data: { page_id: pageId, category: 'Research', published_at: null },
+    const { slug } = await seedArticle(page, {
+      prefix: 'narrow-article',
+      category: 'Research',
     });
-    expect(attached.ok(), await attached.text()).toBeTruthy();
 
     // Searched rather than trusting page 1 to still hold the newest row.
     await page.goto(`/admin/news/?q=${slug}`);
@@ -220,7 +217,7 @@ test.describe('The article list below 900px', () => {
     // line here instead: a gesture has no keyboard or screen-reader equivalent,
     // and nothing on screen would say it exists.
     await expect(row.getByRole('link', { name: /^edit$/i })).toBeVisible();
-    await expect(row.getByRole('button', { name: /^detach$/i })).toBeVisible();
+    await expect(row.getByRole('button', { name: /^delete$/i })).toBeVisible();
     await expect(row.getByRole('button', { name: /more actions/i })).toBeVisible();
   });
 

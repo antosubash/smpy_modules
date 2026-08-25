@@ -11,9 +11,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from conftest import make_page
+from conftest import make_article
 from news import service, tag_service
-from pagebuilder.models import PageStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -22,14 +21,7 @@ NEW = datetime(2026, 6, 1, tzinfo=UTC)
 
 
 async def _article(db, slug: str, **kwargs):
-    page = await make_page(db, slug=slug, title=slug, status=PageStatus.PUBLISHED)
-    return await service.create(
-        db,
-        page_id=page.id,
-        category=kwargs.pop("category", ""),
-        published_at=kwargs.pop("published_at", None),
-        author=kwargs.pop("author", ""),
-    )
+    return await make_article(db, slug=slug, title=slug, **kwargs)
 
 
 class TestPinning:

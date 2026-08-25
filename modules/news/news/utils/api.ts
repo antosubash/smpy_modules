@@ -1,20 +1,17 @@
 /** Client for the news read API. */
 
-import { BASE, write } from './http';
+import { BASE, read, write } from './http';
 
-/** Workflow state of the page behind an article.
+/** Workflow state of an article.
  *
- * News' own union, deliberately, even though the values are pagebuilder's
- * `PageStatus` verbatim: this is what the news API sends, and typing it against
- * a neighbour's module made every consumer of this client depend on that
- * module's file layout to name a value news is perfectly able to name itself.
- * `test_integrations` fails if the two vocabularies ever drift.
+ * News' own, on news' own column. The values are unchanged from when they were
+ * a pagebuilder page's status mapped across a module boundary, so a client
+ * written against the old wire format still reads them.
  */
 export type ArticleStatus = 'draft' | 'submitted_for_review' | 'published';
 
 export interface ArticleRead {
   id: number;
-  page_id: number;
   slug: string;
   title: string;
   excerpt: string;
@@ -27,13 +24,44 @@ export interface ArticleRead {
   show_in_feed: boolean;
   author: string;
   published_at: string | null;
-  /** Workflow state of the page behind the article. Always `published` for
-   *  anyone without `news.edit` — drafts are filtered out server-side. */
-  page_status: ArticleStatus;
+  /** Workflow state. Always `published` for anyone without `news.edit` —
+   *  drafts are filtered out server-side. */
+  status: ArticleStatus;
   url: string;
-  /** Where the body is edited. Sent by the server rather than assembled here,
-   *  so this list holds no opinion about how pagebuilder routes its editor. */
+  /** Where the body is composed. Sent by the server rather than assembled
+   *  here, so this list holds no opinion about how the module routes its own
+   *  screens. */
   edit_url: string;
+}
+
+/** One article, with the fields only its editor screens need.
+ *
+ * Extends the listing shape rather than replacing it, so a component holding
+ * an `ArticleRead` can be handed one of these without branching.
+ */
+export interface ArticleDetail extends ArticleRead {
+  /** The block document the canvas edits. Never what readers are served —
+   *  that is the snapshot taken at publish. */
+  draft_data: Record<string, unknown>;
+  /** Whether a published snapshot exists. Distinct from `status`: an
+   *  unpublished article can still have one, from before it was taken down. */
+  has_published: boolean;
+  meta_description: string;
+  og_image: string;
+  canonical_url: string;
+  index_in_search: boolean;
+  json_ld: Record<string, unknown> | null;
+  rejection_note: string | null;
+}
+
+export interface RevisionRead {
+  id: number;
+  article_id: number;
+  title: string;
+  event: 'publish' | 'unpublish' | 'submit' | 'approve' | 'reject';
+  note: string | null;
+  created_at: string | null;
+  created_by: string | null;
 }
 
 export interface ArticleCounts {
@@ -124,54 +152,87 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
   });
 }
 
-export const attachArticle = (data: {
-  page_id: number;
-  category?: string;
-  published_at?: string | null;
-}) => write<ArticleRead>('/articles', 'POST', data);
-
 export const updateArticle = (
   id: number,
   data: {
+    title?: string;
+    slug?: string;
     category?: string;
     published_at?: string | null;
     pinned?: boolean;
     show_in_feed?: boolean;
     author?: string;
+    meta_description?: string;
+    og_image?: string;
+    canonical_url?: string;
+    index_in_search?: boolean;
   },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
-export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
-
-/** Create the page *and* attach the article, in one request.
+/** Delete the article outright — body, tags and all.
  *
- * One call, under news' own CSRF token. This used to be two from here — a POST
- * to pagebuilder's page API, then one back to news — which meant knowing
- * another module's cookie name and priming it with a throwaway GET, and which
- * stranded an empty articleless page whenever the second call failed. The
- * server does both writes in one transaction now, so a failure leaves nothing
- * behind.
+ * This was `detachArticle`, which removed news' metadata and left the document
+ * standing in pagebuilder. There is no second document now, so the word had
+ * nothing left to mean.
+ */
+export const deleteArticle = (id: number) => write<null>(`/articles/${id}`, 'DELETE');
+
+/** Create an article, in one request.
+ *
+ * This used to be `createArticleWithPage`, and before that two calls from the
+ * browser — a POST to pagebuilder's page API, then one back to news — which
+ * meant knowing another module's cookie name and priming it with a throwaway
+ * GET, and which stranded an empty articleless page whenever the second call
+ * failed. One table means one insert.
  *
  * An omitted `slug` is derived from the title, server-side, and given the first
  * free variant. One the author typed is used verbatim, and a collision is a 409
  * rather than a silent rename.
  */
-export const createArticleWithPage = (data: {
+export const createArticle = (data: {
   title: string;
   slug?: string;
   category?: string;
   published_at?: string | null;
   author?: string;
-}) => write<ArticleRead>('/articles/with-page', 'POST', data);
+}) => write<ArticleRead>('/articles', 'POST', data);
 
-/** Publish the page behind an article, from the list's row menu.
+/** Everything the editor screens need, in one request. */
+export const getArticleDetail = (id: number, signal?: AbortSignal) =>
+  read<ArticleDetail>(`/articles/${id}/detail`, signal);
+
+/** Autosave the block document into the draft.
  *
- * Also news' own route: the body belongs to the page, but routing this through
- * pagebuilder's API from the browser was the last thing that made that
- * module's CSRF cookie news' business.
+ * Its own route, deliberately: it fires on a timer rather than on a person
+ * pressing something, so it must not be able to reach the slug or the status.
  */
+export const saveArticleBody = (id: number, draft_data: Record<string, unknown>) =>
+  write<ArticleDetail>(`/articles/${id}/body`, 'PUT', { draft_data });
+
+export const listArticleRevisions = (id: number, signal?: AbortSignal) =>
+  read<RevisionRead[]>(`/articles/${id}/revisions`, signal);
+
+export const restoreArticleRevision = (id: number, revisionId: number) =>
+  write<ArticleDetail>(`/articles/${id}/revisions/${revisionId}/restore`, 'POST', {});
+
+/** Snapshot the draft and serve it. Requires `news.publish`. */
 export const publishArticle = (id: number) =>
   write<ArticleRead>(`/articles/${id}/publish`, 'POST', {});
+
+/** Take it off the public site, keeping the draft. Requires `news.publish`. */
+export const unpublishArticle = (id: number) =>
+  write<ArticleRead>(`/articles/${id}/unpublish`, 'POST', {});
+
+/** Hand a draft to a reviewer. `news.edit` alone — it is what an author does
+ *  when they cannot publish. */
+export const submitArticle = (id: number) =>
+  write<ArticleRead>(`/articles/${id}/submit`, 'POST', {});
+
+/** Move to the trash. Answers 204: there is no visible article to return. */
+export const trashArticle = (id: number) => write<null>(`/articles/${id}/trash`, 'POST', {});
+
+export const restoreArticle = (id: number) =>
+  write<ArticleRead>(`/articles/${id}/restore`, 'POST', {});
 
 /** "2d ago", "in 15d", "today" — the list's relative time.
  *

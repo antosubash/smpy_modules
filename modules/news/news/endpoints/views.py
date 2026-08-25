@@ -77,11 +77,10 @@ async def category_list(inertia: InertiaDep) -> InertiaResponse:
 async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaResponse:
     """Everything about an article except its body.
 
-    The body is a page-builder document and is edited in the page editor — an
-    article *is* a page here, so duplicating that canvas would mean duplicating
-    the block library, the autosave and the revision handling with it. This
-    screen owns what the page has no concept of: category, tags, display date,
-    byline and how the article behaves in feeds.
+    The body has a canvas of its own next door, because the two are edited in
+    genuinely different postures: this screen is a form full of short fields
+    that each save independently, and that one is a full-bleed editor. Splitting
+    them is what keeps either from being cramped by the other.
 
     Only the id is rendered; the article itself is fetched client-side, because
     every field on this screen saves independently and a full Inertia round trip
@@ -89,4 +88,25 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
     """
     return await inertia.render(
         constants._PAGE_ARTICLE_EDITOR, {"article_id": article_id}
+    )
+
+
+@router.get(
+    "/articles/{article_id}/body",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
+)
+async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+    """The block canvas an article's body is composed in.
+
+    This route is the visible half of the split: it used to be a pagebuilder
+    URL, because the body lived on one of its pages, and news linked out to it.
+    News owns the document now, so it owns the canvas.
+
+    The id alone again — the body is fetched client-side and autosaved, so
+    rendering it through Inertia would only mean shipping the whole block
+    document twice on every load.
+    """
+    return await inertia.render(
+        constants._PAGE_ARTICLE_BODY, {"article_id": article_id}
     )

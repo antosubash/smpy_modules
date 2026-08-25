@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
-  detachArticle,
+  deleteArticle,
   listArticles,
   publishArticle,
   updateArticle,
@@ -140,7 +140,7 @@ export function useArticleEditor(articleId: number) {
     }
   }, [article, load]);
 
-  const detach = useCallback(() => detachArticle(articleId), [articleId]);
+  const remove = useCallback(() => deleteArticle(articleId), [articleId]);
 
   return {
     article,
@@ -155,6 +155,6 @@ export function useArticleEditor(articleId: number) {
     patch,
     save,
     publish,
-    detach,
+    remove,
   };
 }

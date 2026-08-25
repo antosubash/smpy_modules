@@ -1,26 +1,22 @@
 # simple_module_news
 
-News articles for SimpleModule hosts, backed by page-builder pages.
+A self-contained news archive for SimpleModule hosts.
 
-An article **is** a page. Its title, slug, body, approval workflow and
-revisions all belong to `simple_module_pagebuilder`; this module adds only the
-things a page has no concept of — the category it belongs to, the date it
-should be listed under — plus the listing API and a feed block.
+An article is a document this module owns outright: its title, slug, body,
+approval workflow, revisions, SEO and public URL are all columns and routes
+here. Install it, migrate it, and a host has a working archive — no other
+content module required.
 
-The one thing it does own is the article's **public address**. Articles serve
-at `/news/{slug}` (`SM_NEWS_PUBLIC_ROUTE_PREFIX`), not at pagebuilder's generic
-`/p/{slug}`, so an article is distinguishable from a contact page in a URL, a
-log line and an analytics report. The *rendering* is still pagebuilder's: news
-resolves the slug and hands off to that module's viewer, keeping the ETag,
-cache, CSP, canonical and site-layout handling in one place.
+It did not start that way. An article used to *be* a `simple_module_pagebuilder`
+page, with this module contributing only a category and a display date beside
+it. That made news uninstallable without its neighbour, made every listing a
+cross-module join, and left article rows that could be orphaned by a deletion
+news never saw. See **Design note: what the split changed** below.
 
-Claiming an address means giving it up elsewhere. `/p/{slug}` **404s** for an
-article, and the sitemap advertises the news URL — see
-`pagebuilder.public_claims`, the generic hook that makes this possible without
-pagebuilder learning anything about news.
-
-The admin console is at `/admin/news`, not `/news`: one prefix cannot be both
-a reader-facing URL and a permission-gated console.
+Articles serve at `/news/{slug}` (`SM_NEWS_PUBLIC_ROUTE_PREFIX`), so an article
+is distinguishable from a contact page in a URL, a log line and an analytics
+report. The admin console is at `/admin/news`, not `/news`: one prefix cannot be
+both a reader-facing URL and a permission-gated console.
 
 ## Installation
 
@@ -28,8 +24,8 @@ a reader-facing URL and a permission-gated console.
 pip install simple_module_news
 ```
 
-The host must also install `simple_module_pagebuilder`. For an in-repo
-checkout, resolve it from the workspace:
+Nothing else is required. For an in-repo checkout, resolve it from the
+workspace:
 
 ```toml
 dependencies = ["simple_module_news"]
@@ -41,116 +37,175 @@ workspace = true
 Then run `make migrate` — the module's first revision is labelled `news`, so it
 can be removed on its own with `alembic downgrade news@base`.
 
+### Optional: pagebuilder
+
+```bash
+pip install "simple_module_news[pagebuilder]"
+```
+
+Where a host runs `simple_module_pagebuilder` too, two conveniences light up:
+
+- the **News feed** block joins that module's palette, so a page can list live
+  articles;
+- the admin search screen gains **Pages** and **Media** sections alongside
+  articles, with "see all" links into that module's screens.
+
+Neither is required, and nothing outside `news/integrations/pagebuilder.py`
+imports the package — every import there is deferred and guarded, so on a host
+without it `available()` is `False` and the extra sections are simply absent.
+`test_module.py` spawns a subprocess to prove that importing news never imports
+pagebuilder.
+
+**One caveat, on the frontend.** A bundler cannot make a static import
+conditional, so `news/puck-blocks.ts` — and the `NewsFeed` component it pulls
+in — genuinely do import `@simple-module-py/pagebuilder` at build time. They are
+the only two files in this module's frontend that do, and
+`@simple-module-py/pagebuilder` is declared an *optional* peer dependency so npm
+does not demand it. A host that installs news without pagebuilder should
+exclude `puck-blocks.ts` from its block glob (see `host/client_app/blocks.ts`);
+there is no feed block to register without the palette it registers into. Every
+other screen — the list, both editors, the public viewer — builds and runs with
+the package absent.
+
 ## Usage
 
-Go to **News** in the sidebar. "New article" creates a page, attaches the
-article metadata to it, and drops you into the page-builder editor to write the
-body. Category and date are edited inline in the list.
+Go to **News** in the sidebar. "New article" creates the article and drops you
+into its **body canvas** — this module's own block editor — to write it.
+Category, tags, byline, display date and feed behaviour are edited on the
+article screen; the list edits category and date inline.
 
-To show articles on a page, add the **News feed** block in the page builder and
-set its category filter and item count.
+## Permissions
+
+| Permission | Grants |
+|---|---|
+| `news.view` | see the admin list |
+| `news.edit` | create, write and edit articles; submit for review |
+| `news.publish` | publish, unpublish, approve, reject, purge |
+
+`news.publish` is separate on purpose. Publishing used to require
+`pagebuilder.publish`, because the write landed on one of its pages and news was
+not entitled to route an author past that module's editor → publisher
+separation. Owning the content means owning the separation: folding it into
+`news.edit` would hand every author a way past a review step a host may want.
 
 ### API
 
 | Route | Access |
 |---|---|
 | `GET /news/{slug}` | anonymous; published articles only |
-| `GET /api/news/articles?limit&offset&category&undated_first` | anonymous; published only |
+| `GET /news/sitemap.xml` | anonymous |
+| `GET /api/news/articles?limit&offset&category&q&status&in_feed&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
+| `GET /api/news/articles/{id}/tags` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
-| `POST /api/news/articles/with-page` | `news.edit` **+ `pagebuilder.edit`** |
-| `POST /api/news/articles/{id}/publish` | `news.edit` **+ `pagebuilder.publish`** |
 | `PUT /api/news/articles/{id}` | `news.edit` |
 | `DELETE /api/news/articles/{id}` | `news.edit` |
+| `GET /api/news/articles/{id}/detail` | `news.edit` |
+| `PUT /api/news/articles/{id}/body` | `news.edit` |
+| `GET /api/news/articles/{id}/revisions` | `news.edit` |
+| `POST /api/news/articles/{id}/revisions/{rev}/restore` | `news.edit` |
+| `POST /api/news/articles/{id}/submit` | `news.edit` |
+| `POST /api/news/articles/{id}/trash` \| `/restore` | `news.edit` |
+| `POST /api/news/articles/{id}/publish` \| `/unpublish` | `news.edit` **+ `news.publish`** |
+| `POST /api/news/articles/{id}/approve` \| `/reject` | `news.edit` **+ `news.publish`** |
+| `DELETE /api/news/articles/{id}/purge` | `news.edit` **+ `news.publish`** |
 
 Reads are anonymous because the feed block runs on public pages. Listing is
-ordered newest first with undated articles last; `undated_first=true` flips
-the undated to the front, which is what the admin list uses so work in
-progress is not buried on the last page. An editor additionally sees
-articles whose page is still a draft. Each item carries `page_status` —
-the workflow state of the page behind it, which the admin list renders as a
-badge; without `news.edit` it is always `published`.
+ordered pinned first, then newest, with undated articles last;
+`undated_first=true` flips the undated to the front, which is what the admin
+list uses so work in progress is not buried on the last page. An editor
+additionally sees drafts. Each item carries `status`, which the admin list
+renders as a badge; without `news.edit` it is always `published`.
 
-`POST /articles` attaches metadata to a page that already exists.
-`POST /articles/with-page` is the "New article" flow: it creates the page *and*
-attaches the article in one transaction, so a failure leaves neither behind.
-Omit `slug` and the server derives one from the title and takes the first free
-variant — `my-title`, then `my-title-2`; send one and it is used verbatim, with
-a collision reported as a 409 rather than silently renamed.
-`POST /articles/{id}/publish` publishes the page behind an article, which is
-what the list's row menu calls.
+`POST /articles` creates the article in one insert. Omit `slug` and the server
+derives one from the title and takes the first free variant — `my-title`, then
+`my-title-2`; send one and it is used verbatim, with a collision reported as a
+409 rather than silently renamed. Trashed articles keep their slugs claimed.
 
-Both of those write a **page**, so both require pagebuilder's own permission on
-top of `news.edit`. That module separates editor from publisher deliberately —
-so a host can run an editor → publisher workflow without granting every editor
-publish rights — and these routes replaced browser calls that went through
-pagebuilder's endpoints and met that gate. Requiring only `news.edit` would
-have handed every article author a way straight past it. A role that creates
-and publishes articles therefore needs `news.edit`, `pagebuilder.edit` and
-`pagebuilder.publish`; attaching metadata to a page somebody else made touches
-nothing of pagebuilder's and still needs only `news.edit`.
+`PUT /articles/{id}` is a **partial** update covering the listing metadata, the
+identity (`title`, `slug`) and the SEO fields. A field you omit is left alone.
+Sending `published_at` as an explicit `null` is different from omitting it —
+that undates the article, which is a real state rather than an error. Changing
+`slug` records a redirect, so the old address keeps working.
+
+`PUT /articles/{id}/body` is the canvas autosave, and deliberately cannot reach
+the slug or the status: it fires on a timer rather than on a person pressing
+something.
 
 `published_at` is a **display date**, not a timestamp. Whatever instant you
 send, the day is taken as you wrote it and stored as midnight UTC — sending
-`2026-02-01T23:00:00-06:00` records the 1st, not the 2nd. The column is a
-timestamp only because that is what the date is carried in.
-
-`PUT` is a **partial** update: a field you omit is left alone. Sending
-`published_at` as an explicit `null` is different from omitting it — that
-undates the article, which is a real state rather than an error.
-
-`DELETE` detaches the metadata; the page and its body stay.
+`2026-02-01T23:00:00-06:00` records the 1st, not the 2nd. It is also independent
+of `status`: an article can be published and undated, or dated and still a
+draft.
 
 Anonymous listings carry `Cache-Control: public, max-age=60`, because the feed
 block runs on every public page that holds one. An editor's listing includes
-drafts and so is `private, no-store`.
+drafts and so is `private, no-store`. The article viewer sends an `ETag`,
+`Cache-Control: public, max-age=300, stale-while-revalidate=60`, and
+`Content-Security-Policy` when `SM_NEWS_PUBLIC_CSP` is set.
 
-## Design note: one seam onto pagebuilder
+## Settings
 
-An article *is* a page, so depending on `simple_module_pagebuilder` is the
-design rather than an accident. What is avoidable is that dependency being
-*spread*, and it was: eight Python modules here imported it directly, the DTO
-re-exported its `PageStatus` as part of news' own public contract, and the
-frontend hardcoded its CSRF cookie name, its page API route, its editor URL and
-its media library path.
+All prefixed `SM_NEWS_`:
 
-It now arrives through `news/integrations/pagebuilder.py`, the only module here
-that imports that package — asserted by a test, because a single convenient
-import is exactly the kind of thing that quietly undoes a rule like this.
-Concretely:
+| Setting | Default | What it does |
+|---|---|---|
+| `PUBLIC_ROUTE_PREFIX` | `/news` | where articles serve |
+| `PUBLIC_BASE_URL` | *(derived from the request)* | origin for canonical URLs and the sitemap |
+| `SITE_NAME` | *(unset)* | `og:site_name` |
+| `TWITTER_HANDLE` | *(unset)* | `twitter:site` |
+| `PUBLIC_CACHE_MAX_AGE` | `300` | shared-cache lifetime of an article |
+| `PUBLIC_CACHE_SWR` | `60` | `stale-while-revalidate` seconds; `0` omits it |
+| `PUBLIC_CSP` | *(unset)* | `Content-Security-Policy` on the article page |
 
-- news names its own `ArticleStatus`. Same values, so the wire format is
-  unchanged; `test_integrations` fails if the two vocabularies ever drift.
-- `edit_url` and the search screen's "see all" links are **served**, so no TSX
-  spells out how the neighbouring module routes its own screens.
-- pages are created and published through pagebuilder's *service*, inside this
-  request's transaction, instead of through its HTTP API with a borrowed CSRF
-  token. That is what removed the throwaway priming GET, and what makes "new
-  article" atomic.
+## Design note: what the split changed
 
-Three frontend imports remain on purpose: the Puck block registry, which is how
-a block is contributed at all, and `ArticleCardsGrid` and `ConfirmDialog`,
-which are shared render kit a second copy of would only make inconsistent.
+The sidecar was a real design with real reasons — it kept pagebuilder a generic
+CMS that knew nothing about news, and it meant articles inherited a mature
+editor, viewer and workflow for free. What it cost was independence, and three
+specific hazards that are now structurally impossible:
 
-## Design note: no foreign key
+- **No orphans.** `news_articles.page_id` was an unenforceable pointer into
+  another module's table: the framework gives every module its own `MetaData`,
+  so a cross-module `ForeignKey` could not resolve. A deleted page left a row
+  behind, and SQLite reuses ids, so that row would re-attach to whatever page
+  was created next and list one article's metadata against another's document.
+  A `PageDeleted` subscription and a startup sweep existed only to contain this.
+  Both are gone; an article's body is its own row.
+- **No cross-module join.** Every listing joined `pagebuilder_pages` and had to
+  remember `load_only` to avoid dragging both block-JSON columns through the ORM
+  per row. The listing is now a single-table scan over named columns.
+- **A real permission boundary.** Publishing borrowed `pagebuilder.publish`;
+  it is `news.publish` now, on this module's own routes.
 
-`news_articles.page_id` carries no database foreign key. The framework gives
-every module its own `MetaData`, so a cross-module `ForeignKey` cannot resolve
-its target table, and pagebuilder publishes no page-deleted event to hang a
-cascade on either.
+Two things news gained that it previously borrowed, and had to grow itself:
 
-Two things make that safe. Every listing inner-joins the page, so an article
-whose page was deleted stops appearing immediately rather than rendering a card
-that links nowhere. And the orphan is then removed rather than merely hidden —
-by a `PageDeleted` subscription first, and by a sweep at application startup
-when that event is missed.
+- **Its own viewer**, carrying the ETag, cache, CSP, canonical tag and old-slug
+  redirects the hand-off used to provide. `test_public_address.py` asserts each
+  one, precisely because a second viewer is what the hand-off existed to avoid.
+- **Its own sitemap**, at `{prefix}/sitemap.xml`. Articles used to reach a
+  crawler through pagebuilder's, via a claim news registered with it; without
+  one of its own the whole archive would silently drop out of every index.
 
-The sweep is not belt-and-braces. The event bus logs a handler failure instead
-of raising it, and pagebuilder has already committed the page deletion by the
-time the handler runs, so a dropped event leaves the row behind with nothing to
-retry it. An invisible orphan does not stay invisible either: SQLite reuses a
-deleted row's id, so the row would re-attach to whatever page is created next
-and list one article's category and date against another article's page.
+One thing it deliberately did **not** grow: a clone of pagebuilder's widget
+catalogue. That catalogue builds *pages* — heroes, feature grids, site
+headers — and almost none of it belongs in a news story. The body canvas ships a
+small prose-shaped set instead (heading, paragraph, list, quote, image, embed,
+divider). A host that wants the full palette on an article can install
+pagebuilder, build the page there, and link to it.
+
+## Known gaps
+
+- **The trash has no screen.** `POST /articles/{id}/trash`, `/restore` and
+  `DELETE /articles/{id}/purge` exist and are tested, but the admin list offers
+  a hard delete rather than a bin, so a trashed article is currently only
+  reachable over the API. Adding a trash filter to the list is the natural next
+  step.
+- **The body canvas has no revision UI.** Revisions are recorded on every
+  transition and readable at `/articles/{id}/revisions`, with a restore
+  endpoint; no screen renders them yet.
+- **Images take a URL, not a picker.** The media library belongs to
+  pagebuilder, and the image block has to work without it.
 
 ## Development
 

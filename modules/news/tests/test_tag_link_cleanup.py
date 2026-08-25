@@ -5,19 +5,22 @@ promise the *database* keeps, and SQLite only keeps it when the connection has
 run ``PRAGMA foreign_keys=ON`` — which nothing in this stack does. So on the
 repo's own default database the join rows survive their parents.
 
-A dangling row here is not inert, for exactly the reason ``NewsArticle.page_id``
-is documented as dangerous: SQLite reuses ids, so an orphaned link re-attaches
-to whatever tag or article is created next, and an article silently acquires a
-tag nobody applied to it.
+A dangling row here is not inert: SQLite reuses ids, so an orphaned link
+re-attaches to whatever tag or article is created next, and an article silently
+acquires a tag nobody applied to it.
+
+``test_the_orphan_sweep_takes_links_too`` used to sit alongside these. It
+covered the sweep that deleted articles whose pagebuilder page had vanished, and
+checked it took their tag links with it. There is no such sweep and no such
+orphan now — an article's body is its own row — so the case has no subject.
 """
 
 from __future__ import annotations
 
 import pytest
-from conftest import make_page
+from conftest import make_article
 from news import service, tag_service
 from news.models import NewsArticle, NewsArticleTag
-from pagebuilder.models import PageStatus
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,12 +28,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _article(db: AsyncSession, slug: str) -> NewsArticle:
-    page = await make_page(db, slug=slug, status=PageStatus.PUBLISHED)
-    article = NewsArticle(page_id=page.id, category="Research")
-    db.add(article)
-    await db.commit()
-    await db.refresh(article)
-    return article
+    return await make_article(db, slug=slug, category="Research")
 
 
 async def _link_count(db: AsyncSession) -> int:
@@ -49,7 +47,7 @@ async def test_deleting_a_tag_takes_its_links(db) -> None:
     assert await _link_count(db) == 0
 
 
-async def test_detaching_an_article_takes_its_links(db) -> None:
+async def test_deleting_an_article_takes_its_links(db) -> None:
     article = await _article(db, "detached")
     await tag_service.set_for_article(db, article.id or 0, ["canopy", "urban"])
     await db.flush()
@@ -57,25 +55,6 @@ async def test_detaching_an_article_takes_its_links(db) -> None:
 
     await service.delete(db, article)
 
-    assert await _link_count(db) == 0
-
-
-async def test_the_orphan_sweep_takes_links_too(db) -> None:
-    """The sweep exists because orphans re-attach; it must not leave new ones."""
-    from news.maintenance import reconcile_orphans
-    from pagebuilder.models import Page
-
-    article = await _article(db, "sweep-me")
-    await tag_service.set_for_article(db, article.id or 0, ["canopy"])
-    await db.flush()
-    page = await db.get(Page, article.page_id)
-    assert page is not None
-    await db.delete(page)
-    await db.commit()
-
-    dropped = await reconcile_orphans(db)
-
-    assert dropped == 1
     assert await _link_count(db) == 0
 
 

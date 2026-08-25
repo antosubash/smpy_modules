@@ -13,13 +13,12 @@ client fixture builds its own in-memory database, so a row written through
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pytest
+from conftest import make_article
 from httpx import AsyncClient
 from news import tag_service
-from news.models import NewsArticle
-from pagebuilder.models import Page, PageStatus
+from news.content import ArticlesService
+from news.models import ArticleStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,31 +26,27 @@ TAGS = ["embargoed", "canopy"]
 
 
 async def _seed(
-    client: AsyncClient, *, status: PageStatus, trashed: bool = False
+    client: AsyncClient, *, status: ArticleStatus, trashed: bool = False
 ) -> int:
     """A tagged article on the client's own database. Returns its id."""
     async with client.db_state.session_factory() as session:  # type: ignore[attr-defined]
-        page = Page(slug="subject", title="Subject", status=status, draft_data={})
-        session.add(page)
-        await session.commit()
-        await session.refresh(page)
-
-        article = NewsArticle(page_id=page.id, category="Research")
-        session.add(article)
-        await session.commit()
-        await session.refresh(article)
-
+        article = await make_article(
+            session, slug="subject", title="Subject", status=status,
+            category="Research",
+        )
         await tag_service.set_for_article(session, article.id or 0, TAGS)
         if trashed:
-            page.deleted_at = datetime.now(UTC)
-            session.add(page)
+            # The article's own column now. It used to be the joined page's,
+            # which is why "trashed" once meant something happening in another
+            # module's table.
+            await ArticlesService(session).trash(article.id or 0)
         await session.commit()
         return article.id or 0
 
 
 async def test_a_drafts_tags_are_not_public(anon_client: AsyncClient) -> None:
     """The leak this file exists for."""
-    article_id = await _seed(anon_client, status=PageStatus.DRAFT)
+    article_id = await _seed(anon_client, status=ArticleStatus.DRAFT)
 
     response = await anon_client.get(f"/api/news/articles/{article_id}/tags")
 
@@ -60,8 +55,8 @@ async def test_a_drafts_tags_are_not_public(anon_client: AsyncClient) -> None:
 
 
 async def test_a_trashed_articles_tags_are_not_public(anon_client: AsyncClient) -> None:
-    """A trashed page is invisible everywhere else; its tags are no exception."""
-    article_id = await _seed(anon_client, status=PageStatus.PUBLISHED, trashed=True)
+    """A trashed article is invisible everywhere else; its tags are no exception."""
+    article_id = await _seed(anon_client, status=ArticleStatus.PUBLISHED, trashed=True)
 
     response = await anon_client.get(f"/api/news/articles/{article_id}/tags")
 
@@ -71,7 +66,7 @@ async def test_a_trashed_articles_tags_are_not_public(anon_client: AsyncClient) 
 
 async def test_a_published_articles_tags_stay_public(anon_client: AsyncClient) -> None:
     """The contract that must not regress — this is an anonymously-readable API."""
-    article_id = await _seed(anon_client, status=PageStatus.PUBLISHED)
+    article_id = await _seed(anon_client, status=ArticleStatus.PUBLISHED)
 
     response = await anon_client.get(f"/api/news/articles/{article_id}/tags")
 
@@ -81,7 +76,7 @@ async def test_a_published_articles_tags_stay_public(anon_client: AsyncClient) -
 
 async def test_an_editor_still_reads_a_drafts_tags(editor_client: AsyncClient) -> None:
     """The article editor loads exactly this while the article is still a draft."""
-    article_id = await _seed(editor_client, status=PageStatus.DRAFT)
+    article_id = await _seed(editor_client, status=ArticleStatus.DRAFT)
 
     response = await editor_client.get(f"/api/news/articles/{article_id}/tags")
 

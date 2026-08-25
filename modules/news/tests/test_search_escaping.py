@@ -15,22 +15,16 @@ So there are two halves to assert, and only together do they pin the behaviour:
 from __future__ import annotations
 
 import pytest
-from conftest import make_page
+from conftest import make_article
 from news import search_service
 from news.models import NewsArticle
-from pagebuilder.models import PageStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.asyncio
 
 
 async def _article(db: AsyncSession, slug: str, title: str) -> NewsArticle:
-    page = await make_page(db, slug=slug, title=title, status=PageStatus.PUBLISHED)
-    article = NewsArticle(page_id=page.id, category="Research")
-    db.add(article)
-    await db.commit()
-    await db.refresh(article)
-    return article
+    return await make_article(db, slug=slug, title=title, category="Research")
 
 
 async def test_a_percent_in_the_query_still_finds_it(db) -> None:

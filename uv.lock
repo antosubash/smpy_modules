@@ -1787,7 +1787,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-ai"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "modules/ai" }
 dependencies = [
     { name = "cryptography" },
@@ -1853,7 +1853,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-canopy-atlas"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "modules/canopy_atlas" }
 dependencies = [
     { name = "httpx" },
@@ -1987,14 +1987,13 @@ wheels = [
 
 [[package]]
 name = "simple-module-news"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "modules/news" }
 dependencies = [
     { name = "pydantic-settings" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
-    { name = "simple-module-pagebuilder" },
     { name = "sqlalchemy" },
 ]
 
@@ -2003,6 +2002,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
+]
+pagebuilder = [
+    { name = "simple-module-pagebuilder" },
 ]
 
 [package.metadata]
@@ -2013,15 +2015,15 @@ requires-dist = [
     { name = "simple-module-core", specifier = ">=0.0.25,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.25,<0.1" },
     { name = "simple-module-hosting", specifier = ">=0.0.25,<0.1" },
-    { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
+    { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.25,<0.1" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-pagebuilder"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "modules/pagebuilder" }
 dependencies = [
     { name = "pillow" },
@@ -2072,7 +2074,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-python-modules"
-version = "0.0.5"
+version = "0.0.6"
 source = { virtual = "." }
 
 [package.dev-dependencies]

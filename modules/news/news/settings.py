@@ -1,9 +1,11 @@
 """Deployment-tunable settings for News.
 
-Only the public URL prefix so far. It is a setting rather than a constant
-because it is the one thing here a site owner has an opinion about: whether
-their articles live at ``/news/…``, ``/blog/…`` or something in their own
-language.
+The public URL prefix was once the only thing here, because everything else
+about serving an article — the origin, the cache policy, the CSP — belonged to
+pagebuilder's viewer. News serves its own articles now, so it carries the
+settings that viewer needs. They are deliberately the same names and defaults
+pagebuilder uses for the equivalent knob: a host running both should not have to
+learn two vocabularies to configure one site.
 """
 
 from __future__ import annotations
@@ -22,9 +24,39 @@ class NewsSettings(BaseSettings):
     notice. The address said nothing about what the document was, and there was
     no way to tell articles apart from pages in a URL, a log line or an
     analytics report.
+    """
 
-    Claiming the address means giving it up elsewhere: an article no longer
-    answers at ``/p/{slug}`` at all — see ``pagebuilder.public_claims``.
+    public_base_url: str = ""
+    """Origin used to build absolute URLs — the canonical tag, ``og:url`` and
+    the sitemap.
+
+    Empty means "derive it from the inbound request", which is right for local
+    development and wrong behind a proxy that rewrites the Host header. A
+    deployment knows its own public name; this is where it says so.
+    """
+
+    site_name: str = ""
+    """``og:site_name``. Empty omits the tag rather than inventing one."""
+
+    twitter_handle: str = ""
+    """``twitter:site``. Empty omits the tag."""
+
+    public_cache_max_age: int = 300
+    """Seconds a published article may be held in a shared cache.
+
+    Longer than the listing's minute because an article's *body* changes only
+    when someone republishes it, and the ETag catches that case anyway.
+    """
+
+    public_cache_swr: int = 60
+    """``stale-while-revalidate`` seconds. Zero omits the directive."""
+
+    public_csp: str = ""
+    """Content-Security-Policy for the public article page.
+
+    Empty sends no header, which is the safe default for a module that cannot
+    know what a host's other pages already set. A site serving articles as its
+    public face should set one.
     """
 
 
@@ -66,6 +98,6 @@ def active() -> NewsSettings:
 
 
 def public_article_path(slug: str) -> str:
-    """Where an article serves. One spelling, shared by the serializer and the
-    claim news registers with pagebuilder."""
+    """Where an article serves. One spelling, shared by the serializer, the
+    viewer's canonical tag and the sitemap."""
     return f"{active().public_route_prefix.rstrip('/')}/{slug}"

@@ -10,7 +10,7 @@ import { ArticleFilters } from '../components/ArticleFilters';
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
 import { useArticleList } from '../hooks/useArticleList';
-import { detachArticle, publishArticle, updateArticle } from '../utils/api';
+import { deleteArticle, publishArticle, updateArticle } from '../utils/api';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
@@ -141,7 +141,7 @@ export default function NewsList() {
               onSave={(id, category, publishedAt) =>
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }
-              onDetach={(id) => runRow(id, () => detachArticle(id))}
+              onDelete={(id) => runRow(id, () => deleteArticle(id))}
               onPublish={(target) => runRow(target.id, () => publishArticle(target.id))}
             />
           ))}

@@ -1,4 +1,3 @@
-import { ConfirmDialog } from '@simple-module-py/pagebuilder/pagebuilder/components/ConfirmDialog';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   DropdownMenu,
@@ -8,8 +7,8 @@ import {
 } from '@simple-module-py/ui/components/ui/dropdown-menu';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
-
 import { type ArticleRead, formatArticleDate, relativeDay } from '../utils/api';
+import { ConfirmDialog } from './ConfirmDialog';
 
 /** The article editor — category, tags, date, byline and feed behaviour. The
  *  body is a page, so it is edited one link further in. */
@@ -30,10 +29,10 @@ function statusLine(article: ArticleRead): string {
   const when = article.published_at;
   const ahead = when ? new Date(`${when.slice(0, 10)}T00:00:00Z`).getTime() > Date.now() : false;
 
-  if (article.page_status === 'published') {
+  if (article.status === 'published') {
     return when ? `Published · ${relativeDay(when)}` : 'Published · no date';
   }
-  if (article.page_status === 'submitted_for_review') return 'Pending review';
+  if (article.status === 'submitted_for_review') return 'Pending review';
   if (!when) return 'Draft · undated';
   return ahead ? `Draft · publishes ${relativeDay(when)}` : `Draft · dated ${relativeDay(when)}`;
 }
@@ -44,7 +43,7 @@ interface Props {
   /** id of a <datalist> of existing category names, offered while typing. */
   suggestionsId?: string;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
-  onDetach: (id: number) => void;
+  onDelete: (id: number) => void;
   onPublish: (article: ArticleRead) => Promise<unknown>;
 }
 
@@ -55,13 +54,13 @@ interface Props {
  *  the thing this list exists to avoid — the body is edited in pagebuilder, so
  *  if these two fields also needed a round trip the list would have no job.
  */
-export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onPublish }: Props) {
+export function ArticleRow({ article, busy, suggestionsId, onSave, onDelete, onPublish }: Props) {
   const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(article.category);
   const [date, setDate] = useState(toDateInput(article.published_at));
 
   const dirty = category !== article.category || date !== toDateInput(article.published_at);
-  const isDraft = article.page_status === 'draft';
+  const isDraft = article.status === 'draft';
   const dateLabel = formatArticleDate(article.published_at) || 'no date';
 
   const save = () => {
@@ -196,7 +195,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
                 Publish now
               </DropdownMenuItem>
             )}
-            {article.page_status === 'published' && (
+            {article.status === 'published' && (
               <DropdownMenuItem asChild>
                 <a href={article.url} target="_blank" rel="noopener noreferrer">
                   View on the site
@@ -213,15 +212,18 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDetach, onP
         </DropdownMenu>
 
         <ConfirmDialog
-          // Low: the page and its body survive; only the news metadata goes.
-          level="low"
-          title={`Detach "${article.title}"?`}
-          description="The page and its body stay. Only the category and date attached to it are removed, and it stops appearing in news feeds."
-          confirmLabel="Detach"
-          onConfirm={async () => onDetach(article.id)}
+          // Medium, where this used to be low. "Detach" removed news' metadata
+          // and left the document standing in pagebuilder, so it cost nothing
+          // that could not be re-attached. There is no second document now —
+          // the body is this row — so the same button destroys the article.
+          level="medium"
+          title={`Delete "${article.title}"?`}
+          description="The article and its body are removed, and its public URL stops working. This cannot be undone from here."
+          confirmLabel="Delete"
+          onConfirm={async () => onDelete(article.id)}
           trigger={
             <Button type="button" size="sm" variant="ghost" disabled={busy}>
-              Detach
+              Delete
             </Button>
           }
         />

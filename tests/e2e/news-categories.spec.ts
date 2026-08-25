@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { seedArticle } from './article-helpers';
+import { login } from './helpers';
 
 /**
  * The categories + tags screen.
@@ -16,26 +17,11 @@ const CATEGORIES_URL = '/admin/news/categories';
 
 /** Create a published page with an article attached, in `category`. */
 async function makeArticle(page: import('@playwright/test').Page, category: string) {
-  const headers = await csrfHeader(page);
-  const slug = uniqueSlug('e2e-article');
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: slug,
-      slug,
-      draft_data: { root: { props: { title: slug, width: 'full' } }, content: [], zones: {} },
-    },
+  const { articleId, slug } = await seedArticle(page, {
+    prefix: 'e2e-article',
+    category,
   });
-  expect(created.ok()).toBeTruthy();
-  const { id } = (await created.json()) as { id: number };
-
-  const newsCsrf = (await page.context().cookies()).find((c) => c.name === 'news_csrf')?.value;
-  const attached = await page.request.post('/api/news/articles', {
-    headers: newsCsrf ? { 'X-CSRF-Token': decodeURIComponent(newsCsrf) } : {},
-    data: { page_id: id, category, published_at: null },
-  });
-  expect(attached.ok()).toBeTruthy();
-  return { id, slug };
+  return { id: articleId, slug };
 }
 
 /** The row for a category.

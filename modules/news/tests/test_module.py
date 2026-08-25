@@ -24,10 +24,36 @@ class TestMeta:
     def test_meta_requires_framework(self):
         assert NewsModule.meta.requires_framework is not None
 
-    def test_depends_on_pagebuilder(self):
-        # An article's body, slug and public URL all live in a page, so the
-        # host must boot pagebuilder first.
-        assert constants._MODULE_PAGEBUILDER in NewsModule.meta.depends_on
+    def test_depends_on_nothing(self):
+        """The headline of the split.
+
+        This list held "PageBuilder" for as long as an article's body, slug and
+        public URL lived in one of its pages. An empty list is what makes
+        ``simple_module_news`` installable, migratable and servable on its own —
+        so this assertion is the regression guard for the whole change, not a
+        detail of it.
+        """
+        assert NewsModule.meta.depends_on == []
+
+    def test_importing_the_module_does_not_import_pagebuilder(self):
+        """The optional integration must stay lazy.
+
+        ``news.integrations.pagebuilder`` defers every import into the call that
+        needs it. A module-scope import there would make the neighbour a hard
+        dependency again by the back door, and nothing else here would notice.
+        """
+        import subprocess
+        import sys
+
+        probe = (
+            "import news.module, news.service, news.endpoints.api;"
+            "import sys;"
+            "print('pagebuilder' in sys.modules)"
+        )
+        out = subprocess.run(
+            [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+        )
+        assert out.stdout.strip() == "False"
 
 
 class TestRoutes:
@@ -52,10 +78,24 @@ class TestRoutes:
 
 
 class TestPermissions:
-    def test_registers_view_and_edit(self):
+    def test_registers_view_edit_and_publish(self):
         registry = PermissionRegistry()
         NewsModule().register_permissions(registry)
-        assert {constants.PERM_VIEW, constants.PERM_EDIT} <= set(registry.all_permissions)
+        assert {
+            constants.PERM_VIEW,
+            constants.PERM_EDIT,
+            constants.PERM_PUBLISH,
+        } <= set(registry.all_permissions)
+
+    def test_publish_is_its_own_permission(self):
+        """Owning the workflow means owning its separation.
+
+        Publishing used to require pagebuilder's ``publish`` permission, because
+        the write landed on one of its pages. Folding that into ``news.edit``
+        would have handed every author a way past a review step the host may
+        well want, so news grew a gate of its own.
+        """
+        assert constants.PERM_PUBLISH != constants.PERM_EDIT
 
 
 class TestMenu:
@@ -69,8 +109,8 @@ class TestMenu:
         assert item.group == constants.MENU_GROUP
 
     def test_search_sits_outside_the_news_group(self):
-        """It searches pages and media too, so filing it under News would say
-        something untrue about what it covers."""
+        """Where pagebuilder is installed it searches pages and media too, so
+        filing it under News would say something untrue about what it covers."""
         registry = MenuRegistry()
         NewsModule().register_menu_items(registry)
         item = next(

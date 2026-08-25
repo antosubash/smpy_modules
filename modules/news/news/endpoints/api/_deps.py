@@ -1,7 +1,7 @@
 """Shared dependencies for the News API.
 
 Split out of the endpoint modules so the draft-visibility rule has exactly one
-definition. It is subtle enough (see ``_may_see_drafts``) that a second copy
+definition. It is subtle enough (see ``may_see_drafts``) that a second copy
 would drift.
 """
 
@@ -16,14 +16,29 @@ from simple_module_hosting.permissions import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
-from news.constants import PERM_EDIT, PRIVATE_CACHE_CONTROL, PUBLIC_CACHE_CONTROL
-from news.contracts.schemas import ArticleRead
+from news.constants import (
+    PERM_EDIT,
+    PERM_PUBLISH,
+    PRIVATE_CACHE_CONTROL,
+    PUBLIC_CACHE_CONTROL,
+)
+from news.contracts.schemas import ArticleDetail, ArticleRead
+from news.models import NewsArticle
 
 require_edit = Depends(RequiresPermission(PERM_EDIT))
 
+require_publish = Depends(RequiresPermission(PERM_PUBLISH))
+"""Separate from ``news.edit``.
+
+Publishing used to go through pagebuilder's own editor→publisher separation,
+because the body lived on one of its pages. Owning the content means owning that
+separation: without a gate of its own, every author would get a way straight
+past a review step the host may well want.
+"""
+
 
 def may_see_drafts(request: Request) -> bool:
-    """Only an editor sees articles whose page is still a draft.
+    """Only an editor sees articles that are still drafts.
 
     Everyone else gets the published site, which is what the public feed block
     must show.
@@ -54,19 +69,6 @@ def may_see_drafts(request: Request) -> bool:
     return WILDCARD in resolved or PERM_EDIT in resolved
 
 
-
-def already_an_article(page_id: int) -> HTTPException:
-    """One spelling of the conflict, raised from both places that find it.
-
-    ``attach`` checks first and catches the unique-index violation second — the
-    check is not a lock — and the two have to answer identically or a client
-    would have to handle a race differently from the ordinary case.
-    """
-    return HTTPException(
-        status_code=409, detail=f"Page {page_id} is already an article."
-    )
-
-
 def cache(response: Response, *, include_drafts: bool) -> None:
     """Let a shared cache hold the public answer, and never the editor's.
 
@@ -87,15 +89,32 @@ def cache(response: Response, *, include_drafts: bool) -> None:
     response.headers["Vary"] = "Cookie"
 
 
-async def read_one_by_page(db: AsyncSession, page_id: int) -> ArticleRead:
-    """Re-read through the listing join so every response has one shape.
+async def read_one(db: AsyncSession, article_id: int) -> ArticleRead:
+    """Re-read through the listing query so every response has one shape.
 
     Drafts are included: an editor has just written this row and must see it
-    back whatever state its page is in.
+    back whatever state it is in.
     """
-    article = await service.get_read_by_page(db, page_id, include_drafts=True)
+    article = await service.get_read(db, article_id, include_drafts=True)
     if article is None:
-        # The page is the only source of slug and title, so without it there is
-        # nothing to return.
-        raise HTTPException(status_code=404, detail="Article's page not found.")
+        raise HTTPException(status_code=404, detail="Article not found.")
     return article
+
+
+def detail_of(article: NewsArticle, listing: ArticleRead) -> ArticleDetail:
+    """Widen a listing row with the fields only the editor needs.
+
+    Built from the listing DTO rather than beside it so the two can never
+    disagree about what a title, a URL or a status is.
+    """
+    return ArticleDetail(
+        **listing.model_dump(),
+        draft_data=article.draft_data or {},
+        has_published=article.has_published,
+        meta_description=article.meta_description or "",
+        og_image=article.og_image or "",
+        canonical_url=article.canonical_url or "",
+        index_in_search=article.index_in_search,
+        json_ld=article.json_ld,
+        rejection_note=article.rejection_note,
+    )

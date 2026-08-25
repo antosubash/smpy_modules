@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { seedArticle } from './article-helpers';
+import { login, uniqueSlug } from './helpers';
 
 /**
  * The article editor — everything about an article except its body.
@@ -14,26 +15,7 @@ async function makeArticle(
   page: Page,
   { publish = true, prefix = 'editor' }: { publish?: boolean; prefix?: string } = {},
 ) {
-  const headers = await csrfHeader(page);
-  const slug = uniqueSlug(prefix);
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: `Editor ${slug}`,
-      slug,
-      draft_data: { root: { props: { title: slug, width: 'full' } }, content: [], zones: {} },
-    },
-  });
-  const { id: pageId } = (await created.json()) as { id: number };
-  if (publish) {
-    await page.request.post(`/api/pagebuilder/pages/${pageId}/publish`, { headers, data: {} });
-  }
-  const attached = await page.request.post('/api/news/articles', {
-    headers,
-    data: { page_id: pageId, category: '', published_at: null },
-  });
-  const article = (await attached.json()) as { id: number };
-  return { articleId: article.id, pageId, slug };
+  return seedArticle(page, { prefix, titlePrefix: 'Editor', publish });
 }
 
 test.describe('Article editor', () => {
@@ -125,8 +107,8 @@ test.describe('Article editor', () => {
     // article rather than doing anything to it.
     await expect(page.getByRole('link', { name: /^preview$/i })).toBeVisible();
     const listed = await page.request.get(`/api/news/articles?q=${slug}`);
-    const body = (await listed.json()) as { items: { page_status: string }[] };
-    expect(body.items[0].page_status).toBe('published');
+    const body = (await listed.json()) as { items: { status: string }[] };
+    expect(body.items[0].status).toBe('published');
   });
 
   test('pinning lifts the article above newer ones in the feed order', async ({ page }) => {

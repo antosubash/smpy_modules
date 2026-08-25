@@ -14,8 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import query_filters
 from news.contracts.schemas import ArticleCounts
-from news.integrations.pagebuilder import NOT_TRASHED, Page, PageStatus
-from news.models import NewsArticle
+from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
 
 
 async def count_by_status(
@@ -35,12 +34,12 @@ async def count_by_status(
     keystroke of the search box.
     """
     stmt = (
-        select(Page.status, NewsArticle.published_at.is_(None), func.count())
+        select(NewsArticle.status, NewsArticle.published_at.is_(None), func.count())
         .select_from(NewsArticle)
         # Same trash rule as the listing: the pills must count what the
         # list would actually show.
-        .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
-        .group_by(Page.status, NewsArticle.published_at.is_(None))
+        .where(NOT_TRASHED)
+        .group_by(NewsArticle.status, NewsArticle.published_at.is_(None))
     )
     stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     stmt = query_filters.search(stmt, q)
@@ -51,9 +50,9 @@ async def count_by_status(
     for status, undated, count in (await db.execute(stmt)).all():
         count = int(count)
         counts.all += count
-        if status == PageStatus.PUBLISHED:
+        if status == ArticleStatus.PUBLISHED:
             counts.published += count
-        elif status == PageStatus.DRAFT:
+        elif status == ArticleStatus.DRAFT:
             counts.draft += count
         # Undated cuts across draft and published rather than being a third
         # status, so it is summed independently and the pills deliberately do
