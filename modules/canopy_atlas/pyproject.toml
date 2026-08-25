@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_canopy_atlas"
-version = "0.0.5"
+version = "0.0.6"
 description = "Global Canopy Atlas site — design pack, brand assets and seed content"
 requires-python = ">=3.12"
 readme = "README.md"

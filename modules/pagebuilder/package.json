@@ -1,6 +1,6 @@
 {
   "name": "@simple-module-py/pagebuilder",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "private": true,
   "description": "Frontend assets for the PageBuilder module",
   "peerDependencies": {
