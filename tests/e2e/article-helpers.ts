@@ -104,6 +104,55 @@ export function walkthroughBody(lead: string): Record<string, unknown> {
         type: 'List',
         props: { id: 'l-1', items: 'Own table\nOwn viewer\nOwn sitemap', ordered: false },
       },
+      {
+        type: 'KeyPoints',
+        props: {
+          id: 'k-1',
+          title: 'What you need to know',
+          items: 'All four plots report hourly\nThe archive is its own module',
+        },
+      },
+      {
+        type: 'Table',
+        props: {
+          id: 't-1',
+          rows: 'Site | Sensors | Live\nNorth | 12 | yes\nSouth | 9 | yes',
+          header: true,
+          caption: 'Coverage at the end of the rollout.',
+        },
+      },
+      {
+        type: 'Timeline',
+        props: {
+          id: 'tl-1',
+          title: 'How it went in',
+          items: 'March | Survey began\nJune | Two more plots added',
+        },
+      },
+      {
+        type: 'Callout',
+        props: {
+          id: 'c-1',
+          tone: 'correction',
+          title: '',
+          text: 'An earlier version put the count at three plots.',
+        },
+      },
+      {
+        type: 'Code',
+        props: { id: 'code-1', code: 'make test-py', language: 'bash', caption: '' },
+      },
+      {
+        type: 'Sources',
+        props: {
+          id: 's-1',
+          title: 'Sources',
+          items: 'Rollout report | https://example.org/report\nInterview, March 2024',
+        },
+      },
+      // No `style` prop, deliberately: this is the shape every divider saved
+      // before that field existed still has, so the walkthrough keeps proving
+      // those documents render.
       { type: 'Divider', props: { id: 'd-1', spacing: 'large' } },
     ],
     zones: {},

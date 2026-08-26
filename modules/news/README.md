@@ -196,9 +196,58 @@ Two things news gained that it previously borrowed, and had to grow itself:
 One thing it deliberately did **not** grow: a clone of pagebuilder's widget
 catalogue. That catalogue builds *pages* — heroes, feature grids, site
 headers — and almost none of it belongs in a news story. The body canvas ships a
-small prose-shaped set instead (heading, paragraph, list, quote, image, embed,
-divider). A host that wants the full palette on an article can install
-pagebuilder, build the page there, and link to it.
+prose palette instead; see **The block palette** below. A host that wants the
+full page-building set on an article can install pagebuilder, build the page
+there, and link to it.
+
+## The block palette
+
+Grouped in the editor by what a writer is reaching for, which is not always what
+the block renders — **Key points** and **Sources** are both lists, and neither
+sits beside **List**, because someone wanting a summary box is not shopping for
+a list.
+
+| Group | Blocks |
+|---|---|
+| Text | Heading, Paragraph, List, Pull quote |
+| Set apart | Key points, Callout, Sources |
+| Media | Image, Gallery, Embed |
+| Data | Table, Code, Timeline |
+| Layout | Divider |
+
+The bar for adding one is that **a newsroom already does this thing in a story
+and currently has to fake it with a paragraph** — a summary box, a correction, a
+table of figures, a dated sequence, a list of sources. A block that only changes
+how something looks is a page-building widget wearing a different hat, and
+belongs in the other module.
+
+A few consequences of that bar worth knowing:
+
+- **Callout** has a `correction` kind. A correction is an obligation a
+  publication owes its readers, and one written as an ordinary paragraph is
+  indistinguishable from the reporting it corrects.
+- **Image** carries a `credit` separately from its caption, because they are
+  different obligations — a caption explains the picture, a credit says whose it
+  is, and a publication that runs the second inside the first eventually runs a
+  picture with neither.
+- **Timeline** takes its dates as free text. Reporting deals in "March 2024",
+  "the following morning" and "some time before 2019"; a calendar control would
+  force a writer to invent precision the reporting does not have.
+- **Code** is not syntax-highlighted and its `language` is a label for the
+  reader, not a hint to a parser. Highlighting means shipping a highlighter, and
+  these render on a host that may have installed nothing else.
+- **Gallery** is a grid, not a carousel — a carousel hides all but one image
+  behind an interaction, costing a reader who is scrolling the pictures they
+  were shown.
+- **Divider** offers an asterism (`* * *`) as well as a rule. They mean
+  different things: a rule separates the article from something appended to it,
+  an asterism marks a change of scene *within* one continuous piece.
+
+Blocks whose content is a list — List, Key points, Sources, Timeline, Gallery,
+Table — are edited as a textarea, one item per line, rather than through Puck's
+array field, so a writer pasting a list out of a document gets it in one action
+instead of clicking "add item" nine times. `blocks/lines.ts` is that parsing,
+in one place, so no two blocks can disagree about what a line means.
 
 ## Known gaps
 
@@ -223,7 +272,9 @@ pagebuilder, build the page there, and link to it.
   transition and readable at `/articles/{id}/revisions`, with a restore
   endpoint; no screen renders them yet.
 - **Images take a URL, not a picker.** The media library belongs to
-  pagebuilder, and the image block has to work without it.
+  pagebuilder, and the Image and Gallery blocks have to work without it. Where
+  that module *is* installed its picker hands out exactly what these want — a
+  URL to paste — so the gap is the extra step, not a missing capability.
 - **The SEO fields have no screen.** `meta_description`, `og_image`,
   `canonical_url`, `index_in_search` and `json_ld` are columns, accepted by
   `PUT /articles/{id}` and rendered by the viewer — the migration carried each

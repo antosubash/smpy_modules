@@ -10,35 +10,58 @@
  * contribute blocks to it — news itself does. Nothing contributes to *this*
  * one: it is the set for writing an article, and a registry would be
  * machinery with no second caller.
+ *
+ * What belongs in the set is governed by `./blocks/index.ts`.
  */
 
 import type { Config } from '@puckeditor/core';
 
 import {
+  CalloutBlock,
+  type CalloutProps,
+  CodeBlock,
+  type CodeProps,
   DividerBlock,
   type DividerProps,
   EmbedBlock,
   type EmbedProps,
+  GalleryBlock,
+  type GalleryProps,
   HeadingBlock,
   type HeadingProps,
   ImageBlock,
   type ImageProps,
+  KeyPointsBlock,
+  type KeyPointsProps,
   ListBlock,
   type ListProps,
   ParagraphBlock,
   type ParagraphProps,
   QuoteBlock,
   type QuoteProps,
-} from './articleBlocks';
+  SourcesBlock,
+  type SourcesProps,
+  TableBlock,
+  type TableProps,
+  TimelineBlock,
+  type TimelineProps,
+} from './blocks';
 
 export interface ArticleBodyProps {
   Heading: HeadingProps;
   Paragraph: ParagraphProps;
-  Image: ImageProps;
-  Quote: QuoteProps;
   List: ListProps;
-  Divider: DividerProps;
+  Quote: QuoteProps;
+  KeyPoints: KeyPointsProps;
+  Callout: CalloutProps;
+  Sources: SourcesProps;
+  Image: ImageProps;
+  Gallery: GalleryProps;
   Embed: EmbedProps;
+  Table: TableProps;
+  Code: CodeProps;
+  Timeline: TimelineProps;
+  Divider: DividerProps;
 }
 
 /** The root edits nothing, so it declares nothing — see `articlePuckConfig`.
@@ -74,19 +97,32 @@ export const articlePuckConfig: ArticleConfig = {
     fields: {},
     render: ({ children }) => <div className="mx-auto max-w-2xl px-4 py-8">{children}</div>,
   },
+  // Grouped by what a writer is reaching for, which is not the same as what the
+  // block renders: Key points and Sources are both lists, and neither belongs
+  // beside List, because a writer wanting a summary box is not shopping for a
+  // list — they are looking for the thing that sits outside the story.
   categories: {
     text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote'] },
-    media: { title: 'Media', components: ['Image', 'Embed'] },
+    asides: { title: 'Set apart', components: ['KeyPoints', 'Callout', 'Sources'] },
+    media: { title: 'Media', components: ['Image', 'Gallery', 'Embed'] },
+    data: { title: 'Data', components: ['Table', 'Code', 'Timeline'] },
     layout: { title: 'Layout', components: ['Divider'] },
   },
   components: {
     Heading: HeadingBlock,
     Paragraph: ParagraphBlock,
-    Image: ImageBlock,
-    Quote: QuoteBlock,
     List: ListBlock,
-    Divider: DividerBlock,
+    Quote: QuoteBlock,
+    KeyPoints: KeyPointsBlock,
+    Callout: CalloutBlock,
+    Sources: SourcesBlock,
+    Image: ImageBlock,
+    Gallery: GalleryBlock,
     Embed: EmbedBlock,
+    Table: TableBlock,
+    Code: CodeBlock,
+    Timeline: TimelineBlock,
+    Divider: DividerBlock,
   },
 };
 
