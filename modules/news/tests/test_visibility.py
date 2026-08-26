@@ -9,7 +9,7 @@ the public site has to hold at the endpoint rather than in a screen.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news.constants import ROUTE_PREFIX_API
 from news.models import ArticleStatus
 

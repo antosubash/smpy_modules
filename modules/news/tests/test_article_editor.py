@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import service, tag_service
 
 pytestmark = pytest.mark.asyncio

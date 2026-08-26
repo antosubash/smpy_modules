@@ -80,6 +80,50 @@ fields saved by one button. The headline lives on the article screen rather than
 on the canvas because moving it also moves the URL, and a rename is a decision —
 not something that should happen on a debounce.
 
+## The reader's side
+
+`/news/` is the archive: published articles, newest first, twelve to a page,
+with `/news/category/{slug}` and `/news/tag/{slug}` narrowing it and
+`/news/feed.xml` carrying the recent run as RSS.
+
+None of that existed until recently, and its absence was the hole in the middle
+of the split. The public router had exactly one route — `/{slug}` — so a reader
+could open an article they already had a link to and nothing else: `/news/`
+answered 404, the bare `/news` bounced an anonymous visitor to the sign-in
+screen, and the only browsing surface in the codebase was the **News feed**
+block, which registers into *pagebuilder's* palette. A module that could be
+installed alone could not be read alone.
+
+Paging is real links rather than "load more", because the pager is how a
+crawler reaches everything past the first page. A page beyond the end is a 404
+rather than an empty document, so a crawler guessing `?page=900` is told there
+is nothing there instead of being handed something valid-looking to index. An
+unknown *tag*, by contrast, renders an empty archive: a tag can be removed from
+the last article carrying it, and a URL published while it existed should say
+"nothing here now", not "never existed".
+
+### Metadata a crawler can read
+
+Articles and archive pages carry a server-rendered `<head>` — `<title>`, the
+description, `og:*`, `twitter:*`, the canonical link, `robots` and JSON-LD —
+written into the document before it leaves the server.
+
+They have to be, because the host renders one Inertia shell for every screen: a
+fixed `<title>` and an `{% inertia_head %}` slot that only fills under SSR,
+which nothing configures. `PublicArticle.tsx` composes all of those tags through
+Inertia's `<Head>`, and every one of them existed only after the bundle ran.
+Google executes JavaScript; Slack, X, LinkedIn, Facebook and most feed tooling
+do not — so an article link previewed as "SimpleModule" with no description and
+no image, and an article marked `index_in_search=false` was indexed anyway
+because the `noindex` never reached the crawler either.
+
+`endpoints/public/_head.py` writes them in on the way out. The tags are
+duplicated with the client-side ones on purpose: one copy serves the crawler
+that never runs the script, the other serves the reader who arrived through the
+SPA and never reloaded, and neither covers the other's case. If the host ever
+adopts SSR, `{% inertia_head %}` starts emitting the same tags and that module
+should be deleted rather than made cleverer.
+
 ## Permissions
 
 | Permission | Grants |
@@ -98,7 +142,11 @@ separation. Owning the content means owning the separation: folding it into
 
 | Route | Access |
 |---|---|
+| `GET /news/` | anonymous; the archive, paged |
+| `GET /news/category/{slug}` | anonymous |
+| `GET /news/tag/{slug}` | anonymous |
 | `GET /news/{slug}` | anonymous; published articles only |
+| `GET /news/feed.xml` | anonymous; RSS 2.0, most recent 20 |
 | `GET /news/sitemap.xml` | anonymous |
 | `GET /api/news/articles?limit&offset&category&q&status&in_feed&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
@@ -289,18 +337,13 @@ the same `metadata` one `Read next` uses, so it is possible, just not free.
 
 ## Known gaps
 
-- **The public `<head>` is rendered by the browser, not the server.** Every
-  `og:*` tag, the description, the canonical link, the `robots` directive and
-  the JSON-LD in `PublicArticle.tsx` go through Inertia's `<Head>`, which only
-  runs once JavaScript has. The raw HTML a crawler or a Slack unfurler receives
-  is `<title>SimpleModule</title>` and an Inertia data blob — the article's
-  content and all of its metadata are in that blob, but nothing that reads
-  markup will find them. This is the host's rendering model rather than anything
-  the split changed: pagebuilder's `/p/{slug}` returns an identical bare head,
-  and there is no SSR anywhere in the host. It is listed here because news is
-  the module it costs the most — an archive exists to be linked to — and because
-  the SEO columns below cannot do their job until it is addressed, which is
-  framework work rather than module work.
+- **The article *body* still needs JavaScript.** The metadata does not — see
+  **The reader's side** — but the document itself is a block tree rendered by
+  React, so the raw HTML carries the article's text only inside the Inertia
+  data blob. A crawler that executes scripts reads it; one that does not sees
+  the head and nothing else. Server-rendering the body would mean a Python
+  implementation of all twenty-one blocks, or SSR in the host. Both are real
+  projects; neither is this module's to start.
 - **The trash has no screen.** `POST /articles/{id}/trash`, `/restore` and
   `DELETE /articles/{id}/purge` exist and are tested, but the admin list offers
   a hard delete rather than a bin, so a trashed article is currently only

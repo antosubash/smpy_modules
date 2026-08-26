@@ -15,7 +15,7 @@ So there are two halves to assert, and only together do they pin the behaviour:
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import search_service
 from news.models import NewsArticle
 from sqlalchemy.ext.asyncio import AsyncSession

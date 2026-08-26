@@ -14,7 +14,7 @@ client fixture builds its own in-memory database, so a row written through
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from httpx import AsyncClient
 from news import tag_service
 from news.content import ArticlesService

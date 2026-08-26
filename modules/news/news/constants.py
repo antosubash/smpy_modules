@@ -53,6 +53,7 @@ _PAGE_CATEGORIES: Final = "News/Categories"
 _PAGE_ARTICLE_EDITOR: Final = "News/ArticleEditor"
 _PAGE_ARTICLE_BODY: Final = "News/ArticleBody"
 _PAGE_PUBLIC_ARTICLE: Final = "News/PublicArticle"
+_PAGE_PUBLIC_INDEX: Final = "News/PublicIndex"
 _PAGE_SEARCH: Final = "News/Search"
 
 PERM_VIEW: Final = "news.view"

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import service
 from news.constants import MAX_LIMIT
 from news.content import ArticlesService

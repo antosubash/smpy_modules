@@ -9,7 +9,7 @@ both tags.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import category_service, service, tag_service
 from news.constants import UNCATEGORISED_LABEL
 from news.models import ArticleStatus, NewsArticle

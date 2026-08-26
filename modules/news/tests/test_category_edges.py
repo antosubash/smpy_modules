@@ -8,7 +8,7 @@ count counted rows the listings hide.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import category_service
 from news.constants import UNCATEGORISED_LABEL
 from news.content import ArticlesService

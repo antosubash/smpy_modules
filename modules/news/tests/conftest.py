@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import AsyncIterator
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -38,7 +37,6 @@ from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from inertia import InertiaConfig, inertia_dependency_factory
 from news.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
-from news.models import ArticleStatus, NewsArticle
 from news.models import Base as NewsBase
 from news.module import NewsModule
 from simple_module_core.permissions import PermissionRegistry
@@ -48,6 +46,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+
+_SHELL = (
+    # Shaped like the host's page, not a bare `<html></html>`: a `<head>` with a
+    # fixed app title and the `{% inertia_head %}` slot that stays empty without
+    # SSR. `endpoints.public._head` writes an article's real metadata into that
+    # head, and against a stub with nowhere to write it every test asserting on
+    # server-rendered metadata would pass by asserting nothing.
+    "<html><head><title>SimpleModule</title>{% inertia_head %}</head>"
+    "<body>{% inertia_body %}</body></html>"
+)
 
 
 async def _create_tables(conn) -> None:
@@ -143,12 +151,11 @@ async def _build_app(user: Any) -> tuple[FastAPI, Any]:
     module.register_settings(app)
 
     # Minimal Inertia config — enough to render without the real host
-    # templates. News needs this now: it serves its own public article viewer
-    # rather than handing the slug to pagebuilder's, so an Inertia render
-    # happens inside this app rather than inside the neighbour's.
+    # templates. News serves its own public viewer, so the render happens here.
+    # See ``_SHELL`` for why it is shaped like the host's page rather than a stub.
     templates_dir = Path(tempfile.mkdtemp()) / "templates"
     templates_dir.mkdir(parents=True)
-    (templates_dir / "index.html").write_text("<html></html>")
+    (templates_dir / "index.html").write_text(_SHELL)
     app.state.inertia_dependency = inertia_dependency_factory(
         InertiaConfig(
             environment="development",
@@ -240,57 +247,3 @@ async def anon_client() -> AsyncIterator[AsyncClient]:
     """No session at all — what the public feed block looks like."""
     async for client in _client(None):
         yield client
-
-
-async def make_article(
-    db: AsyncSession,
-    *,
-    slug: str,
-    title: str = "An article",
-    status: ArticleStatus = ArticleStatus.PUBLISHED,
-    meta_description: str | None = None,
-    og_image: str | None = None,
-    category: str = "",
-    author: str = "",
-    published_at: datetime | None = None,
-    pinned: bool = False,
-    show_in_feed: bool = True,
-    draft_data: dict | None = None,
-    publish_body: bool = True,
-) -> NewsArticle:
-    """Insert an article. Committed, so an API request on another session sees it.
-
-    ``publish_body`` mirrors what publishing actually does — it snapshots the
-    draft — because the public viewer serves ``published_data`` and a fixture
-    that left it null would 404 on rows the test believes are live.
-    """
-    body = (
-        draft_data
-        if draft_data is not None
-        else {"root": {"props": {"title": title}}, "content": []}
-    )
-    article = NewsArticle(
-        slug=slug,
-        title=title,
-        status=status,
-        draft_data=body,
-        published_data=(
-            body if publish_body and status is ArticleStatus.PUBLISHED else None
-        ),
-        meta_description=meta_description,
-        og_image=og_image,
-        category=category,
-        author=author,
-        published_at=published_at,
-        pinned=pinned,
-        show_in_feed=show_in_feed,
-    )
-    db.add(article)
-    await db.commit()
-    await db.refresh(article)
-    return article
-
-
-@pytest.fixture
-def make_article_factory():
-    return make_article

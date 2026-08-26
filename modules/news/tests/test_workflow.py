@@ -15,7 +15,7 @@ thereby be able to put something in front of readers.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news.constants import ROUTE_PREFIX_API
 from news.content import ArticlesService
 from news.models import ArticleStatus, RevisionEvent

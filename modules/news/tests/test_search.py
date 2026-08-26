@@ -14,7 +14,7 @@ whole screen still works with no neighbour at all.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import search_service, tag_service
 from news.integrations import pagebuilder as pb
 

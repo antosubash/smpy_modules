@@ -97,7 +97,39 @@ def active() -> NewsSettings:
     return _active
 
 
+def public_prefix() -> str:
+    """The public route prefix, without a trailing slash."""
+    return active().public_route_prefix.rstrip("/")
+
+
 def public_article_path(slug: str) -> str:
     """Where an article serves. One spelling, shared by the serializer, the
     viewer's canonical tag and the sitemap."""
-    return f"{active().public_route_prefix.rstrip('/')}/{slug}"
+    return f"{public_prefix()}/{slug}"
+
+
+def public_index_path(page: int = 1) -> str:
+    """The archive's front page.
+
+    Page 1 has no query string so the index has exactly one canonical address —
+    ``/news/`` and ``/news/?page=1`` being two URLs for one page is how an
+    archive ends up competing with itself in an index.
+    """
+    root = f"{public_prefix()}/"
+    return root if page <= 1 else f"{root}?page={page}"
+
+
+def public_category_path(slug: str) -> str:
+    """A category's archive. Two segments, so it cannot collide with an article
+    slug — the article route matches a single segment."""
+    return f"{public_prefix()}/category/{slug}"
+
+
+def public_tag_path(slug: str) -> str:
+    return f"{public_prefix()}/tag/{slug}"
+
+
+def public_feed_path() -> str:
+    """The RSS feed. ``feed.xml`` rather than ``rss.xml`` because the same
+    address should keep working if the format is ever changed for Atom."""
+    return f"{public_prefix()}/feed.xml"

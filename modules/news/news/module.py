@@ -8,7 +8,7 @@ left article rows that could be orphaned by a deletion news never saw.
 
 It owns its content now. ``NewsArticle`` carries the body, the address, the
 status and the SEO; :mod:`news.content` performs the writes;
-:mod:`news.endpoints.public_views` serves the reader. Pagebuilder is optional —
+:mod:`news.endpoints.public` serves the reader. Pagebuilder is optional —
 where a host runs it, the admin search screen gains a Pages and a Media section
 and the feed block joins its palette. Where a host does not, nothing here
 notices. See :mod:`news.integrations.pagebuilder`.
@@ -136,7 +136,7 @@ class NewsModule(ModuleBase):
         no foreign row whose disappearance could orphan it, and nothing to
         reconcile after the fact.
         """
-        from news.endpoints.public_views import public_router
+        from news.endpoints.public import public_router
         from news.endpoints.views import admin_router
 
         # Mounted here rather than through ``register_routes`` because that
@@ -162,7 +162,12 @@ class NewsModule(ModuleBase):
         # of a public address. The trailing slash is load-bearing — these are
         # ``startswith`` prefixes, so a bare "/news" would also exempt anything
         # that merely starts with those characters.
-        registry.add_prefix(
-            _dir_prefix(self._resolved_settings().public_route_prefix),
-            methods={"GET", "HEAD"},
-        )
+        prefix = self._resolved_settings().public_route_prefix
+        registry.add_prefix(_dir_prefix(prefix), methods={"GET", "HEAD"})
+        # And the bare prefix, exactly. A reader who trims the URL back to
+        # "/news" is asking for the archive's front page; without this they got
+        # the sign-in screen instead, because the prefix rule above only covers
+        # "/news/" and the redirect to it never happens — auth runs before
+        # routing. Exact rather than a second prefix on purpose: "/news" as a
+        # prefix would also exempt "/newsletter-admin".
+        registry.add_exact(prefix.rstrip("/"), methods={"GET", "HEAD"})

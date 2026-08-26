@@ -7,7 +7,7 @@ was re-exported through news' own DTO, and its CSRF cookie name and editor URL
 were hardcoded in the frontend.
 
 None of that is true any more. ``NewsArticle`` carries its own body, address,
-status and revisions, and :mod:`news.endpoints.public_views` serves them. What
+status and revisions, and :mod:`news.endpoints.public` serves them. What
 remains is genuinely optional — two conveniences that only make sense on a site
 that happens to run both modules:
 

@@ -10,7 +10,7 @@ uncacheable response expensive, and a wrongly-cacheable one a leak.
 from __future__ import annotations
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news.constants import (
     PRIVATE_CACHE_CONTROL,
     PUBLIC_CACHE_CONTROL,

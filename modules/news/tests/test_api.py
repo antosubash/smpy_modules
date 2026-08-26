@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from conftest import make_article
+from factories import make_article
 from news import service
 from news.constants import MAX_LIMIT, ROUTE_PREFIX_API
 from news.models import ArticleStatus

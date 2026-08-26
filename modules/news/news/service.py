@@ -17,13 +17,19 @@ import logging
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import query_filters, tag_service
 from news.constants import ARTICLE_BODY_URL, DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
-from news.models import NOT_TRASHED, NewsArticle, NewsCategory
+from news.models import (
+    NOT_TRASHED,
+    NewsArticle,
+    NewsArticleTag,
+    NewsCategory,
+    NewsTag,
+)
 from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
@@ -102,6 +108,7 @@ async def list_articles(
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
     category: str | None = None,
+    tag: str | None = None,
     q: str | None = None,
     status: str | None = None,
     in_feed_only: bool = False,
@@ -122,6 +129,18 @@ async def list_articles(
         category = await resolve_category_slug(db, category) or category
 
     stmt = _base(include_drafts, category)
+    if tag:
+        # By slug or by name, for the same reason a category accepts both: the
+        # public archive links carry the slug and the admin passes what the
+        # writer typed. An unknown tag matches nothing rather than everything —
+        # a mistyped tag URL should be an empty archive, not the whole one.
+        stmt = stmt.where(
+            NewsArticle.id.in_(
+                select(NewsArticleTag.article_id).join(
+                    NewsTag, NewsTag.id == NewsArticleTag.tag_id
+                ).where(or_(NewsTag.slug == tag, NewsTag.name == tag))
+            )
+        )
     if in_feed_only:
         # Only the feed block asks for this. The admin list must keep showing
         # everything that exists, or an article hidden from the feed becomes
