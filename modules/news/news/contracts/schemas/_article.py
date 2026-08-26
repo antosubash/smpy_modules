@@ -84,6 +84,16 @@ class ArticleDetail(ArticleRead):
     json_ld: dict[str, Any] | None = None
     rejection_note: str | None = None
 
+    publish_at: datetime | None = None
+    unpublish_at: datetime | None = None
+    """When the article goes live and comes down by itself.
+
+    On the editor's shape rather than the listing's, and that is the point: a
+    published article can carry a future ``unpublish_at``, and the listing DTO
+    is what anonymous readers are served. There is no reason for a reader to
+    learn when a piece is scheduled to be taken down.
+    """
+
 
 class ArticleCounts(BaseModel):
     """How many articles each status pill would show.
@@ -184,6 +194,23 @@ class ArticleBodyUpdate(BaseModel):
 
 class RejectRequest(BaseModel):
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
+
+
+class ScheduleRequest(BaseModel):
+    """When an article should go live, and when it should come down.
+
+    Both fields are three-valued and the endpoint passes only what was actually
+    sent: omitted leaves the column alone, an instant sets it, and an explicit
+    ``null`` clears it. Cancelling a schedule has to be expressible, and is not
+    the same as declining to mention one.
+
+    Neither is truncated to a calendar day, unlike ``published_at``. That is a
+    display date and the day is the whole of it; these are instants, and an
+    embargo that lifts "some time on Tuesday" is not an embargo.
+    """
+
+    publish_at: datetime | None = None
+    unpublish_at: datetime | None = None
 
 
 class RevisionRead(BaseModel):

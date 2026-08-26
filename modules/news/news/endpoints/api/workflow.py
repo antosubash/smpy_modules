@@ -18,10 +18,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import tag_service
 from news.content import ArticlesService
-from news.contracts.schemas import ArticleRead, RejectRequest
+from news.contracts.schemas import ArticleRead, RejectRequest, ScheduleRequest
 from news.endpoints.api._deps import read_one, require_edit, require_publish
 
 router = APIRouter()
+
+
+@router.post(
+    "/articles/{article_id}/schedule",
+    response_model=ArticleRead,
+    dependencies=[require_edit, require_publish],
+)
+async def schedule_article(
+    article_id: int, body: ScheduleRequest, db: AsyncSession = Depends(get_db)
+) -> ArticleRead:
+    """Set or clear when an article goes live and comes down.
+
+    Behind ``news.publish`` rather than ``news.edit``, and deliberately: a
+    schedule is a publication decision that happens to be about the future, and
+    a host that gates publishing would be surprised to find an author could
+    arrange one for tomorrow instead.
+    """
+    fields = body.model_dump(exclude_unset=True)
+    await ArticlesService(db).schedule(article_id, **fields)
+    return await read_one(db, article_id)
 
 
 @router.post(

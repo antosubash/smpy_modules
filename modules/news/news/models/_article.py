@@ -203,6 +203,33 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
         return self.published_data is not None
 
 
+    publish_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    """When a draft should go live by itself, or ``None`` for never.
+
+    Deliberately *not* ``published_at``. That is the article's display date and
+    is documented as independent of status — an article may carry a date while
+    still a draft, and back-dating one is ordinary editorial work. Publishing on
+    it would turn every back-dated draft live the moment the scheduler next
+    woke, which is the opposite of what the author meant.
+
+    So this is a separate instant with one job: an intention to publish, cleared
+    the moment it is acted on. The pattern, the column names and the settings
+    that drive it match ``pagebuilder``'s, because a host running both should
+    not have to learn two vocabularies for one idea.
+    """
+
+    unpublish_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    """When a published article should come down by itself. Embargoes expire,
+    and an offer or a notice that has stopped being true is worse than one that
+    was never posted."""
+
+
 class NewsArticleRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """Append-only audit row written on every status transition.
 

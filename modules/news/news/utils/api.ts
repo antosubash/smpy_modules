@@ -52,6 +52,13 @@ export interface ArticleDetail extends ArticleRead {
   index_in_search: boolean;
   json_ld: Record<string, unknown> | null;
   rejection_note: string | null;
+  /** When the article goes live and comes down by itself.
+   *
+   * On this shape rather than `ArticleRead`, and deliberately: a published
+   * article can carry a future `unpublish_at`, and the listing DTO is what
+   * anonymous readers are served. */
+  publish_at: string | null;
+  unpublish_at: string | null;
 }
 
 export interface RevisionRead {
@@ -151,6 +158,16 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
     timeZone: 'UTC',
   });
 }
+
+/** Set or clear when an article goes live and comes down.
+ *
+ * Its own call rather than part of `updateArticle`, because the route is behind
+ * `news.publish` while that one is behind `news.edit` — see `ScheduleCard`.
+ */
+export const scheduleArticle = (
+  id: number,
+  data: { publish_at?: string | null; unpublish_at?: string | null },
+) => write<ArticleRead>(`/articles/${id}/schedule`, 'POST', data);
 
 export const updateArticle = (
   id: number,

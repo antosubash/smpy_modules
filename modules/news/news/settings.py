@@ -51,6 +51,25 @@ class NewsSettings(BaseSettings):
     public_cache_swr: int = 60
     """``stale-while-revalidate`` seconds. Zero omits the directive."""
 
+    scheduler_enabled: bool = True
+    """Run an in-process loop that publishes articles at their scheduled time.
+
+    Disable where a separate worker (a cron job, a k8s CronJob) drives
+    ``ArticlesService.process_due`` instead — otherwise both would race, and an
+    article would be published twice and gain two revision rows saying so.
+
+    Same name, default and reasoning as pagebuilder's: a host running both
+    should not have to learn two vocabularies for one idea.
+    """
+
+    scheduler_interval_seconds: int = 30
+    """How often the in-process scheduler looks for articles that are due.
+
+    The granularity of "goes live at": an article scheduled for 09:00 appears
+    somewhere in the following interval, never before it. Thirty seconds is
+    close enough for an embargo and cheap enough to run on every host.
+    """
+
     public_csp: str = ""
     """Content-Security-Policy for the public article page.
 

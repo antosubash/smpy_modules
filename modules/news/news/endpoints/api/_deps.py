@@ -117,4 +117,6 @@ def detail_of(article: NewsArticle, listing: ArticleRead) -> ArticleDetail:
         index_in_search=article.index_in_search,
         json_ld=article.json_ld,
         rejection_note=article.rejection_note,
+        publish_at=article.publish_at,
+        unpublish_at=article.unpublish_at,
     )

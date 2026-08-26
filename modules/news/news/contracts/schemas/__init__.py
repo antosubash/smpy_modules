@@ -22,6 +22,7 @@ from news.contracts.schemas._article import (
     RejectRequest,
     RevisionEvent,
     RevisionRead,
+    ScheduleRequest,
 )
 from news.contracts.schemas._search import SearchHit, SearchResults
 from news.contracts.schemas._taxonomy import (
@@ -61,6 +62,7 @@ __all__ = [
     "RejectRequest",
     "RevisionEvent",
     "RevisionRead",
+    "ScheduleRequest",
     "SearchHit",
     "SearchResults",
     "TagCreate",

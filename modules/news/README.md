@@ -161,6 +161,7 @@ separation. Owning the content means owning the separation: folding it into
 | `POST /api/news/articles/{id}/submit` | `news.edit` |
 | `POST /api/news/articles/{id}/trash` \| `/restore` | `news.edit` |
 | `POST /api/news/articles/{id}/publish` \| `/unpublish` | `news.edit` **+ `news.publish`** |
+| `POST /api/news/articles/{id}/schedule` | `news.edit` **+ `news.publish`** |
 | `POST /api/news/articles/{id}/approve` \| `/reject` | `news.edit` **+ `news.publish`** |
 | `DELETE /api/news/articles/{id}/purge` | `news.edit` **+ `news.publish`** |
 
@@ -185,6 +186,26 @@ that undates the article, which is a real state rather than an error. Changing
 `PUT /articles/{id}/body` is the canvas autosave, and deliberately cannot reach
 the slug or the status: it fires on a timer rather than on a person pressing
 something.
+
+### Scheduling
+
+`POST /articles/{id}/schedule` sets `publish_at` and `unpublish_at`: a draft
+goes live by itself at the first, a published article comes down by itself at
+the second. Both are optional and both are three-valued — an omitted field is
+left alone, an explicit `null` cancels. Behind `news.publish`, because a
+schedule is a publication decision that happens to be about the future.
+
+An in-process loop (`SM_NEWS_SCHEDULER_ENABLED`, every
+`SM_NEWS_SCHEDULER_INTERVAL_SECONDS`) calls `ArticlesService.process_due`.
+Disable it where a separate worker drives that method instead, or both will race
+and an article will publish twice with two revision rows saying so. The query is
+`<= now` rather than "since the last tick", so a process that was asleep catches
+up rather than losing the window; each timestamp is cleared when acted on, so a
+tick cannot republish the same article forever.
+
+These are deliberately **not** `published_at`, which is the display date below
+and may perfectly reasonably be in the past. The article screen said "a future
+date lists this as scheduled" for a while, which read as a promise nothing kept.
 
 `published_at` is a **display date**, not a timestamp. Whatever instant you
 send, the day is taken as you wrote it and stored as midnight UTC — sending
@@ -211,6 +232,8 @@ All prefixed `SM_NEWS_`:
 | `PUBLIC_CACHE_MAX_AGE` | `300` | shared-cache lifetime of an article |
 | `PUBLIC_CACHE_SWR` | `60` | `stale-while-revalidate` seconds; `0` omits it |
 | `PUBLIC_CSP` | *(unset)* | `Content-Security-Policy` on the article page |
+| `SCHEDULER_ENABLED` | `true` | run the in-process publish/unpublish loop |
+| `SCHEDULER_INTERVAL_SECONDS` | `30` | how often it looks for due articles |
 
 ## Design note: what the split changed
 

@@ -163,7 +163,10 @@ export function ArticleInspector({
       </div>
       <p className="-mt-3 text-xs text-muted-foreground">
         {future
-          ? 'A future date lists this as scheduled. It stays a draft until you publish it.'
+          ? // It used to say "lists this as scheduled", which read as a promise
+            // the module could not keep — nothing acted on the date. Real
+            // scheduling is the Go-live control below; this one is editorial.
+            'The date shown to readers. It does not publish anything — use Go live for that.'
           : 'Clearing the date makes this undated work in progress, which sorts to the top of the list.'}
       </p>
 

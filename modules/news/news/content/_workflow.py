@@ -11,12 +11,21 @@ instead of a permission on somebody else's module.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._revisions import RevisionsMixin
-from news.models import ArticleStatus, NewsArticle, RevisionEvent
+from news.models import NOT_TRASHED, ArticleStatus, NewsArticle, RevisionEvent
+
+_UNSET: Any = object()
+"""Sentinel for "the caller did not mention this field".
+
+``schedule`` has to tell an omitted argument from an explicit ``None``:
+cancelling a schedule is a real instruction, and ``None`` is how it is spelt.
+"""
 
 
 class WorkflowMixin(RevisionsMixin):
@@ -59,9 +68,83 @@ class WorkflowMixin(RevisionsMixin):
         """
         article = await self.get_article(article_id)
         article.published_data = article.draft_data
+        # Acted on, so the intention is spent. Left set, the next tick would
+        # find the article still due and publish it again every thirty seconds.
+        article.publish_at = None
         return await self._transition(
             article, status=ArticleStatus.PUBLISHED, event=RevisionEvent.PUBLISH
         )
+
+    async def schedule(
+        self,
+        article_id: int,
+        *,
+        publish_at: datetime | None = _UNSET,
+        unpublish_at: datetime | None = _UNSET,
+    ) -> NewsArticle:
+        """Set or clear when an article goes live and comes down.
+
+        Each argument is three-valued: omitted leaves the column alone, an
+        instant sets it, and an explicit ``None`` clears it — cancelling a
+        schedule has to be expressible, and is not the same as not mentioning
+        it.
+
+        No status change of its own. Scheduling is a statement about the future;
+        the flip happens in :meth:`process_due` when the time arrives, so an
+        article scheduled for next week is a draft all week.
+        """
+        article = await self.get_article(article_id)
+        if publish_at is not _UNSET:
+            article.publish_at = publish_at
+        if unpublish_at is not _UNSET:
+            article.unpublish_at = unpublish_at
+        self.db.add(article)
+        await self.db.flush()
+        await self.db.refresh(article)
+        return article
+
+    async def process_due(self, now: datetime) -> list[NewsArticle]:
+        """Flip every article whose scheduled moment has passed.
+
+        Idempotent by construction: each tick re-queries, and both `publish` and
+        `unpublish` clear the timestamp they acted on, so a process that was
+        asleep for an hour catches up on its next wakeup rather than losing the
+        window. One bad row is skipped rather than poisoning the whole tick.
+
+        Trashed articles are excluded. An article binned while carrying a
+        schedule must not republish itself out of the trash.
+        """
+        flipped: list[NewsArticle] = []
+
+        due_to_publish = await self.db.execute(
+            select(NewsArticle).where(
+                NOT_TRASHED,
+                NewsArticle.status == ArticleStatus.DRAFT,
+                NewsArticle.publish_at.is_not(None),
+                NewsArticle.publish_at <= now,
+            )
+        )
+        for article in due_to_publish.scalars().all():
+            try:
+                flipped.append(await self.publish(article.id or 0))
+            except HTTPException:
+                continue
+
+        due_to_unpublish = await self.db.execute(
+            select(NewsArticle).where(
+                NOT_TRASHED,
+                NewsArticle.status == ArticleStatus.PUBLISHED,
+                NewsArticle.unpublish_at.is_not(None),
+                NewsArticle.unpublish_at <= now,
+            )
+        )
+        for article in due_to_unpublish.scalars().all():
+            try:
+                flipped.append(await self.unpublish(article.id or 0))
+            except HTTPException:
+                continue
+
+        return flipped
 
     async def unpublish(self, article_id: int) -> NewsArticle:
         """Take the article off the public site, keeping the draft.
@@ -72,6 +155,8 @@ class WorkflowMixin(RevisionsMixin):
         rebuilding a served payload from.
         """
         article = await self.get_article(article_id)
+        # Spent, like `publish_at` — otherwise the next tick takes it down again.
+        article.unpublish_at = None
         return await self._transition(
             article, status=ArticleStatus.DRAFT, event=RevisionEvent.UNPUBLISH
         )

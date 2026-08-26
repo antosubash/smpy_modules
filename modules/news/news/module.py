@@ -16,9 +16,12 @@ notices. See :mod:`news.integrations.pagebuilder`.
 
 from __future__ import annotations
 
+import asyncio
 import importlib.metadata
 import logging
+from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, FastAPI
 from simple_module_core import ModuleBase, ModuleMeta
@@ -144,10 +147,64 @@ class NewsModule(ModuleBase):
         # than the news console and belongs at the app root.
         app.include_router(admin_router, prefix=constants.ADMIN_SEARCH_PREFIX)
 
-        # The public viewer, at the address articles actually serve on.
-        app.include_router(
-            public_router, prefix=self._resolved_settings().public_route_prefix
-        )
+        # The public viewer and the archive, at the address articles serve on.
+        settings = self._resolved_settings()
+        app.include_router(public_router, prefix=settings.public_route_prefix)
+
+        if settings.scheduler_enabled:
+            self._scheduler_task = asyncio.create_task(
+                self._run_scheduler(app, settings)
+            )
+            # FastAPI no longer exposes ``add_event_handler`` on the app itself;
+            # the router still carries it for ASGI lifespan hooks, which is what
+            # this wants — the task lives as long as the app and is cancelled on
+            # shutdown rather than outliving it.
+            app.router.add_event_handler("shutdown", self._stop_scheduler)
+
+    async def _run_scheduler(self, app: FastAPI, settings: NewsSettings) -> None:
+        """Publish and unpublish articles at their scheduled times.
+
+        One short session per tick. A failed tick is logged and the loop
+        continues — a transient database error must not silently stop every
+        future schedule — while cancellation propagates, because that is
+        shutdown.
+        """
+        from news.content import ArticlesService
+
+        factory = app.state.sm.db.session_factory
+        interval = max(1, settings.scheduler_interval_seconds)
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                async with factory() as session:
+                    try:
+                        flipped = await ArticlesService(session).process_due(
+                            datetime.now(UTC)
+                        )
+                        if flipped:
+                            await session.commit()
+                            logger.info(
+                                "news.scheduler.flipped",
+                                extra={"count": len(flipped)},
+                            )
+                        else:
+                            await session.rollback()
+                    except Exception:
+                        await session.rollback()
+                        raise
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("news.scheduler.tick_failed")
+
+    async def _stop_scheduler(self) -> None:
+        task = getattr(self, "_scheduler_task", None)
+        if task is None:
+            return
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        self._scheduler_task = None
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """Let an anonymous reader open an article, and the feed block list them.

@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
+import { ScheduleCard } from '../components/editor/ScheduleCard';
 import { useArticleEditor } from '../hooks/useArticleEditor';
 import { formatArticleDate } from '../utils/api';
 
@@ -19,9 +20,12 @@ import { formatArticleDate } from '../utils/api';
  * independently, and a full-bleed editor.
  */
 export default function ArticleEditor() {
-  const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
+  const page = usePage<{ props: { article_id: number } }>().props as unknown as {
     article_id: number;
+    auth?: { permissions?: string[] };
   };
+  const { article_id } = page;
+  const canPublish = page.auth?.permissions?.includes('news.publish') ?? false;
 
   const {
     article,
@@ -151,6 +155,11 @@ export default function ArticleEditor() {
           >
             Save
           </Button>
+
+          {/* Only for someone who may actually publish. The route is behind
+              `news.publish`, so showing it to an author who may write but not
+              publish would be offering a control that answers 403. */}
+          {canPublish && <ScheduleCard articleId={article_id} />}
         </aside>
       </div>
     </PageShell>
