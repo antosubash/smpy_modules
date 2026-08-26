@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import { csrfHeader, uniqueSlug } from './helpers';
 
@@ -143,6 +143,26 @@ export function walkthroughBody(lead: string): Record<string, unknown> {
         props: { id: 'code-1', code: 'make test-py', language: 'bash', caption: '' },
       },
       {
+        type: 'Facts',
+        props: { id: 'f-1', title: '', items: '21 | sensors installed\n4 | plots covered' },
+      },
+      {
+        type: 'QandA',
+        props: {
+          id: 'qa-1',
+          title: 'A. Subash, field lead',
+          items: 'Why now? | The masts were due for replacement anyway.',
+        },
+      },
+      {
+        type: 'Definitions',
+        props: {
+          id: 'def-1',
+          title: 'The terms',
+          items: 'Canopy cover | The share of ground shaded from above.',
+        },
+      },
+      {
         type: 'Sources',
         props: {
           id: 's-1',
@@ -157,6 +177,34 @@ export function walkthroughBody(lead: string): Record<string, unknown> {
     ],
     zones: {},
   };
+}
+
+/**
+ * Assert that what `walkthroughBody` seeded actually reached the reader.
+ *
+ * Lives beside the fixture rather than in the spec because the two have to
+ * agree: a block added above and not asserted here is a block the walkthrough
+ * silently stops covering. These are the ones whose output is structural rather
+ * than a run of text — a config that registered them but rendered nothing would
+ * still pass every other assertion in the suite.
+ */
+export async function expectPaletteRendered(page: Page): Promise<void> {
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Sensors' })).toBeVisible();
+  await expect(page.getByText('What you need to know')).toBeVisible();
+  await expect(page.getByText('Correction')).toBeVisible();
+  await expect(page.getByText('How it went in')).toBeVisible();
+  // The figure and its label are separate elements, so they are matched
+  // separately — their combined textContent has no space between them.
+  await expect(page.getByText('sensors installed')).toBeVisible();
+  await expect(page.getByText('Why now?')).toBeVisible();
+  await expect(page.getByText('The share of ground shaded from above.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Rollout report' })).toHaveAttribute(
+    'href',
+    'https://example.org/report',
+  );
+  // A source with nowhere to point is still a source.
+  await expect(page.getByText('Interview, March 2024')).toBeVisible();
 }
 
 /**

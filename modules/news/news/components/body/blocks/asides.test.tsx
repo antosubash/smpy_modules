@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CalloutBlock, KeyPointsBlock, SourcesBlock } from './asides';
+import { CalloutBlock, DefinitionsBlock, KeyPointsBlock, SourcesBlock } from './asides';
 import { renderBlock } from './renderBlock';
 
 describe('KeyPoints', () => {
@@ -70,6 +70,25 @@ describe('Callout', () => {
 
   it('keeps a writer’s line breaks', () => {
     expect(renderBlock(CalloutBlock, { text: 'one\ntwo' })).toContain('whitespace-pre-line');
+  });
+});
+
+describe('Definitions', () => {
+  it('renders nothing when empty', () => {
+    expect(renderBlock(DefinitionsBlock)).toBe('');
+  });
+
+  it('pairs each term with its meaning as a description list', () => {
+    const markup = renderBlock(DefinitionsBlock, {
+      items: 'Canopy cover | The share of ground shaded from above.',
+    });
+    expect(markup).toContain('<dl');
+    expect(markup).toContain('Canopy cover');
+    expect(markup).toContain('The share of ground shaded from above.');
+  });
+
+  it('keeps a meaning containing a pipe intact', () => {
+    expect(renderBlock(DefinitionsBlock, { items: 'Term | a | b' })).toContain('a | b');
   });
 });
 

@@ -6,7 +6,7 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
-import { itemKey, lines } from './lines';
+import { cells, itemKey, lines } from './lines';
 
 export interface HeadingProps {
   text: string;
@@ -91,6 +91,52 @@ export const QuoteBlock: ComponentConfig<QuoteProps> = {
       )}
     </blockquote>
   ),
+};
+
+export interface QandAProps {
+  title: string;
+  items: string;
+}
+
+/**
+ * An interview exchange.
+ *
+ * A description list, because that is what it is: each question introduces the
+ * answer that follows it, and a screen reader announcing the pairing gives a
+ * listener the structure a sighted reader gets from the indent. Written as
+ * alternating paragraphs it is neither — just prose where every other sentence
+ * happens to end in a question mark.
+ */
+export const QandABlock: ComponentConfig<QandAProps> = {
+  label: 'Q&A',
+  fields: {
+    title: { type: 'text', label: 'Who is answering (optional)' },
+    items: { type: 'textarea', label: 'One per line — "question | answer"' },
+  },
+  defaultProps: { title: '', items: '' },
+  render: ({ title, items }) => {
+    const exchanges = lines(items).map((line) => cells(line, 2));
+    if (exchanges.length === 0) return <></>;
+    return (
+      <section className="my-8">
+        {title && (
+          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {title}
+          </p>
+        )}
+        <dl className="space-y-5">
+          {exchanges.map(([question, answer], index) => (
+            <div key={itemKey(question, index)}>
+              <dt className="font-semibold leading-relaxed">{question}</dt>
+              <dd className="mt-1 ml-0 whitespace-pre-line leading-relaxed text-muted-foreground">
+                {answer}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    );
+  },
 };
 
 export interface ListProps {

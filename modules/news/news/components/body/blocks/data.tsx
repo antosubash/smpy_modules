@@ -128,6 +128,51 @@ export const CodeBlock: ComponentConfig<CodeProps> = {
   },
 };
 
+export interface FactsProps {
+  title: string;
+  items: string;
+}
+
+/**
+ * The figures a story turns on, pulled out of the prose.
+ *
+ * Not a Table with one row: a table is for numbers a reader compares against
+ * each other, and these are numbers a reader is meant to remember. The label
+ * sits under the figure rather than beside it for the same reason — the figure
+ * is what carries, and the label only says what it counts.
+ */
+export const FactsBlock: ComponentConfig<FactsProps> = {
+  label: 'Key figures',
+  fields: {
+    title: { type: 'text', label: 'Heading (optional)' },
+    items: { type: 'textarea', label: 'One per line — "21 | sensors installed"' },
+  },
+  defaultProps: { title: '', items: '' },
+  render: ({ title, items }) => {
+    const entries = lines(items).map((line) => cells(line, 2));
+    if (entries.length === 0) return <></>;
+    return (
+      <section className="my-8">
+        {title && (
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {title}
+          </p>
+        )}
+        {/* Wraps rather than fixing a column count: three figures on a phone
+            are three unreadable slivers if they are forced to share a row. */}
+        <dl className="flex flex-wrap gap-x-10 gap-y-5">
+          {entries.map(([figure, label], index) => (
+            <div key={itemKey(figure + label, index)}>
+              <dt className="text-3xl font-semibold tracking-tight tabular-nums">{figure}</dt>
+              <dd className="ml-0 mt-0.5 text-sm text-muted-foreground">{label}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    );
+  },
+};
+
 export interface TimelineProps {
   title: string;
   items: string;

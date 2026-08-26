@@ -28,14 +28,19 @@ export {
   CalloutBlock,
   type CalloutProps,
   type CalloutTone,
+  DefinitionsBlock,
+  type DefinitionsProps,
   KeyPointsBlock,
   type KeyPointsProps,
   SourcesBlock,
   type SourcesProps,
 } from './asides';
+export { AudioBlock, type AudioProps, VideoBlock, type VideoProps } from './av';
 export {
   CodeBlock,
   type CodeProps,
+  FactsBlock,
+  type FactsProps,
   TableBlock,
   type TableProps,
   TimelineBlock,
@@ -43,6 +48,8 @@ export {
 } from './data';
 export { DividerBlock, type DividerProps } from './layout';
 export {
+  ComparisonBlock,
+  type ComparisonProps,
   EmbedBlock,
   type EmbedProps,
   GalleryBlock,
@@ -50,6 +57,7 @@ export {
   ImageBlock,
   type ImageProps,
 } from './media';
+export { RelatedBlock, type RelatedProps } from './related';
 export {
   HeadingBlock,
   type HeadingProps,
@@ -57,6 +65,8 @@ export {
   type ListProps,
   ParagraphBlock,
   type ParagraphProps,
+  QandABlock,
+  type QandAProps,
   QuoteBlock,
   type QuoteProps,
 } from './text';

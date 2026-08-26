@@ -120,6 +120,49 @@ export const CalloutBlock: ComponentConfig<CalloutProps> = {
   },
 };
 
+export interface DefinitionsProps {
+  title: string;
+  items: string;
+}
+
+/**
+ * The jargon this story cannot avoid, explained once.
+ *
+ * Set apart rather than parenthesised into the prose, because the two readers
+ * it serves want opposite things: one needs the term explained and the other
+ * already knows it and is slowed down every time the sentence stops to say so.
+ * A box can be read or skipped; a parenthesis cannot.
+ */
+export const DefinitionsBlock: ComponentConfig<DefinitionsProps> = {
+  label: 'Definitions',
+  fields: {
+    title: { type: 'text', label: 'Heading' },
+    items: { type: 'textarea', label: 'One per line — "term | what it means"' },
+  },
+  defaultProps: { title: 'The terms', items: '' },
+  render: ({ title, items }) => {
+    const entries = lines(items).map((line) => cells(line, 2));
+    if (entries.length === 0) return <></>;
+    return (
+      <aside className="my-8 rounded-lg border p-5">
+        {title && (
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {title}
+          </p>
+        )}
+        <dl className="space-y-3 text-sm">
+          {entries.map(([term, meaning], index) => (
+            <div key={itemKey(term, index)}>
+              <dt className="font-semibold">{term}</dt>
+              <dd className="ml-0 leading-relaxed text-muted-foreground">{meaning}</dd>
+            </div>
+          ))}
+        </dl>
+      </aside>
+    );
+  },
+};
+
 export interface SourcesProps {
   title: string;
   items: string;

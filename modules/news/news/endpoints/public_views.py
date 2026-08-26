@@ -162,6 +162,12 @@ async def public_article(
             constants._PAGE_PUBLIC_ARTICLE,
             {
                 "title": article.title,
+                # Which article this is, for the blocks in its own body that
+                # need to know. `Related` is the one: a "read next" list that
+                # includes the article you are reading is visibly broken, and
+                # the slug is the only thing that identifies it inside the
+                # block document.
+                "slug": article.slug,
                 # The published snapshot, never the draft — that is the whole
                 # point of keeping two columns.
                 "data": article.published_data,

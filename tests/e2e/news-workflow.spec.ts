@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { seedArticle, shot, walkthroughBody } from './article-helpers';
+import { expectPaletteRendered, seedArticle, shot, walkthroughBody } from './article-helpers';
 import { csrfHeader, login, uniqueSlug } from './helpers';
 
 /**
@@ -206,21 +206,9 @@ test.describe('News — the full editorial workflow', () => {
     await page.goto(url);
     await expect(page.getByRole('heading', { name: renamed, level: 1 })).toBeVisible();
 
-    // The palette renders through the viewer, not just on the canvas. These are
-    // the blocks whose output is structural rather than a run of text, so a
-    // config that registered them but rendered nothing would still pass every
-    // assertion above.
-    await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Sensors' })).toBeVisible();
-    await expect(page.getByText('What you need to know')).toBeVisible();
-    await expect(page.getByText('Correction')).toBeVisible();
-    await expect(page.getByText('How it went in')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Rollout report' })).toHaveAttribute(
-      'href',
-      'https://example.org/report',
-    );
-    // A source with nowhere to point is still a source.
-    await expect(page.getByText('Interview, March 2024')).toBeVisible();
+    // The palette renders through the viewer, not just on the canvas — asserted
+    // beside the fixture that seeds it, so the two cannot drift apart.
+    await expectPaletteRendered(page);
 
     await shot(page, '06-public-article');
   });

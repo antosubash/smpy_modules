@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CodeBlock, TableBlock, TimelineBlock } from './data';
+import { CodeBlock, FactsBlock, TableBlock, TimelineBlock } from './data';
 import { renderBlock } from './renderBlock';
 
 const ROWS = 'Site | Sensors\nNorth | 12\nSouth | 9';
@@ -66,6 +66,32 @@ describe('Code', () => {
 
   it('scrolls a long line rather than wrapping it', () => {
     expect(renderBlock(CodeBlock, { code: 'x' })).toContain('overflow-x-auto');
+  });
+});
+
+describe('Key figures', () => {
+  it('renders nothing when empty', () => {
+    expect(renderBlock(FactsBlock)).toBe('');
+  });
+
+  it('puts the figure above its label, as a description list', () => {
+    const markup = renderBlock(FactsBlock, { items: '21 | sensors installed\n4 | plots' });
+    expect(markup).toContain('<dl');
+    expect(markup).toContain('21');
+    expect(markup).toContain('sensors installed');
+    expect(markup).toContain('4');
+  });
+
+  it('lines the figures up as numerals', () => {
+    expect(renderBlock(FactsBlock, { items: '21 | sensors' })).toContain('tabular-nums');
+  });
+
+  it('wraps rather than forcing a row, so three figures survive a phone', () => {
+    expect(renderBlock(FactsBlock, { items: '1 | a' })).toContain('flex-wrap');
+  });
+
+  it('renders a figure with no label', () => {
+    expect(renderBlock(FactsBlock, { items: '21' })).toContain('21');
   });
 });
 

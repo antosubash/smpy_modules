@@ -17,14 +17,22 @@
 import type { Config } from '@puckeditor/core';
 
 import {
+  AudioBlock,
+  type AudioProps,
   CalloutBlock,
   type CalloutProps,
   CodeBlock,
   type CodeProps,
+  ComparisonBlock,
+  type ComparisonProps,
+  DefinitionsBlock,
+  type DefinitionsProps,
   DividerBlock,
   type DividerProps,
   EmbedBlock,
   type EmbedProps,
+  FactsBlock,
+  type FactsProps,
   GalleryBlock,
   type GalleryProps,
   HeadingBlock,
@@ -37,14 +45,20 @@ import {
   type ListProps,
   ParagraphBlock,
   type ParagraphProps,
+  QandABlock,
+  type QandAProps,
   QuoteBlock,
   type QuoteProps,
+  RelatedBlock,
+  type RelatedProps,
   SourcesBlock,
   type SourcesProps,
   TableBlock,
   type TableProps,
   TimelineBlock,
   type TimelineProps,
+  VideoBlock,
+  type VideoProps,
 } from './blocks';
 
 export interface ArticleBodyProps {
@@ -52,13 +66,20 @@ export interface ArticleBodyProps {
   Paragraph: ParagraphProps;
   List: ListProps;
   Quote: QuoteProps;
+  QandA: QandAProps;
   KeyPoints: KeyPointsProps;
   Callout: CalloutProps;
+  Definitions: DefinitionsProps;
   Sources: SourcesProps;
+  Related: RelatedProps;
   Image: ImageProps;
   Gallery: GalleryProps;
+  Comparison: ComparisonProps;
+  Video: VideoProps;
+  Audio: AudioProps;
   Embed: EmbedProps;
   Table: TableProps;
+  Facts: FactsProps;
   Code: CodeProps;
   Timeline: TimelineProps;
   Divider: DividerProps;
@@ -102,10 +123,16 @@ export const articlePuckConfig: ArticleConfig = {
   // beside List, because a writer wanting a summary box is not shopping for a
   // list — they are looking for the thing that sits outside the story.
   categories: {
-    text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote'] },
-    asides: { title: 'Set apart', components: ['KeyPoints', 'Callout', 'Sources'] },
-    media: { title: 'Media', components: ['Image', 'Gallery', 'Embed'] },
-    data: { title: 'Data', components: ['Table', 'Code', 'Timeline'] },
+    text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'] },
+    asides: {
+      title: 'Set apart',
+      components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related'],
+    },
+    media: {
+      title: 'Media',
+      components: ['Image', 'Gallery', 'Comparison', 'Video', 'Audio', 'Embed'],
+    },
+    data: { title: 'Data', components: ['Table', 'Facts', 'Code', 'Timeline'] },
     layout: { title: 'Layout', components: ['Divider'] },
   },
   components: {
@@ -113,13 +140,20 @@ export const articlePuckConfig: ArticleConfig = {
     Paragraph: ParagraphBlock,
     List: ListBlock,
     Quote: QuoteBlock,
+    QandA: QandABlock,
     KeyPoints: KeyPointsBlock,
     Callout: CalloutBlock,
+    Definitions: DefinitionsBlock,
     Sources: SourcesBlock,
+    Related: RelatedBlock,
     Image: ImageBlock,
     Gallery: GalleryBlock,
+    Comparison: ComparisonBlock,
+    Video: VideoBlock,
+    Audio: AudioBlock,
     Embed: EmbedBlock,
     Table: TableBlock,
+    Facts: FactsBlock,
     Code: CodeBlock,
     Timeline: TimelineBlock,
     Divider: DividerBlock,

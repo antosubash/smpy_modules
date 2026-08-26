@@ -20,6 +20,9 @@ import { formatArticleDate } from '../utils/api';
 
 interface Props {
   title: string;
+  /** Which article this is. Handed to the block document as Puck metadata so a
+   *  block can know what it is inside — see the `<Render>` call below. */
+  slug?: string;
   data: Record<string, unknown>;
   meta_description: string | null;
   og_image: string | null;
@@ -48,6 +51,7 @@ function safeJsonLd(doc: Record<string, unknown>): string {
 
 export default function PublicArticle({
   title,
+  slug,
   data,
   meta_description,
   og_image,
@@ -132,7 +136,15 @@ export default function PublicArticle({
             />
           )}
         </header>
-        <Render config={articlePuckConfig} data={data as unknown as Data} />
+        {/* `metadata` is how a block learns what it is inside. Only `Related`
+            wants it today — a "read next" list that includes the article you
+            are reading is visibly broken — but it is the seam for any block
+            that needs the article rather than its own props. */}
+        <Render
+          config={articlePuckConfig}
+          data={data as unknown as Data}
+          metadata={{ currentSlug: slug }}
+        />
       </article>
     </div>
   );

@@ -102,6 +102,71 @@ export const GalleryBlock: ComponentConfig<GalleryProps> = {
   },
 };
 
+export interface ComparisonProps {
+  beforeUrl: string;
+  beforeLabel: string;
+  afterUrl: string;
+  afterLabel: string;
+  caption: string;
+}
+
+/**
+ * Two pictures of the same thing, side by side.
+ *
+ * Its own block rather than a two-column Gallery because the labels are the
+ * content: a before-and-after nobody can tell the order of shows a change
+ * without saying which way it went. They stay side by side on a phone rather
+ * than stacking — a comparison a reader has to scroll between is one they have
+ * to hold in their head instead of seeing.
+ *
+ * Not a drag-the-handle slider. That hides half of each frame behind an
+ * interaction, and a reader who never touches it sees neither picture whole.
+ */
+export const ComparisonBlock: ComponentConfig<ComparisonProps> = {
+  label: 'Before / after',
+  fields: {
+    beforeUrl: { type: 'text', label: 'Before — image URL' },
+    beforeLabel: { type: 'text', label: 'Before — label' },
+    afterUrl: { type: 'text', label: 'After — image URL' },
+    afterLabel: { type: 'text', label: 'After — label' },
+    caption: { type: 'text', label: 'Caption (optional)' },
+  },
+  defaultProps: {
+    beforeUrl: '',
+    beforeLabel: 'Before',
+    afterUrl: '',
+    afterLabel: 'After',
+    caption: '',
+  },
+  render: ({ beforeUrl, beforeLabel, afterUrl, afterLabel, caption }) => {
+    // Both or neither: one half of a comparison is just an image, and the
+    // reader would be told it is a "before" with nothing to compare it to.
+    if (!beforeUrl || !afterUrl) return <></>;
+    return (
+      <figure className="my-8">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { url: beforeUrl, label: beforeLabel },
+            { url: afterUrl, label: afterLabel },
+          ].map(({ url, label }) => (
+            <figure key={url} className="m-0">
+              <img src={url} alt={label} loading="lazy" className="w-full rounded-lg" />
+              {label && (
+                <figcaption className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+        {caption && (
+          <figcaption className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>
+        )}
+      </figure>
+    );
+  },
+};
+
 export interface EmbedProps {
   url: string;
   title: string;

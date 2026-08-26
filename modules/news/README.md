@@ -209,10 +209,10 @@ a list.
 
 | Group | Blocks |
 |---|---|
-| Text | Heading, Paragraph, List, Pull quote |
-| Set apart | Key points, Callout, Sources |
-| Media | Image, Gallery, Embed |
-| Data | Table, Code, Timeline |
+| Text | Heading, Paragraph, List, Pull quote, Q&A |
+| Set apart | Key points, Callout, Definitions, Sources, Read next |
+| Media | Image, Gallery, Before / after, Video file, Audio clip, Embed |
+| Data | Table, Key figures, Code, Timeline |
 | Layout | Divider |
 
 The bar for adding one is that **a newsroom already does this thing in a story
@@ -242,12 +242,50 @@ A few consequences of that bar worth knowing:
 - **Divider** offers an asterism (`* * *`) as well as a rule. They mean
   different things: a rule separates the article from something appended to it,
   an asterism marks a change of scene *within* one continuous piece.
+- **Q&A** and **Definitions** render as `<dl>` rather than as alternating
+  paragraphs, because that is what they are — each question introduces the
+  answer that follows it, and a screen reader announcing the pairing gives a
+  listener the structure a sighted reader gets from the indent.
+- **Before / after** stays two frames side by side on a phone rather than
+  stacking, and is not a drag-the-handle slider. A comparison a reader has to
+  scroll between is one they have to hold in their head; a slider hides half of
+  each frame behind an interaction the reader may never make.
+- **Video file** and **Audio clip** are for media the publication hosts itself.
+  `Embed` is an `<iframe>` and so only speaks to services that publish a player;
+  a reporter's own mp4 had nowhere to go before these existed. Both
+  `preload="metadata"`, because an article can carry several and a reader who
+  scrolls past one should not have paid for it.
 
-Blocks whose content is a list — List, Key points, Sources, Timeline, Gallery,
-Table — are edited as a textarea, one item per line, rather than through Puck's
-array field, so a writer pasting a list out of a document gets it in one action
-instead of clicking "add item" nine times. `blocks/lines.ts` is that parsing,
-in one place, so no two blocks can disagree about what a line means.
+### Read next is the exception
+
+Every other block renders exactly what a writer typed into it. **Read next**
+queries the listing API instead, because a related-articles list hand-typed at
+publication is stale the moment the next article goes up and nobody returns to a
+three-month-old story to refresh it.
+
+That makes it the one block that has to know which article it is inside — a
+"read next" offering the article you are reading is visibly broken. The viewer
+passes the current slug to `<Render>` as Puck `metadata`, and the block reads it
+from `puck.metadata.currentSlug`. That seam is deliberately general: it is where
+any future block that needs the article rather than its own props should look.
+
+It renders its own list rather than reusing the card grid the `NewsFeed` block
+draws with, because that grid belongs to pagebuilder and this has to work
+without it.
+
+Blocks whose content is a list — List, Key points, Q&A, Definitions, Sources,
+Timeline, Key figures, Gallery, Table — are edited as a textarea, one item per
+line, rather than through Puck's array field, so a writer pasting a list out of
+a document gets it in one action instead of clicking "add item" nine times.
+`blocks/lines.ts` is that parsing, in one place, so no two blocks can disagree
+about what a line means.
+
+Two things the palette deliberately does **not** have. **Charts** would mean
+shipping a charting library, and these blocks render on the public page of a
+host that may have installed nothing else — a table of the figures is the
+honest version. **A table of contents** would need a block to see its siblings,
+which Puck does not give a `render` function; the seam that would allow it is
+the same `metadata` one `Read next` uses, so it is possible, just not free.
 
 ## Known gaps
 

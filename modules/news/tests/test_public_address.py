@@ -108,6 +108,22 @@ class TestTheViewer:
         assert "live" in response.text
         assert "wip" not in response.text
 
+    async def test_it_tells_the_body_which_article_it_is(self, anon_client) -> None:
+        """The viewer hands the block document the article's own slug.
+
+        It becomes Puck metadata, which is how a block can know what it is
+        inside. ``Related`` is the block that needs it: a "read next" list that
+        includes the article you are reading is visibly broken, and the slug is
+        the only thing identifying the article from within its own body.
+        """
+        await _seed(anon_client, "knows-itself")
+
+        response = await anon_client.get(
+            f"{NEWS}/knows-itself", headers={"X-Inertia": "true"}
+        )
+
+        assert response.json()["props"]["slug"] == "knows-itself"
+
 
 class TestCachingHeaders:
     """What the hand-off to pagebuilder's viewer used to guarantee."""
