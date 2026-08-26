@@ -4,9 +4,12 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 
 import type { ArticleRead } from '../../utils/api';
+import { SLUG_PATTERN } from '../../utils/slugify';
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { TagInput } from './TagInput';
 
+const TITLE_ID = 'article-title';
+const SLUG_ID = 'article-slug';
 const CATEGORY_ID = 'article-category';
 const DATE_ID = 'article-date';
 const TIME_ID = 'article-time';
@@ -17,6 +20,8 @@ const FEED_ID = 'article-show-in-feed';
 /** A draft of the fields this panel edits. Held by the page so a save sends
  *  one request rather than one per control. */
 export interface ArticleDraft {
+  title: string;
+  slug: string;
   category: string;
   tags: string[];
   date: string;
@@ -35,7 +40,14 @@ interface Props {
   onChange: (patch: Partial<ArticleDraft>) => void;
 }
 
-/** The Article tab — everything the page underneath has no concept of.
+/** Everything about an article except the blocks its body is made of.
+ *
+ * The headline and the URL are edited here. They used to belong to the page an
+ * article was attached to, so this panel showed the address read-only and told
+ * the author to change it "in the page editor" — advice that outlived the
+ * screen it pointed at and left an article unrenameable anywhere in the
+ * console. They are columns on `news_articles` now, and this is the screen that
+ * owns them.
  *
  * The date and time are two controls over one stored instant rather than a
  * single datetime field, because they are decided at different moments: the
@@ -55,17 +67,49 @@ export function ArticleInspector({
     ? new Date(`${draft.date}T${draft.time || '00:00'}`) > new Date()
     : false;
 
+  // `url` is the public prefix plus the stored slug, so removing the stored
+  // slug leaves the prefix. Taken from the server's answer rather than from a
+  // setting read here, because the prefix is configurable and this screen
+  // should show the address the article actually has.
+  const prefix = article.url.slice(0, article.url.length - article.slug.length);
+
   return (
     <div className="space-y-5">
       <div className="grid gap-2">
-        <Label htmlFor="article-url">URL</Label>
-        <p id="article-url" className="break-all font-mono text-sm text-muted-foreground">
-          {article.url}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          The slug lives with the page. Change it in the page editor — it is the article's public
-          address, so nothing else may move it.
-        </p>
+        <Label htmlFor={TITLE_ID}>Headline</Label>
+        <Input
+          id={TITLE_ID}
+          value={draft.title}
+          disabled={busy}
+          onChange={(e) => onChange({ title: e.target.value })}
+        />
+        {!draft.title.trim() && (
+          <p className="text-xs text-destructive">An article needs a headline.</p>
+        )}
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor={SLUG_ID}>URL</Label>
+        <div className="flex items-center gap-1">
+          <span className="shrink-0 text-sm text-muted-foreground">{prefix}</span>
+          <Input
+            id={SLUG_ID}
+            value={draft.slug}
+            disabled={busy}
+            onChange={(e) => onChange({ slug: e.target.value })}
+          />
+        </div>
+        {draft.slug && !SLUG_PATTERN.test(draft.slug) ? (
+          <p className="text-xs text-destructive">
+            Lowercase letters, numbers and hyphens, starting with a letter or number.
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Changing this moves the article. The old address keeps working — a rename records a
+            redirect, because it is already in bookmarks and in a search index that has not
+            recrawled.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-2">

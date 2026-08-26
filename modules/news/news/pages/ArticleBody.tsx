@@ -116,13 +116,30 @@ export default function ArticleBody() {
             data={data ?? (emptyArticleData as never)}
             viewports={articleViewports}
             iframe={{ enabled: true }}
-            // Puck's header renders its own primary "Publish", wired to a
-            // plain data change rather than to the workflow. Leaving it would
-            // put two differently-behaved Publish buttons on one screen, the
-            // louder of which does the quieter thing. The toolbar above is the
-            // only publish control; the title, undo/redo and the sidebar
-            // toggles stay in Puck's header.
-            overrides={{ headerActions: () => <></> }}
+            overrides={{
+              // Puck's header renders its own primary "Publish", wired to a
+              // plain data change rather than to the workflow. Leaving it would
+              // put two differently-behaved Publish buttons on one screen, the
+              // louder of which does the quieter thing. The toolbar above is
+              // the only publish control; the title, undo/redo and the sidebar
+              // toggles stay in Puck's header.
+              headerActions: () => <></>,
+              // With nothing selected Puck shows the *root* field set, and this
+              // config deliberately has none — an article's headline is a
+              // column, edited next door, not a root prop (see
+              // `articlePuckConfig`). That would leave an empty panel where a
+              // writer looking for the headline would look first, so it says
+              // where the headline went instead.
+              fields: ({ children, itemSelector }) =>
+                itemSelector ? (
+                  <>{children}</>
+                ) : (
+                  <p className="p-4 text-sm text-muted-foreground">
+                    Select a block to edit it. The headline, URL and publish date belong to the
+                    article — edit them on the article screen.
+                  </p>
+                ),
+            }}
             onChange={change}
           />
         )}

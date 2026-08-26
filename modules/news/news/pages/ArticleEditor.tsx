@@ -30,6 +30,7 @@ export default function ArticleEditor() {
     tagSuggestions,
     busy,
     dirty,
+    valid,
     error,
     saved,
     load,
@@ -143,7 +144,11 @@ export default function ArticleEditor() {
             onChange={patch}
           />
 
-          <Button className="w-full" disabled={busy || !dirty} onClick={() => void save()}>
+          <Button
+            className="w-full"
+            disabled={busy || !dirty || !valid}
+            onClick={() => void save()}
+          >
             Save
           </Button>
         </aside>

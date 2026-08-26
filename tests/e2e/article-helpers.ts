@@ -75,3 +75,54 @@ export function paragraphBody(text: string): Record<string, unknown> {
     zones: {},
   };
 }
+
+/**
+ * A body with some of each block, for the walkthrough to publish and read back.
+ *
+ * Seeded through the body API rather than dragged onto the canvas, which is the
+ * convention the rest of this suite already follows — Puck's palette is
+ * dnd-kit, and driving it under Playwright is flaky enough that it would be the
+ * only thing a walkthrough ever failed on. What the walkthrough *does* drive
+ * through the real canvas is the inspector: seeding proves nothing about
+ * whether editing a block saves, and that is the part worth watching.
+ */
+export function walkthroughBody(lead: string): Record<string, unknown> {
+  return {
+    root: { props: { title: lead } },
+    content: [
+      { type: 'Paragraph', props: { id: 'p-lead', text: lead, lead: true } },
+      { type: 'Heading', props: { id: 'h-1', text: 'What changed', level: '2' } },
+      {
+        type: 'Paragraph',
+        props: { id: 'p-body', text: 'Placeholder body copy.', lead: false },
+      },
+      {
+        type: 'Quote',
+        props: { id: 'q-1', text: 'One row, one owner.', attribution: 'The migration' },
+      },
+      {
+        type: 'List',
+        props: { id: 'l-1', items: 'Own table\nOwn viewer\nOwn sitemap', ordered: false },
+      },
+      { type: 'Divider', props: { id: 'd-1', spacing: 'large' } },
+    ],
+    zones: {},
+  };
+}
+
+/**
+ * Write a screenshot only when `WALKTHROUGH_SHOTS` names a directory.
+ *
+ * Off by default so an ordinary suite run — CI's included — asserts without
+ * leaving files behind. The walkthrough is a test first; the pictures are a
+ * by-product of running it with the flag on.
+ */
+export async function shot(page: Page, name: string): Promise<void> {
+  const dir = process.env.WALKTHROUGH_SHOTS;
+  if (!dir) return;
+  // Back to the top first: the step before a shot usually ends by interacting
+  // with a control near the bottom of a form, and a viewport-height frame taken
+  // from there shows the footer rather than the screen being demonstrated.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
+}

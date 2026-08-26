@@ -71,8 +71,14 @@ the package absent.
 
 Go to **News** in the sidebar. "New article" creates the article and drops you
 into its **body canvas** — this module's own block editor — to write it.
-Category, tags, byline, display date and feed behaviour are edited on the
-article screen; the list edits category and date inline.
+Headline, URL, category, tags, byline, display date and feed behaviour are
+edited on the **article screen**; the list edits category and date inline.
+
+The two screens split by posture, not by importance: the canvas wants the whole
+viewport and autosaves on a timer, and the article screen is a column of short
+fields saved by one button. The headline lives on the article screen rather than
+on the canvas because moving it also moves the URL, and a rename is a decision —
+not something that should happen on a debounce.
 
 ## Permissions
 
@@ -196,6 +202,18 @@ pagebuilder, build the page there, and link to it.
 
 ## Known gaps
 
+- **The public `<head>` is rendered by the browser, not the server.** Every
+  `og:*` tag, the description, the canonical link, the `robots` directive and
+  the JSON-LD in `PublicArticle.tsx` go through Inertia's `<Head>`, which only
+  runs once JavaScript has. The raw HTML a crawler or a Slack unfurler receives
+  is `<title>SimpleModule</title>` and an Inertia data blob — the article's
+  content and all of its metadata are in that blob, but nothing that reads
+  markup will find them. This is the host's rendering model rather than anything
+  the split changed: pagebuilder's `/p/{slug}` returns an identical bare head,
+  and there is no SSR anywhere in the host. It is listed here because news is
+  the module it costs the most — an archive exists to be linked to — and because
+  the SEO columns below cannot do their job until it is addressed, which is
+  framework work rather than module work.
 - **The trash has no screen.** `POST /articles/{id}/trash`, `/restore` and
   `DELETE /articles/{id}/purge` exist and are tested, but the admin list offers
   a hard delete rather than a bin, so a trashed article is currently only
@@ -206,6 +224,15 @@ pagebuilder, build the page there, and link to it.
   endpoint; no screen renders them yet.
 - **Images take a URL, not a picker.** The media library belongs to
   pagebuilder, and the image block has to work without it.
+- **The SEO fields have no screen.** `meta_description`, `og_image`,
+  `canonical_url`, `index_in_search` and `json_ld` are columns, accepted by
+  `PUT /articles/{id}` and rendered by the viewer — the migration carried each
+  one over from the page an article used to be — but nothing in the console
+  sets them. Until a screen does, `meta_description` is only ever what the
+  backfill left, and the listing's `excerpt` is drawn from it.
+- **Submit, approve and reject are API-only.** The article screen publishes
+  directly, so a host that wants the editor → publisher separation
+  `news.publish` exists to enforce has to drive those three routes itself.
 
 ## Development
 

@@ -9,6 +9,7 @@ import {
   publishArticle,
   updateArticle,
 } from '../utils/api';
+import { SLUG_PATTERN } from '../utils/slugify';
 import {
   type CategoryRead,
   listManagedCategories,
@@ -30,6 +31,8 @@ function splitInstant(iso: string | null): { date: string; time: string } {
 function toDraft(article: ArticleRead): ArticleDraft {
   const { date, time } = splitInstant(article.published_at);
   return {
+    title: article.title,
+    slug: article.slug,
     category: article.category,
     tags: article.tags ?? [],
     date,
@@ -107,6 +110,12 @@ export function useArticleEditor(articleId: number) {
       // as null rather than omitted.
       const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
       const updated = await updateArticle(articleId, {
+        // Sent every time rather than only when changed: the server compares
+        // the incoming slug against the stored one and records a redirect only
+        // for a real move, so an unchanged value costs nothing and diffing here
+        // would be a second opinion about what counts as a rename.
+        title: draft.title.trim(),
+        slug: draft.slug,
         category: draft.category,
         published_at: publishedAt,
         pinned: draft.pinned,
@@ -142,6 +151,16 @@ export function useArticleEditor(articleId: number) {
 
   const remove = useCallback(() => deleteArticle(articleId), [articleId]);
 
+  /** Whether Save would be accepted.
+   *
+   * Checked here rather than left to the server because the two fields that can
+   * fail are the two the DTO validates structurally: an empty title and a
+   * malformed slug both come back as a 422 whose body names a Pydantic path,
+   * which is not something this screen can turn into a sentence. A collision
+   * still comes from the server — only it knows what is taken.
+   */
+  const valid = draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
+
   return {
     article,
     draft,
@@ -149,6 +168,7 @@ export function useArticleEditor(articleId: number) {
     tagSuggestions,
     busy,
     dirty,
+    valid,
     saved,
     error,
     load,

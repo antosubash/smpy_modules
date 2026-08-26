@@ -34,9 +34,13 @@ __all__ = ["ArticlesService", "empty_article_document", "slug_for_title"]
 def empty_article_document(title: str) -> dict[str, Any]:
     """What the body editor opens for an article with no blocks yet.
 
-    The title is repeated into the root props because that is where the canvas
-    reads its document heading from; the ``title`` column drives the admin list,
-    the public ``<title>`` and the card.
+    The ``title`` column is the article's headline — the admin list, the public
+    ``<title>``, the card and the rendered ``<h1>`` all read it, and the article
+    screen is where it is edited. The copy in the root props is inert: Puck
+    stores a root prop bag per document and this one has never had a field
+    behind it, so nothing writes to it and nothing renders it. It is seeded
+    anyway so every document has the same shape, whether it was created here or
+    carried over by the migration.
     """
     return {
         "root": {"props": {"title": title}},
