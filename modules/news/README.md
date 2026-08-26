@@ -74,6 +74,10 @@ into its **body canvas** — this module's own block editor — to write it.
 Headline, URL, category, tags, byline, display date and feed behaviour are
 edited on the **article screen**; the list edits category and date inline.
 
+The article screen also carries **Review** (submit, approve, send back with a
+note), **Schedule**, **Search & sharing** and **History**. Binned articles are
+under **News → Trash**, where they can be restored or removed for good.
+
 The two screens split by posture, not by importance: the canvas wants the whole
 viewport and autosaves on a timer, and the article screen is a column of short
 fields saved by one button. The headline lives on the article screen rather than
@@ -367,27 +371,22 @@ the same `metadata` one `Read next` uses, so it is possible, just not free.
   the head and nothing else. Server-rendering the body would mean a Python
   implementation of all twenty-one blocks, or SSR in the host. Both are real
   projects; neither is this module's to start.
-- **The trash has no screen.** `POST /articles/{id}/trash`, `/restore` and
-  `DELETE /articles/{id}/purge` exist and are tested, but the admin list offers
-  a hard delete rather than a bin, so a trashed article is currently only
-  reachable over the API. Adding a trash filter to the list is the natural next
-  step.
-- **The body canvas has no revision UI.** Revisions are recorded on every
-  transition and readable at `/articles/{id}/revisions`, with a restore
-  endpoint; no screen renders them yet.
 - **Images take a URL, not a picker.** The media library belongs to
   pagebuilder, and the Image and Gallery blocks have to work without it. Where
   that module *is* installed its picker hands out exactly what these want — a
   URL to paste — so the gap is the extra step, not a missing capability.
-- **The SEO fields have no screen.** `meta_description`, `og_image`,
-  `canonical_url`, `index_in_search` and `json_ld` are columns, accepted by
-  `PUT /articles/{id}` and rendered by the viewer — the migration carried each
-  one over from the page an article used to be — but nothing in the console
-  sets them. Until a screen does, `meta_description` is only ever what the
-  backfill left, and the listing's `excerpt` is drawn from it.
-- **Submit, approve and reject are API-only.** The article screen publishes
-  directly, so a host that wants the editor → publisher separation
-  `news.publish` exists to enforce has to drive those three routes itself.
+- **Nothing here is translated.** Every string is hardcoded English and there is
+  no `locales/`. This is not news' to fix alone: the framework's convention
+  depends on `@simple-module-py/i18n` and *this repo's host does not wire i18n
+  at all* — no dependency, no loader, no generation step. Adding a catalogue to
+  one module would do nothing until the host adopts it, and then all three
+  modules here convert together. See the repo's `CLAUDE.md`.
+- **The palette has no charts and no table of contents.** Charts would mean
+  shipping a charting library onto the public page of a host that may have
+  installed nothing else; a table of the figures is the honest version. A
+  contents list needs a block to see its siblings, which Puck does not hand a
+  `render` function — the `metadata` seam `Read next` uses is where that would
+  start.
 
 ## Development
 

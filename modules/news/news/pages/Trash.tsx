@@ -1,0 +1,136 @@
+import { Head, router } from '@inertiajs/react';
+import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { Button } from '@simple-module-py/ui/components/ui/button';
+import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import {
+  type ArticleRead,
+  formatArticleDate,
+  listArticles,
+  purgeArticle,
+  restoreArticle,
+} from '../utils/api';
+
+/** Binned articles, and the two things you can do with them.
+ *
+ * Trash, restore and purge were implemented and tested from the day the module
+ * owned its own content, and had no screen. So the admin list offered a hard
+ * delete instead — the one action the soft delete exists to avoid — and a
+ * trashed article was reachable only over the API.
+ *
+ * A trashed article keeps its slug claimed, which is why this screen matters
+ * beyond recovery: an author who bins an article and cannot find it will simply
+ * try to recreate it, and be told the URL is taken by something they cannot
+ * see.
+ */
+export default function Trash() {
+  const [items, setItems] = useState<ArticleRead[] | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = useCallback(
+    (signal?: AbortSignal) =>
+      listArticles({ trashed: true, limit: 100, signal })
+        .then((response) => setItems(response.items))
+        .catch((e: Error) => {
+          if (signal?.aborted) return;
+          toast.error(e.message);
+          setItems([]);
+        }),
+    [],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  const act = async (id: number, action: () => Promise<unknown>, done: string) => {
+    setBusyId(id);
+    try {
+      await action();
+      await load();
+      toast.success(done);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <PageShell
+      title="Trash"
+      description="Articles you have deleted. Restoring puts one back exactly as it was."
+      actions={
+        <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
+          News / Articles
+        </Button>
+      }
+    >
+      <Head title="Trash" />
+
+      {items === null ? (
+        <div role="status" aria-label="Loading the trash" className="h-24" />
+      ) : items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">The trash is empty.</p>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((article) => (
+            <li
+              key={article.id}
+              data-testid="trashed-row"
+              data-slug={article.slug}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium">{article.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {article.url}
+                  {article.published_at ? ` · ${formatArticleDate(article.published_at)}` : ''}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busyId === article.id}
+                  onClick={() => void act(article.id, () => restoreArticle(article.id), 'Restored')}
+                >
+                  Restore
+                </Button>
+                <ConfirmDialog
+                  // High: purging is the one action here with no way back, and
+                  // it also frees the slug — so a link already in the world
+                  // stops resolving and can later point at something else.
+                  level="high"
+                  title={`Delete “${article.title}” for good?`}
+                  description="The article, its body, its tags and its redirects are removed permanently. This cannot be undone."
+                  confirmLabel="Delete for good"
+                  onConfirm={() =>
+                    act(article.id, () => purgeArticle(article.id), 'Deleted for good')
+                  }
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      disabled={busyId === article.id}
+                    >
+                      Delete for good
+                    </Button>
+                  }
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PageShell>
+  );
+}
+
+Trash.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;

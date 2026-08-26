@@ -109,6 +109,11 @@ export async function listArticles(params: {
   /** Sort undated (work-in-progress) articles first — the admin list's view.
    *  Public feeds keep the default, which pushes undated to the end. */
   undated_first?: boolean;
+  /** Only articles carrying this tag, by slug or by name. */
+  tag?: string;
+  /** The trash instead of the list. Needs `news.edit`; anyone else gets
+   *  nothing, because a trashed article is by definition not published. */
+  trashed?: boolean;
   signal?: AbortSignal;
 }): Promise<ArticleListResponse> {
   const query = new URLSearchParams();
@@ -119,6 +124,8 @@ export async function listArticles(params: {
   if (params.status) query.set('status', params.status);
   if (params.in_feed) query.set('in_feed', 'true');
   if (params.undated_first) query.set('undated_first', 'true');
+  if (params.tag) query.set('tag', params.tag);
+  if (params.trashed) query.set('trashed', 'true');
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',
@@ -245,8 +252,22 @@ export const unpublishArticle = (id: number) =>
 export const submitArticle = (id: number) =>
   write<ArticleRead>(`/articles/${id}/submit`, 'POST', {});
 
+/** Approve a submission — which also publishes it. One action, because a
+ *  reviewer who has to approve and then publish separately eventually forgets
+ *  the second half. Requires `news.publish`. */
+export const approveArticle = (id: number) =>
+  write<ArticleRead>(`/articles/${id}/approve`, 'POST', {});
+
+/** Send a submission back, with a reason the author sees on the canvas. */
+export const rejectArticle = (id: number, note: string) =>
+  write<ArticleRead>(`/articles/${id}/reject`, 'POST', { note });
+
 /** Move to the trash. Answers 204: there is no visible article to return. */
 export const trashArticle = (id: number) => write<null>(`/articles/${id}/trash`, 'POST', {});
+
+/** Remove for good, with its redirects. Requires `news.publish`. */
+export const purgeArticle = (id: number) =>
+  write<null>(`/articles/${id}/purge`, 'DELETE', undefined);
 
 export const restoreArticle = (id: number) =>
   write<ArticleRead>(`/articles/${id}/restore`, 'POST', {});

@@ -7,7 +7,10 @@ import { useEffect } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
+import { HistoryCard } from '../components/editor/HistoryCard';
+import { ReviewCard } from '../components/editor/ReviewCard';
 import { ScheduleCard } from '../components/editor/ScheduleCard';
+import { SeoCard } from '../components/editor/SeoCard';
 import { useArticleEditor } from '../hooks/useArticleEditor';
 import { formatArticleDate } from '../utils/api';
 
@@ -156,10 +159,15 @@ export default function ArticleEditor() {
             Save
           </Button>
 
+          <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
+
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not
               publish would be offering a control that answers 403. */}
           {canPublish && <ScheduleCard articleId={article_id} />}
+
+          <SeoCard articleId={article_id} />
+          <HistoryCard articleId={article_id} />
         </aside>
       </div>
     </PageShell>

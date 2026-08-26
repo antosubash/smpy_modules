@@ -72,8 +72,14 @@ to keep.
 """
 
 
-def _base(include_drafts: bool, category: str | None):
-    stmt = select(*_CARD_COLUMNS).where(NOT_TRASHED)
+def _base(include_drafts: bool, category: str | None, trashed_only: bool = False):
+    # The trash is the one listing that asks for the complement of the filter
+    # every other listing applies. Spelt here rather than by a caller dropping
+    # the `where`, so there is still exactly one place that decides what
+    # "trashed" means.
+    stmt = select(*_CARD_COLUMNS).where(
+        NewsArticle.deleted_at.is_not(None) if trashed_only else NOT_TRASHED
+    )
     stmt = query_filters.visible(stmt, include_drafts=include_drafts)
     if category:
         stmt = stmt.where(NewsArticle.category == category)
@@ -114,6 +120,7 @@ async def list_articles(
     in_feed_only: bool = False,
     include_drafts: bool = False,
     undated_first: bool = False,
+    trashed_only: bool = False,
 ) -> tuple[list[ArticleRead], int]:
     """Newest first, undated last. Returns (items, total-before-paging).
 
@@ -128,7 +135,7 @@ async def list_articles(
     if category:
         category = await resolve_category_slug(db, category) or category
 
-    stmt = _base(include_drafts, category)
+    stmt = _base(include_drafts, category, trashed_only)
     if tag:
         # By slug or by name, for the same reason a category accepts both: the
         # public archive links carry the slug and the admin passes what the

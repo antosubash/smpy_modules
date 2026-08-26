@@ -52,6 +52,21 @@ async def article_list(inertia: InertiaDep) -> InertiaResponse:
 
 
 @router.get(
+    "/trash",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
+)
+async def article_trash(inertia: InertiaDep) -> InertiaResponse:
+    """Articles that were binned, and the two things you can do with them.
+
+    Trash, restore and purge were implemented and tested from the start and had
+    no screen, so the admin list offered a hard delete instead — the one action
+    the soft delete existed to avoid.
+    """
+    return await inertia.render(constants._PAGE_TRASH)
+
+
+@router.get(
     "/categories",
     response_model=None,
     dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],

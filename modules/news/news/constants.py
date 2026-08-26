@@ -19,6 +19,7 @@ VIEW_PREFIX: Final = "/admin/news"
 # linking to the bare prefix costs a 307 round trip on every navigation.
 MENU_URL: Final = f"{VIEW_PREFIX}/"
 MENU_URL_CATEGORIES: Final = f"{VIEW_PREFIX}/categories"
+MENU_URL_TRASH: Final = f"{VIEW_PREFIX}/trash"
 ARTICLE_EDITOR_URL: Final = f"{VIEW_PREFIX}/articles/{{article_id}}/edit"
 """Where an article's metadata is edited. Served to the frontend rather than
 assembled there, so the console's own prefix is spelled once."""
@@ -34,6 +35,7 @@ owned. Now it is news', which is what makes the module installable on its own.
 MENU_GROUP: Final = "News"
 MENU_ICON: Final = "newspaper"
 MENU_ICON_CATEGORIES: Final = "tags"
+MENU_ICON_TRASH: Final = "trash-2"
 MENU_ICON_SEARCH: Final = "search"
 MENU_LABEL_SEARCH: Final = "Search everything"
 MENU_GROUP_SEARCH: Final = "Find"
@@ -45,6 +47,7 @@ ADMIN_SEARCH_PREFIX: Final = "/admin"
 ADMIN_SEARCH_URL: Final = f"{ADMIN_SEARCH_PREFIX}/search"
 MENU_LABEL_ARTICLES: Final = "Articles"
 MENU_LABEL_CATEGORIES: Final = "Categories"
+MENU_LABEL_TRASH: Final = "Trash"
 
 # Inertia page identifiers, rendered as literals at the view so the SM003/SM004
 # static-AST diagnostics can pair them with the .tsx under pages/.
@@ -55,6 +58,7 @@ _PAGE_ARTICLE_BODY: Final = "News/ArticleBody"
 _PAGE_PUBLIC_ARTICLE: Final = "News/PublicArticle"
 _PAGE_PUBLIC_INDEX: Final = "News/PublicIndex"
 _PAGE_SEARCH: Final = "News/Search"
+_PAGE_TRASH: Final = "News/Trash"
 
 PERM_VIEW: Final = "news.view"
 PERM_EDIT: Final = "news.edit"

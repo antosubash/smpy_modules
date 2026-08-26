@@ -61,6 +61,15 @@ async def list_articles(
         "ones — what the admin list wants. Public feeds keep the default, "
         "which pushes undated articles to the end.",
     ),
+    tag: str | None = Query(
+        None, description="Only articles carrying this tag, by slug or by name."
+    ),
+    trashed: bool = Query(
+        False,
+        description="The trash instead of the list — the complement of the "
+        "filter every other listing applies. Anyone who may not see drafts "
+        "gets nothing, because a trashed article is not published.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     may_draft = may_see_drafts(request)
@@ -69,11 +78,16 @@ async def list_articles(
         limit=limit,
         offset=offset,
         category=category,
+        tag=tag,
         q=q,
         status=status,
         in_feed_only=in_feed,
         include_drafts=may_draft,
         undated_first=undated_first,
+        # A trashed article is never published, so `visible` would filter the
+        # whole trash away for a caller who may not see drafts — which is the
+        # right answer rather than a bug: they have no business in the bin.
+        trashed_only=trashed and may_draft,
     )
     # Tags in one query for the whole page rather than one per row — the list
     # renders 20 at a time, and per-row would make that 21 round trips.

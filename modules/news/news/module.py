@@ -117,6 +117,17 @@ class NewsModule(ModuleBase):
                     order=110,
                     group=constants.MENU_GROUP,
                 ),
+                # In the rail rather than behind a filter on the list: a trashed
+                # article keeps its slug claimed, so an author who bins one and
+                # cannot find it tries to recreate it and is told the URL is
+                # taken by something they cannot see.
+                MenuItem(
+                    label=constants.MENU_LABEL_TRASH,
+                    url=constants.MENU_URL_TRASH,
+                    icon=constants.MENU_ICON_TRASH,
+                    order=120,
+                    group=constants.MENU_GROUP,
+                ),
                 # Its own group: where pagebuilder is installed the screen
                 # searches pages and media as well, so listing it under News
                 # would say something untrue about what it covers.
