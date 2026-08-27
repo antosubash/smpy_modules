@@ -44,6 +44,10 @@ MENU_LABEL_CATEGORIES: Final = "Categories"
 
 # Modules this one depends on.
 _MODULE_PAGEBUILDER: Final = "PageBuilder"
+#: The framework's settings module, by ``ModuleMeta.name``. Depended on so the
+#: host has built ``app.state.settings.module_registry`` before this module's
+#: ``register_settings`` tries to register against it.
+_MODULE_SETTINGS: Final = "Settings"
 
 # Inertia page identifier, rendered as a literal at the view so the SM003/SM004
 # static-AST diagnostics can pair it with pages/NewsList.tsx.

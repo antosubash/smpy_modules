@@ -18,12 +18,16 @@ and adds one dependency line, no registration code.
 ### Publishing in more than one language
 
 Pages and articles can exist in several languages, each with its own slug,
-draft and approval state. Off by default; turn it on in `.env`:
+draft and approval state. Off by default; turn it on under **Settings →
+PageBuilder**, or headlessly:
 
 ```bash
-SM_PAGEBUILDER_CONTENT_LOCALES='["en","de"]'
-SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
+python scripts/set_setting.py pagebuilder \
+  content_locales '["en","de"]' default_content_locale en
 ```
+
+Both fields are marked *requires restart* on that screen: the languages decide
+which routes get mounted, and that happens once, at boot.
 
 The default language keeps its existing addresses (`/p/about`, `/news/x`) and
 every other one is prefixed (`/de/p/about`, `/de/news/x`), so switching this on

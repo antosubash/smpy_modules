@@ -1,31 +1,66 @@
-"""PageBuilder module settings.
+"""PageBuilder module settings — stored in the database, edited in Settings.
 
-Per-module env-var prefix is ``SM_PAGEBUILDER_*``.
+There is no ``SM_PAGEBUILDER_*`` environment variable and no ``.env`` stanza:
+:meth:`settings_customise_sources` drops every source pydantic-settings would
+otherwise consult, leaving the field defaults below and whatever the settings
+module has stored. The module registers this class in ``register_settings``
+via ``register_module_settings``, the host hydrates it from the DB at lifespan
+start, and the Settings screen writes it back.
+
+One place to look is the point. Configuration split between a ``.env`` file,
+the real environment and a database is configuration nobody can read off a
+running system — and the two that are not the database are invisible to the
+screen that claims to show what the site is configured to do.
+
+Fields the module consumes at boot — the ones that decide route topology, what
+is mounted, and what the auth layer exempts — carry ``requires_restart``, which
+the Settings screen surfaces next to the input. Everything else is read per
+request and takes effect on save.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Final
 
-from pydantic import model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+_RESTART: Final[dict[str, Any]] = {"requires_restart": True}
+"""Marks a field the module reads once, while booting. See the module docstring."""
 
 
 class PagebuilderSettings(BaseSettings):
-    # ``env_file`` mirrors the host's own BootstrapSettings (and sm_ai's
-    # settings): pydantic-settings reads the file itself rather than exporting
-    # it, so a module that omits this only ever sees real environment
-    # variables — and every ``SM_PAGEBUILDER_*`` line in the repo's root
-    # ``.env``, which CLAUDE.md calls the single source of truth for settings,
-    # would be silently ignored.
-    model_config = SettingsConfigDict(
-        env_prefix="SM_PAGEBUILDER_", env_file=".env", extra="ignore"
-    )
+    # ``use_attribute_docstrings`` is what puts the prose under each field on
+    # the Settings screen: the admin UI renders ``FieldInfo.description``, and
+    # without this every field would arrive there unexplained while the
+    # explanation sat in the source three lines below it.
+    model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
-    public_route_prefix: str = "/p"
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Init kwargs only — no env, no ``.env``, no secrets directory.
+
+        The hydrator passes stored overrides as keyword arguments, so this
+        leaves exactly two answers for any field: what the database says, or
+        the default declared here. Dropping the env sources rather than merely
+        not documenting them is deliberate — a stray ``SM_PAGEBUILDER_*`` left
+        in a shell or a deploy manifest would otherwise quietly outrank the
+        value an operator can see and edit on the Settings screen.
+        """
+        return (init_settings,)
+
+    public_route_prefix: str = Field(default="/p", json_schema_extra=_RESTART)
     """URL prefix used for public published pages: ``{prefix}/{slug}``."""
 
-    content_locales: tuple[str, ...] = ("en",)
+    content_locales: tuple[str, ...] = Field(default=("en",), json_schema_extra=_RESTART)
     """Languages a page may be authored in.
 
     Distinct from the host's ``SM_I18N_SUPPORTED_LOCALES``, which decides what
@@ -33,12 +68,13 @@ class PagebuilderSettings(BaseSettings):
     without translating its console, or the reverse, so the two are configured
     separately — see :mod:`pagebuilder.locales`.
 
-    Set as a JSON array: ``SM_PAGEBUILDER_CONTENT_LOCALES='["en","de","fr"]'``.
-    A single-entry tuple (the default) leaves every public URL exactly as it
-    was, so this feature costs a monolingual site nothing.
+    Edited on the Settings screen as a JSON array — ``["en","de","fr"]``.
+    A single entry (the default) leaves every public URL exactly as it was, so
+    this feature costs a monolingual site nothing. Adding or removing a
+    language remounts the public routes, so it takes effect on restart.
     """
 
-    default_content_locale: str = "en"
+    default_content_locale: str = Field(default="en", json_schema_extra=_RESTART)
     """The locale served at the *unprefixed* public URL.
 
     ``/p/{slug}`` is this language; every other one is ``/{locale}/p/{slug}``.
@@ -51,7 +87,9 @@ class PagebuilderSettings(BaseSettings):
     404ing the entire site at the first request.
     """
 
-    media_root: Path = Path("var/pagebuilder/media")
+    media_root: Path = Field(
+        default=Path("var/pagebuilder/media"), json_schema_extra=_RESTART
+    )
     """Filesystem directory where uploaded media is stored.
 
     Relative paths are anchored to the project root (``SM_PROJECT_ROOT``
@@ -61,7 +99,9 @@ class PagebuilderSettings(BaseSettings):
     directories against one database. Created if it doesn't exist.
     """
 
-    media_url_prefix: str = "/media/pagebuilder"
+    media_url_prefix: str = Field(
+        default="/media/pagebuilder", json_schema_extra=_RESTART
+    )
     """URL prefix the media directory is mounted at."""
 
     media_max_bytes: int = 10 * 1024 * 1024
@@ -78,8 +118,8 @@ class PagebuilderSettings(BaseSettings):
     SVG is intentionally excluded from the default allowlist: SVG is XML
     and can embed ``<script>`` tags, yielding stored-XSS the moment a
     user views the file under a same-origin URL. Hosts that need SVG
-    should add it explicitly via ``SM_PAGEBUILDER_MEDIA_ALLOWED_CONTENT_TYPES``
-    and pair it with their own sanitizer.
+    should add it explicitly on the Settings screen and pair it with their
+    own sanitizer.
     """
 
     media_thumbnail_widths: tuple[int, ...] = (320, 640, 1280, 1920)
@@ -106,8 +146,9 @@ class PagebuilderSettings(BaseSettings):
     )
     """Content-Security-Policy header value for ``/p/{slug}`` responses.
 
-    Override via ``SM_PAGEBUILDER_PUBLIC_CSP`` to widen for analytics,
-    fonts, CDNs, etc. Set to an empty string to disable.
+    Widen it on the Settings screen for analytics, fonts, CDNs, etc. Set to
+    an empty string to disable. Read per response, so a change is live on
+    save.
     """
 
     public_cache_max_age: int = 60
@@ -140,7 +181,7 @@ class PagebuilderSettings(BaseSettings):
     blank.
     """
 
-    sitemap_enabled: bool = True
+    sitemap_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Serve ``GET /sitemap.xml`` listing all published, indexable pages.
 
     Disable when the host already publishes its own sitemap (e.g. a
@@ -148,7 +189,7 @@ class PagebuilderSettings(BaseSettings):
     sources).
     """
 
-    robots_enabled: bool = True
+    robots_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Serve ``GET /robots.txt`` referencing the sitemap when enabled."""
 
     robots_body: str | None = None
@@ -170,9 +211,12 @@ class PagebuilderSettings(BaseSettings):
     Defaults to ``True`` so a host scaffolded without auth middleware does
     not silently expose page CRUD + media uploads to the public internet.
     The public viewer (``/p/{slug}``) is always anonymous regardless of
-    this setting. Disable via ``SM_PAGEBUILDER_REQUIRES_AUTH=false`` only
-    when the host gates admin paths at a layer above the application
-    (e.g. an authenticating reverse proxy).
+    this setting. Turn it off only when the host gates admin paths at a
+    layer above the application (e.g. an authenticating reverse proxy).
+
+    Evaluated per request rather than when the routers are built, so it takes
+    effect on save — the alternative is a switch the Settings screen offers
+    and the running app ignores until someone restarts it.
     """
 
     csrf_protect: bool = True
@@ -187,7 +231,7 @@ class PagebuilderSettings(BaseSettings):
     csrf_cookie_name: str = "pagebuilder_csrf"
     """Cookie name used to expose the per-session CSRF token to JS."""
 
-    scheduler_enabled: bool = True
+    scheduler_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Run an in-process loop that flips pages on their scheduled times.
 
     Disable in deployments where a separate worker (Celery beat, k8s
@@ -195,7 +239,7 @@ class PagebuilderSettings(BaseSettings):
     otherwise both would race and double-publish.
     """
 
-    scheduler_interval_seconds: int = 30
+    scheduler_interval_seconds: int = Field(default=30, json_schema_extra=_RESTART)
     """How often the in-process scheduler wakes to look for due flips."""
 
     @model_validator(mode="after")

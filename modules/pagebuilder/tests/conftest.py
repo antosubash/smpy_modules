@@ -36,6 +36,7 @@ from pagebuilder.permissions import (
     ROLE_EDITOR,
 )
 from pagebuilder.settings import PagebuilderSettings
+from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
@@ -103,6 +104,11 @@ async def _build_app(
     )
 
     app = FastAPI()
+    # The settings module's registry, which ``register_settings`` registers
+    # the class against. Stubbed rather than mounted: these tests want the
+    # pre-seeded settings above, not a hydration round trip through a database
+    # the framework module owns.
+    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     module.register_settings(app)
     module.register_middleware(app)
 

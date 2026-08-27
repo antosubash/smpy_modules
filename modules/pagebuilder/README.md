@@ -122,17 +122,24 @@ cumulatively mapped to those permissions.
 
 ## Settings
 
-All settings use the `SM_PAGEBUILDER_` env prefix.
+Stored in the database and edited under **Settings → PageBuilder**. There is
+no `SM_PAGEBUILDER_*` environment variable: the settings class drops every env
+source, so a value can only come from the store or from the default below.
+Headless deployments write them with `scripts/set_setting.py`.
+
+Fields marked ● are read once while the app boots — they decide which routes
+are mounted and what the auth layer exempts — so changing one needs a restart.
+The Settings screen says so next to the input.
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `public_route_prefix` | `/p` | Where published pages are served |
-| `content_locales` | `["en"]` | Languages a page may be authored in |
-| `default_content_locale` | `en` | The language served at the unprefixed URL |
+| `public_route_prefix` ● | `/p` | Where published pages are served |
+| `content_locales` ● | `["en"]` | Languages a page may be authored in |
+| `default_content_locale` ● | `en` | The language served at the unprefixed URL |
 | `requires_auth` | `true` | Gate the admin surface behind authentication |
 | `csrf_protect` | `true` | Require a CSRF token on mutating admin requests |
-| `media_root` | `var/pagebuilder/media` | Upload storage directory |
-| `media_url_prefix` | `/media/pagebuilder` | Public URL prefix for uploads |
+| `media_root` ● | `var/pagebuilder/media` | Upload storage directory |
+| `media_url_prefix` ● | `/media/pagebuilder` | Public URL prefix for uploads |
 | `media_max_bytes` | `10485760` | Per-upload size ceiling |
 | `media_thumbnail_widths` | `320,640,1280,1920` | Widths generated as WebP |
 | `media_webp_quality` | `82` | WebP encoder quality |
@@ -140,10 +147,10 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |
 | `site_name` | `None` | OpenGraph site name |
-| `sitemap_enabled` | `true` | Serve `/sitemap.xml` |
-| `robots_enabled` | `true` | Serve `/robots.txt` |
-| `scheduler_enabled` | `true` | Run the scheduled publish/unpublish poller |
-| `scheduler_interval_seconds` | `30` | Poll interval |
+| `sitemap_enabled` ● | `true` | Serve `/sitemap.xml` |
+| `robots_enabled` ● | `true` | Serve `/robots.txt` |
+| `scheduler_enabled` ● | `true` | Run the scheduled publish/unpublish poller |
+| `scheduler_interval_seconds` ● | `30` | Poll interval |
 
 ## Routes
 
@@ -162,9 +169,12 @@ Off by default: with one content locale nothing changes, no locale-prefixed
 route is mounted, and every existing URL is exactly what it was.
 
 ```bash
-SM_PAGEBUILDER_CONTENT_LOCALES='["en","de","fr"]'
-SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
+python scripts/set_setting.py pagebuilder \
+  content_locales '["en","de","fr"]' default_content_locale en
 ```
+
+Or on the Settings screen, which is the same store. Either way it takes effect
+at the next boot: the languages decide how many public routers are mounted.
 
 These are *content* languages, deliberately separate from the host's
 `SM_I18N_SUPPORTED_LOCALES`, which decides what language the admin console

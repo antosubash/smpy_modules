@@ -8,7 +8,7 @@ things a page has no concept of — the category it belongs to, the date it
 should be listed under — plus the listing API and a feed block.
 
 The one thing it does own is the article's **public address**. Articles serve
-at `/news/{slug}` (`SM_NEWS_PUBLIC_ROUTE_PREFIX`), not at pagebuilder's generic
+at `/news/{slug}` (the `public_route_prefix` setting), not at pagebuilder's generic
 `/p/{slug}`, so an article is distinguishable from a contact page in a URL, a
 log line and an analytics report. The *rendering* is still pagebuilder's: news
 resolves the slug and hands off to that module's viewer, keeping the ETag,
@@ -106,7 +106,7 @@ undates the article, which is a real state rather than an error.
 ## Multilingual articles
 
 An article is a page, so its language is the page's language — configured in
-pagebuilder (`SM_PAGEBUILDER_CONTENT_LOCALES`), not here, because a language
+pagebuilder (its `content_locales` setting), not here, because a language
 news offered that pagebuilder did not would be one no article could be written
 in. Off by default: with one content locale every article URL is exactly what
 it was.

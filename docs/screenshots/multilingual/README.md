@@ -3,8 +3,8 @@
 Captured against the real host booted with two content locales:
 
 ```bash
-SM_PAGEBUILDER_CONTENT_LOCALES='["en","de"]'
-SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE=en
+python scripts/set_setting.py pagebuilder \
+  content_locales '["en","de"]' default_content_locale en
 ```
 
 The seed is one English page with a published German translation, one

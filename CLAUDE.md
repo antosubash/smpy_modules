@@ -42,6 +42,18 @@ dependency specifiers — the framework's own copy of that script does, which
 would pin the framework to a version that doesn't exist. `scripts/tests/`
 guards this and CI runs `--check-current`.
 
+**`pagebuilder` and `news` read no environment variables.** Their settings are
+DB-backed through the framework's settings module (`register_module_settings`),
+and both classes drop pydantic-settings' env, `.env` and secrets sources — so
+adding a field means adding it to the class, not to `.env.example`, and an
+`SM_PAGEBUILDER_*` line anywhere is dead. Configure them on the Settings screen
+or with `scripts/set_setting.py`. Anything the module reads while booting
+(route prefixes, `content_locales`, the media mount) has to be read from
+`app.state.<package>.settings` in `on_startup`, not during app construction:
+hydration happens at lifespan start, so a value read earlier is the pydantic
+default no matter what the database says. Mark such fields
+`json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
+
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
 the root `.env` is the single source of truth for settings regardless of the
@@ -90,9 +102,9 @@ venv and back. Neither touches a tracked file.
   modules should convert together rather than piecemeal during unrelated work.
 
   Not to be confused with **content** i18n, which is done: pages and articles
-  can be published in several languages. That is `SM_PAGEBUILDER_CONTENT_LOCALES`
-  and `pagebuilder.locales`, deliberately separate from the host's
-  `SM_I18N_SUPPORTED_LOCALES` above — one decides what the site publishes, the
-  other what the console speaks.
+  can be published in several languages. That is pagebuilder's
+  `content_locales` setting and `pagebuilder.locales`, deliberately separate
+  from the host's `SM_I18N_SUPPORTED_LOCALES` above — one decides what the site
+  publishes, the other what the console speaks.
 - **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
   repo is canonical; that one is frozen.
