@@ -29,6 +29,7 @@ from pagebuilder.models import MediaAsset, Page, PageRedirect
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
+from pagebuilder.snapshots.media_match import match_existing
 from pagebuilder.snapshots.pages import apply_payload
 from pagebuilder.snapshots.plan import read_documents
 
@@ -41,10 +42,11 @@ async def _restore_media(
 ) -> tuple[dict[str, str], int]:
     """Ensure every bundled file exists here; return ``{bundle name: url}``.
 
-    Matching against what is already here is by ``original_filename`` — the
-    rule the GCA seed already uses, so re-running a restore is idempotent and
-    page content keeps pointing at the same asset rather than accumulating
-    duplicates.
+    Matching against what is already here goes through ``match_existing``,
+    which narrows by ``original_filename`` and then confirms by digest. Re-
+    running a restore is still idempotent — same content, same match, no
+    duplicate — but a host that happens to have a *different* picture under
+    that name no longer has every page repointed at it silently.
 
     Within one bundle, though, the cache is keyed by digest, not by name.
     ``original_filename`` is a label two different uploads can share — which is
@@ -57,15 +59,14 @@ async def _restore_media(
     carrying a disallowed content-type is refused exactly as an upload would be.
     """
     service = MediaService(db, settings)
-    result = await db.execute(select(MediaAsset))
-    existing = {asset.original_filename: asset for asset in result.scalars().all()}
+    existing = await match_existing(db, settings, index)
     uploaded: dict[str, MediaAsset] = {}
 
     name_to_url: dict[str, str] = {}
     added = 0
     for bundle_name, entry in sorted(index.items()):
         original = entry.get("original_filename", bundle_name)
-        asset = uploaded.get(entry["sha256"]) or existing.get(original)
+        asset = uploaded.get(entry["sha256"]) or existing.get(bundle_name)
         if asset is None:
             data = await asyncio.to_thread(blobs.get, entry["sha256"])
             upload = UploadFile(

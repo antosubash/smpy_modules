@@ -208,12 +208,26 @@ carries the bundle name, so it stays readable in a diff while remaining
 unambiguous. Deterministic ordering (by media id) keeps the suffixes stable
 across repeated captures, which is what makes the round-trip test meaningful.
 
-**Two different keys, deliberately.** `sha256` identifies *blobs in the snapshot
-store*, so unchanged media is stored once across many snapshots. Restoring into
-the media library matches on `original_filename` instead — the same rule the GCA
-seed already uses, so re-running is idempotent and page content keeps pointing
-at the same asset. This is why `MediaAsset` needs no new content-hash column:
-each concern uses the key that suits it, and neither leaks into the other.
+**The name narrows, the digest decides.** `sha256` identifies *blobs in the
+snapshot store*, so unchanged media is stored once across many snapshots.
+Restoring into the media library looks up candidates by `original_filename` and
+then confirms the match by hashing the candidate's bytes.
+
+The name alone is not enough, and an earlier draft of this design got it wrong.
+`original_filename` is a label two different pictures can share — which is
+precisely why capture has to mint `hero~2.jpg` in the first place. Matching on
+it alone meant a bundle restored onto a host that happened to have its own
+`hero.jpg` repointed every page at that host's picture, silently: no error, no
+report, just a site quietly showing the wrong images. Since moving content
+between hosts is the whole point of a bundle, that is the case the rule most
+needed to survive.
+
+Confirming by digest still needs no new column on `MediaAsset`: only assets
+whose name actually collides get hashed, each at most once per restore. Both
+the plan and the apply resolve through the same `match_existing`, deliberately —
+if the plan matched more loosely it would resolve a sentinel to a URL the apply
+then declined to reuse, reporting a page as unchanged while its image was about
+to change underneath the approver.
 
 ### Thumbnails are never stored
 

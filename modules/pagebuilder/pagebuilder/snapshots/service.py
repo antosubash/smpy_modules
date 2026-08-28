@@ -25,11 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.media_files import resolve_media_root
-from pagebuilder.media_service import MediaService
 from pagebuilder.models import (
     ContentSnapshot,
     ImportStatus,
-    MediaAsset,
     PendingImport,
     SnapshotMedia,
     SnapshotSource,
@@ -40,6 +38,7 @@ from pagebuilder.snapshots.archive import BundleError, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME
+from pagebuilder.snapshots.media_match import preview_urls
 from pagebuilder.snapshots.plan import build_plan
 
 _SNAPSHOTS_DIR = "snapshots"
@@ -244,21 +243,15 @@ class SnapshotService:
         return staged
 
     async def _preview_urls(self, rows: list[SnapshotMedia]) -> dict[str, str]:
-        """Map bundle names to the URLs they would resolve to on this host.
+        """What the plan's sentinels resolve to, by the apply's own rules.
 
-        Only assets already present here can be known; the rest are uploaded at
-        apply time. Resolving what we can keeps the plan from reporting every
-        page with an image as changed purely because one side reads in
-        sentinels.
+        Delegated to ``media_match.preview_urls`` so the plan and the apply
+        cannot drift into matching by different rules — matching more loosely
+        here would resolve a sentinel to a URL the apply then declines to
+        reuse, telling an approver a page is unchanged while its image is
+        about to change underneath them.
         """
-        service = MediaService(self.db, self.settings)
-        result = await self.db.execute(select(MediaAsset))
-        by_name = {a.original_filename: a for a in result.scalars().all()}
-        return {
-            row.bundle_name: service.url_for(by_name[row.original_filename].filename)
-            for row in rows
-            if row.original_filename in by_name
-        }
+        return await preview_urls(self.db, self.settings, rows)
 
     async def _decide(
         self, import_id: int, actor: str | None, status_value: ImportStatus
