@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import zipfile
 from io import BytesIO
 from pathlib import Path, PurePosixPath
@@ -39,6 +40,8 @@ class BundleError(Exception):
 
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
+
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _safe_relative(name: str) -> PurePosixPath:
@@ -142,10 +145,18 @@ def read_zip(
     if not isinstance(index, dict):
         raise BundleError("media/index.json is not an object")
 
+    # Digests are checked before they are used as names. They arrive as JSON
+    # strings inside the bundle, not as archive members, so `_safe_relative`
+    # never saw them — and `BlobStore` joins them onto the store root.
+    for name, entry in sorted(index.items()):
+        digest = entry.get("sha256") if isinstance(entry, dict) else None
+        if not isinstance(digest, str) or not _DIGEST.match(digest):
+            raise BundleError(f"media entry {name!r} has no valid sha256: {digest!r}")
+
     missing_blobs = sorted(
         name
         for name, entry in index.items()
-        if entry.get("sha256") not in stored and not blobs.exists(entry.get("sha256", ""))
+        if entry["sha256"] not in stored and not blobs.exists(entry["sha256"])
     )
     if missing_blobs:
         raise BundleError(

@@ -107,6 +107,42 @@ def test_a_rejected_bundle_leaves_no_blob_behind(tmp_path):
     assert not blobs.exists(_SHA)
 
 
+def test_index_digest_that_traverses_is_refused(tmp_path):
+    """The attack the zip-member guard does not cover.
+
+    `media/index.json` carries digest *strings*, not archive member names, so
+    `_safe_relative` never inspects them. Left unchecked, apply would call
+    `BlobStore.get("../secret.txt")` and read whatever the server can.
+    """
+    (tmp_path / "secret.txt").write_bytes(b"private")
+    index = {"hero.jpg": {"sha256": "../secret.txt", "original_filename": "hero.jpg"}}
+    data = _zip(
+        {"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()}
+    )
+    with pytest.raises(BundleError, match="no valid sha256"):
+        read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_index_digest_that_is_absolute_is_refused(tmp_path):
+    index = {"hero.jpg": {"sha256": "/etc/hosts", "original_filename": "hero.jpg"}}
+    data = _zip(
+        {"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()}
+    )
+    with pytest.raises(BundleError, match="no valid sha256"):
+        read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_index_entry_that_is_not_an_object_is_refused(tmp_path):
+    data = _zip(
+        {
+            "manifest.json": _manifest(),
+            "media/index.json": json.dumps({"hero.jpg": "nope"}).encode(),
+        }
+    )
+    with pytest.raises(BundleError, match="no valid sha256"):
+        read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
 def test_round_trip_through_write_zip(tmp_path):
     blobs = BlobStore(tmp_path / "blobs")
     sha = blobs.put(_IMAGE)
