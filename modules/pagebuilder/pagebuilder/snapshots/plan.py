@@ -9,9 +9,10 @@ will reject a perfectly good bundle.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -51,6 +52,31 @@ def read_layout(bundle_dir: Path) -> dict[str, Any]:
     return json.loads(path.read_text()) if path.is_file() else {}
 
 
+class BundleDocuments(NamedTuple):
+    """Everything a bundle's JSON says, read once."""
+
+    pages: dict[str, dict[str, Any]]
+    redirects: list[dict[str, str]]
+    layout: dict[str, Any]
+
+
+async def read_documents(bundle_dir: Path) -> BundleDocuments:
+    """Read every bundle document, off the event loop, in one pass.
+
+    Both callers are request handlers, and a site with hundreds of pages is
+    hundreds of blocking reads and parses — the same reason ``service`` already
+    offloads unzipping and hashing. One offload rather than one per document,
+    and one read of each file rather than one per consumer.
+    """
+    return await asyncio.to_thread(
+        lambda: BundleDocuments(
+            read_pages(bundle_dir),
+            read_redirects(bundle_dir),
+            read_layout(bundle_dir),
+        )
+    )
+
+
 def _fields_differ(payload: dict[str, Any], page: Page) -> bool:
     """Compare only the fields the bundle actually carries.
 
@@ -77,7 +103,8 @@ async def build_plan(
     page is only reported as changed when its content genuinely differs — not
     merely because one side is written in sentinels and the other in URLs.
     """
-    bundled = read_pages(bundle_dir)
+    documents = await read_documents(bundle_dir)
+    bundled = documents.pages
 
     # Unfiltered on purpose, and split here rather than in SQL: `apply_bundle`
     # matches slugs against *every* page, trashed included, because restoring
@@ -148,13 +175,13 @@ async def build_plan(
             "unchanged": unchanged,
             "untouched": untouched,
         },
-        "layout": _layout_plan(bundle_dir, name_to_url),
-        "redirects": await _redirect_plan(db, bundle_dir, resolvable),
+        "layout": _layout_plan(documents.layout, name_to_url),
+        "redirects": await _redirect_plan(db, documents.redirects, resolvable),
     }
 
 
-def _layout_plan(bundle_dir: Path, name_to_url: dict[str, str]) -> dict[str, Any]:
-    layout = from_sentinels(read_layout(bundle_dir), name_to_url)
+def _layout_plan(raw_layout: dict[str, Any], name_to_url: dict[str, str]) -> dict[str, Any]:
+    layout = from_sentinels(raw_layout, name_to_url)
     header = layout.get("header_data") or {}
     footer = layout.get("footer_data") or {}
     return {
@@ -164,9 +191,8 @@ def _layout_plan(bundle_dir: Path, name_to_url: dict[str, str]) -> dict[str, Any
 
 
 async def _redirect_plan(
-    db: AsyncSession, bundle_dir: Path, known_slugs: set[str]
+    db: AsyncSession, bundled: list[dict[str, str]], known_slugs: set[str]
 ) -> dict[str, Any]:
-    bundled = read_redirects(bundle_dir)
     result = await db.execute(select(PageRedirect.from_slug))
     existing = {row for (row,) in result}
 

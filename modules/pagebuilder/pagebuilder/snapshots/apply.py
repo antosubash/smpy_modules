@@ -30,7 +30,7 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.pages import apply_payload
-from pagebuilder.snapshots.plan import read_layout, read_pages, read_redirects
+from pagebuilder.snapshots.plan import read_documents
 
 
 async def _restore_media(
@@ -182,14 +182,15 @@ async def apply_bundle(
     """Restore *bundle_dir* onto the live site. Does not commit."""
     name_to_url, media_added = await _restore_media(db, settings, blobs, index)
 
-    bundled = read_pages(bundle_dir)
+    documents = await read_documents(bundle_dir)
+    bundled = documents.pages
     by_slug, ids, created, updated = await _restore_pages(db, bundled, name_to_url)
     await _resolve_parents(db, bundled, by_slug, ids)
     redirects_kept, redirects_dropped = await _restore_redirects(
-        db, read_redirects(bundle_dir), ids
+        db, documents.redirects, ids
     )
 
-    layout = from_sentinels(read_layout(bundle_dir), name_to_url)
+    layout = from_sentinels(documents.layout, name_to_url)
     await LayoutService(db).update(
         header_data=layout.get("header_data"),
         footer_data=layout.get("footer_data"),

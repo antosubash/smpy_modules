@@ -74,6 +74,15 @@ class PagebuilderSettings(BaseSettings):
     contains a whole media library, not one image.
     """
 
+    snapshot_max_extracted_bytes: int = 1024 * 1024 * 1024
+    """Reject a bundle that expands to more than this (default 1 GB).
+
+    Separate from ``snapshot_max_upload_bytes`` because the compressed size
+    bounds nothing: a bundle's media is already-compressed images that barely
+    shrink, but a crafted archive of repetitive bytes reaches roughly 1000:1,
+    so a body inside the upload cap can still fill the disk on extraction.
+    """
+
     public_csp: str = (
         "default-src 'self'; "
         "script-src 'self'; "

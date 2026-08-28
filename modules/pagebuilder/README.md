@@ -136,6 +136,7 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 | `media_webp_quality` | `82` | WebP encoder quality |
 | `snapshot_root` | `var/pagebuilder/snapshots` | Snapshot + blob storage directory |
 | `snapshot_max_upload_bytes` | `209715200` | Ceiling on an uploaded bundle (200 MB) |
+| `snapshot_max_extracted_bytes` | `1073741824` | Ceiling on what a bundle may expand to (1 GB) |
 | `public_csp` | see `settings.py` | CSP header on public pages |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |

@@ -68,7 +68,17 @@ class BlobStore:
 
     def put(self, data: bytes) -> str:
         """Store *data* and return its sha256. Storing twice is a no-op."""
-        digest = hashlib.sha256(data).hexdigest()
+        return self.put_known(hashlib.sha256(data).hexdigest(), data)
+
+    def put_known(self, digest: str, data: bytes) -> str:
+        """Store *data* under an already-computed *digest*.
+
+        For callers that had to hash the bytes anyway to validate them — an
+        uploaded bundle checks every blob against the name it arrived under —
+        so the same megabytes are not hashed twice on the way in. *digest* is
+        still validated as a digest by ``path_for``; what is skipped is only
+        the recomputation, never the check that the name is safe.
+        """
         target = self.path_for(digest)
         if not target.exists():
             self.root.mkdir(parents=True, exist_ok=True)

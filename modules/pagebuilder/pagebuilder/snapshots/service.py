@@ -119,10 +119,23 @@ class SnapshotService:
             # Off the event loop: unzipping, hashing and writing up to
             # `snapshot_max_upload_bytes` would otherwise stall every other
             # request on this worker for the whole extraction.
-            manifest, index = await asyncio.to_thread(read_zip, data, target, self.blobs)
+            manifest, index = await asyncio.to_thread(
+                read_zip,
+                data,
+                target,
+                self.blobs,
+                self.settings.snapshot_max_extracted_bytes,
+            )
         except BundleError as exc:
             shutil.rmtree(target, ignore_errors=True)
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception:
+            # Anything else is a bug rather than a bad bundle, but the
+            # half-extracted directory has to go either way: the row is about
+            # to be rolled back, and on SQLite its integer id is reused, so a
+            # directory left behind is one a later snapshot would inherit.
+            shutil.rmtree(target, ignore_errors=True)
+            raise
 
         snapshot.manifest = manifest
         snapshot.size_bytes = len(data)
@@ -143,14 +156,22 @@ class SnapshotService:
     async def download(self, snapshot_id: int, target: Path) -> int:
         snapshot = await self.get(snapshot_id)
         rows = await self.media_rows(snapshot.id)
-        # Off the event loop: DEFLATE over the whole media library.
-        return await asyncio.to_thread(
-            write_zip,
-            self.dir_for(snapshot.id),
-            self.blobs,
-            [{"sha256": row.sha256} for row in rows],
-            target,
-        )
+        try:
+            # Off the event loop: DEFLATE over the whole media library.
+            return await asyncio.to_thread(
+                write_zip,
+                self.dir_for(snapshot.id),
+                self.blobs,
+                [{"sha256": row.sha256} for row in rows],
+                target,
+            )
+        except BundleError as exc:
+            # The store has lost bytes this snapshot still names. Failing the
+            # download says so; the alternative is handing someone a bundle
+            # that every host will reject on import for reasons invisible here.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+            ) from exc
 
     async def delete(self, snapshot_id: int) -> None:
         snapshot = await self.get(snapshot_id)
