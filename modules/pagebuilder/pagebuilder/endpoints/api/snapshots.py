@@ -33,8 +33,18 @@ _ZIP_MEDIA_TYPE = "application/zip"
 
 
 def _actor(request: Request) -> str | None:
+    """Who decided, in the same terms every other audit field uses.
+
+    The framework's audit listener writes the *user id* into ``created_by``,
+    and this module already renders those ids verbatim (the layout and revision
+    history panels both do). Recording an email here instead would put two
+    different kinds of identifier side by side on one screen.
+    """
     user = getattr(request.state, "user", None)
-    return getattr(user, "email", None) if user else None
+    if user is None:
+        return None
+    identifier = getattr(user, "id", None)
+    return str(identifier) if identifier is not None else None
 
 
 @router.get("/snapshots", response_model=SnapshotListResponse)
