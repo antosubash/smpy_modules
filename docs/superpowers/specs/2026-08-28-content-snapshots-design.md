@@ -52,8 +52,13 @@ snapshot, and the two admin pages that drive all of it.
 **Out (deliberately):**
 
 - **News articles and any other module's content.** A snapshot is *pagebuilder
-  content only*: pages, layout, branding, media. A per-module contribution hook
-  was considered and rejected for v1 — see Rejected alternatives.
+  content only*: pages (including templates), redirects, layout, branding,
+  media. A per-module contribution hook was considered and rejected for v1 —
+  see Rejected alternatives.
+- **Trashed pages, revision history, and scheduled-job state.** A snapshot is
+  the site as it stands, not its past. `PageRevision` / `LayoutRevision` rows
+  stay host-local; restoring history from another host would fabricate an audit
+  trail that never happened there.
 - **Deleting live pages absent from a bundle.** Restore never deletes; pages on
   the site but not in the snapshot are left alone and reported. No `--prune`
   equivalent until there is a demonstrated need.
@@ -101,8 +106,13 @@ manifest.json        format_version, created_at, source, note, counts,
                      [{slug, title, status}]
 branding.json        app_name, primary_color, design_pack
 layout.json          header_data, footer_data
-pages/<slug>.json    title, slug, status, seo fields,
-                     draft_data, published_data
+redirects.json       [{from_slug, to_slug}]
+pages/<slug>.json    slug, title, status, draft_data, published_data,
+                     parent_slug, and every authored column on Page —
+                     meta_title, meta_description, og_image,
+                     canonical_url, index_in_search, json_ld,
+                     show_in_header_nav, show_in_footer, is_template,
+                     publish_at, unpublish_at
 media/index.json     bundle_name -> {sha256, original_filename, folder,
                      content_type}
 media/blobs/<sha256> the bytes (zip only; server-side these live in the
@@ -122,6 +132,35 @@ columns keeps multi-megabyte page JSON out of Postgres.
 Pages carry **both** `draft_data` and `published_data`. A page whose draft
 differs from what is published has work in flight; capturing only the draft and
 publishing it on restore would quietly ship someone's unfinished edit.
+
+### Identity across hosts: slugs, never ids
+
+Primary keys are host-local. Two rows reference a page by id and both would be
+meaningless in a bundle, so both serialise as slugs:
+
+- **`Page.parent_id`** (breadcrumb parent) → `parent_slug`.
+- **`PageRedirect.page_id`** → `to_slug`.
+
+Restore therefore runs in **two passes**: upsert every page first, then resolve
+`parent_slug` and rebuild redirects once all slugs exist. A single pass cannot
+work — a parent may appear later in the manifest than its child, and a redirect
+may point at a page the bundle creates in the same apply.
+
+A `parent_slug` naming a page that is in neither the bundle nor the live site
+resolves to `None` rather than failing: `Page.parent_id` is already
+`ondelete="SET NULL"` precisely because a missing parent must not destroy a
+child. A redirect whose `to_slug` is unresolvable is dropped and reported in the
+plan — an unresolvable redirect is a 404 generator, not a nullable field.
+
+**Trashed pages are never captured.** Capture applies the module's own
+`NOT_TRASHED` filter, so a snapshot holds exactly what the site serves.
+Restoring one therefore never resurrects something an editor binned. Templates
+(`is_template`) *are* captured — a template is an ordinary page carrying a flag,
+and a site without its starting points is not fully restored.
+
+**Redirects are captured** because they are the site's promise to links already
+out in the world. A restore that silently dropped them would convert every old
+bookmark into a 404 — exactly the failure `PageRedirect` exists to prevent.
 
 ### Portable asset references
 
@@ -185,8 +224,9 @@ is the difference between a feature that can be handed to a site owner and one
 that cannot: "Approve & apply" is alarming precisely because it overwrites nine
 pages, and it stops being alarming when the previous state is one click away.
 
-The apply itself runs in a single transaction: pages upserted by slug, media
-upserted by `original_filename`, layout and branding set. Any failure rolls back
+The apply itself runs in a single transaction: media upserted by
+`original_filename`, pages upserted by slug, then the second pass wiring
+`parent_slug` and redirects, then layout and branding. Any failure rolls back
 and the pending import stays pending, so a half-restored site is not a reachable
 state.
 
@@ -220,6 +260,7 @@ plan classifies every item:
 - layout: changed or not, with header / footer block counts;
 - branding: per-field before → after;
 - media: how many blobs are new versus already present;
+- redirects: added / removed, and any dropped for an unresolvable target;
 - pages live on this site but absent from the bundle, listed as untouched.
 
 The plan is what the approver reads. It is computed once, at request time, and
@@ -326,6 +367,12 @@ must be identical. Everything else supports that.
 - Duplicate `original_filename`: two different files both named `hero.jpg` get
   distinct bundle names, both restore, and the suffixes are stable across two
   consecutive captures.
+- Trashed pages are absent from a capture, and restoring does not resurrect
+  them; templates *are* captured.
+- `parent_slug` survives a round-trip when the parent sorts after the child in
+  the manifest; an unresolvable parent restores as `None` rather than failing.
+- Redirects round-trip by slug; one whose target is unresolvable is dropped and
+  named in the plan.
 - Plan classification: new / overwritten / unchanged, and pages present live but
   absent from the bundle reported as untouched.
 - Blob sharing: two snapshots of unchanged media store one blob; deleting one
@@ -365,7 +412,7 @@ modules/pagebuilder/pagebuilder/
     apply.py         atomic restore
     service.py       orchestration + DB rows
   endpoints/api/snapshots.py
-  models.py                    +3 tables
+  models/_snapshot.py          3 tables, re-exported from models/__init__.py
   contracts/schemas.py         + schemas
   settings.py                  +2 settings
   module.py                    + menu item
