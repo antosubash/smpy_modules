@@ -13,6 +13,7 @@ resurrect something an editor binned.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -176,7 +177,17 @@ async def capture(
     dest: Path,
     blobs: BlobStore,
 ) -> CaptureResult:
-    """Write the live site into *dest* as a bundle directory."""
+    """Write the live site into *dest* as a bundle directory.
+
+    *dest* is emptied first. Writing into a directory that already holds a
+    bundle would *merge* with it — the new pages land beside the old ones and
+    the snapshot claims content the site never had. Snapshot ids normally make
+    that impossible, but they come from the database while these files live on
+    disk: restore a database backup without the filesystem and the next
+    snapshot inherits a previous one's pages.
+    """
+    if dest.exists():
+        shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
     url_to_name, assets = await _media_maps(db, settings)
 

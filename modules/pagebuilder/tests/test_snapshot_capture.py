@@ -127,6 +127,30 @@ async def test_media_row_without_a_file_is_reported_not_fatal(snapshot_db, tmp_p
     assert _read(dest, "manifest.json")["missing_media"] == ["gone.jpg"]
 
 
+async def test_capture_replaces_a_stale_bundle_rather_than_merging(
+    snapshot_db, tmp_path
+):
+    """A directory that already holds a bundle must not contribute to the new one.
+
+    Snapshot ids come from the database while these files live on disk, so
+    restoring a database backup without the filesystem hands the next snapshot
+    a directory that already has pages in it. Merging would make the snapshot
+    claim content the site never had — and the restore plan would offer to
+    create it.
+    """
+    dest = tmp_path / "bundle"
+    (dest / "pages").mkdir(parents=True)
+    (dest / "pages" / "ghost.json").write_text('{"slug": "ghost"}')
+
+    snapshot_db.session.add(Page(slug="real", title="Real"))
+    await snapshot_db.session.flush()
+
+    await _capture(snapshot_db, tmp_path, "bundle")
+
+    assert not (dest / "pages" / "ghost.json").exists()
+    assert {e["slug"] for e in _read(dest, "manifest.json")["pages"]} == {"real"}
+
+
 async def test_two_captures_of_unchanged_content_are_byte_identical(
     snapshot_db, tmp_path
 ):
