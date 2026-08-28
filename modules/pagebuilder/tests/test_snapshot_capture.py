@@ -162,3 +162,65 @@ async def test_two_captures_of_unchanged_content_are_byte_identical(
     # created_at differs by design; every content document must not.
     for name in ("layout.json", "redirects.json", "pages/a.json"):
         assert (first / name).read_bytes() == (second / name).read_bytes()
+
+
+async def test_missing_media_is_not_rewritten_to_an_unresolvable_sentinel(
+    snapshot_db, tmp_path
+):
+    """A row whose file is gone must leave the page's URL alone.
+
+    Rewriting it to `asset://` produced a sentinel the bundle could not carry,
+    and `from_sentinels` leaves an unresolvable one verbatim — so restoring
+    wrote the literal string "asset://gone.jpg" into a live page as an image
+    src. Leaving the URL keeps the reference exactly as broken as it was.
+    """
+    session = snapshot_db.session
+    session.add(
+        MediaAsset(
+            filename="gone.jpg",
+            original_filename="gone.jpg",
+            content_type="image/jpeg",
+        )
+    )
+    session.add(
+        Page(
+            slug="home",
+            title="Home",
+            draft_data={
+                "content": [{"props": {"src": "/media/pagebuilder/gone.jpg"}}]
+            },
+        )
+    )
+    await session.flush()
+
+    dest, _ = await _capture(snapshot_db, tmp_path)
+    src = _read(dest, "pages", "home.json")["draft_data"]["content"][0]["props"]["src"]
+    assert src == "/media/pagebuilder/gone.jpg"
+    assert _read(dest, "manifest.json")["missing_media"] == ["gone.jpg"]
+
+
+async def test_og_image_travels_as_a_sentinel(snapshot_db, tmp_path):
+    """og_image is routinely a media URL, and a media URL is host-local.
+
+    Carried verbatim it names the source host's UUID filename and 404s on
+    every other host — a permanently broken social-share image that nothing
+    reported, because it was never treated as an asset reference.
+    """
+    session = snapshot_db.session
+    root = snapshot_db.settings.media_root
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "uuid1.jpg").write_bytes(b"image-bytes")
+    session.add(
+        MediaAsset(
+            filename="uuid1.jpg",
+            original_filename="hero.jpg",
+            content_type="image/jpeg",
+        )
+    )
+    session.add(
+        Page(slug="home", title="Home", og_image="/media/pagebuilder/uuid1.jpg")
+    )
+    await session.flush()
+
+    dest, _ = await _capture(snapshot_db, tmp_path)
+    assert _read(dest, "pages", "home.json")["og_image"] == "asset://hero.jpg"

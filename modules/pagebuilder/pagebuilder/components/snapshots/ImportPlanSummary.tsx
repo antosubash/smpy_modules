@@ -1,7 +1,7 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
 import type { ImportPlan, PagePlanEntry } from '../../utils/snapshotsApi';
-import { overwriteWarning, planTotals, untouchedNote } from './planSummary';
+import { describeLayoutSide, overwriteWarning, planTotals, untouchedNote } from './planSummary';
 
 /** One bucket of the plan, hidden entirely when it is empty.
  *
@@ -88,7 +88,9 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
       <div className="space-y-2">
         <h3 className="text-sm font-medium">Site layout</h3>
         <p className="text-sm text-muted-foreground">
-          Header {plan.layout.header} block(s), footer {plan.layout.footer} block(s).
+          {describeLayoutSide('Header', plan.layout.header, plan.layout.header_present)}
+          {', '}
+          {describeLayoutSide('footer', plan.layout.footer, plan.layout.footer_present)}.
         </p>
       </div>
 

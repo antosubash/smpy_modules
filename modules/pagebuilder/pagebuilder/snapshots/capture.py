@@ -38,7 +38,7 @@ from pagebuilder.snapshots.format import (
     PAGES_DIR,
     REDIRECTS_NAME,
 )
-from pagebuilder.snapshots.pages import page_to_payload
+from pagebuilder.snapshots.pages import MEDIA_FIELDS, page_to_payload
 
 
 @dataclass
@@ -71,14 +71,34 @@ def _write_json(path: Path, payload: Any) -> int:
 
 async def _media_maps(
     db: AsyncSession, settings: PagebuilderSettings
-) -> tuple[dict[str, str], list[tuple[MediaAsset, str]]]:
-    """Build ``{live url: bundle name}`` and the assets to carry."""
+) -> tuple[dict[str, str], list[tuple[MediaAsset, str]], list[str]]:
+    """Build ``{live url: bundle name}``, the assets to carry, and the missing.
+
+    A row whose file is gone from disk is dropped from *both* maps together.
+    Rewriting its URL to a sentinel the bundle then cannot carry would put an
+    unresolvable ``asset://`` string into the captured content, and
+    ``from_sentinels`` leaves those verbatim — so restoring would write the
+    literal sentinel into a live page as an image src. Leaving the URL alone
+    keeps the reference exactly as broken as it already is, and no worse.
+    """
     result = await db.execute(select(MediaAsset).order_by(MediaAsset.id.asc()))
     assets = list(result.scalars().all())
     names = bundle_names([(a.id, a.original_filename) for a in assets if a.id])
     prefix = settings.media_url_prefix.rstrip("/")
-    url_to_name = {f"{prefix}/{a.filename}": names[a.id] for a in assets if a.id}
-    return url_to_name, [(a, names[a.id]) for a in assets if a.id]
+    root = resolve_media_root(settings.media_root)
+
+    url_to_name: dict[str, str] = {}
+    present: list[tuple[MediaAsset, str]] = []
+    missing: list[str] = []
+    for asset in assets:
+        if not asset.id:
+            continue
+        if not (root / asset.filename).is_file():
+            missing.append(asset.original_filename)
+            continue
+        url_to_name[f"{prefix}/{asset.filename}"] = names[asset.id]
+        present.append((asset, names[asset.id]))
+    return url_to_name, present, missing
 
 
 async def _capture_pages(
@@ -93,8 +113,8 @@ async def _capture_pages(
     for page in pages:
         parent_slug = slug_by_id.get(page.parent_id) if page.parent_id else None
         payload = page_to_payload(page, parent_slug)
-        payload["draft_data"] = to_sentinels(payload["draft_data"], url_to_name)
-        payload["published_data"] = to_sentinels(payload["published_data"], url_to_name)
+        for key in ("draft_data", "published_data", *MEDIA_FIELDS):
+            payload[key] = to_sentinels(payload[key], url_to_name)
         written += _write_json(dest / PAGES_DIR / page_filename(page.slug), payload)
         entries.append(
             {
@@ -142,9 +162,11 @@ def _capture_media(
 ) -> tuple[list[dict[str, Any]], list[str], int]:
     """Copy each asset's bytes into the blob store and write the index.
 
-    A row whose file is missing on disk is reported rather than fatal: that
-    divergence is a real failure mode (issue #14) and a snapshot refusing to
-    run is a worse answer than one that says which files it could not find.
+    *assets* has already been narrowed to rows whose file was on disk, by
+    ``_media_maps`` — the same pass that decides which URLs become sentinels,
+    so the two cannot disagree about what the bundle carries. Anything still
+    unreadable here vanished mid-capture; it is reported rather than fatal,
+    as a missing file always has been (issue #14).
     """
     root = resolve_media_root(settings.media_root)
     index: dict[str, Any] = {}
@@ -190,7 +212,7 @@ async def capture(
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
-    url_to_name, assets = await _media_maps(db, settings)
+    url_to_name, assets, missing = await _media_maps(db, settings)
 
     pages, pages_bytes = await _capture_pages(db, dest, url_to_name)
     layout_counts, layout_bytes = await _capture_layout(db, dest, url_to_name)
@@ -198,9 +220,10 @@ async def capture(
     # Off the event loop: one read + SHA-256 + write per asset, unbounded by
     # the size of the media library. `media_service` offloads its own image
     # work the same way.
-    media_rows, missing, media_bytes = await asyncio.to_thread(
+    media_rows, vanished, media_bytes = await asyncio.to_thread(
         _capture_media, dest, blobs, settings, assets
     )
+    missing = sorted(missing + vanished)
 
     manifest = {
         "format_version": FORMAT_VERSION,

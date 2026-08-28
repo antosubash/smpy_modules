@@ -16,7 +16,12 @@ export interface SnapshotManifest {
   format_version: number;
   created_at: string;
   pages: { slug: string; title: string; status: string; parent_slug: string | null }[];
-  layout: { header: number; footer: number };
+  layout: {
+    header: number;
+    footer: number;
+    header_present?: boolean;
+    footer_present?: boolean;
+  };
   counts: { pages: number; redirects: number; media: number };
   missing_media: string[];
 }
@@ -49,7 +54,12 @@ export interface ImportPlan {
     unchanged: PagePlanEntry[];
     untouched: PagePlanEntry[];
   };
-  layout: { header: number; footer: number };
+  layout: {
+    header: number;
+    footer: number;
+    header_present?: boolean;
+    footer_present?: boolean;
+  };
   redirects: { added: string[]; removed: string[]; dropped: string[] };
 }
 
@@ -69,10 +79,6 @@ export interface ApplyResult {
   media_added: number;
   redirects: number;
   redirects_dropped: string[];
-}
-
-export function listSnapshots(): Promise<{ items: Snapshot[] }> {
-  return request<{ items: Snapshot[] }>('/snapshots');
 }
 
 export function takeSnapshot(note?: string): Promise<Snapshot> {

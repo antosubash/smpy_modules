@@ -77,16 +77,20 @@ async def read_documents(bundle_dir: Path) -> BundleDocuments:
     )
 
 
-def _fields_differ(payload: dict[str, Any], page: Page) -> bool:
+def _fields_differ(
+    payload: dict[str, Any], page: Page, name_to_url: dict[str, str]
+) -> bool:
     """Compare only the fields the bundle actually carries.
 
     ``apply_payload`` sets a field only when the payload has it, so comparing
     absent keys against a column default would report drift for a change the
     restore would never make. The plan has to describe the apply that will
-    happen, not a stricter hypothetical one.
+    happen, not a stricter hypothetical one — which is also why the media
+    fields are resolved first: apply writes the resolved URL, so comparing the
+    raw sentinel would report a change on every restore.
     """
     return any(
-        payload[field] != getattr(page, field)
+        from_sentinels(payload[field], name_to_url) != getattr(page, field)
         for field in _COMPARED_FIELDS
         if field in payload
     )
@@ -141,7 +145,8 @@ async def build_plan(
         )
         # A trashed page is never "unchanged": apply clears `deleted_at`, so
         # even byte-identical content means the page comes back to the site.
-        if slug not in trashed and not content_differs and not _fields_differ(payload, page):
+        fields_differ = _fields_differ(payload, page, name_to_url)
+        if slug not in trashed and not content_differs and not fields_differ:
             unchanged.append(entry)
             continue
         blocks = block_diff(page.draft_data, incoming_draft)
@@ -181,13 +186,22 @@ async def build_plan(
 
 
 def _layout_plan(raw_layout: dict[str, Any], name_to_url: dict[str, str]) -> dict[str, Any]:
+    """Block counts per side, and whether the bundle carries that side at all.
+
+    ``LayoutService.update`` reads ``None`` as "no change requested", so a
+    bundle with no ``layout.json`` — or with only one of the two keys — leaves
+    the live layout untouched. Reporting a bare ``0`` for that case told an
+    approver the header would be emptied when it would not be, and read
+    identically to a bundle carrying an explicitly empty header, which *does*
+    empty it. The flags keep those two apart.
+    """
     layout = from_sentinels(raw_layout, name_to_url)
-    header = layout.get("header_data") or {}
-    footer = layout.get("footer_data") or {}
-    return {
-        "header": len(header.get("content", []) or []),
-        "footer": len(footer.get("content", []) or []),
-    }
+    plan: dict[str, Any] = {}
+    for side, key in (("header", "header_data"), ("footer", "footer_data")):
+        carried = layout.get(key)
+        plan[side] = len((carried or {}).get("content", []) or [])
+        plan[f"{side}_present"] = carried is not None
+    return plan
 
 
 async def _redirect_plan(

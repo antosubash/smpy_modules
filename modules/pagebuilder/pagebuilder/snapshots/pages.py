@@ -35,6 +35,15 @@ the ``AuditMixin`` timestamps, which describe this host's history rather than
 the content's.
 """
 
+MEDIA_FIELDS: tuple[str, ...] = ("og_image", "json_ld")
+"""Fields outside the block data that can still hold a media URL.
+
+``og_image`` is routinely set to a media-library URL — the media grid offers
+"copy URL" for exactly that — and ``json_ld`` can embed one under ``image``.
+Both are host-local UUID filenames, so they need the same sentinel round-trip
+the block data gets; carried verbatim they 404 on any other host.
+"""
+
 _DATETIME_FIELDS: tuple[str, ...] = ("publish_at", "unpublish_at")
 """Schedules, carried as ISO-8601 strings because JSON has no datetime."""
 

@@ -222,7 +222,12 @@ class SnapshotService:
             )
         bundle = self.dir_for(snapshot.id)
         rows = await self.media_rows(snapshot.id)
-        name_to_url = await self._preview_urls(rows)
+        # Straight to `media_match.preview_urls` so the plan and the apply
+        # cannot drift into matching by different rules — matching more
+        # loosely here would resolve a sentinel to a URL the apply then
+        # declines to reuse, telling an approver a page is unchanged while
+        # its image is about to change underneath them.
+        name_to_url = await preview_urls(self.db, self.settings, rows)
         plan = await build_plan(self.db, bundle, name_to_url)
 
         staged = PendingImport(snapshot_id=snapshot.id, plan=plan)
@@ -241,17 +246,6 @@ class SnapshotService:
                 detail="An import is already awaiting approval",
             ) from exc
         return staged
-
-    async def _preview_urls(self, rows: list[SnapshotMedia]) -> dict[str, str]:
-        """What the plan's sentinels resolve to, by the apply's own rules.
-
-        Delegated to ``media_match.preview_urls`` so the plan and the apply
-        cannot drift into matching by different rules — matching more loosely
-        here would resolve a sentinel to a URL the apply then declines to
-        reuse, telling an approver a page is unchanged while its image is
-        about to change underneath them.
-        """
-        return await preview_urls(self.db, self.settings, rows)
 
     async def _decide(
         self, import_id: int, actor: str | None, status_value: ImportStatus
@@ -278,16 +272,27 @@ class SnapshotService:
         staged = await self._decide(import_id, actor, ImportStatus.APPROVED)
         # Before anything is overwritten, so the previous state is one click
         # away rather than gone.
-        await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
-
-        snapshot = await self.get(staged.snapshot_id)
-        result = await apply_bundle(
-            self.db,
-            self.settings,
-            self.dir_for(snapshot.id),
-            self.blobs,
-            self._index_for(snapshot.id),
-            note=f"Restored snapshot #{snapshot.id}",
+        pre_restore = await self.take(
+            _PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE
         )
-        await self.db.flush()
+
+        try:
+            snapshot = await self.get(staged.snapshot_id)
+            result = await apply_bundle(
+                self.db,
+                self.settings,
+                self.dir_for(snapshot.id),
+                self.blobs,
+                self._index_for(snapshot.id),
+                note=f"Restored snapshot #{snapshot.id}",
+            )
+            await self.db.flush()
+        except Exception:
+            # `capture` wrote the pre-restore bundle to disk before this
+            # failed, but the row naming it is about to be rolled back with
+            # the rest of the request — leaving a directory holding a copy of
+            # live content, drafts included, that nothing can ever reference
+            # or delete. `upload` guards its extraction the same way.
+            shutil.rmtree(self.dir_for(pre_restore.id), ignore_errors=True)
+            raise
         return result

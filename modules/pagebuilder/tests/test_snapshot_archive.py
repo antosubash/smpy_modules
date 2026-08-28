@@ -253,3 +253,47 @@ def test_writing_a_snapshot_whose_bytes_are_gone_fails_loudly(tmp_path):
             [{"sha256": _SHA}],
             tmp_path / "o.zip",
         )
+
+
+def test_rejects_a_redirect_without_a_from_slug(tmp_path):
+    """Apply and the plan both subscript `from_slug` directly.
+
+    Left unchecked this surfaced as a KeyError 500 partway through a restore,
+    after the pre-restore snapshot had already been taken.
+    """
+    files = _minimal() | {"redirects.json": json.dumps([{"to_slug": "home"}]).encode()}
+    with pytest.raises(BundleError, match="has no from_slug"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_rejects_duplicate_redirect_slugs(tmp_path):
+    """`PageRedirect.from_slug` is unique, so the second insert would 500."""
+    rows = [
+        {"from_slug": "old", "to_slug": "home"},
+        {"from_slug": "old", "to_slug": "home"},
+    ]
+    files = _minimal() | {"redirects.json": json.dumps(rows).encode()}
+    with pytest.raises(BundleError, match="repeats from_slug"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_rejects_a_redirects_document_that_is_not_a_list(tmp_path):
+    files = _minimal() | {"redirects.json": b"{}"}
+    with pytest.raises(BundleError, match="is not a list"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_rejects_an_over_long_media_content_type(tmp_path):
+    """Postgres would turn this into a 500 from the insert; SQLite would not.
+
+    Checking at the boundary makes the two behave alike, and gives the 422
+    every other malformed bundle field already gets.
+    """
+    index = {"logo.png": {"sha256": _SHA, "content_type": "x" * 121}}
+    files = {
+        "manifest.json": _manifest(),
+        "media/index.json": json.dumps(index).encode(),
+        "media/blobs/" + _SHA: _IMAGE,
+    }
+    with pytest.raises(BundleError, match="content_type longer than 120"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))

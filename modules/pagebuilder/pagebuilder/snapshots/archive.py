@@ -6,39 +6,38 @@ must stay inside the destination, the manifest must exist and declare a format
 this build understands, and every blob must actually hash to the name it
 arrived under.
 
-Validation happens here, at the boundary, rather than during apply. A bundle
-that is going to fail should fail while it is still a file someone can replace,
-not halfway through overwriting a live site.
+Validation happens at the boundary, rather than during apply. A bundle that is
+going to fail should fail while it is still a file someone can replace, not
+halfway through overwriting a live site. The document-shape half of that lives
+in ``validate.py``; this file covers the zip itself.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import shutil
 import zipfile
-from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from pagebuilder.models import PageStatus
-from pagebuilder.snapshots.assets import collect_sentinels
 from pagebuilder.snapshots.blobs import BlobStore, is_digest
 from pagebuilder.snapshots.format import (
     BLOBS_DIR,
     FORMAT_VERSION,
-    LAYOUT_NAME,
     MANIFEST_NAME,
     MEDIA_DIR,
     MEDIA_INDEX_NAME,
-    PAGES_DIR,
     REDIRECTS_NAME,
 )
+from pagebuilder.snapshots.validate import (
+    BundleError,
+    check_documents,
+    check_media_entry,
+    load_document,
+)
 
-
-class BundleError(Exception):
-    """A bundle that cannot be trusted, with a reason fit to show a user."""
+__all__ = ["BundleError", "read_zip", "write_zip"]
 
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
@@ -71,71 +70,6 @@ def _require_manifest(payload: Any) -> dict[str, Any]:
             f"this build reads version {FORMAT_VERSION}"
         )
     return payload
-
-
-def _load(path: Path, label: str) -> Any:
-    """Parse a bundle document, reporting bad JSON as a bundle problem.
-
-    ``json.JSONDecodeError`` is a ``ValueError``, not a ``BundleError``, so
-    without this every malformed document escaped the boundary as a 500 and
-    skipped the caller's cleanup of the half-extracted directory.
-    """
-    try:
-        return json.loads(path.read_text())
-    except json.JSONDecodeError as exc:
-        raise BundleError(f"{label} is not valid JSON") from exc
-
-
-def _check_page(label: str, payload: Any) -> None:
-    """Reject a page document ``apply_payload`` would choke on.
-
-    Schema checks belong here with the rest of the boundary, not at apply
-    time: by then a pre-restore snapshot has been taken and pages are being
-    written, so an unknown status would surface as a 500 halfway through a
-    restore rather than as a rejection of the file that caused it.
-    """
-    if not isinstance(payload, dict):
-        raise BundleError(f"{label} is not an object")
-    slug = payload.get("slug")
-    if not isinstance(slug, str) or not slug:
-        raise BundleError(f"{label} has no slug")
-    status = payload.get("status")
-    try:
-        PageStatus(status)
-    except ValueError as exc:
-        raise BundleError(f"{label} has an unknown status: {status!r}") from exc
-    for field in ("publish_at", "unpublish_at"):
-        raw = payload.get(field)
-        if not raw:
-            continue
-        try:
-            datetime.fromisoformat(raw)
-        except (TypeError, ValueError) as exc:
-            raise BundleError(f"{label} has an unreadable {field}: {raw!r}") from exc
-
-
-def _check_documents(dest: Path, index: dict[str, Any]) -> None:
-    """Validate every page and layout document, in one pass over the tree.
-
-    Each document is parsed once and both checked for shape and scanned for
-    ``asset://`` references, so the two concerns cannot drift apart over which
-    files they consider a document.
-    """
-    referenced: set[str] = set()
-    for document in sorted((dest / PAGES_DIR).glob("*.json")):
-        label = f"{PAGES_DIR}/{document.name}"
-        payload = _load(document, label)
-        _check_page(label, payload)
-        referenced |= collect_sentinels(payload)
-    layout = dest / LAYOUT_NAME
-    if layout.is_file():
-        referenced |= collect_sentinels(_load(layout, LAYOUT_NAME))
-
-    missing = sorted(referenced - set(index))
-    if missing:
-        raise BundleError(
-            "bundle references media it does not contain: " + ", ".join(missing)
-        )
 
 
 def write_zip(
@@ -226,10 +160,10 @@ def read_zip(
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
-    manifest = _require_manifest(_load(manifest_path, MANIFEST_NAME))
+    manifest = _require_manifest(load_document(manifest_path, MANIFEST_NAME))
 
     index_path = dest / MEDIA_DIR / MEDIA_INDEX_NAME
-    index = _load(index_path, MEDIA_INDEX_NAME) if index_path.is_file() else {}
+    index = load_document(index_path, MEDIA_INDEX_NAME) if index_path.is_file() else {}
     if not isinstance(index, dict):
         raise BundleError("media/index.json is not an object")
 
@@ -240,6 +174,7 @@ def read_zip(
         digest = entry.get("sha256") if isinstance(entry, dict) else None
         if not is_digest(digest):
             raise BundleError(f"media entry {name!r} has no valid sha256: {digest!r}")
+        check_media_entry(name, entry)
 
     missing_blobs = sorted(
         name
@@ -251,7 +186,7 @@ def read_zip(
             "bundle is missing the bytes for: " + ", ".join(missing_blobs)
         )
 
-    _check_documents(dest, index)
+    check_documents(dest, index)
 
     # Only commit blobs once every check has passed, so a rejected bundle
     # leaves no trace in the shared store. The digest is the one already

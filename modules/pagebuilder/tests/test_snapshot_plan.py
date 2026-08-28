@@ -185,7 +185,28 @@ async def test_layout_plan_counts_blocks(snapshot_db, tmp_path):
         },
     )
     plan = await build_plan(snapshot_db.session, bundle, {})
-    assert plan["layout"] == {"header": 3, "footer": 1}
+    assert plan["layout"] == {
+        "header": 3,
+        "footer": 1,
+        "header_present": True,
+        "footer_present": True,
+    }
+
+
+async def test_layout_plan_marks_an_absent_side_as_unchanged(snapshot_db, tmp_path):
+    """A bundle with no layout leaves the live one alone, and says so.
+
+    `LayoutService.update` reads None as "no change requested", so reporting a
+    bare 0 told an approver the header would be emptied when it would not.
+    """
+    bundle = _bundle(tmp_path, [], layout={})
+    plan = await build_plan(snapshot_db.session, bundle, {})
+    assert plan["layout"] == {
+        "header": 0,
+        "footer": 0,
+        "header_present": False,
+        "footer_present": False,
+    }
 
 
 async def test_a_trashed_slug_is_reported_as_overwritten_not_new(snapshot_db, tmp_path):

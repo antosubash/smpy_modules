@@ -94,3 +94,18 @@ export function missingMediaWarning(snapshot: Snapshot): string | null {
   if (missing.length === 0) return null;
   return `${missing.length} file(s) were missing when this was taken: ${missing.join(', ')}`;
 }
+
+/**
+ * Describe one side of the layout for the approval screen.
+ *
+ * A bundle that does not carry a side leaves the live one untouched — the
+ * restore treats an absent key as "no change requested". Saying "0 block(s)"
+ * for that read as "this will empty your header", and was indistinguishable
+ * from a bundle carrying an explicitly empty header, which does empty it.
+ */
+export function describeLayoutSide(label: string, count: number, present?: boolean): string {
+  if (present === false) {
+    return `${label} unchanged (not in bundle)`;
+  }
+  return `${label} ${count} block(s)`;
+}

@@ -30,7 +30,7 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.media_match import match_existing
-from pagebuilder.snapshots.pages import apply_payload
+from pagebuilder.snapshots.pages import MEDIA_FIELDS, apply_payload
 from pagebuilder.snapshots.plan import read_documents
 
 
@@ -103,10 +103,12 @@ async def _restore_pages(
     updated = 0
     for slug in sorted(bundled):
         payload = dict(bundled[slug])
-        payload["draft_data"] = from_sentinels(payload.get("draft_data"), name_to_url)
-        payload["published_data"] = from_sentinels(
-            payload.get("published_data"), name_to_url
-        )
+        # Only keys the document actually carries: `apply_payload` and the
+        # plan both treat an absent field as "leave it alone", so injecting
+        # one here would overwrite a live value with None.
+        for field in ("draft_data", "published_data", *MEDIA_FIELDS):
+            if field in payload:
+                payload[field] = from_sentinels(payload[field], name_to_url)
         page = by_slug.get(slug)
         if page is None:
             page = Page(slug=slug, title=payload.get("title", slug))
