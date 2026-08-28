@@ -52,9 +52,18 @@ snapshot, and the two admin pages that drive all of it.
 **Out (deliberately):**
 
 - **News articles and any other module's content.** A snapshot is *pagebuilder
-  content only*: pages (including templates), redirects, layout, branding,
-  media. A per-module contribution hook was considered and rejected for v1 —
-  see Rejected alternatives.
+  content only*: pages (including templates), redirects, layout, media. A
+  per-module contribution hook was considered and rejected for v1 — see Rejected
+  alternatives.
+- **Branding**, for the same reason and one more. `pagebuilder` currently has
+  *no* Python dependency on the branding module — not one import — and capture
+  runs in-process, so putting `app_name` / `primary_color` / `design_pack` in the
+  bundle would force every pagebuilder host to install branding to get a feature
+  that has nothing to do with it. Three fields are not worth a new hard
+  dependency between two distributable modules. The per-module contribution hook
+  is the mechanism that should eventually bring branding *and* news in together,
+  through a seam rather than a coupling. Until then, re-pick the colour and
+  design pack in Settings → Branding after restoring onto a fresh host.
 - **Trashed pages, revision history, and scheduled-job state.** A snapshot is
   the site as it stands, not its past. `PageRevision` / `LayoutRevision` rows
   stay host-local; restoring history from another host would fabricate an audit
@@ -104,7 +113,6 @@ GCA content could be converted mechanically later.
 ```
 manifest.json        format_version, created_at, source, note, counts,
                      [{slug, title, status}]
-branding.json        app_name, primary_color, design_pack
 layout.json          header_data, footer_data
 redirects.json       [{from_slug, to_slug}]
 pages/<slug>.json    slug, title, status, draft_data, published_data,
@@ -123,8 +131,8 @@ media/blobs/<sha256> the bytes (zip only; server-side these live in the
 rejected with a clear message rather than partially understood.
 
 **Server-side, a snapshot is that same tree minus the blobs:**
-`snapshot_root/snapshots/<id>/` holds `manifest.json`, `branding.json`,
-`layout.json`, `pages/*.json` and `media/index.json`, while the bytes live once
+`snapshot_root/snapshots/<id>/` holds `manifest.json`, `layout.json`,
+`redirects.json`, `pages/*.json` and `media/index.json`, while the bytes live once
 in the shared `snapshot_root/blobs/`. Download zips the two together; upload
 splits them apart again. Keeping the documents as files rather than table
 columns keeps multi-megabyte page JSON out of Postgres.
@@ -168,7 +176,7 @@ Media URLs are `f"{media_url_prefix}/{filename}"` where the filename is a UUID
 assigned at upload — host-specific by construction. Serialising those verbatim
 would produce a bundle whose images 404 on any other host.
 
-So capture rewrites every media URL found in page, layout and branding content
+So capture rewrites every media URL found in page and layout content
 to a sentinel `asset://<original_filename>`, and restore rewrites the sentinel
 back to whatever URL that file was given on *this* host. This is the inverse of
 `canopy_atlas.seed.uploads.rewrite_asset_paths`, generalised and made
@@ -226,7 +234,7 @@ pages, and it stops being alarming when the previous state is one click away.
 
 The apply itself runs in a single transaction: media upserted by
 `original_filename`, pages upserted by slug, then the second pass wiring
-`parent_slug` and redirects, then layout and branding. Any failure rolls back
+`parent_slug` and redirects, then the layout. Any failure rolls back
 and the pending import stays pending, so a half-restored site is not a reachable
 state.
 
@@ -258,7 +266,6 @@ plan classifies every item:
 - pages: `new` / `overwritten` / `unchanged`, with a block-level summary for
   overwritten pages reusing `diff.py`'s `props.id` pairing;
 - layout: changed or not, with header / footer block counts;
-- branding: per-field before → after;
 - media: how many blobs are new versus already present;
 - redirects: added / removed, and any dropped for an unresolvable target;
 - pages live on this site but absent from the bundle, listed as untouched.
@@ -298,7 +305,7 @@ Two Inertia pages, both real pages (CLAUDE.md: nothing else goes under
 - **`ContentSnapshots.tsx`** — Take snapshot / Upload bundle actions, and the
   snapshot list showing date, author, note, contents summary, size, with
   Download / Restore / Delete. A banner links to any pending import.
-- **`ContentImportReview.tsx`** — the plan, grouped pages / layout / branding /
+- **`ContentImportReview.tsx`** — the plan, grouped pages / redirects / layout /
   media, an explicit count of what will be overwritten, and Approve & apply /
   Reject.
 
@@ -342,9 +349,9 @@ Two additions to `PagebuilderSettings` (`SM_PAGEBUILDER_*`):
   a case that stays unresolvable anyway — Puck block props are opaque blobs, so
   two edits inside one block cannot be merged automatically regardless.
 - **Per-page approval through the existing `PendingReview` queue.** Maximum
-  reuse, but layout, branding and media have no per-item workflow, so they would
+  reuse, but layout, redirects and media have no per-item workflow, so they would
   have to apply immediately on upload — approving pages one at a time while the
-  branding colour has already changed underneath them.
+  header and footer have already changed underneath them.
 - **Per-module contribution hook** letting `news` add its articles to the
   bundle. Genuinely useful and the likely v2, but it turns a concrete format
   into an extension point before there is a second implementor, and the pending
