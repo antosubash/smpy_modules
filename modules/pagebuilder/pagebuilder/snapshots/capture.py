@@ -12,6 +12,7 @@ resurrect something an editor binned.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -194,7 +195,12 @@ async def capture(
     pages, pages_bytes = await _capture_pages(db, dest, url_to_name)
     layout_counts, layout_bytes = await _capture_layout(db, dest, url_to_name)
     redirect_count, redirect_bytes = await _capture_redirects(db, dest)
-    media_rows, missing, media_bytes = _capture_media(dest, blobs, settings, assets)
+    # Off the event loop: one read + SHA-256 + write per asset, unbounded by
+    # the size of the media library. `media_service` offloads its own image
+    # work the same way.
+    media_rows, missing, media_bytes = await asyncio.to_thread(
+        _capture_media, dest, blobs, settings, assets
+    )
 
     manifest = {
         "format_version": FORMAT_VERSION,

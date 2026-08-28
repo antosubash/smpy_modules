@@ -57,9 +57,14 @@ def page_to_payload(page: Page, parent_slug: str | None) -> dict[str, Any]:
 def apply_payload(page: Page, payload: dict[str, Any]) -> None:
     """Write *payload* onto *page*, leaving ``parent_id`` to the second pass.
 
-    Absent optional fields are written as their empty value rather than
-    skipped: restoring is not merging, so a schedule the bundle does not carry
-    must be cleared, not inherited from whatever was there before.
+    An absent *schedule* is written as ``None`` rather than skipped: restoring
+    is not merging, so a schedule the bundle does not carry must be cleared,
+    not inherited from whatever was there before.
+
+    Other absent keys are left untouched. ``page_to_payload`` always emits
+    every ``PAGE_FIELDS`` key, so a bundle this code wrote never has any — and
+    ``plan._fields_differ`` deliberately compares only the keys a payload
+    carries, so the plan an approver reads describes exactly this behaviour.
     """
     page.status = PageStatus(payload["status"])
     for field in PAGE_FIELDS:

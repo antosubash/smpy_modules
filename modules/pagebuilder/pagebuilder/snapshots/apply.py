@@ -12,6 +12,7 @@ state.
 
 from __future__ import annotations
 
+import asyncio
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -40,9 +41,16 @@ async def _restore_media(
 ) -> tuple[dict[str, str], int]:
     """Ensure every bundled file exists here; return ``{bundle name: url}``.
 
-    Matching is by ``original_filename`` — the rule the GCA seed already uses,
-    so re-running a restore is idempotent and page content keeps pointing at
-    the same asset rather than accumulating duplicates.
+    Matching against what is already here is by ``original_filename`` — the
+    rule the GCA seed already uses, so re-running a restore is idempotent and
+    page content keeps pointing at the same asset rather than accumulating
+    duplicates.
+
+    Within one bundle, though, the cache is keyed by digest, not by name.
+    ``original_filename`` is a label two different uploads can share — which is
+    exactly why ``bundle_names`` mints ``photo~2.jpg`` — so a name-keyed cache
+    would make the second file resolve to the first one's asset and silently
+    drop its bytes.
 
     Bytes go back through ``MediaService.upload`` rather than straight to disk,
     so thumbnails regenerate against this host's current settings and a bundle
@@ -51,14 +59,15 @@ async def _restore_media(
     service = MediaService(db, settings)
     result = await db.execute(select(MediaAsset))
     existing = {asset.original_filename: asset for asset in result.scalars().all()}
+    uploaded: dict[str, MediaAsset] = {}
 
     name_to_url: dict[str, str] = {}
     added = 0
     for bundle_name, entry in sorted(index.items()):
         original = entry.get("original_filename", bundle_name)
-        asset = existing.get(original)
+        asset = uploaded.get(entry["sha256"]) or existing.get(original)
         if asset is None:
-            data = blobs.get(entry["sha256"])
+            data = await asyncio.to_thread(blobs.get, entry["sha256"])
             upload = UploadFile(
                 file=BytesIO(data),
                 filename=original,
@@ -71,7 +80,7 @@ async def _restore_media(
                 ),
             )
             asset = await service.upload(upload, folder=entry.get("folder"))
-            existing[original] = asset
+            uploaded[entry["sha256"]] = asset
             added += 1
         name_to_url[bundle_name] = service.url_for(asset.filename)
     return name_to_url, added
@@ -79,8 +88,8 @@ async def _restore_media(
 
 async def _restore_pages(
     db: AsyncSession, bundled: dict[str, dict[str, Any]], name_to_url: dict[str, str]
-) -> tuple[dict[str, int], int, int]:
-    """Pass one: upsert every page. Returns ``({slug: id}, created, updated)``.
+) -> tuple[dict[str, Page], dict[str, int], int, int]:
+    """Pass one: upsert every page. Returns ``({slug: page}, {slug: id}, created, updated)``.
 
     Matching ignores the trash filter on purpose: a trashed page keeps its slug
     claimed, so restoring content under that slug has to revive the row rather
@@ -110,20 +119,26 @@ async def _restore_pages(
         page.deleted_at = None
 
     await db.flush()
-    return {slug: page.id for slug, page in by_slug.items() if page.id}, created, updated
+    ids = {slug: page.id for slug, page in by_slug.items() if page.id}
+    return by_slug, ids, created, updated
 
 
 async def _resolve_parents(
-    db: AsyncSession, bundled: dict[str, dict[str, Any]], ids: dict[str, int]
+    db: AsyncSession,
+    bundled: dict[str, dict[str, Any]],
+    by_slug: dict[str, Page],
+    ids: dict[str, int],
 ) -> None:
     """Pass two: wire ``parent_slug`` now that every slug exists.
+
+    *by_slug* is pass one's map, not a fresh query: those are the same rows,
+    already flushed, so re-reading the table would only return the objects the
+    session is holding.
 
     An unresolvable parent becomes ``None`` rather than an error — ``parent_id``
     is already ``ondelete="SET NULL"`` precisely because a missing parent must
     not destroy the child.
     """
-    result = await db.execute(select(Page))
-    by_slug = {page.slug: page for page in result.scalars().all()}
     for slug, payload in bundled.items():
         page = by_slug.get(slug)
         if page is None:
@@ -168,8 +183,8 @@ async def apply_bundle(
     name_to_url, media_added = await _restore_media(db, settings, blobs, index)
 
     bundled = read_pages(bundle_dir)
-    ids, created, updated = await _restore_pages(db, bundled, name_to_url)
-    await _resolve_parents(db, bundled, ids)
+    by_slug, ids, created, updated = await _restore_pages(db, bundled, name_to_url)
+    await _resolve_parents(db, bundled, by_slug, ids)
     redirects_kept, redirects_dropped = await _restore_redirects(
         db, read_redirects(bundle_dir), ids
     )

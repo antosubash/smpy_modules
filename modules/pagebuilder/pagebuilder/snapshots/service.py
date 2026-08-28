@@ -11,6 +11,7 @@ this one composes. The two rules worth stating here rather than burying:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from datetime import UTC, datetime
@@ -115,7 +116,10 @@ class SnapshotService:
 
         target = self.dir_for(snapshot.id)
         try:
-            manifest, index = read_zip(data, target, self.blobs)
+            # Off the event loop: unzipping, hashing and writing up to
+            # `snapshot_max_upload_bytes` would otherwise stall every other
+            # request on this worker for the whole extraction.
+            manifest, index = await asyncio.to_thread(read_zip, data, target, self.blobs)
         except BundleError as exc:
             shutil.rmtree(target, ignore_errors=True)
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -139,7 +143,9 @@ class SnapshotService:
     async def download(self, snapshot_id: int, target: Path) -> int:
         snapshot = await self.get(snapshot_id)
         rows = await self.media_rows(snapshot.id)
-        return write_zip(
+        # Off the event loop: DEFLATE over the whole media library.
+        return await asyncio.to_thread(
+            write_zip,
             self.dir_for(snapshot.id),
             self.blobs,
             [{"sha256": row.sha256} for row in rows],
@@ -166,7 +172,10 @@ class SnapshotService:
         await self.db.flush()
         # Reference-counted: only bytes no surviving snapshot names are dropped.
         result = await self.db.execute(select(SnapshotMedia.sha256))
-        self.blobs.delete_unreferenced(keep={sha for (sha,) in result})
+        # Off the event loop: a scan of the whole shared blob store.
+        await asyncio.to_thread(
+            self.blobs.delete_unreferenced, keep={sha for (sha,) in result}
+        )
 
     async def pending(self) -> PendingImport | None:
         result = await self.db.execute(

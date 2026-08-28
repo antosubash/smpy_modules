@@ -48,7 +48,10 @@ function blockSummary(entry: PagePlanEntry): string | null {
   if (entry.added) parts.push(`+${entry.added}`);
   if (entry.removed) parts.push(`−${entry.removed}`);
   if (entry.changed) parts.push(`~${entry.changed}`);
-  return parts.length ? `${parts.join(' ')} blocks` : 'metadata only';
+  const blocks = parts.length ? `${parts.join(' ')} blocks` : 'metadata only';
+  // Worth saying out loud: this slug looks free, but the page under it is in
+  // the trash and the restore overwrites and un-bins it.
+  return entry.revived ? `${blocks} · revived from trash` : blocks;
 }
 
 /**

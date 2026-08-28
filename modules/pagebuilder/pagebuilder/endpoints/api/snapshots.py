@@ -11,8 +11,9 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from simple_module_db.listeners import current_user_id
 from starlette.background import BackgroundTask
 
 from pagebuilder.contracts.schemas import (
@@ -57,19 +58,16 @@ async def _read_bounded(file: UploadFile, max_bytes: int) -> bytes:
             )
 
 
-def _actor(request: Request) -> str | None:
-    """Who decided, in the same terms every other audit field uses.
+def _actor() -> str | None:
+    """Who decided, from the same source every other audit field uses.
 
-    The framework's audit listener writes the *user id* into ``created_by``,
-    and this module already renders those ids verbatim (the layout and revision
-    history panels both do). Recording an email here instead would put two
-    different kinds of identifier side by side on one screen.
+    ``PendingImport`` is an ``AuditMixin`` row, so the framework listener is
+    already writing ``created_by``/``updated_by`` on it from this ContextVar.
+    Reading ``request.state.user`` here instead would be a second, independent
+    answer to "who is the current user" on the same row — one that silently
+    drifts from the other the moment the auth middleware changes.
     """
-    user = getattr(request.state, "user", None)
-    if user is None:
-        return None
-    identifier = getattr(user, "id", None)
-    return str(identifier) if identifier is not None else None
+    return current_user_id.get()
 
 
 @router.get("/snapshots", response_model=SnapshotListResponse)
@@ -180,10 +178,9 @@ async def get_pending_import(
 )
 async def approve_import(
     import_id: int,
-    request: Request,
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> ImportApplyResponse:
-    result = await service.approve(import_id, _actor(request))
+    result = await service.approve(import_id, _actor())
     return ImportApplyResponse.model_validate(result)
 
 
@@ -194,11 +191,8 @@ async def approve_import(
 )
 async def reject_import(
     import_id: int,
-    request: Request,
     body: ImportDecisionRequest | None = None,
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> PendingImportRead:
-    staged = await service.reject(
-        import_id, _actor(request), body.note if body else None
-    )
+    staged = await service.reject(import_id, _actor(), body.note if body else None)
     return PendingImportRead.model_validate(staged)

@@ -25,8 +25,18 @@ cover them, because they never travel as archive member names.
 """
 
 
+def is_digest(value: object) -> bool:
+    """Whether *value* is a usable blob name.
+
+    Exported so ``archive`` can reject a bundle's declared digests early with a
+    message fit for a user, without keeping a second copy of the pattern that
+    would then be free to drift from the one actually guarding the store.
+    """
+    return isinstance(value, str) and _DIGEST.match(value) is not None
+
+
 def _checked(sha256: str) -> str:
-    if not isinstance(sha256, str) or not _DIGEST.match(sha256):
+    if not is_digest(sha256):
         raise ValueError(f"not a sha256 digest: {sha256!r}")
     return sha256
 

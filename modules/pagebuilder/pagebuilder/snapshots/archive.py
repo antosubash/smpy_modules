@@ -15,14 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import zipfile
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from pagebuilder.snapshots.assets import collect_sentinels
-from pagebuilder.snapshots.blobs import BlobStore
+from pagebuilder.snapshots.blobs import BlobStore, is_digest
 from pagebuilder.snapshots.format import (
     BLOBS_DIR,
     FORMAT_VERSION,
@@ -40,8 +39,6 @@ class BundleError(Exception):
 
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
-
-_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _safe_relative(name: str) -> PurePosixPath:
@@ -156,7 +153,7 @@ def read_zip(
     # never saw them — and `BlobStore` joins them onto the store root.
     for name, entry in sorted(index.items()):
         digest = entry.get("sha256") if isinstance(entry, dict) else None
-        if not isinstance(digest, str) or not _DIGEST.match(digest):
+        if not is_digest(digest):
             raise BundleError(f"media entry {name!r} has no valid sha256: {digest!r}")
 
     missing_blobs = sorted(

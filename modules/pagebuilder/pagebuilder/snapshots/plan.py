@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.diff import block_diff
-from pagebuilder.models import NOT_TRASHED, Page, PageRedirect
+from pagebuilder.models import Page, PageRedirect
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.format import LAYOUT_NAME, PAGES_DIR, REDIRECTS_NAME
 from pagebuilder.snapshots.pages import PAGE_FIELDS
@@ -79,8 +79,15 @@ async def build_plan(
     """
     bundled = read_pages(bundle_dir)
 
-    result = await db.execute(select(Page).where(NOT_TRASHED))
-    live = {page.slug: page for page in result.scalars().all()}
+    # Unfiltered on purpose, and split here rather than in SQL: `apply_bundle`
+    # matches slugs against *every* page, trashed included, because restoring
+    # content under a claimed slug revives that row. Classifying a trashed
+    # slug as "new" would promise an approver a fresh page while apply
+    # silently overwrites recoverable content.
+    result = await db.execute(select(Page))
+    every = {page.slug: page for page in result.scalars().all()}
+    live = {slug: page for slug, page in every.items() if page.deleted_at is None}
+    trashed = {slug: page for slug, page in every.items() if page.deleted_at is not None}
 
     new: list[dict[str, Any]] = []
     overwritten: list[dict[str, Any]] = []
@@ -88,11 +95,13 @@ async def build_plan(
 
     for slug in sorted(bundled):
         payload = bundled[slug]
-        page = live.get(slug)
+        page = live.get(slug) or trashed.get(slug)
         entry = {"slug": slug, "title": payload.get("title")}
         if page is None:
             new.append(entry)
             continue
+        if slug in trashed:
+            entry["revived"] = True
         incoming_draft = from_sentinels(payload.get("draft_data"), name_to_url)
         incoming_published = from_sentinels(payload.get("published_data"), name_to_url)
         content_differs = (
@@ -103,7 +112,9 @@ async def build_plan(
             )
             or ("status" in payload and payload["status"] != page.status.value)
         )
-        if not content_differs and not _fields_differ(payload, page):
+        # A trashed page is never "unchanged": apply clears `deleted_at`, so
+        # even byte-identical content means the page comes back to the site.
+        if slug not in trashed and not content_differs and not _fields_differ(payload, page):
             unchanged.append(entry)
             continue
         blocks = block_diff(page.draft_data, incoming_draft)
@@ -128,8 +139,7 @@ async def build_plan(
     # the trash-filtered `live` here would tell an approver a redirect will be
     # dropped as "target missing" when apply would actually keep it pointing
     # at a trashed page.
-    all_slugs = await db.execute(select(Page.slug))
-    resolvable = set(bundled) | {slug for (slug,) in all_slugs}
+    resolvable = set(bundled) | set(every)
 
     return {
         "pages": {
@@ -162,8 +172,12 @@ async def _redirect_plan(
 
     dropped = [r["from_slug"] for r in bundled if r.get("to_slug") not in known_slugs]
     keepable = {r["from_slug"] for r in bundled if r.get("to_slug") in known_slugs}
+    # `removed` and `dropped` are shown side by side, so they have to be
+    # disjoint: a redirect that exists today *and* is in the bundle with a
+    # missing target is one redirect, not two. It is reported as dropped —
+    # the more specific fact, and the one that names the slug.
     return {
         "added": sorted(keepable - existing),
-        "removed": sorted(existing - keepable),
+        "removed": sorted(existing - keepable - set(dropped)),
         "dropped": sorted(dropped),
     }

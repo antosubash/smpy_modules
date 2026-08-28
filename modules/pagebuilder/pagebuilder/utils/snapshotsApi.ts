@@ -38,6 +38,8 @@ export interface PagePlanEntry {
   added?: number;
   removed?: number;
   changed?: number;
+  /** The live page under this slug is in the trash; restoring brings it back. */
+  revived?: boolean;
 }
 
 export interface ImportPlan {

@@ -186,3 +186,82 @@ async def test_layout_plan_counts_blocks(snapshot_db, tmp_path):
     )
     plan = await build_plan(snapshot_db.session, bundle, {})
     assert plan["layout"] == {"header": 3, "footer": 1}
+
+
+async def test_a_trashed_slug_is_reported_as_overwritten_not_new(snapshot_db, tmp_path):
+    """The plan has to describe the apply that will happen.
+
+    ``_restore_pages`` matches slugs against every page, trashed included, so a
+    bundled slug claimed by a binned page overwrites and revives it. Calling
+    that "created" would promise an approver a fresh page while recoverable
+    content is destroyed.
+    """
+    from datetime import UTC, datetime
+
+    session = snapshot_db.session
+    session.add(
+        Page(
+            slug="home",
+            title="Binned",
+            draft_data={"content": ["old"]},
+            deleted_at=datetime.now(UTC),
+        )
+    )
+    await session.flush()
+
+    bundle = _bundle(tmp_path, [{"slug": "home", "title": "Home"}])
+    plan = await build_plan(session, bundle, {})
+
+    assert plan["pages"]["new"] == []
+    assert [e["slug"] for e in plan["pages"]["overwritten"]] == ["home"]
+    assert plan["pages"]["overwritten"][0]["revived"] is True
+    # Nor "untouched": that list promises pages the restore leaves alone.
+    assert plan["pages"]["untouched"] == []
+
+
+async def test_an_identical_trashed_page_still_counts_as_a_change(snapshot_db, tmp_path):
+    """Reviving is itself a change, even when every field already matches."""
+    from datetime import UTC, datetime
+
+    session = snapshot_db.session
+    session.add(
+        Page(
+            slug="home",
+            title="Home",
+            draft_data={},
+            published_data=None,
+            deleted_at=datetime.now(UTC),
+        )
+    )
+    await session.flush()
+
+    bundle = _bundle(tmp_path, [{"slug": "home", "title": "Home", "draft_data": {}}])
+    plan = await build_plan(session, bundle, {})
+
+    assert plan["pages"]["unchanged"] == []
+    assert [e["slug"] for e in plan["pages"]["overwritten"]] == ["home"]
+
+
+async def test_a_redirect_is_never_both_removed_and_dropped(snapshot_db, tmp_path):
+    """One redirect must not be counted twice on the approval screen.
+
+    ``removed`` and ``dropped`` are rendered as separate badges, so an overlap
+    would show two numbers for a single redirect and overstate the blast
+    radius. Dropped wins: it is the more specific fact and it names the slug.
+    """
+    session = snapshot_db.session
+    page = Page(slug="home", title="Home")
+    session.add(page)
+    await session.flush()
+    session.add(PageRedirect(from_slug="shared", page_id=page.id))
+    await session.flush()
+
+    bundle = _bundle(
+        tmp_path,
+        [{"slug": "home", "title": "Home"}],
+        redirects=[{"from_slug": "shared", "to_slug": "nowhere"}],
+    )
+    plan = await build_plan(session, bundle, {})
+
+    assert plan["redirects"]["dropped"] == ["shared"]
+    assert plan["redirects"]["removed"] == []
