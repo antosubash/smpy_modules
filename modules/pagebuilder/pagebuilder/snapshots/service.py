@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete as sa_delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -147,6 +149,19 @@ class SnapshotService:
     async def delete(self, snapshot_id: int) -> None:
         snapshot = await self.get(snapshot_id)
         shutil.rmtree(self.dir_for(snapshot.id), ignore_errors=True)
+        # The rows cascade on Postgres, but SQLite does not enforce the
+        # constraint unless PRAGMA foreign_keys is on (see PagesService.purge
+        # for the same gotcha) — so both dependents are cleared explicitly
+        # rather than trusted to `ondelete="CASCADE"`. Left behind, a stale
+        # SnapshotMedia row would poison delete_unreferenced's keep-set
+        # forever, and a stale PENDING PendingImport would 404 on approve
+        # while still blocking every future restore.
+        await self.db.execute(
+            sa_delete(PendingImport).where(PendingImport.snapshot_id == snapshot.id)
+        )
+        await self.db.execute(
+            sa_delete(SnapshotMedia).where(SnapshotMedia.snapshot_id == snapshot.id)
+        )
         await self.db.delete(snapshot)
         await self.db.flush()
         # Reference-counted: only bytes no surviving snapshot names are dropped.
@@ -183,7 +198,19 @@ class SnapshotService:
 
         staged = PendingImport(snapshot_id=snapshot.id, plan=plan)
         self.db.add(staged)
-        await self.db.flush()
+        try:
+            await self.db.flush()
+        except IntegrityError as exc:
+            # The check above is not atomic with this insert: two concurrent
+            # requests can both see no pending import. The partial unique
+            # index on `status` is the real backstop — this turns the race's
+            # loser into the same 409 the check above gives the common case,
+            # instead of a raw 500.
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An import is already awaiting approval",
+            ) from exc
         return staged
 
     async def _preview_urls(self, rows: list[SnapshotMedia]) -> dict[str, str]:

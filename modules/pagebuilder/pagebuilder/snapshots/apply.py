@@ -62,7 +62,13 @@ async def _restore_media(
             upload = UploadFile(
                 file=BytesIO(data),
                 filename=original,
-                headers=Headers({"content-type": entry["content_type"]}),
+                headers=Headers(
+                    {
+                        "content-type": entry.get(
+                            "content_type", "application/octet-stream"
+                        )
+                    }
+                ),
             )
             asset = await service.upload(upload, folder=entry.get("folder"))
             existing[original] = asset

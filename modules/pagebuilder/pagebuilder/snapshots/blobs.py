@@ -83,6 +83,12 @@ class BlobStore:
             return 0
         removed = 0
         for path in self.root.iterdir():
+            # A concurrent put() writes here before its rename; a `.partial`
+            # name never appears in `keep` (which only ever holds digests),
+            # so without this guard a scan landing mid-write deletes the file
+            # out from under that write's `tmp.replace(target)`.
+            if path.name.endswith(_PARTIAL_SUFFIX):
+                continue
             if path.is_file() and path.name not in keep:
                 path.unlink()
                 removed += 1

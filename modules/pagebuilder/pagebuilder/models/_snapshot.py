@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import JSON, Column, DateTime, Index, text
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
@@ -92,6 +92,20 @@ class PendingImport(Base, AuditMixin, table=True):  # ty: ignore[unsupported-bas
     """
 
     __tablename__ = "pagebuilder_pending_imports"
+    __table_args__ = (
+        # The service layer checks-then-inserts to keep at most one row
+        # PENDING, which is not atomic across two concurrent requests. This
+        # partial index is the real backstop: a second concurrent insert
+        # while one is already PENDING hits a unique-constraint violation
+        # instead of silently succeeding.
+        Index(
+            "uq_pagebuilder_pending_imports_one_pending",
+            "status",
+            unique=True,
+            sqlite_where=text("status = 'PENDING'"),
+            postgresql_where=text("status = 'PENDING'"),
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     snapshot_id: int = Field(

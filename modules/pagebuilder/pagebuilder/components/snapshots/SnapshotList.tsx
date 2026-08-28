@@ -22,12 +22,15 @@ export function SnapshotList({
   snapshots,
   busy,
   hasPending,
+  pendingSnapshotId,
   onRestore,
   onDelete,
 }: {
   snapshots: Snapshot[];
   busy: boolean;
   hasPending: boolean;
+  /** The snapshot a staged-but-undecided restore targets, if any. */
+  pendingSnapshotId: number | null;
   onRestore: (snapshot: Snapshot) => Promise<unknown>;
   onDelete: (snapshot: Snapshot) => Promise<unknown>;
 }) {
@@ -75,7 +78,16 @@ export function SnapshotList({
               </Button>
               <ConfirmDialog
                 trigger={
-                  <Button variant="ghost" size="sm" disabled={busy}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || pendingSnapshotId === snapshot.id}
+                    title={
+                      pendingSnapshotId === snapshot.id
+                        ? 'A restore staged from this snapshot is awaiting approval'
+                        : undefined
+                    }
+                  >
                     Delete
                   </Button>
                 }

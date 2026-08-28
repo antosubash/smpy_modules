@@ -52,6 +52,12 @@ def _safe_relative(name: str) -> PurePosixPath:
     # A Windows-style absolute path survives PurePosixPath intact.
     if len(name) > 1 and name[1] == ":":
         raise BundleError(f"unsafe path in bundle: {name}")
+    # An empty name or "." normalises to the destination directory itself —
+    # not a traversal, but `dest / candidate` would then *be* a directory,
+    # and writing bytes to it raises IsADirectoryError instead of the clean
+    # rejection every other malformed entry gets.
+    if not name or candidate == PurePosixPath("."):
+        raise BundleError(f"unsafe path in bundle: {name!r}")
     return candidate
 
 

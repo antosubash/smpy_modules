@@ -11,7 +11,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -30,6 +30,31 @@ from pagebuilder.snapshots.service import SnapshotService
 router = APIRouter()
 
 _ZIP_MEDIA_TYPE = "application/zip"
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+async def _read_bounded(file: UploadFile, max_bytes: int) -> bytes:
+    """Read *file*, aborting as soon as it exceeds *max_bytes*.
+
+    ``SnapshotService.upload`` also checks the length, but only after the
+    whole body is already in memory — reading unconditionally first defeats
+    the cap it exists to enforce. Failing fast here keeps memory bounded by
+    the cap (plus one chunk) regardless of how large the client's upload
+    actually is.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Bundle exceeds {max_bytes} bytes",
+            )
 
 
 def _actor(request: Request) -> str | None:
@@ -81,7 +106,15 @@ async def download_snapshot(
     # background task below is what removes it.
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
         target = Path(handle.name)
-    await service.download(snapshot_id, target)
+    try:
+        await service.download(snapshot_id, target)
+    except Exception:
+        # `service.download` can fail before `write_zip` ever runs (an
+        # unknown or concurrently-deleted snapshot id) or partway through
+        # it — either way the FileResponse below, and the background task
+        # that would otherwise clean this up, is never reached.
+        target.unlink(missing_ok=True)
+        raise
     return FileResponse(
         target,
         media_type=_ZIP_MEDIA_TYPE,
@@ -100,7 +133,8 @@ async def upload_snapshot(
     file: UploadFile,
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> SnapshotRead:
-    snapshot = await service.upload(await file.read(), note=file.filename)
+    data = await _read_bounded(file, service.settings.snapshot_max_upload_bytes)
+    snapshot = await service.upload(data, note=file.filename)
     return SnapshotRead.model_validate(snapshot)
 
 

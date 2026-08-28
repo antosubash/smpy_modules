@@ -64,6 +64,7 @@ export default function ContentSnapshots() {
           snapshots={state.snapshots}
           busy={state.busy}
           hasPending={state.pending !== null}
+          pendingSnapshotId={state.pending?.snapshot_id ?? null}
           onRestore={state.restore}
           onDelete={state.remove}
         />

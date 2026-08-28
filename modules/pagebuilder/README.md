@@ -177,6 +177,13 @@ redirects, the site layout, and the media library's files.
   it stands, not its past; restoring history from another host would fabricate
   an audit trail that never happened here.
 
+A restore also does **not** write a `PageRevision` per page, unlike every other
+mutation path. The `pre_restore` snapshot already holds the previous state of
+every page, once, with media deduplicated by digest — a revision row per page
+would duplicate that whole before-state and recover nothing extra. The restore
+itself stays audited: who approved it, when, from which snapshot, and the plan
+they were shown.
+
 **Restoring is staged, never immediate.** Choosing Restore computes a plan —
 what is created, what is overwritten, what is unchanged — and parks it for
 approval. Taking a snapshot, uploading and staging need `pagebuilder.publish`;

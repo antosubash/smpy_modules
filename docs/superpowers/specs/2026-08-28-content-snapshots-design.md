@@ -68,6 +68,16 @@ snapshot, and the two admin pages that drive all of it.
   the site as it stands, not its past. `PageRevision` / `LayoutRevision` rows
   stay host-local; restoring history from another host would fabricate an audit
   trail that never happened there.
+- **A `PageRevision` per restored page.** Every other mutation path appends one,
+  so this is a deliberate exception rather than an oversight. The `pre_restore`
+  snapshot already holds the previous state of *every* page, stored once with
+  its media deduplicated by digest; writing one revision row per page would
+  duplicate that whole before-state N times and recover nothing the snapshot
+  cannot. The restore stays fully audited at the level it actually happens:
+  who approved it, when, which snapshot, and the plan they saw. The cost is
+  that a page's own history panel does not explain a change a bulk restore
+  made — surfacing "restored from snapshot #N" there is the v2 fix, and it is
+  a read-side change, not more rows.
 - **Deleting live pages absent from a bundle.** Restore never deletes; pages on
   the site but not in the snapshot are left alone and reported. No `--prune`
   equivalent until there is a demonstrated need.

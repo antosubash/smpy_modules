@@ -122,6 +122,15 @@ async def build_plan(
         if slug not in bundled
     ]
 
+    # Not `set(bundled) | set(live)`: `apply_bundle`'s `_restore_pages`
+    # resolves redirect targets against *every* page id, trashed included,
+    # because reviving a page under a claimed slug is deliberate there. Using
+    # the trash-filtered `live` here would tell an approver a redirect will be
+    # dropped as "target missing" when apply would actually keep it pointing
+    # at a trashed page.
+    all_slugs = await db.execute(select(Page.slug))
+    resolvable = set(bundled) | {slug for (slug,) in all_slugs}
+
     return {
         "pages": {
             "new": new,
@@ -130,7 +139,7 @@ async def build_plan(
             "untouched": untouched,
         },
         "layout": _layout_plan(bundle_dir, name_to_url),
-        "redirects": await _redirect_plan(db, bundle_dir, set(bundled) | set(live)),
+        "redirects": await _redirect_plan(db, bundle_dir, resolvable),
     }
 
 
