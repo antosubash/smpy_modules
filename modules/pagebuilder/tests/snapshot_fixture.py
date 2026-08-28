@@ -1,11 +1,14 @@
-"""Session + settings fixture for the snapshot layer, registered as a plugin.
+"""Fixtures for the snapshot layer, registered as a plugin.
 
 Kept out of ``conftest.py`` for the same reason as ``db_fixture``: that file
 sits on the repo's 300-line cap. Registered via ``-p snapshot_fixture`` in
 ``pyproject.toml``.
 
-The snapshot layer talks to the ORM directly, so its tests want a session and a
-settings object rather than the full ASGI harness the API tests build.
+Two fixtures live here. ``snapshot_db`` is a bare session + settings pair,
+because the snapshot layer talks to the ORM directly and does not need the full
+ASGI harness. ``publisher_client`` is an authenticated client holding *publish
+but not approve* — the only way to test the approval gate, since two client
+fixtures in one test would get two separate in-memory databases.
 """
 
 from __future__ import annotations
@@ -15,11 +18,28 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from conftest import _client_fixture
+from httpx import AsyncClient
 from pagebuilder.models import Base
+from pagebuilder.permissions import PERM_EDIT, PERM_PUBLISH, ROLE_PUBLISHER
 from pagebuilder.settings import PagebuilderSettings
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sqlalchemy.pool import StaticPool
+
+
+@pytest.fixture
+async def publisher_client(tmp_path) -> AsyncIterator[AsyncClient]:
+    """Stub user holding edit + publish, but deliberately not approve."""
+    async for client in _client_fixture(
+        tmp_path,
+        requires_auth=True,
+        csrf_protect=False,
+        inject_user=True,
+        user_roles=(ROLE_PUBLISHER,),
+        role_map={ROLE_PUBLISHER: [PERM_EDIT, PERM_PUBLISH]},
+    ):
+        yield client
 
 
 @pytest.fixture
