@@ -109,13 +109,13 @@ async def _capture_pages(
     slug_by_id = {page.id: page.slug for page in pages}
 
     entries: list[dict[str, Any]] = []
-    written = 0
+    documents: list[tuple[Path, dict[str, Any]]] = []
     for page in pages:
         parent_slug = slug_by_id.get(page.parent_id) if page.parent_id else None
         payload = page_to_payload(page, parent_slug)
         for key in ("draft_data", "published_data", *MEDIA_FIELDS):
             payload[key] = to_sentinels(payload[key], url_to_name)
-        written += _write_json(dest / PAGES_DIR / page_filename(page.slug), payload)
+        documents.append((dest / PAGES_DIR / page_filename(page.slug), payload))
         entries.append(
             {
                 "slug": page.slug,
@@ -124,6 +124,12 @@ async def _capture_pages(
                 "parent_slug": parent_slug,
             }
         )
+    # Off the event loop for the same reason `_capture_media` is: one
+    # serialize + write per page, unbounded by the number of pages. The ORM
+    # work above has to stay on the loop, so only the writes are offloaded.
+    written = await asyncio.to_thread(
+        lambda: sum(_write_json(path, payload) for path, payload in documents)
+    )
     return entries, written
 
 
@@ -210,7 +216,7 @@ async def capture(
     snapshot inherits a previous one's pages.
     """
     if dest.exists():
-        shutil.rmtree(dest)
+        await asyncio.to_thread(shutil.rmtree, dest)
     dest.mkdir(parents=True, exist_ok=True)
     url_to_name, assets, missing = await _media_maps(db, settings)
 

@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pagebuilder.models import PageStatus
+from pagebuilder.models import PageStatus, SnapshotMedia
 from pagebuilder.snapshots.assets import collect_sentinels
 from pagebuilder.snapshots.format import (
     LAYOUT_NAME,
@@ -66,19 +66,24 @@ def _check_page(label: str, payload: Any) -> None:
             raise BundleError(f"{label} has an unreadable {field}: {raw!r}") from exc
 
 
-# Mirrors the column widths on `SnapshotMedia`. Checked here so an over-long
-# string fails as a 422 at the boundary rather than as a raw DataError from
-# the insert — which SQLite silently accepts and Postgres turns into a 500.
-_MEDIA_FIELD_LIMITS = (
-    ("original_filename", 300),
-    ("content_type", 120),
-    ("folder", 300),
+# Read off the column widths on `SnapshotMedia` rather than mirrored as
+# literals, so widening a column cannot leave this check behind. Checked here
+# so an over-long string fails as a 422 at the boundary rather than as a raw
+# DataError from the insert — which SQLite silently accepts and Postgres turns
+# into a 500.
+def _width(column: str) -> int:
+    return SnapshotMedia.__table__.columns[column].type.length
+
+
+_MEDIA_FIELD_LIMITS = tuple(
+    (field, _width(field))
+    for field in ("original_filename", "content_type", "folder")
 )
 
 
 def check_media_entry(name: str, entry: dict[str, Any]) -> None:
     """Check that one ``media/index.json`` value fits what the row can hold."""
-    if len(name) > 300:
+    if len(name) > _width("bundle_name"):
         raise BundleError(f"media entry name is too long: {name[:60]!r}...")
     for field, limit in _MEDIA_FIELD_LIMITS:
         value = entry.get(field)
@@ -129,10 +134,18 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
     files they consider a document.
     """
     referenced: set[str] = set()
+    seen_slugs: set[str] = set()
     for document in sorted((dest / PAGES_DIR).glob("*.json")):
         label = f"{PAGES_DIR}/{document.name}"
         payload = load_document(document, label)
         _check_page(label, payload)
+        # Two files claiming one slug would otherwise resolve as "last file
+        # wins" in `read_documents`, dropping a page with nothing in the plan
+        # to say it happened. Rejected here for the same reason repeated
+        # `from_slug` values are.
+        if payload["slug"] in seen_slugs:
+            raise BundleError(f"{label} repeats slug {payload['slug']!r}")
+        seen_slugs.add(payload["slug"])
         referenced |= collect_sentinels(payload)
     layout = dest / LAYOUT_NAME
     if layout.is_file():

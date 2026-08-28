@@ -32,6 +32,11 @@ export function planTotals(plan: ImportPlan): PlanTotals {
   };
 }
 
+/** "1 page" / "3 pages" — one place to decide how a count reads. */
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 /**
  * The headline an approver reads first.
  *
@@ -42,8 +47,7 @@ export function planTotals(plan: ImportPlan): PlanTotals {
 export function overwriteWarning(plan: ImportPlan): string {
   const { overwritten } = planTotals(plan);
   if (overwritten === 0) return 'No existing page will be overwritten.';
-  if (overwritten === 1) return '1 page will be overwritten.';
-  return `${overwritten} pages will be overwritten.`;
+  return `${pluralize(overwritten, 'page')} will be overwritten.`;
 }
 
 /**
@@ -56,7 +60,7 @@ export function overwriteWarning(plan: ImportPlan): string {
 export function untouchedNote(plan: ImportPlan): string | null {
   const { untouched } = planTotals(plan);
   if (untouched === 0) return null;
-  const subject = untouched === 1 ? '1 page is' : `${untouched} pages are`;
+  const subject = `${pluralize(untouched, 'page')} ${untouched === 1 ? 'is' : 'are'}`;
   const object = untouched === 1 ? 'It' : 'They';
   return `${subject} on this site but not in this snapshot. ${object} will not be deleted.`;
 }
@@ -66,8 +70,8 @@ export function contentsLine(snapshot: Snapshot): string {
   const counts = snapshot.manifest?.counts;
   if (!counts) return 'Empty snapshot';
   const parts = [
-    `${counts.pages} ${counts.pages === 1 ? 'page' : 'pages'}`,
-    `${counts.redirects} ${counts.redirects === 1 ? 'redirect' : 'redirects'}`,
+    pluralize(counts.pages, 'page'),
+    pluralize(counts.redirects, 'redirect'),
     `${counts.media} media`,
   ];
   return parts.join(' · ');

@@ -6,6 +6,7 @@ import pytest
 from pagebuilder.models import MediaAsset, Page, PageRedirect, PageStatus
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.capture import capture
+from pagebuilder.snapshots.service import SnapshotService
 
 pytestmark = pytest.mark.asyncio
 
@@ -224,3 +225,28 @@ async def test_og_image_travels_as_a_sentinel(snapshot_db, tmp_path):
 
     dest, _ = await _capture(snapshot_db, tmp_path)
     assert _read(dest, "pages", "home.json")["og_image"] == "asset://hero.jpg"
+
+
+async def test_a_failed_capture_leaves_no_directory_behind(
+    snapshot_db, tmp_path, monkeypatch
+):
+    """The row naming the directory rolls back; the files have to go too.
+
+    Without the guard the bundle stayed on disk holding a copy of live
+    content, drafts included, with no snapshot row left to reference or
+    delete it — and on SQLite its id is reused, so the next snapshot would
+    inherit it.
+    """
+    service = SnapshotService(snapshot_db.session, snapshot_db.settings)
+
+    async def _boom(*args, **kwargs):
+        # Half-written, the way a disk filling up mid-capture would leave it.
+        dest = args[2]
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "manifest.json").write_text("{}")
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr("pagebuilder.snapshots.service.capture", _boom)
+    with pytest.raises(OSError, match="No space left"):
+        await service.take()
+    assert not any(service.root.joinpath("snapshots").glob("*"))

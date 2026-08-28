@@ -91,14 +91,20 @@ class SnapshotService:
         self.db.add(snapshot)
         await self.db.flush()
 
-        result = await capture(
-            self.db, self.settings, self.dir_for(snapshot.id), self.blobs
-        )
-        snapshot.manifest = result.manifest
-        snapshot.size_bytes = result.size_bytes
-        for row in result.media:
-            self.db.add(SnapshotMedia(snapshot_id=snapshot.id, **row))
-        await self.db.flush()
+        try:
+            result = await capture(
+                self.db, self.settings, self.dir_for(snapshot.id), self.blobs
+            )
+            snapshot.manifest = result.manifest
+            snapshot.size_bytes = result.size_bytes
+            for row in result.media:
+                self.db.add(SnapshotMedia(snapshot_id=snapshot.id, **row))
+            await self.db.flush()
+        except Exception:
+            # The row naming this directory rolls back with the request, so
+            # the partial bundle has to go with it. `upload` guards the same.
+            shutil.rmtree(self.dir_for(snapshot.id), ignore_errors=True)
+            raise
         return snapshot
 
     async def upload(self, data: bytes, note: str | None = None) -> ContentSnapshot:
@@ -288,11 +294,7 @@ class SnapshotService:
             )
             await self.db.flush()
         except Exception:
-            # `capture` wrote the pre-restore bundle to disk before this
-            # failed, but the row naming it is about to be rolled back with
-            # the rest of the request — leaving a directory holding a copy of
-            # live content, drafts included, that nothing can ever reference
-            # or delete. `upload` guards its extraction the same way.
+            # `take` guards its own capture; this covers the apply below.
             shutil.rmtree(self.dir_for(pre_restore.id), ignore_errors=True)
             raise
         return result
