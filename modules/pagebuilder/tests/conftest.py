@@ -278,28 +278,6 @@ async def approver_client(tmp_path) -> AsyncIterator[AsyncClient]:
         yield c
 
 
-@pytest.fixture
-async def snapshot_db(tmp_path):
-    """An empty pagebuilder schema plus settings rooted in ``tmp_path``.
-
-    The snapshot layer talks to the ORM directly, so its unit tests want a
-    session rather than the full ASGI harness the API tests build. Same
-    ``StaticPool`` reasoning as ``_build_app``: one connection, so every
-    ``async with`` sees the same ``:memory:`` database.
-    """
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    settings = PagebuilderSettings(
-        media_root=tmp_path / "media",
-        snapshot_root=tmp_path / "snapshots",
-    )
-    async with db_state.session_factory() as session:
-        yield SimpleNamespace(session=session, settings=settings)
-    await db_state.engine.dispose()
-
-
 async def create_draft(
     client: AsyncClient,
     *,
