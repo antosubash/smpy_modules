@@ -222,6 +222,22 @@ class TestRename:
 
         assert response.status_code == 404, response.text
 
+    async def test_it_does_not_forward_to_a_trashed_article(self, db) -> None:
+        """The same refusal as the unpublished case, by the same shared rule.
+
+        ``resolve`` open-coded ``deleted_at IS NULL`` where every other read
+        path applies ``NOT_TRASHED``; this pins the behaviour so the one
+        definition cannot quietly stop covering the redirect.
+        """
+        from news import redirects
+
+        article = await make_article(db, slug="was-binned")
+        service = ArticlesService(db)
+        await service.update(article.id, {"slug": "now-binned"})
+        await service.trash(article.id)
+
+        assert await redirects.resolve(db, "was-binned") is None
+
     async def test_it_forwards_again_once_the_article_is_back(
         self, anon_client
     ) -> None:

@@ -10,6 +10,7 @@ instead of a permission on somebody else's module.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._revisions import RevisionsMixin
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle, RevisionEvent
+
+logger = logging.getLogger(__name__)
 
 _UNSET: Any = object()
 """Sentinel for "the caller did not mention this field".
@@ -132,7 +135,9 @@ class WorkflowMixin(RevisionsMixin):
         Idempotent by construction: each tick re-queries, and both `publish` and
         `unpublish` clear the timestamp they acted on, so a process that was
         asleep for an hour catches up on its next wakeup rather than losing the
-        window. One bad row is skipped rather than poisoning the whole tick.
+        window. One bad row is skipped rather than poisoning the whole tick, but
+        never silently: each skip is logged with the article's id, because a
+        schedule that quietly never fires leaves no other trace anywhere.
 
         Trashed articles are excluded. An article binned while carrying a
         schedule must not republish itself out of the trash.
@@ -150,7 +155,16 @@ class WorkflowMixin(RevisionsMixin):
         for article in due_to_publish.scalars().all():
             try:
                 flipped.append(await self.publish(article.id or 0))
-            except HTTPException:
+            except HTTPException as exc:
+                # Warned rather than swallowed: a schedule that never fires is
+                # invisible otherwise, and "the article did not go live" is the
+                # kind of thing nobody notices until a reader asks about it.
+                logger.warning(
+                    "news.scheduler.publish_failed article_id=%s: %s",
+                    article.id,
+                    exc.detail,
+                    extra={"article_id": article.id, "status_code": exc.status_code},
+                )
                 continue
 
         due_to_unpublish = await self.db.execute(
@@ -164,7 +178,13 @@ class WorkflowMixin(RevisionsMixin):
         for article in due_to_unpublish.scalars().all():
             try:
                 flipped.append(await self.unpublish(article.id or 0))
-            except HTTPException:
+            except HTTPException as exc:
+                logger.warning(
+                    "news.scheduler.unpublish_failed article_id=%s: %s",
+                    article.id,
+                    exc.detail,
+                    extra={"article_id": article.id, "status_code": exc.status_code},
+                )
                 continue
 
         return flipped

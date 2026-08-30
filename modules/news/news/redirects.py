@@ -16,7 +16,12 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news.models import ArticleStatus, NewsArticle, NewsArticleRedirect
+from news.models import (
+    NOT_TRASHED,
+    ArticleStatus,
+    NewsArticle,
+    NewsArticleRedirect,
+)
 
 
 async def record(
@@ -59,13 +64,16 @@ async def resolve(db: AsyncSession, slug: str) -> str | None:
     browser that once followed it to a dead URL keeps doing so from cache, long
     after the article comes back. So the conditions below are deliberately the
     viewer's own: not trashed, published, and carrying a snapshot to serve.
+
+    The trashed half is the shared ``NOT_TRASHED`` every other read path uses,
+    rather than a second spelling of it here — one rule, one definition.
     """
     result = await db.execute(
         select(NewsArticle.slug, NewsArticle.published_data)
         .join(NewsArticleRedirect, NewsArticleRedirect.article_id == NewsArticle.id)
         .where(
             NewsArticleRedirect.from_slug == slug,
-            NewsArticle.deleted_at.is_(None),
+            NOT_TRASHED,
             NewsArticle.status == ArticleStatus.PUBLISHED,
         )
     )

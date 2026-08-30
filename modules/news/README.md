@@ -207,6 +207,17 @@ and an article will publish twice with two revision rows saying so. The query is
 up rather than losing the window; each timestamp is cleared when acted on, so a
 tick cannot republish the same article forever.
 
+> **Single process only.** The loop starts in *every* process that boots the
+> module, and `process_due` takes no lock — no `FOR UPDATE SKIP LOCKED`, no
+> advisory lock (`SKIP LOCKED` does not exist on SQLite, the local-dev default).
+> So `uvicorn -w 4`, gunicorn with workers, or a Deployment with `replicas > 1`
+> runs N schedulers that can each find the same due article in one tick and each
+> publish it: two PUBLISH revision rows, and a flip-flop on unpublish. **Before
+> scaling out, set `SM_NEWS_SCHEDULER_ENABLED=false` on every replica** and
+> drive `process_due` from exactly one place — a cron job, a k8s CronJob, or a
+> single dedicated worker. Making the in-process loop safe under replicas needs
+> leader election or row locking, and it has neither today.
+
 These are deliberately **not** `published_at`, which is the display date below
 and may perfectly reasonably be in the past. The article screen said "a future
 date lists this as scheduled" for a while, which read as a promise nothing kept.
@@ -236,7 +247,7 @@ All prefixed `SM_NEWS_`:
 | `PUBLIC_CACHE_MAX_AGE` | `300` | shared-cache lifetime of an article |
 | `PUBLIC_CACHE_SWR` | `60` | `stale-while-revalidate` seconds; `0` omits it |
 | `PUBLIC_CSP` | *(unset)* | `Content-Security-Policy` on the article page |
-| `SCHEDULER_ENABLED` | `true` | run the in-process publish/unpublish loop |
+| `SCHEDULER_ENABLED` | `true` | run the in-process publish/unpublish loop — **set `false` when running more than one replica**, see [Scheduling](#scheduling) |
 | `SCHEDULER_INTERVAL_SECONDS` | `30` | how often it looks for due articles |
 
 ## Design note: what the split changed

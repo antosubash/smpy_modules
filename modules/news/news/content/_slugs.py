@@ -12,7 +12,7 @@ from sqlmodel import select
 
 from news.constants import MAX_SLUG_ATTEMPTS, MAX_SLUG_LEN
 from news.models import NewsArticle
-from news.slugify import slugify
+from news.slugify import slugify, suffixed
 
 
 def slug_for_title(title: str) -> str:
@@ -30,7 +30,9 @@ def _stem_length(base: str) -> int:
     """How much of ``base`` every candidate is guaranteed to share.
 
     The longest suffix is the one that eats the most of the base, so cutting to
-    that leaves a prefix common to ``base`` and to all of its variants.
+    that leaves a prefix common to ``base`` and to all of its variants. Tied to
+    :func:`news.slugify.suffixed`, which is what actually does the cutting —
+    hence the shared helper rather than a second copy of the rule here.
     """
     longest = len(str(MAX_SLUG_ATTEMPTS + 1))
     return min(len(base), MAX_SLUG_LEN - longest - 1)
@@ -50,6 +52,15 @@ async def free_slug(db: AsyncSession, base: str) -> str:
 
     Returns ``""`` when even the suffixed candidates are all taken, which the
     caller turns into an error rather than guessing further.
+
+    Not :func:`news.slugify.unique_slug`, though the two look alike and share
+    :func:`~news.slugify.suffixed` for the candidate shape. That one is the
+    category/tag rule: it tries 998 suffixes and raises when it runs out, both
+    right for a slug nobody typed. An article slug is a URL a reader keeps, so
+    this one stops at ``MAX_SLUG_ATTEMPTS`` and reports a 409 asking the author
+    to choose rather than quietly minting ``my-headline-731``. It also takes an
+    already-slugified ``base`` and a *stem-prefiltered* ``taken``, where
+    ``unique_slug`` slugifies its input and wants the complete set.
     """
     # The prefilter is the *stem* rather than ``base``: a base already at
     # MAX_SLUG_LEN has to be cut to make room for the suffix, so its candidates
@@ -65,8 +76,9 @@ async def free_slug(db: AsyncSession, base: str) -> str:
     )
     if base not in taken:
         return base
-    for suffix in range(2, MAX_SLUG_ATTEMPTS + 2):
-        candidate = f"{base[: MAX_SLUG_LEN - len(str(suffix)) - 1]}-{suffix}"
+    for candidate in suffixed(
+        base, max_length=MAX_SLUG_LEN, limit=MAX_SLUG_ATTEMPTS + 1
+    ):
         if candidate not in taken:
             return candidate
     return ""

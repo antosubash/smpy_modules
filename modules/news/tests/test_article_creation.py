@@ -15,7 +15,9 @@ part with the sharp edges.
 from __future__ import annotations
 
 import pytest
-from news.constants import ARTICLE_BODY_URL, ROUTE_PREFIX_API
+from factories import make_article
+from news.constants import ARTICLE_BODY_URL, MAX_SLUG_ATTEMPTS, ROUTE_PREFIX_API
+from news.content._slugs import free_slug
 from news.models import ArticleStatus, NewsArticle
 from sqlalchemy import func, select
 
@@ -200,3 +202,47 @@ class TestCreate:
 
         assert detail.status_code == 200, detail.text
         assert detail.json()["draft_data"]["content"] == []
+
+
+class TestRunningOutOfAddresses:
+    """``free_slug`` gives up early, where the tag/category rule does not.
+
+    Both derive a slug and both suffix it, and they now share the candidate
+    shape (``news.slugify.suffixed``) — but not the cap or the failure mode, and
+    deliberately. An article slug is a URL a reader keeps, so news stops after
+    ``MAX_SLUG_ATTEMPTS`` and asks the author to choose rather than minting
+    ``crowded-24``; ``unique_slug`` tries 998 and raises, which is right for a
+    slug nobody typed. These pin the article half so the two cannot converge by
+    accident.
+    """
+
+    async def test_it_gives_up_after_the_capped_number_of_attempts(self, db) -> None:
+        for slug in ["crowded"] + [
+            f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)
+        ]:
+            await make_article(db, slug=slug)
+
+        assert await free_slug(db, "crowded") == ""
+
+    async def test_the_last_attempt_is_still_offered(self, db) -> None:
+        # One short of exhaustion: the final suffix has to be tried, not skipped.
+        for slug in ["crowded"] + [
+            f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 1)
+        ]:
+            await make_article(db, slug=slug)
+
+        assert await free_slug(db, "crowded") == f"crowded-{MAX_SLUG_ATTEMPTS + 1}"
+
+    async def test_an_exhausted_title_is_a_409_rather_than_a_guess(
+        self, editor_client
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            for slug in ["taken-out"] + [
+                f"taken-out-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)
+            ]:
+                await make_article(db, slug=slug)
+            await db.commit()
+
+        response = await editor_client.post(ARTICLES, json={"title": "Taken out"})
+
+        assert response.status_code == 409, response.text

@@ -54,9 +54,19 @@ class NewsSettings(BaseSettings):
     scheduler_enabled: bool = True
     """Run an in-process loop that publishes articles at their scheduled time.
 
-    Disable where a separate worker (a cron job, a k8s CronJob) drives
-    ``ArticlesService.process_due`` instead — otherwise both would race, and an
-    article would be published twice and gain two revision rows saying so.
+    **Turn this off before you scale the app out.** The loop starts in *every*
+    process that boots the module, so ``uvicorn -w 4``, gunicorn with workers,
+    or a Deployment with ``replicas > 1`` runs one scheduler per replica.
+    ``ArticlesService.process_due`` takes no lock — no ``FOR UPDATE SKIP
+    LOCKED``, no advisory lock, nothing that would exist on SQLite anyway — so
+    two replicas can find the same due article in the same tick and both publish
+    it, leaving two PUBLISH revision rows and, for an unpublish, a flip-flop. A
+    single process is the only configuration this default is safe in.
+
+    Multi-replica deployments should set this False everywhere and drive
+    ``process_due`` from one place instead — a cron job, a k8s CronJob, a single
+    dedicated worker. The same applies where such a worker already exists
+    alongside a single app process: both racing gives the same double publish.
 
     Same name, default and reasoning as pagebuilder's: a host running both
     should not have to learn two vocabularies for one idea.
