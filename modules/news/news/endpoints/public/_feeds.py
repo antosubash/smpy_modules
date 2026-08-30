@@ -9,7 +9,7 @@ which meant the only way to follow the archive was to keep visiting it.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from email.utils import format_datetime
 from xml.sax.saxutils import escape
 
@@ -26,6 +26,7 @@ from news.endpoints.public._urls import (
     public_base_url,
 )
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
+from news.naive_utc import as_utc
 from news.settings import active, public_article_path, public_feed_path, public_index_path
 
 feed_router = APIRouter()
@@ -118,14 +119,9 @@ async def article_feed(
     entries = []
     for item in items:
         url = base + item.url
-        # SQLite drops tz info on round-trip, so a value that was written as
-        # UTC can come back naive; `format_datetime` treats a naive value as
-        # local time, which would misdate the item for any reader whose host
-        # isn't running in UTC. Every value here was written UTC, so a naive
-        # one is assumed to still be that.
-        pub_dt = item.published_at
-        if pub_dt is not None and pub_dt.tzinfo is None:
-            pub_dt = pub_dt.replace(tzinfo=UTC)
+        # `format_datetime` treats a naive value as local time, which would
+        # misdate the item for any reader whose host isn't running in UTC.
+        pub_dt = as_utc(item.published_at)
         published = f"<pubDate>{format_datetime(pub_dt)}</pubDate>" if pub_dt is not None else ""
         entries.append(
             "<item>"

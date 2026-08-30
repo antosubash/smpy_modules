@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._revisions import RevisionsMixin
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle, RevisionEvent
+from news.naive_utc import as_utc
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +32,10 @@ cancelling a schedule is a real instruction, and ``None`` is how it is spelt.
 """
 
 
-def _as_utc(value: datetime | None) -> datetime | None:
-    """Attach UTC to a naive instant, leave an aware one alone.
-
-    SQLite drops tz info on round-trip, so a column read back from it comes
-    back naive even though every value written here was UTC. Comparing that
-    against an aware ``datetime.now(UTC)`` without this would raise
-    ``TypeError``; assuming UTC for a naive value matches how it was stored.
-    """
-    if value is not None and value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value
+def _elapsed(value: datetime | None, now: datetime) -> bool:
+    """Whether a stored timestamp, once normalized to UTC, is due or past."""
+    aware = as_utc(value)
+    return aware is not None and aware <= now
 
 
 class WorkflowMixin(RevisionsMixin):
@@ -87,6 +81,13 @@ class WorkflowMixin(RevisionsMixin):
         # Acted on, so the intention is spent. Left set, the next tick would
         # find the article still due and publish it again every thirty seconds.
         article.publish_at = None
+        # A genuinely future `unpublish_at` is a real "take it down later"
+        # instruction and survives — process_due still needs it. One that has
+        # already elapsed is a leftover from a schedule this publish did not
+        # go through, and would take the article straight back down on the
+        # next tick.
+        if _elapsed(article.unpublish_at, datetime.now(UTC)):
+            article.unpublish_at = None
         return await self._transition(
             article, status=ArticleStatus.PUBLISHED, event=RevisionEvent.PUBLISH
         )
@@ -114,8 +115,8 @@ class WorkflowMixin(RevisionsMixin):
         (or before) it went live.
         """
         article = await self.get_article(article_id)
-        new_publish = _as_utc(article.publish_at if publish_at is _UNSET else publish_at)
-        new_unpublish = _as_utc(article.unpublish_at if unpublish_at is _UNSET else unpublish_at)
+        new_publish = as_utc(article.publish_at if publish_at is _UNSET else publish_at)
+        new_unpublish = as_utc(article.unpublish_at if unpublish_at is _UNSET else unpublish_at)
         if new_publish is not None and new_unpublish is not None and new_publish >= new_unpublish:
             raise HTTPException(
                 status_code=422, detail="publish_at must be strictly before unpublish_at"
@@ -232,6 +233,11 @@ class WorkflowMixin(RevisionsMixin):
         # reviewer who acts before the scheduled moment must not leave a date
         # behind that outlives their decision.
         article.publish_at = None
+        # Same reasoning as `publish`: a still-future `unpublish_at` is kept,
+        # an already-elapsed one is a leftover that would take the article
+        # straight back down on the next tick.
+        if _elapsed(article.unpublish_at, datetime.now(UTC)):
+            article.unpublish_at = None
         return await self._transition(
             article, status=ArticleStatus.PUBLISHED, event=RevisionEvent.APPROVE
         )
@@ -247,6 +253,11 @@ class WorkflowMixin(RevisionsMixin):
         # article a reviewer just turned back, once its stale `publish_at`
         # arrives.
         article.publish_at = None
+        # An elapsed `unpublish_at` would otherwise sit inert (process_due only
+        # unpublishes what is PUBLISHED) until a later publish/approve, and
+        # then take the article straight back down.
+        if _elapsed(article.unpublish_at, datetime.now(UTC)):
+            article.unpublish_at = None
         return await self._transition(
             article,
             status=ArticleStatus.DRAFT,
@@ -279,9 +290,9 @@ class WorkflowMixin(RevisionsMixin):
         article = await self.get_article(article_id, include_trashed=True)
         article.deleted_at = None
         now = datetime.now(UTC)
-        if _as_utc(article.publish_at) is not None and _as_utc(article.publish_at) <= now:
+        if _elapsed(article.publish_at, now):
             article.publish_at = None
-        if _as_utc(article.unpublish_at) is not None and _as_utc(article.unpublish_at) <= now:
+        if _elapsed(article.unpublish_at, now):
             article.unpublish_at = None
         self.db.add(article)
         await self.db.flush()
