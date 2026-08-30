@@ -28,6 +28,19 @@ cancelling a schedule is a real instruction, and ``None`` is how it is spelt.
 """
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Attach UTC to a naive instant, leave an aware one alone.
+
+    SQLite drops tz info on round-trip, so a column read back from it comes
+    back naive even though every value written here was UTC. Comparing that
+    against an aware ``datetime.now(UTC)`` without this would raise
+    ``TypeError``; assuming UTC for a naive value matches how it was stored.
+    """
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
 class WorkflowMixin(RevisionsMixin):
     """Status behaviour for :class:`ArticlesService`.
 
@@ -92,8 +105,18 @@ class WorkflowMixin(RevisionsMixin):
         No status change of its own. Scheduling is a statement about the future;
         the flip happens in :meth:`process_due` when the time arrives, so an
         article scheduled for next week is a draft all week.
+
+        Rejects ``publish_at >= unpublish_at`` with a 422: that ordering would
+        have :meth:`process_due` take the article back down in the same tick
+        (or before) it went live.
         """
         article = await self.get_article(article_id)
+        new_publish = _as_utc(article.publish_at if publish_at is _UNSET else publish_at)
+        new_unpublish = _as_utc(article.unpublish_at if unpublish_at is _UNSET else unpublish_at)
+        if new_publish is not None and new_unpublish is not None and new_publish >= new_unpublish:
+            raise HTTPException(
+                status_code=422, detail="publish_at must be strictly before unpublish_at"
+            )
         if publish_at is not _UNSET:
             article.publish_at = publish_at
         if unpublish_at is not _UNSET:
@@ -199,6 +222,11 @@ class WorkflowMixin(RevisionsMixin):
             raise HTTPException(
                 status_code=409, detail="Only a submitted article can be rejected."
             )
+        # A schedule set before submission must not survive the rejection —
+        # otherwise the next `process_due` tick auto-publishes the very
+        # article a reviewer just turned back, once its stale `publish_at`
+        # arrives.
+        article.publish_at = None
         return await self._transition(
             article,
             status=ArticleStatus.DRAFT,
@@ -221,9 +249,20 @@ class WorkflowMixin(RevisionsMixin):
         Its status is untouched: an article that was published when it was
         binned is published again, which is the only reading of "restore" that
         does not quietly change what readers can see.
+
+        A schedule that elapsed while the article was trashed is a different
+        matter: `process_due` was correctly skipping it while trashed, and
+        must not treat coming back out of the trash as the moment that was
+        waiting for. Only a *stale* (already-past) timestamp is cleared — one
+        still in the future is exactly what the author asked for and stays.
         """
         article = await self.get_article(article_id, include_trashed=True)
         article.deleted_at = None
+        now = datetime.now(UTC)
+        if _as_utc(article.publish_at) is not None and _as_utc(article.publish_at) <= now:
+            article.publish_at = None
+        if _as_utc(article.unpublish_at) is not None and _as_utc(article.unpublish_at) <= now:
+            article.unpublish_at = None
         self.db.add(article)
         await self.db.flush()
         await self.db.refresh(article)

@@ -256,7 +256,10 @@ class NewsArticleRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupport
             SAEnum(RevisionEvent, name="news_revision_event"),
             nullable=False,
             index=True,
-            server_default=RevisionEvent.PUBLISH.value,
+            # SAEnum stores the member *name* ("PUBLISH"), not its value
+            # ("publish") — the default must match, or Postgres rejects the
+            # DDL with "invalid input value for enum" at CREATE TABLE time.
+            server_default=RevisionEvent.PUBLISH.name,
         ),
     )
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)

@@ -23,6 +23,7 @@ pytestmark = pytest.mark.asyncio
 NOW = datetime(2026, 8, 26, 9, 0, tzinfo=UTC)
 EARLIER = NOW - timedelta(hours=1)
 LATER = NOW + timedelta(hours=1)
+MUCH_LATER = NOW + timedelta(hours=2)
 
 
 class TestScheduling:
@@ -134,7 +135,7 @@ class TestClearing:
     async def test_an_omitted_field_is_left_alone(self, db) -> None:
         article = await make_article(db, slug="partial", status=ArticleStatus.DRAFT)
         service = ArticlesService(db)
-        await service.schedule(article.id, publish_at=LATER, unpublish_at=LATER)
+        await service.schedule(article.id, publish_at=LATER, unpublish_at=MUCH_LATER)
 
         await service.schedule(article.id, publish_at=NOW)
 

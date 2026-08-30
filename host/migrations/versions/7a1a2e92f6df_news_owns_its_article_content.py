@@ -209,7 +209,7 @@ def upgrade() -> None:
                 "PUBLISH", "UNPUBLISH", "SUBMIT", "APPROVE", "REJECT",
                 name="news_revision_event",
             ),
-            server_default="publish",
+            server_default="PUBLISH",
             nullable=False,
         ),
         sa.Column("note", sa.String(length=2000), nullable=True),

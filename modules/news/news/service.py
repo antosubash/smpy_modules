@@ -185,9 +185,13 @@ async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
     """Category name for a slug, or ``None`` when no managed row matches.
 
     Kept here rather than imported from ``category_service`` so the listing
-    path does not depend on the management module.
+    path does not depend on the management module. Matches by slug or by
+    name — like the tag filter above — so a caller that already resolved the
+    slug (the archive routes do, for the page heading) still finds the row.
     """
-    return await db.scalar(select(NewsCategory.name).where(NewsCategory.slug == slug))
+    return await db.scalar(
+        select(NewsCategory.name).where(or_(NewsCategory.slug == slug, NewsCategory.name == slug))
+    )
 
 
 async def list_categories(
