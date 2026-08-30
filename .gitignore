@@ -19,8 +19,11 @@ host/client_app/modules.manifest.json
 host/client_app/modules.generated.ts
 host/client_app/modules.generated.css
 
-# Local databases
+# Local databases. `make migrate` resolves alembic's script_location relative
+# to the repo root, so running it the documented way leaves ./app.db here —
+# not under host/ — and it must never be committed.
 host/*.db
+app.db*
 
 # Runtime upload storage (PagebuilderSettings.media_root)
 var/

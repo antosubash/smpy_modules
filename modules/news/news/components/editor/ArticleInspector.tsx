@@ -141,7 +141,7 @@ export function ArticleInspector({
 
       <div className="grid grid-cols-2 gap-2">
         <div className="grid gap-2">
-          <Label htmlFor={DATE_ID}>Publish date</Label>
+          <Label htmlFor={DATE_ID}>Display date</Label>
           <Input
             id={DATE_ID}
             type="date"

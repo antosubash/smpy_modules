@@ -39,7 +39,7 @@ test.describe('Article editor', () => {
 
     await page.goto(`/admin/news/articles/${articleId}/edit`);
     await page.getByLabel('Author').fill('J. Okonkwo');
-    await page.getByLabel('Publish date').fill('2026-03-12');
+    await page.getByLabel('Display date').fill('2026-03-12');
     await page.getByLabel('Pin to the top of listings').check();
     await page.getByLabel('Show in feed blocks').uncheck();
     await page.getByRole('button', { name: /^save$/i }).click();
@@ -124,12 +124,12 @@ test.describe('Article editor', () => {
 
     // Give them dates so the order is unambiguous.
     await page.goto(`/admin/news/articles/${older.articleId}/edit`);
-    await page.getByLabel('Publish date').fill('2026-01-01');
+    await page.getByLabel('Display date').fill('2026-01-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     await page.goto(`/admin/news/articles/${newer.articleId}/edit`);
-    await page.getByLabel('Publish date').fill('2026-06-01');
+    await page.getByLabel('Display date').fill('2026-06-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 

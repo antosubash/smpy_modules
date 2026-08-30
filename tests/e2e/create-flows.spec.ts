@@ -112,7 +112,7 @@ test.describe('New article', () => {
     await dialog.getByLabel('Headline').fill(headline);
     // The date defaults to today rather than to empty, so a new article does
     // not silently land in the undated pile.
-    await expect(dialog.getByLabel('Publish date')).not.toHaveValue('');
+    await expect(dialog.getByLabel('Display date')).not.toHaveValue('');
     await dialog.getByRole('button', { name: 'Create draft' }).click();
 
     await expect(page).toHaveURL(/\/admin\/news\/articles\/\d+\/body$/);

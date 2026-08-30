@@ -49,7 +49,7 @@ test.describe('News — the full editorial workflow', () => {
     // Typed rather than derived, so the rest of the walkthrough can address the
     // article by a slug it already holds.
     await dialog.getByLabel('URL').fill(slug);
-    await dialog.getByLabel('Publish date').fill('2026-08-26');
+    await dialog.getByLabel('Display date').fill('2026-08-26');
     await shot(page, '02-new-article-dialog');
 
     // Creating opens the body canvas — one motion, not two.
