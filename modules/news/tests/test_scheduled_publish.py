@@ -153,6 +153,63 @@ class TestClearing:
         assert article.publish_at is None
 
 
+class TestApprovalAndRetraction:
+    """The chain that used to put a retracted article back in front of readers.
+
+    ``approve`` publishes, so it has to spend a pending ``publish_at`` the way
+    ``publish`` does — and ``unpublish`` has to spend one too, because it leaves
+    the article a DRAFT, which is exactly the shape ``process_due`` hunts for.
+    """
+
+    async def test_approving_early_clears_a_pending_schedule(self, db) -> None:
+        article = await make_article(
+            db, slug="approved-early", status=ArticleStatus.DRAFT, publish_body=False
+        )
+        service = ArticlesService(db)
+        await service.schedule(article.id, publish_at=LATER)
+        await service.submit_for_review(article.id)
+
+        await service.approve(article.id)
+
+        await db.refresh(article)
+        assert article.status is ArticleStatus.PUBLISHED
+        assert article.publish_at is None
+
+    async def test_unpublishing_clears_one_too(self, db) -> None:
+        article = await make_article(db, slug="pulled")
+        service = ArticlesService(db)
+        await service.schedule(article.id, publish_at=LATER)
+
+        await service.unpublish(article.id)
+
+        await db.refresh(article)
+        assert article.publish_at is None
+
+    async def test_a_retraction_is_not_undone_by_the_schedule_before_it(
+        self, db
+    ) -> None:
+        """Scheduled, approved early, then deliberately taken down.
+
+        Every step is something a person did on purpose, and the last one has to
+        stick: without both clears the next tick after ``LATER`` found a DRAFT
+        with a due ``publish_at`` and served the article again, hours after a
+        human pulled it and with nothing in the UI to say why.
+        """
+        article = await make_article(
+            db, slug="retracted", status=ArticleStatus.DRAFT, publish_body=False
+        )
+        service = ArticlesService(db)
+        await service.schedule(article.id, publish_at=LATER)
+        await service.submit_for_review(article.id)
+        await service.approve(article.id)
+
+        await service.unpublish(article.id)
+
+        assert await service.process_due(LATER + timedelta(minutes=1)) == []
+        await db.refresh(article)
+        assert article.status is ArticleStatus.DRAFT
+
+
 class TestTheEndpoint:
     async def test_an_author_without_publish_is_refused(self, author_client) -> None:
         # A schedule is a publication decision that happens to be about the

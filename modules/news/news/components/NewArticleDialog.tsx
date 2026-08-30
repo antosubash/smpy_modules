@@ -179,7 +179,7 @@ export function NewArticleDialog() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={DATE_ID}>Publish date</Label>
+              <Label htmlFor={DATE_ID}>Display date</Label>
               <Input
                 id={DATE_ID}
                 type="date"
@@ -188,8 +188,8 @@ export function NewArticleDialog() {
                 onChange={(e) => setDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                A future date lists the article as scheduled. Clearing it makes it undated work in
-                progress.
+                The date shown on the article — it does not schedule a publish. Clearing it makes it
+                undated work in progress.
               </p>
             </div>
 

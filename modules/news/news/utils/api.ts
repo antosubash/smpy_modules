@@ -193,7 +193,9 @@ export const updateArticle = (
   },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
-/** Delete the article outright — body, tags and all.
+/** Delete the article outright — body, tags and all. Requires `news.publish`,
+ *  the same pair `purgeArticle` needs: nothing here comes back. An author who
+ *  may write but not publish keeps `trashArticle` instead.
  *
  * This was `detachArticle`, which removed news' metadata and left the document
  * standing in pagebuilder. There is no second document now, so the word had

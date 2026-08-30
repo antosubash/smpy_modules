@@ -1,9 +1,11 @@
 """Composable ``WHERE`` fragments for the article listing.
 
 Separated from :mod:`news.service` so the listing module stays inside the
-repo's 300-line cap, and so each rule is stated once. Every function here only
-ever *narrows* a statement, which is what lets ``service.list_articles`` apply
-them in any order without widening what a caller is allowed to see.
+repo's 300-line cap, and so each rule is stated once. Every ``WHERE`` fragment
+here only ever *narrows* a statement, which is what lets
+``service.list_articles`` apply them in any order without widening what a
+caller is allowed to see. :func:`ordered` is the one exception and says so in
+its name: it sorts rather than filters, so it changes no caller's reach.
 """
 
 from __future__ import annotations
@@ -60,3 +62,24 @@ def status(stmt, value: str | None):
     if value == STATUS_UNDATED:
         return stmt.where(NewsArticle.published_at.is_(None))
     return stmt
+
+
+def ordered(stmt, *, undated_first: bool):
+    """Newest first, with the undated at whichever end the caller asked for.
+
+    NULLS placement is explicit either way: SQLite and Postgres disagree about
+    where NULL lands on a DESC sort, so without this the two databases disagree
+    about where an undated article goes.
+
+    Pinning sorts *before* the date rather than rewriting it, so an article held
+    at the top still reports honestly when it was published — unpin it and the
+    archive reads correctly again. The two orders differ on purpose: a reader
+    wants the pinned pieces first, while an editor wants the work-in-progress
+    pile first, because that is the row they came to finish.
+    """
+    dated = NewsArticle.published_at.desc()
+    if undated_first:
+        clauses = (dated.nullsfirst(), NewsArticle.pinned.desc())
+    else:
+        clauses = (NewsArticle.pinned.desc(), dated.nullslast())
+    return stmt.order_by(*clauses, NewsArticle.id.desc())

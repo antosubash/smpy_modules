@@ -201,6 +201,45 @@ class TestRename:
 
         assert await redirects.resolve(db, "first") is None
 
+    async def test_it_does_not_forward_to_an_unpublished_article(
+        self, anon_client
+    ) -> None:
+        """The old address 404s rather than 301ing into one.
+
+        Published at A, renamed to B, then taken off the site: the viewer serves
+        only published articles, so a redirect to B lands on a 404 — and because
+        the redirect is permanent, a browser that followed it once keeps doing
+        so from cache long after the article comes back.
+        """
+        article = await _seed(anon_client, "was-here")
+        async with anon_client.db_state.session_factory() as db:
+            service = ArticlesService(db)
+            await service.update(article.id, {"slug": "now-here"})
+            await service.unpublish(article.id)
+            await db.commit()
+
+        response = await anon_client.get(f"{NEWS}/was-here")
+
+        assert response.status_code == 404, response.text
+
+    async def test_it_forwards_again_once_the_article_is_back(
+        self, anon_client
+    ) -> None:
+        # Refusing while the article is down must not be permanent either: the
+        # redirect row is still there, and republishing makes it good again.
+        article = await _seed(anon_client, "returning")
+        async with anon_client.db_state.session_factory() as db:
+            service = ArticlesService(db)
+            await service.update(article.id, {"slug": "returned"})
+            await service.unpublish(article.id)
+            await service.publish(article.id)
+            await db.commit()
+
+        response = await anon_client.get(f"{NEWS}/returning")
+
+        assert response.status_code == 301
+        assert response.headers["location"] == "/news/returned"
+
 
 class TestSitemap:
     """News advertises its own archive now.

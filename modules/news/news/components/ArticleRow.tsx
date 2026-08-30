@@ -21,20 +21,21 @@ function toDateInput(iso: string | null): string {
 
 /** The one-line status the card carries under its metadata.
  *
- * A future date on a draft is the design's "scheduled": there is no third
- * status, just a draft that will flip itself, and saying so is the only way
- * the list can be honest about a two-state pipeline.
+ * `published_at` is the editorial display date, not a schedule — the field
+ * that actually drives auto-publish is `publish_at`, set from ScheduleCard
+ * and not read anywhere in this list. A future `published_at` used to read
+ * as "publishes {date}", which promised something this row cannot keep: an
+ * editor could set a future display date, see "publishes …" and believe the
+ * article will go live on its own when nothing here does that.
  */
 function statusLine(article: ArticleRead): string {
   const when = article.published_at;
-  const ahead = when ? new Date(`${when.slice(0, 10)}T00:00:00Z`).getTime() > Date.now() : false;
 
   if (article.status === 'published') {
     return when ? `Published · ${relativeDay(when)}` : 'Published · no date';
   }
   if (article.status === 'submitted_for_review') return 'Pending review';
-  if (!when) return 'Draft · undated';
-  return ahead ? `Draft · publishes ${relativeDay(when)}` : `Draft · dated ${relativeDay(when)}`;
+  return when ? `Draft · dated ${relativeDay(when)}` : 'Draft · undated';
 }
 
 interface Props {
@@ -42,8 +43,13 @@ interface Props {
   busy: boolean;
   /** id of a <datalist> of existing category names, offered while typing. */
   suggestionsId?: string;
+  /** Whether the viewer holds `news.publish`. Hard delete needs it — the
+   *  same pair the backend requires for `purge` — so a `news.edit`-only
+   *  author gets the recoverable `onTrash` instead of a button that 403s. */
+  canPublish: boolean;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
   onDelete: (id: number) => void;
+  onTrash: (id: number) => Promise<unknown>;
   onPublish: (article: ArticleRead) => Promise<unknown>;
 }
 
@@ -54,7 +60,16 @@ interface Props {
  *  the thing this list exists to avoid — the body is edited in pagebuilder, so
  *  if these two fields also needed a round trip the list would have no job.
  */
-export function ArticleRow({ article, busy, suggestionsId, onSave, onDelete, onPublish }: Props) {
+export function ArticleRow({
+  article,
+  busy,
+  suggestionsId,
+  canPublish,
+  onSave,
+  onDelete,
+  onTrash,
+  onPublish,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(article.category);
   const [date, setDate] = useState(toDateInput(article.published_at));
@@ -211,22 +226,46 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onDelete, onP
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <ConfirmDialog
-          // Medium, where this used to be low. "Detach" removed news' metadata
-          // and left the document standing in pagebuilder, so it cost nothing
-          // that could not be re-attached. There is no second document now —
-          // the body is this row — so the same button destroys the article.
-          level="medium"
-          title={`Delete "${article.title}"?`}
-          description="The article and its body are removed, and its public URL stops working. This cannot be undone from here."
-          confirmLabel="Delete"
-          onConfirm={async () => onDelete(article.id)}
-          trigger={
-            <Button type="button" size="sm" variant="ghost" disabled={busy}>
-              Delete
-            </Button>
-          }
-        />
+        {canPublish ? (
+          <ConfirmDialog
+            // Medium, where this used to be low. "Detach" removed news' metadata
+            // and left the document standing in pagebuilder, so it cost nothing
+            // that could not be re-attached. There is no second document now —
+            // the body is this row — so the same button destroys the article.
+            //
+            // Gated on `canPublish`: the backend requires `news.publish` here,
+            // the same pair `purge` carries, because a hard delete is the one
+            // action with no way back. An author with `news.edit` alone gets
+            // the recoverable door below instead.
+            level="medium"
+            title={`Delete "${article.title}"?`}
+            description="The article and its body are removed, and its public URL stops working. This cannot be undone from here."
+            confirmLabel="Delete"
+            onConfirm={async () => onDelete(article.id)}
+            trigger={
+              <Button type="button" size="sm" variant="ghost" disabled={busy}>
+                Delete
+              </Button>
+            }
+          />
+        ) : (
+          <ConfirmDialog
+            // Medium for a published article — trashing takes it off the
+            // public site immediately, same as unpublish, even though it is
+            // fully reversible. Low would undersell that. A draft that was
+            // never public fits "low" on the same scale, so it gets it.
+            level={article.status === 'published' ? 'medium' : 'low'}
+            title={`Move "${article.title}" to trash?`}
+            description="It comes off the public site and out of this list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse."
+            confirmLabel="Move to trash"
+            onConfirm={async () => onTrash(article.id)}
+            trigger={
+              <Button type="button" size="sm" variant="ghost" disabled={busy}>
+                Move to trash
+              </Button>
+            }
+          />
+        )}
       </div>
     </li>
   );

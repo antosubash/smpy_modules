@@ -27,7 +27,13 @@ from news.contracts.schemas import (
     ArticleUpdate,
     CategoryListResponse,
 )
-from news.endpoints.api._deps import cache, may_see_drafts, read_one, require_edit
+from news.endpoints.api._deps import (
+    cache,
+    may_see_drafts,
+    read_one,
+    require_edit,
+    require_publish,
+)
 
 router = APIRouter()
 
@@ -73,6 +79,15 @@ async def list_articles(
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     may_draft = may_see_drafts(request)
+    if trashed and not may_draft:
+        # An empty bin, not the ordinary listing. A trashed article is never
+        # published, so there is nothing here such a caller may see — and
+        # answering with the published list would silently return a different
+        # question's answer to a client that asked for the trash. Not a 403
+        # either: this route is anonymously readable, and refusing would
+        # confirm the bin has something in it.
+        cache(response, include_drafts=False)
+        return ArticleListResponse(items=[], total=0)
     items, total = await service.list_articles(
         db,
         limit=limit,
@@ -84,10 +99,7 @@ async def list_articles(
         in_feed_only=in_feed,
         include_drafts=may_draft,
         undated_first=undated_first,
-        # A trashed article is never published, so `visible` would filter the
-        # whole trash away for a caller who may not see drafts — which is the
-        # right answer rather than a bug: they have no business in the bin.
-        trashed_only=trashed and may_draft,
+        trashed_only=trashed,
     )
     # Tags in one query for the whole page rather than one per row — the list
     # renders 20 at a time, and per-row would make that 21 round trips.
@@ -166,7 +178,11 @@ async def update_article(
     an explicit null undates the article. Only ``model_fields_set`` can tell
     those apart, and the distinction is the endpoint's to make.
     """
-    if await service.get(db, article_id) is None:
+    # Read once and kept. `ArticlesService.update` re-reads through the session
+    # identity map, so it costs no second round trip — but re-running this
+    # `select` further down did, and returned the very row already in hand.
+    article = await service.get(db, article_id)
+    if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
 
     sent = body.model_dump(exclude_unset=True)
@@ -191,9 +207,6 @@ async def update_article(
         await ArticlesService(db).update(article_id, identity)
 
     if sent:
-        article = await service.get(db, article_id)
-        if article is None:  # pragma: no cover - checked above, kept for narrowing
-            raise HTTPException(status_code=404, detail="Article not found.")
         await service.update(
             db,
             article,
@@ -251,7 +264,11 @@ async def set_article_tags(
     return await tag_service.set_for_article(db, article_id, body.tags)
 
 
-@router.delete("/articles/{article_id}", status_code=204, dependencies=[require_edit])
+@router.delete(
+    "/articles/{article_id}",
+    status_code=204,
+    dependencies=[require_edit, require_publish],
+)
 async def delete_article(
     article_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:
@@ -261,6 +278,11 @@ async def delete_article(
     delete and not the "detach" it used to be: detaching removed news' metadata
     and left the document in pagebuilder, and with no such document there is
     nothing for that word to mean.
+
+    Gated on ``news.publish`` as well as ``news.edit``, the same pair
+    ``purge`` carries, because it is the same act: the row and its body go, and
+    nothing brings them back. An author who may write is left the recoverable
+    door — ``trash`` — which is what that permission split is for.
     """
     article = await service.get(db, article_id)
     if article is None:

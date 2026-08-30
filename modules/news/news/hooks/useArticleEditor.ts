@@ -7,6 +7,7 @@ import {
   deleteArticle,
   listArticles,
   publishArticle,
+  trashArticle,
   updateArticle,
 } from '../utils/api';
 import { SLUG_PATTERN } from '../utils/slugify';
@@ -109,20 +110,28 @@ export function useArticleEditor(articleId: number) {
       // An empty date is a real value — it undates the article — so it is sent
       // as null rather than omitted.
       const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-      const updated = await updateArticle(articleId, {
-        // Sent every time rather than only when changed: the server compares
-        // the incoming slug against the stored one and records a redirect only
-        // for a real move, so an unchanged value costs nothing and diffing here
-        // would be a second opinion about what counts as a rename.
-        title: draft.title.trim(),
-        slug: draft.slug,
-        category: draft.category,
-        published_at: publishedAt,
-        pinned: draft.pinned,
-        show_in_feed: draft.showInFeed,
-        author: draft.author,
-      });
-      const tags = await setArticleTags(articleId, draft.tags);
+      // Run together rather than sequentially: tags live in their own table,
+      // keyed only on the article's id, which is already known and does not
+      // change here — neither call reads the other's result, so there is
+      // nothing for ordering to protect. `Promise.all` still rejects with
+      // whichever call failed first, which the catch below turns into the
+      // same error banner either one would have on its own.
+      const [updated, tags] = await Promise.all([
+        updateArticle(articleId, {
+          // Sent every time rather than only when changed: the server compares
+          // the incoming slug against the stored one and records a redirect only
+          // for a real move, so an unchanged value costs nothing and diffing here
+          // would be a second opinion about what counts as a rename.
+          title: draft.title.trim(),
+          slug: draft.slug,
+          category: draft.category,
+          published_at: publishedAt,
+          pinned: draft.pinned,
+          show_in_feed: draft.showInFeed,
+          author: draft.author,
+        }),
+        setArticleTags(articleId, draft.tags),
+      ]);
       if (updated) setArticle({ ...updated, tags: tags ?? draft.tags });
       setDirty(false);
       setSaved(true);
@@ -149,7 +158,13 @@ export function useArticleEditor(articleId: number) {
     }
   }, [article, load]);
 
+  // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
+  // — so the editor screen only offers it to a viewer who has it.
   const remove = useCallback(() => deleteArticle(articleId), [articleId]);
+
+  // The recoverable door `news.edit` alone keeps open, for a viewer who
+  // cannot hard-delete.
+  const trash = useCallback(() => trashArticle(articleId), [articleId]);
 
   /** Whether Save would be accepted.
    *
@@ -176,5 +191,6 @@ export function useArticleEditor(articleId: number) {
     save,
     publish,
     remove,
+    trash,
   };
 }

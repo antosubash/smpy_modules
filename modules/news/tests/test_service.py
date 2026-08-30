@@ -89,6 +89,36 @@ class TestReadBack:
         assert await service.get_read(db, article.id, include_drafts=True) is None
 
 
+class TestSkippingTheCount:
+    """``with_total=False`` — for the callers with no pager to feed.
+
+    The RSS feed takes a fixed window and discards the total, so counting the
+    archive behind it was a second full scan per request for a number nothing
+    read.
+    """
+
+    async def test_the_rows_are_the_same_ones(self, db) -> None:
+        for i in range(3):
+            await make_article(db, slug=f"counted-{i}", published_at=DATED)
+
+        counted, total = await service.list_articles(db)
+        uncounted, skipped = await service.list_articles(db, with_total=False)
+
+        assert [item.id for item in uncounted] == [item.id for item in counted]
+        assert total == 3
+        assert skipped == 0
+
+    async def test_paging_still_reports_the_real_total(self, db) -> None:
+        # The default has to stay honest — every paged caller counts against it.
+        for i in range(3):
+            await make_article(db, slug=f"paged-{i}", published_at=DATED)
+
+        page, total = await service.list_articles(db, limit=2)
+
+        assert len(page) == 2
+        assert total == 3
+
+
 class TestPartialUpdate:
     async def test_omitting_published_at_leaves_the_date_alone(self, db) -> None:
         """`UNSET` is the default, so a caller that says nothing changes nothing."""

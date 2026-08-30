@@ -108,7 +108,12 @@ async def article_feed(
     """
     settings = active()
     base = public_base_url(request, settings)
-    items, _ = await service.list_articles(db, limit=FEED_LIMIT, in_feed_only=True)
+    # `with_total=False` because a feed has no pager: it is a fixed window, and
+    # the `count(*)` behind it would be a second scan of the whole archive for
+    # a number nothing here reads.
+    items, _ = await service.list_articles(
+        db, limit=FEED_LIMIT, in_feed_only=True, with_total=False
+    )
 
     entries = []
     for item in items:

@@ -16,7 +16,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news.models import NewsArticle, NewsArticleRedirect
+from news.models import ArticleStatus, NewsArticle, NewsArticleRedirect
 
 
 async def record(
@@ -53,18 +53,31 @@ async def resolve(db: AsyncSession, slug: str) -> str | None:
     renames collapses to one hop: every old address points at the article, and
     the article always knows where it lives now.
 
-    A trashed article resolves to nothing. Forwarding to an address that would
-    itself 404 is worse than saying so at the old one.
+    An article the public viewer would not serve resolves to nothing.
+    Forwarding to an address that would itself 404 is worse than saying so at
+    the old one — and worse than it sounds, because the redirect is a 301: a
+    browser that once followed it to a dead URL keeps doing so from cache, long
+    after the article comes back. So the conditions below are deliberately the
+    viewer's own: not trashed, published, and carrying a snapshot to serve.
     """
     result = await db.execute(
-        select(NewsArticle.slug)
+        select(NewsArticle.slug, NewsArticle.published_data)
         .join(NewsArticleRedirect, NewsArticleRedirect.article_id == NewsArticle.id)
         .where(
             NewsArticleRedirect.from_slug == slug,
             NewsArticle.deleted_at.is_(None),
+            NewsArticle.status == ArticleStatus.PUBLISHED,
         )
     )
-    return result.scalars().first()
+    row = result.first()
+    # The snapshot is checked in Python rather than in the `WHERE`, and that is
+    # forced rather than stylistic: `published_data` is a JSON column, and a
+    # Python ``None`` is stored in one as the JSON text ``null``, not as SQL
+    # NULL — so ``IS NOT NULL`` is true of an unpublished snapshot too. Cheap
+    # here, where at most one row is ever loaded.
+    if row is None or row.published_data is None:
+        return None
+    return row.slug
 
 
 async def clear_for_article(db: AsyncSession, article_id: int) -> None:

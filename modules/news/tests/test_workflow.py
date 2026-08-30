@@ -57,6 +57,28 @@ class TestPublishSeparation:
 
         assert response.status_code in (401, 403)
 
+    async def test_deleting_outright_needs_news_publish(self, author_client) -> None:
+        """The same act as ``purge``, reached by a different route.
+
+        ``DELETE /articles/{id}`` removes the row and its body for good — no
+        trash, nothing to restore — so gating it on ``news.edit`` alone left the
+        separation with a door straight through it: an author who could not
+        purge a *trashed* article could hard-delete a live one.
+        """
+        article = await _draft(author_client)
+
+        response = await author_client.delete(f"{ARTICLES}/{article.id}")
+
+        assert response.status_code in (401, 403)
+
+    async def test_trashing_still_needs_only_news_edit(self, author_client) -> None:
+        """The recoverable door the tightening above leaves an author open."""
+        article = await _draft(author_client, slug="binnable")
+
+        response = await author_client.post(f"{ARTICLES}/{article.id}/trash")
+
+        assert response.status_code == 204, response.text
+
     async def test_writing_still_needs_only_news_edit(self, author_client) -> None:
         """The gate is on reaching readers, not on writing.
 

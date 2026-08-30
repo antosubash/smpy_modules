@@ -57,22 +57,30 @@ class TestTrashListing:
         assert (await editor_client.get(f"{ARTICLES}?trashed=true")).json()["items"] == []
 
     async def test_an_anonymous_reader_gets_nothing_from_it(self, anon_client) -> None:
-        # Not a 403: the flag is simply ignored for a caller who cannot see
-        # drafts, and a trashed article is by definition not published. Asking
-        # for the bin without the right to see it returns the empty set rather
-        # than confirming there is one.
+        # An empty bin, not the ordinary listing. Not a 403 either: the route is
+        # anonymously readable, and refusing would confirm the bin has something
+        # in it. The published article is what makes this test bite — the flag
+        # used to be dropped rather than honoured, so the answer was the
+        # ordinary list, which an empty database cannot tell apart from an
+        # empty trash.
         await _binned(anon_client, "secret")
+        async with anon_client.db_state.session_factory() as db:
+            await make_article(db, slug="on-the-site", title="on-the-site")
 
         body = (await anon_client.get(f"{ARTICLES}?trashed=true")).json()
 
         assert body["items"] == []
+        assert body["total"] == 0
 
     async def test_a_viewer_without_edit_gets_nothing_either(self, viewer_client) -> None:
         await _binned(viewer_client, "also-secret")
+        async with viewer_client.db_state.session_factory() as db:
+            await make_article(db, slug="also-on-the-site", title="also-on-the-site")
 
         body = (await viewer_client.get(f"{ARTICLES}?trashed=true")).json()
 
         assert body["items"] == []
+        assert body["total"] == 0
 
 
 class TestTagFilter:

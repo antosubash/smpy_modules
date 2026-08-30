@@ -155,8 +155,14 @@ class WorkflowMixin(RevisionsMixin):
         rebuilding a served payload from.
         """
         article = await self.get_article(article_id)
-        # Spent, like `publish_at` — otherwise the next tick takes it down again.
+        # Both timestamps are spent here, for two different reasons.
+        # `unpublish_at` because the next tick would otherwise take it down
+        # again; `publish_at` because a retraction a stale schedule can undo is
+        # not a retraction — this leaves the article a DRAFT, which is exactly
+        # the shape `process_due` looks for, so a date left over from before it
+        # went live would quietly serve it again.
         article.unpublish_at = None
+        article.publish_at = None
         return await self._transition(
             article, status=ArticleStatus.DRAFT, event=RevisionEvent.UNPUBLISH
         )
@@ -179,6 +185,10 @@ class WorkflowMixin(RevisionsMixin):
                 status_code=409, detail="Only a submitted article can be approved."
             )
         article.published_data = article.draft_data
+        # Spent, exactly as in `publish`: approving *is* publishing, so a
+        # reviewer who acts before the scheduled moment must not leave a date
+        # behind that outlives their decision.
+        article.publish_at = None
         return await self._transition(
             article, status=ArticleStatus.PUBLISHED, event=RevisionEvent.APPROVE
         )

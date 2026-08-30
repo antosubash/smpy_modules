@@ -1,7 +1,8 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import type { SharedProps } from '@simple-module-py/ui/types';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -27,6 +28,12 @@ import {
  * see.
  */
 export default function Trash() {
+  const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
+  // Purge needs `news.publish` on the backend, the same pair a hard delete
+  // needs — see ArticleRow and ArticleEditor. Restore does not: it is
+  // `news.edit` alone, so it stays available below with no gate of its own.
+  const canPublish = auth?.permissions?.includes('news.publish') ?? false;
+
   const [items, setItems] = useState<ArticleRead[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -102,28 +109,30 @@ export default function Trash() {
                 >
                   Restore
                 </Button>
-                <ConfirmDialog
-                  // High: purging is the one action here with no way back, and
-                  // it also frees the slug — so a link already in the world
-                  // stops resolving and can later point at something else.
-                  level="high"
-                  title={`Delete “${article.title}” for good?`}
-                  description="The article, its body, its tags and its redirects are removed permanently. This cannot be undone."
-                  confirmLabel="Delete for good"
-                  onConfirm={() =>
-                    act(article.id, () => purgeArticle(article.id), 'Deleted for good')
-                  }
-                  trigger={
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={busyId === article.id}
-                    >
-                      Delete for good
-                    </Button>
-                  }
-                />
+                {canPublish && (
+                  <ConfirmDialog
+                    // High: purging is the one action here with no way back, and
+                    // it also frees the slug — so a link already in the world
+                    // stops resolving and can later point at something else.
+                    level="high"
+                    title={`Delete “${article.title}” for good?`}
+                    description="The article, its body, its tags and its redirects are removed permanently. This cannot be undone."
+                    confirmLabel="Delete for good"
+                    onConfirm={() =>
+                      act(article.id, () => purgeArticle(article.id), 'Deleted for good')
+                    }
+                    trigger={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        disabled={busyId === article.id}
+                      >
+                        Delete for good
+                      </Button>
+                    }
+                  />
+                )}
               </div>
             </li>
           ))}

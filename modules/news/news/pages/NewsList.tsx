@@ -10,7 +10,7 @@ import { ArticleFilters } from '../components/ArticleFilters';
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
 import { useArticleList } from '../hooks/useArticleList';
-import { deleteArticle, publishArticle, updateArticle } from '../utils/api';
+import { deleteArticle, publishArticle, trashArticle, updateArticle } from '../utils/api';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
@@ -22,15 +22,18 @@ const STATUS_NOUN: Record<string, string> = {
   undated: 'undated articles',
 };
 
-/** The article list: search, two-state pipeline filters, and card rows.
+/** The article list: search, status filters, and card rows.
  *
  * Rows are cards rather than table cells because the metadata is a sentence
- * about state ("Draft · publishes in 15d"), not a set of comparable columns —
- * a table would line up four values nobody scans vertically.
+ * about state ("Draft · dated Feb 15"), not a set of comparable columns — a
+ * table would line up four values nobody scans vertically.
  */
 export default function NewsList() {
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   const canEdit = auth?.permissions?.includes('news.edit');
+  // Hard delete needs `news.publish` too — see `ArticleRow`. Without it a
+  // row offers the recoverable trash instead.
+  const canPublish = auth?.permissions?.includes('news.publish') ?? false;
 
   const {
     articles,
@@ -138,10 +141,12 @@ export default function NewsList() {
               article={article}
               busy={busyId === article.id || busy || !canEdit}
               suggestionsId={CATEGORY_SUGGESTIONS_ID}
+              canPublish={canPublish}
               onSave={(id, category, publishedAt) =>
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }
               onDelete={(id) => runRow(id, () => deleteArticle(id))}
+              onTrash={(id) => runRow(id, () => trashArticle(id))}
               onPublish={(target) => runRow(target.id, () => publishArticle(target.id))}
             />
           ))}

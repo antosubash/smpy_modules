@@ -121,6 +121,7 @@ async def list_articles(
     include_drafts: bool = False,
     undated_first: bool = False,
     trashed_only: bool = False,
+    with_total: bool = True,
 ) -> tuple[list[ArticleRead], int]:
     """Newest first, undated last. Returns (items, total-before-paging).
 
@@ -128,6 +129,11 @@ async def list_articles(
     them up front because an undated article is by definition work in
     progress — with pagination it would otherwise sit on the *last* page,
     burying exactly the row its author is about to set a date on.
+
+    ``with_total=False`` skips the ``count(*)`` and reports ``0``, for the
+    callers that have no pager to feed — the RSS feed takes a fixed window, so
+    counting the archive behind it is a second full scan whose answer is thrown
+    away. Default ``True``, because every paged caller needs the real number.
     """
     # A category arrives from the UI as a name and from a public link as a
     # slug. Resolving here rather than at each call site is what lets
@@ -159,24 +165,14 @@ async def list_articles(
     # narrows, so the two compose safely in either order.
     stmt = query_filters.status(stmt, status)
 
-    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    total = (
+        await db.scalar(select(func.count()).select_from(stmt.subquery()))
+        if with_total
+        else 0
+    )
 
-    # NULLS placement is explicit either way: SQLite and Postgres disagree
-    # about where NULL lands on a DESC sort, so without this the two databases
-    # disagree about where an undated article goes.
-    #
-    # Pinning sorts *before* the date rather than rewriting it, so an article
-    # held at the top still reports honestly when it was published — unpin it
-    # and the archive reads correctly again. The two orders differ on purpose:
-    # a reader wants the pinned pieces first, while an editor wants the
-    # work-in-progress pile first, because that is the row they came to finish.
-    dated = NewsArticle.published_at.desc()
-    if undated_first:
-        clauses = (dated.nullsfirst(), NewsArticle.pinned.desc())
-    else:
-        clauses = (NewsArticle.pinned.desc(), dated.nullslast())
     stmt = (
-        stmt.order_by(*clauses, NewsArticle.id.desc())
+        query_filters.ordered(stmt, undated_first=undated_first)
         .limit(min(limit, MAX_LIMIT))
         .offset(offset)
     )
