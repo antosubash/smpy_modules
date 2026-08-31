@@ -40,13 +40,21 @@ class TranslationsMixin:
     db: AsyncSession
 
     async def list_translations(self, group: str) -> list[Page]:
-        """Every untrashed page in ``group``, the source included.
+        """Every page in ``group``, the source included — trashed ones too.
+
+        Trashed siblings are listed rather than filtered out because
+        ``(translation_group, locale)`` is unique regardless of ``deleted_at``:
+        the language is occupied until the page is purged or restored, and
+        :meth:`create_translation` refuses it. Hiding the row would leave the
+        editor offering an "Add translation" button that can only 409. Each
+        one is flagged so the panel can say *why* the language is unavailable
+        instead of silently dropping its button.
 
         Ordered by locale so the language switcher does not reshuffle itself
         between two loads of the same page.
         """
         result = await self.db.execute(
-            select(Page).where(NOT_TRASHED, Page.translation_group == group).order_by(Page.locale)
+            select(Page).where(Page.translation_group == group).order_by(Page.locale)
         )
         return list(result.scalars().all())
 

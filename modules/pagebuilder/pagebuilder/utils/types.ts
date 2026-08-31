@@ -49,6 +49,8 @@ export interface PageTranslationRead {
   slug: string;
   title: string;
   status: PageStatus;
+  /** In the trash, so the language is occupied but the page is not reachable. */
+  trashed: boolean;
 }
 
 export interface PageDetail extends PageRead {

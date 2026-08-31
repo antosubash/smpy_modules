@@ -5,9 +5,13 @@ Lifted out of :mod:`pagebuilder.module` when that file crossed the repo's
 a page changes state, and nothing else in the module registration is.
 
 A deployment that drives :meth:`PagesService.process_due` from a separate
-worker (Celery beat, a k8s CronJob) turns this off with
-``SM_PAGEBUILDER_SCHEDULER_ENABLED=false`` — otherwise both would race and
-double-publish.
+worker (Celery beat, a k8s CronJob) turns this off with the
+``scheduler_enabled`` setting — on the Settings screen, or
+``scripts/set_setting.py pagebuilder scheduler_enabled false``. Not an
+environment variable: this module reads none, so an
+``SM_PAGEBUILDER_SCHEDULER_ENABLED`` in a deploy manifest would leave the
+in-process loop running and racing the worker, which is exactly the
+double-publish this switch exists to prevent.
 """
 
 from __future__ import annotations

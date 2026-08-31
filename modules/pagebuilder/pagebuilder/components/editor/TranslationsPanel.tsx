@@ -94,12 +94,24 @@ export function TranslationsPanel({
                 {sibling && (
                   <span className="block truncate text-xs text-muted-foreground">
                     {publicPath(publicPrefix, sibling.slug, entryLocale, defaultLocale)} ·{' '}
-                    {STATUS_LABEL[sibling.status]}
+                    {sibling.trashed ? 'In trash' : STATUS_LABEL[sibling.status]}
                   </span>
                 )}
               </span>
               {isCurrent ? (
                 <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">Editing</span>
+              ) : sibling?.trashed ? (
+                // The language is taken even though the page is binned:
+                // (translation_group, locale) is unique regardless of
+                // deleted_at, so offering "Add translation" here would only
+                // ever 409. Restoring or purging it from the trash screen is
+                // what frees the language.
+                <span
+                  className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  data-testid={`translation-trashed-${entryLocale}`}
+                >
+                  In trash
+                </span>
               ) : sibling ? (
                 <a
                   className="shrink-0 text-primary underline"

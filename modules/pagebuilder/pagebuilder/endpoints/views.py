@@ -101,7 +101,7 @@ async def admin_list(
     board: list[dict] | None = None
     if view != _VIEW_LIST:
         board = board_query.to_payload(
-            await board_query.load(db, search=search),
+            await board_query.load(db, search=search, locale=locale),
             lambda item: PageRead.model_validate(item).model_dump(mode="json"),
         )
 

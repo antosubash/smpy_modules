@@ -178,3 +178,45 @@ class TestCreatingATranslation:
         ).json()
 
         assert created["canonical_url"] is None
+
+
+class TestATrashedCounterpart:
+    """``(translation_group, locale)`` is unique regardless of ``deleted_at``.
+
+    So a trashed translation still occupies its language. The editor's panel is
+    built from ``detail().translations``; if that list dropped trashed rows the
+    panel would show the language as free and offer a button whose only
+    possible outcome is the 409 below.
+    """
+
+    async def test_it_still_occupies_the_language(
+        self, bilingual_client: AsyncClient
+    ) -> None:
+        source = await _page(bilingual_client, slug="about", locale="en")
+        german = (
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
+        ).json()
+
+        assert (await bilingual_client.delete(f"{API}/{german['id']}")).status_code == 204
+
+        refused = await bilingual_client.post(
+            f"{API}/{source['id']}/translations", json={"locale": "de"}
+        )
+        assert refused.status_code == 409
+
+        detail = (await bilingual_client.get(f"{API}/{source['id']}")).json()
+        german_row = next(t for t in detail["translations"] if t["locale"] == "de")
+        assert german_row["trashed"] is True
+
+    async def test_a_live_counterpart_is_not_flagged(
+        self, bilingual_client: AsyncClient
+    ) -> None:
+        """The flag has to distinguish, or the panel labels every sibling
+        "In trash" and no language is ever openable."""
+        source = await _page(bilingual_client, slug="about", locale="en")
+        await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+
+        detail = (await bilingual_client.get(f"{API}/{source['id']}")).json()
+        assert all(t["trashed"] is False for t in detail["translations"])

@@ -80,3 +80,34 @@ async def test_an_offset_past_the_end_steps_back_to_the_last_page(
     props = response.json()["props"]
     assert props["filters"]["offset"] == 0
     assert [p["slug"] for p in props["pages"]["items"]] == ["only-page"]
+
+
+async def test_the_language_filter_narrows_the_board_too(
+    bilingual_client: AsyncClient,
+) -> None:
+    """The board is the *default* view, so a language pill the board ignored
+    would be a control that visibly does nothing on the screen an author
+    lands on."""
+    for title, slug, locale in (("About", "about", "en"), ("Ueber", "ueber", "de")):
+        response = await bilingual_client.post(
+            API,
+            json={
+                "title": title,
+                "slug": slug,
+                "locale": locale,
+                "draft_data": {"content": []},
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    props = (
+        await bilingual_client.get(
+            VIEW, params={"locale": "de"}, headers={"X-Inertia": "true"}
+        )
+    ).json()["props"]
+
+    board_slugs = {
+        item["slug"] for stage in props["board"] for item in stage["items"]
+    }
+    assert board_slugs == {"ueber"}
+

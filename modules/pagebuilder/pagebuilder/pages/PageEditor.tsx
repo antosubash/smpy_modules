@@ -18,6 +18,7 @@ import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
 import type { PageDetail, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { publicPath } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`
@@ -112,6 +113,7 @@ export default function PageEditor() {
           form.setSlug(value);
           form.setSlugTouched(true);
         }}
+        viewHref={publicPath(PUBLIC_PREFIX, form.effectiveSlug, form.locale, defaultLocale)}
         status={form.status}
         publishAt={form.publishAt}
         unpublishAt={form.unpublishAt}

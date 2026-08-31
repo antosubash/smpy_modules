@@ -13,6 +13,11 @@ dependencies = [
     "simple_module_core>=0.0.25,<0.1",
     "simple_module_db>=0.0.25,<0.1",
     "simple_module_hosting>=0.0.25,<0.1",
+    # This module's settings live in the DB-backed settings store, so
+    # ``register_settings`` imports ``settings.registration``. Floor verified:
+    # ``register_module_settings`` and ``apply_changes_and_reload`` both exist
+    # at 0.0.25.
+    "simple_module_settings>=0.0.25,<0.1",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
     "sqlmodel>=0.0.21",

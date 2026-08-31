@@ -78,13 +78,20 @@ async def _alternates(
     db: AsyncSession,
     request: Request,
     settings: PagebuilderSettings,
-    prefix: str,
     group: str,
 ) -> list[dict[str, str]]:
     """``hreflang`` entries for every *published* page in the group.
 
     Only published ones: advertising a draft translation points a crawler at a
     404 and offers a reader a language switch that dead-ends.
+
+    Each sibling is resolved through :mod:`pagebuilder.public_claims`, exactly
+    as the sitemap does, rather than assembled from the *caller's* prefix: a
+    translation group can hold a page this module serves and one another
+    module has claimed — translate an article's page from the page list and it
+    does — and pasting one prefix over both would advertise ``/de/news/x`` for
+    an ordinary page or ``/p/x`` for an article. Both 404, in the one place a
+    404 is invisible until traffic drops.
 
     Omitted entirely when the group has one member, which is every page on a
     monolingual site — a lone ``hreflang`` pointing at the page itself says
@@ -93,13 +100,20 @@ async def _alternates(
     published = await PagesService(db).published_alternates(group)
     if len(published) < 2:
         return []
-    alternates = [
-        {
-            "locale": locale,
-            "url": _absolute_page_url(request, settings, slug, prefix, locale),
-        }
-        for locale, slug in published
-    ]
+    base = _public_base_url(request, settings)
+    alternates = []
+    for locale, slug in published:
+        claimed = await public_claims.claimed_url(db, slug, locale)
+        alternates.append(
+            {
+                "locale": locale,
+                "url": f"{base}{claimed}"
+                if claimed
+                else _absolute_page_url(
+                    request, settings, slug, settings.public_route_prefix, locale
+                ),
+            }
+        )
     # x-default names the version to serve someone whose language nobody
     # matched. The site's own default is the only defensible answer.
     default = next(
@@ -189,7 +203,7 @@ async def render_public_page(
                 "twitter_handle": settings.twitter_handle,
                 "locale": page.locale,
                 "alternates": await _alternates(
-                    db, request, settings, prefix, page.translation_group
+                    db, request, settings, page.translation_group
                 ),
                 **public_layout_props(layout),
             },

@@ -214,6 +214,15 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     def has_published(self) -> bool:
         return self.published_data is not None
 
+    @property
+    def trashed(self) -> bool:
+        """The row-level counterpart of the ``NOT_TRASHED`` query filter.
+
+        A property rather than a comparison at each call site so that code
+        holding a loaded ``Page`` asks the question the same way a query does.
+        """
+        return self.deleted_at is not None
+
 
 class PageRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """Append-only audit row written on every status transition.

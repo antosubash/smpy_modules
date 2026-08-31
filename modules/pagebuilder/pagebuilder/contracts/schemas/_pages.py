@@ -149,6 +149,14 @@ class PageTranslationRead(BaseModel):
     slug: str
     title: str
     status: PageStatus
+    trashed: bool = False
+    """This counterpart is in the trash awaiting purge.
+
+    Carried because ``(translation_group, locale)`` is unique *including*
+    trashed rows, so the language is occupied and starting a new translation
+    in it would be refused. A panel that omitted trashed siblings would offer
+    a button that only ever 409s.
+    """
 
 
 class PageTranslationCreate(BaseModel):

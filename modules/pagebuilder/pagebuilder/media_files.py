@@ -120,7 +120,7 @@ async def warn_on_orphaned_media(
         logger.warning(
             "pagebuilder.media: %d media row(s) have no file under %s — "
             "uploads from a different working directory or a missing volume. "
-            "Re-upload the assets or point SM_PAGEBUILDER_MEDIA_ROOT at the "
+            "Re-upload the assets or point the pagebuilder media_root setting at the "
             "directory that holds them.",
             missing,
             media_root,

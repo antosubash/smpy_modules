@@ -20,13 +20,11 @@ Hand-adjusted from autogenerate in three places:
   this change exists to allow — the same word as the address in two languages.
 """
 
-import os
 from collections.abc import Sequence
 from uuid import uuid4
 
 import sqlalchemy as sa
 from alembic import op
-from simple_module_core.dotenv import parse_dotenv
 
 # revision identifiers, used by Alembic.
 revision: str = "b1f4a72c9d30"
@@ -38,27 +36,48 @@ _PAGES = "pagebuilder_pages"
 _REDIRECTS = "pagebuilder_page_redirects"
 _LOCALE_LEN = 12
 
-# Read from the environment rather than imported from
+# Read straight out of the settings table rather than through
 # ``PagebuilderSettings``: a migration that constructs application settings
 # starts failing whenever an unrelated required setting is added, and this is
-# the only value it needs. Matches the default the model carries.
-_DEFAULT_LOCALE_ENV = "SM_PAGEBUILDER_DEFAULT_CONTENT_LOCALE"
+# the only value it needs. The store is also the *only* place the value can
+# come from — pagebuilder reads no environment variables — so an absent row
+# means the class default, which ``_FALLBACK_LOCALE`` repeats.
+_SETTINGS_TABLE = "settings_setting"
+_LOCALE_KEY = "pagebuilder.default_content_locale"
 _FALLBACK_LOCALE = "en"
 
+_SETTINGS = sa.table(
+    _SETTINGS_TABLE,
+    sa.column("scope", sa.String),
+    sa.column("scope_id", sa.String),
+    sa.column("key", sa.String),
+    sa.column("value", sa.String),
+)
 
-def _default_locale() -> str:
-    from_env = os.environ.get(_DEFAULT_LOCALE_ENV, "").strip()
-    if from_env:
-        return from_env
-    # The repo's root ``.env`` is the single source of truth for settings and
-    # pydantic-settings reads it without exporting it, so a host that
-    # configured its default language there would otherwise have every
-    # existing page backfilled into the wrong one.
-    return parse_dotenv().get(_DEFAULT_LOCALE_ENV, "").strip() or _FALLBACK_LOCALE
+
+def _default_locale(bind: sa.Connection) -> str:
+    """The language every pre-existing page is in, per the settings store.
+
+    ``default_content_locale`` is a plain ``str``, so the store holds it
+    verbatim rather than JSON-encoded. The table is checked for rather than
+    assumed: it is created by the initial revision this one descends from, but
+    a host that mounts pagebuilder without the Settings module would otherwise
+    fail here instead of backfilling the default.
+    """
+    if not sa.inspect(bind).has_table(_SETTINGS_TABLE):
+        return _FALLBACK_LOCALE
+    stored = bind.scalar(
+        sa.select(_SETTINGS.c.value).where(
+            _SETTINGS.c.scope == "system",
+            _SETTINGS.c.scope_id == "",
+            _SETTINGS.c.key == _LOCALE_KEY,
+        )
+    )
+    return (stored or "").strip() or _FALLBACK_LOCALE
 
 
 def upgrade() -> None:
-    locale = _default_locale()
+    locale = _default_locale(op.get_bind())
 
     with op.batch_alter_table(_PAGES) as batch:
         batch.add_column(

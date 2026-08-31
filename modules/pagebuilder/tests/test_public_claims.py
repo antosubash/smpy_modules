@@ -176,3 +176,41 @@ class TestSitemap:
 
         assert old.status_code == 301
         assert old.headers["location"] == "/p/now-here"
+
+
+class TestHreflang:
+    async def test_a_claimed_sibling_is_advertised_at_the_claimants_address(
+        self, bilingual_client: AsyncClient
+    ) -> None:
+        """A translation group can mix a page this module serves with one
+        another module has claimed — translating an article's page from the
+        page list produces exactly that. Pasting one prefix over both would
+        advertise an address that 404s, in the one place a 404 stays invisible
+        until traffic drops."""
+        source = (
+            await bilingual_client.post(
+                "/api/pagebuilder/pages",
+                json={"title": "About", "slug": "about", "draft_data": {"content": []}},
+            )
+        ).json()
+        translation = (
+            await bilingual_client.post(
+                f"/api/pagebuilder/pages/{source['id']}/translations",
+                json={"locale": "de"},
+            )
+        ).json()
+        for page_id in (source["id"], translation["id"]):
+            assert (
+                await bilingual_client.post(f"/api/pagebuilder/pages/{page_id}/publish")
+            ).status_code == 200
+        public_claims.register(claiming("about", prefix="/de/news", locale="de"))
+
+        props = (
+            await bilingual_client.get(
+                "/p/about", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            )
+        ).json()["props"]
+
+        by_locale = {a["locale"]: a["url"] for a in props["alternates"]}
+        assert by_locale["de"].endswith("/de/news/about")
+        assert by_locale["en"].endswith("/p/about")
