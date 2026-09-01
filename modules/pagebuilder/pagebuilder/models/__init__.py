@@ -19,11 +19,20 @@ from pagebuilder.models._page import (
     RevisionEvent,
 )
 from pagebuilder.models._redirect import PageRedirect
+from pagebuilder.models._snapshot import (
+    ContentSnapshot,
+    ImportStatus,
+    PendingImport,
+    SnapshotMedia,
+    SnapshotSource,
+)
 
 __all__ = [
     "NOT_TRASHED",
     "PAGE_TABLE",
     "Base",
+    "ContentSnapshot",
+    "ImportStatus",
     "Layout",
     "LayoutRevision",
     "MediaAsset",
@@ -31,5 +40,8 @@ __all__ = [
     "PageRedirect",
     "PageRevision",
     "PageStatus",
+    "PendingImport",
     "RevisionEvent",
+    "SnapshotMedia",
+    "SnapshotSource",
 ]

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.media_service import MediaService
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.service import SnapshotService
 
 
 def get_settings(request: Request) -> PagebuilderSettings:
@@ -24,3 +25,10 @@ def get_media_service(
     db: AsyncSession = Depends(get_db),
 ) -> MediaService:
     return MediaService(db, request.app.state.pagebuilder.settings)
+
+
+def get_snapshot_service(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> SnapshotService:
+    return SnapshotService(db, request.app.state.pagebuilder.settings)

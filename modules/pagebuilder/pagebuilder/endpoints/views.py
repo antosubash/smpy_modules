@@ -30,12 +30,16 @@ from pagebuilder.contracts.schemas import (
     StatusFilter,
 )
 from pagebuilder.deps import get_media_service, get_settings
+from pagebuilder.endpoints import content_views
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 
 router = APIRouter()
+# The content-snapshot screens live in their own module (300-line cap) but
+# belong to this same router, so their URLs and dependencies are unchanged.
+router.include_router(content_views.router)
 
 _PAGE_LIST = "PageBuilder/PageList"
 _VIEW_BOARD = "board"

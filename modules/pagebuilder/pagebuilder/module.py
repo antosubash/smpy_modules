@@ -33,9 +33,11 @@ _MENU_GROUP = "Site"
 _URL_PAGES = "/pagebuilder/"
 _URL_LAYOUT = "/pagebuilder/layout"
 _URL_MEDIA = "/pagebuilder/media"
+_URL_CONTENT = "/pagebuilder/content"
 _ICON_PAGES = "file-text"
 _ICON_LAYOUT = "layout"
 _ICON_MEDIA = "image"
+_ICON_CONTENT = "package"
 
 
 # Read from installed package metadata so pyproject.toml is the single source
@@ -129,6 +131,14 @@ class PagebuilderModule(ModuleBase):
                     url=_URL_MEDIA,
                     icon=_ICON_MEDIA,
                     order=220,
+                    section=MenuSection.SIDEBAR,
+                    group=_MENU_GROUP,
+                ),
+                MenuItem(
+                    label="Import / Export",
+                    url=_URL_CONTENT,
+                    icon=_ICON_CONTENT,
+                    order=230,
                     section=MenuSection.SIDEBAR,
                     group=_MENU_GROUP,
                 ),

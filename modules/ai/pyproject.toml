@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_ai"
-version = "0.0.5"
+version = "0.0.6"
 description = "AI base module: provider-configurable Pydantic AI service layer, encrypted key storage, admin settings UI"
 requires-python = ">=3.12"
 readme = "README.md"

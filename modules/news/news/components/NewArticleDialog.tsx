@@ -113,9 +113,12 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });
-      // `write` types a 204 as null; this route answers 201 with a body, so
-      // null means the shape changed rather than "nothing was created".
-      if (article === null) throw new Error('The article was created but not returned.');
+      // `write` resolves to null on a 204. This route answers 201 with a body,
+      // so this is unreachable in practice — but reading `edit_url` off null
+      // would throw past the catch below and leave the dialog stuck on
+      // "Creating…" with both buttons disabled, which is the one outcome worth
+      // spending three lines to avoid.
+      if (!article) throw new Error('The server created the article but returned nothing.');
       router.visit(article.edit_url, {
         // A visit that lands unmounts this component, so this only fires when
         // one does not. Without it a failed navigation leaves the dialog on

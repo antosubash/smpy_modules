@@ -1,7 +1,7 @@
 """add page locale and translation group
 
 Revision ID: b1f4a72c9d30
-Revises: 6504b2249610
+Revises: b98d8185ecef
 Create Date: 2026-08-22 14:40:00.000000
 
 Hand-adjusted from autogenerate in three places:
@@ -28,7 +28,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b1f4a72c9d30"
-down_revision: str | None = "6504b2249610"
+down_revision: str | None = "b98d8185ecef"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
