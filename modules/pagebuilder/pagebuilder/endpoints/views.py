@@ -27,13 +27,16 @@ from pagebuilder.contracts.schemas import (
     PageRead,
     PageRevisionListResponse,
     PageRevisionRead,
+    PendingImportRead,
+    SnapshotRead,
     StatusFilter,
 )
-from pagebuilder.deps import get_media_service, get_settings
+from pagebuilder.deps import get_media_service, get_settings, get_snapshot_service
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.service import SnapshotService
 
 router = APIRouter()
 
@@ -46,6 +49,8 @@ _PAGE_MEDIA = "PageBuilder/MediaLibrary"
 _PAGE_MEDIA_DETAIL = "PageBuilder/MediaDetail"
 _PAGE_PENDING = "PageBuilder/PendingReview"
 _PAGE_LAYOUT_EDITOR = "PageBuilder/LayoutEditor"
+_PAGE_SNAPSHOTS = "PageBuilder/ContentSnapshots"
+_PAGE_IMPORT_REVIEW = "PageBuilder/ContentImportReview"
 # The draft preview deliberately reuses the public component — see admin_preview.
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -117,6 +122,50 @@ async def admin_trash(inertia: InertiaDep) -> InertiaResponse:
     every time.
     """
     return await inertia.render(_PAGE_TRASH)
+
+
+@router.get("/content", response_model=None)
+async def admin_content(
+    inertia: InertiaDep,
+    service: SnapshotService = Depends(get_snapshot_service),
+) -> InertiaResponse:
+    """Snapshot list, plus whether a restore is waiting on someone.
+
+    Server-rendered so the list paints on first navigation; the pending banner
+    travels with it because a restore awaiting approval is the one thing on
+    this screen nobody should have to go looking for.
+    """
+    snapshots = [
+        SnapshotRead.model_validate(s).model_dump(mode="json")
+        for s in await service.list()
+    ]
+    staged = await service.pending()
+    return await inertia.render(
+        _PAGE_SNAPSHOTS,
+        {
+            "snapshots": snapshots,
+            "pending": PendingImportRead.model_validate(staged).model_dump(mode="json")
+            if staged
+            else None,
+        },
+    )
+
+
+@router.get("/content/review", response_model=None)
+async def admin_content_review(
+    inertia: InertiaDep,
+    service: SnapshotService = Depends(get_snapshot_service),
+) -> InertiaResponse:
+    """The staged restore's plan, for an approver to accept or reject."""
+    staged = await service.pending()
+    return await inertia.render(
+        _PAGE_IMPORT_REVIEW,
+        {
+            "pending": PendingImportRead.model_validate(staged).model_dump(mode="json")
+            if staged
+            else None,
+        },
+    )
 
 
 @router.get("/pending", response_model=None)

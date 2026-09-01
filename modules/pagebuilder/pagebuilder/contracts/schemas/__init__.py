@@ -41,9 +41,19 @@ from pagebuilder.contracts.schemas._pages import (
     RevisionDiffResponse,
     StatusFilter,
 )
+from pagebuilder.contracts.schemas._snapshots import (
+    ImportApplyResponse,
+    ImportDecisionRequest,
+    PendingImportRead,
+    SnapshotCreateRequest,
+    SnapshotListResponse,
+    SnapshotRead,
+)
 
 __all__ = [
     "BlockChange",
+    "ImportApplyResponse",
+    "ImportDecisionRequest",
     "LayoutDetail",
     "LayoutRead",
     "LayoutRevisionDetail",
@@ -68,7 +78,11 @@ __all__ = [
     "PageRevisionRead",
     "PageScheduleRequest",
     "PageUpdate",
+    "PendingImportRead",
     "PuckData",
     "RevisionDiffResponse",
+    "SnapshotCreateRequest",
+    "SnapshotListResponse",
+    "SnapshotRead",
     "StatusFilter",
 ]

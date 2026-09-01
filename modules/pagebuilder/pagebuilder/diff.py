@@ -71,8 +71,20 @@ def revision_diff(before: PageRevision, after: PageRevision) -> dict[str, Any]:
         if before_value != after_value:
             metadata[field] = {"before": before_value, "after": after_value}
 
-    before_blocks = _normalise_blocks(before.data)
-    after_blocks = _normalise_blocks(after.data)
+    return {"metadata": metadata, "blocks": block_diff(before.data, after.data)}
+
+
+def block_diff(
+    before_data: dict[str, Any] | None, after_data: dict[str, Any] | None
+) -> dict[str, list[dict[str, Any]]]:
+    """Group two Puck documents' blocks into added / removed / changed.
+
+    Split out of :func:`revision_diff` so callers holding raw documents rather
+    than ``PageRevision`` rows — the snapshot restore plan, for one — can pair
+    blocks by ``props.id`` without reimplementing the rules.
+    """
+    before_blocks = _normalise_blocks(before_data)
+    after_blocks = _normalise_blocks(after_data)
 
     before_by_id = {key: b for b in before_blocks if (key := _block_key(b)) is not None}
     after_by_id = {key: b for b in after_blocks if (key := _block_key(b)) is not None}
@@ -119,11 +131,4 @@ def revision_diff(before: PageRevision, after: PageRevision) -> dict[str, Any]:
                 }
             )
 
-    return {
-        "metadata": metadata,
-        "blocks": {
-            "added": added,
-            "removed": removed,
-            "changed": changed,
-        },
-    }
+    return {"added": added, "removed": removed, "changed": changed}

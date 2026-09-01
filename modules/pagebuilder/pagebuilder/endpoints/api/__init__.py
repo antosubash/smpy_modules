@@ -14,6 +14,7 @@ from pagebuilder.endpoints.api import (
     media_detail,
     pages,
     revisions,
+    snapshots,
     uploads,
     workflow,
 )
@@ -23,6 +24,7 @@ router.include_router(pages.router)
 router.include_router(workflow.router)
 router.include_router(revisions.router)
 router.include_router(layout.router)
+router.include_router(snapshots.router)
 # Before uploads so its literal `/uploads/{id}/checked` wins the match.
 router.include_router(media_detail.router)
 router.include_router(uploads.router)

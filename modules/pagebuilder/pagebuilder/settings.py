@@ -58,6 +58,31 @@ class PagebuilderSettings(BaseSettings):
     media_webp_quality: int = 82
     """Pillow encoder ``quality`` for webp thumbnails (0-100)."""
 
+    snapshot_root: Path = Path("var/pagebuilder/snapshots")
+    """Filesystem directory holding content snapshots and their shared blobs.
+
+    Anchored to the project root exactly like :attr:`media_root`. A
+    cwd-relative default is what made two differently-launched processes
+    read and write different media directories against one database
+    (issue #14); snapshots would fail the same way, and more quietly.
+    """
+
+    snapshot_max_upload_bytes: int = 200 * 1024 * 1024
+    """Reject uploaded bundles larger than this (default 200 MB).
+
+    Far larger than ``media_max_bytes`` because a bundle legitimately
+    contains a whole media library, not one image.
+    """
+
+    snapshot_max_extracted_bytes: int = 1024 * 1024 * 1024
+    """Reject a bundle that expands to more than this (default 1 GB).
+
+    Separate from ``snapshot_max_upload_bytes`` because the compressed size
+    bounds nothing: a bundle's media is already-compressed images that barely
+    shrink, but a crafted archive of repetitive bytes reaches roughly 1000:1,
+    so a body inside the upload cap can still fill the disk on extraction.
+    """
+
     public_csp: str = (
         "default-src 'self'; "
         "script-src 'self'; "

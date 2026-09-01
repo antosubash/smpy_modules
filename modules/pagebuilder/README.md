@@ -21,6 +21,8 @@ at `/p/{slug}`.
   poller flips status at the due time.
 - **SEO** — per-page meta description, canonical URL, OG image, JSON-LD, plus
   `/sitemap.xml` and `/robots.txt`.
+- **Content snapshots** — capture the whole site, download or upload it as a
+  `.zip`, and restore behind an approval gate. See below.
 
 ## Installation
 
@@ -132,6 +134,9 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 | `media_max_bytes` | `10485760` | Per-upload size ceiling |
 | `media_thumbnail_widths` | `320,640,1280,1920` | Widths generated as WebP |
 | `media_webp_quality` | `82` | WebP encoder quality |
+| `snapshot_root` | `var/pagebuilder/snapshots` | Snapshot + blob storage directory |
+| `snapshot_max_upload_bytes` | `209715200` | Ceiling on an uploaded bundle (200 MB) |
+| `snapshot_max_extracted_bytes` | `1073741824` | Ceiling on what a bundle may expand to (1 GB) |
 | `public_csp` | see `settings.py` | CSP header on public pages |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |
@@ -144,12 +149,58 @@ All settings use the `SM_PAGEBUILDER_` env prefix.
 ## Routes
 
 **Admin views** (under `/pagebuilder`): `/`, `/new`, `/{page_id}/edit`,
-`/pending`, `/layout`, `/media`.
+`/pending`, `/layout`, `/media`, `/trash`, `/content`, `/content/review`.
 
 **Admin API** (under `/api/pagebuilder`): pages CRUD, workflow transitions,
-revisions and diffs, layout and its revisions, uploads.
+revisions and diffs, layout and its revisions, uploads, snapshots and imports.
 
 **Public**: `/p/{slug}`, `/sitemap.xml`, `/robots.txt`.
+
+## Content snapshots
+
+**Content › Import / Export** captures the site as a restore point. Every entry
+in that list is a snapshot; they differ only in where they came from —
+`manual` (you took it), `upload` (a bundle from another host), or `pre_restore`
+(taken automatically before a restore).
+
+**What a snapshot holds:** every non-trashed page including templates, page
+redirects, the site layout, and the media library's files.
+
+**What it deliberately does not hold:**
+
+- *Branding.* `pagebuilder` has no Python dependency on the branding module,
+  and capture runs in-process. Bundling three fields would force every
+  pagebuilder host to install branding for a feature unrelated to it. Re-pick
+  the colour and design pack in Settings → Branding after restoring onto a
+  fresh host.
+- *Another module's content*, news articles included, for the same reason.
+- *Trashed pages, revision history and audit trails.* A snapshot is the site as
+  it stands, not its past; restoring history from another host would fabricate
+  an audit trail that never happened here.
+
+A restore also does **not** write a `PageRevision` per page, unlike every other
+mutation path. The `pre_restore` snapshot already holds the previous state of
+every page, once, with media deduplicated by digest — a revision row per page
+would duplicate that whole before-state and recover nothing extra. The restore
+itself stays audited: who approved it, when, from which snapshot, and the plan
+they were shown.
+
+**Restoring is staged, never immediate.** Choosing Restore computes a plan —
+what is created, what is overwritten, what is unchanged — and parks it for
+approval. Taking a snapshot, uploading and staging need `pagebuilder.publish`;
+only `pagebuilder.approve` can apply one. One import is pending at a time,
+because a plan computed against content that has since changed no longer
+describes what applying would do.
+
+**Restoring is reversible and never deletes.** Applying takes a `pre_restore`
+snapshot first, so the previous state is one restore away. A page live on the
+site but absent from the bundle is left alone and reported in the plan.
+
+**Portability.** Media URLs embed a host-local filename, so bundled content
+stores `asset://<name>` sentinels instead and they resolve to whatever URL each
+host assigns. `Page.parent_id` and `PageRedirect.page_id` travel as slugs and
+are resolved in a second pass, since a parent may sort after its child and a
+redirect may target a page the same restore creates.
 
 ## Contracts
 
