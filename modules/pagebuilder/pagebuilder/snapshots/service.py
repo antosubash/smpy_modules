@@ -37,7 +37,7 @@ from pagebuilder.snapshots.apply import apply_bundle
 from pagebuilder.snapshots.archive import BundleError, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.capture import capture
-from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME
+from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME, is_readable
 from pagebuilder.snapshots.media_match import preview_urls
 from pagebuilder.snapshots.plan import build_plan
 
@@ -220,7 +220,7 @@ class SnapshotService:
                 detail="An import is already awaiting approval",
             )
         snapshot = await self.get(snapshot_id)
-        if snapshot.format_version != FORMAT_VERSION:
+        if not is_readable(snapshot.format_version):
             raise HTTPException(
                 status_code=422,
                 detail=f"Snapshot uses unsupported format version "

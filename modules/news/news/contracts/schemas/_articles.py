@@ -1,4 +1,4 @@
-"""DTOs for the News module — the public surface."""
+"""An article, and the ways one is created and changed."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from news.constants import (
     MAX_CATEGORY_LEN,
+    MAX_LOCALE_LEN,
     MAX_SLUG_LEN,
-    MAX_TAG_LEN,
     MAX_TITLE_LEN,
     SLUG_PATTERN,
 )
@@ -51,6 +51,22 @@ class ArticleRead(BaseModel):
     show_in_feed: bool = True
     author: str = ""
     published_at: datetime | None = None
+    locale: str = ""
+    """Which language the article is written in.
+
+    The page's, because an article *is* a page — there is no second copy of it
+    on the sidecar row that could drift. Defaulted rather than required so a
+    caller constructing an ``ArticleRead`` by hand (the search screen does)
+    does not have to supply it.
+    """
+
+    translation_group: str = ""
+    """What this article and its counterparts in other languages share.
+
+    Carried on the card so the admin list can mark which articles already have
+    a translation without a query per row.
+    """
+
     page_status: ArticleStatus
     """Workflow state of the page behind the article.
 
@@ -99,15 +115,6 @@ class ArticleListResponse(BaseModel):
     counts: ArticleCounts = Field(default_factory=ArticleCounts)
 
 
-class CategoryCount(BaseModel):
-    category: str
-    count: int
-
-
-class CategoryListResponse(BaseModel):
-    items: list[CategoryCount]
-
-
 class ArticleCreate(BaseModel):
     """Attach article metadata to an existing page."""
 
@@ -138,12 +145,42 @@ class ArticleWithPageCreate(BaseModel):
     slug: str | None = Field(
         default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
     )
+    locale: str | None = Field(default=None, max_length=MAX_LOCALE_LEN)
+    """Language to write in. ``None`` means the site's default.
+
+    An article created this way starts a translation group of its own. Joining
+    an existing one is ``POST /articles/{id}/translations``.
+    """
+
     category: str = Field(default="", max_length=MAX_CATEGORY_LEN)
     published_at: datetime | None = None
     author: str = Field(default="", max_length=120)
 
     _display_date = field_validator("published_at")(as_display_date)
     """Truncate to the calendar day as sent — see ``news.display_date``."""
+
+
+class ArticleTranslationCreate(BaseModel):
+    """Start an article's counterpart in another language.
+
+    Only the three things a translator decides. Category, byline, date, pin and
+    feed membership are copied from the source rather than asked for again:
+    they are facts about the story, not about the language it is told in, and
+    a form that asked would invite them to drift apart between languages.
+    """
+
+    locale: str = Field(min_length=2, max_length=MAX_LOCALE_LEN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
+    """Address within the new language. Defaults to the source article's own,
+    which is free unless an unrelated page already took it — slugs are unique
+    per language, so ``/news/x`` and ``/de/news/x`` do not collide."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LEN)
+    """Defaults to the source's headline, i.e. untranslated — which is a more
+    useful starting point for a translator than a blank field, and makes what
+    still needs doing obvious in the list."""
 
 
 class ArticleUpdate(BaseModel):
@@ -157,131 +194,7 @@ class ArticleUpdate(BaseModel):
     """Truncate to the calendar day as sent — see ``news.display_date``."""
 
 
-class CategoryRead(BaseModel):
-    """A category row for the management screen.
-
-    ``id`` is 0 for two different things the screen must tell apart from a real
-    row: the system Uncategorised bucket (``is_system``), and a category that
-    exists only as free text on articles with no table row yet. Neither can be
-    renamed or reordered until it has one.
-    """
-
-    id: int
-    name: str
-    slug: str
-    position: int
-    article_count: int
-    is_system: bool = False
-
-
-class CategoryAdminListResponse(BaseModel):
-    """The management screen's view.
-
-    Distinct from ``CategoryListResponse``, which stays exactly as it was: that
-    one backs the anonymous ``/api/news/categories`` the public feed block
-    calls, and widening it would change a published contract for the sake of a
-    screen only editors see.
-    """
-
-    items: list[CategoryRead]
-
-
-class CategoryCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_CATEGORY_LEN)
-    slug: str | None = Field(default=None, max_length=MAX_CATEGORY_LEN)
-
-
-class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=MAX_CATEGORY_LEN)
-    slug: str | None = Field(default=None, min_length=1, max_length=MAX_CATEGORY_LEN)
-
-
-class CategoryReorder(BaseModel):
-    """Full ordering, as dragged. Ids omitted keep the position they had."""
-
-    ordered_ids: list[int]
-
-
-class CategoryDeleteResult(BaseModel):
-    reassigned: int
-    """How many articles moved. Nothing is ever deleted with the category."""
-
-
-class TagRead(BaseModel):
-    id: int
-    name: str
-    slug: str
-    article_count: int
-
-
-class TagListResponse(BaseModel):
-    items: list[TagRead]
-
-
-class TagCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_TAG_LEN)
-
-
-class TagUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_TAG_LEN)
-
-
-class TagMerge(BaseModel):
-    """Fold ``source_id`` into this tag; the source row is removed."""
-
-    source_id: int
-
-
-class TagMergeResult(BaseModel):
-    moved: int
-
-
 class ArticleTagsUpdate(BaseModel):
     """Full replacement set — a tag the writer removed has to disappear."""
 
     tags: list[str] = Field(default_factory=list)
-
-
-class SearchHit(BaseModel):
-    """One result, in whatever section found it."""
-
-    id: int
-    title: str
-    subtitle: str
-    """The line under the title — category and status, or a path, or a MIME
-    type. Which of those it is depends on the section, which is why it is one
-    pre-rendered string rather than a shape the screen has to branch on."""
-
-    url: str
-    excerpt: str = ""
-
-
-class SearchResults(BaseModel):
-    """Hits per section, plus how many each section actually has.
-
-    The totals are separate from the lists because each section shows only its
-    first few: "17 more articles" is the design's own affordance, and it needs a
-    number the list itself cannot supply.
-    """
-
-    query: str
-    articles: list[SearchHit] = Field(default_factory=list)
-    pages: list[SearchHit] = Field(default_factory=list)
-    media: list[SearchHit] = Field(default_factory=list)
-    article_total: int = 0
-    page_total: int = 0
-    media_total: int = 0
-
-    pages_more_url: str = ""
-    media_more_url: str = ""
-    """Where each section's "see all" goes.
-
-    Sent rather than assembled in the screen because both land in pagebuilder,
-    and how that module routes its own list and its media library is not
-    something this one should be spelling out in TSX — see
-    ``news.integrations.pagebuilder``.
-    """
-
-    @property
-    def total(self) -> int:
-        return self.article_total + self.page_total + self.media_total

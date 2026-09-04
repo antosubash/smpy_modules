@@ -25,4 +25,17 @@ rm -f "${db_path}" "${db_path}-wal" "${db_path}-shm"
 # first revision carries a branch label.
 make migrate
 
+# Two content locales, so the multilingual surface is exercised end to end
+# rather than only in the module test suites. English stays the default, which
+# is what keeps every other spec's URLs unchanged: /p/{slug} and /news/{slug}
+# are still where an English page serves.
+#
+# Written into the settings table rather than exported: the modules read their
+# configuration from the database now, and an SM_PAGEBUILDER_* variable would
+# be ignored. This runs after `make migrate` because the table it writes to is
+# one the migrations create.
+uv run python scripts/set_setting.py pagebuilder \
+  content_locales '["en","de"]' \
+  default_content_locale en
+
 exec make dev

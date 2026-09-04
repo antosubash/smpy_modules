@@ -15,6 +15,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
 import { createArticleWithPage } from '../utils/api';
+import { localeLabel } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
 
@@ -22,19 +23,32 @@ const HEADLINE_ID = 'news-new-article-headline';
 const SLUG_ID = 'news-new-article-slug';
 const CATEGORY_ID = 'news-new-article-category';
 const DATE_ID = 'news-new-article-date';
+const LOCALE_ID = 'news-new-article-locale';
 
 /** Today in the UTC calendar, which is the calendar `published_at` is stored in. */
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** "New article" — headline, URL, category, date. All changeable later.
+interface Props {
+  /** Every language the site publishes in. One or none hides the field. */
+  locales?: string[];
+  defaultLocale?: string;
+}
+
+/** "New article" — headline, URL, category, date. All changeable later, except
+ * the language.
  *
  * The date defaults to today rather than to empty: an article with no date is
  * work in progress, and defaulting to that would make every new article land in
  * the undated pile whether or not its author meant it to.
+ *
+ * The language is fixed once the article exists, because an article *is* a
+ * page and a page's language is: moving one would strand its slug in the old
+ * language and orphan the redirect pointing at it. The way to the same story
+ * in another language is a translation, offered from the editor.
  */
-export function NewArticleDialog() {
+export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) {
   const [open, setOpen] = useState(false);
   const [headline, setHeadline] = useState('');
   // Null until edited: while null the slug tracks the headline, and the moment
@@ -42,6 +56,7 @@ export function NewArticleDialog() {
   const [slugOverride, setSlugOverride] = useState<string | null>(null);
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(todayUtc);
+  const [locale, setLocale] = useState(defaultLocale);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +85,7 @@ export function NewArticleDialog() {
       setSlugOverride(null);
       setCategory('');
       setDate(todayUtc());
+      setLocale(defaultLocale);
       setError(null);
     }
   };
@@ -93,6 +109,7 @@ export function NewArticleDialog() {
         // "Slug already in use" dead end — the server can only take the next
         // free variant for a slug nobody asked for by name.
         slug: slugOverride ?? undefined,
+        locale,
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });
@@ -146,10 +163,34 @@ export function NewArticleDialog() {
               />
             </div>
 
+            {locales.length > 1 && (
+              <div className="grid gap-2">
+                <Label htmlFor={LOCALE_ID}>Language</Label>
+                <NativeSelect
+                  id={LOCALE_ID}
+                  value={locale}
+                  disabled={pending}
+                  onChange={(e) => setLocale(e.target.value)}
+                >
+                  {locales.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {localeLabel(tag)}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <p className="text-xs text-muted-foreground">
+                  Fixed once the article exists. To publish the same story in another language, add
+                  a translation from the editor.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-2">
               <Label htmlFor={SLUG_ID}>URL</Label>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground">/news/</span>
+                <span className="text-sm text-muted-foreground">
+                  {locale === defaultLocale ? '' : `/${locale}`}/news/
+                </span>
                 <Input
                   id={SLUG_ID}
                   value={slug}

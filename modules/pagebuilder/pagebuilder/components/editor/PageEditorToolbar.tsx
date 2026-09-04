@@ -17,6 +17,11 @@ interface Props {
   onTitleChange: (value: string) => void;
   effectiveSlug: string;
   onSlugChange: (value: string) => void;
+  /** Where the published page actually answers — locale-prefixed for every
+   *  language but the site's default. Passed in rather than built from the
+   *  slug here: a translation usually reuses its source's slug, so `/p/{slug}`
+   *  would open the *other* language's page. */
+  viewHref: string;
   status: PageDetail['status'];
   publishAt: string | null;
   unpublishAt: string | null;
@@ -44,6 +49,7 @@ export function PageEditorToolbar({
   onTitleChange,
   effectiveSlug,
   onSlugChange,
+  viewHref,
   status,
   publishAt,
   unpublishAt,
@@ -192,7 +198,7 @@ export function PageEditorToolbar({
         {/* Stays an <a>: the e2e selects it with getByRole('link', {name: /^view$/i}). */}
         {status === 'published' && pageId !== null && (
           <a
-            href={`/p/${effectiveSlug}`}
+            href={viewHref}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"

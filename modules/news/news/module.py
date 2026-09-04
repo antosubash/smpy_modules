@@ -32,15 +32,25 @@ from simple_module_core.public_routes import PublicRouteRegistry
 
 from news import constants
 from news import settings as news_settings
+from news.integrations.locales import (
+    content_locales,
+    default_locale,
+    locale_path_prefix,
+)
 from news.integrations.pagebuilder import PageDeleted, claim_slugs
 from news.settings import NewsSettings
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass
 class _NewsServices:
-    """Module-scoped state on ``app.state.news``, mirroring pagebuilder's."""
+    """Module-scoped state on ``app.state.news``, mirroring pagebuilder's.
+
+    Not frozen: the host's hydrate step assigns the DB-resolved settings onto
+    this object at lifespan start, and the Settings screen assigns again on
+    every save.
+    """
 
     settings: NewsSettings
 
@@ -57,7 +67,7 @@ class NewsModule(ModuleBase):
         name="News",
         route_prefix=constants.ROUTE_PREFIX_API,
         view_prefix=constants.VIEW_PREFIX,
-        depends_on=[constants._MODULE_PAGEBUILDER],
+        depends_on=[constants._MODULE_PAGEBUILDER, constants._MODULE_SETTINGS],
         version=_VERSION,
         # The framework API version (1.0.0) is decoupled from the framework
         # package version (0.0.x) — this range is correct as written.
@@ -66,22 +76,38 @@ class NewsModule(ModuleBase):
 
     def __init__(self) -> None:
         super().__init__()
-        # ``register_settings`` runs before routes and public-route rules, and
-        # populates this so every later hook reads one env-resolved instance —
-        # and so a test can pre-seed an override.
+        # Pre-seeding this pins the settings for a test with no database
+        # behind it: ``register_settings`` hands it to the services container
+        # in place of the pydantic defaults, and nothing overwrites it.
         self.settings: NewsSettings | None = None
 
-    def _resolved_settings(self) -> NewsSettings:
-        if self.settings is None:
-            self.settings = NewsSettings()
-        return self.settings
+    def _live_settings(self, app: FastAPI) -> NewsSettings:
+        """The settings the app is actually running on.
+
+        Off ``app.state.news``, because that is where the host's hydrate step
+        puts the DB-resolved instance — the one handed over during
+        ``register_settings`` predates it.
+        """
+        services = getattr(app.state, constants.PACKAGE, None)
+        settings = getattr(services, "settings", None)
+        if settings is None:  # pragma: no cover - register_settings always runs
+            settings = self.settings or NewsSettings()
+        # Republished process-wide: the article serializer builds the public
+        # URL and has no request to read app.state from.
+        news_settings.use(settings)
+        return settings
 
     def register_settings(self, app: FastAPI) -> None:
-        resolved = self._resolved_settings()
-        app.state.news = _NewsServices(settings=resolved)
-        # Also published process-wide: the article serializer builds the
-        # public URL and has no request to read app.state from.
-        news_settings.use(resolved)
+        """Register the settings class; the host hydrates it from the DB."""
+        from settings.registration import register_module_settings
+
+        register_module_settings(
+            app,
+            constants.PACKAGE,
+            NewsSettings,
+            lambda defaults: _NewsServices(settings=self.settings or defaults),
+        )
+        news_settings.use(self.settings or NewsSettings())
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from news.endpoints.api import router as api
@@ -170,7 +196,11 @@ class NewsModule(ModuleBase):
         the repair should be visible, not silent.
         """
         from news import service
-        from news.endpoints.public_views import public_router, slug_claim
+        from news.endpoints.public_views import (
+            default_locale_alias_router,
+            locale_router,
+            slug_claim,
+        )
         from news.endpoints.views import admin_router
 
         # Mounted here rather than through ``register_routes`` because that
@@ -182,9 +212,23 @@ class NewsModule(ModuleBase):
         # claimed with pagebuilder in the same breath: the prefix an article is
         # served at and the prefix a crawler is sent to are one value, so they
         # cannot drift apart.
-        prefix = self._resolved_settings().public_route_prefix
-        app.include_router(public_router, prefix=prefix)
+        settings = self._live_settings(app)
+        prefix = settings.public_route_prefix
+        locales = content_locales()
+        for locale in locales:
+            # The site's default language keeps the bare prefix so no article
+            # URL that already exists changes; every other one is prefixed with
+            # its tag, exactly as pagebuilder addresses pages.
+            app.include_router(
+                locale_router(locale), prefix=f"{locale_path_prefix(locale)}{prefix}"
+            )
+        if len(locales) > 1:
+            app.include_router(
+                default_locale_alias_router(prefix),
+                prefix=f"/{default_locale()}{prefix}",
+            )
         claim_slugs(slug_claim())
+        self._exempt_public_routes(app, prefix, locales)
 
         async with app.state.sm.db.session_factory() as db:
             dropped = await service.reconcile_orphans(db)
@@ -197,19 +241,44 @@ class NewsModule(ModuleBase):
             )
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
-        """Let an anonymous visitor read an article, and the feed block list them.
+        """Let the feed block and the article API be read anonymously.
 
         Reads only, and by exact prefix: the same API paths carry
         POST/PUT/DELETE, which must stay behind ``news.edit``.
+
+        The *viewer's* prefixes are not here. They depend on
+        ``public_route_prefix`` and on pagebuilder's content locales, neither
+        of which the host has hydrated from the database yet at this point in
+        boot — so they are added from ``on_startup`` instead, into the same
+        registry, which ``AuthMiddleware`` reads live.
         """
         for prefix in constants.PUBLIC_READ_PREFIXES:
             registry.add_prefix(prefix, methods={"GET"})
-        # The public article viewer. Without this every article 302s an
-        # anonymous reader to the login screen, which is the whole point of a
-        # public address. The trailing slash is load-bearing — these are
-        # ``startswith`` prefixes, so a bare "/news" would also exempt anything
-        # that merely starts with those characters.
-        registry.add_prefix(
-            _dir_prefix(self._resolved_settings().public_route_prefix),
-            methods={"GET", "HEAD"},
-        )
+
+    def _exempt_public_routes(
+        self, app: FastAPI, prefix: str, locales: tuple[str, ...]
+    ) -> None:
+        """Exempt the public article viewer, one prefix per language.
+
+        Without this every article 302s an anonymous reader to the login
+        screen, which is the whole point of a public address. The trailing
+        slash is load-bearing — these are ``startswith`` prefixes, so a bare
+        "/news" would also exempt anything that merely starts with those
+        characters.
+        """
+        registry = getattr(app.state, "public_routes", None)
+        if registry is None:
+            # No auth middleware in this app, so nothing to be exempt from.
+            return
+        for locale in locales:
+            registry.add_prefix(
+                _dir_prefix(f"{locale_path_prefix(locale)}{prefix}"),
+                methods={"GET", "HEAD"},
+            )
+        if len(locales) > 1:
+            # The default language's redundant prefix, which 301s to the bare
+            # address. Exempt too, or the redirect that exists to be forgiving
+            # answers with a login page.
+            registry.add_prefix(
+                _dir_prefix(f"/{default_locale()}{prefix}"), methods={"GET", "HEAD"}
+            )

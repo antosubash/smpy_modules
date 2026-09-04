@@ -24,11 +24,12 @@ from typing import Any
 from pagebuilder.snapshots.blobs import BlobStore, is_digest
 from pagebuilder.snapshots.format import (
     BLOBS_DIR,
-    FORMAT_VERSION,
     MANIFEST_NAME,
     MEDIA_DIR,
     MEDIA_INDEX_NAME,
+    READABLE_VERSIONS,
     REDIRECTS_NAME,
+    is_readable,
 )
 from pagebuilder.snapshots.validate import (
     BundleError,
@@ -64,10 +65,11 @@ def _require_manifest(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise BundleError("manifest.json is not an object")
     version = payload.get("format_version")
-    if version != FORMAT_VERSION:
+    if not is_readable(version):
+        readable = ", ".join(str(v) for v in sorted(READABLE_VERSIONS))
         raise BundleError(
             f"unsupported bundle format version {version!r}; "
-            f"this build reads version {FORMAT_VERSION}"
+            f"this build reads version {readable}"
         )
     return payload
 

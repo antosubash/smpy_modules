@@ -30,8 +30,8 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.media_match import match_existing
-from pagebuilder.snapshots.pages import MEDIA_FIELDS, apply_payload
-from pagebuilder.snapshots.plan import read_documents
+from pagebuilder.snapshots.pages import MEDIA_FIELDS, PageKey, apply_payload
+from pagebuilder.snapshots.plan import read_documents, redirect_locale
 
 
 async def _restore_media(
@@ -88,32 +88,41 @@ async def _restore_media(
 
 
 async def _restore_pages(
-    db: AsyncSession, bundled: dict[str, dict[str, Any]], name_to_url: dict[str, str]
-) -> tuple[dict[str, Page], dict[str, int], int, int]:
-    """Pass one: upsert every page. Returns ``({slug: page}, {slug: id}, created, updated)``.
+    db: AsyncSession, bundled: dict[PageKey, dict[str, Any]], name_to_url: dict[str, str]
+) -> tuple[dict[PageKey, Page], dict[PageKey, int], int, int]:
+    """Pass one: upsert every page. Returns ``({key: page}, {key: id}, created, updated)``.
+
+    Keyed by ``(locale, slug)`` because that is what the unique index is on:
+    matching on the bare slug would make a German ``about`` overwrite the
+    English one and then fail to create the page the bundle actually carried.
 
     Matching ignores the trash filter on purpose: a trashed page keeps its slug
-    claimed, so restoring content under that slug has to revive the row rather
-    than insert a second one and trip the unique constraint.
+    claimed *in its own language*, so restoring content under that key has to
+    revive the row rather than insert a second one and trip the constraint.
+
+    ``locale`` is passed to the constructor rather than through
+    ``apply_payload``, because a page's language is fixed once it exists — a
+    restore may create a page in a language, never move one between them.
     """
     result = await db.execute(select(Page))
-    by_slug = {page.slug: page for page in result.scalars().all()}
+    by_key = {(page.locale, page.slug): page for page in result.scalars().all()}
 
     created = 0
     updated = 0
-    for slug in sorted(bundled):
-        payload = dict(bundled[slug])
+    for key in sorted(bundled):
+        locale, slug = key
+        payload = dict(bundled[key])
         # Only keys the document actually carries: `apply_payload` and the
         # plan both treat an absent field as "leave it alone", so injecting
         # one here would overwrite a live value with None.
         for field in ("draft_data", "published_data", *MEDIA_FIELDS):
             if field in payload:
                 payload[field] = from_sentinels(payload[field], name_to_url)
-        page = by_slug.get(slug)
+        page = by_key.get(key)
         if page is None:
-            page = Page(slug=slug, title=payload.get("title", slug))
+            page = Page(slug=slug, locale=locale, title=payload.get("title", slug))
             db.add(page)
-            by_slug[slug] = page
+            by_key[key] = page
             created += 1
         else:
             updated += 1
@@ -122,19 +131,25 @@ async def _restore_pages(
         page.deleted_at = None
 
     await db.flush()
-    ids = {slug: page.id for slug, page in by_slug.items() if page.id}
-    return by_slug, ids, created, updated
+    ids = {key: page.id for key, page in by_key.items() if page.id}
+    return by_key, ids, created, updated
 
 
 async def _resolve_parents(
     db: AsyncSession,
-    bundled: dict[str, dict[str, Any]],
-    by_slug: dict[str, Page],
-    ids: dict[str, int],
+    bundled: dict[PageKey, dict[str, Any]],
+    by_key: dict[PageKey, Page],
+    ids: dict[PageKey, int],
 ) -> None:
-    """Pass two: wire ``parent_slug`` now that every slug exists.
+    """Pass two: wire ``parent_slug`` now that every page exists.
 
-    *by_slug* is pass one's map, not a fresh query: those are the same rows,
+    The parent is looked up in the *child's own* language. Breadcrumbs never
+    cross languages — ``PagesService._parent_in`` picks the parent's own
+    counterpart for exactly that reason — so resolving the slug globally would
+    let a German page's trail climb into the English tree whenever the German
+    parent happened to be missing.
+
+    *by_key* is pass one's map, not a fresh query: those are the same rows,
     already flushed, so re-reading the table would only return the objects the
     session is holding.
 
@@ -142,19 +157,25 @@ async def _resolve_parents(
     is already ``ondelete="SET NULL"`` precisely because a missing parent must
     not destroy the child.
     """
-    for slug, payload in bundled.items():
-        page = by_slug.get(slug)
+    for key, payload in bundled.items():
+        page = by_key.get(key)
         if page is None:
             continue
+        locale = key[0]
         parent_slug = payload.get("parent_slug")
-        page.parent_id = ids.get(parent_slug) if parent_slug else None
+        page.parent_id = ids.get((locale, parent_slug)) if parent_slug else None
     await db.flush()
 
 
 async def _restore_redirects(
-    db: AsyncSession, rows: list[dict[str, str]], ids: dict[str, int]
+    db: AsyncSession, rows: list[dict[str, str]], ids: dict[PageKey, int]
 ) -> tuple[int, list[str]]:
     """Rebuild the redirect table, dropping any whose target does not exist.
+
+    A redirect resolves within its own language: ``(locale, from_slug)`` is
+    unique, and the target slug is looked up in that same locale, because a
+    retired English address must not start resolving to the German page that
+    happens to use the slug it pointed at.
 
     An unresolvable redirect is a 404 generator, so it is discarded and named
     rather than stored pointing at nothing.
@@ -163,11 +184,14 @@ async def _restore_redirects(
     kept = 0
     dropped: list[str] = []
     for row in rows:
-        page_id = ids.get(row.get("to_slug", ""))
+        locale = redirect_locale(row)
+        page_id = ids.get((locale, row.get("to_slug", "")))
         if page_id is None:
             dropped.append(row.get("from_slug", ""))
             continue
-        db.add(PageRedirect(from_slug=row["from_slug"], page_id=page_id))
+        db.add(
+            PageRedirect(from_slug=row["from_slug"], locale=locale, page_id=page_id)
+        )
         kept += 1
     await db.flush()
     return kept, dropped
@@ -187,8 +211,8 @@ async def apply_bundle(
 
     documents = await read_documents(bundle_dir)
     bundled = documents.pages
-    by_slug, ids, created, updated = await _restore_pages(db, bundled, name_to_url)
-    await _resolve_parents(db, bundled, by_slug, ids)
+    by_key, ids, created, updated = await _restore_pages(db, bundled, name_to_url)
+    await _resolve_parents(db, bundled, by_key, ids)
     redirects_kept, redirects_dropped = await _restore_redirects(
         db, documents.redirects, ids
     )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from conftest import create_draft
+from page_helpers import create_draft
 
 pytestmark = pytest.mark.asyncio
 

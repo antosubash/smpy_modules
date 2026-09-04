@@ -15,9 +15,16 @@ import type React from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
 import { approvePage, type PageRead, rejectPage } from '../utils/api';
+import { publicPath } from '../utils/locale';
+
+/** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
+const PUBLIC_PREFIX = '/p';
 
 interface Props {
   pages: { items: PageRead[] };
+  /** The language that serves unprefixed, so the approve confirmation names
+   *  the address this page will actually take. */
+  default_locale?: string;
 }
 
 /**
@@ -27,7 +34,9 @@ interface Props {
  * the editor header + history panel).
  */
 export default function PendingReview() {
-  const { pages } = usePage<{ props: Props }>().props as unknown as Props;
+  const props = usePage<{ props: Props }>().props as unknown as Props;
+  const { pages } = props;
+  const defaultLocale = props.default_locale ?? 'en';
 
   // Both handlers let their error escape into the dialog that triggered them,
   // which keeps the message next to the row it belongs to. The page-level
@@ -90,7 +99,12 @@ export default function PendingReview() {
                       </Button>
                     }
                     title={`Publish "${p.title}"?`}
-                    description={`Approving publishes it immediately at /p/${p.slug}.`}
+                    description={`Approving publishes it immediately at ${publicPath(
+                      PUBLIC_PREFIX,
+                      p.slug,
+                      p.locale,
+                      defaultLocale,
+                    )}.`}
                     confirmLabel="Approve"
                     onConfirm={() => handleApprove(p.id)}
                   />

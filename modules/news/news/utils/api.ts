@@ -27,6 +27,11 @@ export interface ArticleRead {
   show_in_feed: boolean;
   author: string;
   published_at: string | null;
+  /** Which language the article is written in — the page's own. */
+  locale: string;
+  /** What this article shares with its counterparts in other languages.
+   *  Lets the admin list mark a translated article without a query per row. */
+  translation_group: string;
   /** Workflow state of the page behind the article. Always `published` for
    *  anyone without `news.edit` — drafts are filtered out server-side. */
   page_status: ArticleStatus;
@@ -61,6 +66,25 @@ export interface CategoryListResponse {
   items: CategoryCount[];
 }
 
+export interface ArticleWithPagePayload {
+  title: string;
+  slug?: string;
+  /** Language to write in. Omitted means the site's default. */
+  locale?: string;
+  category?: string;
+  published_at?: string | null;
+  author?: string;
+}
+
+export interface ArticleTranslationPayload {
+  locale: string;
+  /** Defaults to the source article's slug, which is free unless an unrelated
+   *  page in that language already took it. */
+  slug?: string;
+  /** Defaults to the source's headline, i.e. untranslated. */
+  title?: string;
+}
+
 export async function listArticles(params: {
   limit?: number;
   offset?: number;
@@ -74,6 +98,12 @@ export async function listArticles(params: {
   /** Sort undated (work-in-progress) articles first — the admin list's view.
    *  Public feeds keep the default, which pushes undated to the end. */
   undated_first?: boolean;
+  /** Only articles in this language. A feed block on a German page passes
+   *  `de`; the admin list leaves it unset and shows every language. */
+  locale?: string;
+  /** One article and its counterparts in other languages — what the editor's
+   *  language switcher lists. */
+  translation_group?: string;
   signal?: AbortSignal;
 }): Promise<ArticleListResponse> {
   const query = new URLSearchParams();
@@ -84,6 +114,8 @@ export async function listArticles(params: {
   if (params.status) query.set('status', params.status);
   if (params.in_feed) query.set('in_feed', 'true');
   if (params.undated_first) query.set('undated_first', 'true');
+  if (params.locale) query.set('locale', params.locale);
+  if (params.translation_group) query.set('translation_group', params.translation_group);
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',
@@ -156,13 +188,17 @@ export const detachArticle = (id: number) => write<null>(`/articles/${id}`, 'DEL
  * free variant. One the author typed is used verbatim, and a collision is a 409
  * rather than a silent rename.
  */
-export const createArticleWithPage = (data: {
-  title: string;
-  slug?: string;
-  category?: string;
-  published_at?: string | null;
-  author?: string;
-}) => write<ArticleRead>('/articles/with-page', 'POST', data);
+export const createArticleWithPage = (data: ArticleWithPagePayload) =>
+  write<ArticleRead>('/articles/with-page', 'POST', data);
+
+/** Start this article's counterpart in another language.
+ *
+ * News' own route, not pagebuilder's: the translated *page* is the
+ * neighbour's, the sidecar row carrying category, byline and date is this
+ * module's, and an article that exists as only one of those is not something
+ * either module can repair alone. One request, one transaction. */
+export const translateArticle = (articleId: number, data: ArticleTranslationPayload) =>
+  write<ArticleRead>(`/articles/${articleId}/translations`, 'POST', data);
 
 /** Publish the page behind an article, from the list's row menu.
  *

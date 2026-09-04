@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from pagebuilder import locales
 from pagebuilder.models import PageStatus, SnapshotMedia
 from pagebuilder.snapshots.assets import collect_sentinels
 from pagebuilder.snapshots.format import (
@@ -25,6 +26,8 @@ from pagebuilder.snapshots.format import (
     PAGES_DIR,
     REDIRECTS_NAME,
 )
+from pagebuilder.snapshots.pages import payload_locale
+from pagebuilder.snapshots.plan import redirect_locale
 
 
 class BundleError(Exception):
@@ -44,6 +47,27 @@ def load_document(path: Path, label: str) -> Any:
         raise BundleError(f"{label} is not valid JSON") from exc
 
 
+def _check_locale(label: str, value: Any) -> None:
+    """Reject a locale a column could not hold or a URL could not carry.
+
+    Absent is fine — a version 1 document predates the field and is read as
+    the default locale. A tag this host does not publish is also fine, and is
+    read the same way: refusing it would make a bundle from a site with one
+    extra language unrestorable in full, when all that is actually true is
+    that those pages land in the default locale. What is rejected is a value
+    that is not a locale at all, because it would otherwise reach the column
+    as junk.
+    """
+    if value is None:
+        return
+    if not isinstance(value, str) or not value:
+        raise BundleError(f"{label} has an empty locale")
+    if len(value) > locales.MAX_LOCALE_LEN:
+        raise BundleError(f"{label} has a locale longer than {locales.MAX_LOCALE_LEN}")
+    if not locales.LOCALE_PATTERN.match(value):
+        raise BundleError(f"{label} has an unreadable locale: {value!r}")
+
+
 def _check_page(label: str, payload: Any) -> None:
     """Reject a page document ``apply_payload`` would choke on."""
     if not isinstance(payload, dict):
@@ -51,6 +75,7 @@ def _check_page(label: str, payload: Any) -> None:
     slug = payload.get("slug")
     if not isinstance(slug, str) or not slug:
         raise BundleError(f"{label} has no slug")
+    _check_locale(label, payload.get("locale"))
     status = payload.get("status")
     try:
         PageStatus(status)
@@ -100,9 +125,12 @@ def check_media_entry(name: str, entry: dict[str, Any]) -> None:
 def _check_redirects(dest: Path) -> None:
     """Validate ``redirects.json`` before anything tries to restore from it.
 
-    Both the plan and apply read ``row["from_slug"]`` directly, and the column
-    is unique, so a missing key or a repeated slug would otherwise escape as a
-    500 rather than as a rejected bundle.
+    Both the plan and apply read ``row["from_slug"]`` directly, and
+    ``(locale, from_slug)`` is unique, so a missing key or a repeat within one
+    language would otherwise escape as a 500 rather than as a rejected bundle.
+    The pair is what is checked, not the bare slug: two languages retiring the
+    same address is ordinary, and rejecting it would refuse a bundle the
+    database would have accepted.
     """
     path = dest / REDIRECTS_NAME
     if not path.is_file():
@@ -110,7 +138,7 @@ def _check_redirects(dest: Path) -> None:
     rows = load_document(path, REDIRECTS_NAME)
     if not isinstance(rows, list):
         raise BundleError(f"{REDIRECTS_NAME} is not a list")
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for position, row in enumerate(rows):
         label = f"{REDIRECTS_NAME}[{position}]"
         if not isinstance(row, dict):
@@ -121,9 +149,11 @@ def _check_redirects(dest: Path) -> None:
                 raise BundleError(f"{label} has no {field}")
             if len(value) > 200:
                 raise BundleError(f"{label} has a {field} longer than 200 characters")
-        if row["from_slug"] in seen:
+        _check_locale(label, row.get("locale"))
+        key = (redirect_locale(row), row["from_slug"])
+        if key in seen:
             raise BundleError(f"{label} repeats from_slug {row['from_slug']!r}")
-        seen.add(row["from_slug"])
+        seen.add(key)
 
 
 def check_documents(dest: Path, index: dict[str, Any]) -> None:
@@ -134,18 +164,23 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
     files they consider a document.
     """
     referenced: set[str] = set()
-    seen_slugs: set[str] = set()
+    seen_pages: set[tuple[str, str]] = set()
     for document in sorted((dest / PAGES_DIR).glob("*.json")):
         label = f"{PAGES_DIR}/{document.name}"
         payload = load_document(document, label)
         _check_page(label, payload)
-        # Two files claiming one slug would otherwise resolve as "last file
+        # Two files claiming one page would otherwise resolve as "last file
         # wins" in `read_documents`, dropping a page with nothing in the plan
         # to say it happened. Rejected here for the same reason repeated
-        # `from_slug` values are.
-        if payload["slug"] in seen_slugs:
-            raise BundleError(f"{label} repeats slug {payload['slug']!r}")
-        seen_slugs.add(payload["slug"])
+        # `from_slug` values are — and on `(locale, slug)`, because two
+        # languages publishing the same slug is the ordinary case this whole
+        # change exists to support, not a malformed bundle.
+        page_key = (payload_locale(payload), payload["slug"])
+        if page_key in seen_pages:
+            raise BundleError(
+                f"{label} repeats slug {payload['slug']!r} in {page_key[0]}"
+            )
+        seen_pages.add(page_key)
         referenced |= collect_sentinels(payload)
     layout = dest / LAYOUT_NAME
     if layout.is_file():

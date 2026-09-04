@@ -29,7 +29,7 @@ async def test_capture_writes_the_whole_bundle_tree(snapshot_db, tmp_path):
     assert (dest / "redirects.json").is_file()
     assert (dest / "media" / "index.json").is_file()
     manifest = _read(dest, "manifest.json")
-    assert manifest["format_version"] == 1
+    assert manifest["format_version"] == 2
     assert result.manifest == manifest
     assert result.size_bytes > 0
 
@@ -75,7 +75,7 @@ async def test_capture_records_redirects_by_slug(snapshot_db, tmp_path):
 
     dest, _ = await _capture(snapshot_db, tmp_path)
     assert _read(dest, "redirects.json") == [
-        {"from_slug": "old-home", "to_slug": "new-home"}
+        {"from_slug": "old-home", "locale": "en", "to_slug": "new-home"}
     ]
 
 

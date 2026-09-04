@@ -14,6 +14,8 @@ export interface BoardStage {
 interface Props {
   stages: BoardStage[];
   search: string;
+  /** The language that serves unprefixed — see PageBoardCard. */
+  defaultLocale: string;
   /** The create control, passed in so the empty state offers the same dialog
    *  the header does rather than a second, divergent path to a new page. */
   newPageSlot?: React.ReactNode;
@@ -36,6 +38,7 @@ interface Props {
 export function PageBoard({
   stages,
   search,
+  defaultLocale,
   newPageSlot,
   onDelete,
   onPublish,
@@ -83,6 +86,7 @@ export function PageBoard({
                   key={page.id}
                   page={page}
                   stage={stage.key}
+                  defaultLocale={defaultLocale}
                   onDelete={onDelete}
                   onPublish={onPublish}
                   onUnpublish={onUnpublish}

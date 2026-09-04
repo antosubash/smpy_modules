@@ -12,6 +12,7 @@ import inspect
 from news import constants
 from news.endpoints import views
 from news.module import NewsModule
+from news.settings import NewsSettings
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
@@ -135,12 +136,22 @@ class TestPublicRoutes:
 
     def test_the_article_viewer_is_readable_without_a_session(self):
         """Otherwise every article 302s a reader to the login screen, which
-        would make having a public address pointless."""
+        would make having a public address pointless.
+
+        Added at startup rather than from ``register_public_routes``: the
+        prefix and the site's languages are hydrated from the database after
+        that hook has run. ``AuthMiddleware`` reads the registry live, so a
+        rule added later still applies.
+        """
+        from types import SimpleNamespace
+
         registry = PublicRouteRegistry()
         module = NewsModule()
-        module.register_public_routes(registry)
+        settings = NewsSettings()
+        app = SimpleNamespace(state=SimpleNamespace(public_routes=registry))
+        module._exempt_public_routes(app, settings.public_route_prefix, ("en",))
 
-        prefix = module._resolved_settings().public_route_prefix
         assert any(
-            route.matches("GET", f"{prefix}/some-article") for route in registry.routes
+            route.matches("GET", f"{settings.public_route_prefix}/some-article")
+            for route in registry.routes
         )

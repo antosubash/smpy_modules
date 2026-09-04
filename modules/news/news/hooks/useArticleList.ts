@@ -61,6 +61,7 @@ export function useArticleList() {
         category: filters.category || undefined,
         q: debouncedQ || undefined,
         status: filters.status || undefined,
+        locale: filters.locale || undefined,
         // Undated first: an undated article is work in progress — with the
         // default (public-feed) order it would sit on the last page, burying
         // exactly the row its author just created.
@@ -97,7 +98,7 @@ export function useArticleList() {
 
       await Promise.all([rows, cats]);
     },
-    [filters.category, filters.status, debouncedQ],
+    [filters.category, filters.status, filters.locale, debouncedQ],
   );
 
   /** Reload from the top. Called on mount and whenever a filter changes. */

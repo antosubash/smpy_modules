@@ -21,6 +21,7 @@ from news.constants import MAX_SLUG_LEN
 from news.contracts.schemas import ArticleStatus
 from news.display_date import as_display_date
 from news.integrations import pagebuilder as pb
+from news.integrations import pages as pb_pages
 from news.settings import NewsSettings, public_article_path
 from pagebuilder.contracts.schemas import PageCreate
 
@@ -35,16 +36,24 @@ class TestNoOtherModuleImportsPagebuilder:
 
         Asserted rather than left to review because it is the kind of thing a
         single convenient import quietly undoes, and nothing else would fail.
+
+        The unit is ``news/integrations/`` rather than one file in it — which
+        is what the package docstring has always said. It outgrew a single
+        module when the 300-line cap split the page *writes* and the content
+        locales into siblings; both still sit behind the same boundary, and
+        widening the check to the directory is what keeps it checkable by
+        reading one directory listing.
         """
         import pathlib
 
         import news
 
         root = pathlib.Path(news.__file__).parent
+        seam = root / "integrations"
         offenders = sorted(
             path.relative_to(root).as_posix()
             for path in root.rglob("*.py")
-            if path.name != "pagebuilder.py"
+            if seam not in path.parents
             and re.search(r"^\s*(from|import) pagebuilder", path.read_text(), re.M)
         )
 
@@ -63,7 +72,7 @@ class TestSlugForTitle:
         ],
     )
     def test_folds_a_title_to_a_slug(self, title: str, expected: str) -> None:
-        assert pb.slug_for_title(title) == expected
+        assert pb_pages.slug_for_title(title) == expected
 
     @pytest.mark.parametrize(
         "title",
@@ -85,7 +94,7 @@ class TestSlugForTitle:
         Truncating to the column bound is where this nearly went wrong: the cut
         can land mid-separator, and a trailing hyphen fails the pattern.
         """
-        slug = pb.slug_for_title(title)
+        slug = pb_pages.slug_for_title(title)
 
         assert slug, "never empty — the column is unique and NOT NULL"
         assert len(slug) <= MAX_SLUG_LEN

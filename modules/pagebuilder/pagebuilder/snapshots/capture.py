@@ -23,6 +23,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder import locales
 from pagebuilder.layout_service import LayoutService
 from pagebuilder.media_files import resolve_media_root
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageRedirect
@@ -48,14 +49,28 @@ class CaptureResult:
     size_bytes: int = 0
 
 
-def page_filename(slug: str) -> str:
-    """Filename for a page document.
+def _safe(segment: str) -> str:
+    """*segment* with path separators neutralised.
 
-    Slugs are URL segments, but a separator sneaking into one would silently
-    write outside ``pages/`` — so they are replaced rather than trusted. The
-    authoritative slug is inside the document either way.
+    Slugs and locales are URL segments, but a separator sneaking into one
+    would silently write outside ``pages/`` — so they are replaced rather
+    than trusted. The authoritative values are inside the document either way.
     """
-    return f"{slug.replace('/', '_').replace(chr(92), '_')}.json"
+    return segment.replace("/", "_").replace(chr(92), "_")
+
+
+def page_filename(slug: str, locale: str) -> str:
+    """Filename for a page document, unique across languages.
+
+    The default locale keeps the bare ``{slug}.json`` it has always had, so a
+    monolingual site's bundle is byte-for-byte what earlier builds wrote and
+    its diffs stay readable. Every other language is prefixed, because two
+    languages may legitimately both publish ``about`` and one file cannot hold
+    both — without the prefix the second page written would silently replace
+    the first, losing a whole document with nothing in the manifest to say so.
+    """
+    stem = _safe(slug)
+    return f"{stem}.json" if locales.is_default(locale) else f"{_safe(locale)}__{stem}.json"
 
 
 def _write_json(path: Path, payload: Any) -> int:
@@ -104,21 +119,30 @@ async def _media_maps(
 async def _capture_pages(
     db: AsyncSession, dest: Path, url_to_name: dict[str, str]
 ) -> tuple[list[dict[str, Any]], int]:
-    result = await db.execute(select(Page).where(NOT_TRASHED).order_by(Page.slug.asc()))
+    result = await db.execute(
+        select(Page).where(NOT_TRASHED).order_by(Page.locale.asc(), Page.slug.asc())
+    )
     pages = list(result.scalars().all())
     slug_by_id = {page.id: page.slug for page in pages}
 
     entries: list[dict[str, Any]] = []
     documents: list[tuple[Path, dict[str, Any]]] = []
     for page in pages:
+        # A parent is always its child's own counterpart — `_parent_in` picks
+        # the parent's sibling in the child's language precisely so a
+        # breadcrumb never crosses one — so the slug alone names it, read back
+        # within this page's locale on restore.
         parent_slug = slug_by_id.get(page.parent_id) if page.parent_id else None
         payload = page_to_payload(page, parent_slug)
         for key in ("draft_data", "published_data", *MEDIA_FIELDS):
             payload[key] = to_sentinels(payload[key], url_to_name)
-        documents.append((dest / PAGES_DIR / page_filename(page.slug), payload))
+        documents.append(
+            (dest / PAGES_DIR / page_filename(page.slug, page.locale), payload)
+        )
         entries.append(
             {
                 "slug": page.slug,
+                "locale": page.locale,
                 "title": page.title,
                 "status": page.status.value,
                 "parent_slug": parent_slug,
@@ -150,13 +174,19 @@ async def _capture_layout(
 
 
 async def _capture_redirects(db: AsyncSession, dest: Path) -> tuple[int, int]:
+    # `PageRedirect.locale` rather than the target page's: the two always
+    # agree today, but the redirect is the row the unique index is on, so it
+    # is the one whose language decides where the old address resolved.
     result = await db.execute(
-        select(PageRedirect.from_slug, Page.slug)
+        select(PageRedirect.from_slug, PageRedirect.locale, Page.slug)
         .join(Page, Page.id == PageRedirect.page_id)
         .where(NOT_TRASHED)
-        .order_by(PageRedirect.from_slug.asc())
+        .order_by(PageRedirect.locale.asc(), PageRedirect.from_slug.asc())
     )
-    rows = [{"from_slug": from_slug, "to_slug": to_slug} for from_slug, to_slug in result]
+    rows = [
+        {"from_slug": from_slug, "locale": locale, "to_slug": to_slug}
+        for from_slug, locale, to_slug in result
+    ]
     return len(rows), _write_json(dest / REDIRECTS_NAME, rows)
 
 

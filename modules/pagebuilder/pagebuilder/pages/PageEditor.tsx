@@ -18,6 +18,7 @@ import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
 import type { PageDetail, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { publicPath } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`
@@ -27,6 +28,11 @@ const PUBLIC_PREFIX = '/p';
 interface Props {
   page: PageDetail | null;
   revisions: PageRevisionRead[];
+  /** Every language the site publishes in, and the one that serves at the
+   *  unprefixed public URL. Server-rendered so the Languages tab paints with
+   *  the first response instead of correcting itself a moment later. */
+  locales?: string[];
+  default_locale?: string;
 }
 
 function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
@@ -64,6 +70,8 @@ export default function PageEditor() {
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { page } = props;
   const revisions = props.revisions ?? [];
+  const locales = props.locales ?? ['en'];
+  const defaultLocale = props.default_locale ?? 'en';
   // ``rejection_note`` lives on the page prop and refreshes after every
   // partial reload — no separate state slot needed.
   const rejectionNote = page?.rejection_note ?? null;
@@ -73,7 +81,7 @@ export default function PageEditor() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const form = useEditorForm(page);
+  const form = useEditorForm(page, defaultLocale);
   const isNarrow = useIsNarrow();
 
   const { isDirty, saveState, lastSavedAt, autosaveError, markSaved } = useAutosave({
@@ -105,6 +113,7 @@ export default function PageEditor() {
           form.setSlug(value);
           form.setSlugTouched(true);
         }}
+        viewHref={publicPath(PUBLIC_PREFIX, form.effectiveSlug, form.locale, defaultLocale)}
         status={form.status}
         publishAt={form.publishAt}
         unpublishAt={form.unpublishAt}
@@ -137,6 +146,9 @@ export default function PageEditor() {
           schedule={schedule}
           busy={busy}
           publicPrefix={PUBLIC_PREFIX}
+          locales={locales}
+          defaultLocale={defaultLocale}
+          translations={page?.translations ?? []}
           onMessage={setMessage}
         />
       )}

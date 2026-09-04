@@ -32,10 +32,19 @@ def _no_leaked_claims():
     public_claims.reset()
 
 
-def claiming(*slugs: str, prefix: str = "/elsewhere"):
-    """A claim that owns exactly these slugs."""
+def claiming(*slugs: str, prefix: str = "/elsewhere", locale: str = "en"):
+    """A claim that owns exactly these slugs, in one language.
 
-    async def claim(session: AsyncSession, asked: Sequence[str]) -> Mapping[str, str]:
+    The locale is part of the signature because a slug only identifies a page
+    within one — a claimant asked about ``about`` in German must not answer for
+    the English page of the same name.
+    """
+
+    async def claim(
+        session: AsyncSession, asked: Sequence[str], asked_locale: str
+    ) -> Mapping[str, str]:
+        if asked_locale != locale:
+            return {}
         return {slug: f"{prefix}/{slug}" for slug in asked if slug in slugs}
 
     return claim
@@ -54,20 +63,20 @@ async def _publish(client: AsyncClient, slug: str) -> int:
 
 class TestResolve:
     async def test_no_claims_owns_nothing(self, db: AsyncSession) -> None:
-        assert await public_claims.resolve(db, ["a", "b"]) == {}
+        assert await public_claims.resolve(db, ["a", "b"], "en") == {}
 
     async def test_returns_only_the_claimed(self, db: AsyncSession) -> None:
         public_claims.register(claiming("a"))
 
-        assert await public_claims.resolve(db, ["a", "b"]) == {"a": "/elsewhere/a"}
+        assert await public_claims.resolve(db, ["a", "b"], "en") == {"a": "/elsewhere/a"}
 
     async def test_an_empty_ask_never_reaches_a_claim(self, db: AsyncSession) -> None:
-        async def explodes(session, slugs):
+        async def explodes(session, slugs, locale):
             raise AssertionError("should not be called for an empty set")
 
         public_claims.register(explodes)
 
-        assert await public_claims.resolve(db, []) == {}
+        assert await public_claims.resolve(db, [], "en") == {}
 
     async def test_the_first_claim_wins_a_contested_slug(
         self, db: AsyncSession
@@ -79,12 +88,23 @@ class TestResolve:
         public_claims.register(claiming("a", prefix="/first"))
         public_claims.register(claiming("a", prefix="/second"))
 
-        assert await public_claims.resolve(db, ["a"]) == {"a": "/first/a"}
+        assert await public_claims.resolve(db, ["a"], "en") == {"a": "/first/a"}
 
     async def test_claimed_url_is_none_when_unowned(self, db: AsyncSession) -> None:
         public_claims.register(claiming("a"))
 
-        assert await public_claims.claimed_url(db, "b") is None
+        assert await public_claims.claimed_url(db, "b", "en") is None
+
+    async def test_a_claim_in_another_language_does_not_answer(
+        self, db: AsyncSession
+    ) -> None:
+        """Slugs are unique per language, so the same word is two pages. A
+        claimant that owns the German one must leave the English one alone —
+        otherwise claiming an article silently 404s an unrelated page."""
+        public_claims.register(claiming("about", locale="de"))
+
+        assert await public_claims.claimed_url(db, "about", "en") is None
+        assert await public_claims.claimed_url(db, "about", "de") == "/elsewhere/about"
 
 
 class TestViewer:
@@ -156,3 +176,41 @@ class TestSitemap:
 
         assert old.status_code == 301
         assert old.headers["location"] == "/p/now-here"
+
+
+class TestHreflang:
+    async def test_a_claimed_sibling_is_advertised_at_the_claimants_address(
+        self, bilingual_client: AsyncClient
+    ) -> None:
+        """A translation group can mix a page this module serves with one
+        another module has claimed — translating an article's page from the
+        page list produces exactly that. Pasting one prefix over both would
+        advertise an address that 404s, in the one place a 404 stays invisible
+        until traffic drops."""
+        source = (
+            await bilingual_client.post(
+                "/api/pagebuilder/pages",
+                json={"title": "About", "slug": "about", "draft_data": {"content": []}},
+            )
+        ).json()
+        translation = (
+            await bilingual_client.post(
+                f"/api/pagebuilder/pages/{source['id']}/translations",
+                json={"locale": "de"},
+            )
+        ).json()
+        for page_id in (source["id"], translation["id"]):
+            assert (
+                await bilingual_client.post(f"/api/pagebuilder/pages/{page_id}/publish")
+            ).status_code == 200
+        public_claims.register(claiming("about", prefix="/de/news", locale="de"))
+
+        props = (
+            await bilingual_client.get(
+                "/p/about", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            )
+        ).json()["props"]
+
+        by_locale = {a["locale"]: a["url"] for a in props["alternates"]}
+        assert by_locale["de"].endswith("/de/news/about")
+        assert by_locale["en"].endswith("/p/about")

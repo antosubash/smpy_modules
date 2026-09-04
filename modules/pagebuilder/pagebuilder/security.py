@@ -130,16 +130,9 @@ class CsrfCookieMiddleware:
     token.
     """
 
-    def __init__(
-        self,
-        app: ASGIApp,
-        cookie_name: str,
-        admin_prefixes: tuple[str, ...] = (),
-    ) -> None:
+    def __init__(self, app: ASGIApp, admin_prefixes: tuple[str, ...] = ()) -> None:
         self.app = app
-        self.cookie_name = cookie_name
         self.admin_prefixes = admin_prefixes
-        self._cookie_attr = f"{cookie_name}="
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -151,17 +144,29 @@ class CsrfCookieMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Both the switch and the cookie's name are read here rather than
+        # captured in ``__init__``: middleware is installed while the app is
+        # built, which is before the host hydrates settings from the database,
+        # so a value captured then would be the pydantic default for the life
+        # of the process.
+        settings = _settings_from_scope(scope)
+        if settings is None or not settings.csrf_protect:
+            await self.app(scope, receive, send)
+            return
+        cookie_name = settings.csrf_cookie_name
+        cookie_attr = f"{cookie_name}="
+
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
                 session = scope.get("session")
                 token = (
                     session.get(_CSRF_SESSION_KEY) if isinstance(session, dict) else None
                 )
-                if token and _request_cookie_value(scope, self._cookie_attr) != token:
+                if token and _request_cookie_value(scope, cookie_attr) != token:
                     headers = MutableHeaders(scope=message)
                     headers.append(
                         "set-cookie",
-                        f"{self.cookie_name}={token}; Path=/; SameSite=Strict",
+                        f"{cookie_name}={token}; Path=/; SameSite=Strict",
                     )
             await send(message)
 
@@ -184,6 +189,17 @@ def _request_cookie_value(scope: Scope, attr: str) -> str | None:
     return None
 
 
+def _settings_from_scope(scope: Scope):
+    """The live settings, or ``None`` when the module isn't mounted yet.
+
+    ASGI middleware gets a scope, not a ``Request``; ``scope["app"]`` is the
+    same object ``request.app`` would resolve to.
+    """
+    app = scope.get("app")
+    services = getattr(getattr(app, "state", None), "pagebuilder", None)
+    return getattr(services, "settings", None)
+
+
 def _get_settings(request: Request):
     """Resolve the pagebuilder settings from app state.
 
@@ -195,9 +211,28 @@ def _get_settings(request: Request):
     return request.app.state.pagebuilder.settings
 
 
-def build_admin_dependencies(
-    *, requires_auth: bool, csrf_protect: bool
-) -> list[Any]:
+async def require_user_if_configured(request: Request) -> Any:
+    """Apply :func:`get_current_user_or_401` when ``requires_auth`` is set.
+
+    Always installed, and decides per request. The routers are built before
+    the host hydrates settings from the database, so a dependency list
+    assembled from the flag at that point would be frozen at the pydantic
+    default — leaving the Settings screen showing a switch that changes
+    nothing until someone edits an environment that no longer exists.
+    """
+    if not _get_settings(request).requires_auth:
+        return None
+    return await get_current_user_or_401(request)
+
+
+async def verify_csrf_if_configured(request: Request) -> None:
+    """Apply :func:`verify_csrf` when ``csrf_protect`` is set."""
+    if not _get_settings(request).csrf_protect:
+        return
+    await verify_csrf(request)
+
+
+def build_admin_dependencies() -> list[Any]:
     """Mutating-side dependencies applied to the API router.
 
     Returned items are ``Depends(...)`` wrappers ready to be passed to
@@ -205,26 +240,15 @@ def build_admin_dependencies(
     runs first so an unauthenticated request gets 401 (the more useful
     error) before CSRF fails it with 403.
     """
-    deps: list[Any] = []
-    if requires_auth:
-        deps.append(Depends(get_current_user_or_401))
-    if csrf_protect:
-        deps.append(Depends(verify_csrf))
-    return deps
+    return [Depends(require_user_if_configured), Depends(verify_csrf_if_configured)]
 
 
-def build_view_dependencies(
-    *, requires_auth: bool, csrf_protect: bool
-) -> list[Any]:
+def build_view_dependencies() -> list[Any]:
     """View-side dependencies applied to the Inertia view router.
 
     Mirrors :func:`build_admin_dependencies` but emits the CSRF token
     via Inertia shared-props + cookie instead of enforcing it (Inertia
     GETs are safe methods, so verification is a no-op anyway).
+    ``share_csrf_to_inertia`` already checks the flag itself.
     """
-    deps: list[Any] = []
-    if requires_auth:
-        deps.append(Depends(get_current_user_or_401))
-    if csrf_protect:
-        deps.append(Depends(share_csrf_to_inertia))
-    return deps
+    return [Depends(require_user_if_configured), Depends(share_csrf_to_inertia)]

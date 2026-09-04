@@ -21,24 +21,32 @@ from pagebuilder.diff import block_diff
 from pagebuilder.models import Page, PageRedirect
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.format import LAYOUT_NAME, PAGES_DIR, REDIRECTS_NAME
-from pagebuilder.snapshots.pages import PAGE_FIELDS
+from pagebuilder.snapshots.pages import (
+    PAGE_FIELDS,
+    PageKey,
+    normalise_locale,
+    payload_key,
+)
 
 _COMPARED_FIELDS = tuple(f for f in PAGE_FIELDS if f not in ("draft_data", "published_data"))
 
 
-def read_pages(bundle_dir: Path) -> dict[str, dict[str, Any]]:
-    """Every page document in *bundle_dir*, keyed by the slug inside it.
+def read_pages(bundle_dir: Path) -> dict[PageKey, dict[str, Any]]:
+    """Every page document in *bundle_dir*, keyed by ``(locale, slug)``.
 
-    Keyed by the document's own ``slug`` rather than its filename: the filename
-    is sanitised for the filesystem, the slug is the truth.
+    Keyed by what the document itself says rather than by its filename: the
+    filename is sanitised for the filesystem, the document is the truth. The
+    locale is part of the key because a slug is only unique within one — key
+    by slug alone and a bilingual site's two ``about`` pages collapse into
+    whichever file happened to sort last.
     """
-    pages: dict[str, dict[str, Any]] = {}
+    pages: dict[PageKey, dict[str, Any]] = {}
     directory = bundle_dir / PAGES_DIR
     if not directory.is_dir():
         return pages
     for path in sorted(directory.glob("*.json")):
         payload = json.loads(path.read_text())
-        pages[payload["slug"]] = payload
+        pages[payload_key(payload)] = payload
     return pages
 
 
@@ -55,7 +63,7 @@ def read_layout(bundle_dir: Path) -> dict[str, Any]:
 class BundleDocuments(NamedTuple):
     """Everything a bundle's JSON says, read once."""
 
-    pages: dict[str, dict[str, Any]]
+    pages: dict[PageKey, dict[str, Any]]
     redirects: list[dict[str, str]]
     layout: dict[str, Any]
 
@@ -75,6 +83,16 @@ async def read_documents(bundle_dir: Path) -> BundleDocuments:
             read_layout(bundle_dir),
         )
     )
+
+
+def redirect_locale(row: dict[str, str]) -> str:
+    """The language a redirect row belongs to, defaulting a v1 bundle's absence.
+
+    The mirror of :func:`~pagebuilder.snapshots.pages.payload_locale`, and for
+    the same reason: ``redirects.json`` gained the key in version 2, so a row
+    without one came from a site that had only the default locale.
+    """
+    return normalise_locale(row.get("locale"))
 
 
 def _fields_differ(
@@ -116,22 +134,23 @@ async def build_plan(
     # slug as "new" would promise an approver a fresh page while apply
     # silently overwrites recoverable content.
     result = await db.execute(select(Page))
-    every = {page.slug: page for page in result.scalars().all()}
-    live = {slug: page for slug, page in every.items() if page.deleted_at is None}
-    trashed = {slug: page for slug, page in every.items() if page.deleted_at is not None}
+    every = {(page.locale, page.slug): page for page in result.scalars().all()}
+    live = {key: page for key, page in every.items() if page.deleted_at is None}
+    trashed = {key: page for key, page in every.items() if page.deleted_at is not None}
 
     new: list[dict[str, Any]] = []
     overwritten: list[dict[str, Any]] = []
     unchanged: list[dict[str, Any]] = []
 
-    for slug in sorted(bundled):
-        payload = bundled[slug]
-        page = live.get(slug) or trashed.get(slug)
-        entry = {"slug": slug, "title": payload.get("title")}
+    for key in sorted(bundled):
+        locale, slug = key
+        payload = bundled[key]
+        page = live.get(key) or trashed.get(key)
+        entry = {"slug": slug, "locale": locale, "title": payload.get("title")}
         if page is None:
             new.append(entry)
             continue
-        if slug in trashed:
+        if key in trashed:
             entry["revived"] = True
         incoming_draft = from_sentinels(payload.get("draft_data"), name_to_url)
         incoming_published = from_sentinels(payload.get("published_data"), name_to_url)
@@ -146,7 +165,7 @@ async def build_plan(
         # A trashed page is never "unchanged": apply clears `deleted_at`, so
         # even byte-identical content means the page comes back to the site.
         fields_differ = _fields_differ(payload, page, name_to_url)
-        if slug not in trashed and not content_differs and not fields_differ:
+        if key not in trashed and not content_differs and not fields_differ:
             unchanged.append(entry)
             continue
         blocks = block_diff(page.draft_data, incoming_draft)
@@ -160,9 +179,9 @@ async def build_plan(
         )
 
     untouched = [
-        {"slug": slug, "title": page.title}
-        for slug, page in sorted(live.items())
-        if slug not in bundled
+        {"slug": slug, "locale": locale, "title": page.title}
+        for (locale, slug), page in sorted(live.items())
+        if (locale, slug) not in bundled
     ]
 
     # Not `set(bundled) | set(live)`: `apply_bundle`'s `_restore_pages`
@@ -205,19 +224,37 @@ def _layout_plan(raw_layout: dict[str, Any], name_to_url: dict[str, str]) -> dic
 
 
 async def _redirect_plan(
-    db: AsyncSession, bundled: list[dict[str, str]], known_slugs: set[str]
+    db: AsyncSession, bundled: list[dict[str, str]], known_pages: set[PageKey]
 ) -> dict[str, Any]:
-    result = await db.execute(select(PageRedirect.from_slug))
-    existing = {row for (row,) in result}
+    """Which redirects a restore would add, remove, or drop as unresolvable.
 
-    dropped = [r["from_slug"] for r in bundled if r.get("to_slug") not in known_slugs]
-    keepable = {r["from_slug"] for r in bundled if r.get("to_slug") in known_slugs}
+    Keyed by ``(locale, from_slug)`` throughout, matching the unique index:
+    the same retired slug can exist in two languages pointing at two different
+    pages, and collapsing them onto the bare slug would report one as removed
+    the moment the other appeared in a bundle.
+
+    The three lists report slugs, not pairs, because the screen only counts
+    them and joins them into a sentence. One consequence is deliberate: a slug
+    retired in two languages appears twice, which is two redirects and so two
+    entries — deduplicating would undercount the work a restore is about to do.
+    """
+    result = await db.execute(select(PageRedirect.locale, PageRedirect.from_slug))
+    existing = {(locale, from_slug) for locale, from_slug in result}
+
+    def target(row: dict[str, str]) -> PageKey:
+        return redirect_locale(row), row.get("to_slug", "")
+
+    def source(row: dict[str, str]) -> PageKey:
+        return redirect_locale(row), row.get("from_slug", "")
+
+    dropped = [source(r) for r in bundled if target(r) not in known_pages]
+    keepable = {source(r) for r in bundled if target(r) in known_pages}
     # `removed` and `dropped` are shown side by side, so they have to be
     # disjoint: a redirect that exists today *and* is in the bundle with a
     # missing target is one redirect, not two. It is reported as dropped —
     # the more specific fact, and the one that names the slug.
     return {
-        "added": sorted(keepable - existing),
-        "removed": sorted(existing - keepable - set(dropped)),
-        "dropped": sorted(dropped),
+        "added": [slug for _, slug in sorted(keepable - existing)],
+        "removed": [slug for _, slug in sorted(existing - keepable - set(dropped))],
+        "dropped": [slug for _, slug in sorted(dropped)],
     }

@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 from conftest import _client_fixture
 from httpx import AsyncClient
+from pagebuilder import locales
 from pagebuilder.models import Base
 from pagebuilder.permissions import PERM_EDIT, PERM_PUBLISH, ROLE_PUBLISHER
 from pagebuilder.settings import PagebuilderSettings
@@ -57,6 +58,33 @@ async def snapshot_db(tmp_path) -> AsyncIterator[Any]:
         media_root=tmp_path / "media",
         snapshot_root=tmp_path / "snapshots",
     )
+    async with db_state.session_factory() as session:
+        yield SimpleNamespace(session=session, settings=settings)
+    await db_state.engine.dispose()
+
+
+@pytest.fixture
+async def bilingual_snapshot_db(tmp_path) -> AsyncIterator[Any]:
+    """``snapshot_db`` on a site publishing in English (default) and German.
+
+    The locales are *published* with ``locales.use``, not merely set on the
+    settings object: ``Page.locale``'s column default and the snapshot layer's
+    own readers both go through the process-wide accessor, so a fixture that
+    only built the settings would hand out pages in the default locale and
+    quietly test the monolingual path instead. ``locale_fixture``'s autouse
+    reset clears it again after the test.
+    """
+    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    register_listeners(db_state)
+    async with db_state.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    settings = PagebuilderSettings(
+        media_root=tmp_path / "media",
+        snapshot_root=tmp_path / "snapshots",
+        content_locales=("en", "de"),
+        default_content_locale="en",
+    )
+    locales.use(settings)
     async with db_state.session_factory() as session:
         yield SimpleNamespace(session=session, settings=settings)
     await db_state.engine.dispose()

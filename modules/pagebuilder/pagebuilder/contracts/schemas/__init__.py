@@ -25,6 +25,7 @@ from pagebuilder.contracts.schemas._media import (
 )
 from pagebuilder.contracts.schemas._pages import (
     BlockChange,
+    LocalesResponse,
     MetadataChange,
     PageCreate,
     PageDetail,
@@ -36,6 +37,8 @@ from pagebuilder.contracts.schemas._pages import (
     PageRevisionListResponse,
     PageRevisionRead,
     PageScheduleRequest,
+    PageTranslationCreate,
+    PageTranslationRead,
     PageUpdate,
     PuckData,
     RevisionDiffResponse,
@@ -60,6 +63,7 @@ __all__ = [
     "LayoutRevisionListResponse",
     "LayoutRevisionRead",
     "LayoutUpdate",
+    "LocalesResponse",
     "MediaAssetDetail",
     "MediaAssetListResponse",
     "MediaAssetRead",
@@ -77,6 +81,8 @@ __all__ = [
     "PageRevisionListResponse",
     "PageRevisionRead",
     "PageScheduleRequest",
+    "PageTranslationCreate",
+    "PageTranslationRead",
     "PageUpdate",
     "PendingImportRead",
     "PuckData",

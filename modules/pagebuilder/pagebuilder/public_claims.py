@@ -25,12 +25,18 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-SlugClaim = Callable[[AsyncSession, Sequence[str]], Awaitable[Mapping[str, str]]]
-"""Given slugs, return ``{slug: public_path}`` for the ones this claimant owns.
+SlugClaim = Callable[[AsyncSession, Sequence[str], str], Awaitable[Mapping[str, str]]]
+"""Given slugs *in one locale*, return ``{slug: public_path}`` for the ones this
+claimant owns.
 
 Bulk rather than one slug at a time because the sitemap asks about every
 published page at once, and a per-slug callback would make a crawl N queries
 deep. The viewer passes a single-element sequence.
+
+The locale is a separate argument rather than folded into the key because a
+claimant answers about one language at a time — slugs are only unique within
+one, so a bare slug does not identify a page — and because the path it returns
+has to carry that language's prefix.
 
 Slugs the claimant does not own are simply absent from the mapping.
 """
@@ -52,8 +58,10 @@ def reset() -> None:
     _claims.clear()
 
 
-async def resolve(db: AsyncSession, slugs: Sequence[str]) -> dict[str, str]:
-    """``{slug: public_path}`` across every registered claim.
+async def resolve(
+    db: AsyncSession, slugs: Sequence[str], locale: str
+) -> dict[str, str]:
+    """``{slug: public_path}`` across every registered claim, within ``locale``.
 
     Earlier claims win on the same slug. Two modules claiming one page is a
     misconfiguration rather than something to arbitrate here, and picking a
@@ -63,11 +71,11 @@ async def resolve(db: AsyncSession, slugs: Sequence[str]) -> dict[str, str]:
     if not slugs:
         return resolved
     for claim in _claims:
-        for slug, url in (await claim(db, slugs)).items():
+        for slug, url in (await claim(db, slugs, locale)).items():
             resolved.setdefault(slug, url)
     return resolved
 
 
-async def claimed_url(db: AsyncSession, slug: str) -> str | None:
+async def claimed_url(db: AsyncSession, slug: str, locale: str) -> str | None:
     """Where one slug actually serves, or ``None`` if this module still owns it."""
-    return (await resolve(db, [slug])).get(slug)
+    return (await resolve(db, [slug], locale)).get(slug)

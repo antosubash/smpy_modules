@@ -12,18 +12,35 @@ directly, from the anonymous side.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
-from pagebuilder.module import PagebuilderModule
+from pagebuilder import boot
 from pagebuilder.settings import PagebuilderSettings
 from simple_module_core.public_routes import PublicRouteRegistry
 
 
 def _registry(**overrides) -> PublicRouteRegistry:
-    module = PagebuilderModule()
-    module.settings = PagebuilderSettings(**overrides)
+    """The rules the module adds for a site configured with ``overrides``.
+
+    Filled from ``boot.exempt_public_routes`` rather than the
+    ``register_public_routes`` hook: which paths are public depends on
+    settings the host hydrates from the database *after* that hook has run,
+    so the module adds them at startup instead, into the registry the auth
+    middleware reads live. A stub app is all that function needs — the
+    registry hangs off ``app.state``.
+    """
     registry = PublicRouteRegistry()
-    module.register_public_routes(registry)
+    app = SimpleNamespace(state=SimpleNamespace(public_routes=registry))
+    boot.exempt_public_routes(app, PagebuilderSettings(**overrides))
     return registry
+
+
+def test_no_registry_is_survivable():
+    """A host with no auth middleware publishes no registry to add to."""
+    boot.exempt_public_routes(
+        SimpleNamespace(state=SimpleNamespace()), PagebuilderSettings()
+    )
 
 
 @pytest.mark.parametrize(
