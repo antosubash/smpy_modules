@@ -3,7 +3,7 @@ import { Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import {
   articlePuckConfig,
@@ -11,6 +11,7 @@ import {
   emptyArticleData,
 } from '../components/body/articlePuckConfig';
 import { useArticleBody } from '../hooks/useArticleBody';
+import { useArticleOutline } from '../hooks/useArticleOutline';
 
 /** The canvas an article's body is written in.
  *
@@ -30,6 +31,13 @@ export default function ArticleBody() {
 
   const { article, data, saveState, error, busy, dirty, load, change, saveNow, publish } =
     useArticleBody(article_id);
+
+  // What the public viewer passes too, so `Contents` lists the same sections
+  // here that a reader will get and every anchor resolves on both screens. The
+  // hook keeps the identity stable between heading edits — see its docstring
+  // for why handing Puck a fresh object per keystroke would be expensive.
+  const outline = useArticleOutline(data);
+  const metadata = useMemo(() => ({ outline }), [outline]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,6 +124,7 @@ export default function ArticleBody() {
             data={data ?? (emptyArticleData as never)}
             viewports={articleViewports}
             iframe={{ enabled: true }}
+            metadata={metadata}
             overrides={{
               // Puck's header renders its own primary "Publish", wired to a
               // plain data change rather than to the workflow. Leaving it would

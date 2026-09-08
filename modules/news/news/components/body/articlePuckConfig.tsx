@@ -21,10 +21,14 @@ import {
   type AudioProps,
   CalloutBlock,
   type CalloutProps,
+  ChartBlock,
+  type ChartProps,
   CodeBlock,
   type CodeProps,
   ComparisonBlock,
   type ComparisonProps,
+  ContentsBlock,
+  type ContentsProps,
   DefinitionsBlock,
   type DefinitionsProps,
   DividerBlock,
@@ -72,6 +76,7 @@ export interface ArticleBodyProps {
   Definitions: DefinitionsProps;
   Sources: SourcesProps;
   Related: RelatedProps;
+  Contents: ContentsProps;
   Image: ImageProps;
   Gallery: GalleryProps;
   Comparison: ComparisonProps;
@@ -79,6 +84,7 @@ export interface ArticleBodyProps {
   Audio: AudioProps;
   Embed: EmbedProps;
   Table: TableProps;
+  Chart: ChartProps;
   Facts: FactsProps;
   Code: CodeProps;
   Timeline: TimelineProps;
@@ -126,13 +132,13 @@ export const articlePuckConfig: ArticleConfig = {
     text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'] },
     asides: {
       title: 'Set apart',
-      components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related'],
+      components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related', 'Contents'],
     },
     media: {
       title: 'Media',
       components: ['Image', 'Gallery', 'Comparison', 'Video', 'Audio', 'Embed'],
     },
-    data: { title: 'Data', components: ['Table', 'Facts', 'Code', 'Timeline'] },
+    data: { title: 'Data', components: ['Table', 'Chart', 'Facts', 'Code', 'Timeline'] },
     layout: { title: 'Layout', components: ['Divider'] },
   },
   components: {
@@ -146,6 +152,7 @@ export const articlePuckConfig: ArticleConfig = {
     Definitions: DefinitionsBlock,
     Sources: SourcesBlock,
     Related: RelatedBlock,
+    Contents: ContentsBlock,
     Image: ImageBlock,
     Gallery: GalleryBlock,
     Comparison: ComparisonBlock,
@@ -153,6 +160,7 @@ export const articlePuckConfig: ArticleConfig = {
     Audio: AudioBlock,
     Embed: EmbedBlock,
     Table: TableBlock,
+    Chart: ChartBlock,
     Facts: FactsBlock,
     Code: CodeBlock,
     Timeline: TimelineBlock,

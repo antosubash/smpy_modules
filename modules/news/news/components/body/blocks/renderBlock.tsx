@@ -21,9 +21,12 @@ interface Renderable {
 /**
  * `block`'s markup, given its own defaults plus `props`.
  *
- * Puck also passes `id` and a `puck` bag alongside the authored props. No block
- * in this palette reads either, so the tests supply the authored props alone —
- * if one ever does, this is where the fake would go.
+ * Puck also passes `id` and a `puck` bag alongside the authored props, and
+ * three blocks now read them: `Heading` and `Contents` take the document's
+ * outline out of `puck.metadata`, and `Related` takes the current slug. Those
+ * go in through `props` like anything else — the bag has no defaults to merge,
+ * so there is nothing for this helper to supply, and a test that wants one
+ * writes the shape it is asserting about.
  */
 export function renderBlock(block: Renderable, props: Record<string, unknown> = {}): string {
   const Block = block.render as (p: Record<string, unknown>) => ReactElement;

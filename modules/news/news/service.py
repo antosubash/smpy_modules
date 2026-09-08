@@ -20,8 +20,7 @@ from typing import Final
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import locales, query_filters, tag_service
-from news.card import to_read as _to_read
+from news import card, locales, query_filters, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.models import (
@@ -49,46 +48,6 @@ A typed singleton rather than a bare ``object()`` so ``datetime | None | _Unset`
 stays a real union that a type checker can narrow with ``isinstance``.
 """
 
-_CARD_COLUMNS: Final = (
-    NewsArticle.id,
-    NewsArticle.slug,
-    NewsArticle.title,
-    NewsArticle.meta_description,
-    NewsArticle.og_image,
-    NewsArticle.status,
-    NewsArticle.category,
-    NewsArticle.pinned,
-    NewsArticle.show_in_feed,
-    NewsArticle.author,
-    NewsArticle.published_at,
-    # The card's public URL is locale-prefixed and the editor's language
-    # switcher keys off the group, so both are read on every row.
-    NewsArticle.locale,
-    NewsArticle.translation_group,
-)
-"""The only columns a card reads.
-
-Named explicitly rather than selecting the entity: a whole ``NewsArticle``
-drags both block-JSON columns through the ORM for every row, so list cost would
-scale with article *content* size instead of card count — the regression that
-made this a rule for the sidecar's join (issue #12) and is now this module's own
-to keep.
-"""
-
-
-def _base(include_drafts: bool, category: str | None, trashed_only: bool = False):
-    # The trash is the one listing that asks for the complement of the filter
-    # every other listing applies. Spelt here rather than by a caller dropping
-    # the `where`, so there is still exactly one place that decides what
-    # "trashed" means.
-    stmt = select(*_CARD_COLUMNS).where(
-        NewsArticle.deleted_at.is_not(None) if trashed_only else NOT_TRASHED
-    )
-    stmt = query_filters.visible(stmt, include_drafts=include_drafts)
-    if category:
-        stmt = stmt.where(NewsArticle.category == category)
-    return stmt
-
 
 async def list_articles(
     db: AsyncSession,
@@ -98,6 +57,7 @@ async def list_articles(
     category: str | None = None,
     tag: str | None = None,
     q: str | None = None,
+    authors: list[str] | None = None,
     status: str | None = None,
     locale: str | None = None,
     group: str | None = None,
@@ -125,7 +85,7 @@ async def list_articles(
     if category:
         category = await resolve_category_slug(db, category) or category
 
-    stmt = _base(include_drafts, category, trashed_only)
+    stmt = card.base(include_drafts, category, trashed_only)
     if tag:
         # By slug or by name, for the same reason a category accepts both: the
         # public archive links carry the slug and the admin passes what the
@@ -144,6 +104,11 @@ async def list_articles(
         # unreachable from the one screen that could un-hide it.
         stmt = stmt.where(NewsArticle.show_in_feed.is_(True))
     stmt = query_filters.search(stmt, q)
+    # The bylines one author address means — usually one, occasionally two
+    # spellings of the same person. Resolved by the caller (``news.authors``)
+    # because the slug rule that maps between the two lives in Python, not in
+    # SQL. ``[]`` narrows to nothing, which is what an unpublished byline means.
+    stmt = query_filters.author(stmt, authors)
     # Public feeds pass the language the visitor is reading in, so a German
     # page's feed block lists German articles. The admin list leaves it unset
     # and shows every language, with a badge per row.
@@ -160,6 +125,11 @@ async def list_articles(
         else 0
     )
 
+    if include_drafts:
+        # After the count, and only for a caller who may see drafts. Both
+        # halves are load-bearing — see ``card.HAS_UNPUBLISHED_CHANGES``.
+        stmt = stmt.add_columns(card.HAS_UNPUBLISHED_CHANGES)
+
     stmt = (
         query_filters.ordered(stmt, undated_first=undated_first)
         .limit(min(limit, MAX_LIMIT))
@@ -167,7 +137,7 @@ async def list_articles(
     )
 
     rows = (await db.execute(stmt)).all()
-    return [_to_read(row) for row in rows], int(total or 0)
+    return [card.to_read(row) for row in rows], int(total or 0)
 
 
 async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
@@ -214,15 +184,17 @@ async def get_read(
 ) -> ArticleRead | None:
     """One article in listing shape.
 
-    Shares ``_base`` with the listing, so the response shape and the visibility
-    rule stay identical by construction rather than by convention. This exists
-    because reading a just-written article back out of the first page of
-    ``list_articles`` cannot work: a new article is undated and undated sorts
-    last, so past a hundred dated articles it is simply not in that page.
+    Shares ``card.base`` with the listing, so the response shape and the
+    visibility rule stay identical by construction rather than by convention.
+    This exists because reading a just-written article back out of the first
+    page of ``list_articles`` cannot work: a new article is undated and undated
+    sorts last, so past a hundred dated articles it is simply not in that page.
     """
-    stmt = _base(include_drafts, None).where(NewsArticle.id == article_id)
+    stmt = card.base(include_drafts, None).where(NewsArticle.id == article_id)
+    if include_drafts:
+        stmt = stmt.add_columns(card.HAS_UNPUBLISHED_CHANGES)
     row = (await db.execute(stmt)).first()
-    return _to_read(row) if row is not None else None
+    return card.to_read(row) if row is not None else None
 
 
 async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:

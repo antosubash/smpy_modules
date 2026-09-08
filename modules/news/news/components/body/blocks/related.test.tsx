@@ -19,6 +19,7 @@ function article(slug: string): ArticleRead {
     locale: 'en',
     translation_group: '',
     status: 'published',
+    has_unpublished_changes: false,
     url: `/news/${slug}`,
     edit_url: '',
   } as ArticleRead;

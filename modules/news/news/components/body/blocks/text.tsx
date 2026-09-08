@@ -7,6 +7,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { cells, itemKey, lines } from './lines';
+import { headingAnchor, outlineFromMetadata } from './outline';
 
 export interface HeadingProps {
   text: string;
@@ -14,7 +15,13 @@ export interface HeadingProps {
 }
 
 /** Levels start at 2: the article's own title is the page's `<h1>`, so a
- *  body heading that claimed it would give the document two. */
+ *  body heading that claimed it would give the document two.
+ *
+ *  Each one carries an `id` so `Contents` has something to link to, and so a
+ *  reader can share a link to the section rather than to the article. The id
+ *  comes from the document's outline rather than from this block's own text —
+ *  see `./outline.ts`: only the document knows whether this is the first
+ *  "Background" or the second. */
 export const HeadingBlock: ComponentConfig<HeadingProps> = {
   label: 'Heading',
   fields: {
@@ -29,12 +36,18 @@ export const HeadingBlock: ComponentConfig<HeadingProps> = {
     },
   },
   defaultProps: { text: 'Section heading', level: '2' },
-  render: ({ text, level }) =>
-    level === '3' ? (
-      <h3 className="mt-8 mb-3 text-xl font-semibold tracking-tight">{text}</h3>
+  render: ({ id, level, puck, text }) => {
+    const anchor = headingAnchor(id, text, outlineFromMetadata(puck?.metadata));
+    return level === '3' ? (
+      <h3 id={anchor} className="mt-8 mb-3 text-xl font-semibold tracking-tight">
+        {text}
+      </h3>
     ) : (
-      <h2 className="mt-10 mb-4 text-2xl font-semibold tracking-tight">{text}</h2>
-    ),
+      <h2 id={anchor} className="mt-10 mb-4 text-2xl font-semibold tracking-tight">
+        {text}
+      </h2>
+    );
+  },
 };
 
 export interface ParagraphProps {

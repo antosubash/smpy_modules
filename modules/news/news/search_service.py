@@ -93,6 +93,13 @@ async def _search_articles(
         NewsArticle.title.ilike(pattern, escape="\\"),
         NewsArticle.slug.ilike(pattern, escape="\\"),
         NewsArticle.category.ilike(pattern, escape="\\"),
+        # The excerpt, so this screen stays a *superset* of what the article
+        # list's own `q` finds (``news.query_filters.search``). Two search boxes
+        # in one console that disagree about what matches is worse than either
+        # rule alone: a row the list surfaced and this screen did not would read
+        # as the screen being broken. This one adds the category and the body on
+        # top; it must never subtract.
+        NewsArticle.meta_description.ilike(pattern, escape="\\"),
         # The body. Articles could not be searched on it while it lived on a
         # joined page: the pages section deliberately excluded every row that
         # was an article, so an article's prose was in the index of neither

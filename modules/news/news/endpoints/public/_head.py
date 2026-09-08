@@ -135,6 +135,7 @@ def listing_head(
     feed_url: str | None,
     locale: str | None = None,
     alternates: list[dict[str, str]] | None = None,
+    robots: str | None = None,
 ) -> str:
     """The head an archive page needs.
 
@@ -145,6 +146,13 @@ def listing_head(
     which is a fixed list of addresses rather than something to look up: every
     language has an index, a category page and a tag page at the same shape of
     URL under its own prefix.
+
+    ``robots`` is a directive rather than a boolean because the archive needs
+    one the article page never does: a *search results* page is
+    ``noindex,follow`` — keep it out of the index, but do follow the links out
+    of it — where an article opted out of indexing is ``noindex,nofollow``.
+    Omitted entirely by default, which is what every ordinary archive page
+    wants.
     """
     parts = [
         f"<title>{html.escape(title)}</title>",
@@ -155,6 +163,7 @@ def listing_head(
         _tag("og:url", canonical, prop=True),
         _tag("og:site_name", site_name, prop=True),
         _tag("og:locale", locale, prop=True),
+        _tag("robots", robots),
     ]
     parts.extend(_alternate_links(alternates))
     if canonical:

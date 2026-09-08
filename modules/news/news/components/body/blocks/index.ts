@@ -36,6 +36,8 @@ export {
   type SourcesProps,
 } from './asides';
 export { AudioBlock, type AudioProps, VideoBlock, type VideoProps } from './av';
+export { ChartBlock, type ChartProps } from './chart';
+export { ContentsBlock, type ContentsProps } from './contents';
 export {
   CodeBlock,
   type CodeProps,

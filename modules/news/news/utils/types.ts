@@ -48,6 +48,14 @@ export interface ArticleRead {
   /** Workflow state. Always `published` for anyone without `news.edit` —
    *  drafts are filtered out server-side. */
   status: ArticleStatus;
+  /** Readers are being served an older document than this one: the article is
+   *  live and its draft has since moved on.
+   *
+   *  Only ever true for a genuinely live article. A draft holding a snapshot
+   *  from before it was taken down is not this case — there is nothing live
+   *  for it to diverge from. Sent only to a caller who may see drafts, so it
+   *  is `false` for anyone else rather than absent. */
+  has_unpublished_changes: boolean;
   url: string;
   /** Where the body is composed. Sent by the server rather than assembled
    *  here, so this list holds no opinion about how the module routes its own

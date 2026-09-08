@@ -1,7 +1,46 @@
 import { describe, expect, it } from 'vitest';
 
+import { articleOutline } from './outline';
 import { renderBlock } from './renderBlock';
-import { QandABlock } from './text';
+import { HeadingBlock, QandABlock } from './text';
+
+describe('Heading', () => {
+  const outline = articleOutline({
+    content: [
+      { type: 'Heading', props: { id: 'a', text: 'Background', level: '2' } },
+      { type: 'Heading', props: { id: 'b', text: 'Background', level: '3' } },
+    ],
+  });
+  const bag = { puck: { metadata: { outline } } };
+
+  it('carries the anchor the document reserved for it', () => {
+    // Not a slug of its own text: only the document knows whether this is the
+    // first "Background" or the second.
+    expect(renderBlock(HeadingBlock, { ...bag, id: 'a', text: 'Background' })).toContain(
+      '<h2 id="background"',
+    );
+    expect(
+      renderBlock(HeadingBlock, { ...bag, id: 'b', text: 'Background', level: '3' }),
+    ).toContain('<h3 id="background-2"');
+  });
+
+  it('is still addressable when nothing passed an outline', () => {
+    expect(renderBlock(HeadingBlock, { id: 'a', text: 'The survey' })).toContain(
+      '<h2 id="the-survey"',
+    );
+  });
+
+  it('emits no id for a heading with nothing to slug', () => {
+    const markup = renderBlock(HeadingBlock, { id: 'a', text: '   ' });
+    expect(markup).toContain('<h2 class=');
+    expect(markup).not.toContain('id=');
+  });
+
+  it('still starts at level 2, so the article keeps one h1', () => {
+    expect(renderBlock(HeadingBlock, { id: 'a', text: 'X' })).toContain('<h2');
+    expect(renderBlock(HeadingBlock, { id: 'a', text: 'X', level: '3' })).toContain('<h3');
+  });
+});
 
 describe('Q&A', () => {
   it('renders nothing when empty', () => {

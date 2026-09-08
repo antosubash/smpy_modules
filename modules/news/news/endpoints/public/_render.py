@@ -23,9 +23,10 @@ from fastapi import Response
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from news import constants
+from news.authors import slug_for as author_slug
 from news.endpoints.public import _head
 from news.models import NewsArticle
-from news.settings import NewsSettings
+from news.settings import NewsSettings, public_author_path
 
 
 async def render_article(
@@ -60,6 +61,15 @@ async def render_article(
     published_at = (
         article.published_at.isoformat() if article.published_at is not None else None
     )
+    # The byline's archive, where it has one. It was a dead end before: rendered
+    # on the page and emitted as ``article:author``, with nowhere for a reader
+    # who liked the writer to go, while a category and a tag each had a page.
+    #
+    # ``None`` for a byline that slugs to nothing — a name in a script that does
+    # not transliterate — and the viewer then renders it as plain text. An
+    # address that cannot name this author is worse than no address; see
+    # :mod:`news.authors`.
+    byline_slug = author_slug(article.author)
     props: dict[str, Any] = {
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to
@@ -78,6 +88,7 @@ async def render_article(
         "twitter_handle": settings.twitter_handle or None,
         "category": article.category,
         "author": article.author,
+        "author_url": public_author_path(byline_slug, locale) if byline_slug else None,
         "published_at": published_at,
         "locale": locale,
         "alternates": alternates or [],

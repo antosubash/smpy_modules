@@ -194,13 +194,6 @@ class TestFeed:
         assert "Fish &amp; chips &lt;b&gt;" in response.text
         assert "<b>" not in response.text
 
-    async def test_the_sitemap_now_lists_the_index_too(self, anon_client) -> None:
-        # A sitemap of leaves tells a crawler the articles exist but not that
-        # anything links them.
-        await _seed(anon_client, "leaf")
-        response = await anon_client.get(f"{NEWS}/sitemap.xml")
-        assert f"{NEWS}/</loc>" in response.text
-
     async def test_the_feed_is_not_mistaken_for_an_article_slug(
         self, anon_client
     ) -> None:

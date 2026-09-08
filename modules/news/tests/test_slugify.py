@@ -2,8 +2,38 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
 from news.constants import MAX_SLUG_ATTEMPTS, MAX_SLUG_LEN
 from news.slugify import slugify, suffixed, unique_slug
+
+#: The one slug rule, shared with the two TypeScript implementations that
+#: preview it — news' new-article dialog and pagebuilder's page editor. Read
+#: from a file rather than restated in each, because a restated copy drifts
+#: silently: pagebuilder's used to turn every letter NFKD leaves whole into a
+#: separator while this module dropped it, so one headline produced two
+#: different URLs depending on which admin screen it was typed into.
+_FIXTURE = json.loads(
+    (Path(__file__).resolve().parents[3] / "tests/fixtures/slug_cases.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+class TestSharedRule:
+    """This module is the source of truth: it is the one with a database."""
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(c["input"], c["expected"]) for c in _FIXTURE["cases"]],
+        ids=[c["input"] or "<empty>" for c in _FIXTURE["cases"]],
+    )
+    def test_matches_the_shared_cases(self, value: str, expected: str) -> None:
+        # ``fallback=""`` because the fallback is this side's alone — the
+        # browser leaves the field empty and lets the server substitute.
+        assert slugify(value, fallback="", max_length=_FIXTURE["max_length"]) == expected
 
 
 class TestSlugify:

@@ -5,10 +5,18 @@
  * library belongs to pagebuilder, and these have to render on a host that never
  * installed it. Where that module *is* installed, its picker hands out exactly
  * this — a URL to paste.
+ *
+ * The single-URL fields show what the address points at as it is typed (see
+ * `./imageUrlField.tsx`). That is not the picker and does not close the gap;
+ * it only means a wrong address is caught in the panel rather than on the
+ * published page. `Gallery` keeps a plain textarea: its field is a *list*, and
+ * a strip of thumbnails is a different control rather than the same one with a
+ * picture under it.
  */
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { imageUrlField } from './imageUrlField';
 import { cells, itemKey, lines } from './lines';
 
 export interface ImageProps {
@@ -21,7 +29,10 @@ export interface ImageProps {
 export const ImageBlock: ComponentConfig<ImageProps> = {
   label: 'Image',
   fields: {
-    url: { type: 'text', label: 'Image URL' },
+    // A URL, still — see `./imageUrlField.tsx` and the README's known gaps.
+    // The field shows what the address points at, so a typo is caught where it
+    // was made rather than on the published page.
+    url: imageUrlField('Image URL'),
     alt: { type: 'text', label: 'Alt text (describe the image)' },
     caption: { type: 'text', label: 'Caption (optional)' },
     // Separate from the caption because it is a different obligation: a caption
@@ -125,9 +136,9 @@ export interface ComparisonProps {
 export const ComparisonBlock: ComponentConfig<ComparisonProps> = {
   label: 'Before / after',
   fields: {
-    beforeUrl: { type: 'text', label: 'Before — image URL' },
+    beforeUrl: imageUrlField('Before — image URL'),
     beforeLabel: { type: 'text', label: 'Before — label' },
-    afterUrl: { type: 'text', label: 'After — image URL' },
+    afterUrl: imageUrlField('After — image URL'),
     afterLabel: { type: 'text', label: 'After — label' },
     caption: { type: 'text', label: 'Caption (optional)' },
   },

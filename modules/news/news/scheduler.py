@@ -5,14 +5,18 @@ cap, and shaped like :mod:`pagebuilder.scheduler` for the same reason: it is a
 coherent piece to lift, because everything here is about *when* an article
 changes state and nothing else in the module registration is.
 
-A deployment that drives :meth:`ArticlesService.process_due` from a separate
-worker — Celery beat, a cron job, a k8s CronJob — turns this off with the
-``scheduler_enabled`` setting, on the Settings screen or via
-``scripts/set_setting.py news scheduler_enabled false``. Not an environment
-variable: this module reads none, so an ``SM_NEWS_SCHEDULER_ENABLED`` in a
-deploy manifest would leave the in-process loop running and racing the worker,
-which is exactly the double publish that switch exists to prevent. The setting's
-own docstring has the full warning.
+One of these runs per process, so a replica set runs several. That is no longer
+a hazard: :meth:`ArticlesService.process_due` claims each due article with a
+single conditional ``UPDATE`` before flipping it, so two ticks landing on the
+same instant flip it exactly once — see :mod:`news.content._claims`. The same
+holds for a separate worker driving ``process_due`` alongside the loop.
+
+``scheduler_enabled`` turns this off anyway where a deployment would rather one
+place did the polling — Celery beat, a cron job, a k8s CronJob. It is set on the
+Settings screen or via ``scripts/set_setting.py news scheduler_enabled false``,
+never an environment variable: this module reads none, so an
+``SM_NEWS_SCHEDULER_ENABLED`` in a deploy manifest would leave the loop running
+with nothing on screen saying so. The setting's own docstring has the detail.
 """
 
 from __future__ import annotations
@@ -84,11 +88,27 @@ class Scheduler:
         if task is None:
             return
         task.cancel()
-        # Only ``CancelledError`` is suppressed, deliberately narrower than
-        # pagebuilder's catch-all: cancelling is the expected outcome here and
-        # says nothing, but a tick that died of something else has a traceback
-        # worth seeing, and swallowing it at shutdown is how a scheduler that
-        # stopped working weeks ago goes unnoticed.
-        with suppress(asyncio.CancelledError):
-            await task
-        self._task = None
+        try:
+            # Only ``CancelledError`` is suppressed, and that narrowness is the
+            # point: cancelling is the expected outcome of the line above and
+            # says nothing, while a task that died of something else has a
+            # traceback worth seeing. ``_run`` already logs and continues past a
+            # failed *tick*, so anything arriving here died before the loop — a
+            # missing ``app.state.sm``, an import that failed — and quietly
+            # discarding it is how a scheduler that stopped working weeks ago
+            # goes unnoticed.
+            with suppress(asyncio.CancelledError):
+                await task
+        except Exception:
+            # Logged rather than re-raised, which is not general defensiveness:
+            # FastAPI's ``Router._shutdown`` is a bare ``for`` over the
+            # registered shutdown handlers with no ``try`` around each one
+            # (``fastapi/routing.py``), so an exception escaping this handler
+            # aborts that loop and every handler registered after news' never
+            # runs — including another module's scheduler, whose polling task
+            # would then never be cancelled at all. Nothing about this failure
+            # is lost; only its blast radius. Pagebuilder's ``stop`` does the
+            # same, for the same reason and in the other direction.
+            logger.exception("news.scheduler.stop_failed")
+        finally:
+            self._task = None

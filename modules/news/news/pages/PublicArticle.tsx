@@ -1,8 +1,10 @@
 import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
-
+import { useEffect } from 'react';
+import { Byline } from '../components/Byline';
 import { articlePuckConfig } from '../components/body/articlePuckConfig';
+import { articleOutline } from '../components/body/blocks/outline';
 import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
 import { formatArticleDate } from '../utils/api';
 
@@ -35,6 +37,10 @@ interface Props {
   twitter_handle?: string | null;
   category?: string;
   author?: string;
+  /** The byline's archive, or null when the byline has no address — a name in
+   *  a script that leaves nothing to slugify. Null renders the byline as plain
+   *  text rather than as a link somewhere that cannot name this author. */
+  author_url?: string | null;
   published_at?: string | null;
   /** Present only on the authenticated preview at
    *  `{VIEW_PREFIX}/articles/{id}/preview`, which renders this same screen over
@@ -60,6 +66,26 @@ function safeJsonLd(doc: Record<string, unknown>): string {
     .replace(/<!--/g, '<\\!--');
 }
 
+/**
+ * Re-apply a `#section` the reader arrived with.
+ *
+ * The browser resolves the fragment while the document is still the Inertia
+ * blob — the body is a block tree React draws afterwards, so the heading the
+ * link names does not exist yet and the reader lands at the top of the article
+ * with no sign anything was meant to happen. Clicking an entry in `Contents`
+ * is unaffected either way; this is only for a link that arrived from
+ * somewhere else, which is the half a section anchor exists for.
+ *
+ * Once, on mount. A later navigation is Inertia's to scroll.
+ */
+function useAnchorOnArrival() {
+  useEffect(() => {
+    const anchor = window.location.hash.slice(1);
+    if (!anchor) return;
+    document.getElementById(anchor)?.scrollIntoView();
+  }, []);
+}
+
 export default function PublicArticle({
   title,
   slug,
@@ -74,9 +100,11 @@ export default function PublicArticle({
   twitter_handle,
   category,
   author,
+  author_url,
   published_at,
   preview,
 }: Props) {
+  useAnchorOnArrival();
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   const dated = formatArticleDate(published_at ?? null);
 
@@ -132,11 +160,12 @@ export default function PublicArticle({
           {/* The article's title is the document's only `<h1>` — which is why
               the body's Heading block starts at level 2. */}
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-          {(author || dated) && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {[author, dated].filter(Boolean).join(' · ')}
-            </p>
-          )}
+          {/* The byline links to everything else under it. A reader who
+              finishes a piece and wants more of the same writer had nowhere to
+              go before — the category and the tags were both links and the
+              person who wrote it was not. Its own component because the
+              link-or-plain-text rule is the part that must not slip. */}
+          <Byline author={author} dated={dated} url={author_url} />
           {og_image && (
             <img
               src={og_image}
@@ -149,14 +178,18 @@ export default function PublicArticle({
             />
           )}
         </header>
-        {/* `metadata` is how a block learns what it is inside. Only `Related`
-            wants it today — a "read next" list that includes the article you
-            are reading is visibly broken — but it is the seam for any block
-            that needs the article rather than its own props. */}
+        {/* `metadata` is how a block learns what it is inside — the seam for
+            any block that needs the article rather than its own props.
+            `Related` reads the slug, because a "read next" list that includes
+            the article you are reading is visibly broken; `Contents` and
+            `Heading` read the outline, because Puck hands a `render` function
+            no way to see its siblings and a contents list is nothing but a
+            statement about them. The canvas builds the same outline the same
+            way, so the anchors match on both screens. */}
         <Render
           config={articlePuckConfig}
           data={data as unknown as Data}
-          metadata={{ currentSlug: slug }}
+          metadata={{ currentSlug: slug, outline: articleOutline(data) }}
         />
       </article>
     </div>

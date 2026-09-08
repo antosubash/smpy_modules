@@ -49,8 +49,11 @@ async def list_articles(
     category: str | None = Query(None),
     q: str | None = Query(
         None,
-        description="Free-text filter over headline and slug. Applied before "
-        "paging, so `total` reflects the search rather than the whole list.",
+        description="Free-text filter over headline, address, excerpt and "
+        "tags — what a card shows. Not the body: the admin search screen "
+        "covers that, and it scans the *draft*, which a public route must not "
+        "answer for. Applied before paging, so `total` reflects the search "
+        "rather than the whole list.",
     ),
     status: str | None = Query(
         None,

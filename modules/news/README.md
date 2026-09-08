@@ -56,23 +56,32 @@ without it `available()` is `False` and the extra sections are simply absent.
 `test_module.py` spawns a subprocess to prove that importing news never imports
 pagebuilder.
 
-**One caveat, on the frontend.** A bundler cannot make a static import
-conditional, so `news/puck-blocks.ts` — and the `NewsFeed` component it pulls
-in — genuinely do import `@simple-module-py/pagebuilder` at build time. They are
-the only two files in this module's frontend that do, and
-`@simple-module-py/pagebuilder` is declared an *optional* peer dependency so npm
-does not demand it. A host that installs news without pagebuilder should
-exclude `puck-blocks.ts` from its block glob (see `host/client_app/blocks.ts`);
-there is no feed block to register without the palette it registers into. Every
-other screen — the list, both editors, the public viewer — builds and runs with
-the package absent.
+**One caveat, on the frontend.** A bundler resolves imports statically, and that
+includes *dynamic* ones — Rollup errors on an unresolvable `import()` exactly as
+it does on a static `import`, so the `try`/`catch` around it never runs and no
+amount of guarding inside this module makes the dependency conditional. So
+`news/puck-blocks.ts` — and the `NewsFeed` component it pulls in — genuinely do
+import `@simple-module-py/pagebuilder` at build time. They are the only two
+files in this module's frontend that do, and `@simple-module-py/pagebuilder` is
+declared an *optional* peer dependency so npm does not demand it. A host that
+installs news without pagebuilder should exclude `puck-blocks.ts` from its block
+glob (see `host/client_app/blocks.ts`); there is no feed block to register
+without the palette it registers into. Every other screen — the list, both
+editors, the public viewer — builds and runs with the package absent.
+
+The real fix belongs to the framework rather than here: `gen-pages` already
+emits the page globs, and could emit the block imports too, skipping a module
+whose optional peers do not resolve — once, for every host and every module.
 
 ## Usage
 
 Go to **News** in the sidebar. "New article" creates the article and drops you
 into its **body canvas** — this module's own block editor — to write it.
 Headline, URL, category, tags, byline, display date and feed behaviour are
-edited on the **article screen**; the list edits category and date inline.
+edited on the **article screen**; the list edits category and date inline. A
+live article whose draft has moved on since it was published is marked
+**Unpublished edits** in the list, because "Published" on its own is a true
+sentence about a document nobody is looking at.
 
 The article screen also carries **Review** (submit, approve, send back with a
 note), **Schedule**, **Search & sharing** and **History**. Binned articles are
@@ -87,8 +96,31 @@ not something that should happen on a debounce.
 ## The reader's side
 
 `/news/` is the archive: published articles, newest first, twelve to a page,
-with `/news/category/{slug}` and `/news/tag/{slug}` narrowing it and
+with `/news/category/{slug}`, `/news/tag/{slug}` and `/news/author/{slug}`
+narrowing it, `?q=` searching within whichever of those you are on, and
 `/news/feed.xml` carrying the recent run as RSS.
+
+Search narrows the page it was typed on rather than replacing it, which is why
+there is no `/news/search`: a reader on a category page is standing somewhere
+that already promises a scope, and answering a question they did not ask by
+silently widening to the whole archive is worse than answering the one they
+did. Results are `noindex, follow` — the input space is unbounded, so one
+indexed `?q=` invites a crawler to enumerate query strings forever, while the
+links *out* of a result page are the real documents and worth following.
+
+It searches headline, slug, excerpt and tags, and deliberately **not** the
+body. Not for cost: the body column the admin's search scans is `draft_data`,
+so a public search over it would answer for text nobody has published — a
+phrase living only in an unpublished edit would surface the article and tell an
+outsider that the edit exists.
+
+An author becomes an address through the same slug rule as everything else, so
+two spellings of one byline (`A. Subash`, `A Subash`) share one page rather
+than one of them disappearing: that is nearly always one person entered
+inconsistently, and two genuinely different people are an editorial fix that
+costs nothing. A byline with no ASCII to fold onto has no address at all and
+renders as plain text — a missing feature, chosen over the slugifier's fallback
+collapsing unrelated writers onto a single archive claiming to be each of them.
 
 None of that existed until recently, and its absence was the hole in the middle
 of the split. The public router had exactly one route — `/{slug}` — so a reader
@@ -101,10 +133,15 @@ installed alone could not be read alone.
 Paging is real links rather than "load more", because the pager is how a
 crawler reaches everything past the first page. A page beyond the end is a 404
 rather than an empty document, so a crawler guessing `?page=900` is told there
-is nothing there instead of being handed something valid-looking to index. An
-unknown *tag*, by contrast, renders an empty archive: a tag can be removed from
-the last article carrying it, and a URL published while it existed should say
-"nothing here now", not "never existed".
+is nothing there instead of being handed something valid-looking to index.
+
+The *first* page of a narrowing that matches nothing is the opposite case, and
+the two are easy to confuse. An unknown tag, a byline nobody wrote under, or a
+search with no hits all render an empty archive with a way back: the address is
+meaningful and simply holds nothing today — a tag can be removed from the last
+article carrying it, and a URL published while it existed should say "nothing
+here now", not "never existed". Page *900* of that same empty tag is still a
+404, because there is no reading under which it has one.
 
 ### Metadata a crawler can read
 
@@ -178,6 +215,14 @@ list uses so work in progress is not buried on the last page. An editor
 additionally sees drafts. Each item carries `status`, which the admin list
 renders as a badge; without `news.edit` it is always `published`.
 
+An editor's items also carry `has_unpublished_changes` — the article is live
+and its draft has since moved on, so what you are looking at is not what
+readers are served. Only for a caller who may see drafts: it is a statement
+about work in progress, and the column behind it is not even selected for
+anyone else. It is compared, not inferred from a timestamp, and it is false for
+a *draft* holding an old snapshot — there is nothing live there to diverge
+from.
+
 `POST /articles` creates the article in one insert. Omit `slug` and the server
 derives one from the title and takes the first free variant — `my-title`, then
 `my-title-2`; send one and it is used verbatim, with a collision reported as a
@@ -202,26 +247,46 @@ left alone, an explicit `null` cancels. Behind `news.publish`, because a
 schedule is a publication decision that happens to be about the future.
 
 An in-process loop (`scheduler_enabled`, every `scheduler_interval_seconds`)
-calls `ArticlesService.process_due`.
-Disable it where a separate worker drives that method instead, or both will race
-and an article will publish twice with two revision rows saying so. The query is
-`<= now` rather than "since the last tick", so a process that was asleep catches
-up rather than losing the window; each timestamp is cleared when acted on, so a
-tick cannot republish the same article forever.
+calls `ArticlesService.process_due`. The query is `<= now` rather than "since
+the last tick", so a process that was asleep catches up rather than losing the
+window; each timestamp is cleared when acted on, so a tick cannot republish the
+same article forever.
 
-> **Single process only.** The loop starts in *every* process that boots the
-> module, and `process_due` takes no lock — no `FOR UPDATE SKIP LOCKED`, no
-> advisory lock (`SKIP LOCKED` does not exist on SQLite, the local-dev default).
-> So `uvicorn -w 4`, gunicorn with workers, or a Deployment with `replicas > 1`
-> runs N schedulers that can each find the same due article in one tick and each
-> publish it: two PUBLISH revision rows, and a flip-flop on unpublish. **Before
-> scaling out, turn `scheduler_enabled` off** — on the Settings screen or with
-> `scripts/set_setting.py news scheduler_enabled false`, never an environment
-> variable, which this module does not read and which would therefore leave the
-> loop running and racing the worker — and drive `process_due` from exactly one
-> place: a cron job, a k8s CronJob, or a single dedicated worker. Making the
-> in-process loop safe under replicas needs leader election or row locking, and
-> it has neither today.
+#### Running more than one of them
+
+The loop starts in *every* process that boots the module, so `uvicorn -w 4`,
+gunicorn with workers and a Deployment with `replicas > 1` all run several. That
+is safe: before touching a due article, `process_due` **claims** it with one
+conditional statement whose own effect takes it out of the due set —
+
+```sql
+UPDATE news_article SET publish_at = NULL
+ WHERE id = :id AND deleted_at IS NULL AND status = 'draft'
+   AND publish_at IS NOT NULL AND publish_at <= :now
+```
+
+— and acts only if that updated a row. The check and the claim are one
+statement, so the database decides the winner: whichever replica runs second
+meets a row that no longer matches and moves on. One PUBLISH revision row per
+article, and no flip-flop on the way down. An external worker driving
+`process_due` alongside the loop is safe for the same reason.
+
+Row claiming rather than `SELECT … FOR UPDATE SKIP LOCKED`, which is
+Postgres-only and would do nothing on SQLite, this repo's local-dev default; and
+rather than a lease table, which elects one scheduler for the whole app and buys
+a migration, a clock comparison and a window after a leaseholder dies in which
+nothing publishes. A claim here lives in the tick's transaction, so a process
+that dies mid-flip releases it and the article is simply due again. See
+`news/content/_claims.py`.
+
+What it does **not** cover: N replicas still each poll the database every
+`scheduler_interval_seconds`, and each still reads its own clock — an article
+goes live when the first replica to think it due acts, so a badly skewed clock
+moves that by the skew, exactly as the poll interval already does. Where either
+matters, set `scheduler_enabled` false everywhere and drive `process_due` from
+one place — a cron job, a k8s CronJob, a dedicated worker. Set it on the
+Settings screen or with `scripts/set_setting.py news scheduler_enabled false`,
+never an environment variable, which this module does not read.
 
 These are deliberately **not** `published_at`, which is the display date below
 and may perfectly reasonably be in the past. The article screen said "a future
@@ -289,7 +354,7 @@ Settings screen says so next to the input.
 | `public_cache_max_age` | `300` | shared-cache lifetime of an article |
 | `public_cache_swr` | `60` | `stale-while-revalidate` seconds; `0` omits it |
 | `public_csp` | *(unset)* | `Content-Security-Policy` on the article page |
-| `scheduler_enabled` ● | `true` | run the in-process publish/unpublish loop — **set `false` when running more than one replica**, see [Scheduling](#scheduling) |
+| `scheduler_enabled` ● | `true` | run the in-process publish/unpublish loop — safe under replicas, which claim each due article; see [Scheduling](#scheduling) |
 | `scheduler_interval_seconds` ● | `30` | how often it looks for due articles |
 
 The languages articles may be written in are **not** here. They are
@@ -325,7 +390,12 @@ Two things news gained that it previously borrowed, and had to grow itself:
   one, precisely because a second viewer is what the hand-off existed to avoid.
 - **Its own sitemap**, at `{prefix}/sitemap.xml`. Articles used to reach a
   crawler through pagebuilder's, via a claim news registered with it; without
-  one of its own the whole archive would silently drop out of every index.
+  one of its own the whole archive would silently drop out of every index. It
+  lists the archive index and every category and tag page as well as the
+  articles — a sitemap of leaves says the articles exist but not that anything
+  links them — and a taxonomy page only while at least one published,
+  indexable, listed article in that language fills it. An empty one is a thin
+  page, and a sitemap is a request to come and index.
 
 One thing it deliberately did **not** grow: a clone of pagebuilder's widget
 catalogue. That catalogue builds *pages* — heroes, feature grids, site
@@ -431,21 +501,37 @@ the same `metadata` one `Read next` uses, so it is possible, just not free.
   implementation of all twenty-one blocks, or SSR in the host. Both are real
   projects; neither is this module's to start.
 - **Images take a URL, not a picker.** The media library belongs to
-  pagebuilder, and the Image and Gallery blocks have to work without it. Where
-  that module *is* installed its picker hands out exactly what these want — a
-  URL to paste — so the gap is the extra step, not a missing capability.
+  pagebuilder, and the Image and Gallery blocks have to work without it. The
+  single-URL fields now show what the address points at as it is typed, so a
+  wrong one is caught in the panel rather than on the published page — but that
+  is a preview, not a library, and the extra step remains.
+
+  The obvious alternative does not work. This repo's host also runs
+  `file_storage`, but every one of its routes sits behind `RequiresPermission`,
+  there is no static mount over `uploads/`, and `StoredFileOut` carries no
+  `url` at all. An article image served from it renders in the admin preview
+  and 401s for every logged-out reader — which is exactly why pagebuilder
+  mounts `MediaFiles(StaticFiles)` and adds an auth-exempt prefix for its own
+  media, saying so in `boot.py`: *"without this the page renders for an
+  anonymous visitor but every image 302s to login."* Proxying it through a news
+  route would be worse than the gap, not a shortcut: the store is shared by
+  every module with no notion of "public", so a `GET /media/{file_id}` would
+  make any file anyone ever uploaded anonymously readable to whoever holds the
+  UUID. The fix is a public-read capability in `file_storage`, which is the
+  framework's to add.
 - **Nothing here is translated.** Every string is hardcoded English and there is
   no `locales/`. This is not news' to fix alone: the framework's convention
   depends on `@simple-module-py/i18n` and *this repo's host does not wire i18n
   at all* — no dependency, no loader, no generation step. Adding a catalogue to
   one module would do nothing until the host adopts it, and then all three
   modules here convert together. See the repo's `CLAUDE.md`.
-- **The palette has no charts and no table of contents.** Charts would mean
-  shipping a charting library onto the public page of a host that may have
-  installed nothing else; a table of the figures is the honest version. A
-  contents list needs a block to see its siblings, which Puck does not hand a
-  `render` function — the `metadata` seam `Read next` uses is where that would
-  start.
+- **The scheduler still polls per process.** Publishing at the right moment is
+  now safe with several replicas — each due article is taken with one
+  conditional `UPDATE`, so two ticks landing together flip it once — but every
+  replica still wakes on its own interval. Where that traffic is unwanted,
+  turning `scheduler_enabled` off and driving `process_due` from one external
+  worker remains the answer. That is now a preference rather than a safety
+  requirement.
 
 ## Development
 

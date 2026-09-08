@@ -17,6 +17,7 @@ import pytest
 from factories import make_article
 from news import locales, redirects
 from news.content import ArticlesService
+from news.models import NewsCategory
 
 pytestmark = pytest.mark.asyncio
 
@@ -150,6 +151,50 @@ class TestRoutesAreMountedPerLanguage:
 
         assert "/news/{slug}" in paths
         assert "/en/news/{slug}" not in paths
+
+
+class TestTheSitemapCarriesEveryLanguage:
+    """One sitemap, but the addresses in it are per language.
+
+    A taxonomy page exists in each language and lists different articles in
+    each, so ``/news/category/x`` and ``/de/news/category/x`` are two pages —
+    and either can be empty while the other is not. Advertising one under the
+    other's prefix sends a crawler to a page with nothing on it.
+    """
+
+    async def _seed(self, client, *, slug: str, locale: str, name: str, cat: str):
+        async with client.db_state.session_factory() as db:
+            db.add(NewsCategory(name=name, slug=cat))
+            await make_article(db, slug=slug, locale=locale, category=name)
+
+    async def test_each_taxonomy_page_is_listed_under_its_own_prefix(
+        self, bilingual_public_client
+    ) -> None:
+        client = bilingual_public_client
+        await self._seed(client, slug="budget", locale="en", name="Budget", cat="budget")
+        await self._seed(
+            client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt"
+        )
+
+        text = (await client.get("/news/sitemap.xml")).text
+
+        assert "<loc>http://test/news/category/budget</loc>" in text
+        assert "<loc>http://test/de/news/category/haushalt</loc>" in text
+
+    async def test_it_does_not_advertise_a_language_that_has_nothing_in_it(
+        self, bilingual_public_client
+    ) -> None:
+        """The German article carries the category, so only the German page has
+        anything on it. The English one answers 200 and lists nothing."""
+        client = bilingual_public_client
+        await self._seed(
+            client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt"
+        )
+
+        text = (await client.get("/news/sitemap.xml")).text
+
+        assert "<loc>http://test/de/news/category/haushalt</loc>" in text
+        assert "<loc>http://test/news/category/haushalt</loc>" not in text
 
 
 class TestTheViewerResolvesWithinOneLanguage:

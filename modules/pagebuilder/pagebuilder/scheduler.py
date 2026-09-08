@@ -82,11 +82,27 @@ class Scheduler:
                 _log.exception("pagebuilder.scheduler.tick_failed")
 
     async def stop(self) -> None:
-        if self._task is None:
+        task = self._task
+        if task is None:
             return
-        self._task.cancel()
-        # CancelledError is listed explicitly because it derives from
-        # BaseException, not Exception, so it isn't covered by the latter.
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await self._task
-        self._task = None
+        task.cancel()
+        try:
+            # Only ``CancelledError`` is suppressed — it is the expected
+            # outcome of the ``cancel`` above and says nothing. It used to be
+            # ``(CancelledError, Exception)``, which swallowed everything, and
+            # that is how a scheduler which stopped working weeks ago goes
+            # unnoticed. ``_run`` already logs and continues past a failed
+            # tick, so anything reaching here died *before* the loop — a
+            # missing ``app.state.sm``, an import that failed — and has a
+            # traceback worth seeing. Matches ``news.scheduler.Scheduler``.
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        except Exception:
+            # Logged rather than re-raised. FastAPI runs shutdown handlers in
+            # a plain loop with no ``try`` around each one, so raising here
+            # would skip every handler registered after this module's —
+            # including another module's scheduler, which would then never be
+            # stopped at all.
+            _log.exception("pagebuilder.scheduler.stop_failed")
+        finally:
+            self._task = None

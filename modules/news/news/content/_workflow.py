@@ -15,11 +15,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news.content._claims import claim, due_candidates, release
 from news.content._revisions import RevisionsMixin
-from news.models import NOT_TRASHED, ArticleStatus, NewsArticle, RevisionEvent
+from news.models import ArticleStatus, NewsArticle, RevisionEvent
 from news.naive_utc import as_utc
 
 logger = logging.getLogger(__name__)
@@ -133,61 +133,61 @@ class WorkflowMixin(RevisionsMixin):
     async def process_due(self, now: datetime) -> list[NewsArticle]:
         """Flip every article whose scheduled moment has passed.
 
+        Safe to run in more than one process. Each row is *claimed* before it is
+        touched — one conditional ``UPDATE`` that clears the timestamp it is
+        acting on, whose affected-row count says whether this caller won it — so
+        two replicas ticking at the same instant flip a due article exactly
+        once. :mod:`news.content._claims` has the shape and the reasoning; the
+        two steps are spelt out here rather than hidden behind one call because
+        the gap between them is the whole subject.
+
         Idempotent by construction: each tick re-queries, and both `publish` and
         `unpublish` clear the timestamp they acted on, so a process that was
         asleep for an hour catches up on its next wakeup rather than losing the
-        window. One bad row is skipped rather than poisoning the whole tick, but
-        never silently: each skip is logged with the article's id, because a
-        schedule that quietly never fires leaves no other trace anywhere.
+        window. One bad row is skipped rather than poisoning the whole tick —
+        its claim handed straight back, so a later tick retries instead of the
+        schedule dying here — but never silently: each skip is logged with the
+        article's id, because a schedule that quietly never fires leaves no
+        other trace anywhere.
 
         Trashed articles are excluded. An article binned while carrying a
         schedule must not republish itself out of the trash.
         """
         flipped: list[NewsArticle] = []
-
-        due_to_publish = await self.db.execute(
-            select(NewsArticle).where(
-                NOT_TRASHED,
-                NewsArticle.status == ArticleStatus.DRAFT,
-                NewsArticle.publish_at.is_not(None),
-                NewsArticle.publish_at <= now,
-            )
-        )
-        for article in due_to_publish.scalars().all():
-            try:
-                flipped.append(await self.publish(article.id or 0))
-            except HTTPException as exc:
-                # Warned rather than swallowed: a schedule that never fires is
-                # invisible otherwise, and "the article did not go live" is the
-                # kind of thing nobody notices until a reader asks about it.
-                logger.warning(
-                    "news.scheduler.publish_failed article_id=%s: %s",
-                    article.id,
-                    exc.detail,
-                    extra={"article_id": article.id, "status_code": exc.status_code},
-                )
-                continue
-
-        due_to_unpublish = await self.db.execute(
-            select(NewsArticle).where(
-                NOT_TRASHED,
-                NewsArticle.status == ArticleStatus.PUBLISHED,
-                NewsArticle.unpublish_at.is_not(None),
-                NewsArticle.unpublish_at <= now,
-            )
-        )
-        for article in due_to_unpublish.scalars().all():
-            try:
-                flipped.append(await self.unpublish(article.id or 0))
-            except HTTPException as exc:
-                logger.warning(
-                    "news.scheduler.unpublish_failed article_id=%s: %s",
-                    article.id,
-                    exc.detail,
-                    extra={"article_id": article.id, "status_code": exc.status_code},
-                )
-                continue
-
+        for label, column, status, act in (
+            ("publish", NewsArticle.publish_at, ArticleStatus.DRAFT, self.publish),
+            (
+                "unpublish",
+                NewsArticle.unpublish_at,
+                ArticleStatus.PUBLISHED,
+                self.unpublish,
+            ),
+        ):
+            for article_id, due_at in await due_candidates(
+                self.db, column=column, status=status, now=now
+            ):
+                if not await claim(
+                    self.db, article_id, column=column, status=status, now=now
+                ):
+                    # Another replica got there first, or a person did. Not a
+                    # failure and not worth a line in the log: the article is
+                    # being flipped, just not by us.
+                    continue
+                try:
+                    flipped.append(await act(article_id))
+                except HTTPException as exc:
+                    # Warned rather than swallowed: a schedule that never fires
+                    # is invisible otherwise, and "the article did not go live"
+                    # is the kind of thing nobody notices until a reader asks
+                    # about it.
+                    await release(self.db, article_id, column=column, when=due_at)
+                    logger.warning(
+                        "news.scheduler.%s_failed article_id=%s: %s",
+                        label,
+                        article_id,
+                        exc.detail,
+                        extra={"article_id": article_id, "status_code": exc.status_code},
+                    )
         return flipped
 
     async def unpublish(self, article_id: int) -> NewsArticle:

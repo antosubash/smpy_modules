@@ -184,7 +184,24 @@ export function ArticleRow({
           </div>
         )}
 
-        <p className="mt-1 text-xs text-muted-foreground">{statusLine(article)}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{statusLine(article)}</span>
+          {/* A state, not a fault. Publishing snapshots the body, so an author
+              who keeps writing leaves the row saying "Published" about a
+              document readers have never seen — truthfully, and about the
+              wrong one. Neutral chrome rather than a warning colour: an
+              article with edits in progress is the ordinary case, and the
+              only thing this has to do is stop "Published" from being read
+              as "up to date". */}
+          {article.has_unpublished_changes && (
+            <span
+              data-testid="unpublished-changes"
+              className="rounded-full border px-2 py-0.5 font-medium text-foreground"
+            >
+              Unpublished edits
+            </span>
+          )}
+        </p>
       </div>
 
       <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">

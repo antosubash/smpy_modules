@@ -1,10 +1,12 @@
 import { Head } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
+import { ArchiveSearch } from '../components/ArchiveSearch';
 import { type ArticleRead, formatArticleDate } from '../utils/api';
+import { archiveUrl } from '../utils/archiveUrl';
 
-/** The archive's front page, and the same screen narrowed to one category or
- *  tag.
+/** The archive's front page, and the same screen narrowed to one category,
+ *  tag, byline or search.
  *
  * The reader's way in. Until this existed a visitor could only open an article
  * they already had a link to: the public router had one route, `/{slug}`, so
@@ -26,12 +28,14 @@ interface Props {
   total: number;
   /** Path this archive lives at, for building page links. */
   base_path: string;
+  /** The search term this page was narrowed by, or ''. Server-trimmed, so what
+   *  is echoed here is exactly what was searched for. */
+  query?: string;
+  /** Whether this archive was already narrowed before any search — a category,
+   *  a tag or a byline. */
+  narrowed?: boolean;
   feed_url: string;
   site_name?: string | null;
-}
-
-function pageHref(basePath: string, page: number): string {
-  return page <= 1 ? basePath : `${basePath}?page=${page}`;
 }
 
 export default function PublicIndex({
@@ -42,6 +46,8 @@ export default function PublicIndex({
   pages,
   total,
   base_path,
+  query = '',
+  narrowed = false,
   feed_url,
 }: Props) {
   return (
@@ -49,7 +55,16 @@ export default function PublicIndex({
       {/* A public page has no admin layout, so without this the configured
           brand colour and favicon would stop at the sign-in wall. */}
       <BrandingHead />
-      <Head title={heading} />
+      <Head title={query ? `${query} — ${heading}` : heading}>
+        {/* Results pages stay out of the index: the input space is unbounded,
+            so one indexed `?q=` link invites a crawler to enumerate query
+            strings forever, and every result page is a rearrangement of
+            articles already indexed at their own addresses. `follow`, though —
+            the links out of it are the real documents. The server writes the
+            same tag into the head for the crawler that never runs this script;
+            see `endpoints/public/_head.py`. */}
+        {query && <meta name="robots" content="noindex,follow" />}
+      </Head>
 
       <div className="mx-auto max-w-2xl px-4 py-12">
         <header className="mb-10">
@@ -57,10 +72,30 @@ export default function PublicIndex({
           {description && <p className="mt-2 text-muted-foreground">{description}</p>}
         </header>
 
+        <ArchiveSearch basePath={base_path} query={query} narrowed={narrowed} heading={heading} />
+
         {items.length === 0 ? (
           // An archive with nothing in it says so. A blank page is
-          // indistinguishable from one that failed to load.
-          <p className="text-muted-foreground">Nothing published here yet.</p>
+          // indistinguishable from one that failed to load — and a search that
+          // found nothing needs a way out as well as an explanation, or the
+          // reader's only route back is the browser's Back button.
+          <div className="text-muted-foreground">
+            {query ? (
+              <>
+                <p>
+                  Nothing matches <span className="font-medium">“{query}”</span>
+                  {narrowed ? ` in ${heading}` : ''}.
+                </p>
+                <p className="mt-2">
+                  <a href={base_path} className="underline underline-offset-2">
+                    {narrowed ? `Show all of ${heading}` : 'Show all articles'}
+                  </a>
+                </p>
+              </>
+            ) : (
+              <p>Nothing published here yet.</p>
+            )}
+          </div>
         ) : (
           <ul className="space-y-8">
             {items.map((article) => {
@@ -96,7 +131,10 @@ export default function PublicIndex({
           // reach everything past the first page, and "load more" is not a link.
           <nav className="mt-12 flex items-center justify-between border-t pt-5 text-sm">
             {page > 1 ? (
-              <a href={pageHref(base_path, page - 1)} className="underline underline-offset-2">
+              <a
+                href={archiveUrl(base_path, page - 1, query)}
+                className="underline underline-offset-2"
+              >
                 ← Newer
               </a>
             ) : (
@@ -106,7 +144,10 @@ export default function PublicIndex({
               Page {page} of {pages} · {total} articles
             </span>
             {page < pages ? (
-              <a href={pageHref(base_path, page + 1)} className="underline underline-offset-2">
+              <a
+                href={archiveUrl(base_path, page + 1, query)}
+                className="underline underline-offset-2"
+              >
                 Older →
               </a>
             ) : (
