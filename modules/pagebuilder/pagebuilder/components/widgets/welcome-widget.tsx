@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
 export type WelcomeWidgetProps = {
@@ -8,11 +9,11 @@ export type WelcomeWidgetProps = {
 };
 
 export const WelcomeWidget: ComponentConfig<WelcomeWidgetProps> = {
-  label: 'Welcome',
+  label: keys.pagebuilder.blocks.welcome.label,
   fields: {
-    greeting: { type: 'text', label: 'Greeting' },
-    body: { type: 'textarea', label: 'Body' },
-    signature: { type: 'text', label: 'Signature' },
+    greeting: { type: 'text', label: keys.pagebuilder.blocks.welcome.greeting },
+    body: { type: 'textarea', label: keys.pagebuilder.blocks.common.body },
+    signature: { type: 'text', label: keys.pagebuilder.blocks.welcome.signature },
   },
   defaultProps: {
     greeting: 'Welcome!',

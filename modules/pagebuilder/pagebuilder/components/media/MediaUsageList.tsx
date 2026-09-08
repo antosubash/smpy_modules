@@ -1,3 +1,4 @@
+import { keys, useT } from '../../utils/i18n';
 import type { MediaUsage } from '../../utils/mediaApi';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
  * the reason anyone reads this list is to go and detach it from one of them.
  */
 export function MediaUsageList({ usages, total }: Props) {
+  const { t } = useT();
   if (total === 0) {
     return (
       <p
@@ -18,15 +20,19 @@ export function MediaUsageList({ usages, total }: Props) {
         data-total="0"
         className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
       >
-        Not used on any page. Deleting it will not break anything.
+        {t(keys.pagebuilder.usage.unused)}
       </p>
     );
   }
 
   return (
-    <section data-testid="media-usage" data-total={total} aria-label="Pages using this asset">
+    <section
+      data-testid="media-usage"
+      data-total={total}
+      aria-label={t(keys.pagebuilder.usage.aria)}
+    >
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Used in {total} {total === 1 ? 'place' : 'places'}
+        {t(keys.pagebuilder.usage.used_in, { count: total })}
       </h2>
       <ul className="space-y-2">
         {usages.map((usage) => (
@@ -44,14 +50,16 @@ export function MediaUsageList({ usages, total }: Props) {
               <span className="shrink-0 text-xs text-muted-foreground">
                 {/* Worth distinguishing: a reference only the draft carries is a
                     weaker claim on the asset than one that is live. */}
-                {usage.draft_only ? 'draft only' : usage.status}
+                {usage.draft_only ? t(keys.pagebuilder.usage.draft_only) : usage.status}
               </span>
             </a>
           </li>
         ))}
       </ul>
       {total > usages.length && (
-        <p className="mt-2 text-sm text-muted-foreground">and {total - usages.length} more</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t(keys.pagebuilder.usage.and_more, { count: total - usages.length })}
+        </p>
       )}
     </section>
   );

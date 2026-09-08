@@ -19,6 +19,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys, useT } from '../../../utils/i18n';
+
 import { groupOutline, type OutlineEntry, outlineFromMetadata } from './outline';
 
 export interface ContentsProps {
@@ -41,6 +43,7 @@ export function ContentsRender({
   outline,
   isEditing,
 }: ContentsProps & { outline: OutlineEntry[]; isEditing: boolean }) {
+  const { t } = useT();
   const sections = groupOutline(outline, depth === '3');
 
   if (sections.length < MIN_SECTIONS) {
@@ -50,14 +53,16 @@ export function ContentsRender({
     if (!isEditing) return <></>;
     return (
       <p className="my-8 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-        Contents lists this article's section headings. Add at least {MIN_SECTIONS} Heading blocks
-        and they appear here, and on the published page.
+        {t(keys.news.blocks.contents.hint, { min: MIN_SECTIONS })}
       </p>
     );
   }
 
   return (
-    <nav aria-label={title || 'Contents'} className="my-8 rounded-lg border bg-muted/40 p-5">
+    <nav
+      aria-label={title || t(keys.news.blocks.contents.fallback_label)}
+      className="my-8 rounded-lg border bg-muted/40 p-5"
+    >
       {title && (
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {title}
@@ -91,15 +96,15 @@ export function ContentsRender({
 }
 
 export const ContentsBlock: ComponentConfig<ContentsProps> = {
-  label: 'Contents',
+  label: keys.news.blocks.contents.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
+    title: { type: 'text', label: keys.news.blocks.common.heading },
     depth: {
       type: 'select',
-      label: 'How deep',
+      label: keys.news.blocks.contents.depth,
       options: [
-        { label: 'Sections only', value: '2' },
-        { label: 'Sections and sub-sections', value: '3' },
+        { label: keys.news.blocks.contents.depth_sections, value: '2' },
+        { label: keys.news.blocks.contents.depth_subsections, value: '3' },
       ],
     },
   },

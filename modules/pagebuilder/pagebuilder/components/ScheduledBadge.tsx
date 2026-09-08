@@ -1,4 +1,5 @@
 import type { PageStatus } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 interface Props {
   status: PageStatus;
@@ -14,6 +15,7 @@ interface Props {
  * can drop this in unconditionally.
  */
 export function ScheduledBadge({ status, publishAt, unpublishAt }: Props) {
+  const { t } = useT();
   const target =
     status === 'draft' && publishAt
       ? { kind: 'publish' as const, at: publishAt }
@@ -21,7 +23,10 @@ export function ScheduledBadge({ status, publishAt, unpublishAt }: Props) {
         ? { kind: 'unpublish' as const, at: unpublishAt }
         : null;
   if (!target) return null;
-  const label = target.kind === 'publish' ? 'Scheduled to publish' : 'Scheduled to unpublish';
+  const label =
+    target.kind === 'publish'
+      ? t(keys.pagebuilder.badge.scheduled_publish)
+      : t(keys.pagebuilder.badge.scheduled_unpublish);
   return (
     <span
       className="ml-2 inline-block text-xs font-medium px-2 py-1 rounded bg-blue-100 text-blue-800"

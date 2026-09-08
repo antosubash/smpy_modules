@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { diffRevisions, type RevisionDiff, restoreRevision } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { keys, useT } from '../utils/i18n';
 import type { EditorForm } from './useEditorForm';
 
 interface Params {
@@ -21,6 +22,7 @@ export interface PageRevisions {
 }
 
 export function usePageRevisions({ form, setBusy, setMessage, markSaved }: Params): PageRevisions {
+  const { t } = useT();
   const [activeDiff, setActiveDiff] = useState<RevisionDiff | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
 
@@ -35,7 +37,7 @@ export function usePageRevisions({ form, setBusy, setMessage, markSaved }: Param
       const diff = await diffRevisions(form.pageId, beforeId, afterId);
       setActiveDiff(diff);
     } catch (e) {
-      setDiffError(e instanceof Error ? e.message : 'Could not load diff');
+      setDiffError(e instanceof Error ? e.message : t(keys.pagebuilder.history.diff_failed));
     }
   };
 
@@ -48,7 +50,7 @@ export function usePageRevisions({ form, setBusy, setMessage, markSaved }: Param
     try {
       const restored = await restoreRevision(form.pageId, revisionId);
       markSaved(form.applyRestored(restored));
-      setMessage('Revision restored to draft.');
+      setMessage(t(keys.pagebuilder.history.restored));
     } finally {
       setBusy(false);
     }

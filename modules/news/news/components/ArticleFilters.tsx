@@ -1,6 +1,7 @@
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import type { ArticleCounts, CategoryCount } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
 
 const SEARCH_INPUT_ID = 'news-article-search';
@@ -11,10 +12,18 @@ const LOCALE_SELECT_ID = 'news-article-locale';
  *  state: it cuts across both, and it is the work-in-progress pile a writer
  *  actually wants to find. */
 const STATUSES = [
-  { value: '', label: 'All', count: (c: ArticleCounts) => c.all },
-  { value: 'draft', label: 'Draft', count: (c: ArticleCounts) => c.draft },
-  { value: 'published', label: 'Published', count: (c: ArticleCounts) => c.published },
-  { value: 'undated', label: 'Undated', count: (c: ArticleCounts) => c.undated },
+  { value: '', label: keys.news.filters.status_all, count: (c: ArticleCounts) => c.all },
+  { value: 'draft', label: keys.news.filters.status_draft, count: (c: ArticleCounts) => c.draft },
+  {
+    value: 'published',
+    label: keys.news.filters.status_published,
+    count: (c: ArticleCounts) => c.published,
+  },
+  {
+    value: 'undated',
+    label: keys.news.filters.status_undated,
+    count: (c: ArticleCounts) => c.undated,
+  },
 ];
 
 interface Props {
@@ -46,12 +55,13 @@ export function ArticleFilters({
   locales,
   onChange,
 }: Props) {
+  const { t } = useT();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <Input
         id={SEARCH_INPUT_ID}
-        aria-label="Search headline or slug"
-        placeholder="Search headline or slug"
+        aria-label={t(keys.news.filters.search_label)}
+        placeholder={t(keys.news.filters.search_label)}
         value={q}
         className="h-9 w-64"
         onChange={(e) => onChange({ q: e.target.value })}
@@ -61,7 +71,7 @@ export function ArticleFilters({
           choice among four, and the legend names that choice for a screen
           reader without taking space in the layout. */}
       <fieldset className="m-0 flex flex-wrap gap-1 border-0 p-0">
-        <legend className="sr-only">Filter by status</legend>
+        <legend className="sr-only">{t(keys.news.filters.status_legend)}</legend>
         {STATUSES.map((option) => {
           const active = status === option.value;
           return (
@@ -75,7 +85,7 @@ export function ArticleFilters({
                 active ? 'border-primary bg-primary/10 font-medium' : 'bg-card hover:bg-muted'
               }`}
             >
-              {option.label}{' '}
+              {t(option.label)}{' '}
               <span className="tabular-nums text-muted-foreground">{option.count(counts)}</span>
             </button>
           );
@@ -85,15 +95,15 @@ export function ArticleFilters({
       {categories.length > 0 && (
         <NativeSelect
           id={CATEGORY_SELECT_ID}
-          aria-label="Filter by category"
+          aria-label={t(keys.news.filters.category_label)}
           value={category}
           className="h-9 w-48"
           onChange={(e) => onChange({ category: e.target.value })}
         >
-          <option value="">All categories</option>
+          <option value="">{t(keys.news.filters.category_all)}</option>
           {categories.map((c) => (
             <option key={c.category} value={c.category}>
-              {c.category} ({c.count})
+              {t(keys.news.filters.category_option, { name: c.category, total: c.count })}
             </option>
           ))}
         </NativeSelect>
@@ -102,12 +112,12 @@ export function ArticleFilters({
       {locales.length > 1 && (
         <NativeSelect
           id={LOCALE_SELECT_ID}
-          aria-label="Filter by language"
+          aria-label={t(keys.news.filters.locale_label)}
           value={locale}
           className="h-9 w-44"
           onChange={(e) => onChange({ locale: e.target.value })}
         >
-          <option value="">All languages</option>
+          <option value="">{t(keys.news.filters.locale_all)}</option>
           {locales.map((tag) => (
             <option key={tag} value={tag}>
               {localeLabel(tag)}

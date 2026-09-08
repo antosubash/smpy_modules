@@ -3,6 +3,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 
 import type { PageRead } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { localeLabel, publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ScheduledBadge } from './ScheduledBadge';
@@ -37,6 +38,7 @@ export function PageListRow({
   publicPrefix,
   onDelete,
 }: Props) {
+  const { t } = useT();
   const address = publicPath(publicPrefix, page.slug, page.locale, defaultLocale);
   return (
     <TableRow>
@@ -67,7 +69,7 @@ export function PageListRow({
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline"
           >
-            View
+            {t(keys.pagebuilder.row.view)}
           </a>
         )}
         <Button
@@ -75,7 +77,7 @@ export function PageListRow({
           size="sm"
           onClick={() => router.visit(`/pagebuilder/${page.id}/edit`)}
         >
-          Edit
+          {t(keys.pagebuilder.row.edit)}
         </Button>
         {/* On the row rather than only inside the editor: "we need this in
             German" is a thought an author has while looking at the list. */}
@@ -90,7 +92,7 @@ export function PageListRow({
         <ConfirmDialog
           trigger={
             <Button variant="link" size="sm" className="text-destructive">
-              Delete
+              {t(keys.pagebuilder.row.delete)}
             </Button>
           }
           // The same gate the board card applies, because it is the same
@@ -98,21 +100,20 @@ export function PageListRow({
           // much friction a live URL going dark gets.
           level={page.status === 'published' ? 'high' : 'low'}
           confirmPhrase={page.status === 'published' ? page.slug : undefined}
-          title={`Delete "${page.title}"?`}
+          title={t(keys.pagebuilder.row.delete_title, { title: page.title })}
           description={
             page.status === 'published' ? (
+              // The address is a <code> span inside the sentence, so the two
+              // halves are separate keys rather than one with a placeholder.
               <>
-                This page is published. <code>{address}</code> starts answering 404 the moment you
-                confirm. It goes to the trash for 30 days, and after that it is gone.
+                {t(keys.pagebuilder.row.delete_published_before)} <code>{address}</code>{' '}
+                {t(keys.pagebuilder.row.delete_published_after)}
               </>
             ) : (
-              <>
-                It was never published, so nothing on the site changes. It goes to the trash for 30
-                days.
-              </>
+              t(keys.pagebuilder.row.delete_draft)
             )
           }
-          confirmLabel="Delete"
+          confirmLabel={t(keys.pagebuilder.row.delete)}
           onConfirm={() => onDelete(page)}
         />
       </TableCell>

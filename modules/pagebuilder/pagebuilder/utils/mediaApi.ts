@@ -1,5 +1,6 @@
 /** Media library calls, upload progress, and srcset helpers. */
 
+import { keys, translate } from './i18n';
 import { BASE, CSRF_COOKIE, readCookie, request } from './request';
 import type {
   MediaAssetDetail,
@@ -65,10 +66,17 @@ export const uploadMedia = (
           reject(err);
         }
       } else {
-        reject(new Error(`Request failed (${xhr.status}): ${xhr.responseText}`));
+        reject(
+          new Error(
+            translate(keys.pagebuilder.errors.upload_failed, {
+              status: xhr.status,
+              detail: xhr.responseText,
+            }),
+          ),
+        );
       }
     };
-    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.onerror = () => reject(new Error(translate(keys.pagebuilder.errors.upload_network)));
     xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
     if (signal) {
       if (signal.aborted) {

@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { listArticleRevisions, type RevisionRead, restoreArticleRevision } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 
 /** Labels for the events the workflow records.
@@ -12,11 +13,11 @@ import { ConfirmDialog } from '../ConfirmDialog';
  * a bare "Approved" would leave a reader of the history wondering.
  */
 const EVENTS: Record<RevisionRead['event'], string> = {
-  submit: 'Submitted for review',
-  approve: 'Approved and published',
-  reject: 'Sent back',
-  publish: 'Published',
-  unpublish: 'Taken down',
+  submit: keys.news.history.event_submit,
+  approve: keys.news.history.event_approve,
+  reject: keys.news.history.event_reject,
+  publish: keys.news.history.event_publish,
+  unpublish: keys.news.history.event_unpublish,
 };
 
 /** Every transition this article has been through.
@@ -30,6 +31,8 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  * action pushes further down the list.
  */
 export function HistoryCard({ articleId }: { articleId: number }) {
+  const { t } = useT();
+  const copy = keys.news.history;
   const [revisions, setRevisions] = useState<RevisionRead[] | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -54,7 +57,7 @@ export function HistoryCard({ articleId }: { articleId: number }) {
     try {
       await restoreArticleRevision(articleId, revision.id);
       await load();
-      toast.success('Draft restored — reopen the body canvas to see it');
+      toast.success(t(copy.restored_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -66,18 +69,18 @@ export function HistoryCard({ articleId }: { articleId: number }) {
 
   return (
     <div className="space-y-3 rounded-lg border p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide">History</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
 
       {revisions.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Nothing yet. Submitting, publishing or taking the article down records a row here.
-        </p>
+        <p className="text-xs text-muted-foreground">{t(copy.empty)}</p>
       ) : (
         <ol className="space-y-3">
           {revisions.map((revision) => (
             <li key={revision.id} className="border-b pb-3 last:border-0 last:pb-0">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-sm font-medium">{EVENTS[revision.event] ?? revision.event}</p>
+                <p className="text-sm font-medium">
+                  {EVENTS[revision.event] ? t(EVENTS[revision.event]) : revision.event}
+                </p>
                 {revision.created_at && (
                   <time
                     dateTime={revision.created_at}
@@ -93,13 +96,13 @@ export function HistoryCard({ articleId }: { articleId: number }) {
               {revision.note && <p className="mt-1 text-xs italic">“{revision.note}”</p>}
               <ConfirmDialog
                 level="medium"
-                title="Restore this version?"
-                description="The body you are working on is replaced by the one saved at this point. Anything written since is lost unless it was itself recorded here."
-                confirmLabel="Restore"
+                title={t(copy.restore_title)}
+                description={t(copy.restore_description)}
+                confirmLabel={t(copy.restore_confirm)}
                 onConfirm={() => restore(revision)}
                 trigger={
                   <Button variant="ghost" size="sm" className="mt-1 h-7 px-2" disabled={busy}>
-                    Restore this version
+                    {t(copy.restore_trigger)}
                   </Button>
                 }
               />

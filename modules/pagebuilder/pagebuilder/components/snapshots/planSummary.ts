@@ -8,6 +8,7 @@
  * deleted, makes the wrong call on a live site.
  */
 
+import { keys, translate } from '../../utils/i18n';
 import type { ImportPlan, Snapshot } from '../../utils/snapshotsApi';
 
 export interface PlanTotals {
@@ -32,9 +33,14 @@ export function planTotals(plan: ImportPlan): PlanTotals {
   };
 }
 
-/** "1 page" / "3 pages" — one place to decide how a count reads. */
-function pluralize(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+/** "1 page" / "3 pages" — one place to decide how a count reads.
+ *
+ *  Every string in this file goes through `translate` rather than a hook:
+ *  these are pure functions their callers invoke while rendering, which is
+ *  what keeps them unit-testable without a DOM. `translate` reads the shared
+ *  i18next instance at call time, so that stays true. */
+function pluralize(key: string, count: number): string {
+  return translate(key, { count });
 }
 
 /**
@@ -46,8 +52,8 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
  */
 export function overwriteWarning(plan: ImportPlan): string {
   const { overwritten } = planTotals(plan);
-  if (overwritten === 0) return 'No existing page will be overwritten.';
-  return `${pluralize(overwritten, 'page')} will be overwritten.`;
+  if (overwritten === 0) return translate(keys.pagebuilder.plan.overwrite_none);
+  return pluralize(keys.pagebuilder.plan.overwrite, overwritten);
 }
 
 /**
@@ -60,31 +66,31 @@ export function overwriteWarning(plan: ImportPlan): string {
 export function untouchedNote(plan: ImportPlan): string | null {
   const { untouched } = planTotals(plan);
   if (untouched === 0) return null;
-  const subject = `${pluralize(untouched, 'page')} ${untouched === 1 ? 'is' : 'are'}`;
-  const object = untouched === 1 ? 'It' : 'They';
-  return `${subject} on this site but not in this snapshot. ${object} will not be deleted.`;
+  return pluralize(keys.pagebuilder.plan.untouched, untouched);
 }
 
 /** "12 pages · 3 redirects · 11 media" — a snapshot's contents in one line. */
 export function contentsLine(snapshot: Snapshot): string {
   const counts = snapshot.manifest?.counts;
-  if (!counts) return 'Empty snapshot';
+  if (!counts) return translate(keys.pagebuilder.plan.empty_snapshot);
   const parts = [
-    pluralize(counts.pages, 'page'),
-    pluralize(counts.redirects, 'redirect'),
-    `${counts.media} media`,
+    pluralize(keys.pagebuilder.plan.page_count, counts.pages),
+    pluralize(keys.pagebuilder.plan.redirect_count, counts.redirects),
+    translate(keys.pagebuilder.plan.media_count, { count: counts.media }),
   ];
   return parts.join(' · ');
 }
 
 const SOURCE_LABELS: Record<Snapshot['source'], string> = {
-  manual: 'Taken here',
-  upload: 'Uploaded',
-  pre_restore: 'Automatic, before a restore',
+  manual: keys.pagebuilder.plan.source_manual,
+  upload: keys.pagebuilder.plan.source_upload,
+  pre_restore: keys.pagebuilder.plan.source_pre_restore,
 };
 
 export function sourceLabel(source: Snapshot['source']): string {
-  return SOURCE_LABELS[source] ?? source;
+  // The raw value is the fallback for a source this build does not know — it
+  // is not translatable, and saying it is truer than saying nothing.
+  return SOURCE_LABELS[source] ? translate(SOURCE_LABELS[source]) : source;
 }
 
 /**
@@ -96,7 +102,10 @@ export function sourceLabel(source: Snapshot['source']): string {
 export function missingMediaWarning(snapshot: Snapshot): string | null {
   const missing = snapshot.manifest?.missing_media ?? [];
   if (missing.length === 0) return null;
-  return `${missing.length} file(s) were missing when this was taken: ${missing.join(', ')}`;
+  return translate(keys.pagebuilder.plan.missing_media, {
+    count: missing.length,
+    files: missing.join(', '),
+  });
 }
 
 /**
@@ -107,9 +116,25 @@ export function missingMediaWarning(snapshot: Snapshot): string | null {
  * for that read as "this will empty your header", and was indistinguishable
  * from a bundle carrying an explicitly empty header, which does empty it.
  */
-export function describeLayoutSide(label: string, count: number, present?: boolean): string {
+export function describeLayoutSide(
+  side: 'header' | 'footer',
+  count: number,
+  present?: boolean,
+): string {
+  // A key per side rather than a translated noun spliced into a sentence: the
+  // footer half reads mid-sentence and is lowercase in English, which is not a
+  // property any other language has to share.
   if (present === false) {
-    return `${label} unchanged (not in bundle)`;
+    return translate(
+      side === 'header'
+        ? keys.pagebuilder.plan.layout_header_unchanged
+        : keys.pagebuilder.plan.layout_footer_unchanged,
+    );
   }
-  return `${label} ${count} block(s)`;
+  return translate(
+    side === 'header'
+      ? keys.pagebuilder.plan.layout_header_blocks
+      : keys.pagebuilder.plan.layout_footer_blocks,
+    { count },
+  );
 }

@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { MEASURE_OPTIONS, type Measure, measureClass } from '../../utils/measure';
 import { cn } from '../../utils/widgetUtils';
 
@@ -24,28 +25,32 @@ const STYLE_CLASS: Record<DividerWidgetProps['style'], string> = {
 };
 
 export const DividerWidget: ComponentConfig<DividerWidgetProps> = {
-  label: 'Divider',
+  label: keys.pagebuilder.blocks.divider.label,
   fields: {
     thickness: {
       type: 'select',
-      label: 'Thickness',
+      label: keys.pagebuilder.blocks.divider.thickness,
       options: [
-        { label: 'Thin', value: 'thin' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'Thick', value: 'thick' },
+        { label: keys.pagebuilder.blocks.divider.thickness_thin, value: 'thin' },
+        { label: keys.pagebuilder.blocks.divider.thickness_medium, value: 'medium' },
+        { label: keys.pagebuilder.blocks.divider.thickness_thick, value: 'thick' },
       ],
     },
     style: {
       type: 'select',
-      label: 'Style',
+      label: keys.pagebuilder.blocks.divider.style,
       options: [
-        { label: 'Solid', value: 'solid' },
-        { label: 'Dashed', value: 'dashed' },
-        { label: 'Dotted', value: 'dotted' },
+        { label: keys.pagebuilder.blocks.divider.style_solid, value: 'solid' },
+        { label: keys.pagebuilder.blocks.divider.style_dashed, value: 'dashed' },
+        { label: keys.pagebuilder.blocks.divider.style_dotted, value: 'dotted' },
       ],
     },
-    color: { type: 'text', label: 'Color (CSS value)' },
-    maxWidth: { type: 'select', label: 'Max width', options: MEASURE_OPTIONS },
+    color: { type: 'text', label: keys.pagebuilder.blocks.divider.color },
+    maxWidth: {
+      type: 'select',
+      label: keys.pagebuilder.blocks.divider.max_width,
+      options: MEASURE_OPTIONS,
+    },
   },
   defaultProps: {
     thickness: 'thin',

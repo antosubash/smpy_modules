@@ -7,36 +7,14 @@ import {
 } from '@simple-module-py/ui/components/ui/dropdown-menu';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
-import { type ArticleRead, formatArticleDate, relativeDay } from '../utils/api';
-import { ConfirmDialog } from './ConfirmDialog';
+import { type ArticleRead, formatArticleDate } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
+import { ArticleRowDelete } from './ArticleRowDelete';
+import { statusLine, toDateInput } from './articleStatus';
 
 /** The article editor — category, tags, date, byline and feed behaviour. The
  *  body has a canvas of its own, so it is edited one link further in. */
 const articleSettingsUrl = (id: number) => `/admin/news/articles/${id}/edit`;
-
-/** `2026-02-01T00:00:00` -> `2026-02-01`, which is what <input type=date> wants. */
-function toDateInput(iso: string | null): string {
-  return iso ? iso.slice(0, 10) : '';
-}
-
-/** The one-line status the card carries under its metadata.
- *
- * `published_at` is the editorial display date, not a schedule — the field
- * that actually drives auto-publish is `publish_at`, set from ScheduleCard
- * and not read anywhere in this list. A future `published_at` used to read
- * as "publishes {date}", which promised something this row cannot keep: an
- * editor could set a future display date, see "publishes …" and believe the
- * article will go live on its own when nothing here does that.
- */
-function statusLine(article: ArticleRead): string {
-  const when = article.published_at;
-
-  if (article.status === 'published') {
-    return when ? `Published · ${relativeDay(when)}` : 'Published · no date';
-  }
-  if (article.status === 'submitted_for_review') return 'Pending review';
-  return when ? `Draft · dated ${relativeDay(when)}` : 'Draft · undated';
-}
 
 interface Props {
   article: ArticleRead;
@@ -70,13 +48,15 @@ export function ArticleRow({
   onTrash,
   onPublish,
 }: Props) {
+  const { t } = useT();
+  const row = keys.news.row;
   const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(article.category);
   const [date, setDate] = useState(toDateInput(article.published_at));
 
   const dirty = category !== article.category || date !== toDateInput(article.published_at);
   const isDraft = article.status === 'draft';
-  const dateLabel = formatArticleDate(article.published_at) || 'no date';
+  const dateLabel = formatArticleDate(article.published_at) || t(row.no_date);
 
   const save = () => {
     onSave(article.id, category, date ? `${date}T00:00:00Z` : null);
@@ -105,7 +85,7 @@ export function ArticleRow({
           aria-hidden
           className="flex h-14 w-20 shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
         >
-          no image
+          {t(row.no_image)}
         </div>
       )}
 
@@ -115,30 +95,30 @@ export function ArticleRow({
           className="font-medium hover:underline"
           data-testid="article-title"
         >
-          {article.title || 'Untitled article'}
+          {article.title || t(row.untitled)}
         </a>
 
         {editing ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Input
-              aria-label={`Category for ${article.title}`}
+              aria-label={t(row.category_input, { title: article.title })}
               value={category}
               disabled={busy}
               list={suggestionsId}
-              placeholder="Uncategorised"
+              placeholder={t(row.uncategorised)}
               onChange={(e) => setCategory(e.target.value)}
               className="h-8 w-44"
             />
             <Input
               type="date"
-              aria-label={`Date for ${article.title}`}
+              aria-label={t(row.date_input, { title: article.title })}
               value={date}
               disabled={busy}
               onChange={(e) => setDate(e.target.value)}
               className="h-8 w-40"
             />
             <Button type="button" size="sm" disabled={busy || !dirty} onClick={save}>
-              Save
+              {t(row.save)}
             </Button>
             <Button
               type="button"
@@ -151,7 +131,7 @@ export function ArticleRow({
                 setEditing(false);
               }}
             >
-              Cancel
+              {t(row.cancel)}
             </Button>
           </div>
         ) : (
@@ -164,17 +144,19 @@ export function ArticleRow({
               type="button"
               disabled={busy}
               onClick={() => setEditing(true)}
-              aria-label={`${article.category || 'Uncategorised'} — edit category and date`}
+              aria-label={t(row.edit_category_and_date, {
+                value: article.category || t(row.uncategorised),
+              })}
               className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
             >
-              {article.category || 'Uncategorised'}
+              {article.category || t(row.uncategorised)}
             </button>
             <span>·</span>
             <button
               type="button"
               disabled={busy}
               onClick={() => setEditing(true)}
-              aria-label={`${dateLabel} — edit category and date`}
+              aria-label={t(row.edit_category_and_date, { value: dateLabel })}
               className="hover:underline"
             >
               {dateLabel}
@@ -185,7 +167,7 @@ export function ArticleRow({
         )}
 
         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{statusLine(article)}</span>
+          <span>{statusLine(article, t)}</span>
           {/* A state, not a fault. Publishing snapshots the body, so an author
               who keeps writing leaves the row saying "Published" about a
               document readers have never seen — truthfully, and about the
@@ -198,7 +180,7 @@ export function ArticleRow({
               data-testid="unpublished-changes"
               className="rounded-full border px-2 py-0.5 font-medium text-foreground"
             >
-              Unpublished edits
+              {t(row.unpublished_edits)}
             </span>
           )}
         </p>
@@ -206,7 +188,7 @@ export function ArticleRow({
 
       <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
         <Button type="button" size="sm" variant="outline" asChild>
-          <a href={articleSettingsUrl(article.id)}>Edit</a>
+          <a href={articleSettingsUrl(article.id)}>{t(row.edit)}</a>
         </Button>
 
         <DropdownMenu>
@@ -216,7 +198,7 @@ export function ArticleRow({
               size="sm"
               variant="ghost"
               disabled={busy}
-              aria-label={`More actions for ${article.title}`}
+              aria-label={t(row.more_actions, { title: article.title })}
             >
               ···
             </Button>
@@ -224,65 +206,32 @@ export function ArticleRow({
           <DropdownMenuContent align="end">
             {isDraft && (
               <DropdownMenuItem onSelect={() => void onPublish(article).catch(() => {})}>
-                Publish now
+                {t(row.publish_now)}
               </DropdownMenuItem>
             )}
             {article.status === 'published' && (
               <DropdownMenuItem asChild>
                 <a href={article.url} target="_blank" rel="noopener noreferrer">
-                  View on the site
+                  {t(row.view_on_site)}
                 </a>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem asChild>
-              <a href={article.edit_url}>Edit the body</a>
+              <a href={article.edit_url}>{t(row.edit_body)}</a>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setEditing(true)}>
-              Edit category and date
+              {t(row.edit_category_date_action)}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {canPublish ? (
-          <ConfirmDialog
-            // Medium, where this used to be low. "Detach" removed news' metadata
-            // and left the document standing in pagebuilder, so it cost nothing
-            // that could not be re-attached. There is no second document now —
-            // the body is this row — so the same button destroys the article.
-            //
-            // Gated on `canPublish`: the backend requires `news.publish` here,
-            // the same pair `purge` carries, because a hard delete is the one
-            // action with no way back. An author with `news.edit` alone gets
-            // the recoverable door below instead.
-            level="medium"
-            title={`Delete "${article.title}"?`}
-            description="The article and its body are removed, and its public URL stops working. This cannot be undone from here."
-            confirmLabel="Delete"
-            onConfirm={async () => onDelete(article.id)}
-            trigger={
-              <Button type="button" size="sm" variant="ghost" disabled={busy}>
-                Delete
-              </Button>
-            }
-          />
-        ) : (
-          <ConfirmDialog
-            // Medium for a published article — trashing takes it off the
-            // public site immediately, same as unpublish, even though it is
-            // fully reversible. Low would undersell that. A draft that was
-            // never public fits "low" on the same scale, so it gets it.
-            level={article.status === 'published' ? 'medium' : 'low'}
-            title={`Move "${article.title}" to trash?`}
-            description="It comes off the public site and out of this list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse."
-            confirmLabel="Move to trash"
-            onConfirm={async () => onTrash(article.id)}
-            trigger={
-              <Button type="button" size="sm" variant="ghost" disabled={busy}>
-                Move to trash
-              </Button>
-            }
-          />
-        )}
+        <ArticleRowDelete
+          article={article}
+          busy={busy}
+          canPublish={canPublish}
+          onDelete={onDelete}
+          onTrash={onTrash}
+        />
       </div>
     </li>
   );

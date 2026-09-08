@@ -1,5 +1,7 @@
 /** "As it appears" — what the page looks like in a result list and a social card. */
 
+import { keys, useT } from '../../utils/i18n';
+
 interface Props {
   /** Site origin, e.g. `acmelab.org`. Falls back to the browser's. */
   host: string;
@@ -38,14 +40,15 @@ export function SeoPreview({
   metaDescription,
   socialImage,
 }: Props) {
-  const title = metaTitle.trim() || pageTitle.trim() || 'Untitled page';
-  const path = `${publicPrefix.replace(/^\//, '')} › ${slug || 'untitled'}`;
+  const { t } = useT();
+  const title = metaTitle.trim() || pageTitle.trim() || t(keys.pagebuilder.seo.untitled_page);
+  const path = `${publicPrefix.replace(/^\//, '')} › ${slug || t(keys.pagebuilder.seo.untitled_slug)}`;
   const description = metaDescription.trim();
 
   return (
     <div className="grid gap-3" data-testid="seo-preview">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        As it appears
+        {t(keys.pagebuilder.seo.as_it_appears)}
       </p>
 
       {/* Search result */}
@@ -60,9 +63,7 @@ export function SeoPreview({
           {description ? (
             truncate(description, DESCRIPTION_LIMIT)
           ) : (
-            <span className="italic">
-              No meta description — search engines will invent one from the page.
-            </span>
+            <span className="italic">{t(keys.pagebuilder.seo.no_description)}</span>
           )}
         </p>
       </div>
@@ -78,7 +79,7 @@ export function SeoPreview({
           />
         ) : (
           <div className="flex aspect-[1200/630] w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-            No social image — falls back to the first image on the page
+            {t(keys.pagebuilder.seo.no_social_image)}
           </div>
         )}
         <div className="px-3 py-2">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { keys } from '../../../utils/i18n';
 import { imageUrlField, previewNote, showsPreview, statusFor } from './imageUrlField';
 import { ComparisonBlock, ImageBlock } from './media';
 import { renderStored } from './renderBlock';
@@ -38,7 +39,8 @@ describe('showsPreview', () => {
 
 describe('previewNote', () => {
   it('says so, once, when the address loads nothing', () => {
-    expect(previewNote('a.png', 'failed')).toBe('Nothing loaded from that address.');
+    // The key, not the sentence — the field translates it on the way out.
+    expect(previewNote('a.png', 'failed')).toBe(keys.news.blocks.image_field.not_loaded);
   });
 
   it('stays quiet the rest of the time', () => {
@@ -53,7 +55,7 @@ describe('imageUrlField', () => {
   it('is a custom field that carries its own label', () => {
     // Puck renders a `custom` field's `render` with no label wrapper, so the
     // field has to supply one or the panel loses the name of the input.
-    const field = imageUrlField('Image URL');
+    const field = imageUrlField(keys.news.blocks.image.url);
     expect(field.type).toBe('custom');
     expect(typeof field.render).toBe('function');
   });

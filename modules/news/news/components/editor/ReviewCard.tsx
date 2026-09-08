@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { type ArticleRead, approveArticle, rejectArticle, submitArticle } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 
 /** The review step, for hosts that want one.
  *
@@ -44,6 +45,8 @@ export function ReviewCard({
   canPublish: boolean;
   onChanged: () => Promise<void> | void;
 }) {
+  const { t } = useT();
+  const copy = keys.news.review;
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
@@ -69,52 +72,45 @@ export function ReviewCard({
   if (submitted && !canPublish) {
     return (
       <div className="rounded-lg border p-4">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide">Review</h2>
-        <p className="mb-3 text-xs text-muted-foreground">
-          With a reviewer. You will see their note here if it is sent back.
-        </p>
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
+        <p className="mb-3 text-xs text-muted-foreground">{t(copy.with_reviewer)}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3 rounded-lg border p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide">Review</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
 
       {submitted ? (
         <>
-          <p className="text-xs text-muted-foreground">
-            Submitted for review. Approving publishes it in the same action, so read it as a reader
-            will before you decide.
-          </p>
+          <p className="text-xs text-muted-foreground">{t(copy.submitted)}</p>
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               disabled={busy}
-              onClick={() => void run(() => approveArticle(article.id), 'Approved and published')}
+              onClick={() => void run(() => approveArticle(article.id), t(copy.approved_toast))}
             >
-              Approve
+              {t(copy.approve)}
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setRejecting(true)}>
-              Send back
+              {t(copy.send_back)}
             </Button>
           </div>
         </>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
-            {canPublish
-              ? 'You can publish directly. Submitting instead puts it in front of another reviewer.'
-              : 'Hand this to someone who can publish it.'}
+            {canPublish ? t(copy.can_publish) : t(copy.hand_over)}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"
               disabled={busy}
-              onClick={() => void run(() => submitArticle(article.id), 'Submitted for review')}
+              onClick={() => void run(() => submitArticle(article.id), t(copy.submitted_toast))}
             >
-              Submit for review
+              {t(copy.submit)}
             </Button>
           </div>
         </>
@@ -123,34 +119,33 @@ export function ReviewCard({
       <Dialog open={rejecting} onOpenChange={(next) => !busy && setRejecting(next)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send back to the author</DialogTitle>
-            <DialogDescription>
-              The note appears on the body canvas, where the author is working. It clears when they
-              resubmit.
-            </DialogDescription>
+            <DialogTitle>{t(copy.reject_title)}</DialogTitle>
+            <DialogDescription>{t(copy.reject_description)}</DialogDescription>
           </DialogHeader>
           <Textarea
             rows={3}
             value={note}
             disabled={busy}
-            aria-label="Reason"
-            placeholder="What needs to change?"
+            aria-label={t(copy.reject_label)}
+            placeholder={t(copy.reject_placeholder)}
             onChange={(e) => setNote(e.target.value)}
           />
           <DialogFooter>
             <Button variant="outline" disabled={busy} onClick={() => setRejecting(false)}>
-              Cancel
+              {t(copy.cancel)}
             </Button>
             <Button
               disabled={busy}
               onClick={() =>
-                void run(() => rejectArticle(article.id, note), 'Sent back').then(() => {
-                  setRejecting(false);
-                  setNote('');
-                })
+                void run(() => rejectArticle(article.id, note), t(copy.sent_back_toast)).then(
+                  () => {
+                    setRejecting(false);
+                    setNote('');
+                  },
+                )
               }
             >
-              Send back
+              {t(copy.send_back)}
             </Button>
           </DialogFooter>
         </DialogContent>

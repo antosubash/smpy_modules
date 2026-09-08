@@ -10,6 +10,7 @@ import {
   trashArticle,
   updateArticle,
 } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { SLUG_PATTERN } from '../utils/slugify';
 import {
   type CategoryRead,
@@ -52,6 +53,7 @@ function toDraft(article: ArticleRead): ArticleDraft {
  * than two that can disagree.
  */
 export function useArticleEditor(articleId: number) {
+  const { t } = useT();
   const [article, setArticle] = useState<ArticleRead | null>(null);
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
@@ -71,7 +73,7 @@ export function useArticleEditor(articleId: number) {
         const found = response.items.find((a) => a.id === articleId) ?? null;
         if (signal?.aborted) return;
         if (found === null) {
-          setError('That article no longer exists.');
+          setError(t(keys.news.editor.gone));
           return;
         }
         setArticle(found);
@@ -93,7 +95,7 @@ export function useArticleEditor(articleId: number) {
         })
         .catch(() => {});
     },
-    [articleId],
+    [articleId, t],
   );
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {
@@ -135,13 +137,13 @@ export function useArticleEditor(articleId: number) {
       if (updated) setArticle({ ...updated, tags: tags ?? draft.tags });
       setDirty(false);
       setSaved(true);
-      toast.success('Article saved');
+      toast.success(t(keys.news.editor.saved_toast));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [articleId, draft]);
+  }, [articleId, draft, t]);
 
   const publish = useCallback(async () => {
     if (!article) return;
@@ -150,13 +152,13 @@ export function useArticleEditor(articleId: number) {
     try {
       await publishArticle(article.id);
       await load();
-      toast.success('Published');
+      toast.success(t(keys.news.editor.published_toast));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [article, load]);
+  }, [article, load, t]);
 
   // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
   // — so the editor screen only offers it to a viewer who has it.

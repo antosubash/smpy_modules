@@ -1,0 +1,531 @@
+{
+  "list": {
+    "title": "News",
+    "description": "{published} published · {draft} drafts · public at /news/:slug",
+    "loading": "Loading articles",
+    "empty_title": "No articles yet",
+    "empty_description": "“New article” creates a draft and opens it in the editor. Set the category and date back here afterwards.",
+    "no_match_articles_query": "No articles match “{query}”",
+    "no_match_articles_filter": "No articles match this filter",
+    "no_match_drafts_query": "No drafts match “{query}”",
+    "no_match_drafts_filter": "No drafts match this filter",
+    "no_match_published_query": "No published articles match “{query}”",
+    "no_match_published_filter": "No published articles match this filter",
+    "no_match_undated_query": "No undated articles match “{query}”",
+    "no_match_undated_filter": "No undated articles match this filter",
+    "across_statuses_one": "{count} article match across all statuses. Widen the filter or clear the search.",
+    "across_statuses_other": "{count} articles match across all statuses. Widen the filter or clear the search.",
+    "nothing_in_archive": "Nothing in the archive matches. Try a shorter search.",
+    "search_all_statuses": "Search all statuses",
+    "clear": "Clear",
+    "showing": "Showing {shown} of {total}",
+    "load_more": "Load more"
+  },
+  "filters": {
+    "search_label": "Search headline or slug",
+    "status_legend": "Filter by status",
+    "status_all": "All",
+    "status_draft": "Draft",
+    "status_published": "Published",
+    "status_undated": "Undated",
+    "category_label": "Filter by category",
+    "category_all": "All categories",
+    "category_option": "{name} ({total})",
+    "locale_label": "Filter by language",
+    "locale_all": "All languages"
+  },
+  "row": {
+    "no_image": "no image",
+    "untitled": "Untitled article",
+    "category_input": "Category for {title}",
+    "date_input": "Date for {title}",
+    "uncategorised": "Uncategorised",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit_category_and_date": "{value} — edit category and date",
+    "no_date": "no date",
+    "status_published_dated": "Published · {when}",
+    "status_published_undated": "Published · no date",
+    "status_pending": "Pending review",
+    "status_draft_dated": "Draft · dated {when}",
+    "status_draft_undated": "Draft · undated",
+    "unpublished_edits": "Unpublished edits",
+    "edit": "Edit",
+    "more_actions": "More actions for {title}",
+    "publish_now": "Publish now",
+    "view_on_site": "View on the site",
+    "edit_body": "Edit the body",
+    "edit_category_date_action": "Edit category and date",
+    "delete_title": "Delete \"{title}\"?",
+    "delete_description": "The article and its body are removed, and its public URL stops working. This cannot be undone from here.",
+    "delete_confirm": "Delete",
+    "trash_title": "Move \"{title}\" to trash?",
+    "trash_description": "It comes off the public site and out of this list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse.",
+    "trash_confirm": "Move to trash"
+  },
+  "new_article": {
+    "trigger": "New article",
+    "title": "New article",
+    "description": "Four fields, all changeable later. Creating opens the editor for the body.",
+    "headline_label": "Headline",
+    "headline_placeholder": "Sensor rollout, north site",
+    "language_label": "Language",
+    "language_help": "Fixed once the article exists. To publish the same story in another language, add a translation from the editor.",
+    "url_label": "URL",
+    "category_label": "Category",
+    "category_none": "Uncategorised",
+    "date_label": "Display date",
+    "date_help": "The date shown on the article — it does not schedule a publish. Clearing it makes it undated work in progress.",
+    "empty_response": "The server created the article but returned nothing.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create draft"
+  },
+  "editor": {
+    "fallback_title": "Article",
+    "loading": "Loading…",
+    "loading_article": "Loading article",
+    "untitled": "Untitled article",
+    "description": "{url} · {status}",
+    "status_published": "Published",
+    "status_published_dated": "Published · {date}",
+    "status_pending": "Pending review",
+    "status_pending_dated": "Pending review · dated {date}",
+    "status_draft_dated": "Draft · dated {date}",
+    "status_draft_undated": "Draft · undated",
+    "back_to_list": "News / Articles",
+    "preview": "Preview",
+    "view_live": "View live",
+    "publish_now": "Publish now",
+    "body_card_title": "The body has its own canvas",
+    "body_card_description": "Blocks, autosave and revision history live there. This screen owns everything else — category, tags, display date, byline and how the article behaves in feeds.",
+    "edit_body": "Edit the body",
+    "delete_title": "Delete “{title}”?",
+    "delete_description": "The article, its body and its tags are removed, and its public URL stops working. This cannot be undone from here.",
+    "delete_confirm": "Delete",
+    "delete_trigger": "Delete article",
+    "trash_title": "Move “{title}” to trash?",
+    "trash_description": "It comes off the public site and out of the list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse.",
+    "trash_confirm": "Move to trash",
+    "trash_trigger": "Move article to trash",
+    "aside_heading": "Article",
+    "saving": "Saving…",
+    "unsaved": "Unsaved changes",
+    "saved": "Saved",
+    "save": "Save",
+    "saved_toast": "Article saved",
+    "published_toast": "Published",
+    "gone": "That article no longer exists."
+  },
+  "inspector": {
+    "headline_label": "Headline",
+    "headline_required": "An article needs a headline.",
+    "url_label": "URL",
+    "slug_invalid": "Lowercase letters, numbers and hyphens, starting with a letter or number.",
+    "slug_help": "Changing this moves the article. The old address keeps working — a rename records a redirect, because it is already in bookmarks and in a search index that has not recrawled.",
+    "category_label": "Category",
+    "category_none": "Uncategorised",
+    "tags_label": "Tags",
+    "date_label": "Display date",
+    "time_label": "Time",
+    "date_help_future": "The date shown to readers. It does not publish anything — use Go live for that.",
+    "date_help_past": "Clearing the date makes this undated work in progress, which sorts to the top of the list.",
+    "author_label": "Author",
+    "author_placeholder": "Byline",
+    "feed_legend": "Feed behaviour",
+    "pin_label": "Pin to the top of listings",
+    "pin_help": "Sorts before the date rather than changing it, so the archive still reads correctly once it is unpinned.",
+    "feed_label": "Show in feed blocks",
+    "feed_help": "Off keeps the article at its own URL and out of the chronological feed."
+  },
+  "review": {
+    "heading": "Review",
+    "with_reviewer": "With a reviewer. You will see their note here if it is sent back.",
+    "submitted": "Submitted for review. Approving publishes it in the same action, so read it as a reader will before you decide.",
+    "approve": "Approve",
+    "send_back": "Send back",
+    "can_publish": "You can publish directly. Submitting instead puts it in front of another reviewer.",
+    "hand_over": "Hand this to someone who can publish it.",
+    "submit": "Submit for review",
+    "approved_toast": "Approved and published",
+    "submitted_toast": "Submitted for review",
+    "sent_back_toast": "Sent back",
+    "reject_title": "Send back to the author",
+    "reject_description": "The note appears on the body canvas, where the author is working. It clears when they resubmit.",
+    "reject_label": "Reason",
+    "reject_placeholder": "What needs to change?",
+    "cancel": "Cancel"
+  },
+  "schedule": {
+    "heading": "Schedule",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "publish_at_label": "Go live",
+    "unpublish_at_label": "Come down",
+    "help": "Both are optional, and clearing one cancels it. The article changes state within a minute of the time you set, not exactly on it.",
+    "save": "Save schedule",
+    "saved_toast": "Schedule saved"
+  },
+  "seo": {
+    "heading": "Search & sharing",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "summary_label": "Summary",
+    "summary_help": "Shown under the headline in a search result and in a shared link. Also the excerpt in the archive and in feed blocks, so it is worth writing even for a site nobody searches.",
+    "image_label": "Share image URL",
+    "image_placeholder": "https://…",
+    "image_help": "The picture a link preview shows, and the cover at the top of the article.",
+    "canonical_label": "Canonical URL",
+    "canonical_placeholder": "Leave blank to use this article's own address",
+    "canonical_help": "Only for an article republished from somewhere else — it points search engines at the original instead of this copy.",
+    "index_label": "Allow search engines to index it",
+    "index_help": "Off sends {directive} and drops the article from the sitemap. It stays readable to anyone with the link.",
+    "save": "Save search settings",
+    "saved_toast": "Search settings saved"
+  },
+  "history": {
+    "heading": "History",
+    "empty": "Nothing yet. Submitting, publishing or taking the article down records a row here.",
+    "event_submit": "Submitted for review",
+    "event_approve": "Approved and published",
+    "event_reject": "Sent back",
+    "event_publish": "Published",
+    "event_unpublish": "Taken down",
+    "restore_title": "Restore this version?",
+    "restore_description": "The body you are working on is replaced by the one saved at this point. Anything written since is lost unless it was itself recorded here.",
+    "restore_confirm": "Restore",
+    "restore_trigger": "Restore this version",
+    "restored_toast": "Draft restored — reopen the body canvas to see it"
+  },
+  "translations": {
+    "heading": "Languages",
+    "status_draft": "Draft",
+    "status_pending": "Pending review",
+    "status_published": "Live",
+    "editing": "Editing",
+    "open": "Open",
+    "creating": "Creating…",
+    "add": "Add translation",
+    "empty_response": "The translation was created but not returned.",
+    "failed": "Could not create the translation."
+  },
+  "tag_input": {
+    "remove": "Remove tag {tag}",
+    "add_label": "Add a tag",
+    "add_placeholder": "add…"
+  },
+  "body": {
+    "title": "{title} — body",
+    "fallback_title": "Article body",
+    "back": "← Article",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "save_failed": "Save failed",
+    "unsaved": "Unsaved changes",
+    "saved": "Saved",
+    "save_draft": "Save draft",
+    "update_published": "Update published",
+    "publish": "Publish",
+    "sent_back": "Sent back:",
+    "select_a_block": "Select a block to edit it. The headline, URL and publish date belong to the article — edit them on the article screen."
+  },
+  "categories": {
+    "title": "Categories",
+    "description": "One category per article, many tags. The category drives the public /news filters and every feed block.",
+    "new_label": "New category name",
+    "new_placeholder": "New category",
+    "add": "Add",
+    "loading": "Loading categories",
+    "delete": "Delete",
+    "help": "Drag to change the order categories appear in the public /news filter bar. Deleting one asks where its articles go — nothing is deleted with it.",
+    "drag": "Drag to reorder",
+    "name_label": "Category name",
+    "slug_label": "Category slug",
+    "system": "system category · cannot be deleted or renamed",
+    "count_one": "{count} article",
+    "count_other": "{count} articles",
+    "save": "Save",
+    "cancel": "Cancel",
+    "rename": "Rename",
+    "adopt": "Add to list",
+    "delete_title": "Delete \"{name}\"?",
+    "delete_empty": "The category is empty, so nothing moves. The public filter loses one entry.",
+    "delete_moving_one": "{count} article will move to {destination}. Nothing is deleted with the category — the articles keep their body, slug and date.",
+    "delete_moving_other": "{count} articles will move to {destination}. Nothing is deleted with the category — the articles keep their body, slug and date.",
+    "delete_confirm": "Delete category",
+    "reassign_label": "Move its articles to",
+    "uncategorised": "Uncategorised"
+  },
+  "tags": {
+    "heading": "Tags",
+    "description": "Freeform, and made while writing. Select two to merge them.",
+    "find_or_create": "Find or create a tag",
+    "create": "Create",
+    "merge_summary": "Merge {source} into {target}",
+    "merge": "Merge",
+    "no_match": "No tag matches \"{query}\". Create it above.",
+    "empty": "No tags yet. They appear here as writers add them to articles."
+  },
+  "trash": {
+    "title": "Trash",
+    "description": "Articles you have deleted. Restoring puts one back exactly as it was.",
+    "back_to_list": "News / Articles",
+    "loading": "Loading the trash",
+    "empty": "The trash is empty.",
+    "restore": "Restore",
+    "restored_toast": "Restored",
+    "purge_title": "Delete “{title}” for good?",
+    "purge_description": "The article, its body, its tags and its redirects are removed permanently. This cannot be undone.",
+    "purge_confirm": "Delete for good",
+    "purged_toast": "Deleted for good"
+  },
+  "search": {
+    "title": "Search",
+    "description": "Headlines, slugs, body text, categories, tags and filenames — across articles, pages and media.",
+    "input_label": "Search everything",
+    "section_legend": "Filter by section",
+    "filter_all": "Everything",
+    "filter_articles": "Articles",
+    "filter_pages": "Pages",
+    "filter_media": "Media",
+    "prompt_title": "Type to search",
+    "prompt_description": "The same index the Articles and Pages lists use — those scope themselves to their own section, this one does not.",
+    "searching": "Searching",
+    "no_match_title": "Nothing matches “{query}”",
+    "no_match_description": "Try a shorter search — this looks in headlines, slugs, body text, categories, tags and filenames.",
+    "section_results": "{label} results",
+    "section_heading": "{label} · {total}",
+    "untitled": "Untitled",
+    "more_articles_one": "{count} more article →",
+    "more_articles_other": "{count} more articles →",
+    "more_pages_one": "{count} more page →",
+    "more_pages_other": "{count} more pages →",
+    "more_media_one": "{count} more file →",
+    "more_media_other": "{count} more files →"
+  },
+  "preview": {
+    "label": "Preview",
+    "badge": "Preview",
+    "state_draft": "Draft",
+    "detail_draft": "Readers cannot see this yet.",
+    "state_pending": "Pending review",
+    "detail_pending": "Readers cannot see this until it is approved.",
+    "state_unpublished_changes": "Unpublished changes",
+    "detail_unpublished_changes": "Readers are still being served the published version.",
+    "state_published": "Published",
+    "detail_published": "This matches what readers are served.",
+    "back_to_editor": "Back to the editor",
+    "view_live": "View live"
+  },
+  "public": {
+    "search_placeholder": "Search articles",
+    "search_placeholder_narrowed": "Search in {heading}",
+    "search_submit": "Search",
+    "title_with_query": "{query} — {heading}",
+    "no_match": "Nothing matches “{query}”.",
+    "no_match_narrowed": "Nothing matches “{query}” in {heading}.",
+    "show_all": "Show all articles",
+    "show_all_narrowed": "Show all of {heading}",
+    "empty": "Nothing published here yet.",
+    "newer": "← Newer",
+    "older": "Older →",
+    "pager_one": "Page {page} of {pages} · {count} article",
+    "pager_other": "Page {page} of {pages} · {count} articles",
+    "feed": "Subscribe by RSS"
+  },
+  "confirm": {
+    "default_label": "Confirm",
+    "failed": "{action} failed",
+    "phrase": "Type {phrase} to confirm",
+    "cancel": "Cancel",
+    "working": "Working…"
+  },
+  "dates": {
+    "today": "today",
+    "in_days": "in {days}d",
+    "days_ago": "{days}d ago"
+  },
+  "blocks": {
+    "common": {
+      "heading": "Heading",
+      "heading_optional": "Heading (optional)",
+      "text": "Text",
+      "style": "Style",
+      "caption_optional": "Caption (optional)",
+      "quantity": "How many"
+    },
+    "categories": {
+      "text": "Text",
+      "asides": "Set apart",
+      "media": "Media",
+      "data": "Data",
+      "layout": "Layout"
+    },
+    "viewports": {
+      "mobile": "Mobile",
+      "tablet": "Tablet",
+      "desktop": "Desktop"
+    },
+    "heading": {
+      "label": "Heading",
+      "level": "Level",
+      "level_h2": "Section (H2)",
+      "level_h3": "Sub-section (H3)"
+    },
+    "paragraph": {
+      "label": "Paragraph",
+      "style_body": "Body",
+      "style_lead": "Lead (larger)"
+    },
+    "quote": {
+      "label": "Pull quote",
+      "text": "Quote",
+      "attribution": "Attribution (optional)"
+    },
+    "qanda": {
+      "label": "Q&A",
+      "title": "Who is answering (optional)",
+      "items": "One per line — \"question | answer\""
+    },
+    "list": {
+      "label": "List",
+      "items": "One item per line",
+      "style_bulleted": "Bulleted",
+      "style_numbered": "Numbered"
+    },
+    "key_points": {
+      "label": "Key points",
+      "items": "One point per line"
+    },
+    "callout": {
+      "label": "Callout",
+      "kind": "Kind",
+      "kind_note": "Note",
+      "kind_important": "Important",
+      "kind_correction": "Correction",
+      "title": "Label (optional)",
+      "tone_note": "Note",
+      "tone_important": "Important",
+      "tone_correction": "Correction"
+    },
+    "definitions": {
+      "label": "Definitions",
+      "items": "One per line — \"term | what it means\""
+    },
+    "sources": {
+      "label": "Sources",
+      "items": "One per line — \"what it is | https://…\""
+    },
+    "related": {
+      "label": "Read next",
+      "category": "Category filter (blank = any)"
+    },
+    "contents": {
+      "label": "Contents",
+      "depth": "How deep",
+      "depth_sections": "Sections only",
+      "depth_subsections": "Sections and sub-sections",
+      "fallback_label": "Contents",
+      "hint": "Contents lists this article's section headings. Add at least {min} Heading blocks and they appear here, and on the published page."
+    },
+    "image": {
+      "label": "Image",
+      "url": "Image URL",
+      "alt": "Alt text (describe the image)",
+      "credit": "Credit (optional)"
+    },
+    "gallery": {
+      "label": "Gallery",
+      "images": "One per line — \"https://… | alt text | caption\"",
+      "columns": "Across",
+      "columns_2": "Two",
+      "columns_3": "Three"
+    },
+    "comparison": {
+      "label": "Before / after",
+      "before_url": "Before — image URL",
+      "before_label": "Before — label",
+      "after_url": "After — image URL",
+      "after_label": "After — label"
+    },
+    "video": {
+      "label": "Video file",
+      "url": "Video URL (mp4, webm)",
+      "poster": "Poster image URL (optional)"
+    },
+    "audio": {
+      "label": "Audio clip",
+      "url": "Audio URL (mp3, m4a, ogg)",
+      "title": "What it is",
+      "fallback_label": "Audio clip"
+    },
+    "embed": {
+      "label": "Embed (video, map…)",
+      "url": "Embed URL",
+      "title": "Title (read by screen readers)",
+      "ratio": "Aspect ratio",
+      "ratio_16_9": "16:9",
+      "ratio_4_3": "4:3"
+    },
+    "table": {
+      "label": "Table",
+      "rows": "One row per line, cells split by |",
+      "header": "First row",
+      "header_is_header": "Is a header",
+      "header_is_data": "Is data"
+    },
+    "chart": {
+      "label": "Chart",
+      "kind": "Shape",
+      "kind_bar": "Bars (compare)",
+      "kind_line": "Line (over time)",
+      "series": "One per line — \"2019 | 4,100\"",
+      "figures": "Figures",
+      "column_label": "Label",
+      "column_value": "Value"
+    },
+    "facts": {
+      "label": "Key figures",
+      "items": "One per line — \"21 | sensors installed\""
+    },
+    "code": {
+      "label": "Code",
+      "code": "Code",
+      "language": "Language label (optional)"
+    },
+    "timeline": {
+      "label": "Timeline",
+      "items": "One per line — \"when | what happened\""
+    },
+    "divider": {
+      "label": "Divider",
+      "style_rule": "Rule",
+      "style_asterism": "Asterism",
+      "spacing": "Spacing",
+      "spacing_small": "Small",
+      "spacing_large": "Large"
+    },
+    "image_field": {
+      "not_loaded": "Nothing loaded from that address."
+    }
+  },
+  "feed": {
+    "label": "News feed (live articles)",
+    "palette_group": "Feeds",
+    "title": "Heading",
+    "category": "Category filter (blank = all)",
+    "limit": "How many",
+    "columns": "Columns (desktop)",
+    "columns_2": "2",
+    "columns_3": "3",
+    "columns_4": "4",
+    "view_all_label": "View-all link label",
+    "view_all_href": "View-all link URL"
+  },
+  "errors": {
+    "request_failed": "Request failed ({status} {statusText})",
+    "request_failed_snippet": "{message}: {snippet}",
+    "field_message": "{field}: {message}",
+    "not_valid": "is not valid"
+  }
+}

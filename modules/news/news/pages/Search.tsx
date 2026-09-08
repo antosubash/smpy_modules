@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 
 import { SearchSection } from '../components/search/SearchSection';
 import { useAdminSearch } from '../hooks/useAdminSearch';
+import { keys, useT } from '../utils/i18n';
 
 const SEARCH_INPUT_ID = 'admin-search-input';
 
@@ -17,6 +18,8 @@ const SEARCH_INPUT_ID = 'admin-search-input';
  * an asset". The sections keep the answer legible once it arrives.
  */
 export default function Search() {
+  const { t } = useT();
+  const copy = keys.news.search;
   const { q, setQuery, results, loading, error, section, setSection } = useAdminSearch();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,34 +37,31 @@ export default function Search() {
   };
 
   const filters = [
-    { key: '', label: 'Everything', count: counts?.all },
-    { key: 'articles', label: 'Articles', count: counts?.articles },
-    { key: 'pages', label: 'Pages', count: counts?.pages },
-    { key: 'media', label: 'Media', count: counts?.media },
+    { key: '', label: t(copy.filter_all), count: counts?.all },
+    { key: 'articles', label: t(copy.filter_articles), count: counts?.articles },
+    { key: 'pages', label: t(copy.filter_pages), count: counts?.pages },
+    { key: 'media', label: t(copy.filter_media), count: counts?.media },
   ];
 
   const show = (key: string) => section === '' || section === key;
 
   return (
-    <PageShell
-      title="Search"
-      description="Headlines, slugs, body text, categories, tags and filenames — across articles, pages and media."
-    >
-      <Head title="Search" />
+    <PageShell title={t(copy.title)} description={t(copy.description)}>
+      <Head title={t(copy.title)} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Input
           id={SEARCH_INPUT_ID}
           ref={inputRef}
-          aria-label="Search everything"
-          placeholder="Search everything"
+          aria-label={t(copy.input_label)}
+          placeholder={t(copy.input_label)}
           value={q}
           className="h-10 w-80"
           onChange={(e) => setQuery(e.target.value)}
         />
         {results && (
           <fieldset className="m-0 flex flex-wrap gap-1 border-0 p-0">
-            <legend className="sr-only">Filter by section</legend>
+            <legend className="sr-only">{t(copy.section_legend)}</legend>
             {filters.map((filter) => (
               <button
                 key={filter.key || 'all'}
@@ -87,52 +87,46 @@ export default function Search() {
 
       {!q.trim() ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="font-medium">Type to search</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The same index the Articles and Pages lists use — those scope themselves to their own
-            section, this one does not.
-          </p>
+          <p className="font-medium">{t(copy.prompt_title)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t(copy.prompt_description)}</p>
         </div>
       ) : loading && !results ? (
-        <div role="status" aria-label="Searching" className="space-y-2">
+        <div role="status" aria-label={t(copy.searching)} className="space-y-2">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
       ) : results && counts && counts.all === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="font-medium">Nothing matches “{q.trim()}”</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try a shorter search — this looks in headlines, slugs, body text, categories, tags and
-            filenames.
-          </p>
+          <p className="font-medium">{t(copy.no_match_title, { query: q.trim() })}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t(copy.no_match_description)}</p>
         </div>
       ) : results ? (
         <div className="space-y-8">
           {show('articles') && (
             <SearchSection
-              label="Articles"
+              label={t(copy.filter_articles)}
               hits={results.articles}
               total={results.article_total}
               moreHref={`/admin/news/?q=${encodeURIComponent(q.trim())}`}
-              moreLabel="articles"
+              moreKey={copy.more_articles}
             />
           )}
           {show('pages') && (
             <SearchSection
-              label="Pages"
+              label={t(copy.filter_pages)}
               hits={results.pages}
               total={results.page_total}
               moreHref={results.pages_more_url}
-              moreLabel="pages"
+              moreKey={copy.more_pages}
             />
           )}
           {show('media') && (
             <SearchSection
-              label="Media"
+              label={t(copy.filter_media)}
               hits={results.media}
               total={results.media_total}
               moreHref={results.media_more_url}
-              moreLabel="files"
+              moreKey={copy.more_media}
             />
           )}
         </div>

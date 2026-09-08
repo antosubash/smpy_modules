@@ -14,6 +14,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type ReactNode, useState } from 'react';
 
 import { usePendingDialog } from '../hooks/usePendingDialog';
+import { keys, useT } from '../utils/i18n';
 
 /** How much a confirmation is allowed to cost the person clicking it.
  *
@@ -49,7 +50,7 @@ export function ConfirmDialog({
   trigger,
   title,
   description,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   destructive = false,
   level,
   confirmPhrase,
@@ -72,6 +73,8 @@ export function ConfirmDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
+  const { t } = useT();
+  const label = confirmLabel ?? t(keys.pagebuilder.confirm.confirm);
   const [typed, setTyped] = useState('');
 
   const resolvedLevel: ConfirmLevel = level ?? (destructive ? 'medium' : 'low');
@@ -87,8 +90,9 @@ export function ConfirmDialog({
   // phrase, because reopening must not inherit the one typed last time: that
   // would put a second delete one click from confirmed, which is the exact
   // property this level exists to remove.
-  const { open, pending, error, change, run } = usePendingDialog(`${confirmLabel} failed`, () =>
-    setTyped(''),
+  const { open, pending, error, change, run } = usePendingDialog(
+    t(keys.pagebuilder.confirm.failed, { action: label }),
+    () => setTyped(''),
   );
 
   return (
@@ -103,7 +107,9 @@ export function ConfirmDialog({
         {needsPhrase && (
           <div className="grid gap-2 py-2">
             <Label htmlFor={CONFIRM_PHRASE_INPUT}>
-              Type <code className="font-mono font-semibold">{confirmPhrase}</code> to confirm
+              {t(keys.pagebuilder.confirm.type_prefix)}{' '}
+              <code className="font-mono font-semibold">{confirmPhrase}</code>{' '}
+              {t(keys.pagebuilder.confirm.type_suffix)}
             </Label>
             <Input
               id={CONFIRM_PHRASE_INPUT}
@@ -116,7 +122,9 @@ export function ConfirmDialog({
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            {t(keys.pagebuilder.confirm.cancel)}
+          </AlertDialogCancel>
           <AlertDialogAction
             disabled={pending || !unlocked}
             className={
@@ -129,7 +137,7 @@ export function ConfirmDialog({
               void run(onConfirm);
             }}
           >
-            {pending ? 'Working…' : confirmLabel}
+            {pending ? t(keys.pagebuilder.confirm.working) : label}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

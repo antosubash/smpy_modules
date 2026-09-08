@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { getArticleDetail, updateArticle } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 
 const DESC_ID = 'article-meta-description';
 const IMAGE_ID = 'article-og-image';
@@ -26,6 +27,8 @@ const INDEX_ID = 'article-index-in-search';
  * document just to render a panel most edits never touch.
  */
 export function SeoCard({ articleId }: { articleId: number }) {
+  const { t } = useT();
+  const copy = keys.news.seo;
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [canonical, setCanonical] = useState('');
@@ -56,7 +59,7 @@ export function SeoCard({ articleId }: { articleId: number }) {
         index_in_search: indexed,
       });
       setSaved(true);
-      toast.success('Search settings saved');
+      toast.success(t(copy.saved_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -67,14 +70,14 @@ export function SeoCard({ articleId }: { articleId: number }) {
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide">Search &amp; sharing</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
         <span className="text-xs text-muted-foreground" aria-live="polite">
-          {busy ? 'Saving…' : saved ? 'Saved' : ''}
+          {busy ? t(copy.saving) : saved ? t(copy.saved) : ''}
         </span>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={DESC_ID}>Summary</Label>
+        <Label htmlFor={DESC_ID}>{t(copy.summary_label)}</Label>
         <Textarea
           id={DESC_ID}
           rows={3}
@@ -82,39 +85,31 @@ export function SeoCard({ articleId }: { articleId: number }) {
           disabled={busy}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          Shown under the headline in a search result and in a shared link. Also the excerpt in the
-          archive and in feed blocks, so it is worth writing even for a site nobody searches.
-        </p>
+        <p className="text-xs text-muted-foreground">{t(copy.summary_help)}</p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={IMAGE_ID}>Share image URL</Label>
+        <Label htmlFor={IMAGE_ID}>{t(copy.image_label)}</Label>
         <Input
           id={IMAGE_ID}
           value={image}
           disabled={busy}
-          placeholder="https://…"
+          placeholder={t(copy.image_placeholder)}
           onChange={(e) => setImage(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          The picture a link preview shows, and the cover at the top of the article.
-        </p>
+        <p className="text-xs text-muted-foreground">{t(copy.image_help)}</p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={CANONICAL_ID}>Canonical URL</Label>
+        <Label htmlFor={CANONICAL_ID}>{t(copy.canonical_label)}</Label>
         <Input
           id={CANONICAL_ID}
           value={canonical}
           disabled={busy}
-          placeholder="Leave blank to use this article's own address"
+          placeholder={t(copy.canonical_placeholder)}
           onChange={(e) => setCanonical(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          Only for an article republished from somewhere else — it points search engines at the
-          original instead of this copy.
-        </p>
+        <p className="text-xs text-muted-foreground">{t(copy.canonical_help)}</p>
       </div>
 
       <div className="flex items-start gap-2">
@@ -125,16 +120,17 @@ export function SeoCard({ articleId }: { articleId: number }) {
           onCheckedChange={(checked) => setIndexed(checked === true)}
         />
         <div className="grid gap-0.5">
-          <Label htmlFor={INDEX_ID}>Allow search engines to index it</Label>
+          <Label htmlFor={INDEX_ID}>{t(copy.index_label)}</Label>
+          {/* The directive is a placeholder rather than a <code> splicing two
+              translated halves together — one sentence, one catalogue entry. */}
           <p className="text-xs text-muted-foreground">
-            Off sends <code>noindex</code> and drops the article from the sitemap. It stays readable
-            to anyone with the link.
+            {t(copy.index_help, { directive: 'noindex' })}
           </p>
         </div>
       </div>
 
       <Button className="w-full" variant="outline" disabled={busy} onClick={() => void save()}>
-        Save search settings
+        {t(copy.save)}
       </Button>
     </div>
   );

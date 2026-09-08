@@ -7,15 +7,16 @@ import {
   listArticles,
   translateArticle,
 } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { localeLabel } from '../../utils/locale';
 
 /** Three words for three states. A submission is not a draft the author is
  *  still holding and it is not live either, and "Draft" for both is how a
  *  reviewer ends up chasing a translation that is already waiting on them. */
 const STATUS_WORD: Record<ArticleStatus, string> = {
-  draft: 'Draft',
-  submitted_for_review: 'Pending review',
-  published: 'Live',
+  draft: keys.news.translations.status_draft,
+  submitted_for_review: keys.news.translations.status_pending,
+  published: keys.news.translations.status_published,
 };
 
 interface Props {
@@ -38,6 +39,8 @@ interface Props {
  * server copies them across; a form that asked would invite them to drift.
  */
 export function ArticleTranslations({ article, locales, onError }: Props) {
+  const { t } = useT();
+  const copy = keys.news.translations;
   const [siblings, setSiblings] = useState<ArticleRead[] | null>(null);
   const [busyLocale, setBusyLocale] = useState<string | null>(null);
   const group = article.translation_group;
@@ -83,17 +86,17 @@ export function ArticleTranslations({ article, locales, onError }: Props) {
       // `write` types a 204 as null; this route answers 201 with a body, so
       // null here means the shape changed rather than "nothing was created" —
       // say so instead of navigating to `undefined`.
-      if (created === null) throw new Error('The translation was created but not returned.');
+      if (created === null) throw new Error(t(copy.empty_response));
       router.visit(created.edit_url);
     } catch (error) {
       setBusyLocale(null);
-      onError(error instanceof Error ? error.message : 'Could not create the translation.');
+      onError(error instanceof Error ? error.message : t(copy.failed));
     }
   };
 
   return (
     <div data-testid="article-translations">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide">Languages</h2>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
       <ul className="divide-y rounded-lg border bg-card text-sm">
         {locales.map((tag) => {
           const sibling = byLocale.get(tag);
@@ -108,15 +111,17 @@ export function ArticleTranslations({ article, locales, onError }: Props) {
                 <span className="font-medium">{localeLabel(tag)}</span>
                 {sibling && (
                   <span className="block truncate text-xs text-muted-foreground">
-                    {sibling.url} · {STATUS_WORD[sibling.status]}
+                    {sibling.url} · {t(STATUS_WORD[sibling.status])}
                   </span>
                 )}
               </span>
               {isCurrent ? (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">Editing</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
+                  {t(copy.editing)}
+                </span>
               ) : sibling ? (
                 <a className="shrink-0 text-primary underline" href={sibling.edit_url}>
-                  Open
+                  {t(copy.open)}
                 </a>
               ) : (
                 <button
@@ -128,7 +133,7 @@ export function ArticleTranslations({ article, locales, onError }: Props) {
                   onClick={() => void handleAdd(tag)}
                   data-testid={`add-article-translation-${tag}`}
                 >
-                  {busyLocale === tag ? 'Creating…' : 'Add translation'}
+                  {busyLocale === tag ? t(copy.creating) : t(copy.add)}
                 </button>
               )}
             </li>

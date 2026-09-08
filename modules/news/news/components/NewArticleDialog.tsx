@@ -15,6 +15,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
 import { createArticle } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
@@ -49,6 +50,8 @@ interface Props {
  * language is a translation, offered from the editor.
  */
 export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) {
+  const { t } = useT();
+  const copy = keys.news.new_article;
   const [open, setOpen] = useState(false);
   const [headline, setHeadline] = useState('');
   // Null until edited: while null the slug tracks the headline, and the moment
@@ -117,7 +120,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
       // unreachable — but reading `edit_url` off null would throw past the
       // catch below and leave the dialog stuck on "Creating…" with both
       // buttons disabled, which is the one outcome worth three lines to avoid.
-      if (!article) throw new Error('The server created the article but returned nothing.');
+      if (!article) throw new Error(t(copy.empty_response));
       // `edit_url` is the body canvas: creating an article and writing it are
       // one motion. It used to be a pagebuilder editor URL, which is why this
       // is served by the API rather than assembled here.
@@ -136,7 +139,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
   return (
     <Dialog open={open} onOpenChange={reset}>
       <DialogTrigger asChild>
-        <Button type="button">New article</Button>
+        <Button type="button">{t(copy.trigger)}</Button>
       </DialogTrigger>
       <DialogContent>
         <form
@@ -146,28 +149,26 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
           }}
         >
           <DialogHeader>
-            <DialogTitle>New article</DialogTitle>
-            <DialogDescription>
-              Four fields, all changeable later. Creating opens the editor for the body.
-            </DialogDescription>
+            <DialogTitle>{t(copy.title)}</DialogTitle>
+            <DialogDescription>{t(copy.description)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor={HEADLINE_ID}>Headline</Label>
+              <Label htmlFor={HEADLINE_ID}>{t(copy.headline_label)}</Label>
               <Input
                 id={HEADLINE_ID}
                 value={headline}
                 autoFocus
                 disabled={pending}
-                placeholder="Sensor rollout, north site"
+                placeholder={t(copy.headline_placeholder)}
                 onChange={(e) => setHeadline(e.target.value)}
               />
             </div>
 
             {locales.length > 1 && (
               <div className="grid gap-2">
-                <Label htmlFor={LOCALE_ID}>Language</Label>
+                <Label htmlFor={LOCALE_ID}>{t(copy.language_label)}</Label>
                 <NativeSelect
                   id={LOCALE_ID}
                   value={locale}
@@ -180,15 +181,12 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
                     </option>
                   ))}
                 </NativeSelect>
-                <p className="text-xs text-muted-foreground">
-                  Fixed once the article exists. To publish the same story in another language, add
-                  a translation from the editor.
-                </p>
+                <p className="text-xs text-muted-foreground">{t(copy.language_help)}</p>
               </div>
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor={SLUG_ID}>URL</Label>
+              <Label htmlFor={SLUG_ID}>{t(copy.url_label)}</Label>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-muted-foreground">
                   {locale === defaultLocale ? '' : `/${locale}`}/news/
@@ -203,14 +201,14 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={CATEGORY_ID}>Category</Label>
+              <Label htmlFor={CATEGORY_ID}>{t(copy.category_label)}</Label>
               <NativeSelect
                 id={CATEGORY_ID}
                 value={category}
                 disabled={pending}
                 onChange={(e) => setCategory(e.target.value)}
               >
-                <option value="">Uncategorised</option>
+                <option value="">{t(copy.category_none)}</option>
                 {categories.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.name}
@@ -220,7 +218,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={DATE_ID}>Display date</Label>
+              <Label htmlFor={DATE_ID}>{t(copy.date_label)}</Label>
               <Input
                 id={DATE_ID}
                 type="date"
@@ -228,10 +226,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
                 disabled={pending}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                The date shown on the article — it does not schedule a publish. Clearing it makes it
-                undated work in progress.
-              </p>
+              <p className="text-xs text-muted-foreground">{t(copy.date_help)}</p>
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
@@ -239,10 +234,10 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
 
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => reset(false)}>
-              Cancel
+              {t(copy.cancel)}
             </Button>
             <Button type="submit" disabled={pending || !headline.trim() || !slug}>
-              {pending ? 'Creating…' : 'Create draft'}
+              {pending ? t(copy.creating) : t(copy.create)}
             </Button>
           </DialogFooter>
         </form>

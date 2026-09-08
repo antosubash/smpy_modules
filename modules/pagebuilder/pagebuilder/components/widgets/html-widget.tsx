@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { EmptyPlaceholder } from './_shared';
 
 export type HtmlWidgetProps = {
@@ -7,15 +8,15 @@ export type HtmlWidgetProps = {
 };
 
 export const HtmlWidget: ComponentConfig<HtmlWidgetProps> = {
-  label: 'Raw HTML',
+  label: keys.pagebuilder.blocks.html.label,
   fields: {
     html: {
       type: 'textarea',
-      label: 'HTML (rendered in sandboxed iframe)',
+      label: keys.pagebuilder.blocks.html.html,
     },
     height: {
       type: 'text',
-      label: 'Height (e.g. 400px)',
+      label: keys.pagebuilder.blocks.html.height,
     },
   },
   defaultProps: {
@@ -26,7 +27,7 @@ export const HtmlWidget: ComponentConfig<HtmlWidgetProps> = {
     html?.trim() ? (
       <div className="container mx-auto py-6">
         <iframe
-          title="Embedded HTML"
+          title={translate(keys.pagebuilder.blocks.html.frame_title)}
           className="w-full rounded-lg border bg-white"
           // Stored blocks may omit height (Puck's public Render does not
           // merge defaultProps) — fall back to the default instead of
@@ -37,6 +38,6 @@ export const HtmlWidget: ComponentConfig<HtmlWidgetProps> = {
         />
       </div>
     ) : (
-      <EmptyPlaceholder label="Html (no content)" />
+      <EmptyPlaceholder label={translate(keys.pagebuilder.blocks.html.empty)} />
     ),
 };

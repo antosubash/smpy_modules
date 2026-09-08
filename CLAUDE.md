@@ -92,14 +92,34 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n.** No module here is translated — pagebuilder, news and
-  canopy_atlas all have hardcoded English TSX and no `locales/en.json`. The
-  framework's own modules do have one, and the convention depends on
-  `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
-  *does* now wire it (`host/client_app/app.tsx` configures the catalog from
-  the `i18n` shared prop, and the framework mounts `LocaleMiddleware`), so the
-  blocker is gone — what remains is the conversion itself, and all three
-  modules should convert together rather than piecemeal during unrelated work.
+- **UI i18n — done.** news and pagebuilder both ship `locales/en.json` and call
+  `t(keys.<module>.<section>.<key>)`. canopy_atlas needs nothing: it has no
+  frontend at all — zero `.ts`/`.tsx` files, and its `pages/` holds only a
+  `.gitkeep` — so the older note here, claiming all three had hardcoded English
+  TSX, was wrong about it.
+
+  **The trap, if you add a module.** The framework generates the `keys` object
+  and the `t()` key union into `packages/i18n/src`, from the merged registry of
+  every locale directory *a host inside its own monorepo* loads. That directory
+  does not exist here, and the published `@simple-module-py/i18n` carries only
+  the framework's own namespaces — so `keys.<yourmodule>` does not exist and
+  passing a literal to `t()` is a type error. That is a property of where the
+  generator writes rather than of anything a module does wrong, and it will be
+  equally true of the next module added to this repo.
+
+  The way round it, which news established and pagebuilder copied: derive `keys`
+  from the module's own `locales/en.json` at compile time (`resolveJsonModule`
+  plus a mapped type), so the catalogue *is* the key tree and `tsc` rejects a
+  key the JSON does not define. See `modules/news/news/utils/i18n.ts` — about
+  ninety lines, and the reference implementation. Leaves are typed `string`
+  rather than the literal, because the published `t()` narrows to the
+  framework's union and rejects a literal outside it.
+
+  Puck block labels cannot call a hook: a block config is a module-scope
+  constant, imported before anything renders. Labels hold the *key* and are
+  resolved at render — see each module's `localizeConfig.ts`. Pagebuilder's also
+  recurses into `arrayFields`/`objectFields`, without which the labels inside a
+  repeater's rows stay dotted keys, visible only once a row is expanded.
 
   Not to be confused with **content** i18n, which is done: pages and articles
   can be published in several languages. That is pagebuilder's

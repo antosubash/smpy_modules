@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { emptyData } from '../components/puckConfig';
 import type { PageDetail } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { keys, useT } from '../utils/i18n';
 import { slugify } from '../utils/slugify';
 
 export interface EditorForm {
@@ -63,6 +64,7 @@ export interface EditorForm {
 }
 
 export function useEditorForm(page: PageDetail | null, defaultLocale = 'en'): EditorForm {
+  const { t } = useT();
   const [pageId, setPageId] = useState<number | null>(page?.id ?? null);
   const [title, setTitle] = useState(page?.title ?? 'Untitled page');
   const [slug, setSlug] = useState(page?.slug ?? '');
@@ -104,12 +106,12 @@ export function useEditorForm(page: PageDetail | null, defaultLocale = 'en'): Ed
     try {
       const parsed = JSON.parse(trimmed);
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        setJsonLdError('JSON-LD must be a JSON object.');
+        setJsonLdError(t(keys.pagebuilder.seo.json_ld_not_object));
       } else {
         setJsonLdError(null);
       }
     } catch (err) {
-      setJsonLdError(err instanceof Error ? err.message : 'Invalid JSON.');
+      setJsonLdError(err instanceof Error ? err.message : t(keys.pagebuilder.seo.json_ld_invalid));
     }
   };
 

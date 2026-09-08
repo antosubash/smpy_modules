@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { DisclosureChevron } from './_internal/disclosure-chevron';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -12,14 +13,14 @@ export type AccordionWidgetProps = {
 };
 
 export const AccordionWidget: ComponentConfig<AccordionWidgetProps> = {
-  label: 'Accordion',
+  label: keys.pagebuilder.blocks.accordion.label,
   fields: {
     items: {
       type: 'array',
-      label: 'Items',
+      label: keys.pagebuilder.blocks.accordion.items,
       arrayFields: {
-        title: { type: 'text', label: 'Title' },
-        content: { type: 'textarea', label: 'Content' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.accordion.items_title },
+        content: { type: 'textarea', label: keys.pagebuilder.blocks.accordion.items_content },
       },
       defaultItemProps: {
         title: 'Section title',
@@ -38,7 +39,9 @@ export const AccordionWidget: ComponentConfig<AccordionWidgetProps> = {
   render: ({ items }) => {
     if (!items || items.length === 0) {
       return (
-        <div className="text-gray-500 text-center py-4">Add accordion items in the editor.</div>
+        <div className="text-gray-500 text-center py-4">
+          {translate(keys.pagebuilder.blocks.accordion.empty)}
+        </div>
       );
     }
     return (

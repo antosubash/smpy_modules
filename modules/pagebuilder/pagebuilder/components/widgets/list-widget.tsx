@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type ListWidgetProps = {
@@ -7,19 +8,19 @@ export type ListWidgetProps = {
 };
 
 export const ListWidget: ComponentConfig<ListWidgetProps> = {
-  label: 'List',
+  label: keys.pagebuilder.blocks.list.label,
   fields: {
     type: {
       type: 'select',
-      label: 'List type',
+      label: keys.pagebuilder.blocks.list.type,
       options: [
-        { label: 'Unordered', value: 'ul' },
-        { label: 'Ordered', value: 'ol' },
+        { label: keys.pagebuilder.blocks.list.type_ul, value: 'ul' },
+        { label: keys.pagebuilder.blocks.list.type_ol, value: 'ol' },
       ],
     },
     items: {
       type: 'textarea',
-      label: 'Items (one per line)',
+      label: keys.pagebuilder.blocks.list.items,
     },
   },
   defaultProps: {

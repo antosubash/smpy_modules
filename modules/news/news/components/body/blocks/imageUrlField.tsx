@@ -19,7 +19,9 @@
  */
 
 import { AutoField, type CustomField, FieldLabel } from '@puckeditor/core';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
+
+import { keys, useT } from '../../../utils/i18n';
 
 export type PreviewStatus = 'idle' | 'loaded' | 'failed';
 
@@ -27,8 +29,11 @@ export type PreviewStatus = 'idle' | 'loaded' | 'failed';
  *
  * Phrased as an observation rather than an error: an address that is merely
  * unreachable from the writer's network, or not an image yet because nobody
- * has uploaded it, is not a mistake the editor should be scolding them for. */
-const NOT_LOADED = 'Nothing loaded from that address.';
+ * has uploaded it, is not a mistake the editor should be scolding them for.
+ *
+ * The catalogue key rather than the sentence itself: `previewNote` decides
+ * whether there is anything to say, and saying it is the component's job. */
+const NOT_LOADED = keys.news.blocks.image_field.not_loaded;
 
 interface Seen {
   url: string;
@@ -54,12 +59,13 @@ export function showsPreview(url: string, status: PreviewStatus): boolean {
   return url.trim() !== '' && status !== 'failed';
 }
 
-/** The line under the field, or nothing to say. */
+/** The key of the line under the field, or nothing to say. */
 export function previewNote(url: string, status: PreviewStatus): string | null {
   return url.trim() !== '' && status === 'failed' ? NOT_LOADED : null;
 }
 
 function ImageUrlPreview({ url }: { url: string }) {
+  const { t } = useT();
   const [seen, setSeen] = useState<Seen>({ url, status: 'idle' });
   const status = statusFor(seen, url);
   const note = previewNote(url, status);
@@ -77,20 +83,29 @@ function ImageUrlPreview({ url }: { url: string }) {
           onError={() => setSeen({ url, status: 'failed' })}
         />
       )}
-      {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      {note && <p className="mt-2 text-xs text-muted-foreground">{t(note)}</p>}
     </>
   );
 }
 
+/** `FieldLabel` given a catalogue key instead of a sentence.
+ *
+ * Its own component because Puck calls a field's `render` as a plain function
+ * — the hook has to sit one level down, the same shape `RelatedBlock` uses. */
+function ImageUrlFieldLabel({ labelKey, children }: { labelKey: string; children: ReactNode }) {
+  const { t } = useT();
+  return <FieldLabel label={t(labelKey)}>{children}</FieldLabel>;
+}
+
 /** A labelled URL field that shows what it points at. */
-export function imageUrlField(label: string): CustomField<string> {
+export function imageUrlField(labelKey: string): CustomField<string> {
   return {
     type: 'custom',
     // `name` is deliberately not forwarded: `FieldProps` has none, and the
     // focus tracking that reads it lives on the wrapper Puck already put
     // around this render, not on the input inside it.
     render: ({ id, onChange, readOnly, value }) => (
-      <FieldLabel label={label}>
+      <ImageUrlFieldLabel labelKey={labelKey}>
         <AutoField
           field={{ type: 'text' }}
           id={id}
@@ -99,7 +114,7 @@ export function imageUrlField(label: string): CustomField<string> {
           readOnly={readOnly}
         />
         <ImageUrlPreview url={value ?? ''} />
-      </FieldLabel>
+      </ImageUrlFieldLabel>
     ),
   };
 }

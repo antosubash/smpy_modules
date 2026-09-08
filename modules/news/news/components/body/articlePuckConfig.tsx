@@ -16,6 +16,8 @@
 
 import type { Config } from '@puckeditor/core';
 
+import { keys } from '../../utils/i18n';
+
 import {
   AudioBlock,
   type AudioProps,
@@ -129,17 +131,23 @@ export const articlePuckConfig: ArticleConfig = {
   // beside List, because a writer wanting a summary box is not shopping for a
   // list — they are looking for the thing that sits outside the story.
   categories: {
-    text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'] },
+    text: {
+      title: keys.news.blocks.categories.text,
+      components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'],
+    },
     asides: {
-      title: 'Set apart',
+      title: keys.news.blocks.categories.asides,
       components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related', 'Contents'],
     },
     media: {
-      title: 'Media',
+      title: keys.news.blocks.categories.media,
       components: ['Image', 'Gallery', 'Comparison', 'Video', 'Audio', 'Embed'],
     },
-    data: { title: 'Data', components: ['Table', 'Chart', 'Facts', 'Code', 'Timeline'] },
-    layout: { title: 'Layout', components: ['Divider'] },
+    data: {
+      title: keys.news.blocks.categories.data,
+      components: ['Table', 'Chart', 'Facts', 'Code', 'Timeline'],
+    },
+    layout: { title: keys.news.blocks.categories.layout, components: ['Divider'] },
   },
   components: {
     Heading: HeadingBlock,
@@ -192,7 +200,7 @@ export const emptyArticleData = {
  * than specific devices so the preview reflects what readers see.
  */
 export const articleViewports = [
-  { width: 360, height: 640, label: 'Mobile', icon: 'Smartphone' },
-  { width: 768, height: 1024, label: 'Tablet', icon: 'Tablet' },
-  { width: 1280, height: 800, label: 'Desktop', icon: 'Monitor' },
+  { width: 360, height: 640, label: keys.news.blocks.viewports.mobile, icon: 'Smartphone' },
+  { width: 768, height: 1024, label: keys.news.blocks.viewports.tablet, icon: 'Tablet' },
+  { width: 1280, height: 800, label: keys.news.blocks.viewports.desktop, icon: 'Monitor' },
 ];

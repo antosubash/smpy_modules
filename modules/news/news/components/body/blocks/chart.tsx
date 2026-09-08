@@ -23,6 +23,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys, useT } from '../../../utils/i18n';
+
 import {
   barSpan,
   baselineY,
@@ -132,16 +134,17 @@ function LineChart({ points }: { points: ChartPoint[] }) {
 }
 
 function FiguresTable({ points }: { points: ChartPoint[] }) {
+  const { t } = useT();
   return (
     <div className="overflow-x-auto">
       <table className="mt-2 w-full border-collapse text-sm">
         <thead>
           <tr>
             <th scope="col" className="border-b-2 px-3 py-2 text-left font-semibold">
-              Label
+              {t(keys.news.blocks.chart.column_label)}
             </th>
             <th scope="col" className="border-b-2 px-3 py-2 text-left font-semibold">
-              Value
+              {t(keys.news.blocks.chart.column_value)}
             </th>
           </tr>
         </thead>
@@ -159,47 +162,54 @@ function FiguresTable({ points }: { points: ChartPoint[] }) {
 }
 
 export const ChartBlock: ComponentConfig<ChartProps> = {
-  label: 'Chart',
+  label: keys.news.blocks.chart.label,
   fields: {
-    title: { type: 'text', label: 'Heading (optional)' },
+    title: { type: 'text', label: keys.news.blocks.common.heading_optional },
     kind: {
       type: 'radio',
-      label: 'Shape',
+      label: keys.news.blocks.chart.kind,
       options: [
-        { label: 'Bars (compare)', value: 'bar' },
-        { label: 'Line (over time)', value: 'line' },
+        { label: keys.news.blocks.chart.kind_bar, value: 'bar' },
+        { label: keys.news.blocks.chart.kind_line, value: 'line' },
       ],
     },
-    series: { type: 'textarea', label: 'One per line — "2019 | 4,100"' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    series: { type: 'textarea', label: keys.news.blocks.chart.series },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: { title: '', kind: 'bar', series: '', caption: '' },
-  render: ({ caption, kind, series, title }) => {
-    const points = parseSeries(series);
-    if (points.length === 0) return <></>;
-    return (
-      <figure className="my-8">
-        {title && (
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {title}
-          </p>
-        )}
-        {/* Hidden from a screen reader because the table below says the same
-            thing properly. Reading out a row of bars is reading out the numbers
-            twice, in the worse order. */}
-        <div aria-hidden="true">
-          {kind === 'line' ? <LineChart points={points} /> : <BarChart points={points} />}
-        </div>
-        {/* Closed by default and open without JavaScript — a disclosure the
-            browser implements, not one this module would have to ship. */}
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-muted-foreground">Figures</summary>
-          <FiguresTable points={points} />
-        </details>
-        {caption && (
-          <figcaption className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>
-        )}
-      </figure>
-    );
-  },
+  // A component rather than JSX inline, because the disclosure's own word is
+  // translated and Puck calls `render` as a plain function.
+  render: ({ caption, kind, series, title }) => (
+    <ChartRender caption={caption} kind={kind} series={series} title={title} />
+  ),
 };
+
+function ChartRender({ caption, kind, series, title }: ChartProps) {
+  const { t } = useT();
+  const points = parseSeries(series);
+  if (points.length === 0) return <></>;
+  return (
+    <figure className="my-8">
+      {title && (
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </p>
+      )}
+      {/* Hidden from a screen reader because the table below says the same
+          thing properly. Reading out a row of bars is reading out the numbers
+          twice, in the worse order. */}
+      <div aria-hidden="true">
+        {kind === 'line' ? <LineChart points={points} /> : <BarChart points={points} />}
+      </div>
+      {/* Closed by default and open without JavaScript — a disclosure the
+          browser implements, not one this module would have to ship. */}
+      <details className="mt-3">
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          {t(keys.news.blocks.chart.figures)}
+        </summary>
+        <FiguresTable points={points} />
+      </details>
+      {caption && <figcaption className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>}
+    </figure>
+  );
+}

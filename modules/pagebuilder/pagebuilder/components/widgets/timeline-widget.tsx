@@ -2,65 +2,65 @@
  *  Types live in timeline-layout.ts, render in timeline-render.tsx. */
 
 import type { ComponentConfig } from '@puckeditor/core';
-
+import { keys } from '../../utils/i18n';
 import type { TimelineWidgetProps } from './timeline-layout';
 import { TimelineWidgetRender } from './timeline-render';
 
 export type * from './timeline-layout';
 
 export const TimelineWidget: ComponentConfig<TimelineWidgetProps> = {
-  label: 'Timeline',
+  label: keys.pagebuilder.blocks.timeline.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    title: { type: 'text', label: 'Title' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.timeline.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.timeline.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Muted (soft card)', value: 'muted' },
+        { label: keys.pagebuilder.blocks.timeline.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.timeline.surface_muted, value: 'muted' },
       ],
     },
     variant: {
       type: 'select',
-      label: 'Variant',
+      label: keys.pagebuilder.blocks.timeline.variant,
       options: [
-        { label: 'Rows (list)', value: 'rows' },
-        { label: 'Blobs (organic shapes)', value: 'blobs' },
+        { label: keys.pagebuilder.blocks.timeline.variant_rows, value: 'rows' },
+        { label: keys.pagebuilder.blocks.timeline.variant_blobs, value: 'blobs' },
       ],
     },
     blobMaskUrl: {
       type: 'text',
-      label: 'Blob mask URL (organic shape — blobs variant)',
+      label: keys.pagebuilder.blocks.timeline.blob_mask_url,
     },
     markerMaskUrl: {
       type: 'text',
-      label: 'Marker mask URL (organic tag shape — blobs variant)',
+      label: keys.pagebuilder.blocks.timeline.marker_mask_url,
     },
     markerImageUrl: {
       type: 'text',
-      label: 'Marker artwork (transparent PNG — replaces mask + colour)',
+      label: keys.pagebuilder.blocks.timeline.marker_image_url,
     },
     markerColor: {
       type: 'text',
-      label: 'Marker color (CSS — blobs variant)',
+      label: keys.pagebuilder.blocks.timeline.marker_color,
     },
     items: {
       type: 'array',
-      label: 'Entries',
+      label: keys.pagebuilder.blocks.timeline.items,
       arrayFields: {
-        marker: { type: 'text', label: 'Marker (e.g. year)' },
-        title: { type: 'text', label: 'Title' },
-        body: { type: 'textarea', label: 'Body' },
-        meta: { type: 'text', label: 'Trailing line (e.g. date)' },
-        color: { type: 'text', label: 'Blob color (CSS — blobs variant)' },
+        marker: { type: 'text', label: keys.pagebuilder.blocks.timeline.items_marker },
+        title: { type: 'text', label: keys.pagebuilder.blocks.timeline.items_title },
+        body: { type: 'textarea', label: keys.pagebuilder.blocks.timeline.items_body },
+        meta: { type: 'text', label: keys.pagebuilder.blocks.timeline.items_meta },
+        color: { type: 'text', label: keys.pagebuilder.blocks.timeline.items_color },
         shapeMaskUrl: {
           type: 'text',
-          label: 'Blob shape mask URL (overrides the section mask)',
+          label: keys.pagebuilder.blocks.timeline.items_shape_mask_url,
         },
         shapeImageUrl: {
           type: 'text',
-          label: 'Blob artwork (transparent PNG — replaces mask + colour)',
+          label: keys.pagebuilder.blocks.timeline.items_shape_image_url,
         },
       },
       defaultItemProps: {

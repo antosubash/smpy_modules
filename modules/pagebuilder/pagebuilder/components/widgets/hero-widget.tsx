@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock } from './_internal/rich-text';
 import {
@@ -15,7 +16,6 @@ import {
   SIZES_HALF,
   srcsetAttrs,
 } from './_shared';
-
 import type { HeroWidgetProps } from './hero-widget-props';
 
 export type { HeroWidgetProps } from './hero-widget-props';
@@ -206,56 +206,56 @@ export function renderHero({
 }
 
 export const HeroWidget: ComponentConfig<HeroWidgetProps> = {
-  label: 'Hero',
+  label: keys.pagebuilder.blocks.hero.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow (optional)' },
-    title: { type: 'text', label: 'Title' },
-    subtitle: { type: 'textarea', label: 'Subtitle' },
-    logoUrl: createImageField(mediaLibraryAdapter, 'Logo image (replaces title, optional)'),
-    logoAlt: { type: 'text', label: 'Logo alt text' },
-    imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
-    imageAlt: { type: 'text', label: 'Image alt text' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.hero.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.common.subtitle },
+    logoUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.hero.logo_url),
+    logoAlt: { type: 'text', label: keys.pagebuilder.blocks.common.logo_alt },
+    imageUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.hero.image_url),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.common.image_alt },
     imageSrcset: imageSrcsetField,
     imageMaskUrl: {
       type: 'text',
-      label: 'Image mask URL (organic shape, side layouts — optional)',
+      label: keys.pagebuilder.blocks.hero.image_mask_url,
     },
     imageShape: {
       type: 'select',
-      label: 'Image shape (side layouts)',
+      label: keys.pagebuilder.blocks.hero.image_shape,
       options: [
-        { label: 'Rounded', value: 'rounded' },
-        { label: "Image's own shape (transparent artwork)", value: 'native' },
+        { label: keys.pagebuilder.blocks.hero.image_shape_rounded, value: 'rounded' },
+        { label: keys.pagebuilder.blocks.hero.image_shape_native, value: 'native' },
       ],
     },
     imagePosition: {
       type: 'select',
-      label: 'Image position',
+      label: keys.pagebuilder.blocks.hero.image_position,
       options: [
-        { label: 'Background', value: 'background' },
-        { label: 'Right', value: 'right' },
-        { label: 'Left', value: 'left' },
+        { label: keys.pagebuilder.blocks.hero.image_position_background, value: 'background' },
+        { label: keys.pagebuilder.blocks.hero.image_position_right, value: 'right' },
+        { label: keys.pagebuilder.blocks.hero.image_position_left, value: 'left' },
       ],
     },
-    primaryLabel: { type: 'text', label: 'Primary button text' },
-    primaryHref: { type: 'text', label: 'Primary button link' },
-    secondaryLabel: { type: 'text', label: 'Secondary button text' },
-    secondaryHref: { type: 'text', label: 'Secondary button link' },
-    overlay: createCheckboxField('Dark overlay (background only)'),
+    primaryLabel: { type: 'text', label: keys.pagebuilder.blocks.hero.primary_label },
+    primaryHref: { type: 'text', label: keys.pagebuilder.blocks.hero.primary_href },
+    secondaryLabel: { type: 'text', label: keys.pagebuilder.blocks.hero.secondary_label },
+    secondaryHref: { type: 'text', label: keys.pagebuilder.blocks.hero.secondary_href },
+    overlay: createCheckboxField(keys.pagebuilder.blocks.hero.overlay),
     align: {
       type: 'select',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.common.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
+        { label: keys.pagebuilder.blocks.common.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.common.align_center, value: 'center' },
       ],
     },
     surface: {
       type: 'select',
-      label: 'Surface (background variant)',
+      label: keys.pagebuilder.blocks.hero.surface,
       options: [
-        { label: 'Plain', value: 'plain' },
-        { label: 'Card overlay', value: 'card' },
+        { label: keys.pagebuilder.blocks.hero.surface_plain, value: 'plain' },
+        { label: keys.pagebuilder.blocks.hero.surface_card, value: 'card' },
       ],
     },
   },

@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MediaUsageList } from '../components/media/MediaUsageList';
 import { useMediaDetail } from '../hooks/useMediaDetail';
+import { keys, useT } from '../utils/i18n';
 import { formatBytes } from '../utils/mediaFormat';
 
 const ALT_ID = 'media-alt-text';
@@ -27,6 +28,7 @@ const CREDIT_ID = 'media-credit';
  * which was pleasant and untrue.
  */
 export default function MediaDetail() {
+  const { t } = useT();
   const { asset_id } = usePage<{ props: { asset_id: number } }>().props as unknown as {
     asset_id: number;
   };
@@ -44,17 +46,23 @@ export default function MediaDetail() {
     // an asset id that does not exist is a permanent answer, not a slow one.
     return (
       <PageShell
-        title={error ? 'Asset not found' : 'Asset'}
-        description={error ? 'It may have been deleted.' : 'Loading…'}
+        title={error ? t(keys.pagebuilder.asset.not_found) : t(keys.pagebuilder.asset.title)}
+        description={
+          error
+            ? t(keys.pagebuilder.asset.not_found_description)
+            : t(keys.pagebuilder.asset.loading)
+        }
         actions={
           error ? (
             <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
-              Media library
+              {t(keys.pagebuilder.asset.media_library)}
             </Button>
           ) : undefined
         }
       >
-        <Head title={error ? 'Asset not found' : 'Asset'} />
+        <Head
+          title={error ? t(keys.pagebuilder.asset.not_found) : t(keys.pagebuilder.asset.title)}
+        />
         {error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : (
@@ -75,11 +83,11 @@ export default function MediaDetail() {
       actions={
         <>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
-            Media library
+            {t(keys.pagebuilder.asset.media_library)}
           </Button>
           <Button variant="outline" asChild>
             <a href={asset.url} download>
-              Download
+              {t(keys.pagebuilder.asset.download)}
             </a>
           </Button>
         </>
@@ -102,59 +110,59 @@ export default function MediaDetail() {
 
         <aside className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide">Details</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide">
+              {t(keys.pagebuilder.asset.details)}
+            </h2>
             <span className="text-xs text-muted-foreground" aria-live="polite">
-              {busy ? 'Saving…' : dirty ? 'Unsaved changes' : ''}
+              {busy
+                ? t(keys.pagebuilder.asset.saving)
+                : dirty
+                  ? t(keys.pagebuilder.asset.unsaved)
+                  : ''}
             </span>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={ALT_ID}>Alt text</Label>
+            <Label htmlFor={ALT_ID}>{t(keys.pagebuilder.asset.alt_text)}</Label>
             <Input
               id={ALT_ID}
               value={draft.alt_text}
               disabled={busy}
-              placeholder="What the image shows"
+              placeholder={t(keys.pagebuilder.asset.alt_placeholder)}
               onChange={(e) => patch({ alt_text: e.target.value })}
             />
-            <p className="text-xs text-muted-foreground">
-              Describes the picture, not the placement, so it is the starting alt text wherever this
-              image is placed next. Pages already using it keep the alt text saved on the block —
-              change those where they are.
-            </p>
+            <p className="text-xs text-muted-foreground">{t(keys.pagebuilder.asset.alt_help)}</p>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={CAPTION_ID}>Caption</Label>
+            <Label htmlFor={CAPTION_ID}>{t(keys.pagebuilder.asset.caption)}</Label>
             <Input
               id={CAPTION_ID}
               value={draft.caption}
               disabled={busy}
-              placeholder="Optional, shown under the image"
+              placeholder={t(keys.pagebuilder.asset.caption_placeholder)}
               onChange={(e) => patch({ caption: e.target.value })}
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={CREDIT_ID}>Credit</Label>
+            <Label htmlFor={CREDIT_ID}>{t(keys.pagebuilder.asset.credit)}</Label>
             <Input
               id={CREDIT_ID}
               value={draft.credit}
               disabled={busy}
-              placeholder="Photographer or source"
+              placeholder={t(keys.pagebuilder.asset.credit_placeholder)}
               onChange={(e) => patch({ credit: e.target.value })}
             />
           </div>
 
           <Button className="w-full" disabled={busy || !dirty} onClick={() => void save()}>
-            Save
+            {t(keys.pagebuilder.asset.save)}
           </Button>
 
           {inUse ? (
             <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-              Delete is blocked while this asset is in use. Detach it from the{' '}
-              {used_in_total === 1 ? 'page' : `${used_in_total} pages`} above first — deleting it
-              anyway would leave them serving a broken image.
+              {t(keys.pagebuilder.asset.in_use, { count: used_in_total })}
             </p>
           ) : (
             <ConfirmDialog
@@ -162,16 +170,16 @@ export default function MediaDetail() {
               // changes, but there is no trash for media — the file is gone for
               // good. `low` promises reversibility this cannot offer.
               level="medium"
-              title={`Delete “${asset.original_filename}”?`}
-              description="No page references this asset, so nothing on the site changes. The file itself is removed for good."
-              confirmLabel="Delete"
+              title={t(keys.pagebuilder.asset.delete_title, { name: asset.original_filename })}
+              description={t(keys.pagebuilder.asset.delete_description)}
+              confirmLabel={t(keys.pagebuilder.asset.delete_confirm)}
               onConfirm={async () => {
                 await remove();
                 router.visit('/pagebuilder/media');
               }}
               trigger={
                 <Button variant="ghost" className="w-full text-destructive" disabled={busy}>
-                  Delete asset
+                  {t(keys.pagebuilder.asset.delete_trigger)}
                 </Button>
               }
             />

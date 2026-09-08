@@ -71,12 +71,26 @@ function safeJsonLd(doc: Record<string, unknown>): string {
  *
  * The browser resolves the fragment while the document is still the Inertia
  * blob — the body is a block tree React draws afterwards, so the heading the
- * link names does not exist yet and the reader lands at the top of the article
- * with no sign anything was meant to happen. Clicking an entry in `Contents`
- * is unaffected either way; this is only for a link that arrived from
- * somewhere else, which is the half a section anchor exists for.
+ * link names does not exist yet when the fragment is first looked up. Clicking
+ * an entry in `Contents` is unaffected either way; this is only for a link
+ * that arrived from somewhere else, which is the half a section anchor exists
+ * for.
  *
  * Once, on mount. A later navigation is Inertia's to scroll.
+ *
+ * **This is untested, and not for want of trying.** `tests/e2e/`
+ * `article-contents.spec.ts` is named after this behaviour but asserts the
+ * *outcome* — that arriving at `/news/{slug}#section` lands on that section —
+ * and it passes with this hook deleted. Chromium does not need it: Blink keeps
+ * a pending fragment scroll and re-applies it when the late-rendered element
+ * appears, which held even with the page module delayed 2.5s past `load`. The
+ * premise above ("the reader lands at the top of the article") is therefore
+ * false in the only engine the suite runs.
+ *
+ * It stays because untested in WebKit and Firefox is not the same as
+ * unnecessary — neither is exercised here, and neither is promised to hold a
+ * pending scroll the way Blink does. Do not read the spec's name as coverage
+ * for this function; nothing in the suite fails if it goes.
  */
 function useAnchorOnArrival() {
   useEffect(() => {
@@ -186,6 +200,9 @@ export default function PublicArticle({
             no way to see its siblings and a contents list is nothing but a
             statement about them. The canvas builds the same outline the same
             way, so the anchors match on both screens. */}
+        {/* The raw config, labels and all: `<Render>` draws blocks, never the
+            panel that names them, so the catalogue keys the config carries
+            never reach a reader. The canvas localizes it — see `ArticleBody`. */}
         <Render
           config={articlePuckConfig}
           data={data as unknown as Data}

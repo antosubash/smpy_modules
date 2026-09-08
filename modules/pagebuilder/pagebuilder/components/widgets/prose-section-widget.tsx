@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';
@@ -27,29 +28,29 @@ function paragraphs(body: string): string[] {
 }
 
 export const ProseSectionWidget: ComponentConfig<ProseSectionWidgetProps> = {
-  label: 'Prose section (eyebrow + heading + rich body)',
+  label: keys.pagebuilder.blocks.prose_section.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    heading: { type: 'text', label: 'Heading' },
-    subheading: { type: 'text', label: 'Lead sub-heading (optional)' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.prose_section.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    subheading: { type: 'text', label: keys.pagebuilder.blocks.prose_section.subheading },
     body: {
       type: 'textarea',
-      label: 'Body (blank line = new paragraph)',
+      label: keys.pagebuilder.blocks.prose_section.body,
     },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.prose_section.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Muted (soft card)', value: 'muted' },
+        { label: keys.pagebuilder.blocks.prose_section.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.prose_section.surface_muted, value: 'muted' },
       ],
     },
     variant: {
       type: 'select',
-      label: 'Body style',
+      label: keys.pagebuilder.blocks.prose_section.variant,
       options: [
-        { label: 'Prose', value: 'prose' },
-        { label: 'Questions (large, accented)', value: 'questions' },
+        { label: keys.pagebuilder.blocks.prose_section.variant_prose, value: 'prose' },
+        { label: keys.pagebuilder.blocks.prose_section.variant_questions, value: 'questions' },
       ],
     },
   },

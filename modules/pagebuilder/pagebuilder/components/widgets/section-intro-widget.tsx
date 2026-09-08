@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { eyebrowTextStyle } from './_shared';
@@ -23,29 +24,29 @@ const headingStyle: CSSProperties = {
 };
 
 export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
-  label: 'Section intro',
+  label: keys.pagebuilder.blocks.section_intro.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow (optional)' },
-    heading: { type: 'text', label: 'Heading' },
-    body: { type: 'textarea', label: 'Body text' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.section_intro.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    body: { type: 'textarea', label: keys.pagebuilder.blocks.section_intro.body },
     align: {
       type: 'select',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.common.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
+        { label: keys.pagebuilder.blocks.common.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.common.align_center, value: 'center' },
       ],
     },
     layout: {
       type: 'select',
-      label: 'Layout',
+      label: keys.pagebuilder.blocks.section_intro.layout,
       options: [
-        { label: 'Stacked', value: 'stacked' },
-        { label: 'Split (eyebrow left)', value: 'split' },
+        { label: keys.pagebuilder.blocks.section_intro.layout_stacked, value: 'stacked' },
+        { label: keys.pagebuilder.blocks.section_intro.layout_split, value: 'split' },
       ],
     },
-    ctaLabel: { type: 'text', label: 'Button label (optional)' },
-    ctaHref: { type: 'text', label: 'Button link (optional)' },
+    ctaLabel: { type: 'text', label: keys.pagebuilder.blocks.section_intro.cta_label },
+    ctaHref: { type: 'text', label: keys.pagebuilder.blocks.section_intro.cta_href },
   },
   defaultProps: {
     eyebrow: '',

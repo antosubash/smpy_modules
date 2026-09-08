@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
+import { keys, translate } from '../utils/i18n';
 import {
   deleteAssetIfUnused,
   getAssetDetail,
@@ -61,7 +62,7 @@ export function useMediaDetail(assetId: number) {
       const updated = await updateAsset(assetId, draft);
       if (updated) setDetail(updated);
       setDirty(false);
-      toast.success('Saved');
+      toast.success(translate(keys.pagebuilder.asset.saved_toast));
     } catch (e) {
       setError((e as Error).message);
     } finally {

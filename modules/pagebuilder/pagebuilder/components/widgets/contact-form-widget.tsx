@@ -2,48 +2,54 @@
  *  Types and render live in contact-form-render.tsx. */
 
 import type { ComponentConfig } from '@puckeditor/core';
-
+import { keys } from '../../utils/i18n';
 import { ContactFormRender, type ContactFormWidgetProps } from './contact-form-render';
 
 export type { ContactFormWidgetProps } from './contact-form-render';
 
 export const ContactFormWidget: ComponentConfig<ContactFormWidgetProps> = {
-  label: 'Contact form',
+  label: keys.pagebuilder.blocks.contact_form.label,
   fields: {
     variant: {
       type: 'select',
-      label: 'Style',
+      label: keys.pagebuilder.blocks.contact_form.variant,
       options: [
-        { label: 'Boxed inputs', value: 'boxed' },
-        { label: 'Underline inputs (panel)', value: 'underline' },
+        { label: keys.pagebuilder.blocks.contact_form.variant_boxed, value: 'boxed' },
+        { label: keys.pagebuilder.blocks.contact_form.variant_underline, value: 'underline' },
       ],
     },
     surfaceColor: {
       type: 'text',
-      label: 'Panel color (CSS, inverse text — optional)',
+      label: keys.pagebuilder.blocks.contact_form.surface_color,
     },
-    title: { type: 'text', label: 'Title' },
-    subtitle: { type: 'textarea', label: 'Subtitle' },
-    nameLabel: { type: 'text', label: 'Name field label' },
-    namePlaceholder: { type: 'text', label: 'Name placeholder' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.common.subtitle },
+    nameLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.name_label },
+    namePlaceholder: { type: 'text', label: keys.pagebuilder.blocks.contact_form.name_placeholder },
     orgLabel: {
       type: 'text',
-      label: 'Organisation field label (blank to hide)',
+      label: keys.pagebuilder.blocks.contact_form.org_label,
     },
-    orgPlaceholder: { type: 'text', label: 'Organisation placeholder' },
-    enquiryLabel: { type: 'text', label: 'Enquiry type label' },
+    orgPlaceholder: { type: 'text', label: keys.pagebuilder.blocks.contact_form.org_placeholder },
+    enquiryLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.enquiry_label },
     enquiryOptions: {
       type: 'textarea',
-      label: 'Enquiry options (one per line)',
+      label: keys.pagebuilder.blocks.contact_form.enquiry_options,
     },
-    emailLabel: { type: 'text', label: 'Email field label' },
-    emailPlaceholder: { type: 'text', label: 'Email placeholder' },
-    messageLabel: { type: 'text', label: 'Message field label' },
-    messagePlaceholder: { type: 'text', label: 'Message placeholder' },
-    termsLabel: { type: 'text', label: 'Terms agreement label' },
-    submitLabel: { type: 'text', label: 'Submit button' },
-    successTitle: { type: 'text', label: 'Success title' },
-    successBody: { type: 'textarea', label: 'Success body' },
+    emailLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.email_label },
+    emailPlaceholder: {
+      type: 'text',
+      label: keys.pagebuilder.blocks.contact_form.email_placeholder,
+    },
+    messageLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.message_label },
+    messagePlaceholder: {
+      type: 'text',
+      label: keys.pagebuilder.blocks.contact_form.message_placeholder,
+    },
+    termsLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.terms_label },
+    submitLabel: { type: 'text', label: keys.pagebuilder.blocks.contact_form.submit_label },
+    successTitle: { type: 'text', label: keys.pagebuilder.blocks.contact_form.success_title },
+    successBody: { type: 'textarea', label: keys.pagebuilder.blocks.contact_form.success_body },
   },
   defaultProps: {
     variant: 'boxed',

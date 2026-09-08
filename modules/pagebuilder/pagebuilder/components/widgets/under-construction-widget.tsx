@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type UnderConstructionWidgetProps = {
@@ -6,9 +7,9 @@ export type UnderConstructionWidgetProps = {
 };
 
 export const UnderConstructionWidget: ComponentConfig<UnderConstructionWidgetProps> = {
-  label: 'Under Construction',
+  label: keys.pagebuilder.blocks.under_construction.label,
   fields: {
-    message: { type: 'text', label: 'Message' },
+    message: { type: 'text', label: keys.pagebuilder.blocks.under_construction.message },
   },
   defaultProps: {
     message: 'This section is under construction.',

@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { renderHero } from './hero-widget';
 
 export type CenteredHeroWidgetProps = {
@@ -16,14 +17,17 @@ export type CenteredHeroWidgetProps = {
  * surface="card". Kept for backwards compatibility with saved pages.
  */
 export const CenteredHeroWidget: ComponentConfig<CenteredHeroWidgetProps> = {
-  label: 'Centered hero (deprecated)',
+  label: keys.pagebuilder.blocks.centered_hero.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
-    subtitle: { type: 'textarea', label: 'Subtitle' },
-    imageUrl: createImageField(mediaLibraryAdapter, 'Background image URL'),
-    imageAlt: { type: 'text', label: 'Image alt text' },
-    primaryLabel: { type: 'text', label: 'Button label' },
-    primaryHref: { type: 'text', label: 'Button link' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.common.subtitle },
+    imageUrl: createImageField(
+      mediaLibraryAdapter,
+      keys.pagebuilder.blocks.centered_hero.image_url,
+    ),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.common.image_alt },
+    primaryLabel: { type: 'text', label: keys.pagebuilder.blocks.centered_hero.primary_label },
+    primaryHref: { type: 'text', label: keys.pagebuilder.blocks.centered_hero.primary_href },
   },
   defaultProps: {
     title: 'Welcome to GeoWiki',

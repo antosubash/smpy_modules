@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 
 export type RowWidgetProps = {
@@ -22,33 +23,33 @@ const ALIGN_CLASS: Record<RowWidgetProps['align'], string> = {
 };
 
 export const RowWidget: ComponentConfig<RowWidgetProps> = {
-  label: 'Row',
+  label: keys.pagebuilder.blocks.row.label,
   fields: {
     gap: {
       type: 'select',
-      label: 'Gap',
+      label: keys.pagebuilder.blocks.common.gap,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.common.gap_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.common.gap_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.common.gap_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.common.gap_lg, value: 'lg' },
       ],
     },
     align: {
       type: 'select',
-      label: 'Vertical alignment',
+      label: keys.pagebuilder.blocks.row.align,
       options: [
-        { label: 'Start', value: 'start' },
-        { label: 'Center', value: 'center' },
-        { label: 'End', value: 'end' },
+        { label: keys.pagebuilder.blocks.row.align_start, value: 'start' },
+        { label: keys.pagebuilder.blocks.row.align_center, value: 'center' },
+        { label: keys.pagebuilder.blocks.row.align_end, value: 'end' },
       ],
     },
     wrap: {
       type: 'select',
-      label: 'Wrap',
+      label: keys.pagebuilder.blocks.row.wrap,
       options: [
-        { label: 'Wrap', value: 'wrap' },
-        { label: 'No wrap', value: 'nowrap' },
+        { label: keys.pagebuilder.blocks.row.wrap_wrap, value: 'wrap' },
+        { label: keys.pagebuilder.blocks.row.wrap_nowrap, value: 'nowrap' },
       ],
     },
     row: { type: 'slot' },

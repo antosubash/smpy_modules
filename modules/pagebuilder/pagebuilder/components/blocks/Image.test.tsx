@@ -2,6 +2,8 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { translate } from '../../utils/i18n';
+import { localizeConfig } from '../localizeConfig';
 import { ImageBlock } from './Image';
 
 // Puck passes its own `id`/`puck` props alongside the authored ones; the block
@@ -20,7 +22,14 @@ function html(props: Record<string, unknown> = {}): string {
 
 describe('ImageBlock caption', () => {
   it('offers a Caption field in the inspector', () => {
-    expect(ImageBlock.fields?.caption).toEqual({ type: 'text', label: 'Caption' });
+    // Through `localizeConfig`, which is how Puck receives the config: the
+    // label a block is written with is a catalogue key, so asserting on the
+    // raw one would only prove the key exists, not that it resolves.
+    const localized = localizeConfig({ components: { Image: ImageBlock } }, translate);
+    expect(localized.components.Image.fields?.caption).toEqual({
+      type: 'text',
+      label: 'Caption',
+    });
   });
 
   it('defaults to no caption', () => {

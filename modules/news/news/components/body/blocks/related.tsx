@@ -14,8 +14,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 import { useEffect, useState } from 'react';
-
 import { type ArticleRead, formatArticleDate, listArticles } from '../../../utils/api';
+import { keys } from '../../../utils/i18n';
 
 export interface RelatedProps {
   title: string;
@@ -95,11 +95,11 @@ export function RelatedRender({
 }
 
 export const RelatedBlock: ComponentConfig<RelatedProps> = {
-  label: 'Read next',
+  label: keys.news.blocks.related.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
-    category: { type: 'text', label: 'Category filter (blank = any)' },
-    limit: { type: 'number', label: 'How many', min: 1, max: MAX },
+    title: { type: 'text', label: keys.news.blocks.common.heading },
+    category: { type: 'text', label: keys.news.blocks.related.category },
+    limit: { type: 'number', label: keys.news.blocks.common.quantity, min: 1, max: MAX },
   },
   defaultProps: { title: 'Read next', category: '', limit: 3 },
   // `puck.metadata` is how the viewer tells a block which article it is inside

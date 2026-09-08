@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 
@@ -27,25 +28,25 @@ const TONE_DIVIDER: Record<ColoredActionListWidgetProps['tone'], string> = {
 };
 
 export const ColoredActionListWidget: ComponentConfig<ColoredActionListWidgetProps> = {
-  label: 'Colored action list (tinted block)',
+  label: keys.pagebuilder.blocks.colored_action_list.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    heading: { type: 'text', label: 'Heading' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.colored_action_list.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
     tone: {
       type: 'select',
-      label: 'Tone',
+      label: keys.pagebuilder.blocks.colored_action_list.tone,
       options: [
-        { label: 'Green', value: 'green' },
-        { label: 'Purple', value: 'purple' },
-        { label: 'Neutral', value: 'neutral' },
+        { label: keys.pagebuilder.blocks.colored_action_list.tone_green, value: 'green' },
+        { label: keys.pagebuilder.blocks.colored_action_list.tone_purple, value: 'purple' },
+        { label: keys.pagebuilder.blocks.colored_action_list.tone_neutral, value: 'neutral' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Items',
+      label: keys.pagebuilder.blocks.colored_action_list.items,
       arrayFields: {
-        title: { type: 'text', label: 'Title' },
-        href: { type: 'text', label: 'Link' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.colored_action_list.items_title },
+        href: { type: 'text', label: keys.pagebuilder.blocks.colored_action_list.items_href },
       },
       defaultItemProps: { title: 'Action', href: '#' },
       min: 1,

@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -15,15 +16,15 @@ export type FeatureCardWidgetProps = {
 };
 
 export const FeatureCardWidget: ComponentConfig<FeatureCardWidgetProps> = {
-  label: 'Feature card (image + text)',
+  label: keys.pagebuilder.blocks.feature_card.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow tag' },
-    title: { type: 'text', label: 'Title' },
-    description: { type: 'textarea', label: 'Description' },
-    imageUrl: createImageField(mediaLibraryAdapter, 'Image URL'),
-    imageAlt: { type: 'text', label: 'Image alt text' },
-    linkLabel: { type: 'text', label: 'Link label' },
-    linkHref: { type: 'text', label: 'Link URL' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.feature_card.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    description: { type: 'textarea', label: keys.pagebuilder.blocks.common.description },
+    imageUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.feature_card.image_url),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.common.image_alt },
+    linkLabel: { type: 'text', label: keys.pagebuilder.blocks.feature_card.link_label },
+    linkHref: { type: 'text', label: keys.pagebuilder.blocks.feature_card.link_href },
   },
   defaultProps: {
     eyebrow: 'Featured',

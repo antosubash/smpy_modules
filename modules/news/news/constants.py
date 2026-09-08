@@ -10,6 +10,12 @@ from typing import Final
 
 PACKAGE: Final = "news"
 
+# The prefix every key in ``news/locales/*.json`` is registered under, so a
+# console string is ``news.<section>.<key>``. Deliberately the package name:
+# the frontend derives the same prefix in ``news/utils/i18n.ts``, and the two
+# have to agree or every label renders as its own key.
+LOCALE_NAMESPACE: Final = PACKAGE
+
 ROUTE_PREFIX_API: Final = "/api/news"
 # The admin screens sit under /admin, not /news. /news is the *public* address
 # an article serves at — see NewsSettings.public_route_prefix — and one prefix

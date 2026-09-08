@@ -334,6 +334,45 @@ drafts and so is `private, no-store`. The article viewer sends an `ETag`,
 `Cache-Control: public, max-age=300, stale-while-revalidate=60`, and
 `Content-Security-Policy` when `public_csp` is set.
 
+## The console's language
+
+Separate from the article's. The section above is about what the *site*
+publishes; this is about what the *console* speaks, and the two are configured
+in different places — `content_locales` for one, the host's
+`SM_I18N_SUPPORTED_LOCALES` for the other.
+
+Every console string lives in `news/locales/en.json`, registered by
+`NewsModule.locale_dirs()` under the `news` namespace, so a key reads
+`news.<section>.<name>` in the merged catalogue the host ships to the browser.
+Add a language by adding `news/locales/<tag>.json` with the same shape; the
+framework's `SM013`–`SM016` diagnostics report a file that has drifted from the
+default.
+
+The frontend derives its key tree from that JSON at compile time —
+`news/utils/i18n.ts` — rather than from the framework's generated `keys`, which
+only carries the namespaces of modules that live in the framework's own
+monorepo. The upshot is that `tsc` rejects a key the catalogue does not define,
+and `modules/news/news/utils/i18n.test.ts` rejects an entry nothing references,
+a plural missing a form, and a placeholder nothing fills.
+
+Two things stay literal on purpose. A block's `defaultProps` are the seed
+*content* a writer is given and are then saved into the document, so
+translating them at render time would rewrite what a reader is served. And
+Puck's block labels are catalogue *keys* in the config constant, resolved by
+`localizeConfig` inside the screen that mounts the editor — a module-scope
+config cannot call a hook, and `puck-blocks.ts` is imported before the app has
+rendered anything.
+
+**The feed block is localized by its neighbour.** `NewsFeed` lands in
+*pagebuilder's* palette, not this module's, so the resolver is pagebuilder's
+`localizeConfig` when `PageEditor` mounts Puck — it walks the assembled config,
+registered blocks included, and resolves whatever keys it finds there. That
+works across the module boundary because the host merges every catalogue into
+one flat table and i18next runs with `keySeparator: false`, so `news.feed.…` is
+a whole key rather than a path into a namespace pagebuilder would have to know
+about. The `pagebuilder` extra carries a `>=0.0.8` floor for exactly this: an
+older neighbour does not crash, it renders each label as its own dotted key.
+
 ## Settings
 
 Stored in the database and edited under **Settings → News**. There is no
@@ -519,12 +558,6 @@ the same `metadata` one `Read next` uses, so it is possible, just not free.
   make any file anyone ever uploaded anonymously readable to whoever holds the
   UUID. The fix is a public-read capability in `file_storage`, which is the
   framework's to add.
-- **Nothing here is translated.** Every string is hardcoded English and there is
-  no `locales/`. This is not news' to fix alone: the framework's convention
-  depends on `@simple-module-py/i18n` and *this repo's host does not wire i18n
-  at all* — no dependency, no loader, no generation step. Adding a catalogue to
-  one module would do nothing until the host adopts it, and then all three
-  modules here convert together. See the repo's `CLAUDE.md`.
 - **The scheduler still polls per process.** Publishing at the right moment is
   now safe with several replicas — each due article is taken with one
   conditional `UPDATE`, so two ticks landing together flip it once — but every

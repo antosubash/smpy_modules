@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 
@@ -14,21 +15,21 @@ export type TagsWidgetProps = {
 };
 
 export const TagsWidget: ComponentConfig<TagsWidgetProps> = {
-  label: 'Tags (pill row)',
+  label: keys.pagebuilder.blocks.tags.label,
   fields: {
-    label: { type: 'text', label: 'Aria label' },
+    label: { type: 'text', label: keys.pagebuilder.blocks.tags.label_field },
     items: {
       type: 'array',
-      label: 'Tags',
+      label: keys.pagebuilder.blocks.tags.items,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'Link' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.tags.items_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.tags.items_href },
         active: {
           type: 'radio',
-          label: 'Active',
+          label: keys.pagebuilder.blocks.tags.items_active,
           options: [
-            { label: 'No', value: false },
-            { label: 'Yes', value: true },
+            { label: keys.pagebuilder.blocks.tags.items_active_no, value: false },
+            { label: keys.pagebuilder.blocks.tags.items_active_yes, value: true },
           ],
         },
       },
@@ -47,7 +48,9 @@ export const TagsWidget: ComponentConfig<TagsWidgetProps> = {
   },
   render: ({ label, items }) =>
     !items || items.length === 0 ? (
-      <div className="text-gray-500 text-center py-4">Add tags in the editor.</div>
+      <div className="text-gray-500 text-center py-4">
+        {translate(keys.pagebuilder.blocks.tags.empty)}
+      </div>
     ) : (
       <nav aria-label={label || 'Tags'} className="container mx-auto px-4 py-4 sm:px-6 lg:px-8">
         <ul className="flex flex-wrap gap-2">

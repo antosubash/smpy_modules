@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { useState } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys, useT } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 import { EmptyPlaceholder } from './_shared';
 
@@ -14,9 +15,10 @@ export type CarouselWidgetProps = {
 };
 
 function CarouselRenderer({ slides }: CarouselWidgetProps) {
+  const { t } = useT();
   const [index, setIndex] = useState(0);
   if (!slides || slides.length === 0) {
-    return <EmptyPlaceholder label="Carousel (no slides)" />;
+    return <EmptyPlaceholder label={t(keys.pagebuilder.blocks.carousel.empty)} />;
   }
   const slide = slides[Math.min(index, slides.length - 1)];
   return (
@@ -40,7 +42,7 @@ function CarouselRenderer({ slides }: CarouselWidgetProps) {
           type="button"
           onClick={() => setIndex((i) => (i === 0 ? slides.length - 1 : i - 1))}
           className="absolute left-3 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/80 hover:bg-white text-gray-900 grid place-items-center"
-          aria-label="Previous slide"
+          aria-label={t(keys.pagebuilder.blocks.carousel.previous)}
         >
           ‹
         </button>
@@ -48,7 +50,7 @@ function CarouselRenderer({ slides }: CarouselWidgetProps) {
           type="button"
           onClick={() => setIndex((i) => (i === slides.length - 1 ? 0 : i + 1))}
           className="absolute right-3 top-1/2 -translate-y-1/2 size-10 rounded-full bg-white/80 hover:bg-white text-gray-900 grid place-items-center"
-          aria-label="Next slide"
+          aria-label={t(keys.pagebuilder.blocks.carousel.next)}
         >
           ›
         </button>
@@ -72,14 +74,17 @@ function CarouselRenderer({ slides }: CarouselWidgetProps) {
 }
 
 export const CarouselWidget: ComponentConfig<CarouselWidgetProps> = {
-  label: 'Carousel',
+  label: keys.pagebuilder.blocks.carousel.label,
   fields: {
     slides: {
       type: 'array',
-      label: 'Slides',
+      label: keys.pagebuilder.blocks.carousel.slides,
       arrayFields: {
-        imageUrl: createImageField(mediaLibraryAdapter, 'Image URL'),
-        caption: { type: 'text', label: 'Caption' },
+        imageUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.carousel.slides_image_url,
+        ),
+        caption: { type: 'text', label: keys.pagebuilder.blocks.carousel.slides_caption },
       },
       defaultItemProps: { imageUrl: '', caption: '' },
       min: 1,

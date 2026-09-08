@@ -14,6 +14,7 @@ import {
   purgeArticle,
   restoreArticle,
 } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 /** Binned articles, and the two things you can do with them.
  *
@@ -28,6 +29,8 @@ import {
  * see.
  */
 export default function Trash() {
+  const { t } = useT();
+  const copy = keys.news.trash;
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   // Purge needs `news.publish` on the backend, the same pair a hard delete
   // needs — see ArticleRow and ArticleEditor. Restore does not: it is
@@ -70,20 +73,20 @@ export default function Trash() {
 
   return (
     <PageShell
-      title="Trash"
-      description="Articles you have deleted. Restoring puts one back exactly as it was."
+      title={t(copy.title)}
+      description={t(copy.description)}
       actions={
         <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
-          News / Articles
+          {t(copy.back_to_list)}
         </Button>
       }
     >
-      <Head title="Trash" />
+      <Head title={t(copy.title)} />
 
       {items === null ? (
-        <div role="status" aria-label="Loading the trash" className="h-24" />
+        <div role="status" aria-label={t(copy.loading)} className="h-24" />
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">The trash is empty.</p>
+        <p className="text-sm text-muted-foreground">{t(copy.empty)}</p>
       ) : (
         <ul className="space-y-3">
           {items.map((article) => (
@@ -105,9 +108,11 @@ export default function Trash() {
                   size="sm"
                   variant="outline"
                   disabled={busyId === article.id}
-                  onClick={() => void act(article.id, () => restoreArticle(article.id), 'Restored')}
+                  onClick={() =>
+                    void act(article.id, () => restoreArticle(article.id), t(copy.restored_toast))
+                  }
                 >
-                  Restore
+                  {t(copy.restore)}
                 </Button>
                 {canPublish && (
                   <ConfirmDialog
@@ -115,11 +120,11 @@ export default function Trash() {
                     // it also frees the slug — so a link already in the world
                     // stops resolving and can later point at something else.
                     level="high"
-                    title={`Delete “${article.title}” for good?`}
-                    description="The article, its body, its tags and its redirects are removed permanently. This cannot be undone."
-                    confirmLabel="Delete for good"
+                    title={t(copy.purge_title, { title: article.title })}
+                    description={t(copy.purge_description)}
+                    confirmLabel={t(copy.purge_confirm)}
                     onConfirm={() =>
-                      act(article.id, () => purgeArticle(article.id), 'Deleted for good')
+                      act(article.id, () => purgeArticle(article.id), t(copy.purged_toast))
                     }
                     trigger={
                       <Button
@@ -128,7 +133,7 @@ export default function Trash() {
                         className="text-destructive"
                         disabled={busyId === article.id}
                       >
-                        Delete for good
+                        {t(copy.purge_confirm)}
                       </Button>
                     }
                   />

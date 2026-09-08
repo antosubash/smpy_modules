@@ -4,6 +4,7 @@ import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { ArchiveSearch } from '../components/ArchiveSearch';
 import { type ArticleRead, formatArticleDate } from '../utils/api';
 import { archiveUrl } from '../utils/archiveUrl';
+import { keys, useT } from '../utils/i18n';
 
 /** The archive's front page, and the same screen narrowed to one category,
  *  tag, byline or search.
@@ -50,12 +51,14 @@ export default function PublicIndex({
   narrowed = false,
   feed_url,
 }: Props) {
+  const { t } = useT();
+  const copy = keys.news.public;
   return (
     <div>
       {/* A public page has no admin layout, so without this the configured
           brand colour and favicon would stop at the sign-in wall. */}
       <BrandingHead />
-      <Head title={query ? `${query} — ${heading}` : heading}>
+      <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
         {/* Results pages stay out of the index: the input space is unbounded,
             so one indexed `?q=` link invites a crawler to enumerate query
             strings forever, and every result page is a rearrangement of
@@ -82,18 +85,22 @@ export default function PublicIndex({
           <div className="text-muted-foreground">
             {query ? (
               <>
+                {/* One entry per sentence rather than a translated fragment
+                    around the emphasised term: which half of "in {heading}"
+                    leads is the translator's call. */}
                 <p>
-                  Nothing matches <span className="font-medium">“{query}”</span>
-                  {narrowed ? ` in ${heading}` : ''}.
+                  {narrowed
+                    ? t(copy.no_match_narrowed, { query, heading })
+                    : t(copy.no_match, { query })}
                 </p>
                 <p className="mt-2">
                   <a href={base_path} className="underline underline-offset-2">
-                    {narrowed ? `Show all of ${heading}` : 'Show all articles'}
+                    {narrowed ? t(copy.show_all_narrowed, { heading }) : t(copy.show_all)}
                   </a>
                 </p>
               </>
             ) : (
-              <p>Nothing published here yet.</p>
+              <p>{t(copy.empty)}</p>
             )}
           </div>
         ) : (
@@ -135,20 +142,20 @@ export default function PublicIndex({
                 href={archiveUrl(base_path, page - 1, query)}
                 className="underline underline-offset-2"
               >
-                ← Newer
+                {t(copy.newer)}
               </a>
             ) : (
               <span />
             )}
             <span className="text-muted-foreground">
-              Page {page} of {pages} · {total} articles
+              {t(copy.pager, { page, pages, count: total })}
             </span>
             {page < pages ? (
               <a
                 href={archiveUrl(base_path, page + 1, query)}
                 className="underline underline-offset-2"
               >
-                Older →
+                {t(copy.older)}
               </a>
             ) : (
               <span />
@@ -158,7 +165,7 @@ export default function PublicIndex({
 
         <p className="mt-10 text-sm text-muted-foreground">
           <a href={feed_url} className="underline underline-offset-2">
-            Subscribe by RSS
+            {t(copy.feed)}
           </a>
         </p>
       </div>

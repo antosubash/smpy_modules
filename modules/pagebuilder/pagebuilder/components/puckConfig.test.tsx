@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { translate } from '../utils/i18n';
 import { type AnyBlock, registerPuckBlocks, resetBlockRegistry } from './blockRegistry';
 import { getLayoutPuckConfig } from './layoutPuckConfig';
+import { localizeConfig } from './localizeConfig';
 import { getPuckConfig } from './puckConfig';
 
 const stub = { render: () => null } as unknown as AnyBlock;
@@ -37,6 +39,27 @@ describe('getPuckConfig', () => {
   it('leaves pagebuilder’s own categories intact', () => {
     registerPuckBlocks({ blocks: { Widget: stub }, category: { key: 'feeds', title: 'Feeds' } });
     expect(getPuckConfig().categories?.sections?.components).toContain('Hero');
+  });
+
+  it('localizes a registered block against another module’s namespace', () => {
+    // The reason a contributed block can hold catalogue keys at all. The host
+    // merges every module's catalogue into one flat table and i18next is
+    // configured with `keySeparator: false`, so `news.…` is a whole key rather
+    // than a path into a namespace this module would have to know about —
+    // `localizeConfig` walks the *assembled* config and resolves it with
+    // pagebuilder's own `t`. A real news key, because a made-up one would
+    // resolve to itself and prove nothing.
+    registerPuckBlocks({
+      blocks: { Widget: { ...stub, label: 'news.list.title' } as AnyBlock },
+      category: { key: 'feeds', title: 'news.list.title' },
+    });
+    const config = localizeConfig(getPuckConfig(), translate);
+    // Through a structural view: the config's static type names pagebuilder's
+    // own 56 blocks, and a contributed one is only ever known at runtime —
+    // which is the whole point of the registry.
+    const components = config.components as unknown as Record<string, { label?: string }>;
+    expect(components.Widget.label).toBe('News');
+    expect(config.categories?.feeds?.title).toBe('News');
   });
 });
 

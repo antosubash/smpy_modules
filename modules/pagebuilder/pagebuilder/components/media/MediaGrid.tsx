@@ -3,6 +3,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { MediaAssetRead } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { formatBytes } from '../../utils/mediaFormat';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -16,10 +17,11 @@ interface Props {
 }
 
 export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props) {
+  const { t } = useT();
   if (assets.length === 0 && !loading) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        No assets match the current filter.
+        {t(keys.pagebuilder.grid.empty)}
       </div>
     );
   }
@@ -56,7 +58,7 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
                   pages depending on this asset live. */}
               <Button variant="link" size="sm" className="h-auto p-0" asChild>
                 <a href={`/pagebuilder/media/${a.id}`} data-testid="media-details-link">
-                  Details
+                  {t(keys.pagebuilder.grid.details)}
                 </a>
               </Button>
               <Button
@@ -64,19 +66,21 @@ export function MediaGrid({ assets, loading, copiedId, onCopy, onDelete }: Props
                 size="sm"
                 className="h-auto p-0"
                 onClick={() => onCopy(a)}
-                title="Useful for the SEO og_image field or external use"
+                title={t(keys.pagebuilder.grid.copy_hint)}
               >
-                {copiedId === a.id ? 'Copied!' : 'Copy URL'}
+                {copiedId === a.id
+                  ? t(keys.pagebuilder.grid.copied)
+                  : t(keys.pagebuilder.grid.copy)}
               </Button>
               <ConfirmDialog
                 trigger={
                   <Button variant="link" size="sm" className="ml-auto h-auto p-0 text-destructive">
-                    Delete
+                    {t(keys.pagebuilder.grid.delete)}
                   </Button>
                 }
-                title={`Delete ${a.original_filename}?`}
-                description="If a page still uses this asset the delete is refused, and the pages using it are named. Open the asset to see them."
-                confirmLabel="Delete"
+                title={t(keys.pagebuilder.grid.delete_title, { name: a.original_filename })}
+                description={t(keys.pagebuilder.grid.delete_description)}
+                confirmLabel={t(keys.pagebuilder.grid.delete)}
                 destructive
                 onConfirm={() => onDelete(a.id)}
               />

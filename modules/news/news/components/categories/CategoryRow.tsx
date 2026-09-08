@@ -3,6 +3,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
 
+import { keys, useT } from '../../utils/i18n';
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { isManaged } from '../../utils/taxonomyApi';
 
@@ -40,14 +41,13 @@ export function CategoryRow({
   onDrop,
   onDragEnd,
 }: Props) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
   const [slug, setSlug] = useState(category.slug);
 
   const managed = isManaged(category);
-  const countLabel = `${category.article_count} ${
-    category.article_count === 1 ? 'article' : 'articles'
-  }`;
+  const countLabel = t(keys.news.categories.count, { count: category.article_count });
 
   const startEditing = () => {
     setName(category.name);
@@ -78,7 +78,7 @@ export function CategoryRow({
     >
       <span
         aria-hidden
-        title={managed ? 'Drag to reorder' : undefined}
+        title={managed ? t(keys.news.categories.drag) : undefined}
         className={`mt-1 select-none text-muted-foreground ${
           managed ? 'cursor-grab' : 'opacity-30'
         }`}
@@ -90,14 +90,14 @@ export function CategoryRow({
         {editing ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <Input
-              aria-label="Category name"
+              aria-label={t(keys.news.categories.name_label)}
               value={name}
               autoFocus
               disabled={busy}
               onChange={(e) => setName(e.target.value)}
             />
             <Input
-              aria-label="Category slug"
+              aria-label={t(keys.news.categories.slug_label)}
               value={slug}
               disabled={busy}
               onChange={(e) => setSlug(e.target.value)}
@@ -108,7 +108,7 @@ export function CategoryRow({
             <p className="truncate font-medium">{category.name}</p>
             <p className="truncate text-sm text-muted-foreground">
               {category.is_system
-                ? 'system category · cannot be deleted or renamed'
+                ? t(keys.news.categories.system)
                 : `/admin/news/?category=${category.slug}`}
             </p>
           </>
@@ -123,7 +123,7 @@ export function CategoryRow({
         {editing ? (
           <>
             <Button type="button" size="sm" disabled={busy || !name.trim()} onClick={save}>
-              Save
+              {t(keys.news.categories.save)}
             </Button>
             <Button
               type="button"
@@ -132,7 +132,7 @@ export function CategoryRow({
               disabled={busy}
               onClick={() => setEditing(false)}
             >
-              Cancel
+              {t(keys.news.categories.cancel)}
             </Button>
           </>
         ) : (
@@ -145,7 +145,7 @@ export function CategoryRow({
                 disabled={busy}
                 onClick={startEditing}
               >
-                Rename
+                {t(keys.news.categories.rename)}
               </Button>
             )}
             {/* A free-text category cannot be ordered or re-slugged until it
@@ -158,7 +158,7 @@ export function CategoryRow({
                 disabled={busy}
                 onClick={() => onAdopt(category.name)}
               >
-                Add to list
+                {t(keys.news.categories.adopt)}
               </Button>
             )}
             {managed && deleteSlot}

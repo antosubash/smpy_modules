@@ -40,7 +40,13 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.25,<0.1"]
 #
 # Must stay a 0.0.x range: the repo publishes at 0.0.x, so `>=0.1` would be
 # unsatisfiable and the extra uninstallable.
-pagebuilder = ["simple_module_pagebuilder>=0.0.1,<0.1"]
+#
+# Floor raised from 0.0.1 for the NewsFeed block's labels, which are catalogue
+# keys resolved by *pagebuilder's* ``localizeConfig`` — added in 0.0.8. On an
+# older neighbour nothing crashes, but every label in that block's palette
+# entry renders as its own dotted key, which is worse than the English it
+# replaced. The floor is what makes holding keys there safe.
+pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

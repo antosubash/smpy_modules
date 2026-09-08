@@ -1,6 +1,7 @@
 /** Client for the news read API. */
 
 import { BASE, read, write } from './http';
+import { keys, type Translate } from './i18n';
 import type {
   ArticleDetail,
   ArticleListResponse,
@@ -221,15 +222,15 @@ export const restoreArticle = (id: number) =>
  * UTC, so reading it in the viewer's own timezone shifts it a day for everyone
  * west of UTC.
  */
-export function relativeDay(iso: string | null, now = new Date()): string {
+export function relativeDay(iso: string | null, t: Translate, now = new Date()): string {
   if (!iso) return '';
   const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(then.getTime())) return '';
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const days = Math.round((then.getTime() - today) / 86_400_000);
-  if (days === 0) return 'today';
-  if (days > 0) return `in ${days}d`;
-  return `${-days}d ago`;
+  if (days === 0) return t(keys.news.dates.today);
+  if (days > 0) return t(keys.news.dates.in_days, { days });
+  return t(keys.news.dates.days_ago, { days: -days });
 }
 
 export type {

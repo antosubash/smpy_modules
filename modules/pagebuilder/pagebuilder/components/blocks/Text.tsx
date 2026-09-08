@@ -1,5 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
-
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock } from '../widgets/_internal/rich-text';
 
@@ -30,7 +30,7 @@ const alignClass: Record<TextProps['align'], string> = {
 };
 
 export const TextBlock: ComponentConfig<TextProps> = {
-  label: 'Text',
+  label: keys.pagebuilder.blocks.text.label,
   fields: {
     /**
      * Upstream uses Puck's `richtext` field here, which stores HTML and hands
@@ -45,24 +45,24 @@ export const TextBlock: ComponentConfig<TextProps> = {
      * operator-tunable setting that can be emptied. It also keeps this block
      * consistent with the other 50, which all render copy this way.
      */
-    text: { type: 'textarea', label: 'Text (markdown)' },
+    text: { type: 'textarea', label: keys.pagebuilder.blocks.text.text },
     size: {
       type: 'select',
-      label: 'Size',
+      label: keys.pagebuilder.blocks.text.size,
       options: [
-        { label: 'Small', value: 'sm' },
-        { label: 'Base', value: 'base' },
-        { label: 'Large', value: 'lg' },
-        { label: 'Extra large', value: 'xl' },
+        { label: keys.pagebuilder.blocks.text.size_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.text.size_base, value: 'base' },
+        { label: keys.pagebuilder.blocks.text.size_lg, value: 'lg' },
+        { label: keys.pagebuilder.blocks.text.size_xl, value: 'xl' },
       ],
     },
     align: {
       type: 'radio',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.text.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
-        { label: 'Right', value: 'right' },
+        { label: keys.pagebuilder.blocks.text.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.text.align_center, value: 'center' },
+        { label: keys.pagebuilder.blocks.text.align_right, value: 'right' },
       ],
     },
   },

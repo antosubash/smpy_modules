@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type TableWidgetProps = {
@@ -15,13 +16,13 @@ function parseDelimited(value: string): string[] {
 }
 
 export const TableWidget: ComponentConfig<TableWidgetProps> = {
-  label: 'Table',
+  label: keys.pagebuilder.blocks.table.label,
   fields: {
-    caption: { type: 'text', label: 'Caption (accessibility)' },
-    headers: { type: 'text', label: 'Headers (pipe-separated)' },
+    caption: { type: 'text', label: keys.pagebuilder.blocks.table.caption },
+    headers: { type: 'text', label: keys.pagebuilder.blocks.table.headers },
     rows: {
       type: 'textarea',
-      label: 'Rows (one per line, columns pipe-separated)',
+      label: keys.pagebuilder.blocks.table.rows,
     },
   },
   defaultProps: {
@@ -39,7 +40,9 @@ export const TableWidget: ComponentConfig<TableWidgetProps> = {
 
     if (headerList.length === 0 && rowList.length === 0) {
       return (
-        <div className="text-gray-500 text-center py-4">Add headers and rows in the editor.</div>
+        <div className="text-gray-500 text-center py-4">
+          {translate(keys.pagebuilder.blocks.table.empty)}
+        </div>
       );
     }
 

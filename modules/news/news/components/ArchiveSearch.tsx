@@ -18,6 +18,8 @@
  * search box is not a screen.
  */
 
+import { keys, useT } from '../utils/i18n';
+
 interface Props {
   /** Where the search goes — this archive's own path, without a query string. */
   basePath: string;
@@ -33,7 +35,10 @@ interface Props {
 }
 
 export function ArchiveSearch({ basePath, query, narrowed, heading }: Props) {
-  const placeholder = narrowed ? `Search in ${heading}` : 'Search articles';
+  const { t } = useT();
+  const placeholder = narrowed
+    ? t(keys.news.public.search_placeholder_narrowed, { heading })
+    : t(keys.news.public.search_placeholder);
   return (
     // `<search>` rather than `role="search"` on the form: the element carries
     // the role, and one landmark is what a screen-reader user skips to.
@@ -54,7 +59,7 @@ export function ArchiveSearch({ basePath, query, narrowed, heading }: Props) {
           type="submit"
           className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
         >
-          Search
+          {t(keys.news.public.search_submit)}
         </button>
       </form>
     </search>

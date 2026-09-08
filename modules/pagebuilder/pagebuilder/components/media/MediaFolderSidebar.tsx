@@ -2,6 +2,8 @@
 
 import { Input } from '@simple-module-py/ui/components/ui/input';
 
+import { keys, useT } from '../../utils/i18n';
+
 interface FolderItemProps {
   label: string;
   active: boolean;
@@ -42,20 +44,21 @@ export function MediaFolderSidebar({
   uploadFolder,
   onUploadFolderChange,
 }: Props) {
+  const { t } = useT();
   return (
     <aside className="space-y-4">
       <div>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Folders
+          {t(keys.pagebuilder.folders.title)}
         </h2>
         <ul className="space-y-1 text-sm">
           <FolderItem
-            label="All assets"
+            label={t(keys.pagebuilder.folders.all_assets)}
             active={activeFolder === null}
             onClick={() => onSelectFolder(null)}
           />
           <FolderItem
-            label="Unfiled"
+            label={t(keys.pagebuilder.folders.unfiled)}
             active={activeFolder === ''}
             onClick={() => onSelectFolder('')}
           />
@@ -74,7 +77,7 @@ export function MediaFolderSidebar({
           htmlFor="media-upload-folder"
           className="mb-1 block text-sm font-semibold text-muted-foreground"
         >
-          Upload to folder
+          {t(keys.pagebuilder.folders.upload_to)}
         </label>
         <Input
           id="media-upload-folder"
@@ -82,7 +85,7 @@ export function MediaFolderSidebar({
           value={uploadFolder}
           onChange={(e) => onUploadFolderChange(e.target.value)}
           list="pagebuilder-folder-suggestions"
-          placeholder="e.g. marketing/heros"
+          placeholder={t(keys.pagebuilder.folders.upload_placeholder)}
           className="w-full"
         />
         <datalist id="pagebuilder-folder-suggestions">
@@ -90,7 +93,9 @@ export function MediaFolderSidebar({
             <option key={name} value={name} />
           ))}
         </datalist>
-        <p className="mt-1 text-xs text-muted-foreground">Leave blank to upload into Unfiled.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t(keys.pagebuilder.folders.upload_help)}
+        </p>
       </div>
     </aside>
   );

@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
+import { keys } from '../../utils/i18n';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -10,11 +11,11 @@ export type EyebrowSectionWidgetProps = {
 };
 
 export const EyebrowSectionWidget: ComponentConfig<EyebrowSectionWidgetProps> = {
-  label: 'Eyebrow + heading + body',
+  label: keys.pagebuilder.blocks.eyebrow_section.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    heading: { type: 'text', label: 'Heading' },
-    body: { type: 'textarea', label: 'Body' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.eyebrow_section.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    body: { type: 'textarea', label: keys.pagebuilder.blocks.common.body },
   },
   defaultProps: {
     eyebrow: 'Our story',

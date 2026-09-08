@@ -14,6 +14,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type ReactNode, useState } from 'react';
 
 import { usePendingDialog } from '../hooks/usePendingDialog';
+import { keys, useT } from '../utils/i18n';
 
 /* A copy of pagebuilder's dialog, and deliberately a copy rather than an
  * import.
@@ -64,7 +65,7 @@ export function ConfirmDialog({
   trigger,
   title,
   description,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   destructive = false,
   level,
   confirmPhrase,
@@ -87,8 +88,10 @@ export function ConfirmDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
+  const { t } = useT();
   const [typed, setTyped] = useState('');
 
+  const label = confirmLabel ?? t(keys.news.confirm.default_label);
   const resolvedLevel: ConfirmLevel = level ?? (destructive ? 'medium' : 'low');
   // Compared exactly, case included. A forgiving match would defeat the point:
   // the delay is the safeguard, and it only works while the phrase is actually
@@ -102,8 +105,9 @@ export function ConfirmDialog({
   // phrase, because reopening must not inherit the one typed last time: that
   // would put a second delete one click from confirmed, which is the exact
   // property this level exists to remove.
-  const { open, pending, error, change, run } = usePendingDialog(`${confirmLabel} failed`, () =>
-    setTyped(''),
+  const { open, pending, error, change, run } = usePendingDialog(
+    t(keys.news.confirm.failed, { action: label }),
+    () => setTyped(''),
   );
 
   return (
@@ -117,8 +121,11 @@ export function ConfirmDialog({
         {children && <div className="grid gap-2 py-2">{children}</div>}
         {needsPhrase && (
           <div className="grid gap-2 py-2">
+            {/* Plain text rather than the phrase in a <code>: the sentence is one
+                catalogue entry with a placeholder, so a translator can put the
+                phrase wherever their grammar wants it. */}
             <Label htmlFor={CONFIRM_PHRASE_INPUT}>
-              Type <code className="font-mono font-semibold">{confirmPhrase}</code> to confirm
+              {t(keys.news.confirm.phrase, { phrase: confirmPhrase })}
             </Label>
             <Input
               id={CONFIRM_PHRASE_INPUT}
@@ -131,7 +138,7 @@ export function ConfirmDialog({
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{t(keys.news.confirm.cancel)}</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending || !unlocked}
             className={
@@ -144,7 +151,7 @@ export function ConfirmDialog({
               void run(onConfirm);
             }}
           >
-            {pending ? 'Working…' : confirmLabel}
+            {pending ? t(keys.news.confirm.working) : label}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

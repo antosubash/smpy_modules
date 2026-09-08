@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { TextLink } from './_shared/text-link';
@@ -41,31 +42,34 @@ const COLS_CLASS: Record<StoryCardsWidgetProps['columns'], string> = {
 };
 
 export const StoryCardsWidget: ComponentConfig<StoryCardsWidgetProps> = {
-  label: 'Story cards (image with overlay text)',
+  label: keys.pagebuilder.blocks.story_cards.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
-    subtitle: { type: 'textarea', label: 'Subtitle' },
-    viewAllLabel: { type: 'text', label: 'View-all link label' },
-    viewAllHref: { type: 'text', label: 'View-all link URL' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.common.subtitle },
+    viewAllLabel: { type: 'text', label: keys.pagebuilder.blocks.story_cards.view_all_label },
+    viewAllHref: { type: 'text', label: keys.pagebuilder.blocks.story_cards.view_all_href },
     columns: {
       type: 'select',
-      label: 'Columns (desktop)',
+      label: keys.pagebuilder.blocks.story_cards.columns,
       options: [
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
+        { label: keys.pagebuilder.blocks.story_cards.columns_2, value: '2' },
+        { label: keys.pagebuilder.blocks.story_cards.columns_3, value: '3' },
+        { label: keys.pagebuilder.blocks.story_cards.columns_4, value: '4' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Stories',
+      label: keys.pagebuilder.blocks.story_cards.items,
       arrayFields: {
-        imageUrl: createImageField(mediaLibraryAdapter, 'Image URL'),
-        imageAlt: { type: 'text', label: 'Image alt text' },
-        eyebrow: { type: 'text', label: 'Eyebrow / tag' },
-        date: { type: 'text', label: 'Date' },
-        title: { type: 'text', label: 'Title' },
-        href: { type: 'text', label: 'Link' },
+        imageUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.story_cards.items_image_url,
+        ),
+        imageAlt: { type: 'text', label: keys.pagebuilder.blocks.story_cards.items_image_alt },
+        eyebrow: { type: 'text', label: keys.pagebuilder.blocks.story_cards.items_eyebrow },
+        date: { type: 'text', label: keys.pagebuilder.blocks.story_cards.items_date },
+        title: { type: 'text', label: keys.pagebuilder.blocks.story_cards.items_title },
+        href: { type: 'text', label: keys.pagebuilder.blocks.story_cards.items_href },
       },
       defaultItemProps: {
         imageUrl: '',
