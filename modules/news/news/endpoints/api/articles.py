@@ -28,6 +28,7 @@ from news.contracts.schemas import (
     CategoryListResponse,
 )
 from news.endpoints.api._deps import (
+    blank_filter,
     cache,
     checked_locale,
     may_see_drafts,
@@ -104,6 +105,12 @@ async def list_articles(
         # either: this route is anonymously readable, and refusing would
         # confirm the bin has something in it.
         cache(response, include_drafts=False)
+        return ArticleListResponse(items=[], total=0)
+    if blank_filter(group) or blank_filter(locale):
+        # A filter supplied as nothing narrows to nothing. The reasoning is
+        # on `blank_filter`, because that is the part that must not be
+        # simplified away.
+        cache(response, include_drafts=may_draft)
         return ArticleListResponse(items=[], total=0)
     items, total = await service.list_articles(
         db,

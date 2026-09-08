@@ -99,6 +99,28 @@ def checked_locale(value: str | None) -> str | None:
     return resolved
 
 
+def blank_filter(value: str | None) -> bool:
+    """Was this filter supplied, and supplied as nothing?
+
+    ``None`` is absent; ``""`` and ``"   "`` are present and empty. Only this
+    boundary can tell them apart — below it both reach ``query_filters``, where
+    ``if not value`` reads an empty string as "no filter" and hands back the
+    *whole site* under a name that promised one story's translations. So an
+    empty value narrows to nothing instead: a caller that computed an empty
+    group id gets a visibly empty panel, not every article on the site.
+
+    Not the same as ``?locale=fr`` where the site publishes en and de. That
+    names a language, just not a configured one, and its documented rule is to
+    ignore the filter — a stale link should not be an error. An empty value
+    names nothing at all, so there is no list it could mean.
+
+    Same class as the ``published_data`` bug this branch fixed: a falsy-but-
+    present value one layer reads as absent and another as a value. Please
+    don't re-simplify it away.
+    """
+    return value is not None and not value.strip()
+
+
 def cache(response: Response, *, include_drafts: bool) -> None:
     """Let a shared cache hold the public answer, and never the editor's.
 

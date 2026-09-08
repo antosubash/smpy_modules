@@ -17,7 +17,6 @@ import pytest
 from factories import make_article
 from news import locales, redirects
 from news.content import ArticlesService
-from news.models import ArticleStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -82,6 +81,75 @@ class TestRoutesAreMountedPerLanguage:
 
         assert response.status_code == 301
         assert response.headers["location"] == "/news/budget"
+
+    async def test_only_the_default_language_has_an_alias(
+        self, bilingual_public_client
+    ) -> None:
+        """The alias exists because the default language serves *unprefixed*,
+        so ``/en/news/x`` is a second spelling of one address. ``/de/news/x`` is
+        the German article's only address — bouncing it anywhere would send a
+        German reader to English, which is the whole failure the prefix scheme
+        exists to prevent."""
+        async with bilingual_public_client.db_state.session_factory() as db:
+            await make_article(db, slug="haushalt", locale="de")
+
+        response = await bilingual_public_client.get(
+            "/de/news/haushalt", follow_redirects=False
+        )
+
+        assert response.status_code == 200, response.text
+
+    async def test_a_language_the_site_does_not_publish_is_not_served(
+        self, bilingual_public_client
+    ) -> None:
+        """No router is mounted for it, so there is nothing to fall through to.
+
+        The failure this guards is the one CLAUDE.md names by example: an
+        address in a language the site does not publish must never answer with
+        the default language's article. It 404s — it does not redirect to
+        ``/news/budget`` either, because the two were never the same document
+        and forwarding would invent an equivalence nobody declared.
+        """
+        async with bilingual_public_client.db_state.session_factory() as db:
+            await make_article(db, slug="budget", title="Budget", locale="en")
+
+        response = await bilingual_public_client.get(
+            "/fr/news/budget", follow_redirects=False
+        )
+
+        assert response.status_code == 404
+        assert "Budget" not in response.text
+        assert "/fr/news/{slug}" not in self._paths(bilingual_public_client)
+
+    async def test_a_configured_language_does_not_borrow_anothers_article(
+        self, bilingual_public_client
+    ) -> None:
+        """``/de/news/budget`` 404s while only the English ``budget`` exists.
+
+        The counterpart to the test above, and the sharper half: German *is*
+        configured and its router *is* mounted, so this is the case where a
+        locale-blind lookup would quietly succeed and serve English copy at a
+        German URL.
+        """
+        async with bilingual_public_client.db_state.session_factory() as db:
+            await make_article(db, slug="budget", title="Budget", locale="en")
+
+        response = await bilingual_public_client.get(
+            "/de/news/budget", follow_redirects=False
+        )
+
+        assert response.status_code == 404
+        assert "Budget" not in response.text
+
+    async def test_a_monolingual_site_gets_no_alias_at_all(
+        self, anon_client
+    ) -> None:
+        """One language means the bare prefix is the only address there is, so
+        there is no second spelling for an alias to collapse."""
+        paths = set(anon_client.app.openapi()["paths"])
+
+        assert "/news/{slug}" in paths
+        assert "/en/news/{slug}" not in paths
 
 
 class TestTheViewerResolvesWithinOneLanguage:
@@ -153,92 +221,6 @@ class TestRedirectsAreScopedToOneLanguage:
 
         assert await redirects.resolve(db, "budget", "en") == "the-budget"
         assert await redirects.resolve(db, "budget", "de") == "der-haushalt"
-
-
-class TestTheViewerAdvertisesItsTranslations:
-    """``hreflang``, server-rendered.
-
-    A crawler deciding which language to index for a query does it without
-    running the script, so a switch that only exists after the bundle executes
-    is a switch that does not exist.
-    """
-
-    async def _pair(self, client) -> None:
-        async with client.db_state.session_factory() as db:
-            english = await make_article(
-                db, slug="budget", title="Budget", locale="en"
-            )
-            await make_article(
-                db,
-                slug="haushalt",
-                title="Haushalt",
-                locale="de",
-                translation_group=english.translation_group,
-            )
-
-    async def test_each_language_is_linked_from_the_other(
-        self, bilingual_public_client
-    ) -> None:
-        await self._pair(bilingual_public_client)
-
-        body = (await bilingual_public_client.get("/news/budget")).text
-
-        assert 'hreflang="en"' in body
-        assert 'hreflang="de"' in body
-        assert "/de/news/haushalt" in body
-
-    async def test_x_default_names_the_sites_own_language(
-        self, bilingual_public_client
-    ) -> None:
-        """The version to serve someone whose language nobody matched. The
-        site's default is the only defensible answer."""
-        await self._pair(bilingual_public_client)
-
-        body = (await bilingual_public_client.get("/de/news/haushalt")).text
-
-        assert 'hreflang="x-default"' in body
-
-    async def test_an_untranslated_article_advertises_nothing(
-        self, bilingual_public_client
-    ) -> None:
-        """A lone ``hreflang`` pointing at the document itself says nothing and
-        is noise in the head of every page."""
-        async with bilingual_public_client.db_state.session_factory() as db:
-            await make_article(db, slug="alone", locale="en")
-
-        body = (await bilingual_public_client.get("/news/alone")).text
-
-        assert "hreflang" not in body
-
-    async def test_a_draft_translation_is_not_advertised(
-        self, bilingual_public_client
-    ) -> None:
-        """Pointing a crawler at a 404 and offering a reader a language switch
-        that dead-ends."""
-        async with bilingual_public_client.db_state.session_factory() as db:
-            english = await make_article(db, slug="budget", locale="en")
-            await make_article(
-                db,
-                slug="haushalt",
-                locale="de",
-                status=ArticleStatus.DRAFT,
-                translation_group=english.translation_group,
-            )
-
-        body = (await bilingual_public_client.get("/news/budget")).text
-
-        assert "haushalt" not in body
-
-    async def test_the_response_says_which_language_it_is(
-        self, bilingual_public_client
-    ) -> None:
-        """For caches, and for anything reading the response without parsing
-        the body."""
-        await self._pair(bilingual_public_client)
-
-        response = await bilingual_public_client.get("/de/news/haushalt")
-
-        assert response.headers["Content-Language"] == "de"
 
 
 class TestMonolingualSitesAreUnaffected:

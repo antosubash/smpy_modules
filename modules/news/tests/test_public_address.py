@@ -15,6 +15,11 @@ described: news had to tell pagebuilder which slugs it no longer owned, so
 ``/p/{slug}`` would 404 and the sitemap would advertise the news URL. Articles
 are not pages, so there is nothing to claim and no sitemap to borrow —
 ``TestSitemap`` covers the one news now publishes itself.
+
+Two siblings hold what used to be here as well, split for the 300-line cap at
+seams that were already there: ``test_public_redirects`` for the addresses an
+article *used* to serve at, and ``test_locale_addressing`` for what the language
+does to all of them.
 """
 
 from __future__ import annotations
@@ -74,8 +79,48 @@ class TestTheViewer:
 
         assert (await anon_client.get(f"{NEWS}/binned")).status_code == 404
 
+    async def test_a_submission_awaiting_review_is_a_404(self, anon_client) -> None:
+        """Between draft and published is still not published.
+
+        An article submitted for review is finished work waiting on somebody,
+        which is exactly the state a reviewer might assume is already safe to
+        link. It is not: the viewer serves ``PUBLISHED`` and nothing else.
+        """
+        await _seed(
+            anon_client, "awaiting", status=ArticleStatus.SUBMITTED_FOR_REVIEW
+        )
+
+        assert (await anon_client.get(f"{NEWS}/awaiting")).status_code == 404
+
     async def test_a_slug_that_never_existed_is_a_404(self, anon_client) -> None:
         assert (await anon_client.get(f"{NEWS}/nothing-here")).status_code == 404
+
+    async def test_every_one_of_those_404s_identically(self, anon_client) -> None:
+        """The indistinguishability is the point, not a side effect.
+
+        A draft, a submission, a trashed article, one published without a
+        snapshot and a slug that was never an article all answer the same way.
+        Anything that told them apart — a different status, a different body, a
+        different header — would answer precisely the question the 404 exists to
+        refuse: whether there is something here you are not allowed to see.
+        """
+        await _seed(anon_client, "d", status=ArticleStatus.DRAFT)
+        await _seed(anon_client, "s", status=ArticleStatus.SUBMITTED_FOR_REVIEW)
+        await _seed(anon_client, "n", publish_body=False)
+        binned = await _seed(anon_client, "t")
+        async with anon_client.db_state.session_factory() as db:
+            await ArticlesService(db).trash(binned.id)
+            await db.commit()
+
+        answers = {
+            (r.status_code, r.json()["detail"])
+            for r in [
+                await anon_client.get(f"{NEWS}/{slug}")
+                for slug in ("d", "s", "n", "t", "never-existed")
+            ]
+        }
+
+        assert answers == {(404, "Article not found")}
 
     async def test_an_article_published_without_a_body_snapshot_is_a_404(
         self, anon_client
@@ -163,98 +208,6 @@ class TestCachingHeaders:
         response = await anon_client.get(f"{NEWS}/unpoliced")
 
         assert "Content-Security-Policy" not in response.headers
-
-
-class TestRename:
-    """Renaming an article must not break the links already in the world.
-
-    News used to read pagebuilder's redirect table, because the slug being
-    renamed was a page's. It keeps its own now — same rule, its own rows.
-    """
-
-    async def test_the_old_address_forwards_to_the_new_one(self, anon_client) -> None:
-        article = await _seed(anon_client, "old-name")
-        async with anon_client.db_state.session_factory() as db:
-            await ArticlesService(db).update(article.id, {"slug": "new-name"})
-            await db.commit()
-
-        response = await anon_client.get(f"{NEWS}/old-name")
-
-        assert response.status_code == 301
-        assert response.headers["location"] == "/news/new-name"
-
-    async def test_a_slug_nobody_renamed_forwards_nowhere(self, anon_client) -> None:
-        await _seed(anon_client, "steady")
-
-        assert (await anon_client.get(f"{NEWS}/never-used")).status_code == 404
-
-    async def test_renaming_back_leaves_no_redirect_loop(self, db) -> None:
-        """An article reclaiming an address it once redirected away would
-        otherwise send readers straight back off it."""
-        from news import locales, redirects
-
-        article = await make_article(db, slug="first")
-        service = ArticlesService(db)
-        await service.update(article.id, {"slug": "second"})
-
-        await service.update(article.id, {"slug": "first"})
-
-        assert await redirects.resolve(db, "first", locales.default()) is None
-
-    async def test_it_does_not_forward_to_an_unpublished_article(
-        self, anon_client
-    ) -> None:
-        """The old address 404s rather than 301ing into one.
-
-        Published at A, renamed to B, then taken off the site: the viewer serves
-        only published articles, so a redirect to B lands on a 404 — and because
-        the redirect is permanent, a browser that followed it once keeps doing
-        so from cache long after the article comes back.
-        """
-        article = await _seed(anon_client, "was-here")
-        async with anon_client.db_state.session_factory() as db:
-            service = ArticlesService(db)
-            await service.update(article.id, {"slug": "now-here"})
-            await service.unpublish(article.id)
-            await db.commit()
-
-        response = await anon_client.get(f"{NEWS}/was-here")
-
-        assert response.status_code == 404, response.text
-
-    async def test_it_does_not_forward_to_a_trashed_article(self, db) -> None:
-        """The same refusal as the unpublished case, by the same shared rule.
-
-        ``resolve`` open-coded ``deleted_at IS NULL`` where every other read
-        path applies ``NOT_TRASHED``; this pins the behaviour so the one
-        definition cannot quietly stop covering the redirect.
-        """
-        from news import locales, redirects
-
-        article = await make_article(db, slug="was-binned")
-        service = ArticlesService(db)
-        await service.update(article.id, {"slug": "now-binned"})
-        await service.trash(article.id)
-
-        assert await redirects.resolve(db, "was-binned", locales.default()) is None
-
-    async def test_it_forwards_again_once_the_article_is_back(
-        self, anon_client
-    ) -> None:
-        # Refusing while the article is down must not be permanent either: the
-        # redirect row is still there, and republishing makes it good again.
-        article = await _seed(anon_client, "returning")
-        async with anon_client.db_state.session_factory() as db:
-            service = ArticlesService(db)
-            await service.update(article.id, {"slug": "returned"})
-            await service.unpublish(article.id)
-            await service.publish(article.id)
-            await db.commit()
-
-        response = await anon_client.get(f"{NEWS}/returning")
-
-        assert response.status_code == 301
-        assert response.headers["location"] == "/news/returned"
 
 
 class TestSitemap:

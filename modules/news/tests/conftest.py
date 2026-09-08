@@ -263,6 +263,19 @@ async def anon_client() -> AsyncIterator[AsyncClient]:
 
 
 @pytest_asyncio.fixture
+async def editor_public_client() -> AsyncIterator[AsyncClient]:
+    """An editor, on an app that also mounts the public viewer.
+
+    The one shape neither half gives on its own: a published article whose
+    author has kept editing has to be read at the preview *and* at its public
+    URL, in the same database, to show that the two are serving different
+    versions. Every other fixture has one or the other.
+    """
+    async for client in _client(stub_user((ROLE_EDITOR,)), mount_public=True):
+        yield client
+
+
+@pytest_asyncio.fixture
 async def bilingual_public_client(bilingual) -> AsyncIterator[AsyncClient]:
     """An anonymous reader on a two-language app with its public routes mounted.
 

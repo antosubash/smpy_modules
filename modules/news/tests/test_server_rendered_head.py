@@ -8,6 +8,11 @@ application's name with no description and no image.
 
 Every assertion here reads the *raw* HTML, without an ``X-Inertia`` header and
 without executing anything. That is exactly what an unfurler sees.
+
+``hreflang`` is here for the same reason and not in ``test_locale_addressing``
+with the rest of the language rules: a crawler deciding which language to index
+for a query does it without running the script, so a language switch that only
+exists after the bundle executes is a language switch that does not exist.
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from __future__ import annotations
 import pytest
 from factories import make_article
 from news import settings as news_settings
+from news.models import ArticleStatus
 from news.settings import NewsSettings
 
 pytestmark = pytest.mark.asyncio
@@ -144,3 +150,91 @@ class TestListingHead:
     ) -> None:
         body = (await anon_client.get(f"{NEWS}/")).text
         assert '<meta property="og:type" content="website">' in body
+
+
+class TestTheViewerAdvertisesItsTranslations:
+    """``hreflang``, server-rendered.
+
+    A crawler deciding which language to index for a query does it without
+    running the script, so a switch that only exists after the bundle executes
+    is a switch that does not exist.
+    """
+
+    async def _pair(self, client) -> None:
+        async with client.db_state.session_factory() as db:
+            english = await make_article(
+                db, slug="budget", title="Budget", locale="en"
+            )
+            await make_article(
+                db,
+                slug="haushalt",
+                title="Haushalt",
+                locale="de",
+                translation_group=english.translation_group,
+            )
+
+    async def test_each_language_is_linked_from_the_other(
+        self, bilingual_public_client
+    ) -> None:
+        await self._pair(bilingual_public_client)
+
+        body = (await bilingual_public_client.get("/news/budget")).text
+
+        assert 'hreflang="en"' in body
+        assert 'hreflang="de"' in body
+        assert "/de/news/haushalt" in body
+
+    async def test_x_default_names_the_sites_own_language(
+        self, bilingual_public_client
+    ) -> None:
+        """The version to serve someone whose language nobody matched. The
+        site's default is the only defensible answer."""
+        await self._pair(bilingual_public_client)
+
+        body = (await bilingual_public_client.get("/de/news/haushalt")).text
+
+        assert 'hreflang="x-default"' in body
+
+    async def test_an_untranslated_article_advertises_nothing(
+        self, bilingual_public_client
+    ) -> None:
+        """A lone ``hreflang`` pointing at the document itself says nothing and
+        is noise in the head of every page."""
+        async with bilingual_public_client.db_state.session_factory() as db:
+            await make_article(db, slug="alone", locale="en")
+
+        body = (await bilingual_public_client.get("/news/alone")).text
+
+        assert "hreflang" not in body
+
+    async def test_a_draft_translation_is_not_advertised(
+        self, bilingual_public_client
+    ) -> None:
+        """Pointing a crawler at a 404 and offering a reader a language switch
+        that dead-ends."""
+        async with bilingual_public_client.db_state.session_factory() as db:
+            english = await make_article(db, slug="budget", locale="en")
+            await make_article(
+                db,
+                slug="haushalt",
+                locale="de",
+                status=ArticleStatus.DRAFT,
+                translation_group=english.translation_group,
+            )
+
+        body = (await bilingual_public_client.get("/news/budget")).text
+
+        assert "haushalt" not in body
+
+    async def test_the_response_says_which_language_it_is(
+        self, bilingual_public_client
+    ) -> None:
+        """For caches, and for anything reading the response without parsing
+        the body."""
+        await self._pair(bilingual_public_client)
+
+        response = await bilingual_public_client.get("/de/news/haushalt")
+
+        assert response.headers["Content-Language"] == "de"
+
+

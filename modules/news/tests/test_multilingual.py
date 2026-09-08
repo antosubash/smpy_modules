@@ -88,6 +88,68 @@ class TestListingFilter:
         assert len(response.json()["items"]) == 1
 
 
+class TestABlankFilterMatchesNothing:
+    """A filter supplied as empty must never widen to the whole site.
+
+    Below the endpoint both of these reach ``query_filters``, where
+    ``if not value`` reads an empty string as "no filter" — so a caller that
+    computed an empty group id would get every article on the site handed back
+    under a name that promised one story's translations. The endpoint is the
+    only layer that can still tell "absent" from "supplied as nothing", so the
+    distinction is drawn there and these pin it.
+
+    Deliberately different from ``?locale=fr`` above: that value names a
+    language, just not one this site publishes, and the documented rule for it
+    is to ignore the filter. An empty value names nothing at all.
+    """
+
+    async def test_a_blank_group_returns_nothing_not_everything(
+        self, editor_client, bilingual
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="unrelated-one", locale="en")
+            await make_article(db, slug="unrelated-two", locale="de")
+
+        response = await editor_client.get(f"{API}/articles?translation_group=")
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []
+
+    async def test_a_whitespace_group_is_blank_too(
+        self, editor_client, bilingual
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="unrelated-one", locale="en")
+
+        response = await editor_client.get(f"{API}/articles?translation_group=%20")
+
+        assert response.json()["items"] == []
+
+    async def test_a_blank_locale_returns_nothing_not_every_language(
+        self, editor_client, bilingual
+    ) -> None:
+        """A feed block whose language prop came through empty shows an empty
+        feed, not an English card in a German list."""
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
+
+        response = await editor_client.get(f"{API}/articles?locale=")
+
+        assert response.json()["items"] == []
+
+    async def test_omitting_them_entirely_still_lists_everything(
+        self, editor_client, bilingual
+    ) -> None:
+        """The other half of the distinction, or the guard above would be a
+        very quiet way to break the admin list."""
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
+
+        assert len((await editor_client.get(f"{API}/articles")).json()["items"]) == 2
+
+
 class TestSlugsAreUniquePerLanguage:
     """``/news/budget`` and ``/de/news/budget`` are two documents.
 
