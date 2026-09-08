@@ -29,6 +29,14 @@ ARTICLE_BODY_URL: Final = f"{VIEW_PREFIX}/articles/{{article_id}}/body"
 This used to be a pagebuilder URL, because the body lived on a page that module
 owned. Now it is news', which is what makes the module installable on its own.
 """
+ARTICLE_PREVIEW_URL: Final = f"{VIEW_PREFIX}/articles/{{article_id}}/preview"
+"""Where an article is read the way a reader will read it, before one can.
+
+Under the console's prefix rather than the public one because it is not public:
+it renders ``draft_data`` through the reader's own screen, which is the only
+way ``approve`` — a single action that publishes — can be exercised by someone
+who has actually seen what they are publishing.
+"""
 # The rail splits by section rather than lumping every content surface into
 # one "Content" group: which module a screen belongs to is then legible from
 # the sidebar as well as from the URL.
@@ -134,6 +142,11 @@ PUBLIC_CACHE_CONTROL: Final = f"public, max-age={PUBLIC_CACHE_SECONDS}"
 # An editor's listing includes drafts, so it differs by permission and must
 # never be held anywhere another visitor could be served it from.
 PRIVATE_CACHE_CONTROL: Final = "private, no-store"
+# Sent on the preview as a header as well as in the head. The head is the tag a
+# crawler reads, but ``_head.inject`` has nowhere to write when the response is
+# an Inertia XHR rather than a document — and a preview URL is exactly the kind
+# of link that gets pasted into a chat and followed by something that indexes.
+NOINDEX_ROBOTS_TAG: Final = "noindex, nofollow"
 # Shown on the categories screen as the system row. Articles in it carry an
 # empty ``category``; there is no table row, so it cannot be renamed or
 # deleted — which is exactly what the screen promises.

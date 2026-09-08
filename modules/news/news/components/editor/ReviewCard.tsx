@@ -24,14 +24,25 @@ import { type ArticleRead, approveArticle, rejectArticle, submitArticle } from '
  * Which controls appear depends on both the article's state and the viewer's
  * permissions, because they are different jobs: an author submits, a reviewer
  * decides.
+ *
+ * Every branch offers the preview, because approving publishes in the same
+ * action: this is the screen where someone commits an article to readers, and
+ * until the preview route existed the only thing they could look at first was
+ * the block canvas — an editor, with drag handles and editor chrome, which is
+ * not the article.
  */
 export function ReviewCard({
   article,
   canPublish,
+  previewUrl,
   onChanged,
 }: {
   article: ArticleRead;
   canPublish: boolean;
+  /** Where the article renders through the reader's own screen, over the draft
+   *  body. Handed down from the editor screen, which is given it by the server
+   *  rather than assembling it. */
+  previewUrl: string;
   onChanged: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -53,6 +64,14 @@ export function ReviewCard({
 
   const submitted = article.status === 'submitted_for_review';
 
+  const preview = (
+    <Button size="sm" variant="outline" asChild>
+      <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+        Preview
+      </a>
+    </Button>
+  );
+
   // Nothing to offer: a published article has been through review, and an
   // author looking at someone else's submission has no decision to make.
   if (!submitted && article.status !== 'draft') return null;
@@ -60,9 +79,10 @@ export function ReviewCard({
     return (
       <div className="rounded-lg border p-4">
         <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide">Review</h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="mb-3 text-xs text-muted-foreground">
           With a reviewer. You will see their note here if it is sent back.
         </p>
+        {preview}
       </div>
     );
   }
@@ -74,9 +94,11 @@ export function ReviewCard({
       {submitted ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Submitted for review. Approving publishes it in the same action.
+            Submitted for review. Approving publishes it in the same action, so read it as a reader
+            will before you decide.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {preview}
             <Button
               size="sm"
               disabled={busy}
@@ -96,14 +118,17 @@ export function ReviewCard({
               ? 'You can publish directly. Submitting instead puts it in front of another reviewer.'
               : 'Hand this to someone who can publish it.'}
           </p>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => void run(() => submitArticle(article.id), 'Submitted for review')}
-          >
-            Submit for review
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {preview}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void run(() => submitArticle(article.id), 'Submitted for review')}
+            >
+              Submit for review
+            </Button>
+          </div>
         </>
       )}
 

@@ -25,13 +25,17 @@ import { formatArticleDate } from '../utils/api';
  */
 export default function ArticleEditor() {
   const props = usePage<{
-    props: { article_id: number; locales?: string[] };
+    props: { article_id: number; preview_url: string; locales?: string[] };
   }>().props as unknown as {
     article_id: number;
+    /** Where this article renders through the reader's own screen, over the
+     *  draft body. Served rather than assembled here, the same way `edit_url`
+     *  is on the listing DTO. */
+    preview_url: string;
     locales?: string[];
     auth?: { permissions?: string[] };
   };
-  const { article_id } = props;
+  const { article_id, preview_url } = props;
   const canPublish = props.auth?.permissions?.includes('news.publish') ?? false;
   const locales = props.locales ?? [];
 
@@ -98,19 +102,28 @@ export default function ArticleEditor() {
           <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
             News / Articles
           </Button>
-          {/* `article` here is the listing DTO (`ArticleRead`) — the Inertia
-              props for this route carry only the id, and the client-side
-              fetch that fills the rest does not include `has_published`
-              (only `ArticleDetail`, fetched separately by ScheduleCard and
-              SeoCard, has that). So the only real signal this screen has for
-              "the public URL will resolve" is `status === 'published'`. A
-              submitted-for-review article that was never live before would
-              404 on `article.url`, which is worse than no button at all for
-              the reviewer who most wants to check it. */}
+          {/* Always available now. This used to be the *only* preview and had
+              to hide itself unless `status === 'published'`, because it linked
+              at the public URL and that URL 404s anything else — which left
+              the reviewer who most wants to check an article with no way to
+              look at it. `preview_url` renders the draft through the reader's
+              own screen, so it resolves in every state. */}
+          <Button variant="outline" asChild>
+            <a href={preview_url} target="_blank" rel="noopener noreferrer">
+              Preview
+            </a>
+          </Button>
+          {/* Kept beside it rather than replaced by it: for a published
+              article whose author has kept editing, "what am I about to ship"
+              and "what do readers have right now" are different questions and
+              both get asked. `article` here is the listing DTO (`ArticleRead`),
+              whose only signal that the public URL resolves is
+              `status === 'published'` — the client-side fetch that fills this
+              screen does not carry `has_published`. */}
           {isPublished && (
             <Button variant="outline" asChild>
               <a href={article.url} target="_blank" rel="noopener noreferrer">
-                Preview
+                View live
               </a>
             </Button>
           )}
@@ -208,7 +221,12 @@ export default function ArticleEditor() {
             Save
           </Button>
 
-          <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
+          <ReviewCard
+            article={article}
+            canPublish={canPublish}
+            previewUrl={preview_url}
+            onChanged={load}
+          />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}

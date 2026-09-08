@@ -24,9 +24,9 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import constants, locales, redirects, service
+from news import locales, redirects, service
 from news.content import ArticlesService
-from news.endpoints.public import _head
+from news.endpoints.public._render import render_article
 from news.endpoints.public._urls import (
     absolute_article,
     cache_control,
@@ -142,62 +142,21 @@ def article_router(locale: str) -> APIRouter:
         canonical = article.canonical_url or absolute_article(
             request, settings, slug, locale
         )
-        published_at = (
-            article.published_at.isoformat()
-            if article.published_at is not None
-            else None
-        )
         siblings = await alternates(db, request, settings, article.translation_group)
-        rendered = await inertia.render(
-            constants._PAGE_PUBLIC_ARTICLE,
-            {
-                "title": article.title,
-                # Which article this is, for the blocks in its own body that
-                # need to know. `Related` is the one: a "read next" list that
-                # includes the article you are reading is visibly broken, and
-                # the slug is the only thing that identifies it inside the
-                # block document.
-                "slug": article.slug,
-                # The published snapshot, never the draft — that is the whole
-                # point of keeping two columns.
-                "data": article.published_data,
-                "meta_description": article.meta_description,
-                "og_image": article.og_image,
-                "canonical_url": canonical,
-                "og_url": canonical,
-                "index_in_search": article.index_in_search,
-                "json_ld": article.json_ld,
-                "site_name": settings.site_name or None,
-                "twitter_handle": settings.twitter_handle or None,
-                "category": article.category,
-                "author": article.author,
-                "published_at": published_at,
-                "locale": locale,
-                "alternates": siblings,
-            },
-        )
-
-        # The same tags `PublicArticle` renders through Inertia's `<Head>`,
-        # written into the document server-side — see `_head` for why both are
-        # needed.
+        # Everything from here is shared with the authenticated preview — see
+        # `_render`. The one thing that is not shared is the argument below:
+        # this route serves the published snapshot, never the draft, which is
+        # the whole point of keeping two columns.
         return apply_headers(
-            _head.inject(
-                rendered,
-                _head.article_head(
-                    title=article.title,
-                    description=article.meta_description or None,
-                    canonical=canonical,
-                    image=article.og_image or None,
-                    site_name=settings.site_name or None,
-                    twitter_handle=settings.twitter_handle or None,
-                    published_at=published_at,
-                    author=article.author or None,
-                    section=article.category or None,
-                    index_in_search=article.index_in_search,
-                    json_ld=article.json_ld,
-                    locale=locale,
-                    alternates=siblings,
-                ),
+            await render_article(
+                inertia,
+                article=article,
+                data=article.published_data,
+                locale=locale,
+                settings=settings,
+                canonical=canonical,
+                alternates=siblings,
+                index_in_search=article.index_in_search,
             )
         )
 

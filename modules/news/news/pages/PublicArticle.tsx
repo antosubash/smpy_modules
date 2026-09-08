@@ -3,6 +3,7 @@ import { type Data, Render } from '@puckeditor/core';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
 import { articlePuckConfig } from '../components/body/articlePuckConfig';
+import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
 import { formatArticleDate } from '../utils/api';
 
 /** What a reader gets at `{public_route_prefix}/{slug}`.
@@ -35,6 +36,16 @@ interface Props {
   category?: string;
   author?: string;
   published_at?: string | null;
+  /** Present only on the authenticated preview at
+   *  `{VIEW_PREFIX}/articles/{id}/preview`, which renders this same screen over
+   *  `draft_data` so a reviewer approving an article has actually read it.
+   *
+   *  One screen rather than two on purpose: a preview that rendered
+   *  differently from the real thing would be worthless, and a second viewer
+   *  would be a second copy of the head, the canonical and the `hreflang`
+   *  handling. The banner is the only thing that differs, and the server
+   *  omits this prop entirely on the public route. */
+  preview?: ArticlePreviewState | null;
 }
 
 // Inline JSON-LD as a string requires the document to be safe to embed inside
@@ -64,6 +75,7 @@ export default function PublicArticle({
   category,
   author,
   published_at,
+  preview,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   const dated = formatArticleDate(published_at ?? null);
@@ -73,6 +85,7 @@ export default function PublicArticle({
       {/* A public page has no admin layout, so without this the configured
           brand colour and favicon would stop at the sign-in wall. */}
       <BrandingHead />
+      {preview && <PreviewBanner preview={preview} />}
       <Head title={title}>
         {meta_description && (
           <>
