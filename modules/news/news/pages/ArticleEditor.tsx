@@ -221,12 +221,7 @@ export default function ArticleEditor() {
             Save
           </Button>
 
-          <ReviewCard
-            article={article}
-            canPublish={canPublish}
-            previewUrl={preview_url}
-            onChanged={load}
-          />
+          <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}

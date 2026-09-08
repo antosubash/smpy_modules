@@ -107,9 +107,10 @@ test.describe('Article editor', () => {
     await expect(page.getByText(`/news/${slug} · Draft`)).toBeVisible();
     await page.getByRole('button', { name: /publish now/i }).click();
 
-    // Preview is a link to the public URL, not a button — it opens the live
-    // article rather than doing anything to it.
-    await expect(page.getByRole('link', { name: /^preview$/i })).toBeVisible();
+    // "View live" is the one that appears on publishing. Preview sits beside it
+    // in every state and renders the draft, so it says nothing about whether
+    // this article reached readers; the live link exists only once one has.
+    await expect(page.getByRole('link', { name: /^view live$/i })).toBeVisible();
     const listed = await page.request.get(`/api/news/articles?q=${slug}`);
     const body = (await listed.json()) as { items: { status: string }[] };
     expect(body.items[0].status).toBe('published');
