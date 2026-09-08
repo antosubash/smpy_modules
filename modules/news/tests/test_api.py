@@ -166,9 +166,12 @@ class TestPartialUpdate:
         assert response.json()["slug"] == "new-name"
 
         async with editor_client.db_state.session_factory() as db:
-            from news import redirects
+            from news import locales, redirects
 
-            assert await redirects.resolve(db, "old-name") == "new-name"
+            # Within the article's own language: a slug is only unique there,
+            # so a lookup without one is not an address.
+            resolved = await redirects.resolve(db, "old-name", locales.default())
+            assert resolved == "new-name"
 
     async def test_missing_article_is_a_404(self, editor_client) -> None:
         response = await editor_client.put(f"{ARTICLES}/9999", json={"category": "x"})

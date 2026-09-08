@@ -11,7 +11,7 @@ import { type ArticleRead, formatArticleDate, relativeDay } from '../utils/api';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /** The article editor — category, tags, date, byline and feed behaviour. The
- *  body is a page, so it is edited one link further in. */
+ *  body has a canvas of its own, so it is edited one link further in. */
 const articleSettingsUrl = (id: number) => `/admin/news/articles/${id}/edit`;
 
 /** `2026-02-01T00:00:00` -> `2026-02-01`, which is what <input type=date> wants. */

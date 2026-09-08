@@ -20,8 +20,9 @@ from typing import Final
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import query_filters, tag_service
-from news.constants import ARTICLE_BODY_URL, DEFAULT_LIMIT, MAX_LIMIT
+from news import locales, query_filters, tag_service
+from news.card import to_read as _to_read
+from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.models import (
     NOT_TRASHED,
@@ -30,7 +31,6 @@ from news.models import (
     NewsCategory,
     NewsTag,
 )
-from news.settings import public_article_path
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,10 @@ _CARD_COLUMNS: Final = (
     NewsArticle.show_in_feed,
     NewsArticle.author,
     NewsArticle.published_at,
+    # The card's public URL is locale-prefixed and the editor's language
+    # switcher keys off the group, so both are read on every row.
+    NewsArticle.locale,
+    NewsArticle.translation_group,
 )
 """The only columns a card reads.
 
@@ -86,28 +90,6 @@ def _base(include_drafts: bool, category: str | None, trashed_only: bool = False
     return stmt
 
 
-def _to_read(row) -> ArticleRead:
-    """One card row — the ``_CARD_COLUMNS`` tuple — as the published DTO."""
-    return ArticleRead(
-        id=row.id or 0,
-        slug=row.slug,
-        title=row.title,
-        excerpt=row.meta_description or "",
-        cover_image_url=row.og_image or "",
-        category=row.category,
-        tags=[],
-        pinned=row.pinned,
-        show_in_feed=row.show_in_feed,
-        author=row.author,
-        published_at=row.published_at,
-        status=row.status,
-        url=public_article_path(row.slug),
-        # Served rather than assembled in the browser, so the admin list holds
-        # no opinion about how this module routes its own body canvas.
-        edit_url=ARTICLE_BODY_URL.format(article_id=row.id or 0),
-    )
-
-
 async def list_articles(
     db: AsyncSession,
     *,
@@ -117,6 +99,8 @@ async def list_articles(
     tag: str | None = None,
     q: str | None = None,
     status: str | None = None,
+    locale: str | None = None,
+    group: str | None = None,
     in_feed_only: bool = False,
     include_drafts: bool = False,
     undated_first: bool = False,
@@ -160,6 +144,11 @@ async def list_articles(
         # unreachable from the one screen that could un-hide it.
         stmt = stmt.where(NewsArticle.show_in_feed.is_(True))
     stmt = query_filters.search(stmt, q)
+    # Public feeds pass the language the visitor is reading in, so a German
+    # page's feed block lists German articles. The admin list leaves it unset
+    # and shows every language, with a badge per row.
+    stmt = query_filters.locale(stmt, locale)
+    stmt = query_filters.translation_group(stmt, group)
     # A draft filter from someone who may not see drafts must not widen the
     # base query — `visible` has already restricted it, and `status` only
     # narrows, so the two compose safely in either order.
@@ -248,9 +237,19 @@ async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:
     )
 
 
-async def get_by_slug(db: AsyncSession, slug: str) -> NewsArticle | None:
+async def get_by_slug(
+    db: AsyncSession, slug: str, locale: str | None = None
+) -> NewsArticle | None:
+    """One article by address. Scoped to a language, because that is what an
+    address is: a slug identifies an article only within one locale, so a
+    lookup without it returns whichever translation the database reached
+    first. ``None`` means the site's default language."""
     return await db.scalar(
-        select(NewsArticle).where(NOT_TRASHED, NewsArticle.slug == slug)
+        select(NewsArticle).where(
+            NOT_TRASHED,
+            NewsArticle.slug == slug,
+            NewsArticle.locale == (locale or locales.default()),
+        )
     )
 
 

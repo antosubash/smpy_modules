@@ -6,7 +6,8 @@ session has to be able to list articles. Writes require ``news.edit``.
 The body and the workflow live next door in :mod:`news.endpoints.api.body` and
 :mod:`news.endpoints.api.workflow`, which is a split by *authority* rather than
 by tidiness — publishing is gated on ``news.publish``, and an autosave must not
-be able to reach a slug.
+be able to reach a slug. An article's tags and its translations have modules of
+their own for the ordinary reason: this file is at the repo's 300-line cap.
 """
 
 from __future__ import annotations
@@ -16,19 +17,19 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import counts as counts_module
-from news import service, tag_service
+from news import locales, service, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.content import ArticlesService
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleListResponse,
     ArticleRead,
-    ArticleTagsUpdate,
     ArticleUpdate,
     CategoryListResponse,
 )
 from news.endpoints.api._deps import (
     cache,
+    checked_locale,
     may_see_drafts,
     read_one,
     require_edit,
@@ -76,6 +77,22 @@ async def list_articles(
         "filter every other listing applies. Anyone who may not see drafts "
         "gets nothing, because a trashed article is not published.",
     ),
+    locale: str | None = Query(
+        None,
+        description="Only articles written in this language. A feed block on "
+        "a German page passes `de` so it lists German articles; the admin list "
+        "leaves it unset and shows every language, badged per row. An "
+        "unconfigured value is ignored rather than rejected — the filter "
+        "arrives from a query string, and a stale link should show the list.",
+    ),
+    group: str | None = Query(
+        None,
+        alias="translation_group",
+        description="One article and its counterparts in other languages — "
+        "what the editor's language switcher lists. Goes through this route "
+        "rather than one of its own so it inherits the same visibility rule: "
+        "a reader without `news.edit` sees the published translations only.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleListResponse:
     may_draft = may_see_drafts(request)
@@ -96,6 +113,8 @@ async def list_articles(
         tag=tag,
         q=q,
         status=status,
+        locale=locales.resolve(locale),
+        group=group,
         in_feed_only=in_feed,
         include_drafts=may_draft,
         undated_first=undated_first,
@@ -155,10 +174,16 @@ async def create_article(
     *about* a page — and could only ever be half-done, stranding an empty page
     whenever the second call failed. One table means one write, so a failure
     leaves nothing behind to adopt.
+
+    The language is chosen here and never again: it is fixed for the article's
+    lifetime, because moving one between languages would strand its slug in the
+    old one and orphan every redirect pointing at it. The counterpart in another
+    language is a sibling — see :mod:`news.endpoints.api.translations`.
     """
     article = await ArticlesService(db).create(
         title=body.title.strip(),
         slug=body.slug,
+        locale=checked_locale(body.locale),
         category=body.category,
         published_at=body.published_at,
         author=body.author,
@@ -220,48 +245,6 @@ async def update_article(
     read = await read_one(db, article_id)
     read.tags = await tag_service.list_for_article(db, article_id)
     return read
-
-
-@router.get("/articles/{article_id}/tags", response_model=list[str])
-async def list_article_tags(
-    article_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> list[str]:
-    """Tags on one article, under the same visibility rule as the listing.
-
-    The gate is not optional here. ``PUBLIC_READ_PREFIXES`` is matched with
-    ``str.startswith``, so this path is exempt from auth exactly like
-    ``GET /articles`` is — and it used to answer from ``NewsArticleTag`` alone,
-    which never applied the visibility rule. An anonymous visitor who guessed an
-    id read the tags of an article nobody had published yet.
-
-    Resolving through ``service.get_read`` rather than re-deriving the rule
-    keeps it in one place: that query is the listing's own, so "visible" means
-    the same thing here as it does there, trash included.
-    """
-    visible = await service.get_read(
-        db, article_id, include_drafts=may_see_drafts(request)
-    )
-    # One message for both misses on purpose: a distinguishable "exists but is
-    # hidden" would answer the question the 404 is there to refuse.
-    if visible is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
-    return await tag_service.list_for_article(db, article_id)
-
-
-@router.put(
-    "/articles/{article_id}/tags",
-    response_model=list[str],
-    dependencies=[require_edit],
-)
-async def set_article_tags(
-    article_id: int, body: ArticleTagsUpdate, db: AsyncSession = Depends(get_db)
-) -> list[str]:
-    """Replace the article's tags, creating any name that is new."""
-    if await service.get(db, article_id) is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
-    return await tag_service.set_for_article(db, article_id, body.tags)
 
 
 @router.delete(

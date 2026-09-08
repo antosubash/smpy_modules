@@ -14,6 +14,21 @@ from news.models import (
     NewsArticleRevision,
     NewsArticleTag,
 )
+from sqlalchemy import Table
+
+
+def unique_index(table: Table, name: str) -> tuple[str, ...]:
+    """The columns of one unique index, in order, or ``()`` if it is absent.
+
+    Named rather than matched on shape because the name is what a migration
+    creates and drops: an index that exists under a different one is a schema
+    the migrations cannot manage, not a passing test.
+    """
+    for index in table.indexes:
+        if index.name == name:
+            assert index.unique is True, f"{name} exists but is not unique"
+            return tuple(column.name for column in index.columns)
+    return ()
 
 
 def test_table_name() -> None:
@@ -52,17 +67,62 @@ def test_no_page_id_remains() -> None:
     assert "page_id" not in NewsArticle.__table__.columns
 
 
-def test_one_article_per_slug() -> None:
-    # The slug is the public address. Two articles sharing one would make the
-    # URL ambiguous and the viewer's lookup non-deterministic.
-    assert NewsArticle.__table__.columns["slug"].unique is True
+def test_one_article_per_slug_per_language() -> None:
+    """The slug is the public address *within a language*.
+
+    Two articles sharing one in the same locale would make the URL ambiguous
+    and the viewer's lookup non-deterministic. Across locales it is not a
+    collision at all: ``/news/budget`` and ``/de/news/budget`` are two
+    documents, and forcing the German one to pick a different word would make
+    the URL a workaround for a schema decision.
+    """
+    assert unique_index(NewsArticle.__table__, "ix_news_articles_locale_slug") == (
+        "locale",
+        "slug",
+    )
+    assert NewsArticle.__table__.columns["slug"].unique is not True
+
+
+def test_one_article_per_language_per_translation_group() -> None:
+    # Without it a second "add German" click — a double submit, a stale tab —
+    # produces two German siblings and every alternates list starts
+    # contradicting itself.
+    assert unique_index(NewsArticle.__table__, "ix_news_articles_group_locale") == (
+        "translation_group",
+        "locale",
+    )
+
+
+def test_every_article_has_a_language_and_a_group() -> None:
+    """Neither is nullable, and both are defaulted by a factory.
+
+    A nullable locale would mean every query had to spell "this locale or
+    nothing", and the rows that predate the feature would be the ones behaving
+    differently. A nullable group would make "does this have translations" a
+    null check instead of "are there siblings sharing this group" — every
+    article starts a group of one.
+    """
+    for name in ("locale", "translation_group"):
+        assert NewsArticle.__table__.columns[name].nullable is False
 
 
 def test_listing_columns_are_indexed() -> None:
     # Every listing filters on category or status and orders by published_at;
-    # the viewer looks up by slug; the trash filter is on every query there is.
-    for name in ("category", "published_at", "slug", "status", "deleted_at"):
+    # the trash filter is on every query there is.
+    for name in ("category", "published_at", "status", "deleted_at"):
         assert NewsArticle.__table__.columns[name].index is True
+
+
+def test_the_addressing_columns_lean_on_their_composites() -> None:
+    """No single-column index on slug, locale or translation_group.
+
+    Both composites lead with the column a single-column lookup would want, so
+    a ``locale = ?`` or ``translation_group = ?`` scan already has one to use
+    and a second would only cost writes. The viewer never looks a slug up
+    without a locale either, so the pair is the index it actually wants.
+    """
+    for name in ("slug", "locale", "translation_group"):
+        assert NewsArticle.__table__.columns[name].index is not True
 
 
 def test_revisions_cascade_from_the_article() -> None:
@@ -83,8 +143,14 @@ def test_redirects_cascade_from_the_article() -> None:
     assert fk.ondelete == "CASCADE"
 
 
-def test_an_old_slug_resolves_to_exactly_one_article() -> None:
-    assert NewsArticleRedirect.__table__.columns["from_slug"].unique is True
+def test_an_old_slug_resolves_to_exactly_one_article_per_language() -> None:
+    # Scoped to a language for the same reason the article's own slug is: two
+    # languages can legitimately have retired the same word, and a global
+    # unique index would make the second rename collide with the first.
+    assert unique_index(
+        NewsArticleRedirect.__table__, "ix_news_article_redirects_locale_from_slug"
+    ) == ("locale", "from_slug")
+    assert NewsArticleRedirect.__table__.columns["from_slug"].unique is not True
 
 
 def test_tag_links_cascade_from_the_article() -> None:

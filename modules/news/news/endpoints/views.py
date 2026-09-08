@@ -7,9 +7,28 @@ from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_hosting.permissions import RequiresPermission
 
-from news import constants
+from news import constants, locales
 
 router = APIRouter()
+
+
+def _locale_props() -> dict:
+    """The site's content languages, for every screen that offers a choice.
+
+    Inertia props rather than a fetch: these screens already load their rows
+    client-side, and a second round trip for a list that never changes within a
+    session would make the language filter appear a beat after the list it
+    filters.
+
+    Read from :mod:`news.locales`, which is news' own vocabulary: borrowed off
+    the neighbour where pagebuilder is installed, and a single default where it
+    is not. Never fetched from that module's ``/locales`` endpoint by the
+    browser — the frontend reaching into a neighbour's API is exactly what
+    ``news.integrations.pagebuilder`` exists to prevent — it is how the CSRF
+    cookie name and the page API route ended up hardcoded in TSX before.
+    """
+    return {"locales": list(locales.supported()), "default_locale": locales.default()}
+
 
 admin_router = APIRouter()
 """Routes mounted at the app root rather than under ``VIEW_PREFIX``.
@@ -48,7 +67,7 @@ async def article_list(inertia: InertiaDep) -> InertiaResponse:
     # repo's check_hardcoded_strings. The framework's own modules inline the
     # literal instead, for the SM003/SM004 static-AST pairing — the two
     # conventions disagree, and an in-repo module follows the in-repo linter.
-    return await inertia.render(constants._PAGE_LIST)
+    return await inertia.render(constants._PAGE_LIST, _locale_props())
 
 
 @router.get(
@@ -102,7 +121,8 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
     per keystroke would be absurd.
     """
     return await inertia.render(
-        constants._PAGE_ARTICLE_EDITOR, {"article_id": article_id}
+        constants._PAGE_ARTICLE_EDITOR,
+        {"article_id": article_id, **_locale_props()},
     )
 
 

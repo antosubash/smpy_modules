@@ -46,8 +46,17 @@ def absolute(request: Request, settings: NewsSettings, path: str) -> str:
     return f"{public_base_url(request, settings)}{path}"
 
 
-def absolute_article(request: Request, settings: NewsSettings, slug: str) -> str:
-    return absolute(request, settings, public_article_path(slug))
+def absolute_article(
+    request: Request, settings: NewsSettings, slug: str, locale: str | None = None
+) -> str:
+    """An article's own absolute address, in the language it is written in.
+
+    The locale is not optional information here even though the parameter is: a
+    slug identifies an article only within one language, so ``/news/budget`` and
+    ``/de/news/budget`` are two documents. ``None`` means the site's default,
+    which is the only thing an unqualified slug can mean.
+    """
+    return absolute(request, settings, public_article_path(slug, locale))
 
 
 def cache_control(settings: NewsSettings) -> str:

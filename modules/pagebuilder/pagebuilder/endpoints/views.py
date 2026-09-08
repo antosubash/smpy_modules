@@ -17,12 +17,12 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import board as board_query
+from pagebuilder import locales
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
     LayoutRevisionRead,
     MediaAssetListResponse,
-    PageDetail,
     PageListResponse,
     PageRead,
     PageRevisionListResponse,
@@ -30,12 +30,16 @@ from pagebuilder.contracts.schemas import (
     StatusFilter,
 )
 from pagebuilder.deps import get_media_service, get_settings
+from pagebuilder.endpoints import content_views
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 
 router = APIRouter()
+# The content-snapshot screens live in their own module (300-line cap) but
+# belong to this same router, so their URLs and dependencies are unchanged.
+router.include_router(content_views.router)
 
 _PAGE_LIST = "PageBuilder/PageList"
 _VIEW_BOARD = "board"
@@ -59,6 +63,7 @@ async def admin_list(
     db: AsyncSession = Depends(get_db),
     search: str = "",
     status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
+    locale_filter: Annotated[str, Query(alias="locale")] = "",
     offset: int = Query(default=0, ge=0),
     view: str = Query(default=_VIEW_BOARD),
 ) -> InertiaResponse:
@@ -69,8 +74,16 @@ async def admin_list(
     browser's back button steps through the filters the way a user expects it
     to.
     """
+    # An unconfigured tag filters nothing rather than 404ing: the value comes
+    # off a query string, and a link to a language the site has since dropped
+    # should show the list, not an error.
+    locale = locales.resolve(locale_filter)
     pages, total = await PagesService(db).list_pages(
-        search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
+        search=search,
+        status=status_filter,
+        locale=locale,
+        limit=PAGE_LIST_LIMIT,
+        offset=offset,
     )
     # Deleting the last row of the last page leaves the offset past the end.
     # Re-ask for the final page rather than rendering an empty table under a
@@ -78,7 +91,11 @@ async def admin_list(
     if not pages and total:
         offset = max(0, ((total - 1) // PAGE_LIST_LIMIT) * PAGE_LIST_LIMIT)
         pages, total = await PagesService(db).list_pages(
-            search=search, status=status_filter, limit=PAGE_LIST_LIMIT, offset=offset
+            search=search,
+            status=status_filter,
+            locale=locale,
+            limit=PAGE_LIST_LIMIT,
+            offset=offset,
         )
     payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
 
@@ -88,7 +105,7 @@ async def admin_list(
     board: list[dict] | None = None
     if view != _VIEW_LIST:
         board = board_query.to_payload(
-            await board_query.load(db, search=search),
+            await board_query.load(db, search=search, locale=locale),
             lambda item: PageRead.model_validate(item).model_dump(mode="json"),
         )
 
@@ -100,12 +117,27 @@ async def admin_list(
             "filters": {
                 "search": search,
                 "status": status_filter.value if status_filter else "",
+                "locale": locale or "",
                 "offset": offset,
                 "limit": PAGE_LIST_LIMIT,
                 "view": _VIEW_LIST if view == _VIEW_LIST else _VIEW_BOARD,
             },
+            **_locale_props(),
         },
     )
+
+
+def _locale_props() -> dict:
+    """The site's content languages, for every screen that offers a choice.
+
+    Server-rendered rather than fetched so the language column and the New
+    page dialog paint with the first response instead of flashing a
+    single-language list and then correcting itself.
+    """
+    return {
+        "locales": list(locales.supported()),
+        "default_locale": locales.default(),
+    }
 
 
 @router.get("/trash", response_model=None)
@@ -128,13 +160,16 @@ async def admin_pending(
     pages = await PagesService(db).list_pending()
     payload = PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
     return await inertia.render(
-        _PAGE_PENDING, {"pages": payload.model_dump(mode="json")}
+        _PAGE_PENDING,
+        {"pages": payload.model_dump(mode="json"), **_locale_props()},
     )
 
 
 @router.get("/new", response_model=None)
 async def admin_new(inertia: InertiaDep) -> InertiaResponse:
-    return await inertia.render(_PAGE_EDITOR, {"page": None, "revisions": []})
+    return await inertia.render(
+        _PAGE_EDITOR, {"page": None, "revisions": [], **_locale_props()}
+    )
 
 
 @router.get("/{page_id}/edit", response_model=None)
@@ -152,8 +187,9 @@ async def admin_edit(
     return await inertia.render(
         _PAGE_EDITOR,
         {
-            "page": PageDetail.model_validate(page).model_dump(mode="json"),
+            "page": (await service.detail(page)).model_dump(mode="json"),
             "revisions": revisions_payload.model_dump(mode="json")["items"],
+            **_locale_props(),
         },
     )
 
@@ -192,6 +228,10 @@ async def admin_preview(
             "json_ld": page.json_ld,
             "site_name": settings.site_name,
             "twitter_handle": settings.twitter_handle,
+            # No alternates: a preview is one draft, and advertising the
+            # published translations of it from behind the session would name
+            # live URLs on a page that is deliberately noindex.
+            "locale": page.locale,
             **public_layout_props(layout),
         },
     )

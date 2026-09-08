@@ -16,21 +16,29 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import JSON, Column, DateTime, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
+from news import locales
 from news.constants import (
     MAX_AUTHOR_LEN,
     MAX_CATEGORY_LEN,
+    MAX_LOCALE_LEN,
     MAX_NOTE_LEN,
     MAX_SLUG_LEN,
     MAX_TITLE_LEN,
+    MAX_TRANSLATION_GROUP_LEN,
     MAX_URL_LEN,
 )
 from news.models._base import ARTICLE_TABLE, Base
+
+
+def _new_translation_group() -> str:
+    return uuid4().hex
 
 
 # Deliberately (str, Enum) rather than enum.StrEnum: these values are persisted
@@ -51,36 +59,78 @@ class ArticleStatus(str, enum.Enum):  # noqa: UP042
     PUBLISHED = "published"
 
 
-class RevisionEvent(str, enum.Enum):  # noqa: UP042  — see ArticleStatus above
-    """Status-transition kind recorded in :class:`NewsArticleRevision`.
-
-    ``PUBLISH`` and ``APPROVE`` rows snapshot the bytes served at the article's
-    public URL (approve also publishes), so restore-as-draft treats them
-    identically. ``SUBMIT`` / ``REJECT`` / ``UNPUBLISH`` are audit-only — their
-    ``data`` is the current draft, kept for forensics.
-    """
-
-    PUBLISH = "publish"
-    UNPUBLISH = "unpublish"
-    SUBMIT = "submit"
-    APPROVE = "approve"
-    REJECT = "reject"
-
-
 class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
-    """An article: its body, its address, and how it lists."""
+    """An article: its body, its language, its address, and how it lists."""
 
     __tablename__ = ARTICLE_TABLE
+
+    __table_args__ = (
+        # Slugs are unique *per language*, not globally: /news/budget and
+        # /de/news/budget are two articles at two addresses, and forcing the
+        # German one to pick a different word would make the URL a workaround
+        # for a schema decision. Replaces the single-column unique index the
+        # slug column carried before there was such a thing as a locale.
+        Index("ix_news_articles_locale_slug", "locale", "slug", unique=True),
+        # One article per language per group. Without it a second "add German"
+        # click — a double submit, a stale tab — produces two German siblings
+        # and every alternates list starts contradicting itself.
+        Index(
+            "ix_news_articles_group_locale",
+            "translation_group",
+            "locale",
+            unique=True,
+        ),
+    )
+    # Neither column carries its own index: both composites lead with the one
+    # a single-column lookup would want, so a "locale = ?" or
+    # "translation_group = ?" scan already has one to use and a second would
+    # only cost writes. Same shape as ``pagebuilder_pages``, deliberately — a
+    # host running both should not find two spellings of one idea.
 
     id: int | None = Field(default=None, primary_key=True)
 
     # ── Address and headline ──────────────────────────────────────────
-    slug: str = Field(max_length=MAX_SLUG_LEN, unique=True, index=True)
-    """The article's public address, under ``NewsSettings.public_route_prefix``.
+    slug: str = Field(max_length=MAX_SLUG_LEN)
+    """The article's address within its language.
 
-    Unique across articles and nothing else. When the slug changes a
-    :class:`NewsArticleRedirect` is written, because the old URL is already in
-    bookmarks and in a search index that has not recrawled.
+    Unique per ``locale``, not globally — see ``__table_args__``. When the slug
+    changes a :class:`NewsArticleRedirect` is written, because the old URL is
+    already in bookmarks and in a search index that has not recrawled; that
+    redirect is scoped to this article's locale for the same reason the index
+    is.
+    """
+
+    locale: str = Field(default_factory=locales.default, max_length=MAX_LOCALE_LEN)
+    """Which language this article is written in.
+
+    Its own column rather than the language of the pagebuilder page the body
+    used to live in. That page is gone — the article carries its body now — so
+    borrowing a neighbour's answer would mean news could not be multilingual,
+    or even installed, without it.
+
+    Every article has one, including on a monolingual site: a nullable column
+    would mean every query had to spell "this locale or nothing", and the row
+    that predates the feature would be the one that behaves differently.
+    Existing rows are backfilled to the default locale, which is also the one
+    that keeps serving at the unprefixed URL.
+
+    Fixed for the article's lifetime. Moving one between languages would strand
+    its slug in the old locale and orphan the redirect pointing at it, so there
+    is no "change language" — there is
+    ``POST /articles/{id}/translations``, which creates a sibling.
+    """
+
+    translation_group: str = Field(
+        default_factory=_new_translation_group,
+        max_length=MAX_TRANSLATION_GROUP_LEN,
+    )
+    """What an article and its translations share.
+
+    A generated key rather than a foreign key to the "original", because there
+    isn't one: translations are siblings, and pointing each at a source would
+    make deleting the English article orphan the German and French ones — or,
+    worse, quietly re-parent them. Every article gets its own group at creation
+    and joins another's only by being created as a translation of it.
     """
 
     title: str = Field(max_length=MAX_TITLE_LEN)
@@ -228,41 +278,6 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """When a published article should come down by itself. Embargoes expire,
     and an offer or a notice that has stopped being true is worse than one that
     was never posted."""
-
-
-class NewsArticleRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
-    """Append-only audit row written on every status transition.
-
-    ``NewsArticle.rejection_note`` mirrors the most recent ``REJECT`` row's
-    ``note`` so the editor banner avoids a join.
-    """
-
-    __tablename__ = "news_article_revisions"
-
-    id: int | None = Field(default=None, primary_key=True)
-    article_id: int = Field(
-        foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE"
-    )
-    title: str = Field(max_length=MAX_TITLE_LEN)
-    meta_description: str | None = Field(default=None, max_length=MAX_URL_LEN)
-    og_image: str | None = Field(default=None, max_length=MAX_URL_LEN)
-    data: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False, default=dict),
-    )
-    event: RevisionEvent = Field(
-        default=RevisionEvent.PUBLISH,
-        sa_column=Column(
-            SAEnum(RevisionEvent, name="news_revision_event"),
-            nullable=False,
-            index=True,
-            # SAEnum stores the member *name* ("PUBLISH"), not its value
-            # ("publish") — the default must match, or Postgres rejects the
-            # DDL with "invalid input value for enum" at CREATE TABLE time.
-            server_default=RevisionEvent.PUBLISH.name,
-        ),
-    )
-    note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
 
 
 NOT_TRASHED = NewsArticle.deleted_at.is_(None)

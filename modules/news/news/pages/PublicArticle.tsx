@@ -14,7 +14,7 @@ import { formatArticleDate } from '../utils/api';
  *
  * The body is a news column now, so this is the only thing that can render it.
  * The headers that hand-off used to carry are on the server side of this route
- * — see `news/endpoints/public_views.py`; what is here is the document and its
+ * — see `news/endpoints/public/`; what is here is the document and its
  * metadata.
  */
 

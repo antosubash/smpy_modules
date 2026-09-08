@@ -49,6 +49,25 @@ def _tag(name: str, value: str | None, *, prop: bool = False) -> str:
     return f'<meta {key}="{name}" content="{html.escape(value, quote=True)}">'
 
 
+def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
+    """``hreflang`` links for a document that exists in several languages.
+
+    Server-rendered rather than left to Inertia's ``<Head>`` for the same reason
+    everything else here is: a crawler deciding which language to index for a
+    query does it without running the script, and a switch it never sees is a
+    switch that does not exist.
+
+    Empty for a monolingual site — see ``alternates`` in ``_article``, which
+    returns nothing rather than a lone entry pointing at the document itself.
+    """
+    return [
+        '<link rel="alternate" '
+        f'hreflang="{html.escape(entry["locale"], quote=True)}" '
+        f'href="{html.escape(entry["url"], quote=True)}">'
+        for entry in alternates or []
+    ]
+
+
 def article_head(
     *,
     title: str,
@@ -62,6 +81,8 @@ def article_head(
     section: str | None,
     index_in_search: bool,
     json_ld: dict[str, Any] | None,
+    locale: str | None = None,
+    alternates: list[dict[str, str]] | None = None,
 ) -> str:
     """The head an article needs, as markup.
 
@@ -87,7 +108,12 @@ def article_head(
         _tag("twitter:card", "summary_large_image" if image else "summary"),
         _tag("twitter:image", image),
         _tag("twitter:site", twitter_handle),
+        # The bare language tag, not a full ``ll_CC`` locale: content locales
+        # here are BCP-47 and often just ``de``, and inventing a region to fill
+        # the Open Graph shape would claim something nobody configured.
+        _tag("og:locale", locale, prop=True),
     ]
+    parts.extend(_alternate_links(alternates))
     if canonical:
         parts.append(f'<link rel="canonical" href="{html.escape(canonical, quote=True)}">')
     if not index_in_search:
@@ -107,11 +133,18 @@ def listing_head(
     canonical: str | None,
     site_name: str | None,
     feed_url: str | None,
+    locale: str | None = None,
+    alternates: list[dict[str, str]] | None = None,
 ) -> str:
     """The head an archive page needs.
 
     ``og:type`` is ``website`` here and ``article`` above, which is the
     distinction the split was about in the first place.
+
+    The ``hreflang`` set is the same archive in the site's other languages,
+    which is a fixed list of addresses rather than something to look up: every
+    language has an index, a category page and a tag page at the same shape of
+    URL under its own prefix.
     """
     parts = [
         f"<title>{html.escape(title)}</title>",
@@ -121,7 +154,9 @@ def listing_head(
         _tag("og:type", "website", prop=True),
         _tag("og:url", canonical, prop=True),
         _tag("og:site_name", site_name, prop=True),
+        _tag("og:locale", locale, prop=True),
     ]
+    parts.extend(_alternate_links(alternates))
     if canonical:
         parts.append(f'<link rel="canonical" href="{html.escape(canonical, quote=True)}">')
     if feed_url:

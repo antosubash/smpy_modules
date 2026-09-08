@@ -143,7 +143,13 @@ jobs:
     # Hard ceiling so a hung webServer / runaway test can't burn 6h of
     # billable runner time. Adjust upward only if the suite legitimately
     # grows beyond this.
-    timeout-minutes: 15
+    #
+    # Raised from 15 when the multilingual specs landed: a green run reached
+    # test 138 of 143 at 15m17s and was cancelled with the last file still to
+    # go. At ~7s a test the suite now needs a little under 16 minutes, so 25
+    # leaves room for a slow runner without going near the billable runaway
+    # this ceiling exists to stop.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 

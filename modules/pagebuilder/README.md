@@ -21,6 +21,10 @@ at `/p/{slug}`.
   poller flips status at the due time.
 - **SEO** — per-page meta description, canonical URL, OG image, JSON-LD, plus
   `/sitemap.xml` and `/robots.txt`.
+- **Multilingual content** — a page can exist in several languages, each with
+  its own slug, draft and approval state. See below.
+- **Content snapshots** — capture the whole site, download or upload it as a
+  `.zip`, and restore behind an approval gate. See below.
 
 ## Installation
 
@@ -120,36 +124,162 @@ cumulatively mapped to those permissions.
 
 ## Settings
 
-All settings use the `SM_PAGEBUILDER_` env prefix.
+Stored in the database and edited under **Settings → PageBuilder**. There is
+no `SM_PAGEBUILDER_*` environment variable: the settings class drops every env
+source, so a value can only come from the store or from the default below.
+Headless deployments write them with `scripts/set_setting.py`.
+
+Fields marked ● are read once while the app boots — they decide which routes
+are mounted and what the auth layer exempts — so changing one needs a restart.
+The Settings screen says so next to the input.
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `public_route_prefix` | `/p` | Where published pages are served |
+| `public_route_prefix` ● | `/p` | Where published pages are served |
+| `content_locales` ● | `["en"]` | Languages a page may be authored in |
+| `default_content_locale` ● | `en` | The language served at the unprefixed URL |
 | `requires_auth` | `true` | Gate the admin surface behind authentication |
 | `csrf_protect` | `true` | Require a CSRF token on mutating admin requests |
-| `media_root` | `var/pagebuilder/media` | Upload storage directory |
-| `media_url_prefix` | `/media/pagebuilder` | Public URL prefix for uploads |
+| `media_root` ● | `var/pagebuilder/media` | Upload storage directory |
+| `media_url_prefix` ● | `/media/pagebuilder` | Public URL prefix for uploads |
 | `media_max_bytes` | `10485760` | Per-upload size ceiling |
 | `media_thumbnail_widths` | `320,640,1280,1920` | Widths generated as WebP |
 | `media_webp_quality` | `82` | WebP encoder quality |
+| `snapshot_root` | `var/pagebuilder/snapshots` | Snapshot + blob storage directory |
+| `snapshot_max_upload_bytes` | `209715200` | Ceiling on an uploaded bundle (200 MB) |
+| `snapshot_max_extracted_bytes` | `1073741824` | Ceiling on what a bundle may expand to (1 GB) |
 | `public_csp` | see `settings.py` | CSP header on public pages |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |
 | `site_name` | `None` | OpenGraph site name |
-| `sitemap_enabled` | `true` | Serve `/sitemap.xml` |
-| `robots_enabled` | `true` | Serve `/robots.txt` |
-| `scheduler_enabled` | `true` | Run the scheduled publish/unpublish poller |
-| `scheduler_interval_seconds` | `30` | Poll interval |
+| `sitemap_enabled` ● | `true` | Serve `/sitemap.xml` |
+| `robots_enabled` ● | `true` | Serve `/robots.txt` |
+| `scheduler_enabled` ● | `true` | Run the scheduled publish/unpublish poller |
+| `scheduler_interval_seconds` ● | `30` | Poll interval |
 
 ## Routes
 
 **Admin views** (under `/pagebuilder`): `/`, `/new`, `/{page_id}/edit`,
-`/pending`, `/layout`, `/media`.
+`/pending`, `/layout`, `/media`, `/trash`, `/content`, `/content/review`.
 
 **Admin API** (under `/api/pagebuilder`): pages CRUD, workflow transitions,
-revisions and diffs, layout and its revisions, uploads.
+revisions and diffs, layout and its revisions, uploads, snapshots and imports.
 
-**Public**: `/p/{slug}`, `/sitemap.xml`, `/robots.txt`.
+**Public**: `/p/{slug}`, `/{locale}/p/{slug}` (one mount per non-default
+content locale), `/sitemap.xml`, `/robots.txt`.
+
+## Multilingual content
+
+Off by default: with one content locale nothing changes, no locale-prefixed
+route is mounted, and every existing URL is exactly what it was.
+
+```bash
+python scripts/set_setting.py pagebuilder \
+  content_locales '["en","de","fr"]' default_content_locale en
+```
+
+Or on the Settings screen, which is the same store. Either way it takes effect
+at the next boot: the languages decide how many public routers are mounted.
+
+These are *content* languages, deliberately separate from the host's
+`SM_I18N_SUPPORTED_LOCALES`, which decides what language the admin console
+speaks. A site can translate its content without translating its console, or
+the reverse.
+
+**A translation is an ordinary page.** It has its own row, slug, draft,
+revisions, schedule and approval state; what makes two pages translations of
+each other is a shared `translation_group`. Publishing one never publishes
+another, and there is no "master" — deleting the English page leaves the German
+one intact.
+
+**Addresses.** The default locale keeps the bare prefix (`/p/about`) so adding
+a language strands no link that already exists; every other locale is prefixed
+(`/de/p/about`). `/{default}/p/{slug}` permanently redirects to the bare form,
+so one document never answers at two URLs. Slugs are unique *per language*, so
+`/p/about` and `/de/p/about` can both be "about".
+
+**Discovery.** A published page emits `hreflang` links for every published
+counterpart plus `x-default`, and the sitemap lists each language at its own
+address with `xhtml:link` alternates — so a crawler finds a translation nothing
+links to yet.
+
+**Authoring.** Two ways in, because "we need this in German" is a thought an
+author has while scanning the page list as often as while editing the page:
+
+* the page list's **Translate** row action duplicates the page into a language
+  it does not have yet — it asks the server which languages are still free
+  (the list is paged, so a counterpart may be on a page the browser has not
+  loaded), offers a *Copy this page's content* choice, and opens the editor on
+  the result;
+* the editor's **Languages** tab lists the site's locales, shows which ones the
+  page exists in and where each serves, and starts the ones it does not.
+
+Both call `POST /api/pagebuilder/pages/{id}/translations`. A new translation inherits
+the layout, nav membership and the source's title (untranslated, so what still
+needs doing is obvious), starts as a draft, and never inherits `canonical_url`.
+Its breadcrumb parent is the parent's own counterpart, so a trail never crosses
+languages. A page's own language is fixed for its lifetime — moving one would
+strand its slug and orphan the redirect pointing at it.
+
+## Content snapshots
+
+**Content › Import / Export** captures the site as a restore point. Every entry
+in that list is a snapshot; they differ only in where they came from —
+`manual` (you took it), `upload` (a bundle from another host), or `pre_restore`
+(taken automatically before a restore).
+
+**What a snapshot holds:** every non-trashed page including templates, page
+redirects, the site layout, and the media library's files.
+
+**What it deliberately does not hold:**
+
+- *Branding.* `pagebuilder` has no Python dependency on the branding module,
+  and capture runs in-process. Bundling three fields would force every
+  pagebuilder host to install branding for a feature unrelated to it. Re-pick
+  the colour and design pack in Settings → Branding after restoring onto a
+  fresh host.
+- *Another module's content*, news articles included, for the same reason.
+- *Trashed pages, revision history and audit trails.* A snapshot is the site as
+  it stands, not its past; restoring history from another host would fabricate
+  an audit trail that never happened here.
+
+A restore also does **not** write a `PageRevision` per page, unlike every other
+mutation path. The `pre_restore` snapshot already holds the previous state of
+every page, once, with media deduplicated by digest — a revision row per page
+would duplicate that whole before-state and recover nothing extra. The restore
+itself stays audited: who approved it, when, from which snapshot, and the plan
+they were shown.
+
+**Restoring is staged, never immediate.** Choosing Restore computes a plan —
+what is created, what is overwritten, what is unchanged — and parks it for
+approval. Taking a snapshot, uploading and staging need `pagebuilder.publish`;
+only `pagebuilder.approve` can apply one. One import is pending at a time,
+because a plan computed against content that has since changed no longer
+describes what applying would do.
+
+**Restoring is reversible and never deletes.** Applying takes a `pre_restore`
+snapshot first, so the previous state is one restore away. A page live on the
+site but absent from the bundle is left alone and reported in the plan.
+
+**Portability.** Media URLs embed a host-local filename, so bundled content
+stores `asset://<name>` sentinels instead and they resolve to whatever URL each
+host assigns. `Page.parent_id` and `PageRedirect.page_id` travel as slugs and
+are resolved in a second pass, since a parent may sort after its child and a
+redirect may target a page the same restore creates.
+
+**Languages.** A bundle identifies a page by `(locale, slug)`, not by slug
+alone — the same pair the database is unique on — so a site publishing `about`
+in two languages captures and restores as two pages rather than one silently
+overwriting the other. Each document carries its `locale` and its
+`translation_group`, so counterparts stay linked as one document after a
+restore. A parent and a redirect both resolve within their own language, so a
+breadcrumb or a retired address never crosses into another one.
+
+Pages in a language the target host does not publish are restored and kept, not
+discarded: nothing routes `/fr/p/…` until `fr` is added to `content_locales`,
+at which point they simply start serving. Bundles written before languages
+existed (`format_version` 1) still restore — every page in one is read as the
+default content locale, which is what the schema guaranteed at the time.
 
 ## Contracts
 

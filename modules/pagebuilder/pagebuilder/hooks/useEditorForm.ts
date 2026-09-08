@@ -11,6 +11,14 @@ import { slugify } from '../utils/slugify';
 export interface EditorForm {
   pageId: number | null;
   setPageId: (id: number | null) => void;
+  /** Which language the page is written in.
+   *
+   * Read-only for the whole life of the page. A language is not a setting to
+   * be corrected: moving a page between languages would strand its slug in the
+   * old one, orphan the redirect that points at it, and either collide with or
+   * duplicate the counterpart it is supposed to *be*. Wrong language means a
+   * new page in the right one, which is what the Languages tab offers. */
+  locale: string;
   title: string;
   setTitle: (v: string) => void;
   slug: string;
@@ -54,7 +62,7 @@ export interface EditorForm {
   applyRestored: (restored: PageDetail) => EditorSnapshot;
 }
 
-export function useEditorForm(page: PageDetail | null): EditorForm {
+export function useEditorForm(page: PageDetail | null, defaultLocale = 'en'): EditorForm {
   const [pageId, setPageId] = useState<number | null>(page?.id ?? null);
   const [title, setTitle] = useState(page?.title ?? 'Untitled page');
   const [slug, setSlug] = useState(page?.slug ?? '');
@@ -195,6 +203,10 @@ export function useEditorForm(page: PageDetail | null): EditorForm {
   return {
     pageId,
     setPageId,
+    // A page that has never been saved is in the site's default language:
+    // that is what `create` will give it, and showing anything else here
+    // would be the editor guessing differently from the server.
+    locale: page?.locale ?? defaultLocale,
     title,
     setTitle,
     slug,

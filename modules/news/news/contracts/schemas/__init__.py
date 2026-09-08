@@ -1,14 +1,15 @@
 """DTOs for the News module — the public surface.
 
-Split into three files, and re-exported here so every existing
-``from news.contracts.schemas import X`` keeps working. The split is only about
-the repo's 300-line cap: the module grew when articles stopped being a sidecar
-and started carrying a body, a workflow and their own SEO.
+A package rather than one file, for the same reason pagebuilder's is: it
+crossed the repo's 300-line cap when articles stopped being a sidecar and
+started carrying a body, a workflow, their own SEO and their own language.
+Import from ``news.contracts.schemas`` exactly as before; the split is not part
+of the contract.
 """
 
 from __future__ import annotations
 
-from news.contracts.schemas._article import (
+from news.contracts.schemas._articles import (
     ArticleBodyUpdate,
     ArticleCounts,
     ArticleCreate,
@@ -16,9 +17,8 @@ from news.contracts.schemas._article import (
     ArticleListResponse,
     ArticleRead,
     ArticleStatus,
+    ArticleTranslationCreate,
     ArticleUpdate,
-    CategoryCount,
-    CategoryListResponse,
     RejectRequest,
     RevisionEvent,
     RevisionRead,
@@ -28,8 +28,10 @@ from news.contracts.schemas._search import SearchHit, SearchResults
 from news.contracts.schemas._taxonomy import (
     ArticleTagsUpdate,
     CategoryAdminListResponse,
+    CategoryCount,
     CategoryCreate,
     CategoryDeleteResult,
+    CategoryListResponse,
     CategoryRead,
     CategoryReorder,
     CategoryUpdate,
@@ -50,6 +52,7 @@ __all__ = [
     "ArticleRead",
     "ArticleStatus",
     "ArticleTagsUpdate",
+    "ArticleTranslationCreate",
     "ArticleUpdate",
     "CategoryAdminListResponse",
     "CategoryCount",

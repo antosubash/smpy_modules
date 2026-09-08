@@ -27,6 +27,34 @@ def visible(stmt, *, include_drafts: bool):
     return stmt.where(NewsArticle.status == ArticleStatus.PUBLISHED)
 
 
+def locale(stmt, value: str | None):
+    """Narrow to articles written in one language.
+
+    The column is the article's own. It was the joined page's while an article
+    *was* a page; the article carries its content now, so it carries its
+    language, and a host without pagebuilder still has one to filter on.
+    ``None`` means every language, which is what the admin list wants by
+    default: an editor looking for an article should not have to guess which
+    translation they filed it under.
+    """
+    if not value:
+        return stmt
+    return stmt.where(NewsArticle.locale == value)
+
+
+def translation_group(stmt, value: str | None):
+    """Narrow to one article and its counterparts in other languages.
+
+    What the editor's language switcher lists. Goes through the ordinary
+    listing rather than a route of its own so it inherits the visibility rule
+    for free: a reader without ``news.edit`` sees the published translations
+    and nothing else, which is the same thing they would see anywhere else.
+    """
+    if not value:
+        return stmt
+    return stmt.where(NewsArticle.translation_group == value)
+
+
 def search(stmt, q: str | None):
     """Filter on headline or slug.
 

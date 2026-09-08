@@ -49,6 +49,17 @@ MENU_LABEL_ARTICLES: Final = "Articles"
 MENU_LABEL_CATEGORIES: Final = "Categories"
 MENU_LABEL_TRASH: Final = "Trash"
 
+# Modules this one depends on. PageBuilder is deliberately absent: it was here
+# while an article *was* a page, and a ``depends_on`` entry is a hard one — it
+# would stop news booting on a host that installed it without the optional
+# ``pagebuilder`` extra, which is exactly the arrangement this module's shape
+# now exists to allow. What news still borrows from it, it borrows at runtime
+# and only where it is there — see ``news.integrations.pagebuilder``.
+#: The framework's settings module, by ``ModuleMeta.name``. Depended on so the
+#: host has built ``app.state.settings.module_registry`` before this module's
+#: ``register_settings`` tries to register against it.
+_MODULE_SETTINGS: Final = "Settings"
+
 # Inertia page identifiers, rendered as literals at the view so the SM003/SM004
 # static-AST diagnostics can pair them with the .tsx under pages/.
 _PAGE_LIST: Final = "News/NewsList"
@@ -86,6 +97,16 @@ PAGEBUILDER_MEDIA_PATH: Final = "/pagebuilder/media"
 PAGEBUILDER_PAGES_PATH: Final = "/pagebuilder/?view=list&search={query}"
 
 MAX_CATEGORY_LEN: Final = 80
+# Bound on ``NewsArticle.locale``. Comfortably fits ``zh-Hant-HK``, and the same
+# number pagebuilder bounds its own locale column by — a host running both
+# should not find one module accepting a tag the other rejects.
+MAX_LOCALE_LEN: Final = 12
+# The language a site publishes in when nothing says otherwise. Also what
+# ``news.locales`` falls back to where pagebuilder — whose ``content_locales``
+# news borrows when it is installed — is not there to be asked.
+FALLBACK_LOCALE: Final = "en"
+# Bound on ``NewsArticle.translation_group``. A uuid4 hex, so exactly 32.
+MAX_TRANSLATION_GROUP_LEN: Final = 32
 MAX_TAG_LEN: Final = 60
 MAX_TITLE_LEN: Final = 300
 MAX_AUTHOR_LEN: Final = 120

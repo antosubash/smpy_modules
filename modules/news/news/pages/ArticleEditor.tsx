@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import { ArticleInspector } from '../components/editor/ArticleInspector';
+import { ArticleTranslations } from '../components/editor/ArticleTranslations';
 import { HistoryCard } from '../components/editor/HistoryCard';
 import { ReviewCard } from '../components/editor/ReviewCard';
 import { ScheduleCard } from '../components/editor/ScheduleCard';
@@ -23,12 +24,16 @@ import { formatArticleDate } from '../utils/api';
  * independently, and a full-bleed editor.
  */
 export default function ArticleEditor() {
-  const page = usePage<{ props: { article_id: number } }>().props as unknown as {
+  const props = usePage<{
+    props: { article_id: number; locales?: string[] };
+  }>().props as unknown as {
     article_id: number;
+    locales?: string[];
     auth?: { permissions?: string[] };
   };
-  const { article_id } = page;
-  const canPublish = page.auth?.permissions?.includes('news.publish') ?? false;
+  const { article_id } = props;
+  const canPublish = props.auth?.permissions?.includes('news.publish') ?? false;
+  const locales = props.locales ?? [];
 
   const {
     article,
@@ -39,6 +44,7 @@ export default function ArticleEditor() {
     dirty,
     valid,
     error,
+    setError,
     saved,
     load,
     patch,
@@ -203,6 +209,12 @@ export default function ArticleEditor() {
           </Button>
 
           <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
+
+          {/* Only on a multilingual site: a panel listing one language is a
+              panel that answers a question nobody asked. */}
+          {locales.length > 1 && (
+            <ArticleTranslations article={article} locales={locales} onError={setError} />
+          )}
 
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not

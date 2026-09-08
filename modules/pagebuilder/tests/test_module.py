@@ -64,7 +64,7 @@ class TestMenu:
 
     def test_contributes_the_admin_surface(self):
         labels = [i["label"] for i in self._sidebar(roles=["admin"])]
-        assert labels == ["Pages", "Site layout", "Media library"]
+        assert labels == ["Pages", "Site layout", "Media library", "Import / Export"]
 
     def test_items_point_at_real_view_routes(self, build_test_app):
         """A menu entry whose URL 404s is worse than no entry at all."""
@@ -95,5 +95,5 @@ class TestMenu:
         An unknown name renders as a blank spacer, so a typo is invisible
         rather than loud.
         """
-        known = {"file-text", "layout", "image"}
+        known = {"file-text", "layout", "image", "package"}
         assert {i["icon"] for i in self._sidebar(roles=["admin"])} <= known

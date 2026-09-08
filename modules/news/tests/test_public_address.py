@@ -191,7 +191,7 @@ class TestRename:
     async def test_renaming_back_leaves_no_redirect_loop(self, db) -> None:
         """An article reclaiming an address it once redirected away would
         otherwise send readers straight back off it."""
-        from news import redirects
+        from news import locales, redirects
 
         article = await make_article(db, slug="first")
         service = ArticlesService(db)
@@ -199,7 +199,7 @@ class TestRename:
 
         await service.update(article.id, {"slug": "first"})
 
-        assert await redirects.resolve(db, "first") is None
+        assert await redirects.resolve(db, "first", locales.default()) is None
 
     async def test_it_does_not_forward_to_an_unpublished_article(
         self, anon_client
@@ -229,14 +229,14 @@ class TestRename:
         path applies ``NOT_TRASHED``; this pins the behaviour so the one
         definition cannot quietly stop covering the redirect.
         """
-        from news import redirects
+        from news import locales, redirects
 
         article = await make_article(db, slug="was-binned")
         service = ArticlesService(db)
         await service.update(article.id, {"slug": "now-binned"})
         await service.trash(article.id)
 
-        assert await redirects.resolve(db, "was-binned") is None
+        assert await redirects.resolve(db, "was-binned", locales.default()) is None
 
     async def test_it_forwards_again_once_the_article_is_back(
         self, anon_client

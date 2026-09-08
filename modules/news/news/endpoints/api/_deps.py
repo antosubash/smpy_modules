@@ -15,7 +15,7 @@ from simple_module_hosting.permissions import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import service
+from news import locales, service
 from news.constants import (
     PERM_EDIT,
     PERM_PUBLISH,
@@ -67,6 +67,36 @@ def may_see_drafts(request: Request) -> bool:
             role_map=registry.role_map if registry is not None else None,
         )
     return WILDCARD in resolved or PERM_EDIT in resolved
+
+
+def checked_locale(value: str | None) -> str | None:
+    """``value`` as a content locale, or a 422 naming the configured ones.
+
+    A write is refused rather than quietly filed under the default language:
+    an article's locale is fixed for its lifetime and is part of its address,
+    so accepting ``fr`` on a site that publishes ``en`` and ``de`` would put the
+    article at a URL the author did not ask for and cannot move it off.
+
+    ``None`` passes through, meaning "the site's default" — which is what every
+    caller written before there was such a thing as a language means, and what
+    keeps a monolingual host from having to say ``en`` on every create.
+
+    The *listing* filter deliberately does the opposite and ignores an
+    unconfigured value (see ``resolve_locale`` there): that one arrives from a
+    query string, where a stale link should show the list rather than an error.
+    """
+    if value is None:
+        return None
+    resolved = locales.resolve(value)
+    if resolved is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{value!r} is not a content locale. "
+                f"Configured: {', '.join(locales.supported())}."
+            ),
+        )
+    return resolved
 
 
 def cache(response: Response, *, include_drafts: bool) -> None:

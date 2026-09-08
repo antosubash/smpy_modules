@@ -2,7 +2,11 @@ import { router } from '@inertiajs/react';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageRead } from '../utils/api';
+import { publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
+
+/** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
+const PUBLIC_PREFIX = '/p';
 
 /** "1 Sep, 09:00" — when a scheduled draft flips itself. */
 function whenLabel(iso: string | null | undefined): string {
@@ -30,6 +34,9 @@ function relative(iso: string | null | undefined): string {
 interface Props {
   page: PageRead;
   stage: string;
+  /** The language that serves unprefixed, so a card shows the address its own
+   *  page actually answers on rather than the default language's. */
+  defaultLocale: string;
   onDelete: (page: PageRead) => Promise<unknown>;
   onPublish: (page: PageRead) => Promise<unknown>;
   onUnpublish: (page: PageRead) => Promise<unknown>;
@@ -38,13 +45,21 @@ interface Props {
 /** One page on the board. The line under the title says the thing that stage
  *  actually cares about — when a scheduled page fires, when a draft was last
  *  touched, whether a published page has unpublished edits waiting. */
-export function PageBoardCard({ page, stage, onDelete, onPublish, onUnpublish }: Props) {
+export function PageBoardCard({
+  page,
+  stage,
+  defaultLocale,
+  onDelete,
+  onPublish,
+  onUnpublish,
+}: Props) {
   const scheduled = stage === 'scheduled';
   const published = page.status === 'published';
+  const address = publicPath(PUBLIC_PREFIX, page.slug, page.locale, defaultLocale);
 
   const meta = scheduled
     ? `publishes ${whenLabel(page.publish_at)} · ${relative(page.publish_at)}`
-    : `/p/${page.slug}${page.updated_at ? ` · ${relative(page.updated_at)}` : ''}`;
+    : `${address}${page.updated_at ? ` · ${relative(page.updated_at)}` : ''}`;
 
   return (
     <li
@@ -79,7 +94,7 @@ export function PageBoardCard({ page, stage, onDelete, onPublish, onUnpublish }:
 
         {published && (
           <Button type="button" size="sm" variant="outline" asChild>
-            <a href={`/p/${page.slug}`} target="_blank" rel="noopener noreferrer">
+            <a href={address} target="_blank" rel="noopener noreferrer">
               View
             </a>
           </Button>

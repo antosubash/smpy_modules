@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 from factories import make_article
+from news import locales
 from news.constants import ARTICLE_BODY_URL, MAX_SLUG_ATTEMPTS, ROUTE_PREFIX_API
 from news.content._slugs import free_slug
 from news.models import ArticleStatus, NewsArticle
@@ -222,7 +223,7 @@ class TestRunningOutOfAddresses:
         ]:
             await make_article(db, slug=slug)
 
-        assert await free_slug(db, "crowded") == ""
+        assert await free_slug(db, "crowded", locales.default()) == ""
 
     async def test_the_last_attempt_is_still_offered(self, db) -> None:
         # One short of exhaustion: the final suffix has to be tried, not skipped.
@@ -231,7 +232,10 @@ class TestRunningOutOfAddresses:
         ]:
             await make_article(db, slug=slug)
 
-        assert await free_slug(db, "crowded") == f"crowded-{MAX_SLUG_ATTEMPTS + 1}"
+        assert (
+            await free_slug(db, "crowded", locales.default())
+            == f"crowded-{MAX_SLUG_ATTEMPTS + 1}"
+        )
 
     async def test_an_exhausted_title_is_a_409_rather_than_a_guess(
         self, editor_client

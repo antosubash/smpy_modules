@@ -3,11 +3,17 @@
 News owns the address *and* the rendering now. It used to own only the address:
 the route resolved a slug and handed off to pagebuilder's viewer, because the
 body was a page in that module and duplicating the viewer would have meant
-duplicating its ETag, cache, CSP, canonical and redirect handling.
+duplicating its ETag, cache, CSP, canonical, ``hreflang`` and redirect handling.
 
 That trade is gone with the sidecar. The body is a column here, so this is the
 one place that can serve it — and everything the old hand-off preserved is
 below, over this module's own rows.
+
+One router per content locale, mounted at ``/news/{slug}`` for the site's
+default language and ``/{locale}/news/{slug}`` for every other, mirroring how
+pagebuilder addresses pages. A slug identifies an article only within one
+language, so the locale is a parameter of every lookup here rather than
+something inferred later.
 """
 
 from __future__ import annotations
@@ -18,99 +24,199 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import constants, redirects
+from news import constants, locales, redirects, service
 from news.content import ArticlesService
 from news.endpoints.public import _head
-from news.endpoints.public._urls import absolute_article, cache_control, etag_for
-from news.settings import active, public_article_path
+from news.endpoints.public._urls import (
+    absolute_article,
+    cache_control,
+    etag_for,
+    public_base_url,
+)
+from news.settings import NewsSettings, active, public_article_path
 
-article_router = APIRouter()
 
+async def alternates(
+    db: AsyncSession, request: Request, settings: NewsSettings, group: str | None
+) -> list[dict[str, str]]:
+    """``hreflang`` entries for every *published* article in the group.
 
-@article_router.get("/{slug}", response_model=None)
-async def public_article(
-    slug: str,
-    request: Request,
-    inertia: InertiaDep,
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """One published article, with everything a public URL needs.
+    Only published ones — ``list_articles`` without ``include_drafts`` is
+    exactly that rule: advertising a draft translation points a crawler at a 404
+    and offers a reader a language switch that dead-ends.
 
-    A draft, a trashed article and a slug that was never an article all answer
-    the same 404. A distinguishable "exists but is not published" would answer
-    exactly the question the 404 is there to refuse.
+    Read through the ordinary listing rather than a query of its own, so the
+    address advertised here is the same string the admin list and the feed show.
+    ``ArticleRead.url`` is built from ``public_article_path``, language prefix
+    and all, and a second way of assembling it is a second chance to disagree.
+
+    Omitted entirely when the group has one published member, which is every
+    article on a monolingual site — a lone ``hreflang`` pointing at the document
+    itself says nothing and is noise in the head of every page.
+
+    A site with one content locale is answered without asking the database at
+    all. It cannot have a second member, and this runs on every public article
+    render: a query per page view to reach a guaranteed empty list is the kind
+    of cost a monolingual host should not pay for a feature it does not use.
     """
-    settings = active()
-    article = await ArticlesService(db).get_by_slug_published(slug)
-    if article is None or article.published_data is None:
-        # Before giving up: renaming an article records a redirect, and the old
-        # address has to honour it or a rename silently breaks every link
-        # already published.
-        moved = await redirects.resolve(db, slug)
-        if moved is not None:
-            return RedirectResponse(public_article_path(moved), status_code=301)
-        raise HTTPException(status_code=404, detail="Article not found")
-
-    etag = etag_for(article.id or 0, article.updated_at)
-    control = cache_control(settings)
-
-    def apply_headers(response: Response) -> Response:
-        response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = control
-        if settings.public_csp:
-            response.headers["Content-Security-Policy"] = settings.public_csp
-        return response
-
-    if request.headers.get("if-none-match") == etag:
-        return apply_headers(Response(status_code=304))
-
-    canonical = article.canonical_url or absolute_article(request, settings, slug)
-    published_at = (
-        article.published_at.isoformat() if article.published_at is not None else None
+    languages = locales.supported()
+    if not group or len(languages) < 2:
+        return []
+    siblings, _ = await service.list_articles(
+        db,
+        # One per language and no more; a group cannot hold two of the same.
+        limit=len(languages),
+        group=group,
+        with_total=False,
     )
-    rendered = await inertia.render(
-        constants._PAGE_PUBLIC_ARTICLE,
-        {
-            "title": article.title,
-            # Which article this is, for the blocks in its own body that need to
-            # know. `Related` is the one: a "read next" list that includes the
-            # article you are reading is visibly broken, and the slug is the
-            # only thing that identifies it inside the block document.
-            "slug": article.slug,
-            # The published snapshot, never the draft — that is the whole point
-            # of keeping two columns.
-            "data": article.published_data,
-            "meta_description": article.meta_description,
-            "og_image": article.og_image,
-            "canonical_url": canonical,
-            "og_url": canonical,
-            "index_in_search": article.index_in_search,
-            "json_ld": article.json_ld,
-            "site_name": settings.site_name or None,
-            "twitter_handle": settings.twitter_handle or None,
-            "category": article.category,
-            "author": article.author,
-            "published_at": published_at,
-        },
-    )
+    if len(siblings) < 2:
+        return []
+    base = public_base_url(request, settings)
+    entries = [
+        {"locale": item.locale, "url": f"{base}{item.url}"} for item in siblings
+    ]
+    # x-default names the version to serve someone whose language nobody
+    # matched. The site's own default is the only defensible answer.
+    default = next((e for e in entries if locales.is_default(e["locale"])), None)
+    if default is not None:
+        entries.append({"locale": "x-default", "url": default["url"]})
+    return entries
 
-    # The same tags `PublicArticle` renders through Inertia's `<Head>`, written
-    # into the document server-side — see `_head` for why both are needed.
-    return apply_headers(
-        _head.inject(
-            rendered,
-            _head.article_head(
-                title=article.title,
-                description=article.meta_description or None,
-                canonical=canonical,
-                image=article.og_image or None,
-                site_name=settings.site_name or None,
-                twitter_handle=settings.twitter_handle or None,
-                published_at=published_at,
-                author=article.author or None,
-                section=article.category or None,
-                index_in_search=article.index_in_search,
-                json_ld=article.json_ld,
-            ),
+
+def article_router(locale: str) -> APIRouter:
+    """The article viewer for one language.
+
+    A router per locale rather than a ``/{locale}`` path parameter, for the same
+    reason pagebuilder does it: a parameter matches *any* first segment, and the
+    public-route registry exempts by string prefix — so the exemption would have
+    to be widened to something that no longer describes what is public.
+    """
+    router = APIRouter()
+
+    @router.get("/{slug}", response_model=None)
+    async def public_article(
+        slug: str,
+        request: Request,
+        inertia: InertiaDep,
+        db: AsyncSession = Depends(get_db),
+    ) -> Response:
+        """One published article, with everything a public URL needs.
+
+        A draft, a trashed article and a slug that was never an article all
+        answer the same 404. A distinguishable "exists but is not published"
+        would answer exactly the question the 404 is there to refuse.
+        """
+        settings = active()
+        article = await ArticlesService(db).get_by_slug_published(slug, locale)
+        if article is None or article.published_data is None:
+            # Before giving up: renaming an article records a redirect, and the
+            # old address has to honour it or a rename silently breaks every
+            # link already published.
+            #
+            # Within this language, and only this one: an old German address
+            # forwarding to the English article would answer the question
+            # "where did my page go" with someone else's article.
+            moved = await redirects.resolve(db, slug, locale)
+            if moved is not None:
+                return RedirectResponse(
+                    public_article_path(moved, locale), status_code=301
+                )
+            raise HTTPException(status_code=404, detail="Article not found")
+
+        etag = etag_for(article.id or 0, article.updated_at)
+        control = cache_control(settings)
+
+        def apply_headers(response: Response) -> Response:
+            response.headers["ETag"] = etag
+            response.headers["Cache-Control"] = control
+            # Which language was served, for caches and for anything reading
+            # the response without parsing the body.
+            response.headers["Content-Language"] = locale
+            if settings.public_csp:
+                response.headers["Content-Security-Policy"] = settings.public_csp
+            return response
+
+        if request.headers.get("if-none-match") == etag:
+            return apply_headers(Response(status_code=304))
+
+        canonical = article.canonical_url or absolute_article(
+            request, settings, slug, locale
         )
-    )
+        published_at = (
+            article.published_at.isoformat()
+            if article.published_at is not None
+            else None
+        )
+        siblings = await alternates(db, request, settings, article.translation_group)
+        rendered = await inertia.render(
+            constants._PAGE_PUBLIC_ARTICLE,
+            {
+                "title": article.title,
+                # Which article this is, for the blocks in its own body that
+                # need to know. `Related` is the one: a "read next" list that
+                # includes the article you are reading is visibly broken, and
+                # the slug is the only thing that identifies it inside the
+                # block document.
+                "slug": article.slug,
+                # The published snapshot, never the draft — that is the whole
+                # point of keeping two columns.
+                "data": article.published_data,
+                "meta_description": article.meta_description,
+                "og_image": article.og_image,
+                "canonical_url": canonical,
+                "og_url": canonical,
+                "index_in_search": article.index_in_search,
+                "json_ld": article.json_ld,
+                "site_name": settings.site_name or None,
+                "twitter_handle": settings.twitter_handle or None,
+                "category": article.category,
+                "author": article.author,
+                "published_at": published_at,
+                "locale": locale,
+                "alternates": siblings,
+            },
+        )
+
+        # The same tags `PublicArticle` renders through Inertia's `<Head>`,
+        # written into the document server-side — see `_head` for why both are
+        # needed.
+        return apply_headers(
+            _head.inject(
+                rendered,
+                _head.article_head(
+                    title=article.title,
+                    description=article.meta_description or None,
+                    canonical=canonical,
+                    image=article.og_image or None,
+                    site_name=settings.site_name or None,
+                    twitter_handle=settings.twitter_handle or None,
+                    published_at=published_at,
+                    author=article.author or None,
+                    section=article.category or None,
+                    index_in_search=article.index_in_search,
+                    json_ld=article.json_ld,
+                    locale=locale,
+                    alternates=siblings,
+                ),
+            )
+        )
+
+    return router
+
+
+def default_locale_alias_router(prefix: str) -> APIRouter:
+    """``/{default}/news/{slug}`` → ``/news/{slug}``, permanently.
+
+    The default language serves unprefixed so existing links keep working, but
+    anyone who has seen ``/de/news/x`` will reasonably try ``/en/news/x``, and so
+    will anything that builds URLs by pasting a locale in front. Serving the
+    article at both would put one document at two addresses; 404ing would be
+    correct and useless. A 301 is the third option and the only good one.
+    """
+    router = APIRouter()
+
+    @router.get("/{slug}", response_model=None)
+    async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
+        return RedirectResponse(f"{prefix.rstrip('/')}/{slug}", status_code=301)
+
+    return router

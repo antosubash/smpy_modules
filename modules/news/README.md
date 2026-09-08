@@ -13,7 +13,7 @@ it. That made news uninstallable without its neighbour, made every listing a
 cross-module join, and left article rows that could be orphaned by a deletion
 news never saw. See **Design note: what the split changed** below.
 
-Articles serve at `/news/{slug}` (`SM_NEWS_PUBLIC_ROUTE_PREFIX`), so an article
+Articles serve at `/news/{slug}` (the `public_route_prefix` setting), so an article
 is distinguishable from a contact page in a URL, a log line and an analytics
 report. The admin console is at `/admin/news`, not `/news`: one prefix cannot be
 both a reader-facing URL and a permission-gated console.
@@ -134,7 +134,7 @@ should be deleted rather than made cleverer.
 |---|---|
 | `news.view` | see the admin list |
 | `news.edit` | create, write and edit articles; submit for review |
-| `news.publish` | publish, unpublish, approve, reject, purge |
+| `news.publish` | publish, unpublish, approve, reject, purge, hard delete |
 
 `news.publish` is separate on purpose. Publishing used to require
 `pagebuilder.publish`, because the write landed on one of its pages and news was
@@ -150,14 +150,16 @@ separation. Owning the content means owning the separation: folding it into
 | `GET /news/category/{slug}` | anonymous |
 | `GET /news/tag/{slug}` | anonymous |
 | `GET /news/{slug}` | anonymous; published articles only |
+| `GET /{locale}/news/{slug}` | anonymous; one mount per non-default content locale |
 | `GET /news/feed.xml` | anonymous; RSS 2.0, most recent 20 |
 | `GET /news/sitemap.xml` | anonymous |
-| `GET /api/news/articles?limit&offset&category&q&status&in_feed&undated_first` | anonymous; published only |
+| `GET /api/news/articles?limit&offset&category&q&status&in_feed&locale&translation_group&undated_first` | anonymous; published only |
 | `GET /api/news/categories` | anonymous; published only |
 | `GET /api/news/articles/{id}/tags` | anonymous; published only |
 | `POST /api/news/articles` | `news.edit` |
+| `POST /api/news/articles/{id}/translations` | `news.edit` |
 | `PUT /api/news/articles/{id}` | `news.edit` |
-| `DELETE /api/news/articles/{id}` | `news.edit` |
+| `DELETE /api/news/articles/{id}` | `news.edit` **+ `news.publish`** |
 | `GET /api/news/articles/{id}/detail` | `news.edit` |
 | `PUT /api/news/articles/{id}/body` | `news.edit` |
 | `GET /api/news/articles/{id}/revisions` | `news.edit` |
@@ -199,8 +201,8 @@ the second. Both are optional and both are three-valued — an omitted field is
 left alone, an explicit `null` cancels. Behind `news.publish`, because a
 schedule is a publication decision that happens to be about the future.
 
-An in-process loop (`SM_NEWS_SCHEDULER_ENABLED`, every
-`SM_NEWS_SCHEDULER_INTERVAL_SECONDS`) calls `ArticlesService.process_due`.
+An in-process loop (`scheduler_enabled`, every `scheduler_interval_seconds`)
+calls `ArticlesService.process_due`.
 Disable it where a separate worker drives that method instead, or both will race
 and an article will publish twice with two revision rows saying so. The query is
 `<= now` rather than "since the last tick", so a process that was asleep catches
@@ -213,10 +215,13 @@ tick cannot republish the same article forever.
 > So `uvicorn -w 4`, gunicorn with workers, or a Deployment with `replicas > 1`
 > runs N schedulers that can each find the same due article in one tick and each
 > publish it: two PUBLISH revision rows, and a flip-flop on unpublish. **Before
-> scaling out, set `SM_NEWS_SCHEDULER_ENABLED=false` on every replica** and
-> drive `process_due` from exactly one place — a cron job, a k8s CronJob, or a
-> single dedicated worker. Making the in-process loop safe under replicas needs
-> leader election or row locking, and it has neither today.
+> scaling out, turn `scheduler_enabled` off** — on the Settings screen or with
+> `scripts/set_setting.py news scheduler_enabled false`, never an environment
+> variable, which this module does not read and which would therefore leave the
+> loop running and racing the worker — and drive `process_due` from exactly one
+> place: a cron job, a k8s CronJob, or a single dedicated worker. Making the
+> in-process loop safe under replicas needs leader election or row locking, and
+> it has neither today.
 
 These are deliberately **not** `published_at`, which is the display date below
 and may perfectly reasonably be in the past. The article screen said "a future
@@ -228,27 +233,70 @@ send, the day is taken as you wrote it and stored as midnight UTC — sending
 of `status`: an article can be published and undated, or dated and still a
 draft.
 
+## Multilingual articles
+
+An article is a page, so its language is the page's language — configured in
+pagebuilder (its `content_locales` setting), not here, because a language
+news offered that pagebuilder did not would be one no article could be written
+in. Off by default: with one content locale every article URL is exactly what
+it was.
+
+Articles in the default language keep `/news/{slug}`; every other language is
+prefixed, `/de/news/{slug}`. `ArticleRead.url` carries the prefix, so the admin
+list, the feed block and the slug news claims from pagebuilder all agree on
+one address. `/{default}/news/{slug}` permanently redirects to the bare form.
+
+`?locale=de` narrows a listing to one language — what a feed block on a German
+page passes, so a German list never shows an English card. The block reads the
+surrounding page's language rather than offering it as a field: a feed set to
+one language on a page written in another is a mistake nothing would catch.
+The admin list leaves it unset and shows every language, badged per row.
+
+`POST /articles/{id}/translations` starts the same story in another language:
+one request, one transaction, creating both the translated page and the sidecar
+row. Category, byline, date, pin and feed membership are copied from the source
+rather than asked for again — they are facts about the story, not about the
+language it is told in. The translation starts as a draft.
+
+`?translation_group=…` lists one article and its counterparts, which is what
+the editor's language switcher shows. It goes through the ordinary listing
+rather than a route of its own, so it inherits the same visibility rule: a
+reader without `news.edit` sees the published translations only.
+
 Anonymous listings carry `Cache-Control: public, max-age=60`, because the feed
 block runs on every public page that holds one. An editor's listing includes
 drafts and so is `private, no-store`. The article viewer sends an `ETag`,
 `Cache-Control: public, max-age=300, stale-while-revalidate=60`, and
-`Content-Security-Policy` when `SM_NEWS_PUBLIC_CSP` is set.
+`Content-Security-Policy` when `public_csp` is set.
 
 ## Settings
 
-All prefixed `SM_NEWS_`:
+Stored in the database and edited under **Settings → News**. There is no
+`SM_NEWS_*` environment variable: the settings class drops every env source, so
+a value can only come from the store or from the default below. Headless
+deployments write them with `scripts/set_setting.py`.
+
+Fields marked ● are read once while the app boots — they decide which routes are
+mounted and what the auth layer exempts — so changing one needs a restart. The
+Settings screen says so next to the input.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `PUBLIC_ROUTE_PREFIX` | `/news` | where articles serve |
-| `PUBLIC_BASE_URL` | *(derived from the request)* | origin for canonical URLs and the sitemap |
-| `SITE_NAME` | *(unset)* | `og:site_name` |
-| `TWITTER_HANDLE` | *(unset)* | `twitter:site` |
-| `PUBLIC_CACHE_MAX_AGE` | `300` | shared-cache lifetime of an article |
-| `PUBLIC_CACHE_SWR` | `60` | `stale-while-revalidate` seconds; `0` omits it |
-| `PUBLIC_CSP` | *(unset)* | `Content-Security-Policy` on the article page |
-| `SCHEDULER_ENABLED` | `true` | run the in-process publish/unpublish loop — **set `false` when running more than one replica**, see [Scheduling](#scheduling) |
-| `SCHEDULER_INTERVAL_SECONDS` | `30` | how often it looks for due articles |
+| `public_route_prefix` ● | `/news` | where articles serve |
+| `public_base_url` | *(derived from the request)* | origin for canonical URLs and the sitemap |
+| `site_name` | *(unset)* | `og:site_name` |
+| `twitter_handle` | *(unset)* | `twitter:site` |
+| `public_cache_max_age` | `300` | shared-cache lifetime of an article |
+| `public_cache_swr` | `60` | `stale-while-revalidate` seconds; `0` omits it |
+| `public_csp` | *(unset)* | `Content-Security-Policy` on the article page |
+| `scheduler_enabled` ● | `true` | run the in-process publish/unpublish loop — **set `false` when running more than one replica**, see [Scheduling](#scheduling) |
+| `scheduler_interval_seconds` ● | `30` | how often it looks for due articles |
+
+The languages articles may be written in are **not** here. They are
+pagebuilder's `content_locales`, borrowed through `news.integrations.locales`
+so one site does not keep two lists that can disagree. Without pagebuilder news
+publishes in one language, at the unprefixed URL — the behaviour every
+monolingual site already has.
 
 ## Design note: what the split changed
 

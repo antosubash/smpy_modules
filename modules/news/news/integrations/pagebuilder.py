@@ -8,18 +8,21 @@ were hardcoded in the frontend.
 
 None of that is true any more. ``NewsArticle`` carries its own body, address,
 status and revisions, and :mod:`news.endpoints.public` serves them. What
-remains is genuinely optional — two conveniences that only make sense on a site
-that happens to run both modules:
+remains is genuinely optional — three conveniences that only make sense on a
+site that happens to run both modules:
 
 * the admin search screen searches *pages* and *media* alongside articles,
   because on such a site those are things an editor is looking for;
 * the "see all" links on those two sections point into pagebuilder's own
-  screens.
+  screens;
+* the site's content languages are pagebuilder's, borrowed through the sibling
+  :mod:`news.integrations.locales` — a separate file only because this one is
+  at the repo's 300-line cap, and behind the same boundary.
 
 So every import here is deferred and guarded. On a host without pagebuilder
-``available()`` is ``False``, the two extra sections return nothing, and every
-other part of this module carries on unaffected — which is the whole point of
-the split.
+``available()`` is ``False``, the two extra sections return nothing, news
+publishes in one language, and every other part of this module carries on
+unaffected — which is the whole point of the split.
 """
 
 from __future__ import annotations

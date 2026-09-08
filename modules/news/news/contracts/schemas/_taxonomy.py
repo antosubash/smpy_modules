@@ -1,10 +1,19 @@
-"""Category and tag DTOs."""
+"""Categories and tags — the two ways articles are grouped."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 from news.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
+
+
+class CategoryCount(BaseModel):
+    category: str
+    count: int
+
+
+class CategoryListResponse(BaseModel):
+    items: list[CategoryCount]
 
 
 class CategoryRead(BaseModel):
@@ -90,5 +99,4 @@ class ArticleTagsUpdate(BaseModel):
     """Full replacement set — a tag the writer removed has to disappear."""
 
     tags: list[str] = Field(default_factory=list)
-
 

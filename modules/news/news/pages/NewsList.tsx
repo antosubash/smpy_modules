@@ -28,12 +28,24 @@ const STATUS_NOUN: Record<string, string> = {
  * about state ("Draft · dated Feb 15"), not a set of comparable columns — a
  * table would line up four values nobody scans vertically.
  */
+interface LocaleProps {
+  /** Every language the site publishes in, and the one that serves at the
+   *  unprefixed public URL. Server-rendered so the filter and the New article
+   *  dialog offer exactly what the API will accept. */
+  locales?: string[];
+  default_locale?: string;
+}
+
 export default function NewsList() {
-  const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
+  const props = usePage<{ props: SharedProps & LocaleProps }>().props as unknown as SharedProps &
+    LocaleProps;
+  const { auth } = props;
   const canEdit = auth?.permissions?.includes('news.edit');
   // Hard delete needs `news.publish` too — see `ArticleRow`. Without it a
   // row offers the recoverable trash instead.
   const canPublish = auth?.permissions?.includes('news.publish') ?? false;
+  const locales = props.locales ?? [];
+  const defaultLocale = props.default_locale ?? 'en';
 
   const {
     articles,
@@ -57,13 +69,15 @@ export default function NewsList() {
     return () => controller.abort();
   }, [load]);
 
-  const filtered = !!(filters.q || filters.status || filters.category);
+  const filtered = !!(filters.q || filters.status || filters.category || filters.locale);
 
   return (
     <PageShell
       title="News"
       description={`${counts.published} published · ${counts.draft} drafts · public at /news/:slug`}
-      actions={canEdit ? <NewArticleDialog /> : undefined}
+      actions={
+        canEdit ? <NewArticleDialog locales={locales} defaultLocale={defaultLocale} /> : undefined
+      }
     >
       <Head title="News" />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
@@ -72,8 +86,10 @@ export default function NewsList() {
         q={filters.q}
         status={filters.status}
         category={filters.category}
+        locale={filters.locale}
         counts={counts}
         categories={categories}
+        locales={locales}
         onChange={(next) => setFilters({ ...next, offset: 0 })}
       />
 
@@ -124,7 +140,7 @@ export default function NewsList() {
             <>
               <p className="font-medium">No articles yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                “New article” creates a page and opens it in the editor. Set the category and date
+                “New article” creates a draft and opens it in the editor. Set the category and date
                 back here afterwards.
               </p>
             </>

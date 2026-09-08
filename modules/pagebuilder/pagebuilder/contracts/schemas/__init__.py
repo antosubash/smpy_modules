@@ -25,6 +25,7 @@ from pagebuilder.contracts.schemas._media import (
 )
 from pagebuilder.contracts.schemas._pages import (
     BlockChange,
+    LocalesResponse,
     MetadataChange,
     PageCreate,
     PageDetail,
@@ -36,20 +37,33 @@ from pagebuilder.contracts.schemas._pages import (
     PageRevisionListResponse,
     PageRevisionRead,
     PageScheduleRequest,
+    PageTranslationCreate,
+    PageTranslationRead,
     PageUpdate,
     PuckData,
     RevisionDiffResponse,
     StatusFilter,
 )
+from pagebuilder.contracts.schemas._snapshots import (
+    ImportApplyResponse,
+    ImportDecisionRequest,
+    PendingImportRead,
+    SnapshotCreateRequest,
+    SnapshotListResponse,
+    SnapshotRead,
+)
 
 __all__ = [
     "BlockChange",
+    "ImportApplyResponse",
+    "ImportDecisionRequest",
     "LayoutDetail",
     "LayoutRead",
     "LayoutRevisionDetail",
     "LayoutRevisionListResponse",
     "LayoutRevisionRead",
     "LayoutUpdate",
+    "LocalesResponse",
     "MediaAssetDetail",
     "MediaAssetListResponse",
     "MediaAssetRead",
@@ -67,8 +81,14 @@ __all__ = [
     "PageRevisionListResponse",
     "PageRevisionRead",
     "PageScheduleRequest",
+    "PageTranslationCreate",
+    "PageTranslationRead",
     "PageUpdate",
+    "PendingImportRead",
     "PuckData",
     "RevisionDiffResponse",
+    "SnapshotCreateRequest",
+    "SnapshotListResponse",
+    "SnapshotRead",
     "StatusFilter",
 ]

@@ -1,100 +1,14 @@
 /** Client for the news read API. */
 
 import { BASE, read, write } from './http';
-
-/** Workflow state of an article.
- *
- * News' own, on news' own column. The values are unchanged from when they were
- * a pagebuilder page's status mapped across a module boundary, so a client
- * written against the old wire format still reads them.
- */
-export type ArticleStatus = 'draft' | 'submitted_for_review' | 'published';
-
-export interface ArticleRead {
-  id: number;
-  slug: string;
-  title: string;
-  excerpt: string;
-  cover_image_url: string;
-  category: string;
-  tags: string[];
-  /** Held at the top of /news and of every feed block. */
-  pinned: boolean;
-  /** Whether feed blocks may list it. Does not affect the admin list. */
-  show_in_feed: boolean;
-  author: string;
-  published_at: string | null;
-  /** Workflow state. Always `published` for anyone without `news.edit` —
-   *  drafts are filtered out server-side. */
-  status: ArticleStatus;
-  url: string;
-  /** Where the body is composed. Sent by the server rather than assembled
-   *  here, so this list holds no opinion about how the module routes its own
-   *  screens. */
-  edit_url: string;
-}
-
-/** One article, with the fields only its editor screens need.
- *
- * Extends the listing shape rather than replacing it, so a component holding
- * an `ArticleRead` can be handed one of these without branching.
- */
-export interface ArticleDetail extends ArticleRead {
-  /** The block document the canvas edits. Never what readers are served —
-   *  that is the snapshot taken at publish. */
-  draft_data: Record<string, unknown>;
-  /** Whether a published snapshot exists. Distinct from `status`: an
-   *  unpublished article can still have one, from before it was taken down. */
-  has_published: boolean;
-  meta_description: string;
-  og_image: string;
-  canonical_url: string;
-  index_in_search: boolean;
-  json_ld: Record<string, unknown> | null;
-  rejection_note: string | null;
-  /** When the article goes live and comes down by itself.
-   *
-   * On this shape rather than `ArticleRead`, and deliberately: a published
-   * article can carry a future `unpublish_at`, and the listing DTO is what
-   * anonymous readers are served. */
-  publish_at: string | null;
-  unpublish_at: string | null;
-}
-
-export interface RevisionRead {
-  id: number;
-  article_id: number;
-  title: string;
-  event: 'publish' | 'unpublish' | 'submit' | 'approve' | 'reject';
-  note: string | null;
-  created_at: string | null;
-  created_by: string | null;
-}
-
-export interface ArticleCounts {
-  all: number;
-  draft: number;
-  published: number;
-  undated: number;
-}
-
-export interface ArticleListResponse {
-  items: ArticleRead[];
-  /** Matched the whole filter, status included — what the pager counts. */
-  total: number;
-  /** What each status pill would show. `undated` overlaps draft and
-   *  published, so these deliberately do not sum to `all`. */
-  counts: ArticleCounts;
-}
-
-export interface CategoryCount {
-  category: string;
-  count: number;
-}
-
-export interface CategoryListResponse {
-  items: CategoryCount[];
-}
+import type {
+  ArticleDetail,
+  ArticleListResponse,
+  ArticleRead,
+  ArticleTranslationPayload,
+  CategoryListResponse,
+  RevisionRead,
+} from './types';
 
 export async function listArticles(params: {
   limit?: number;
@@ -114,6 +28,12 @@ export async function listArticles(params: {
   /** The trash instead of the list. Needs `news.edit`; anyone else gets
    *  nothing, because a trashed article is by definition not published. */
   trashed?: boolean;
+  /** Only articles in this language. A feed block on a German page passes
+   *  `de`; the admin list leaves it unset and shows every language. */
+  locale?: string;
+  /** One article and its counterparts in other languages — what the editor's
+   *  language switcher lists. */
+  translation_group?: string;
   signal?: AbortSignal;
 }): Promise<ArticleListResponse> {
   const query = new URLSearchParams();
@@ -126,6 +46,8 @@ export async function listArticles(params: {
   if (params.undated_first) query.set('undated_first', 'true');
   if (params.tag) query.set('tag', params.tag);
   if (params.trashed) query.set('trashed', 'true');
+  if (params.locale) query.set('locale', params.locale);
+  if (params.translation_group) query.set('translation_group', params.translation_group);
   const response = await fetch(`${BASE}/articles?${query}`, {
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',
@@ -218,10 +140,28 @@ export const deleteArticle = (id: number) => write<null>(`/articles/${id}`, 'DEL
 export const createArticle = (data: {
   title: string;
   slug?: string;
+  /** Language to write in, and fixed once the article exists. Omitted means
+   *  the site's default. */
+  locale?: string;
   category?: string;
   published_at?: string | null;
   author?: string;
 }) => write<ArticleRead>('/articles', 'POST', data);
+
+/** Start this article's counterpart in another language.
+ *
+ * A sibling article sharing a `translation_group`, not a second view of this
+ * one: its own slug, its own body, its own workflow state. Category, byline
+ * and date are copied across, because they are facts about the story rather
+ * than about the language it is told in.
+ *
+ * This used to translate the pagebuilder *page* the body lived in and then
+ * attach a sidecar row to it — two writes across a module boundary, either of
+ * which could land without the other. The article owns its body now, so one
+ * request to news creates the whole thing.
+ */
+export const translateArticle = (articleId: number, data: ArticleTranslationPayload) =>
+  write<ArticleRead>(`/articles/${articleId}/translations`, 'POST', data);
 
 /** Everything the editor screens need, in one request. */
 export const getArticleDetail = (id: number, signal?: AbortSignal) =>
@@ -291,3 +231,15 @@ export function relativeDay(iso: string | null, now = new Date()): string {
   if (days > 0) return `in ${days}d`;
   return `${-days}d ago`;
 }
+
+export type {
+  ArticleCounts,
+  ArticleDetail,
+  ArticleListResponse,
+  ArticleRead,
+  ArticleStatus,
+  ArticleTranslationPayload,
+  CategoryCount,
+  CategoryListResponse,
+  RevisionRead,
+} from './types';

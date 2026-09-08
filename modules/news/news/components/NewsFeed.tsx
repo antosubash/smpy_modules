@@ -5,6 +5,7 @@ import {
 } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/article-cards-render';
 import { useEffect, useState } from 'react';
 
+import { useContentLocale } from '../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../utils/api';
 
 export interface NewsFeedProps {
@@ -24,7 +25,8 @@ function toCard(article: ArticleRead): ArticleCardItem {
     date: formatArticleDate(article.published_at),
     title: article.title,
     body: article.excerpt,
-    // An article *is* a page, so this is the page's own public URL.
+    // The article's own public URL, served by news. Sent by the server rather
+    // than assembled here, so a card holds no opinion about the route.
     href: article.url,
   };
 }
@@ -38,18 +40,22 @@ export function NewsFeedRender({
   viewAllHref,
 }: NewsFeedProps) {
   const [items, setItems] = useState<ArticleCardItem[] | null>(null);
+  // The page's language, not a field on the block: a feed set to one language
+  // on a page written in another is a mistake nothing would catch, and an
+  // English card in a German list is worse than no card.
+  const locale = useContentLocale();
 
   useEffect(() => {
     const controller = new AbortController();
     // `in_feed` is the block's own filter: an article can be published and
     // linked to without belonging in the chronological feed.
-    listArticles({ limit, category, in_feed: true, signal: controller.signal })
+    listArticles({ limit, category, locale, in_feed: true, signal: controller.signal })
       .then((response) => setItems(response.items.map(toCard)))
       // An empty feed and a failed fetch look the same to a visitor on
       // purpose: a broken API must not put an error box on a public page.
       .catch(() => setItems([]));
     return () => controller.abort();
-  }, [limit, category]);
+  }, [limit, category, locale]);
 
   // Render nothing at all until the first response, and nothing when there
   // are no articles: a heading with an empty grid under it reads as a broken

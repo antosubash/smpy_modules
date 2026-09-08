@@ -6,10 +6,14 @@ export interface NewsFilters {
   q: string;
   /** '', 'draft', 'published' or 'undated'. Empty is the All pill. */
   status: string;
+  /** Language tag, or '' for every language — the list's default. An editor
+   *  looking for an article should not have to guess which translation of it
+   *  they filed the headline under. */
+  locale: string;
   offset: number;
 }
 
-const EMPTY: NewsFilters = { category: '', q: '', status: '', offset: 0 };
+const EMPTY: NewsFilters = { category: '', q: '', status: '', locale: '', offset: 0 };
 
 function fromSearch(search: string): NewsFilters {
   const params = new URLSearchParams(search);
@@ -18,13 +22,14 @@ function fromSearch(search: string): NewsFilters {
     category: params.get('category') ?? '',
     q: params.get('q') ?? '',
     status: params.get('status') ?? '',
+    locale: params.get('locale') ?? '',
     // A hand-edited or stale "?offset=abc" should land on page one rather than
     // NaN its way into the request.
     offset: Number.isFinite(offset) && offset > 0 ? offset : 0,
   };
 }
 
-function toSearch({ category, q, status, offset }: NewsFilters, current: string): string {
+function toSearch({ category, q, status, locale, offset }: NewsFilters, current: string): string {
   // Start from the current query string, not a fresh one: this hook owns only
   // its own keys, and rebuilding from scratch would silently strip params
   // other features (or analytics links) put there.
@@ -35,6 +40,8 @@ function toSearch({ category, q, status, offset }: NewsFilters, current: string)
   else params.delete('q');
   if (status) params.set('status', status);
   else params.delete('status');
+  if (locale) params.set('locale', locale);
+  else params.delete('locale');
   if (offset > 0) params.set('offset', String(offset));
   else params.delete('offset');
   const query = params.toString();

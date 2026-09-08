@@ -8,6 +8,10 @@ falls, which is why the editor promises a redirect and this records one.
 News used to read pagebuilder's redirect table, because the slug being renamed
 was a page's. It keeps its own now — the same rule, over the rows this module
 actually owns.
+
+Every lookup is scoped to a locale, because slugs are only unique within one:
+two languages can legitimately have retired the same word, and resolving
+without the locale would forward a German reader to the English article.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ from news.models import (
 
 
 async def record(
-    db: AsyncSession, *, article_id: int, old_slug: str, new_slug: str
+    db: AsyncSession, *, article_id: int, old_slug: str, new_slug: str, locale: str
 ) -> None:
     """Point ``old_slug`` at the article, now living at ``new_slug``.
 
@@ -38,20 +42,26 @@ async def record(
 
     A rename back to a slug the article already used therefore leaves no
     self-referential row behind.
+
+    Both deletes are locale-scoped, so clearing the German article's path never
+    disturbs the English article's redirect from the same word.
     """
     if old_slug == new_slug:
         return
 
     await db.execute(
         sa_delete(NewsArticleRedirect).where(
-            NewsArticleRedirect.from_slug.in_([old_slug, new_slug])
+            NewsArticleRedirect.locale == locale,
+            NewsArticleRedirect.from_slug.in_([old_slug, new_slug]),
         )
     )
-    db.add(NewsArticleRedirect(from_slug=old_slug, article_id=article_id))
+    db.add(
+        NewsArticleRedirect(from_slug=old_slug, article_id=article_id, locale=locale)
+    )
     await db.flush()
 
 
-async def resolve(db: AsyncSession, slug: str) -> str | None:
+async def resolve(db: AsyncSession, slug: str, locale: str) -> str | None:
     """The current slug an old one should redirect to, or ``None``.
 
     Returns the *article's* slug rather than the redirect row, so a chain of
@@ -67,12 +77,19 @@ async def resolve(db: AsyncSession, slug: str) -> str | None:
 
     The trashed half is the shared ``NOT_TRASHED`` every other read path uses,
     rather than a second spelling of it here — one rule, one definition.
+
+    The article's own locale is checked as well as the redirect's. They agree
+    today — an article's language is fixed for its lifetime — but a redirect
+    that outlived a locale change would otherwise hand ``/de/news/x`` an English
+    slug and send the reader to a URL that 404s.
     """
     result = await db.execute(
         select(NewsArticle.slug, NewsArticle.published_data)
         .join(NewsArticleRedirect, NewsArticleRedirect.article_id == NewsArticle.id)
         .where(
             NewsArticleRedirect.from_slug == slug,
+            NewsArticleRedirect.locale == locale,
+            NewsArticle.locale == locale,
             NOT_TRASHED,
             NewsArticle.status == ArticleStatus.PUBLISHED,
         )

@@ -38,8 +38,14 @@ def _stem_length(base: str) -> int:
     return min(len(base), MAX_SLUG_LEN - longest - 1)
 
 
-async def free_slug(db: AsyncSession, base: str) -> str:
+async def free_slug(db: AsyncSession, base: str, locale: str) -> str:
     """``base``, or ``base-2``, ``base-3``… — the first nobody is using.
+
+    Within ``locale``, and only within it. Slugs are unique per
+    ``(locale, slug)``, so ``/news/budget`` and ``/de/news/budget`` are two
+    documents and neither takes the other's address — scanning across languages
+    would hand a translator ``budget-2`` for a word nothing in their language
+    has claimed.
 
     One query rather than one per candidate: the alternative is a
     create-and-catch-409 loop, and a failed insert rolls the session back, which
@@ -70,7 +76,10 @@ async def free_slug(db: AsyncSession, base: str) -> str:
     taken = set(
         (
             await db.execute(
-                select(NewsArticle.slug).where(NewsArticle.slug.startswith(stem))
+                select(NewsArticle.slug).where(
+                    NewsArticle.locale == locale,
+                    NewsArticle.slug.startswith(stem),
+                )
             )
         ).scalars()
     )

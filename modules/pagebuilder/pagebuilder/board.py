@@ -87,13 +87,22 @@ _ORDER = [
 
 
 async def load(
-    db: AsyncSession, *, search: str | None = None, per_stage: int = PER_STAGE
+    db: AsyncSession,
+    *,
+    search: str | None = None,
+    locale: str | None = None,
+    per_stage: int = PER_STAGE,
 ) -> list[Stage]:
     """Every column, in pipeline order.
 
     ``In review`` is returned even when empty; the caller drops it, because
     whether the approval workflow is in use is a question about the site rather
     than about this query.
+
+    ``locale`` narrows every column to one language, the same way ``search``
+    narrows them. It has to be applied here as well as in the table query: the
+    board is the default view, so a language filter the board ignored would be
+    a control that visibly does nothing.
     """
     now = datetime.now(UTC)
     search_clause = _search_filter(search)
@@ -103,6 +112,8 @@ async def load(
         clauses = _conditions(key, now)
         if search_clause is not None:
             clauses = [*clauses, search_clause]
+        if locale:
+            clauses = [*clauses, Page.locale == locale]
 
         total = await db.scalar(select(func.count()).select_from(Page).where(*clauses))
         # Scheduled sorts by when it fires — the next one to go live is the one

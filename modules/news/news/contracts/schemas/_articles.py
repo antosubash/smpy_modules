@@ -1,4 +1,8 @@
-"""Article DTOs — the listing shape, the editor's, and every write."""
+"""An article, and the ways one is created and changed.
+
+Plural, matching pagebuilder's own ``_pages.py``: the file holds the listing
+shape, the editor's, and every write, not one DTO.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from news.constants import (
     MAX_AUTHOR_LEN,
     MAX_CATEGORY_LEN,
+    MAX_LOCALE_LEN,
     MAX_NOTE_LEN,
     MAX_SLUG_LEN,
     MAX_TITLE_LEN,
@@ -41,6 +46,30 @@ class ArticleRead(BaseModel):
     show_in_feed: bool = True
     author: str = ""
     published_at: datetime | None = None
+
+    locale: str = ""
+    """Which language the article is written in.
+
+    The article's own column now. It used to be the language of the
+    pagebuilder page the body lived in, which is why this had nowhere to come
+    from on a host that did not run that module. Defaulted rather than required
+    so a caller building an ``ArticleRead`` by hand — the search screen does —
+    need not supply it.
+    """
+
+    translation_group: str = ""
+    """What this article and its counterparts in other languages share.
+
+    Carried on the card so the admin list can mark which articles already have
+    a translation without a query per row — "has translations" is then "are
+    there siblings sharing this group", never a null check.
+
+    Empty only where the caller built the shape by hand with no group to give
+    (the search screen does). Every stored article has one: the column is NOT
+    NULL and every article starts a group of its own, so a lone article is a
+    group of one rather than an absence.
+    """
+
     status: ArticleStatus
     """Workflow state.
 
@@ -119,15 +148,6 @@ class ArticleListResponse(BaseModel):
     counts: ArticleCounts = Field(default_factory=ArticleCounts)
 
 
-class CategoryCount(BaseModel):
-    category: str
-    count: int
-
-
-class CategoryListResponse(BaseModel):
-    items: list[CategoryCount]
-
-
 class ArticleCreate(BaseModel):
     """Create an article.
 
@@ -146,6 +166,13 @@ class ArticleCreate(BaseModel):
     slug: str | None = Field(
         default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
     )
+    locale: str | None = Field(default=None, max_length=MAX_LOCALE_LEN)
+    """Language to write in. ``None`` means the site's default.
+
+    An article created this way starts a translation group of its own. Joining
+    an existing one is ``POST /articles/{id}/translations``.
+    """
+
     category: str = Field(default="", max_length=MAX_CATEGORY_LEN)
     published_at: datetime | None = None
     author: str = Field(default="", max_length=MAX_AUTHOR_LEN)
@@ -154,12 +181,46 @@ class ArticleCreate(BaseModel):
     """Truncate to the calendar day as sent — see ``news.display_date``."""
 
 
+class ArticleTranslationCreate(BaseModel):
+    """Start an article's counterpart in another language.
+
+    A translation is a *sibling article* sharing a ``translation_group``, not a
+    second body on one row — and not, as it was while the body lived on a
+    pagebuilder page, a translation of that page performed on the article's
+    behalf.
+
+    Only the three things a translator decides. Category, byline, date, pin and
+    feed membership are copied from the source rather than asked for again:
+    they are facts about the story, not about the language it is told in, and a
+    form that asked would invite them to drift apart between languages.
+    """
+
+    locale: str = Field(min_length=2, max_length=MAX_LOCALE_LEN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
+    """Address within the new language. Defaults to the source article's own,
+    which is free unless an unrelated article already took it — slugs are
+    unique per language, so ``/news/x`` and ``/de/news/x`` do not collide."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LEN)
+    """Defaults to the source's headline, i.e. untranslated — a more useful
+    starting point for a translator than a blank field, and it makes what still
+    needs doing obvious in the list."""
+
+
 class ArticleUpdate(BaseModel):
     """The listing metadata, and the article's identity and SEO.
 
     Every field is optional and only the ones actually sent are applied, so the
     admin list's inline edit can send two fields without clearing the rest.
-    Changing ``slug`` records a redirect from the old one.
+    Changing ``slug`` records a redirect from the old one, scoped to the
+    article's language.
+
+    Deliberately no ``locale``: an article's language is fixed for its
+    lifetime. Moving one would strand its slug in the old language and orphan
+    the redirect pointing at it — ``POST /articles/{id}/translations`` starts a
+    sibling instead.
     """
 
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LEN)

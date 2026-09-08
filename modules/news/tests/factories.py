@@ -24,6 +24,8 @@ async def make_article(
     slug: str,
     title: str = "An article",
     status: ArticleStatus = ArticleStatus.PUBLISHED,
+    locale: str | None = None,
+    translation_group: str | None = None,
     meta_description: str | None = None,
     og_image: str | None = None,
     category: str = "",
@@ -39,13 +41,24 @@ async def make_article(
     ``publish_body`` mirrors what publishing actually does — it snapshots the
     draft — because the public viewer serves ``published_data`` and a fixture
     that left it null would 404 on rows the test believes are live.
+
+    ``locale`` and ``translation_group`` are omitted rather than passed as
+    ``None`` when a test does not care: both columns are non-nullable with a
+    ``default_factory`` behind them, and handing the constructor a ``None``
+    would override the factory with a value the column forbids.
     """
     body = (
         draft_data
         if draft_data is not None
         else {"root": {"props": {"title": title}}, "content": []}
     )
+    optional: dict = {}
+    if locale is not None:
+        optional["locale"] = locale
+    if translation_group is not None:
+        optional["translation_group"] = translation_group
     article = NewsArticle(
+        **optional,
         slug=slug,
         title=title,
         status=status,

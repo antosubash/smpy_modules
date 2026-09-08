@@ -8,11 +8,14 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder import locales
 from pagebuilder.contracts.schemas import (
+    LocalesResponse,
     PageCreate,
     PageDetail,
     PageListResponse,
     PageRead,
+    PageTranslationCreate,
     PageUpdate,
     StatusFilter,
 )
@@ -27,6 +30,11 @@ async def list_pages(
     db: AsyncSession = Depends(get_db),
     search: str | None = None,
     status_filter: Annotated[StatusFilter, Query(alias="status")] = None,
+    locale: str | None = Query(
+        default=None,
+        description="Only pages authored in this language. Unset lists every "
+        "language, which is what an unfiltered admin list wants.",
+    ),
     # Unbounded by default, deliberately: a seed reads this endpoint to build a
     # slug-to-id map, and a default page size would make it recreate pages it
     # already has. Callers that page ask for it.
@@ -34,7 +42,11 @@ async def list_pages(
     offset: int = Query(default=0, ge=0),
 ) -> PageListResponse:
     pages, total = await PagesService(db).list_pages(
-        search=search, status=status_filter, limit=limit, offset=offset
+        search=search,
+        status=status_filter,
+        locale=locales.resolve(locale),
+        limit=limit,
+        offset=offset,
     )
     return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=total)
 
@@ -75,6 +87,17 @@ async def list_pending(db: AsyncSession = Depends(get_db)) -> PageListResponse:
     return PageListResponse(items=[PageRead.model_validate(p) for p in pages], total=len(pages))
 
 
+@router.get("/locales", response_model=LocalesResponse)
+async def list_locales() -> LocalesResponse:
+    """Which languages a page may be authored in.
+
+    Served rather than compiled into the frontend so the language switcher and
+    the New page dialog offer exactly what the deployment configured — a
+    hardcoded list would show a language the API then refuses.
+    """
+    return LocalesResponse(locales=list(locales.supported()), default=locales.default())
+
+
 @router.post(
     "/pages",
     response_model=PageDetail,
@@ -82,14 +105,35 @@ async def list_pending(db: AsyncSession = Depends(get_db)) -> PageListResponse:
     dependencies=[require_edit],
 )
 async def create_page(data: PageCreate, db: AsyncSession = Depends(get_db)) -> PageDetail:
-    page = await PagesService(db).create(data)
-    return PageDetail.model_validate(page)
+    service = PagesService(db)
+    return await service.detail(await service.create(data))
 
 
 @router.get("/pages/{page_id}", response_model=PageDetail)
 async def get_page(page_id: int, db: AsyncSession = Depends(get_db)) -> PageDetail:
-    page = await PagesService(db).get_page(page_id)
-    return PageDetail.model_validate(page)
+    service = PagesService(db)
+    return await service.detail(await service.get_page(page_id))
+
+
+@router.post(
+    "/pages/{page_id}/translations",
+    response_model=PageDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[require_edit],
+)
+async def create_translation(
+    page_id: int,
+    data: PageTranslationCreate,
+    db: AsyncSession = Depends(get_db),
+) -> PageDetail:
+    """Start this page's counterpart in another language.
+
+    Returns the *new* page, not the source: the caller's next move is to open
+    the editor on it, and making them re-read the source to find its id would
+    be a round trip for something this response already knows.
+    """
+    service = PagesService(db)
+    return await service.detail(await service.create_translation(page_id, data))
 
 
 @router.put(
@@ -102,8 +146,8 @@ async def update_page(
     data: PageUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> PageDetail:
-    page = await PagesService(db).update(page_id, data)
-    return PageDetail.model_validate(page)
+    service = PagesService(db)
+    return await service.detail(await service.update(page_id, data))
 
 
 @router.post(
@@ -113,8 +157,8 @@ async def update_page(
 )
 async def restore_page(page_id: int, db: AsyncSession = Depends(get_db)) -> PageDetail:
     """Bring a page back out of the trash. It returns as a draft."""
-    page = await PagesService(db).restore(page_id)
-    return PageDetail.model_validate(page)
+    service = PagesService(db)
+    return await service.detail(await service.restore(page_id))
 
 
 @router.delete(

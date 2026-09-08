@@ -36,6 +36,7 @@ from pagebuilder.permissions import (
     ROLE_EDITOR,
 )
 from pagebuilder.settings import PagebuilderSettings
+from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
@@ -87,6 +88,7 @@ async def _build_app(
     inject_user: bool,
     user_roles: tuple[str, ...] = ("admin",),
     role_map: dict[str, list[str]] | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> tuple[FastAPI, Callable[[], Awaitable[None]]]:
     media_root = tmp_path / "media"
     media_root.mkdir(parents=True, exist_ok=True)
@@ -98,9 +100,15 @@ async def _build_app(
         media_root=media_root,
         requires_auth=requires_auth,
         csrf_protect=csrf_protect,
+        **(settings or {}),
     )
 
     app = FastAPI()
+    # The settings module's registry, which ``register_settings`` registers
+    # the class against. Stubbed rather than mounted: these tests want the
+    # pre-seeded settings above, not a hydration round trip through a database
+    # the framework module owns.
+    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     module.register_settings(app)
     module.register_middleware(app)
 
@@ -198,6 +206,7 @@ async def _client_fixture(
     inject_user: bool,
     user_roles: tuple[str, ...] = ("admin",),
     role_map: dict[str, list[str]] | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> AsyncIterator[AsyncClient]:
     app, cleanup = await _build_app(
         tmp_path,
@@ -206,6 +215,7 @@ async def _client_fixture(
         inject_user=inject_user,
         user_roles=user_roles,
         role_map=role_map,
+        settings=settings,
     )
     try:
         async with _client_for(app) as c:
@@ -276,25 +286,3 @@ async def approver_client(tmp_path) -> AsyncIterator[AsyncClient]:
         role_map={ROLE_APPROVER: [PERM_EDIT, PERM_PUBLISH, PERM_APPROVE]},
     ):
         yield c
-
-
-async def create_draft(
-    client: AsyncClient,
-    *,
-    slug: str = "post",
-    title: str = "Draft",
-    draft_data: dict | None = None,
-) -> dict:
-    """POST a fresh draft page and return the API body."""
-    response = await client.post(
-        "/api/pagebuilder/pages",
-        json={
-            "title": title,
-            "slug": slug,
-            "draft_data": draft_data
-            if draft_data is not None
-            else {"content": ["hello"]},
-        },
-    )
-    assert response.status_code == 201, response.text
-    return response.json()

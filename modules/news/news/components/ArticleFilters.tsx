@@ -1,10 +1,11 @@
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
-
 import type { ArticleCounts, CategoryCount } from '../utils/api';
+import { localeLabel } from '../utils/locale';
 
 const SEARCH_INPUT_ID = 'news-article-search';
 const CATEGORY_SELECT_ID = 'news-article-category';
+const LOCALE_SELECT_ID = 'news-article-locale';
 
 /** The pipeline is two-state — draft or published. `undated` is not a third
  *  state: it cuts across both, and it is the work-in-progress pile a writer
@@ -20,9 +21,13 @@ interface Props {
   q: string;
   status: string;
   category: string;
+  locale: string;
   counts: ArticleCounts;
   categories: CategoryCount[];
-  onChange: (next: { q?: string; status?: string; category?: string }) => void;
+  /** Every language the site publishes in. One or none hides the select — a
+   *  filter that cannot narrow anything is furniture. */
+  locales: string[];
+  onChange: (next: { q?: string; status?: string; category?: string; locale?: string }) => void;
 }
 
 /** Search, status pills and the category select, above the list.
@@ -31,7 +36,16 @@ interface Props {
  * switching filter is visible before the click — "Draft 6" answers the question
  * the click was going to ask.
  */
-export function ArticleFilters({ q, status, category, counts, categories, onChange }: Props) {
+export function ArticleFilters({
+  q,
+  status,
+  category,
+  locale,
+  counts,
+  categories,
+  locales,
+  onChange,
+}: Props) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <Input
@@ -80,6 +94,23 @@ export function ArticleFilters({ q, status, category, counts, categories, onChan
           {categories.map((c) => (
             <option key={c.category} value={c.category}>
               {c.category} ({c.count})
+            </option>
+          ))}
+        </NativeSelect>
+      )}
+
+      {locales.length > 1 && (
+        <NativeSelect
+          id={LOCALE_SELECT_ID}
+          aria-label="Filter by language"
+          value={locale}
+          className="h-9 w-44"
+          onChange={(e) => onChange({ locale: e.target.value })}
+        >
+          <option value="">All languages</option>
+          {locales.map((tag) => (
+            <option key={tag} value={tag}>
+              {localeLabel(tag)}
             </option>
           ))}
         </NativeSelect>

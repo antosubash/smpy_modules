@@ -186,6 +186,9 @@ export function useArticleEditor(articleId: number) {
     valid,
     saved,
     error,
+    /** Exposed so a sibling panel — the language switcher — reports through the
+     *  same banner rather than growing an error surface of its own. */
+    setError,
     load,
     patch,
     save,

@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import type { PageRead } from '../utils/api';
+import { localeLabel, localePrefix } from '../utils/locale';
 import { createPage, listPages, listTemplates } from '../utils/pagesApi';
 import { slugify } from '../utils/slugify';
 
@@ -25,19 +26,35 @@ const TITLE_ID = 'new-page-title';
 const SLUG_ID = 'new-page-slug';
 const START_ID = 'new-page-start';
 const PARENT_ID = 'new-page-parent';
+const LOCALE_ID = 'new-page-locale';
 
 const BLANK = '';
 
 /** An empty Puck document — what "Blank" starts from. */
 const EMPTY_DRAFT = { root: { props: { title: '', width: 'full' } }, content: [], zones: {} };
 
+interface Props {
+  publicPrefix?: string;
+  /** Every language the site publishes in. A single entry hides the field —
+   *  a select with one option is a question with one answer. */
+  locales?: string[];
+  defaultLocale?: string;
+}
+
 /** "New page" — title, URL, a starting point, and an optional breadcrumb parent.
  *
- * Four fields, all changeable later. The dialog exists because two of them are
- * awkward to change *after* the fact: the URL leaves a stale link behind, and
- * the starting point cannot be applied to a page that already has content.
+ * All changeable later, except the language. The dialog exists because some of
+ * them are awkward to change *after* the fact: the URL leaves a stale link
+ * behind, the starting point cannot be applied to a page that already has
+ * content, and a page's language is fixed for its whole life — moving one
+ * would strand its slug and orphan the redirect pointing at it, so the way to
+ * a page in another language is a translation, not an edit.
  */
-export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }) {
+export function NewPageDialog({
+  publicPrefix = '/p',
+  locales = ['en'],
+  defaultLocale = 'en',
+}: Props) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   // Null until the author edits it: while it is null the slug tracks the title,
@@ -45,6 +62,7 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
   const [slugOverride, setSlugOverride] = useState<string | null>(null);
   const [startFrom, setStartFrom] = useState(BLANK);
   const [parentId, setParentId] = useState('');
+  const [locale, setLocale] = useState(defaultLocale);
   const [templates, setTemplates] = useState<PageRead[]>([]);
   const [pages, setPages] = useState<PageRead[]>([]);
   const [pending, setPending] = useState(false);
@@ -77,6 +95,7 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
       setSlugOverride(null);
       setStartFrom(BLANK);
       setParentId('');
+      setLocale(defaultLocale);
       setError(null);
     }
   };
@@ -88,6 +107,7 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
       const page = await createPage({
         title: title.trim(),
         slug,
+        locale,
         draft_data: EMPTY_DRAFT,
         ...(startFrom ? { copy_from_page_id: Number(startFrom) } : {}),
         ...(parentId ? { parent_id: Number(parentId) } : {}),
@@ -116,7 +136,7 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
           <DialogHeader>
             <DialogTitle>New page</DialogTitle>
             <DialogDescription>
-              Four fields, all changeable later. Creating opens the editor.
+              A few fields, all changeable later except the language. Creating opens the editor.
             </DialogDescription>
           </DialogHeader>
 
@@ -133,10 +153,42 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
               />
             </div>
 
+            {locales.length > 1 && (
+              <div className="grid gap-2">
+                <Label htmlFor={LOCALE_ID}>Language</Label>
+                <NativeSelect
+                  id={LOCALE_ID}
+                  value={locale}
+                  disabled={pending}
+                  onChange={(e) => {
+                    setLocale(e.target.value);
+                    // The parent select is scoped to the language, so a
+                    // parent chosen under the old one is no longer on offer —
+                    // leaving its id selected would submit a cross-language
+                    // breadcrumb the list never showed.
+                    setParentId('');
+                  }}
+                >
+                  {locales.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {localeLabel(tag)}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <p className="text-xs text-muted-foreground">
+                  Fixed once the page exists. To publish the same page in another language, add a
+                  translation from the editor's Languages tab.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-2">
               <Label htmlFor={SLUG_ID}>URL</Label>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground">{publicPrefix}/</span>
+                <span className="text-sm text-muted-foreground">
+                  {localePrefix(locale, defaultLocale)}
+                  {publicPrefix}/
+                </span>
                 <Input
                   id={SLUG_ID}
                   value={slug}
@@ -189,14 +241,17 @@ export function NewPageDialog({ publicPrefix = '/p' }: { publicPrefix?: string }
                 onChange={(e) => setParentId(e.target.value)}
               >
                 <option value="">None</option>
-                {pages.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.title}
-                  </option>
-                ))}
+                {pages
+                  .filter((p) => p.locale === locale)
+                  .map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.title}
+                    </option>
+                  ))}
               </NativeSelect>
               <p className="text-xs text-muted-foreground">
-                Optional. Affects the breadcrumb, not the URL.
+                Optional. Affects the breadcrumb, not the URL. Only pages in the same language — a
+                breadcrumb that crosses languages sends a reader out of theirs.
               </p>
             </div>
 

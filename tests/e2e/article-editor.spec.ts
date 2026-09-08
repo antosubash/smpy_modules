@@ -100,7 +100,11 @@ test.describe('Article editor', () => {
     const { articleId, slug } = await makeArticle(page, { publish: false });
 
     await page.goto(`/admin/news/articles/${articleId}/edit`);
-    await expect(page.getByText(/Draft/)).toBeVisible();
+    // Scoped to the header line for THIS article. A bare /Draft/ also matches
+    // the Languages panel, which prints the same word for every unpublished
+    // sibling — under two content locales that is a strict-mode violation, and
+    // even under one it would stop saying which article is the draft.
+    await expect(page.getByText(`/news/${slug} · Draft`)).toBeVisible();
     await page.getByRole('button', { name: /publish now/i }).click();
 
     // Preview is a link to the public URL, not a button — it opens the live

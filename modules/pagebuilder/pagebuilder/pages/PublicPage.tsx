@@ -7,6 +7,12 @@ import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { migrateContent } from '../components/migrateContent';
 import { getPuckConfig } from '../components/puckConfig';
 
+/** One language this document also exists in, as the server resolved it. */
+interface Alternate {
+  locale: string;
+  url: string;
+}
+
 interface Props {
   title: string;
   data: Record<string, unknown>;
@@ -18,6 +24,10 @@ interface Props {
   json_ld?: Record<string, unknown> | null;
   site_name?: string | null;
   twitter_handle?: string | null;
+  locale?: string | null;
+  /** Published counterparts in other languages, plus an `x-default` entry.
+   *  Empty on a monolingual site, and on any page with no live translation. */
+  alternates?: Alternate[];
   layout_header?: Record<string, unknown> | null;
   layout_footer?: Record<string, unknown> | null;
 }
@@ -45,6 +55,8 @@ export default function PublicPage({
   json_ld,
   site_name,
   twitter_handle,
+  locale,
+  alternates = [],
   layout_header,
   layout_footer,
 }: Props) {
@@ -93,6 +105,19 @@ export default function PublicPage({
         <meta name="twitter:card" content={og_image ? 'summary_large_image' : 'summary'} />
         {twitter_handle && <meta name="twitter:site" content={twitter_handle} />}
         {canonical_url && <link rel="canonical" href={canonical_url} />}
+        {/* One <link> per published language, the current one included —
+            hreflang sets are only honoured when every member names every
+            other, this page among them. The server omits the list entirely
+            below two entries, so a monolingual site emits nothing here. */}
+        {alternates.map((alternate) => (
+          <link
+            key={alternate.locale}
+            rel="alternate"
+            hrefLang={alternate.locale}
+            href={alternate.url}
+          />
+        ))}
+        {locale && <meta property="og:locale" content={locale} />}
         {!index_in_search && <meta name="robots" content="noindex,nofollow" />}
         {jsonLdScript && (
           // Emitting author-composed JSON-LD is the feature. The content is

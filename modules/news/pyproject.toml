@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_news"
-version = "0.0.6"
+version = "0.0.7"
 description = "A self-contained news archive — articles, categories, tags and a public viewer"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -13,6 +13,14 @@ dependencies = [
     "simple_module_core>=0.0.25,<0.1",
     "simple_module_db>=0.0.25,<0.1",
     "simple_module_hosting>=0.0.25,<0.1",
+    # ``register_settings`` imports ``settings.registration``: this module's
+    # settings are DB-backed rather than read from the environment. Floor
+    # verified: ``register_module_settings`` exists at 0.0.25.
+    "simple_module_settings>=0.0.25,<0.1",
+    # simple_module_pagebuilder is deliberately NOT here — it is an optional
+    # extra below. main carried it as a hard dependency because an article's
+    # body lived in a pagebuilder page; this branch gives the article its own
+    # content, so the only things left behind it are two conveniences.
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
 ]

@@ -23,7 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news import redirects
+from news import locales, redirects
 from news.content._slugs import free_slug, slug_exhausted, slug_for_title, slug_taken
 from news.content._workflow import WorkflowMixin
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
@@ -80,11 +80,22 @@ class ArticlesService(WorkflowMixin):
             raise HTTPException(status_code=404, detail="Article not found")
         return article
 
-    async def get_by_slug_published(self, slug: str) -> NewsArticle | None:
+    async def get_by_slug_published(
+        self, slug: str, locale: str | None = None
+    ) -> NewsArticle | None:
+        """One published article by address — slug *and* language.
+
+        Both, because a slug identifies an article only within one language:
+        ``/news/budget`` and ``/de/news/budget`` are two documents, and a lookup
+        that took only the slug would serve whichever of them the database
+        happened to return first. ``None`` means the site's default, which is
+        what an unqualified slug can only mean.
+        """
         result = await self.db.execute(
             select(NewsArticle).where(
                 NOT_TRASHED,
                 NewsArticle.slug == slug,
+                NewsArticle.locale == (locale or locales.default()),
                 NewsArticle.status == ArticleStatus.PUBLISHED,
             )
         )
@@ -96,6 +107,8 @@ class ArticlesService(WorkflowMixin):
         *,
         title: str,
         slug: str | None = None,
+        locale: str | None = None,
+        translation_group: str | None = None,
         category: str = "",
         author: str = "",
         published_at: Any = None,
@@ -106,18 +119,32 @@ class ArticlesService(WorkflowMixin):
         An author-supplied ``slug`` is used verbatim and a collision is
         reported rather than silently altered: the URL is a thing they typed and
         expect to get. Only the derived default looks for a free variant,
-        because there the author expressed no preference beyond the headline.
+        because there the author expressed no preference beyond the headline —
+        and it looks within ``locale`` alone, since that is the scope a slug is
+        unique in.
+
+        The language is settled here and never again: it is fixed for the
+        article's lifetime, because moving one between languages would strand
+        its slug in the old one and orphan every redirect pointing at it.
+        ``translation_group`` is passed only when this article is being started
+        as a counterpart to another — see
+        :mod:`news.endpoints.api.translations`. Left out, the column's own
+        ``default_factory`` mints a fresh group, which is why it is *omitted*
+        from the constructor rather than handed a ``None``: passing the None
+        through would override that default with a value the column forbids.
         """
+        active_locale = locale or locales.default()
         if slug:
             chosen = slug
         else:
-            chosen = await free_slug(self.db, slug_for_title(title))
+            chosen = await free_slug(self.db, slug_for_title(title), active_locale)
             if not chosen:
                 raise slug_exhausted(title)
 
         article = NewsArticle(
             title=title,
             slug=chosen,
+            locale=active_locale,
             category=category,
             author=author,
             published_at=published_at,
@@ -125,6 +152,7 @@ class ArticlesService(WorkflowMixin):
             if draft_data is not None
             else empty_article_document(title),
             status=ArticleStatus.DRAFT,
+            **({"translation_group": translation_group} if translation_group else {}),
         )
         self.db.add(article)
         try:
@@ -155,12 +183,16 @@ class ArticlesService(WorkflowMixin):
             await self.db.rollback()
             raise slug_taken() from exc
         # Recorded after the flush, so a rename the database rejected leaves no
-        # redirect pointing at an address the article never took.
+        # redirect pointing at an address the article never took. Scoped to the
+        # article's own language, which a rename cannot change — the redirect
+        # belongs to the address it replaces, and that address is in one
+        # language only.
         await redirects.record(
             self.db,
             article_id=article_id,
             old_slug=previous_slug,
             new_slug=article.slug,
+            locale=article.locale,
         )
         await self.db.refresh(article)
         return article

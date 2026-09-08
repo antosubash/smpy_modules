@@ -12,6 +12,7 @@ import inspect
 from news import constants
 from news.endpoints import views
 from news.module import NewsModule
+from news.settings import NewsSettings
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
@@ -24,16 +25,23 @@ class TestMeta:
     def test_meta_requires_framework(self):
         assert NewsModule.meta.requires_framework is not None
 
-    def test_depends_on_nothing(self):
+    def test_it_does_not_depend_on_pagebuilder(self):
         """The headline of the split.
 
         This list held "PageBuilder" for as long as an article's body, slug and
-        public URL lived in one of its pages. An empty list is what makes
+        public URL lived in one of its pages. Its absence is what makes
         ``simple_module_news`` installable, migratable and servable on its own —
         so this assertion is the regression guard for the whole change, not a
         detail of it.
+
+        "Settings" is here and is not the same kind of entry: news reads no
+        environment variables, so its settings are registered against the
+        framework's settings module, which has to have built its registry
+        first. That is a framework module every host runs, not a sibling
+        feature news would be incomplete without.
         """
-        assert NewsModule.meta.depends_on == []
+        assert "PageBuilder" not in NewsModule.meta.depends_on
+        assert NewsModule.meta.depends_on == ["Settings"]
 
     def test_importing_the_module_does_not_import_pagebuilder(self):
         """The optional integration must stay lazy.
@@ -175,12 +183,22 @@ class TestPublicRoutes:
 
     def test_the_article_viewer_is_readable_without_a_session(self):
         """Otherwise every article 302s a reader to the login screen, which
-        would make having a public address pointless."""
+        would make having a public address pointless.
+
+        Added at startup rather than from ``register_public_routes``: the
+        prefix and the site's languages are hydrated from the database after
+        that hook has run. ``AuthMiddleware`` reads the registry live, so a
+        rule added later still applies.
+        """
+        from types import SimpleNamespace
+
         registry = PublicRouteRegistry()
         module = NewsModule()
-        module.register_public_routes(registry)
+        settings = NewsSettings()
+        app = SimpleNamespace(state=SimpleNamespace(public_routes=registry))
+        module._exempt_public_routes(app, settings.public_route_prefix, ("en",))
 
-        prefix = module._resolved_settings().public_route_prefix
         assert any(
-            route.matches("GET", f"{prefix}/some-article") for route in registry.routes
+            route.matches("GET", f"{settings.public_route_prefix}/some-article")
+            for route in registry.routes
         )

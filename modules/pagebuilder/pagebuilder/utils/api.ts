@@ -6,6 +6,7 @@
  * working for every consumer.
  */
 
+export * from './locale';
 export * from './mediaApi';
 export * from './pagesApi';
 export { BASE, CSRF_COOKIE, readCookie, request } from './request';
