@@ -9,7 +9,7 @@ interface Props {
   busy: boolean;
   /** Whether the viewer holds `news.publish`. */
   canPublish: boolean;
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => Promise<unknown>;
   onTrash: (id: number) => Promise<unknown>;
 }
 
@@ -38,7 +38,7 @@ export function ArticleRowDelete({ article, busy, canPublish, onDelete, onTrash 
       title={t(row.delete_title, { title: article.title })}
       description={t(row.delete_description)}
       confirmLabel={t(row.delete_confirm)}
-      onConfirm={async () => onDelete(article.id)}
+      onConfirm={() => onDelete(article.id)}
       trigger={
         <Button type="button" size="sm" variant="ghost" disabled={busy}>
           {t(row.delete_confirm)}

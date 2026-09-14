@@ -79,12 +79,21 @@ async def due_candidates(
     *new* row, which is precisely the value the claim just erased.
     """
     rows = await db.execute(
-        select(NewsArticle.id, column).where(
+        select(NewsArticle.id, column)
+        .where(
             NOT_TRASHED,
             NewsArticle.status == status,
             column.is_not(None),
             column <= now,
         )
+        # Ordered by id so that when a tick claims more than one row, every
+        # replica takes its row locks in the same order. Without this, two
+        # replicas whose queries happen to scan in different orders can claim
+        # a shared pair of due articles in opposite sequence and deadlock —
+        # Postgres aborts the loser's whole transaction, rolling back every
+        # claim it already made that tick, which is a worse outcome than the
+        # "loses the claim, tries again next tick" this module is built around.
+        .order_by(NewsArticle.id)
     )
     return [(article_id, due_at) for article_id, due_at in rows.all() if article_id]
 

@@ -45,6 +45,15 @@ describe('archiveUrl — matching news/endpoints/public/_archive.py', () => {
     expect(archiveUrl('/news/', 1, 'é')).toBe('/news/?q=%C3%A9');
   });
 
+  it('leaves * and escapes ~ the way URLSearchParams always has', () => {
+    // The one pair `URLSearchParams` and Python's default `urlencode` read
+    // oppositely: the browser leaves `*` bare and escapes `~`, Python's
+    // default does the reverse. `_archive.py`'s `archive_url` writes its own
+    // encoder to match this side rather than the other way round — see
+    // `_form_urlencode` there.
+    expect(archiveUrl('/news/', 1, 'a*b~c d!')).toBe('/news/?q=a*b%7Ec+d%21');
+  });
+
   it('builds on whatever archive it was given', () => {
     // A search typed on a category page stays in that category.
     expect(archiveUrl('/de/news/category/haushalt', 2, 'x')).toBe(

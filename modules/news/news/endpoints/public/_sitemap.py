@@ -63,22 +63,41 @@ async def sitemap_entries(
             NOT_TRASHED,
             NewsArticle.status == ArticleStatus.PUBLISHED,
             NewsArticle.index_in_search.is_(True),
+            # A locale narrowed out of ``content_locales`` after articles were
+            # published under it still has rows — nothing deletes them — but
+            # no router is mounted for it (see ``boot.mount_public_routers``),
+            # so advertising the old address would hand a crawler a 404.
+            NewsArticle.locale.in_(locales.supported()),
         )
         .order_by(NewsArticle.updated_at.desc())
     )
     return [(slug, locale, updated_at) for slug, locale, updated_at in rows.all()]
 
 
-_LISTED = (
-    NOT_TRASHED,
-    NewsArticle.status == ArticleStatus.PUBLISHED,
-    NewsArticle.index_in_search.is_(True),
-    # The archive's own filter, not a looser one: an article held out of
-    # listings does not fill a category page either, so a category whose only
-    # article carries it would be advertised as a page that renders nothing.
-    NewsArticle.show_in_feed.is_(True),
-)
-"""What has to be true of an article for a page listing it to be worth indexing."""
+def _listed() -> tuple[object, ...]:
+    """What has to be true of an article for a page listing it to be worth
+    indexing.
+
+    A function, not a module-level tuple: ``locales.supported()`` changes
+    across a process's life (a fresh publish, a narrowed ``content_locales``),
+    and a tuple built once at import time would freeze whatever the first
+    caller saw — silently right for the locale set at startup and silently
+    wrong for any change after it, which is exactly the kind of thing this
+    check exists to catch.
+    """
+    return (
+        NOT_TRASHED,
+        NewsArticle.status == ArticleStatus.PUBLISHED,
+        NewsArticle.index_in_search.is_(True),
+        # The archive's own filter, not a looser one: an article held out of
+        # listings does not fill a category page either, so a category whose
+        # only article carries it would be advertised as a page that renders
+        # nothing.
+        NewsArticle.show_in_feed.is_(True),
+        # Same reasoning as ``sitemap_entries``: a locale no longer mounted
+        # has no route behind it, published articles or not.
+        NewsArticle.locale.in_(locales.supported()),
+    )
 
 
 async def sitemap_taxonomy_paths(db: AsyncSession) -> list[str]:
@@ -111,7 +130,7 @@ async def sitemap_taxonomy_paths(db: AsyncSession) -> list[str]:
         select(NewsCategory.slug, NewsArticle.locale)
         .select_from(NewsArticle)
         .join(NewsCategory, NewsCategory.name == NewsArticle.category)
-        .where(*_LISTED)
+        .where(*_listed())
         .distinct()
         .order_by(NewsCategory.slug, NewsArticle.locale)
     )
@@ -120,7 +139,7 @@ async def sitemap_taxonomy_paths(db: AsyncSession) -> list[str]:
         .select_from(NewsArticle)
         .join(NewsArticleTag, NewsArticleTag.article_id == NewsArticle.id)
         .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
-        .where(*_LISTED)
+        .where(*_listed())
         .distinct()
         .order_by(NewsTag.slug, NewsArticle.locale)
     )
@@ -145,7 +164,7 @@ async def sitemap_author_paths(db: AsyncSession) -> list[str]:
     """
     rows = await db.execute(
         select(NewsArticle.author, NewsArticle.locale)
-        .where(*_LISTED, NewsArticle.author != "")
+        .where(*_listed(), NewsArticle.author != "")
         .distinct()
         .order_by(NewsArticle.author, NewsArticle.locale)
     )

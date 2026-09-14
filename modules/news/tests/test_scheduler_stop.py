@@ -9,13 +9,15 @@ other way died *before* the polling loop — ``_run`` catches and logs a failing
 tick itself — and quietly discarding that is how a scheduler which stopped
 working weeks ago goes unnoticed.
 
-But the failure is *logged*, not raised. FastAPI's ``Router._shutdown`` is a
-bare ``for`` over the registered shutdown handlers with no ``try`` around each
-one, so an exception escaping this handler aborts the loop and every handler
-registered after news' never runs. News stranding pagebuilder's polling task
-because news' own teardown went wrong is a worse outcome than a line in the log,
-and the last test here is the one that says so — it is the regression test for
-the bug, not a restatement of the first two.
+But the failure is *logged*, not raised. The host's lifespan calls every
+module's ``on_shutdown(app)`` in a bare ``for`` loop with no ``try`` around
+each one (see :mod:`simple_module_hosting.app_builder`), so an exception
+escaping :meth:`NewsModule.on_shutdown` would abort that loop and every
+module after news' in shutdown order never gets torn down — including
+pagebuilder's own polling task. News stranding pagebuilder's scheduler
+because news' own teardown went wrong is a worse outcome than a line in the
+log, and the last test here is the one that says so — it is the regression
+test for the bug, not a restatement of the first two.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import logging
 
 import pytest
 from fastapi import FastAPI
+from news.module import NewsModule
 from news.scheduler import Scheduler
 
 pytestmark = pytest.mark.asyncio
@@ -100,30 +103,30 @@ class TestStop:
 class TestTheNeighbours:
     """The reason the exception is swallowed at this one call site.
 
-    ``Router._shutdown`` has no isolation between handlers, so this is not a
-    hypothetical: news raising on shutdown leaves another module's scheduler
-    polling task never cancelled.
+    The host's own shutdown loop (``for mod in reversed(modules): await
+    mod.on_shutdown(app)``) has no isolation between modules either, so this
+    is not a hypothetical: news raising out of ``on_shutdown`` leaves every
+    module after it in shutdown order — including pagebuilder's own
+    scheduler — never torn down.
     """
 
-    async def test_a_failed_teardown_does_not_strand_a_later_handler(
+    async def test_a_failed_teardown_does_not_strand_a_later_module(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         app = FastAPI()
-        scheduler = Scheduler()
-        scheduler._task = await _settled()
+        news = NewsModule()
+        news._scheduler._task = await _settled()
         neighbour = asyncio.create_task(_forever())
 
-        async def stop_the_neighbour() -> None:
+        async def neighbour_on_shutdown(_: FastAPI) -> None:
             neighbour.cancel()
 
-        # Registered in the order the host registers modules: news first, so a
-        # raise from it is exactly what would swallow the one after.
-        app.router.add_event_handler("shutdown", scheduler.stop)
-        app.router.add_event_handler("shutdown", stop_the_neighbour)
-
+        # Shaped like the host's actual lifespan teardown: a bare loop over
+        # each module's ``on_shutdown``, reverse start order, news before its
+        # neighbour — no ``try`` of its own around either call.
         with caplog.at_level(logging.ERROR, logger=LOGGER):
-            async with app.router.lifespan_context(app):
-                pass
+            for on_shutdown in (news.on_shutdown, neighbour_on_shutdown):
+                await on_shutdown(app)
 
         # Awaited rather than inspected: ``cancelling()`` is already truthy the
         # instant ``cancel`` is called, so it would pass without the
@@ -136,27 +139,28 @@ class TestTheNeighbours:
             "news.scheduler.stop_failed"
         ]
 
-    async def test_the_framework_really_has_no_guard_between_handlers(self) -> None:
-        """The premise of everything above, pinned.
+    async def test_the_host_lifespan_really_has_no_guard_between_modules(self) -> None:
+        """The premise of everything above, pinned against the real hook.
 
-        If FastAPI ever wraps each handler, this fails and the swallow in
-        ``stop`` can be reconsidered — which is the only circumstance in which
-        it should be.
+        If the host ever wraps each module's ``on_shutdown`` in its own
+        ``try``, this fails and the swallow in ``Scheduler.stop`` can be
+        reconsidered — which is the only circumstance in which it should be.
         """
-        app = FastAPI()
+        from simple_module_core.module import ModuleBase
+
         reached: list[str] = []
 
-        async def raises() -> None:
-            raise RuntimeError("boom")
+        class Raises(ModuleBase):
+            async def on_shutdown(self, app: FastAPI) -> None:
+                raise RuntimeError("boom")
 
-        async def after() -> None:
-            reached.append("after")
+        class After(ModuleBase):
+            async def on_shutdown(self, app: FastAPI) -> None:
+                reached.append("after")
 
-        app.router.add_event_handler("shutdown", raises)
-        app.router.add_event_handler("shutdown", after)
-
+        app = FastAPI()
         with pytest.raises(RuntimeError):
-            async with app.router.lifespan_context(app):
-                pass
+            for mod in (Raises(), After()):
+                await mod.on_shutdown(app)
 
         assert reached == []

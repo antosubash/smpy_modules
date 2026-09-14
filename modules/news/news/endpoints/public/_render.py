@@ -25,7 +25,7 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from news import constants
 from news.authors import slug_for as author_slug
 from news.endpoints.public import _head
-from news.models import NewsArticle
+from news.models import ArticleStatus, NewsArticle
 from news.settings import NewsSettings, public_author_path
 
 
@@ -69,7 +69,18 @@ async def render_article(
     # not transliterate — and the viewer then renders it as plain text. An
     # address that cannot name this author is worse than no address; see
     # :mod:`news.authors`.
-    byline_slug = author_slug(article.author)
+    #
+    # Also ``None`` when *this* article is not itself listed
+    # (``news.authors._LISTED``'s own predicate, minus the parts this row
+    # already satisfies by construction). This function has no database
+    # session to ask "does the byline have some OTHER listed article", so it
+    # answers the cheaper, safe half of that question: if this article proves
+    # the author has at least one listed piece, link; otherwise say nothing
+    # rather than link to an archive that resolves to an empty page titled
+    # with the raw slug. An author whose *other* work is listed still gets a
+    # working link from that other article.
+    listed = article.status == ArticleStatus.PUBLISHED and article.show_in_feed
+    byline_slug = author_slug(article.author) if listed else ""
     props: dict[str, Any] = {
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to

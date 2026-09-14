@@ -17,9 +17,9 @@
  *   JSON is a type error at the call site, and `tsc` is what catches the
  *   missing-key failure the framework's generator catches upstream.
  * - `useT`, which resolves against the same i18next instance the host
- *   configured. It exists only to spell the `defaultValue` the published
- *   overloads demand of a `string` key; behaviour is i18next's own — a
- *   missing key renders as the key.
+ *   configured, supplying the English text as the `defaultValue` the
+ *   published overloads demand of a `string` key — so a missing translation
+ *   renders as English rather than as the key.
  *
  * The namespace prefix (`pagebuilder.`) is the one
  * `PagebuilderModule.locale_dirs()` registers the catalogue under, so a leaf
@@ -85,6 +85,36 @@ export const keys: Record<typeof NAMESPACE, KeyTree<typeof en>> = {
   [NAMESPACE]: build(en, NAMESPACE) as KeyTree<typeof en>,
 };
 
+function flatten(node: Record<string, unknown>, prefix: string, out: Record<string, string>) {
+  for (const [name, value] of Object.entries(node)) {
+    const path = `${prefix}.${name}`;
+    if (typeof value !== 'string') {
+      flatten(value as Record<string, unknown>, path, out);
+      continue;
+    }
+    out[path] = value;
+    // A stem resolves to its `_other` form on a miss: the one category every
+    // language has, and the right reading for an unknown count.
+    if (name.endsWith('_other')) out[`${prefix}.${name.slice(0, -'_other'.length)}`] = value;
+  }
+  return out;
+}
+
+/**
+ * Every key's English text, flat, for the `defaultValue` a miss falls back to.
+ *
+ * The framework's `configureI18n` sets `fallbackLng` to the *negotiated*
+ * locale rather than to English, and this module ships only `en.json` — so a
+ * reader negotiated into any other configured console language would see raw
+ * dotted keys wherever a catalogue entry is missing, which is everywhere. The
+ * public page is what that would land on. Handing i18next the English as the
+ * default restores exactly what the hardcoded strings did before the catalogue
+ * existed: English, whatever the locale, until a translation arrives. The
+ * catalogue is already in memory for `keys`; this is the same data read the
+ * other way. Same shape as news' — keep the two in step.
+ */
+const english: Record<string, string> = flatten(en, NAMESPACE, {});
+
 /** Interpolation values — `{name}` placeholders, and `count` for plurals. */
 export type TranslateParams = Record<string, unknown>;
 
@@ -101,22 +131,22 @@ export type Translate = (key: string, params?: TranslateParams) => string;
  * time, which would freeze against whatever was loaded first.
  */
 export function translate(key: string, params?: TranslateParams): string {
-  return frameworkT(key, { defaultValue: key, ...params });
+  return frameworkT(key, { defaultValue: english[key] ?? key, ...params });
 }
 
 /**
  * `t()` for this module's keys.
  *
  * The published `t()` accepts a `string` key only alongside a `defaultValue`,
- * because a key outside its generated union might not resolve. Supplying the
- * key as its own default is what i18next already does on a miss, so this adds
- * a type, not a behaviour.
+ * because a key outside its generated union might not resolve. The default is
+ * the English text — see `english` above for why it is not the key itself.
  */
 export function useT(): { t: Translate } {
   const { t } = useFrameworkT();
   return useMemo(
     () => ({
-      t: (key: string, params?: TranslateParams) => t(key, { defaultValue: key, ...params }),
+      t: (key: string, params?: TranslateParams) =>
+        t(key, { defaultValue: english[key] ?? key, ...params }),
     }),
     [t],
   );

@@ -26,7 +26,7 @@ interface Props {
    *  author gets the recoverable `onTrash` instead of a button that 403s. */
   canPublish: boolean;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => Promise<unknown>;
   onTrash: (id: number) => Promise<unknown>;
   onPublish: (article: ArticleRead) => Promise<unknown>;
 }

@@ -141,10 +141,10 @@ class WorkflowMixin(RevisionsMixin):
         two steps are spelt out here rather than hidden behind one call because
         the gap between them is the whole subject.
 
-        Idempotent by construction: each tick re-queries, and both `publish` and
-        `unpublish` clear the timestamp they acted on, so a process that was
-        asleep for an hour catches up on its next wakeup rather than losing the
-        window. One bad row is skipped rather than poisoning the whole tick —
+        Idempotent by construction: each tick re-queries, and both `publish` and `unpublish` clear
+        the timestamp they acted on, so a process asleep an hour catches up rather than losing the
+        window — except one already elapsed, which `publish` clears rather than taking the article
+        down the same tick. One bad row is skipped rather than poisoning the whole tick —
         its claim handed straight back, so a later tick retries instead of the
         schedule dying here — but never silently: each skip is logged with the
         article's id, because a schedule that quietly never fires leaves no

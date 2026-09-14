@@ -36,11 +36,14 @@ class Scheduler:
 
     def start(self, app: FastAPI, settings: PagebuilderSettings) -> None:
         self._task = asyncio.create_task(self._run(app, settings))
-        # FastAPI 0.136 no longer exposes ``add_event_handler`` on the app
-        # itself; the router still carries it for ASGI lifespan hooks, which is
-        # what we want here — the task lives as long as the app does and gets
-        # cancelled on shutdown.
-        app.router.add_event_handler("shutdown", self.stop)
+        # Not wired through ``app.router.add_event_handler("shutdown", ...)``:
+        # the host builds the app with a custom ``lifespan=``, and under a
+        # custom lifespan FastAPI never installs the ``_DefaultLifespan`` that
+        # drains the router's own shutdown-handler list, so a handler added
+        # that way is never called. The host's lifespan instead calls every
+        # module's ``on_shutdown(app)`` directly — see
+        # :meth:`PagebuilderModule.on_shutdown`, which is what actually stops
+        # this task.
 
     async def _run(self, app: FastAPI, settings: PagebuilderSettings) -> None:
         """Poll for scheduled publish / unpublish flips.

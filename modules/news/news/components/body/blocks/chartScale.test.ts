@@ -39,6 +39,28 @@ describe('parseSeries', () => {
     expect(parseSeries('Change | -4.5').map((p) => p.value)).toEqual([-4.5]);
   });
 
+  it('reads a European decimal comma as a decimal point', () => {
+    // "1,5" is one and a half, not fifteen — a trailing 1-2 digit comma with
+    // no "." in the cell is a decimal separator, not a thousands one.
+    expect(parseSeries('Growth | 1,5').map((p) => p.value)).toEqual([1.5]);
+    expect(parseSeries('Loss | -2,75').map((p) => p.value)).toEqual([-2.75]);
+    // Display keeps exactly what was typed either way.
+    expect(parseSeries('Growth | 1,5')[0].display).toBe('1,5');
+  });
+
+  it('still reads a thousands-separator comma as a thousands separator', () => {
+    // Three or more digits after the comma, or a "." already present,
+    // disambiguates it from the decimal case above.
+    expect(parseSeries('Cost | 1,234').map((p) => p.value)).toEqual([1234]);
+    expect(parseSeries('Cost | 1,234.5').map((p) => p.value)).toEqual([1234.5]);
+  });
+
+  it('reads a typographic minus sign as negative', () => {
+    // U+2212, not the ASCII hyphen-minus a keyboard types — stripped like
+    // ordinary punctuation would turn this positive instead.
+    expect(parseSeries('Change | −4.5').map((p) => p.value)).toEqual([-4.5]);
+  });
+
   it('drops a row whose value is not a number', () => {
     // Plotting a typo as zero would draw a bar of length nothing, which reads
     // as a real measurement of nothing.

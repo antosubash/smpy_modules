@@ -16,12 +16,28 @@ from __future__ import annotations
 
 import pytest
 from factories import make_article
+from news.endpoints.public._archive import archive_url
 from news.models import ArticleStatus, NewsArticleTag, NewsCategory, NewsTag
 
 pytestmark = pytest.mark.asyncio
 
 NEWS = "/news"
 INERTIA = {"X-Inertia": "true"}
+
+
+class TestTheEncoding:
+    """No route involved, just ``archive_url`` itself — ``async`` only because
+    the module's ``pytestmark`` expects it of every test here."""
+
+    async def test_matches_urlsearchparams_on_the_two_characters_that_differ(
+        self,
+    ) -> None:
+        """`*` and `~` are the one pair Python's default ``urlencode`` and the
+        browser's own ``URLSearchParams`` read oppositely — see
+        ``archive_url``'s ``_form_urlencode``. Pinned as a literal string
+        against ``archiveUrl.test.ts``'s matching case, the same way
+        ``test_the_canonical_names_the_search`` below is."""
+        assert archive_url("/news/", q="a*b~c d!") == "/news/?q=a*b%7Ec+d%21"
 
 
 async def _seed(client, slug: str, **kwargs):

@@ -138,3 +138,40 @@ class TestSitemapTaxonomy:
         response = await anon_client.get(f"{NEWS}/sitemap.xml")
 
         assert response.text.count(f"{NEWS}/category/field-notes</loc>") == 1
+
+
+class TestANarrowedLocale:
+    """Nothing deletes an article's row when its language stops being
+    published. The sitemap must not keep advertising an address whose router
+    was unmounted along with it — every one of these clients is English-only,
+    so a row seeded directly in German (bypassing the language the running
+    app was actually configured for, exactly what a ``content_locales``
+    narrowing after the fact leaves behind) must not appear anywhere in it.
+    """
+
+    async def _category(self, client, name: str, slug: str) -> None:
+        async with client.db_state.session_factory() as db:
+            db.add(NewsCategory(name=name, slug=slug))
+            await db.commit()
+
+    async def test_the_article_itself_is_not_advertised(self, anon_client) -> None:
+        await _seed(anon_client, "verlassen", locale="de")
+
+        response = await anon_client.get(f"{NEWS}/sitemap.xml")
+
+        assert "/de/news/verlassen" not in response.text
+
+    async def test_nor_is_its_category_page(self, anon_client) -> None:
+        await self._category(anon_client, "Nachrichten", "nachrichten")
+        await _seed(anon_client, "verlassen", category="Nachrichten", locale="de")
+
+        response = await anon_client.get(f"{NEWS}/sitemap.xml")
+
+        assert "/de/news/category/nachrichten" not in response.text
+
+    async def test_nor_is_its_bylines_author_page(self, anon_client) -> None:
+        await _seed(anon_client, "verlassen", author="Klara Weber", locale="de")
+
+        response = await anon_client.get(f"{NEWS}/sitemap.xml")
+
+        assert "/de/news/author/klara-weber" not in response.text

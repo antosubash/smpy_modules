@@ -184,6 +184,17 @@ class PagebuilderModule(ModuleBase):
         if settings.scheduler_enabled:
             self._scheduler.start(app, settings)
 
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the scheduler's polling task.
+
+        Not reached through a FastAPI ``shutdown`` event handler — the host
+        builds the app with a custom ``lifespan=``, which bypasses the
+        router's own event-handler list entirely. This hook is what the
+        host's lifespan actually calls on the way down, for every module, in
+        reverse start order.
+        """
+        await self._scheduler.stop()
+
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
 

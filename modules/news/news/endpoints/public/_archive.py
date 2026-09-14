@@ -15,7 +15,6 @@ already the one they were divided along internally.
 from __future__ import annotations
 
 from collections.abc import Callable
-from urllib.parse import urlencode
 
 from fastapi import HTTPException, Request, Response
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -56,6 +55,39 @@ would be refusing the only useful thing on the page.
 """
 
 
+_URLSEARCHPARAMS_SAFE = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*-._"
+)
+"""Bytes the browser's ``URLSearchParams`` leaves unescaped.
+
+Not the same set ``urllib.parse.urlencode`` uses: Python's default leaves
+``~`` unescaped and escapes ``*``, the WHATWG form-urlencoded serializer the
+browser runs does the opposite. A search term containing either would make
+``archive_url`` and ``archiveUrl.ts`` spell the same page as two different
+query strings — see ``archive_url``'s own docstring for why that is a
+canonical link nothing on the site links to.
+"""
+
+
+def _form_urlencode(pairs: list[tuple[str, str]]) -> str:
+    """``urlencode``, but byte-for-byte what ``URLSearchParams.toString()``
+    would produce for the same pairs — see :data:`_URLSEARCHPARAMS_SAFE`."""
+
+    def encode(value: str) -> str:
+        chars: list[str] = []
+        for byte in value.encode("utf-8"):
+            char = chr(byte)
+            if char in _URLSEARCHPARAMS_SAFE:
+                chars.append(char)
+            elif char == " ":
+                chars.append("+")
+            else:
+                chars.append(f"%{byte:02X}")
+        return "".join(chars)
+
+    return "&".join(f"{encode(key)}={encode(value)}" for key, value in pairs)
+
+
 def archive_url(path: str, *, page: int = 1, q: str = "") -> str:
     """An archive page's address, with whatever narrows it.
 
@@ -79,7 +111,7 @@ def archive_url(path: str, *, page: int = 1, q: str = "") -> str:
         params.append(("q", q))
     if page > 1:
         params.append(("page", str(page)))
-    return f"{path}?{urlencode(params)}" if params else path
+    return f"{path}?{_form_urlencode(params)}" if params else path
 
 
 def _archive_alternates(

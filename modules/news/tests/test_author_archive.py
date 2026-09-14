@@ -183,6 +183,17 @@ class TestTheBylineOnTheArticle:
 
         assert (await _props(anon_client, f"{NEWS}/piece"))["author_url"] is None
 
+    async def test_an_unlisted_articles_own_byline_is_not_linked(self, anon_client) -> None:
+        """The article is real and publicly readable — ``show_in_feed=False``
+        holds it out of listings, not out of the site — but it is the only
+        piece by this byline, so the archive it would link to has nothing in
+        it. Linking there would send a reader to a page titled with the raw
+        slug and no articles, worse than the plain text this renders instead.
+        """
+        await _seed(anon_client, "piece", author="Anto Subash", show_in_feed=False)
+
+        assert (await _props(anon_client, f"{NEWS}/piece"))["author_url"] is None
+
     async def test_a_german_article_links_to_the_german_archive(
         self, bilingual_public_client
     ) -> None:

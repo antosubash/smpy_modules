@@ -6,9 +6,12 @@ anything else means the task died before it ever reached the loop — ``_run``
 catches and logs a failing *tick* itself — and a blanket catch at shutdown is
 how a scheduler that stopped working weeks ago goes unnoticed.
 
-The failure is logged rather than raised on purpose: FastAPI runs shutdown
-handlers in a plain loop with no ``try`` around each one, so raising here would
-skip every handler registered after pagebuilder's.
+The failure is logged rather than raised on purpose: the host's lifespan calls
+every module's ``on_shutdown(app)`` — which is what actually invokes this, not
+a FastAPI shutdown event handler, since the host builds the app with a custom
+``lifespan=`` that bypasses the router's own event-handler list — in a plain
+loop with no ``try`` around each call, so raising here would skip every
+module's teardown that comes after pagebuilder's in shutdown order.
 """
 
 from __future__ import annotations

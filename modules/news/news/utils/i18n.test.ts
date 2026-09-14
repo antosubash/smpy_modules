@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import i18next from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 import en from '../locales/en.json';
-import { keys } from './i18n';
+import { keys, translate } from './i18n';
 
 /**
  * The catalogue and the call sites, checked against each other.
@@ -126,3 +127,25 @@ function flattenValues(node: Record<string, unknown>, prefix = ''): Record<strin
   }
   return out;
 }
+
+describe('a missing translation', () => {
+  it('renders English, not the key', async () => {
+    // The framework inits i18next with `fallbackLng` set to the negotiated
+    // locale, never to English — so on a host whose console speaks German, a
+    // reader lands on a catalogue this module does not ship, and every miss
+    // would render as its dotted key. The harness here happens to init with
+    // `en`, which would mask exactly that: pull the English bundle out so the
+    // miss is a real one, and the only thing standing between the reader and
+    // `news.list.title` is the default the wrapper supplies.
+    const bundle = i18next.getResourceBundle('en', 'translation');
+    i18next.removeResourceBundle('en', 'translation');
+    await i18next.changeLanguage('de');
+    try {
+      expect(translate(keys.news.list.title)).toBe('News');
+      expect(translate(keys.news.list.title)).not.toContain('.');
+    } finally {
+      i18next.addResourceBundle('en', 'translation', bundle, true, true);
+      await i18next.changeLanguage('en');
+    }
+  });
+});

@@ -43,6 +43,29 @@ export const LINE_BOX: ChartBox = { width: 320, height: 140, pad: 10 };
  *  writer the row — they typed a figure, and the figure is legible. */
 const NOT_NUMERIC = /[^0-9.+-]/g;
 
+/** Typographic minus signs a writer's keyboard or autocorrect might produce
+ *  (U+2212 minus sign, U+2012–U+2015 figure/en/em dashes) are not the ASCII
+ *  hyphen-minus `NOT_NUMERIC` keeps — stripped like any other punctuation,
+ *  they would turn a negative figure positive rather than dropping the row,
+ *  which is the one wrong answer worse than losing it. Folded onto `-` first. */
+const TYPOGRAPHIC_MINUS = /[−‒-―]/g;
+
+/** A trailing comma with one or two digits after it, and no `.` anywhere in
+ *  the cell, reads as a decimal separator (`1,5`) — the reading a
+ *  European-locale writer intends. Anything else (`1,200`, `1,234.5`) is a
+ *  thousands separator, which `NOT_NUMERIC` already strips correctly.
+ *  Ambiguous past this point either way, so only the one shape that would
+ *  otherwise silently multiply the figure by ten (or a hundred) is caught. */
+const TRAILING_DECIMAL_COMMA = /,(\d{1,2})$/;
+
+function normalizeDigits(raw: string): string {
+  const signed = raw.replace(TYPOGRAPHIC_MINUS, '-');
+  if (!signed.includes('.') && TRAILING_DECIMAL_COMMA.test(signed)) {
+    return signed.replace(TRAILING_DECIMAL_COMMA, '.$1');
+  }
+  return signed;
+}
+
 /** Two decimals. Percentages and viewBox coordinates carried to seventeen
  *  make the markup unreadable and the tests unwritable, and no screen can
  *  render the difference. */
@@ -64,7 +87,7 @@ export function parseSeries(text: string | undefined): ChartPoint[] {
     const display = raw.trim();
     // Emptiness is checked *after* stripping, not before: "tbc" strips to the
     // empty string, and `Number("")` is 0 — a value the writer never wrote.
-    const digits = display.replace(NOT_NUMERIC, '');
+    const digits = normalizeDigits(display).replace(NOT_NUMERIC, '');
     if (!digits) continue;
     const value = Number(digits);
     if (!Number.isFinite(value)) continue;
