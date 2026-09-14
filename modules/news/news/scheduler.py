@@ -102,14 +102,15 @@ class Scheduler:
             with suppress(asyncio.CancelledError):
                 await task
         except Exception:
-            # Logged rather than re-raised, which is not general defensiveness:
-            # FastAPI's ``Router._shutdown`` is a bare ``for`` over the
-            # registered shutdown handlers with no ``try`` around each one
-            # (``fastapi/routing.py``), so an exception escaping this handler
-            # aborts that loop and every handler registered after news' never
-            # runs — including another module's scheduler, whose polling task
-            # would then never be cancelled at all. Nothing about this failure
-            # is lost; only its blast radius. Pagebuilder's ``stop`` does the
+            # Logged rather than re-raised, which is not general defensiveness.
+            # This is reached from ``NewsModule.on_shutdown``, which the host's
+            # lifespan calls in a bare ``for mod in reversed(modules)`` with no
+            # ``try`` around each one — and then disposes the database engine
+            # *after* the loop (``simple_module_hosting/app_builder.py``). An
+            # exception escaping here therefore skips every module registered
+            # before news' — another scheduler's polling task never cancelled —
+            # and skips the engine disposal too. Nothing about this failure is
+            # lost; only its blast radius. Pagebuilder's ``stop`` does the
             # same, for the same reason and in the other direction.
             logger.exception("news.scheduler.stop_failed")
         finally:

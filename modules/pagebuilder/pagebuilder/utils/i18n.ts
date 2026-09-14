@@ -93,9 +93,17 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
       continue;
     }
     out[path] = value;
-    // A stem resolves to its `_other` form on a miss: the one category every
-    // language has, and the right reading for an unknown count.
-    if (name.endsWith('_other')) out[`${prefix}.${name.slice(0, -'_other'.length)}`] = value;
+    // A plural entry also answers for its stem, which is what call sites pass
+    // — the same rule `build()` applies to `keys`, and it has to stay the same
+    // rule: a stem `keys` publishes that `english` does not know falls back to
+    // the dotted key, the very leak this map exists to close. `_other` wins
+    // where several forms exist, being the one category every language has
+    // and the right reading for an unknown count.
+    const suffix = PLURAL_SUFFIXES.find((s) => name.endsWith(s));
+    if (suffix) {
+      const stem = `${prefix}.${name.slice(0, -suffix.length)}`;
+      if (suffix === '_other' || !(stem in out)) out[stem] = value;
+    }
   }
   return out;
 }

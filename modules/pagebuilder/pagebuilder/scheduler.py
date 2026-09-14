@@ -101,11 +101,13 @@ class Scheduler:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         except Exception:
-            # Logged rather than re-raised. FastAPI runs shutdown handlers in
-            # a plain loop with no ``try`` around each one, so raising here
-            # would skip every handler registered after this module's —
-            # including another module's scheduler, which would then never be
-            # stopped at all.
+            # Logged rather than re-raised. This is reached from
+            # ``PagebuilderModule.on_shutdown``, which the host's lifespan calls
+            # in a bare ``for mod in reversed(modules)`` with no ``try`` around
+            # each one, then disposes the database engine after the loop
+            # (``simple_module_hosting/app_builder.py``). Raising here would
+            # skip every module registered before this one — another
+            # scheduler never stopped at all — and the engine disposal too.
             _log.exception("pagebuilder.scheduler.stop_failed")
         finally:
             self._task = None

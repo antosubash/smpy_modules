@@ -55,6 +55,20 @@ describe('parseSeries', () => {
     expect(parseSeries('Cost | 1,234.5').map((p) => p.value)).toEqual([1234.5]);
   });
 
+  it('reads both separator conventions when the grouping is unambiguous', () => {
+    expect(parseSeries('Cost | 1.234,5').map((p) => p.value)).toEqual([1234.5]);
+    expect(parseSeries('Cost | €1.234.567,89').map((p) => p.value)).toEqual([1234567.89]);
+    expect(parseSeries('Cost | $1,234,567.89').map((p) => p.value)).toEqual([1234567.89]);
+  });
+
+  it('drops a figure with both separators in no recognisable order', () => {
+    // "1.5,25" used to strip the comma and plot 1.525 — a real-looking number
+    // the writer never typed, which is the one outcome worse than losing the
+    // row. Not a number anyone writes on purpose, so it is not a number.
+    expect(parseSeries('Growth | 1.5,25')).toEqual([]);
+    expect(parseSeries('Growth | 12.34,56')).toEqual([]);
+  });
+
   it('reads a typographic minus sign as negative', () => {
     // U+2212, not the ASCII hyphen-minus a keyboard types — stripped like
     // ordinary punctuation would turn this positive instead.

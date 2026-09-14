@@ -58,8 +58,25 @@ const TYPOGRAPHIC_MINUS = /[−‒-―]/g;
  *  otherwise silently multiply the figure by ten (or a hundred) is caught. */
 const TRAILING_DECIMAL_COMMA = /,(\d{1,2})$/;
 
+/** The two shapes a figure with *both* separators can honestly have: comma
+ *  grouping thousands under a dot decimal (`1,234.5`), or the reverse
+ *  (`1.234,5`). Tested against the numeric core only, so a currency sign or a
+ *  unit does not disqualify a well-formed figure. Anything else with both —
+ *  `1.5,25` — is not a number anyone wrote on purpose, and it is dropped
+ *  rather than stripped into `1.525`, which is a real-looking value the writer
+ *  never typed. */
+const COMMA_GROUPED = /^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$/;
+const DOT_GROUPED = /^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/;
+const NOT_CORE = /[^0-9.,+-]/g;
+
 function normalizeDigits(raw: string): string {
   const signed = raw.replace(TYPOGRAPHIC_MINUS, '-');
+  if (signed.includes('.') && signed.includes(',')) {
+    const core = signed.replace(NOT_CORE, '');
+    if (COMMA_GROUPED.test(core)) return core.replace(/,/g, '');
+    if (DOT_GROUPED.test(core)) return core.replace(/\./g, '').replace(',', '.');
+    return ''; // malformed — the caller drops an empty figure
+  }
   if (!signed.includes('.') && TRAILING_DECIMAL_COMMA.test(signed)) {
     return signed.replace(TRAILING_DECIMAL_COMMA, '.$1');
   }
