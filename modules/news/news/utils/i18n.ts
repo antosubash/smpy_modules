@@ -94,22 +94,31 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
     // A plural entry also answers for its stem, which is what call sites pass
     // — the same rule `build()` applies to `keys`, and it has to stay the same
     // rule: a stem `keys` publishes that `english` does not know falls back to
-    // the dotted key, the very leak this map exists to close. The `_other`
-    // sibling is read directly off `node` rather than tracked through
-    // iteration order, for two reasons: a literal key sharing the stem's name
-    // (`"foo"` beside `"foo_other"`) must never be clobbered by the plural's
-    // text, and the stem's value must not depend on whether `_other` happens
-    // to appear before or after the other categories in the JSON. `_other`
-    // wins where it exists, being the one category every language has and
-    // the right reading for an unknown count; otherwise the first form seen
-    // stands in, same as `build()`.
+    // the dotted key, the very leak this map exists to close. A literal key
+    // sharing the stem's name (`"foo"` beside `"foo_other"`) is never
+    // clobbered: its own visit to this loop writes `out[stem]` unconditionally
+    // (above), so the `stem in out` guard below is all a plural sibling needs
+    // to back off, whichever order the two are visited in. And the stem's
+    // value must not depend on where `_other` happens to sit among the other
+    // categories in the JSON, so it — and every other category, should
+    // `_other` be absent — is looked up directly on `node` in fixed
+    // `PLURAL_SUFFIXES` order rather than picked up from iteration order.
+    // `_other` wins where it exists, being the one category every language
+    // has and the right reading for an unknown count.
     const suffix = PLURAL_SUFFIXES.find((s) => name.endsWith(s));
     if (suffix) {
       const bareStem = name.slice(0, -suffix.length);
       const stem = `${prefix}.${bareStem}`;
-      if (typeof node[bareStem] === 'string' || stem in out) continue;
+      if (stem in out) continue;
       const other = node[`${bareStem}_other`];
-      out[stem] = typeof other === 'string' ? other : value;
+      if (typeof other === 'string') {
+        out[stem] = other;
+      } else {
+        const first = PLURAL_SUFFIXES.map((s) => node[`${bareStem}${s}`]).find(
+          (v): v is string => typeof v === 'string',
+        );
+        out[stem] = first ?? value;
+      }
     }
   }
   return out;
