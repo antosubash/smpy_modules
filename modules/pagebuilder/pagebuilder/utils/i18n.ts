@@ -116,10 +116,11 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
       if (typeof other === 'string') {
         out[stem] = other;
       } else {
-        const first = PLURAL_SUFFIXES.map((s) => node[`${bareStem}${s}`]).find(
+        // `value` (this entry's own text) always matches one of the suffixes
+        // scanned below, so `find` can never come back empty here.
+        out[stem] = PLURAL_SUFFIXES.map((s) => node[`${bareStem}${s}`]).find(
           (v): v is string => typeof v === 'string',
-        );
-        out[stem] = first ?? value;
+        ) as string;
       }
     }
   }
