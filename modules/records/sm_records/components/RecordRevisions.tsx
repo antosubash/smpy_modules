@@ -139,7 +139,7 @@ export function RecordRevisions({
                     <p className="font-medium">
                       {t('records.type_editor.revisions.version_label', {
                         version: rev.version,
-                        defaultValue: 'v{{version}}',
+                        defaultValue: 'v{version}',
                       })}
                       {' · '}
                       {rev.event}
@@ -175,7 +175,7 @@ export function RecordRevisions({
                         })}
                         description={t('records.editor.revisions.restore_confirm', {
                           version: rev.version,
-                          defaultValue: 'Restore the data from v{{version}}?',
+                          defaultValue: 'Restore the data from v{version}?',
                         })}
                         confirmLabel={t('records.editor.revisions.restore', {
                           defaultValue: 'Restore this version',
@@ -216,6 +216,6 @@ function formatSchemaMismatch(t: Translate, errors: ValidationError[]): string |
   const detail = errors.map((e) => `${e.field}: ${e.message}`).join('; ');
   return t('records.editor.revisions.restore_schema_mismatch_detail', {
     detail,
-    defaultValue: "This version no longer fits the type's current schema: {{detail}}",
+    defaultValue: "This version no longer fits the type's current schema: {detail}",
   });
 }

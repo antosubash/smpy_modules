@@ -39,7 +39,7 @@ export function UnknownField({ field, value, error }: FieldComponentProps) {
     <FieldShell field={field} error={error}>
       <p className="text-sm text-muted-foreground">
         {t('records.fields.unknown_type', {
-          defaultValue: 'This field type ({{type}}) is not editable in this version.',
+          defaultValue: 'This field type ({type}) is not editable in this version.',
           type: field.type,
         })}
       </p>

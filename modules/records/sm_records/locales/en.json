@@ -10,14 +10,14 @@
     "label": "Label",
     "label_plural": "Plural label",
     "description": "Description",
-    "record_count": "{{count}} record",
-    "record_count_one": "{{count}} record",
-    "record_count_other": "{{count}} records",
+    "record_count": "{count} record",
+    "record_count_one": "{count} record",
+    "record_count_other": "{count} records",
     "view_records": "View records",
     "edit": "Edit",
-    "trashed_record_count": "({{count}} trashed)",
-    "trashed_record_count_one": "({{count}} trashed)",
-    "trashed_record_count_other": "({{count}} trashed)"
+    "trashed_record_count": "({count} trashed)",
+    "trashed_record_count_one": "({count} trashed)",
+    "trashed_record_count_other": "({count} trashed)"
   },
   "records": {
     "title": "Records",
@@ -33,7 +33,7 @@
     "actions": "Actions",
     "previous": "Previous",
     "next": "Next",
-    "page_info": "Showing {{start}}–{{end}} of {{total}}",
+    "page_info": "Showing {start}–{end} of {total}",
     "filter_field": "Field",
     "filter_op": "Condition",
     "filter_value": "Value",
@@ -42,6 +42,11 @@
     "position": "Position",
     "published_at": "Published",
     "schema_stale": "Outdated schema"
+  },
+  "trash": {
+    "view": "Trash",
+    "view_live": "Back to live records",
+    "empty": "No trashed records"
   },
   "list": {
     "filter_error": {
@@ -99,10 +104,10 @@
       "title": "History",
       "empty": "No earlier versions yet.",
       "restore": "Restore this version",
-      "restore_confirm": "Restore the data from v{{version}}?",
+      "restore_confirm": "Restore the data from v{version}?",
       "restored": "Version restored",
       "restore_schema_mismatch": "This version no longer fits the type's current schema.",
-      "restore_schema_mismatch_detail": "This version no longer fits the type's current schema: {{detail}}"
+      "restore_schema_mismatch_detail": "This version no longer fits the type's current schema: {detail}"
     }
   },
   "errors": {
@@ -112,7 +117,7 @@
   },
   "type_editor": {
     "title_new": "New type",
-    "title_edit": "Edit {{label}}",
+    "title_edit": "Edit {label}",
     "section_details": "Details",
     "section_fields": "Fields",
     "key_immutable": "The key can't be changed once the type is created.",
@@ -128,7 +133,7 @@
     "pointer_none": "None",
     "add_field": "Add field",
     "no_fields": "No fields yet.",
-    "live_notice": "{{count}} live, {{trashed}} trashed records — changes are checked against them before they apply.",
+    "live_notice": "{count} live, {trashed} trashed records — changes are checked against them before they apply.",
     "field_key": "Key",
     "field_key_locked": "Can't be changed after the field is created.",
     "field_type": "Type",
@@ -175,7 +180,7 @@
     "danger_zone": "Danger zone",
     "delete_help": "Deletes this type and every record stored against it, including the trash. This cannot be undone.",
     "delete_type": "Delete this type",
-    "delete_confirm_description": "This permanently deletes \"{{label}}\" and its {{count}} record(s) (live and trashed). Type {{count}} to confirm.",
+    "delete_confirm_description": "This permanently deletes \"{label}\" and its {count} record(s) (live and trashed). Type {count} to confirm.",
     "delete_confirm_label": "Record count",
     "delete_count_mismatch": "That doesn't match. Type the exact number to confirm.",
     "referrers_notice": "Other types still have a relation field pointing at this one:",
@@ -205,12 +210,12 @@
       "kind_index_affecting": "Rebuilds index",
       "kind_restrictive": "Restrictive",
       "kind_destructive": "Removes data",
-      "report_summary": "{{checked}} records checked, {{failing}} would fail",
+      "report_summary": "{checked} records checked, {failing} would fail",
       "report_title": "This change would leave records invalid",
-      "orphaned_conflict": "{{key}}: {{count}} records still hold a removed value",
-      "apply_anyway": "Apply anyway — {{count}} records will be marked invalid",
+      "orphaned_conflict": "{key}: {count} records still hold a removed value",
+      "apply_anyway": "Apply anyway — {count} records will be marked invalid",
       "apply_anyway_title": "Apply this change anyway?",
-      "apply_anyway_description": "{{count}} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.",
+      "apply_anyway_description": "{count} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.",
       "apply_anyway_confirm": "Apply anyway",
       "conflicts_title": "These fields still hold values from a previous delete",
       "conflicts_help": "Restore brings those values back into the field; discard drops them for good.",
@@ -220,7 +225,7 @@
     "reindex": {
       "notice": "Rebuilding the index for:",
       "whole_type": "Whole type",
-      "since": "since {{time}}",
+      "since": "since {time}",
       "reindex_now": "Reindex now"
     },
     "revisions": {
@@ -229,13 +234,13 @@
       "hide": "Hide",
       "loading": "Loading…",
       "empty": "No earlier versions yet.",
-      "version_label": "v{{version}}",
-      "schema_version_label": "schema v{{version}}",
-      "field_count": "{{count}} field",
-      "field_count_one": "{{count}} field",
-      "field_count_other": "{{count}} fields",
+      "version_label": "v{version}",
+      "schema_version_label": "schema v{version}",
+      "field_count": "{count} field",
+      "field_count_one": "{count} field",
+      "field_count_other": "{count} fields",
       "restore": "Restore this schema",
-      "restore_confirm": "Restore the schema from v{{version}}? This is checked the same way any other schema change is.",
+      "restore_confirm": "Restore the schema from v{version}? This is checked the same way any other schema change is.",
       "restored": "Schema restored"
     }
   },
@@ -243,7 +248,7 @@
     "required": "Required",
     "choose": "— choose —",
     "no_choices": "This field has no choices yet.",
-    "unknown_type": "This field type ({{type}}) is not editable in this version."
+    "unknown_type": "This field type ({type}) is not editable in this version."
   },
   "form": {
     "no_fields": "This type has no fields yet. Add some on its schema screen."
@@ -259,17 +264,17 @@
   },
   "validation": {
     "required": "This field is required",
-    "min_length": "Must be at least {{min}} characters",
-    "max_length": "Must be at most {{max}} characters",
+    "min_length": "Must be at least {min} characters",
+    "max_length": "Must be at most {max} characters",
     "pattern": "Does not match the required format",
     "email": "Not a valid email address",
     "url": "Must be an http:// or https:// URL with a host",
     "not_a_number": "Not a number",
-    "decimals": "At most {{scale}} decimal places are stored",
-    "int_digits": "At most {{digits}} digits before the decimal point",
+    "decimals": "At most {scale} decimal places are stored",
+    "int_digits": "At most {digits} digits before the decimal point",
     "not_an_integer": "Must be a whole number",
-    "min": "Must be at least {{min}}",
-    "max": "Must be at most {{max}}",
+    "min": "Must be at least {min}",
+    "max": "Must be at most {max}",
     "boolean": "Expected true or false",
     "date": "Not a valid date (YYYY-MM-DD)",
     "datetime": "Not a valid date and time",

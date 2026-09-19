@@ -3,15 +3,19 @@ import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
+import type { SharedProps } from '@simple-module-py/ui/types';
 import type React from 'react';
 
 import { FilterBar, type FilterValue } from '../components/FilterBar';
+import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
-import { deleteRecord } from '../utils/api';
+import { deleteRecord, restoreRecord } from '../utils/api';
 import { buildSortParam, filterErrorReasonKey, nextSort, parseSort } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
 type Props = { type: TypeRead; records: RecordPage };
+/** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
+const EDIT_PERMISSION = 'records.edit';
 
 // See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
 // against `useT()`'s real, key-union-overloaded signature either blows up TS
@@ -74,10 +78,12 @@ function parseFilterParam(raw: string | null): FilterValue {
  *  can be bookmarked or shared. */
 function RecordList({ type, records }: Props) {
   const { t } = useT();
-  const page = usePage<{ errors?: Record<string, string> }>();
+  const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
   const rawSort = search.get('sort');
+  const trashed = search.get('trashed') === 'true';
+  const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
   const currentFilter = parseFilterParam(rawFilter);
   const currentSort = parseSort(search.toString());
   // Inertia's own `errors` bag — `record_list` (views.py) attaches
@@ -96,7 +102,12 @@ function RecordList({ type, records }: Props) {
   // be reachable from this UI short of a hand-edited URL.
   const filterErrorReason = page.props.errors?.filter;
 
-  const goTo = (next: { page?: number; filter?: string | null; sort?: string | null }) => {
+  const goTo = (next: {
+    page?: number;
+    filter?: string | null;
+    sort?: string | null;
+    trashed?: boolean;
+  }) => {
     const params: Record<string, string> = {};
     const targetPage = next.page ?? records.page;
     if (targetPage > 1) params.page = String(targetPage);
@@ -104,8 +115,14 @@ function RecordList({ type, records }: Props) {
     if (targetFilter) params.filter = targetFilter;
     const targetSort = next.sort === undefined ? rawSort : next.sort;
     if (targetSort) params.sort = targetSort;
+    const targetTrashed = next.trashed ?? trashed;
+    if (targetTrashed) params.trashed = 'true';
+    // Toggling `trashed` swaps every prop (`records`, `errors` and, via
+    // `parse_trashed`, what the server even lets through) — a partial reload
+    // only makes sense for staying inside the same trashed/live view.
+    const full = next.trashed !== undefined;
     router.get(`/admin/records/${type.key}`, params, {
-      only: ['records', 'errors'],
+      only: full ? undefined : ['records', 'errors'],
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -117,9 +134,15 @@ function RecordList({ type, records }: Props) {
   const clearFilter = () => goTo({ page: 1, filter: null });
   const handleSort = (field: string) =>
     goTo({ page: 1, sort: buildSortParam(nextSort(currentSort, field)) ?? null });
+  const toggleTrashed = () => goTo({ page: 1, trashed: !trashed });
 
   const handleDelete = async (record: RecordRead) => {
     await deleteRecord(type.key, record.uuid);
+    router.reload({ only: ['records'] });
+  };
+
+  const handleRestore = async (record: RecordRead) => {
+    await restoreRecord(type.key, record.uuid);
     router.reload({ only: ['records'] });
   };
 
@@ -139,11 +162,25 @@ function RecordList({ type, records }: Props) {
             <Button variant="outline" onClick={() => router.visit('/admin/records')}>
               {t('records.types.title', { defaultValue: 'Record Types' })}
             </Button>
-            <Button asChild>
-              <Link href={`/admin/records/${type.key}/new`}>
-                {t('records.records.new', { defaultValue: 'New record' })}
-              </Link>
-            </Button>
+            {canEdit && (
+              <Button
+                type="button"
+                variant={trashed ? 'default' : 'outline'}
+                data-testid="records-trash-toggle"
+                onClick={toggleTrashed}
+              >
+                {trashed
+                  ? t('records.trash.view_live', { defaultValue: 'Back to live records' })
+                  : t('records.trash.view', { defaultValue: 'Trash' })}
+              </Button>
+            )}
+            {!trashed && (
+              <Button asChild>
+                <Link href={`/admin/records/${type.key}/new`}>
+                  {t('records.records.new', { defaultValue: 'New record' })}
+                </Link>
+              </Button>
+            )}
           </>
         }
       >
@@ -168,15 +205,19 @@ function RecordList({ type, records }: Props) {
 
         {records.items.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-            {t('records.records.empty', { defaultValue: 'No records yet' })}
+            {trashed
+              ? t('records.trash.empty', { defaultValue: 'No trashed records' })
+              : t('records.records.empty', { defaultValue: 'No records yet' })}
           </div>
         ) : (
           <RecordTable
             type={type}
             records={records.items}
             sort={currentSort}
+            trashed={trashed}
             onSort={handleSort}
             onDelete={handleDelete}
+            onRestore={handleRestore}
           />
         )}
 
@@ -187,7 +228,7 @@ function RecordList({ type, records }: Props) {
                 start: rangeStart,
                 end: rangeEnd,
                 total: records.total,
-                defaultValue: 'Showing {{start}}–{{end}} of {{total}}',
+                defaultValue: 'Showing {start}–{end} of {total}',
               })}
             </span>
             <div className="space-x-2">
@@ -217,5 +258,10 @@ function RecordList({ type, records }: Props) {
   );
 }
 
-RecordList.layout = (page: React.ReactNode) => <AdminLayout>{page}</AdminLayout>;
+RecordList.layout = (page: React.ReactNode) => (
+  <AdminLayout>
+    {page}
+    <RecordsToaster />
+  </AdminLayout>
+);
 export default RecordList;

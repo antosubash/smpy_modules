@@ -13,6 +13,7 @@ import {
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 
+import { RecordsToaster } from '../components/RecordsToaster';
 import type { TypeRead } from '../utils/types';
 
 type Props = { types: TypeRead[] };
@@ -63,15 +64,15 @@ function Types({ types }: Props) {
                   <TableCell>
                     {t('records.types.record_count', {
                       count: type.record_count,
-                      defaultValue: '{{count}} record',
-                      defaultValue_other: '{{count}} records',
+                      defaultValue: '{count} record',
+                      defaultValue_other: '{count} records',
                     })}
                     {type.trashed_record_count > 0 && (
                       <span className="ml-1 text-muted-foreground">
                         {t('records.types.trashed_record_count', {
                           count: type.trashed_record_count,
-                          defaultValue: '({{count}} trashed)',
-                          defaultValue_other: '({{count}} trashed)',
+                          defaultValue: '({count} trashed)',
+                          defaultValue_other: '({count} trashed)',
                         })}
                       </span>
                     )}
@@ -100,5 +101,10 @@ function Types({ types }: Props) {
   );
 }
 
-Types.layout = (page: React.ReactNode) => <AdminLayout>{page}</AdminLayout>;
+Types.layout = (page: React.ReactNode) => (
+  <AdminLayout>
+    {page}
+    <RecordsToaster />
+  </AdminLayout>
+);
 export default Types;

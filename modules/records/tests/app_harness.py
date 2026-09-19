@@ -15,6 +15,7 @@ there so tests never need to know this module exists.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any
@@ -28,11 +29,31 @@ from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
+from simple_module_hosting.permissions import resolve_permissions
 from sm_records.models import Base, Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
 from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
+
+try:
+    # Only present when the host also installs ``permissions`` — see
+    # ``sm_records.deps``'s fallback import for why ``records`` cannot
+    # require it. When it *is* installed (as in this repo's dev venv),
+    # ``deps.RequiresPermission`` resolves to ``permissions.deps``'s version,
+    # which (a) needs a real UUID for ``request.state.user.id`` rather than
+    # this harness's plain ``"test:<roles>"`` string, and (b) queries
+    # ``permissions_user_permission`` directly rather than falling back to
+    # the role map when ``request.state.resolved_permissions`` is unset — so
+    # both have to be provided here for the harness to behave like the real
+    # request pipeline (``AuthMiddleware`` sets ``resolved_permissions``;
+    # real user ids are UUIDs).
+    from permissions.models import Base as _PermissionsBase
+
+    _PERMISSIONS_INSTALLED = True
+except ImportError:  # pragma: no cover - exercised only without `permissions`
+    _PermissionsBase = None
+    _PERMISSIONS_INSTALLED = False
 
 #: Holds ``records.view`` + ``records.edit`` — the caller a ``allowed_roles``
 #: test uses as the one who *should* pass.
@@ -74,8 +95,27 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get("X-Test-Roles")
         if raw is not None:
             roles_list = [role.strip() for role in raw.split(",") if role.strip()]
+            # A real UUID when ``permissions`` is installed — its checker
+            # casts ``user.id`` with ``uuid.UUID(str(...))`` before it ever
+            # gets to a role check that would otherwise short-circuit that;
+            # deterministic (not random) so the same header always maps to
+            # the same id within a test.
+            user_id = (
+                str(uuid.uuid5(uuid.NAMESPACE_DNS, raw))
+                if _PERMISSIONS_INSTALLED
+                else f"test:{raw}"
+            )
             request.state.user = SimpleNamespace(
-                id=f"test:{raw}", email="test@example.com", roles=roles_list
+                id=user_id, email="test@example.com", roles=roles_list
+            )
+            # Mirrors ``AuthMiddleware`` (``simple_module_hosting/middleware.py``),
+            # which runs ahead of every dependency in production. Without it,
+            # ``permissions.deps.RequiresPermission`` (unlike the framework's
+            # own, roles-only checker) has no role-map fallback of its own and
+            # treats every caller as holding nothing but direct grants.
+            registry = request.app.state.sm.permissions
+            request.state.resolved_permissions = resolve_permissions(
+                roles_list, role_map=registry.role_map
             )
         return await call_next(request)
 
@@ -111,6 +151,12 @@ async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
         register_listeners(db_state)
         async with db_state.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            if _PERMISSIONS_INSTALLED:
+                # ``permissions.deps.RequiresPermission`` queries this table
+                # directly (see the middleware above) rather than falling
+                # back to the role map — it has to exist even though this
+                # module's own ``Base`` never declares it.
+                await conn.run_sync(_PermissionsBase.metadata.create_all)
 
     registry = PermissionRegistry()
     module.register_permissions(registry)

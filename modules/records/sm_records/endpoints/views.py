@@ -23,8 +23,10 @@ from sm_records.contracts.schemas import (
 )
 from sm_records.deps import (
     get_settings,
+    has_edit_permission,
     load_type,
     parse_sorts,
+    parse_trashed,
     parse_view_filters,
     request_db,
     require_manage_types,
@@ -35,6 +37,7 @@ from sm_records.index.query import Filter, QueryError, Sort
 from sm_records.models import RecordType
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
+from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute, dependencies=[require_view])
@@ -119,13 +122,23 @@ async def record_new(
 
 @router.get("/{key}/{uuid}", response_model=None)
 async def record_edit(
+    request: Request,
     uuid: str,
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
     counts = await type_service.record_counts(db, rtype)
-    record = await record_service.get_record(db, rtype, uuid)
+    try:
+        record = await record_service.get_record(db, rtype, uuid)
+    except NotFound:
+        # A soft-deleted record 404s from ``get_record`` — the framework's
+        # filter hides it. Restore/purge are only reachable from this screen
+        # (FAIL-3), so a caller who can edit gets the trashed row instead of
+        # a dead end; anyone else still sees the same 404 as before.
+        if not await has_edit_permission(request, db):
+            raise
+        record = await record_service.get_deleted_record(db, rtype, uuid)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
         {
@@ -144,11 +157,14 @@ async def record_list(
     page: int = Query(default=1, ge=1),
     parsed: tuple[list[Filter], str | None] = Depends(parse_view_filters),
     sorts: list[Sort] = Depends(parse_sorts),
+    trashed: bool = Depends(parse_trashed),
 ) -> InertiaResponse:
     """First page, deep-linkable via the same ``page``/``sort``/``filter``
     grammar as ``GET /api/records/types/{key}/records`` — the UI reads the
     list client-side thereafter, but the initial render has to match what a
-    shared URL promises."""
+    shared URL promises. ``?trashed=true`` (``records.edit`` only, see
+    ``parse_trashed``) lists the trash instead — the only way the admin ever
+    enumerates soft-deleted rows to restore one (FAIL-3)."""
     counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
     page_size = max(min(settings.default_page_size, settings.max_page_size), 1)
@@ -167,7 +183,13 @@ async def record_list(
     else:
         try:
             items, total = await record_service.list_records(
-                db, rtype, settings=settings, filters=filters, sorts=effective_sorts, page=page
+                db,
+                rtype,
+                settings=settings,
+                filters=filters,
+                sorts=effective_sorts,
+                page=page,
+                trashed=trashed,
             )
         except QueryError as exc:
             # A page navigation, not an API call: Inertia reserves 409 for its
@@ -194,6 +216,7 @@ async def record_list(
         "type": type_read(rtype, *counts).model_dump(mode="json"),
         "records": records_page.model_dump(mode="json"),
         "errors": errors,
+        "trashed": trashed,
     }
     return await inertia.render(constants._PAGE_RECORD_LIST, props)
 

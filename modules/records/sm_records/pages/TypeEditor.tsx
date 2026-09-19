@@ -8,6 +8,7 @@ import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { RecordsToaster } from '../components/RecordsToaster';
 import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
 import { FieldList } from '../components/typeeditor/FieldList';
 import {
@@ -136,7 +137,7 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
           isNew
             ? t('records.type_editor.title_new', { defaultValue: 'New type' })
             : t('records.type_editor.title_edit', {
-                defaultValue: 'Edit {{label}}',
+                defaultValue: 'Edit {label}',
                 label: current?.label ?? '',
               })
         }
@@ -194,7 +195,7 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
                     count: current.record_count,
                     trashed: current.trashed_record_count,
                     defaultValue:
-                      '{{count}} live, {{trashed}} trashed records — changes are checked against them before they apply.',
+                      '{count} live, {trashed} trashed records — changes are checked against them before they apply.',
                   })}
                 </p>
               )}
@@ -245,5 +246,10 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
   );
 }
 
-TypeEditor.layout = (page: React.ReactNode) => <AdminLayout>{page}</AdminLayout>;
+TypeEditor.layout = (page: React.ReactNode) => (
+  <AdminLayout>
+    {page}
+    <RecordsToaster />
+  </AdminLayout>
+);
 export default TypeEditor;

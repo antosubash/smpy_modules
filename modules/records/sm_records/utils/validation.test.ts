@@ -195,7 +195,7 @@ describe('an unknown field type', () => {
 describe('interpolation', () => {
   it('passes the bound value to the translator', () => {
     const interpolating: Translate = (_key, options) =>
-      String(options.defaultValue).replace('{{min}}', String(options.min));
+      String(options.defaultValue).replace('{min}', String(options.min));
     const validator = buildValidator(interpolating, [
       field('text', { constraints: { min_length: 3 } }),
     ]);

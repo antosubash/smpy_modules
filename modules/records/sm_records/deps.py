@@ -14,7 +14,6 @@ from typing import Any, Final
 
 from fastapi import Depends, HTTPException, Query, Request
 from simple_module_db import get_db
-from simple_module_hosting.permissions import RequiresPermission
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
@@ -23,6 +22,31 @@ from sm_records.models import RecordType
 from sm_records.services.errors import Forbidden
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
+
+try:
+    # The ``permissions`` module's checker additionally consults per-user
+    # direct grants (``permissions_user_permission``, written by the
+    # permissions admin screen) on top of roles — the framework's own
+    # ``simple_module_hosting.permissions.RequiresPermission`` resolves roles
+    # only, so a direct ``records.view`` grant with no role attached is
+    # silently ignored by every route below. ``permissions`` is not a
+    # ``simple_module_records`` dependency (a published module can't require
+    # another plugin), so a host may install ``records`` without it — fall
+    # back to the roles-only checker in that case rather than failing to import.
+    from permissions.deps import RequiresPermission as _RequiresPermission
+    from permissions.service import PermissionService as _PermissionService
+
+    async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
+        service = _PermissionService(db, request.app.state.sm.permissions)
+        await _RequiresPermission(permission)(request, service)
+
+    RequiresPermission = _RequiresPermission
+except ImportError:  # pragma: no cover - exercised only when `permissions` isn't installed
+    from simple_module_hosting.permissions import RequiresPermission
+
+    async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
+        RequiresPermission(permission)(request)
+
 
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))
 require_edit = Depends(RequiresPermission(constants.PERM_EDIT))
@@ -182,7 +206,11 @@ def parse_view_filters(
         return [], MALFORMED_FILTER
 
 
-def parse_trashed(request: Request, trashed: bool = Query(default=False)) -> bool:
+async def parse_trashed(
+    request: Request,
+    trashed: bool = Query(default=False),
+    db: AsyncSession = Depends(request_db),
+) -> bool:
     """``?trashed=true`` lists the trash, and costs ``records.edit``.
 
     Enumerating soft-deleted records is how anything gets restored, so it is
@@ -192,8 +220,22 @@ def parse_trashed(request: Request, trashed: bool = Query(default=False)) -> boo
     the query parameter, which ``RequiresPermission`` cannot see.
     """
     if trashed:
-        RequiresPermission(constants.PERM_EDIT)(request)
+        await _check_permission(request, db, constants.PERM_EDIT)
     return trashed
+
+
+async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
+    """Whether the caller holds ``records.edit``, without raising.
+
+    Used where a soft-deleted record's visibility depends on the caller's
+    permission rather than always 403ing or always allowing — see
+    ``endpoints/views.py::record_edit``.
+    """
+    try:
+        await _check_permission(request, db, constants.PERM_EDIT)
+    except HTTPException:
+        return False
+    return True
 
 
 def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[Sort]:
@@ -211,6 +253,7 @@ __all__ = [
     "caller_roles",
     "check_type_roles",
     "get_settings",
+    "has_edit_permission",
     "load_type",
     "parse_filters",
     "parse_sorts",

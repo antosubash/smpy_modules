@@ -55,7 +55,7 @@ export function SchemaConflictPanel({
               <Button type="button" variant="destructive">
                 {t('records.type_editor.preview.apply_anyway', {
                   count: report.failing,
-                  defaultValue: 'Apply anyway — {{count}} records will be marked invalid',
+                  defaultValue: 'Apply anyway — {count} records will be marked invalid',
                 })}
               </Button>
             }
@@ -65,7 +65,7 @@ export function SchemaConflictPanel({
             description={t('records.type_editor.preview.apply_anyway_description', {
               count: report.failing,
               defaultValue:
-                '{{count}} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.',
+                '{count} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.',
             })}
             confirmLabel={t('records.type_editor.preview.apply_anyway_confirm', {
               defaultValue: 'Apply anyway',

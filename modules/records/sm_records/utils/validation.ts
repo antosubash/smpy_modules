@@ -59,13 +59,13 @@ function checkTextConstraints(t: Translate, field: FieldDef, text: string): stri
   const max = numberOr(constraints.max_length, null);
   if (min !== null && text.length < min) {
     return t('records.validation.min_length', {
-      defaultValue: 'Must be at least {{min}} characters',
+      defaultValue: 'Must be at least {min} characters',
       min,
     });
   }
   if (max !== null && text.length > max) {
     return t('records.validation.max_length', {
-      defaultValue: 'Must be at most {{max}} characters',
+      defaultValue: 'Must be at most {max} characters',
       max,
     });
   }
@@ -108,13 +108,13 @@ function checkNumber(t: Translate, field: FieldDef, text: string): string | unde
   const [whole, fraction = ''] = text.replace(/^[+-]/, '').split('.');
   if (fraction.length > NUMBER_SCALE) {
     return t('records.validation.decimals', {
-      defaultValue: 'At most {{scale}} decimal places are stored',
+      defaultValue: 'At most {scale} decimal places are stored',
       scale: NUMBER_SCALE,
     });
   }
   if (whole.replace(/^0+(?=\d)/, '').length > MAX_INT_DIGITS) {
     return t('records.validation.int_digits', {
-      defaultValue: 'At most {{digits}} digits before the decimal point',
+      defaultValue: 'At most {digits} digits before the decimal point',
       digits: MAX_INT_DIGITS,
     });
   }
@@ -127,10 +127,10 @@ function checkRange(t: Translate, field: FieldDef, value: number): string | unde
   const min = numberOr(constraints.min, null);
   const max = numberOr(constraints.max, null);
   if (min !== null && value < min) {
-    return t('records.validation.min', { defaultValue: 'Must be at least {{min}}', min });
+    return t('records.validation.min', { defaultValue: 'Must be at least {min}', min });
   }
   if (max !== null && value > max) {
-    return t('records.validation.max', { defaultValue: 'Must be at most {{max}}', max });
+    return t('records.validation.max', { defaultValue: 'Must be at most {max}', max });
   }
   return undefined;
 }
@@ -203,7 +203,7 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
     case 'media':
       return String(value).length > MEDIA_MAX_LEN
         ? t('records.validation.max_length', {
-            defaultValue: 'Must be at most {{max}} characters',
+            defaultValue: 'Must be at most {max} characters',
             max: MEDIA_MAX_LEN,
           })
         : undefined;
@@ -220,7 +220,7 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
       // relying on `Number()` to have already lost precision on the way in.
       if (text.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '').length > MAX_INT_DIGITS) {
         return t('records.validation.int_digits', {
-          defaultValue: 'At most {{digits}} digits before the decimal point',
+          defaultValue: 'At most {digits} digits before the decimal point',
           digits: MAX_INT_DIGITS,
         });
       }

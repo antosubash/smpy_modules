@@ -17,7 +17,7 @@ export function DryRunReportView({ report }: { report: DryRunReport }) {
         {t('records.type_editor.preview.report_summary', {
           checked: report.checked,
           failing: report.failing,
-          defaultValue: '{{checked}} records checked, {{failing}} would fail',
+          defaultValue: '{checked} records checked, {failing} would fail',
         })}
       </p>
       {report.sample.length > 0 && (

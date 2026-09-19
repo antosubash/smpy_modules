@@ -72,7 +72,7 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
               {' — '}
               {t('records.type_editor.reindex.since', {
                 time: entry.since,
-                defaultValue: 'since {{time}}',
+                defaultValue: 'since {time}',
               })}
             </li>
           ))}

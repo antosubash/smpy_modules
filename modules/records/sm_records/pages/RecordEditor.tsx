@@ -17,6 +17,7 @@ import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
 import { RecordForm } from '../components/RecordForm';
 import { RecordRevisions } from '../components/RecordRevisions';
+import { RecordsToaster } from '../components/RecordsToaster';
 import { useRecordForm } from '../hooks/useRecordForm';
 import { ApiError, createRecord, updateRecord } from '../utils/api';
 import type { RecordRead, RecordStatus, TypeRead, ValidationError } from '../utils/types';
@@ -37,12 +38,11 @@ function fieldMessage(errors: ValidationError[], field: string): string | undefi
 /** `Records/RecordEditor` — `/admin/records/{key}/new` and `/…/{uuid}`.
  *
  * The schema-driven form of design §12: `type.fields` in declaration order,
- * each rendered by `components/fields/`'s registry. The raw-JSON textarea it
- * replaced is still here behind an "advanced" toggle, because a payload the
- * generic form cannot express (a `json` field holding something exotic, a
- * key left behind by a deleted field) still has to be editable — and because
- * it round-trips, switching back re-populates the fields from what was typed.
- */
+ * each rendered by `components/fields/`'s registry, with a raw-JSON "advanced"
+ * toggle for a payload the form can't express — it round-trips, so switching
+ * back re-populates the fields from what was typed. A trashed record loads
+ * here too (for `records.edit`): the `Deleted` badge above and the
+ * restore/purge buttons in `RecordActions` are how it's reached from the UI. */
 function RecordEditor({ type, record }: Props) {
   const { t } = useT();
   const isNew = record === null;
@@ -101,9 +101,8 @@ function RecordEditor({ type, record }: Props) {
     setConflict(null);
   };
 
-  /** Both a trash-restore (`RecordActions`) and a revision restore
-   *  (`RecordRevisions`) hand back a fresh `RecordRead` the same way a save
-   *  does — the envelope inputs and the form both have to re-sync from it. */
+  /** A trash-restore (`RecordActions`) and a revision restore (`RecordRevisions`)
+   *  both hand back a fresh `RecordRead`, so the envelope inputs and form re-sync. */
   const applyRestored = (restored: RecordRead) => {
     setCurrent(restored);
     setStatus(restored.status);
@@ -292,5 +291,10 @@ function RecordEditor({ type, record }: Props) {
   );
 }
 
-RecordEditor.layout = (page: React.ReactNode) => <AdminLayout>{page}</AdminLayout>;
+RecordEditor.layout = (page: React.ReactNode) => (
+  <AdminLayout>
+    {page}
+    <RecordsToaster />
+  </AdminLayout>
+);
 export default RecordEditor;

@@ -28,14 +28,21 @@ export function RecordTable({
   type,
   records,
   sort,
+  trashed = false,
   onSort,
   onDelete,
+  onRestore,
 }: {
   type: TypeRead;
   records: RecordRead[];
   sort: SortState;
+  /** The list is showing the trash (`?trashed=true`): the row action is
+   *  "Restore" rather than "Delete" — deleting an already-trashed row makes
+   *  no sense, and restoring one that isn't does not either. */
+  trashed?: boolean;
   onSort: (field: string) => void;
   onDelete: (record: RecordRead) => Promise<unknown>;
+  onRestore: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
   const columns = listColumns(type);
@@ -117,22 +124,40 @@ export function RecordTable({
               {record.updated_at ?? record.created_at}
             </TableCell>
             <TableCell className="text-right">
-              <ConfirmDialog
-                trigger={
-                  <Button type="button" variant="ghost" size="sm">
-                    {t('records.records.delete', { defaultValue: 'Delete' })}
-                  </Button>
-                }
-                title={t('records.records.delete', { defaultValue: 'Delete' })}
-                description={t('records.records.confirm_delete', {
-                  defaultValue: 'Delete this record?',
-                })}
-                confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
-                cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
-                destructive
-                onConfirm={() => onDelete(record)}
-              />
+              {trashed ? (
+                <ConfirmDialog
+                  trigger={
+                    <Button type="button" variant="ghost" size="sm">
+                      {t('records.editor.restore', { defaultValue: 'Restore' })}
+                    </Button>
+                  }
+                  title={t('records.editor.restore', { defaultValue: 'Restore' })}
+                  description={t('records.editor.confirm_restore', {
+                    defaultValue: 'Restore this record?',
+                  })}
+                  confirmLabel={t('records.editor.restore', { defaultValue: 'Restore' })}
+                  cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
+                  pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
+                  onConfirm={() => onRestore(record)}
+                />
+              ) : (
+                <ConfirmDialog
+                  trigger={
+                    <Button type="button" variant="ghost" size="sm">
+                      {t('records.records.delete', { defaultValue: 'Delete' })}
+                    </Button>
+                  }
+                  title={t('records.records.delete', { defaultValue: 'Delete' })}
+                  description={t('records.records.confirm_delete', {
+                    defaultValue: 'Delete this record?',
+                  })}
+                  confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
+                  cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
+                  pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
+                  destructive
+                  onConfirm={() => onDelete(record)}
+                />
+              )}
             </TableCell>
           </TableRow>
         ))}

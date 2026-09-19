@@ -89,7 +89,7 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
                 {t('records.type_editor.delete_confirm_description', {
                   count: total,
                   defaultValue:
-                    'This permanently deletes "{{label}}" and its {{count}} record(s) (live and trashed). Type {{count}} to confirm.',
+                    'This permanently deletes "{label}" and its {count} record(s) (live and trashed). Type {count} to confirm.',
                   label: type.label,
                 })}
               </p>

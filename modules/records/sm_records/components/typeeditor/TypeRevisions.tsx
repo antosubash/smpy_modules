@@ -114,18 +114,18 @@ export function TypeRevisions({
                     <p className="font-medium">
                       {t('records.type_editor.revisions.version_label', {
                         version: rev.version,
-                        defaultValue: 'v{{version}}',
+                        defaultValue: 'v{version}',
                       })}
                       {' · '}
                       {t('records.type_editor.revisions.field_count', {
                         count: rev.fields.length,
-                        defaultValue: '{{count}} field',
-                        defaultValue_other: '{{count}} fields',
+                        defaultValue: '{count} field',
+                        defaultValue_other: '{count} fields',
                       })}
                       {' · '}
                       {t('records.type_editor.revisions.schema_version_label', {
                         version: rev.schema_version,
-                        defaultValue: 'schema v{{version}}',
+                        defaultValue: 'schema v{version}',
                       })}
                     </p>
                     <p className="text-muted-foreground">
@@ -147,7 +147,7 @@ export function TypeRevisions({
                     description={t('records.type_editor.revisions.restore_confirm', {
                       version: rev.version,
                       defaultValue:
-                        'Restore the schema from v{{version}}? This is checked the same way any other schema change is.',
+                        'Restore the schema from v{version}? This is checked the same way any other schema change is.',
                     })}
                     confirmLabel={t('records.type_editor.revisions.restore', {
                       defaultValue: 'Restore this schema',
