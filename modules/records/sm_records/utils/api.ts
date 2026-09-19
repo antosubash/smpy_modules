@@ -117,9 +117,7 @@ export async function listTypes(): Promise<{ items: TypeRead[] }> {
   return request('/types');
 }
 
-/** Mirrors the API's `TypeCreate`: everything the schema editor collects
- *  goes in one POST — a type must never exist for a moment with half its
- *  settings, and a second request would give that moment a failure mode. */
+/** Mirrors the API's `TypeCreate`: everything collects into one POST. */
 export type CreateTypePayload = {
   key: string;
   label: string;
@@ -166,18 +164,23 @@ export function deleteType(key: string, confirmRecordCount: number): Promise<voi
   return request(`/types/${encodeURIComponent(key)}?${qs.toString()}`, { method: 'DELETE' });
 }
 
+/** Omit a pointer to leave it unchanged, send `null` to clear it (F5). */
+export type SchemaPreviewBody = {
+  fields: FieldDef[];
+  display_field: string | null;
+  slug_field: string | null;
+};
+
 /** `POST /types/{key}/schema/preview` — writes nothing; classifies the
- *  proposed `fields` and dry-runs it against the type's records (design
- *  §8.9). */
-export function previewSchema(key: string, fields: FieldDef[]): Promise<SchemaPreview> {
+ *  proposed schema and dry-runs it (design §8.9). */
+export function previewSchema(key: string, body: SchemaPreviewBody): Promise<SchemaPreview> {
   return request(`/types/${encodeURIComponent(key)}/schema/preview`, {
     method: 'POST',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify(body),
   });
 }
 
-/** Manually kick a stuck reindex (§8.9's health check names it; this button
- *  is the fix). */
+/** Manually kick a stuck reindex (§8.9's health check names it). */
 export function reindexType(key: string): Promise<{ scheduled: boolean }> {
   return request(`/types/${encodeURIComponent(key)}/reindex`, { method: 'POST' });
 }
@@ -186,8 +189,7 @@ export function listTypeRevisions(key: string): Promise<{ items: TypeRevision[] 
   return request(`/types/${encodeURIComponent(key)}/revisions`);
 }
 
-/** A schema rollback goes through the same pipeline as any other change
- *  (§8.6) — same body shape and 409s as `updateType`. */
+/** A schema rollback shares `updateType`'s body shape and 409s (§8.6). */
 export function restoreTypeRevision(
   key: string,
   version: number,

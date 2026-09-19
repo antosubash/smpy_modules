@@ -25,3 +25,11 @@ export function pendingEntries(pending: Record<string, string>): ReindexPendingE
       return a.key.localeCompare(b.key);
     });
 }
+
+/** Whether `ReindexStatus` should keep its poll interval running — true
+ *  while anything is still pending. Pulled out so the "stop polling once
+ *  `reindex_pending` empties" behaviour (F4) is a one-line, unit-testable
+ *  fact rather than something only observable by mounting the component. */
+export function shouldPoll(entries: ReindexPendingEntry[]): boolean {
+  return entries.length > 0;
+}

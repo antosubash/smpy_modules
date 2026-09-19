@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { reindexType } from '../../utils/api';
 import type { TypeRead } from '../../utils/types';
-import { pendingEntries } from './reindexPending';
+import { pendingEntries, shouldPoll } from './reindexPending';
 
 const POLL_MS = 5000;
 
@@ -18,21 +18,29 @@ const POLL_MS = 5000;
  * pending, and stops the moment it isn't — a field stuck in `indexing`
  * because a worker restarted mid-deploy is exactly the case §8.9's health
  * check exists for, so "Reindex now" is the manual recovery for it.
+ *
+ * `type` is the caller's own up-to-date snapshot, not a copy frozen at
+ * mount: `router.reload` only refreshes the Inertia prop upstream, so
+ * `TypeEditor` keeps its `current` state (what it passes here) in sync with
+ * that prop (F4) — otherwise `entries` never empties, this effect's
+ * `[entries.length]` dependency never changes, and both the banner and the
+ * poll outlive the rebuild.
  */
 export function ReindexStatus({ type }: { type: TypeRead }) {
   const { t } = useT();
   const [pending, setPending] = useState(false);
   const entries = pendingEntries(type.reindex_pending);
+  const polling = shouldPoll(entries);
 
   useEffect(() => {
-    if (entries.length === 0) return;
+    if (!polling) return;
     const id = setInterval(() => {
       router.reload({ only: ['type'] });
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [entries.length]);
+  }, [polling]);
 
-  if (entries.length === 0) return null;
+  if (!polling) return null;
 
   const triggerReindex = async () => {
     setPending(true);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { pendingEntries } from './reindexPending';
+import { pendingEntries, shouldPoll } from './reindexPending';
 
 describe('pendingEntries', () => {
   it('returns an empty list for an empty map', () => {
@@ -33,5 +33,19 @@ describe('pendingEntries', () => {
   it('always places the whole-type entry first, ahead of every field key', () => {
     const result = pendingEntries({ zebra: 't1', '*': 't2', apple: 't3' });
     expect(result.map((e) => e.key)).toEqual(['*', 'apple', 'zebra']);
+  });
+});
+
+describe('shouldPoll', () => {
+  it('is false for an empty entry list', () => {
+    expect(shouldPoll([])).toBe(false);
+  });
+
+  it('is true while any entry is still pending', () => {
+    expect(shouldPoll(pendingEntries({ price: '2026-09-19T10:00:00Z' }))).toBe(true);
+  });
+
+  it('is true for a pending whole-type entry', () => {
+    expect(shouldPoll(pendingEntries({ '*': '2026-09-19T10:00:00Z' }))).toBe(true);
   });
 });

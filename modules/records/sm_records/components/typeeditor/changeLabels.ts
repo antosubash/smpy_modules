@@ -37,6 +37,7 @@ export const CHANGE_WHAT_DEFAULTS: Record<string, string> = {
   choice_removed: 'Choice removed',
   options_changed: 'Options changed',
   label_changed: 'Label changed',
+  display_field_changed: "Display title field changed — every record's title will be recomputed",
 };
 
 const CHANGE_KIND_DEFAULTS: Record<ChangeClass, string> = {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, buildFilterParam, getType } from './api';
+import { ApiError, buildFilterParam, getType, previewSchema } from './api';
 import type { ApiErrorBody } from './types';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -81,6 +81,33 @@ describe('request() error shaping', () => {
       status: 500,
       message: 'Request failed (500 Server Error)',
       body: null,
+    });
+  });
+});
+
+/**
+ * F5: a `display_field`/`slug_field`-only edit must not preview as "No
+ * changes" — the server treats an omitted pointer as "unchanged" and an
+ * explicit `null` as "clear", so the client has to send both pointers
+ * (not just `fields`) on every preview.
+ */
+describe('previewSchema', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends fields alongside both pointers, converting "cleared" to null', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { kind: 'additive' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await previewSchema('faq', { fields: [], display_field: null, slug_field: 'slug' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      fields: [],
+      display_field: null,
+      slug_field: 'slug',
     });
   });
 });

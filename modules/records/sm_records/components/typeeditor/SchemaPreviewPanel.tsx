@@ -21,10 +21,18 @@ import { SchemaChangeList } from './SchemaChangeList';
 export function SchemaPreviewPanel({
   typeKey,
   fields,
+  displayField,
+  slugField,
   dirty,
 }: {
   typeKey: string;
   fields: FieldDef[];
+  /** The editor's current `display_field`/`slug_field` form values (empty
+   *  string = cleared) — sent alongside `fields` on every preview so a
+   *  pointer-only edit (no field added/removed/changed) doesn't preview as
+   *  "No changes" (F5). */
+  displayField: string;
+  slugField: string;
   dirty: boolean;
 }) {
   const { t } = useT();
@@ -39,7 +47,11 @@ export function SchemaPreviewPanel({
     setPending(true);
     setError(null);
     try {
-      const result = await previewSchema(typeKey, fields);
+      const result = await previewSchema(typeKey, {
+        fields,
+        display_field: displayField || null,
+        slug_field: slugField || null,
+      });
       setPreview(result);
       setPreviewedFields(fields);
     } catch (err) {

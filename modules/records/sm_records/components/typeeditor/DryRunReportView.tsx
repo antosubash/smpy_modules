@@ -24,7 +24,10 @@ export function DryRunReportView({ report }: { report: DryRunReport }) {
         <ul className="space-y-1.5">
           {report.sample.map((rec) => (
             <li key={rec.uuid}>
-              <span className="font-medium">{rec.display_title}</span>
+              {/* A type without a `display_field` sends `display_title: ""`
+                  (design §8.9) — fall back to the uuid's first 8 characters
+                  rather than a blank bullet. */}
+              <span className="font-medium">{rec.display_title || rec.uuid.slice(0, 8)}</span>
               <ul className="ml-4 list-inside list-disc text-muted-foreground">
                 {rec.errors.map((e) => (
                   <li key={`${rec.uuid}:${e.field}`}>

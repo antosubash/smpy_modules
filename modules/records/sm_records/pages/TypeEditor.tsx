@@ -5,7 +5,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
@@ -53,6 +53,17 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
   const [originalKeys] = useState<Set<string>>(new Set((type?.fields ?? []).map((f) => f.key)));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
+
+  // `current` is seeded once from `type` (the initial `useState` argument is
+  // only read on mount), so a background `router.reload({ only: ['type'] })'
+  // — the reindex poll (F4) — updated the incoming `type` *prop* without
+  // ever reaching `current`, and `ReindexStatus` (which reads `current`, not
+  // `type`) never saw the cleared `reindex_pending`. Re-sync whenever Inertia
+  // hands this page a new `type` object; `values`/`fields` are deliberately
+  // left alone so an in-progress edit survives a poll.
+  useEffect(() => {
+    setCurrent(type);
+  }, [type]);
 
   const applySaved = (saved: TypeRead) => {
     setCurrent(saved);
@@ -196,7 +207,13 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
                 onChange={setFields}
               />
               {!isNew && current && (
-                <SchemaPreviewPanel typeKey={current.key} fields={fields} dirty={dirty} />
+                <SchemaPreviewPanel
+                  typeKey={current.key}
+                  fields={fields}
+                  displayField={values.displayField}
+                  slugField={values.slugField}
+                  dirty={dirty}
+                />
               )}
             </CardContent>
           </Card>

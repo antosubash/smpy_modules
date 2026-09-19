@@ -25,6 +25,7 @@ const ALL_WHATS = [
   'choice_removed',
   'options_changed',
   'label_changed',
+  'display_field_changed',
 ] as const;
 
 const ALL_KINDS: ChangeClass[] = ['additive', 'index_affecting', 'restrictive', 'destructive'];
@@ -56,7 +57,7 @@ describe('CHANGE_WHAT_DEFAULTS', () => {
     }
   });
 
-  it('has exactly the fifteen enumerated whats — no more, no fewer', () => {
+  it('has exactly the sixteen enumerated whats — no more, no fewer', () => {
     expect(Object.keys(CHANGE_WHAT_DEFAULTS).sort()).toEqual([...ALL_WHATS].sort());
   });
 });

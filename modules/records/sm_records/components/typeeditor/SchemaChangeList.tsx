@@ -47,7 +47,11 @@ export function SchemaChangeList({ preview }: { preview: SchemaPreview }) {
             <li
               key={`${change.field_key}:${change.what}:${JSON.stringify(change.before)}:${JSON.stringify(change.after)}`}
             >
-              <span className="font-mono">{change.field_key}</span>
+              <span className="font-mono">
+                {change.field_key === '*'
+                  ? t('records.type_editor.reindex.whole_type', { defaultValue: 'Whole type' })
+                  : change.field_key}
+              </span>
               {' — '}
               {changeWhatLabel(t, change.what)}
             </li>

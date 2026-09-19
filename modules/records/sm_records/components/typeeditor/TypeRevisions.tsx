@@ -31,11 +31,6 @@ export function TypeRevisions({
   const [items, setItems] = useState<TypeRevision[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const apply = useSchemaApply((result) => {
-    onRestored(result);
-    toast.success(t('records.type_editor.revisions.restored', { defaultValue: 'Schema restored' }));
-  });
-
   const load = useCallback(async () => {
     setLoadError(null);
     try {
@@ -45,6 +40,19 @@ export function TypeRevisions({
       setLoadError(err instanceof Error ? err.message : String(err));
     }
   }, [type.key]);
+
+  // A successful restore creates a new revision snapshot on the server (of
+  // the schema *before* the restore), so the list this panel is already
+  // showing is stale the moment `onRestored` fires — reload it here (covers
+  // both a plain restore and a force/orphaned retry through
+  // `SchemaConflictPanel`, since both funnel success through this callback)
+  // so that new revision shows up without the admin having to collapse and
+  // reopen the panel.
+  const apply = useSchemaApply((result) => {
+    onRestored(result);
+    toast.success(t('records.type_editor.revisions.restored', { defaultValue: 'Schema restored' }));
+    void load();
+  });
 
   const toggle = () => {
     const next = !open;
