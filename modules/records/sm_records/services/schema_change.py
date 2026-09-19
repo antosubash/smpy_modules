@@ -28,11 +28,10 @@ from sm_records.index.reindex import pending_map
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
-from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
-from sm_records.services._common import guarded_bump, record_count, reload, utcnow
-from sm_records.services._dry_run import dry_run
+from sm_records.services._common import guarded_bump, reload, utcnow
+from sm_records.services._dry_run import change_report
 from sm_records.services._payload import field_defs, lock_type
 from sm_records.services._preview import MISSING, pointer_preview_changes
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
@@ -51,41 +50,6 @@ _POINTERS = ("display_field", "slug_field")
 
 def _added_keys(diff: SchemaDiff) -> list[str]:
     return [c.field_key for c in diff.changes if c.what == "field_added"]
-
-
-def _needs_dry_run(diff: SchemaDiff) -> bool:
-    """Only a restrictive change can invalidate a record. An additive or
-    index-affecting one cannot, by construction, and a destructive one takes
-    the field away rather than the rows — so scanning the type for them would
-    be a full pass that can only ever report zero (§8.2). A type change is
-    already classified restrictive, so it is covered here."""
-    return any(c.kind is ChangeClass.RESTRICTIVE for c in diff.changes)
-
-
-async def _report(
-    db: AsyncSession,
-    rtype: RecordType,
-    new_defs: list[FieldDefinition],
-    settings: RecordsSettings,
-    *,
-    diff: SchemaDiff,
-    conflicts: dict[str, int],
-    drop_keys: frozenset[str] = frozenset(),
-) -> DryRunReport:
-    if not _needs_dry_run(diff):
-        # Skipped, but ``checked`` still has to be an honest count of what
-        # was skipped (incl. trash — §8.9's own reasoning for the delete
-        # confirmation), or "N records checked, 0 would fail" lies about N.
-        checked = await record_count(db, rtype, include_deleted=True)
-        return DryRunReport(checked=checked, failing=0, orphaned_conflicts=conflicts)
-    return await dry_run(
-        db,
-        rtype,
-        new_defs,
-        batch_size=settings.reindex_batch_size,
-        orphaned_conflicts=conflicts,
-        drop_keys=drop_keys,
-    )
 
 
 async def preview(
@@ -112,7 +76,7 @@ async def preview(
     conflicts = await _orphaned.count_conflicts(
         db, rtype, _added_keys(diff), batch_size=settings.reindex_batch_size
     )
-    return diff, await _report(db, rtype, new_defs, settings, diff=diff, conflicts=conflicts)
+    return diff, await change_report(db, rtype, new_defs, settings, diff=diff, conflicts=conflicts)
 
 
 def _refusal(rtype: RecordType, report: DryRunReport) -> str:
@@ -170,7 +134,14 @@ async def apply(
     ``orphaned`` is ``"restore"`` or ``"discard"``, required exactly when the
     report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes
     nothing — the read path already falls back to ``_orphaned`` for a
-    declared key. ``"discard"`` is the one bulk payload write in §8.
+    declared key — but it is still dry-run first and still refusable: §8.8
+    offers a restore where the values *validate*, and values written under a
+    definition that has since changed need not (see :func:`_needs_dry_run`).
+    ``"discard"`` is the one bulk payload write in §8.
+
+    A ``fields_raw`` equal to what is stored is not a change: the schema bump,
+    the revision snapshot and the rebuild are all skipped, and only ``version``
+    moves.
 
     The version bump is deliberately *not* the first statement, though §8.6
     describes it that way: the row lock and version check happen first, so a
@@ -191,6 +162,18 @@ async def apply(
     if current.version != expected_version:
         raise Conflict(f"record type {rtype.key!r} has changed since it was read", current=current)
 
+    if new_fields is not None and new_fields == list(rtype.fields or []):
+        # A resend of the list already stored is not a schema change, and
+        # ``rollback`` sends one every time an operator undoes something that
+        # touched only a pointer or a label — or rolls back to where they
+        # already are. Treated as a change it would bump ``schema_version``,
+        # which restamps nothing but marks every record ``schema_stale``,
+        # snapshot a revision identical to the last, and enqueue a rebuild of
+        # the whole index for no difference. ``version`` still moves below:
+        # the row was written (``updated_by``), and that is what
+        # ``update_type`` does for any other no-op edit.
+        new_fields = None
+
     if new_fields is not None:
         await check_targets(db, new_defs, rtype.key)
     check_pointers(
@@ -209,7 +192,7 @@ async def apply(
     # must judge each record without them — otherwise a change is refused for
     # values the operator has already said to throw away.
     drop = frozenset(conflicts) if orphaned == _orphaned.DISCARD else frozenset()
-    report = await _report(
+    report = await change_report(
         db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, drop_keys=drop
     )
     if report.failing and not force:

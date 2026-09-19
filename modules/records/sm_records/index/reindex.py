@@ -109,6 +109,31 @@ def pending_map(rtype: RecordType) -> dict[str, str]:
     return dict(raw)
 
 
+async def load_fresh(db: AsyncSession, rtype: RecordType) -> RecordType:
+    """Re-read the type row *inside the caller's transaction*, overwriting what
+    the identity map holds (``populate_existing``).
+
+    The caller has usually been holding ``rtype`` for the length of a rebuild,
+    which is exactly as long as it takes another session to commit a second
+    schema change to the same row. Everything this module writes back to the
+    type row therefore starts from the row as it is now, not as it was read.
+    Falls back to the instance passed in when the row has gone, so a type
+    deleted mid-rebuild is not an ``AttributeError``.
+    """
+    fresh = (
+        (
+            await db.execute(
+                select(RecordType)
+                .where(RecordType.id == rtype.id)
+                .execution_options(populate_existing=True)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    return fresh if fresh is not None else rtype
+
+
 async def clear_pending(db: AsyncSession, rtype: RecordType, field_keys: Sequence[str]) -> None:
     """Drop ``field_keys`` from ``reindex_pending`` — step 4 of design doc §8.5.
 
@@ -119,15 +144,21 @@ async def clear_pending(db: AsyncSession, rtype: RecordType, field_keys: Sequenc
     tracking, so an in-place ``pop()`` is a change SQLAlchemy never sees and
     never writes — and the field stays refused as a filter forever.
 
-    ``reindex_pending`` maps each key to the instant it was enqueued
-    (:class:`~sm_records.models.RecordType`), so a caller that cleared only the
-    keys it saw leaves any marker a *later* schema change added — which is the
+    **The keys are removed one at a time from a freshly loaded row**, never by
+    assigning back a mapping read before the rebuild started. ``reindex_pending``
+    maps each key to the instant it was enqueued
+    (:class:`~sm_records.models.RecordType`), and a run that assigned its own
+    snapshot back would erase every marker a *later* schema change added —
+    silently leaving a field that nothing ever rebuilds. Clearing per key
+    against the current row leaves those markers for the next run, which is the
     behaviour a concurrent second edit needs.
     """
-    dropped = set(field_keys)
-    pending = pending_map(rtype)
-    rtype.reindex_pending = {key: at for key, at in pending.items() if key not in dropped}
-    db.add(rtype)
+    fresh = await load_fresh(db, rtype)
+    pending = pending_map(fresh)
+    for key in field_keys:
+        pending.pop(key, None)
+    fresh.reindex_pending = pending
+    db.add(fresh)
     await db.flush()
 
 

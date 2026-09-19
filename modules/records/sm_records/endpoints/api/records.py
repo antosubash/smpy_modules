@@ -22,6 +22,7 @@ from sm_records.contracts.schemas import (
     RecordRevisionRestoreRequest,
     RecordUpdate,
     RevisionListResponse,
+    record_list_read,
     record_read,
     record_revision_detail_read,
     revision_read,
@@ -79,7 +80,11 @@ async def list_records(
         db, rtype, settings=settings, filters=filters, sorts=sorts, page=page, page_size=page_size
     )
     return RecordPage(
-        items=[record_read(rtype, record) for record in items],
+        # ``record_list_read``, not a comprehension over ``record_read``: a
+        # list reads each row leniently but does not validate it, so a page of
+        # fifty costs one compiled-model pass rather than fifty (``invalid`` is
+        # the record editor's badge — see the contracts module).
+        items=record_list_read(rtype, items),
         total=total,
         page=page,
         page_size=_page_size(settings, page_size),

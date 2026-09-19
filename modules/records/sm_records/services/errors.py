@@ -65,23 +65,6 @@ class Forbidden(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 403
 
 
-class FieldsLocked(Conflict):
-    """A ``fields`` edit on a type that already holds records.
-
-    Design §16: until Phase 3 lands — the classification of §8.2, the dry-run
-    and the index-table migration of §8.5 — **a type's ``fields`` are
-    read-only once it holds a record**. The guard is one check, and it exists
-    because an unguarded ``fields`` write on a populated type is precisely the
-    data loss the whole of §8 is written to prevent.
-    """
-
-    def __init__(self, type_key: str, record_count: int) -> None:
-        super().__init__(
-            f"type {type_key!r} holds {record_count} record(s), so its fields are read-only "
-            "until schema evolution ships (design §16)"
-        )
-
-
 class ReferencedByOthers(Conflict):
     """A delete blocked by ``on_delete: restrict`` relations pointing at it.
 
@@ -120,7 +103,6 @@ class OrphanedKeyConflict(Conflict):
 
 __all__ = [
     "Conflict",
-    "FieldsLocked",
     "Forbidden",
     "NotFound",
     "OrphanedKeyConflict",

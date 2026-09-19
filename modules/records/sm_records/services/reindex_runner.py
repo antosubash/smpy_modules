@@ -34,8 +34,8 @@ from sm_records.index.reindex import (
 )
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import from_stored
-from sm_records.services._common import mark_written, type_resolver
-from sm_records.services._payload import display_title, field_defs
+from sm_records.services._common import mark_written, reload, type_resolver
+from sm_records.services._payload import display_title, field_defs, lock_type
 from sm_records.settings import RecordsSettings
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
@@ -92,6 +92,31 @@ async def _recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int
         await db.flush()
 
 
+async def _clear_rebuilt(
+    session: AsyncSession, rtype: RecordType, keys: list[str], started_at_schema: int
+) -> None:
+    """Clear the markers this run actually rebuilt — see :func:`run_pending`.
+
+    The lock is taken here rather than for the whole run: holding a type's row
+    ``FOR UPDATE`` across a rebuild of every record would block every write to
+    the type for its duration, and the rebuild is idempotent precisely so it
+    does not need that. It is held for the read-modify-write of one JSON
+    column, which is the only part that races.
+    """
+    await lock_type(session, rtype)
+    fresh = await reload(session, RecordType, rtype.id)
+    if fresh is None:  # the type was deleted while the rebuild ran; its markers went with it
+        return
+    if fresh.schema_version != started_at_schema:
+        logger.info(
+            "records: type %s changed schema during its rebuild; leaving %d marker(s) pending",
+            rtype.id,
+            len(pending_map(fresh)),
+        )
+        return
+    await clear_pending(session, fresh, keys)
+
+
 async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> int:
     """Finish whatever ``reindex_pending`` says is outstanding for one type.
 
@@ -106,6 +131,16 @@ async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> i
     recomputed if a whole-type rebuild is pending, and only then are the
     markers cleared. Clearing last is what makes an interrupted run safe to
     repeat.
+
+    **Clearing reads the type row again, under the lock, and clears only what
+    this run rebuilt.** A rebuild is the longest thing this module does, so a
+    second schema change committed by a request while it runs is ordinary, not
+    exotic — and that change's marker must survive a run that knew nothing
+    about it. If the row's ``schema_version`` moved at all, the fields this run
+    reprojected are not the fields the type now declares: nothing is cleared,
+    every marker is left for the next run, and the health check surfaces it if
+    no run follows. Leaving a marker set is always safe — the operation is
+    idempotent — while clearing one that was never rebuilt is not.
     """
     async with db_state.session_factory() as session:
         rtype = (
@@ -118,6 +153,7 @@ async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> i
         pending = pending_map(rtype)
         if not pending:
             return 0
+        started_at_schema = rtype.schema_version
 
         keys = list(pending)
         field_keys = [key for key in keys if key != REINDEX_ALL]
@@ -136,7 +172,7 @@ async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> i
         if REINDEX_ALL in pending:
             await _recompute_titles(session, rtype, settings.reindex_batch_size)
 
-        await clear_pending(session, rtype, keys)
+        await _clear_rebuilt(session, rtype, keys, started_at_schema)
         # The rebuild's own statements are ORM writes, but the row deletes above
         # are core DML, which never fires the listener the framework commits on.
         # This session has no request behind it either way, so say so explicitly.

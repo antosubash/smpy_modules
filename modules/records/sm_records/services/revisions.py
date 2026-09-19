@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.constants import ORPHANED_KEY
 from sm_records.models import Record, RecordRevision, RecordType, RecordTypeRevision, RevisionEvent
 from sm_records.services._common import utcnow
+from sm_records.services._payload import field_defs
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
@@ -99,6 +100,26 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
         await db.execute(delete(RecordRevision).where(RecordRevision.id.in_(list(stale))))
 
 
+def _split(rtype: RecordType, snapshot: dict) -> tuple[dict, dict]:
+    """A revision's payload as ``(write payload, orphaned keys)``.
+
+    The split is by what the type declares *now*: a key it still has is part
+    of the write and validates like any other, and a key it has dropped since
+    the snapshot was taken is recovery data. A revision's own ``_orphaned``
+    sub-key folds into the second half — it was already recovery data when the
+    snapshot was taken — but only for keys still undeclared, since a key that
+    has come back reads from the record's own ``_orphaned`` anyway
+    (``schema.compile.from_stored``) and must not be written twice.
+    """
+    declared = {field.key for field in field_defs(rtype)}
+    data = {k: v for k, v in snapshot.items() if k in declared}
+    orphaned = {k: v for k, v in snapshot.items() if k not in declared and k != ORPHANED_KEY}
+    for key, value in (snapshot.get(ORPHANED_KEY) or {}).items():
+        if key not in declared:
+            orphaned.setdefault(key, value)
+    return data, orphaned
+
+
 async def restore(
     db: AsyncSession,
     rtype: RecordType,
@@ -119,6 +140,17 @@ async def restore(
     says cannot exist, which is exactly the state §8.3 keeps records *out* of
     by restamping on every write. The operator's recourse is the same as for
     any other invalid content: fix the value, or change the schema.
+
+    **A key the schema no longer declares is not a refusal, though.** Every
+    revision taken before a field was deleted still carries that field at top
+    level, and the compiled validator is ``extra="forbid"`` — so handing the
+    snapshot back whole made *every* such revision a permanent 422, which is
+    the opposite of what a history is for. The payload is split instead:
+    declared keys are the write, and the rest is filed under ``_orphaned`` by
+    ``update_record``'s internal ``orphaned_extra``, exactly where the field's
+    value would have gone had the record been edited after the deletion (§8.3).
+    Nothing from the revision is dropped, and nothing about the client-facing
+    rule changes: an inbound payload carrying ``_orphaned`` is still refused.
 
     The revision must belong to this record. Nothing else in the API takes a
     revision id, so an id from another record is a 404 rather than a 403 —
@@ -147,11 +179,7 @@ async def restore(
     # ``write_revision``, so the pair can only be acyclic one way round.
     from sm_records.services.records import update_record
 
-    # ``_orphaned`` is never a client-writable key (``_payload.validate``
-    # refuses it outright), and the record's own copy is carried forward by
-    # the write anyway — a revision that snapshotted one would otherwise make
-    # every restore a 422.
-    data = {k: v for k, v in (revision.data or {}).items() if k != ORPHANED_KEY}
+    data, orphaned = _split(rtype, dict(revision.data or {}))
 
     return await update_record(
         db,
@@ -162,4 +190,5 @@ async def restore(
         settings=settings,
         actor=actor,
         event=RevisionEvent.RESTORE,
+        orphaned_extra=orphaned,
     )

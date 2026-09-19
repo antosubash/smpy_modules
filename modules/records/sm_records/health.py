@@ -60,18 +60,39 @@ def _entries(pending: object) -> dict[str, str]:
     return dict(pending or {})
 
 
-def _stale(rows, limit: int, now: datetime) -> list[str]:
+def _unique_keys(fields: object) -> set[str]:
+    """The type's ``unique`` field keys, read straight from the stored JSON.
+
+    A stale marker on one of them is worse than a slow filter: the uniqueness
+    check of §7.8 is a query over the index, ``count_query`` refuses a pending
+    field, and ``_payload.ensure_unique`` therefore turns *every* write to the
+    type into a 409 until the rebuild finishes. That is worth saying out loud
+    in the health detail rather than leaving an operator to discover it from a
+    support ticket.
+    """
+    if not isinstance(fields, list):
+        return set()
+    return {
+        str(field.get("key")) for field in fields if isinstance(field, dict) and field.get("unique")
+    }
+
+
+def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
+    """``(descriptions, any unique field affected)``."""
     out: list[str] = []
-    for key, pending in rows:
+    blocked = False
+    for key, pending, fields in rows:
         late = [
             field
             for field, at in _entries(pending).items()
             if (age := _age_seconds(at, now)) is not None and age > limit
         ]
         if late:
+            if _unique_keys(fields) & set(late):
+                blocked = True
             names = ", ".join("whole type" if f == REINDEX_ALL else f for f in sorted(late))
             out.append(f"{key} ({names})")
-    return out
+    return out, blocked
 
 
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
@@ -83,16 +104,23 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         limit = settings.reindex_stale_after_seconds
         now = utcnow()
         async with db_state.session_factory() as session:
-            rows = (await session.execute(select(RecordType.key, RecordType.reindex_pending))).all()
-        stale = _stale(rows, limit, now)
+            rows = (
+                await session.execute(
+                    select(RecordType.key, RecordType.reindex_pending, RecordType.fields)
+                )
+            ).all()
+        stale, blocked = _stale(rows, limit, now)
         if not stale:
             return HealthCheckResult(status=HealthStatus.HEALTHY)
-        return HealthCheckResult(
-            status=HealthStatus.DEGRADED,
-            detail=(
-                f"reindex pending for longer than {limit}s: {'; '.join(stale)} — "
-                "run `python -m sm_records.cli reindex`"
-            ),
+        detail = (
+            f"reindex pending for longer than {limit}s: {'; '.join(stale)} — "
+            "run `python -m sm_records.cli reindex`"
         )
+        if blocked:
+            detail += (
+                "; a unique field is among them, so writes to this type are refused "
+                "until the rebuild completes"
+            )
+        return HealthCheckResult(status=HealthStatus.DEGRADED, detail=detail)
 
     return HealthCheck(name=CHECK_NAME, check=check)

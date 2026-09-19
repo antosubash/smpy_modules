@@ -15,7 +15,12 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
-from sm_records.contracts.schemas import RecordPage, record_read, type_read
+from sm_records.contracts.schemas import (
+    RecordPage,
+    record_list_read,
+    record_read,
+    type_read,
+)
 from sm_records.deps import (
     get_settings,
     load_type,
@@ -155,7 +160,9 @@ async def record_list(
         items, total = [], 0
         errors["filter"] = exc.reason
     records_page = RecordPage(
-        items=[record_read(rtype, record) for record in items],
+        # One lenient read per row and no per-row validation — see
+        # ``contracts.schemas.record_list_read``.
+        items=record_list_read(rtype, items),
         total=total,
         page=page,
         page_size=page_size,

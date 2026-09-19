@@ -16,6 +16,7 @@ module is "what does a proposed change to one look like".
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -24,6 +25,8 @@ from sqlmodel import SQLModel
 
 from sm_records.index.reindex import pending_map
 from sm_records.models import Record, RecordRevision, RecordType
+from sm_records.schema.fields import FieldDefinition
+from sm_records.services._payload import field_defs
 from sm_records.services.records import read_view
 
 __all__ = [
@@ -39,6 +42,7 @@ __all__ = [
     "TypeListResponse",
     "TypeRead",
     "TypeUpdate",
+    "record_list_read",
     "record_read",
     "record_revision_detail_read",
     "revision_read",
@@ -136,7 +140,11 @@ class RecordRead(SQLModel):
     """Empty when the record satisfies the current schema. Non-empty marks it
     "invalid under current schema" without hiding it (design §8.3) — set by a
     ``force``d restrictive schema change or a rollback the record no longer
-    fits. Straight from ``read_view``'s own ``invalid`` list."""
+    fits. Straight from ``read_view``'s own ``invalid`` list.
+
+    **Always empty on a list response** — filling it costs a validator pass
+    per row (:func:`record_list_read`); the badge belongs to the editor, which
+    reads one record."""
 
 
 class RecordPage(SQLModel):
@@ -210,11 +218,27 @@ def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -
     )
 
 
-def record_read(rtype: RecordType, record: Record) -> RecordRead:
+def record_read(
+    rtype: RecordType,
+    record: Record,
+    *,
+    with_invalid: bool = True,
+    defs: list[FieldDefinition] | None = None,
+) -> RecordRead:
     """The one lenient read every caller gets: ``read_view`` fills a missing
     key from ``default`` and flags a row stamped at an old schema version
-    rather than failing it (design §8.3)."""
-    view = read_view(rtype, record)
+    rather than failing it (design §8.3).
+
+    ``with_invalid``/``defs`` are ``read_view``'s — see
+    :func:`record_list_read`, the one caller that turns the badge off.
+
+    ``data`` still carries the reserved ``_orphaned`` sub-key when the row has
+    one: these screens are the admin's, and the raw editor shows a deleted
+    field's content on purpose (§8.2 — that is what makes the deletion
+    undoable). **Phase 4's public read API must strip it** before serving a
+    record to anonymous callers.
+    """
+    view = read_view(rtype, record, with_invalid=with_invalid, defs=defs)
     return RecordRead(
         uuid=record.uuid,
         type_key=rtype.key,
@@ -232,6 +256,21 @@ def record_read(rtype: RecordType, record: Record) -> RecordRead:
         is_deleted=record.is_deleted,
         invalid=view["invalid"],
     )
+
+
+def record_list_read(rtype: RecordType, records: Sequence[Record]) -> list[RecordRead]:
+    """A page of records, read once per *type* rather than once per row.
+
+    Two things the per-record path does that a list must not: it re-validates
+    the type's stored field definitions (``field_defs``) for every item, and it
+    runs the compiled payload validator for every item to fill ``invalid``. On
+    a page of fifty that is fifty of each, to produce a badge no list screen
+    shows — so ``invalid`` is ``[]`` here by construction, and a caller that
+    needs it opens the record (design §8.3's "marked, not hidden" is about the
+    editor). ``defs`` is computed once and shared.
+    """
+    defs = field_defs(rtype)
+    return [record_read(rtype, record, with_invalid=False, defs=defs) for record in records]
 
 
 def revision_read(revision: RecordRevision) -> RevisionRead:

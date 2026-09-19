@@ -10,10 +10,10 @@ than re-implementing any of it; what stays here is the row lifecycle around
 the schema (labels, flags, the delete) and the fast path for a type with no
 records, where there is nothing to classify against and nothing to reindex.
 
-Phase 1's blanket refusal, :class:`~sm_records.services.errors.FieldsLocked`,
-is gone from this path. The class stays importable: it is part of the error
-vocabulary the endpoints layer maps, and a host pinned to an older contract
-should not get an ``ImportError`` for it.
+Phase 1's blanket refusal — a type that held any record had read-only
+``fields`` — is gone from this path, and so is the exception that expressed
+it: nothing raises it, so keeping it importable would only leave an error the
+endpoints layer maps and no code path can produce.
 """
 
 from __future__ import annotations

@@ -160,6 +160,15 @@ async def ensure_unique(
     filter uses. ``include_deleted`` for the same reason as the slug: index
     rows survive a soft delete (§7.3) and the trash keeps its claims, so a
     trashed record still owns its unique value until it is purged.
+
+    **The statement is built inside the ``try``**, because that is where the
+    failure is: ``count_query`` refuses a field with a ``reindex_pending``
+    marker (§8.5) while it is being *built*, not when it runs. Built outside,
+    the ``QueryError`` escaped as the query grammar's own 400/409 about a
+    filter the caller never wrote — and this branch, which says the true
+    thing (the write cannot be checked, so it is refused), was unreachable.
+    A ``QueryError`` for any other reason is re-raised untouched: a ``unique``
+    field that is somehow not indexed is a broken definition, not a rebuild.
     """
     for field in defs:
         if not field.unique:
@@ -167,14 +176,19 @@ async def ensure_unique(
         value = values.get(field.key)
         if value is None:
             continue
-        stmt = count_query(rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)])
-        if exclude_id is not None:
-            stmt = stmt.where(Record.id != exclude_id)
         try:
+            stmt = count_query(
+                rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)]
+            )
+            if exclude_id is not None:
+                stmt = stmt.where(Record.id != exclude_id)
             taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalar_one()
         except QueryError as exc:
+            if exc.reason != "reindexing":
+                raise
             raise Conflict(
-                f"{field.key!r} is being reindexed, so its uniqueness cannot be checked"
+                f"{field.key!r} is being reindexed, so its uniqueness cannot be checked; "
+                "writes to this type are refused until the rebuild completes"
             ) from exc
         if taken:
             raise Conflict(f"{field.key!r} must be unique; {value!r} is already taken")
@@ -192,7 +206,13 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())
 
 
-def read_view(rtype: RecordType, record: Record) -> dict[str, Any]:
+def read_view(
+    rtype: RecordType,
+    record: Record,
+    *,
+    with_invalid: bool = True,
+    defs: list[FieldDefinition] | None = None,
+) -> dict[str, Any]:
     """The lenient read of §8.3: what this row looks like under the *current*
     schema, whether it is behind it, and what about it no longer validates.
 
@@ -208,17 +228,26 @@ def read_view(rtype: RecordType, record: Record) -> dict[str, Any]:
     fields are wrong. Hiding it is what makes people stop trusting the module,
     and a third ``status`` value would make "invalid" a state someone can set.
 
-    Single-record only, on purpose: it compiles and runs the validator, which
-    is per-row work a list screen must not do for a page of fifty.
+    ``with_invalid=False`` is what a *list* passes, and it is the difference
+    between one validation and fifty: the coercing read stays (a list screen
+    shows values, and they have to read under the current schema), but nothing
+    is validated and ``invalid`` comes back empty. A badge per row would cost a
+    full pydantic pass per record on every page of every list, and the place
+    that acts on ``invalid`` — the editor — opens one record at a time.
+
+    ``defs`` lets a caller with many records of one type validate the type's
+    field definitions once instead of per row; it must be ``field_defs(rtype)``
+    for this exact type, and is computed here when it is not supplied.
     """
-    defs = field_defs(rtype)
+    defs = field_defs(rtype) if defs is None else defs
     view = from_stored(defs, dict(record.data or {}))
-    model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
-    try:
-        _validate_payload(model, view)
-        invalid: list[dict[str, str]] = []
-    except PayloadValidationError as exc:
-        invalid = exc.errors
+    invalid: list[dict[str, str]] = []
+    if with_invalid:
+        model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
+        try:
+            _validate_payload(model, view)
+        except PayloadValidationError as exc:
+            invalid = exc.errors
     return {
         "data": view,
         "schema_stale": record.schema_version != rtype.schema_version,

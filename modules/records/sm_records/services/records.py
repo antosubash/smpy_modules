@@ -182,7 +182,10 @@ def _published_at(record: Record, new_status: RecordStatus):
 
 
 def _migrate_orphaned(
-    record: Record, defs: list[FieldDefinition], stored: dict[str, Any]
+    record: Record,
+    defs: list[FieldDefinition],
+    stored: dict[str, Any],
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The lazy destructive migration of §8.3, run on this one record.
 
@@ -200,6 +203,13 @@ def _migrate_orphaned(
     ``_orphaned`` itself is never client-supplied (``_payload.validate``
     refuses a payload carrying it), so an update that does not mention it must
     not be read as "delete it": what survives here is carried across.
+
+    ``extra`` is this module's own contribution to that sub-key, and the only
+    way anything reaches it besides the record's own payload — see
+    ``update_record``'s ``orphaned_extra``. It wins over what the record
+    carried, because the one caller is a revision restore: putting an older
+    payload back means putting back *its* value for a key the schema has since
+    dropped, not the one a later edit left behind.
     """
     previous = dict(record.data or {})
     declared = {field.key for field in defs}
@@ -208,6 +218,9 @@ def _migrate_orphaned(
         if key == ORPHANED_KEY or key in declared:
             continue
         orphaned.setdefault(key, value)
+    for key, value in (extra or {}).items():
+        if key != ORPHANED_KEY and key not in declared:
+            orphaned[key] = value
     for key in declared:
         orphaned.pop(key, None)
     return {**stored, ORPHANED_KEY: orphaned} if orphaned else stored
@@ -226,6 +239,7 @@ async def update_record(
     position: int | None = None,
     actor: str | None = None,
     event: RevisionEvent = RevisionEvent.UPDATE,
+    orphaned_extra: dict[str, Any] | None = None,
 ) -> Record:
     """Write a record, restamping it at the type's current schema version.
 
@@ -237,9 +251,18 @@ async def update_record(
     a restore (``services.revisions.restore``) is an ordinary write in every
     respect except how the history should read: ``RESTORE`` rather than an
     update that mysteriously repeats an older payload.
+
+    ``orphaned_extra`` is **internal only**: keys to file under ``_orphaned``
+    on this row, merged server-side *after* validation. It is not the client's
+    ``_orphaned`` rule being relaxed — ``_payload.validate`` still refuses an
+    inbound payload that carries the key, and no endpoint passes this. Its one
+    caller is ``services.revisions.restore``, which has to put the undeclared
+    half of an older payload somewhere rather than drop it on the floor
+    (``extra="forbid"`` would otherwise make every revision older than a field
+    deletion a permanent 422).
     """
     defs, values, stored = await _prepare(db, rtype, data, settings, exclude_id=record.id)
-    stored = _migrate_orphaned(record, defs, stored)
+    stored = _migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _payload.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
 
