@@ -139,3 +139,19 @@ class TestFromStored:
         # coerces, and nothing was bulk-rewritten. Design §8.4.
         fields = validate_fields([field("price", "number")])
         assert from_stored(fields, {"price": "123"}) == {"price": Decimal("123")}
+
+
+class TestCacheIsScopedByTypeId:
+    def test_same_key_different_type_id_do_not_share_a_model(self) -> None:
+        """Delete type ``product``, create a new ``product``: it is back at
+        schema_version 1, and must not validate against the dead type's
+        model. ``type_id`` is the part of the key that never recurs."""
+        fields_a = validate_fields([{"key": "title", "type": "text", "label": "T"}])
+        fields_b = validate_fields([{"key": "price", "type": "number", "label": "P"}])
+        model_a = get_model("product", 1, fields_a, type_id=1)
+        model_b = get_model("product", 1, fields_b, type_id=2)
+        assert model_a is not model_b
+        assert get_model("product", 1, fields_b, type_id=2) is model_b
+        validate_payload(model_b, {"price": "1.5"})
+        with pytest.raises(PayloadValidationError):
+            validate_payload(model_b, {"title": "x"})

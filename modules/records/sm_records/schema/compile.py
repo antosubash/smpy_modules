@@ -129,10 +129,32 @@ def build_model(
     return create_model(f"Record_{type_key}_v{schema_version}", __config__=config, **definitions)
 
 
-def get_model(type_key: str, schema_version: int, fields: list[FieldDefinition]) -> type[BaseModel]:
-    """Process-local cache of :func:`build_model`, keyed on
-    ``(type_key, schema_version)`` — never on ``type_key`` alone."""
-    key = (type_key, schema_version)
+def clear_model_cache() -> None:
+    """Drop every compiled model. For test harnesses whose in-memory
+    databases restart primary keys at 1 on every test, so the same
+    ``(type_id, type_key, schema_version)`` recurs with different fields —
+    a situation a real database never produces."""
+    _MODEL_CACHE.clear()
+
+
+def get_model(
+    type_key: str,
+    schema_version: int,
+    fields: list[FieldDefinition],
+    *,
+    type_id: int | None = None,
+) -> type[BaseModel]:
+    """Process-local cache of :func:`build_model`.
+
+    Keyed on ``(type_id, type_key, schema_version)`` — never on the key or
+    the version alone. ``schema_version`` is what a schema edit bumps; but a
+    type can be deleted and a new one created under the *same key*, and the
+    new one starts again at version 1. Keyed on the key, that new type would
+    validate against the dead type's model. ``type_id`` is never reused, so
+    it is the part of the key that survives that. Callers without a row
+    (tests, the CLI) may omit it and get a key-scoped entry.
+    """
+    key = (type_id, type_key, schema_version)
     cached = _MODEL_CACHE.get(key)
     if cached is not None:
         return cached

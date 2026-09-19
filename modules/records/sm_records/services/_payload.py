@@ -60,7 +60,7 @@ def validate(
     ``get_model`` is keyed on ``(key, schema_version)`` and never on the key
     alone, so a schema edit cannot leave an old validator serving writes.
     """
-    model = get_model(rtype.key, rtype.schema_version, defs)
+    model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
     try:
         values = _validate_payload(model, data)
     except PayloadValidationError as exc:

@@ -48,6 +48,18 @@ async def db(db_state) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture(autouse=True)
+def _clear_model_cache():
+    """Each test's in-memory database hands out ``type_id`` 1 afresh, so two
+    tests that both create type id 1 with different fields would otherwise
+    share one compiled validator — a collision production ids never produce."""
+    from sm_records.schema.compile import clear_model_cache
+
+    clear_model_cache()
+    yield
+    clear_model_cache()
+
+
+@pytest.fixture(autouse=True)
 def _clean_providers():
     """The index-provider registry is process-global (design doc §7.6), so a
     test that registers one changes what every later test's records index to.
