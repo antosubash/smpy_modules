@@ -111,6 +111,19 @@ class RecordsModule(ModuleBase):
 
         registry.add(stale_reindex_check(self))
 
+    def register_middleware(self, app: FastAPI) -> None:
+        """Install the deferred-job drain — see :mod:`sm_records.deferred`.
+
+        The reindex of §8.9 must not start until the request that scheduled it
+        has committed and released its session, and middleware is the first
+        hook that runs after a route's dependency teardown. A ``BackgroundTasks``
+        entry runs *inside* it, which on SQLite deadlocks the schema write
+        against its own rebuild.
+        """
+        from sm_records.deferred import DeferredJobsMiddleware
+
+        app.add_middleware(DeferredJobsMiddleware)
+
     async def on_startup(self, app: FastAPI) -> None:
         """Hand the health check what it cannot reach on its own.
 

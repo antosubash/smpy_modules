@@ -8,7 +8,9 @@ implementation plan exactly.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from functools import partial
+
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schema_change import (
@@ -26,6 +28,7 @@ from sm_records.contracts.schemas import (
     TypeUpdate,
     type_read,
 )
+from sm_records.deferred import defer
 from sm_records.deps import (
     actor,
     check_type_roles,
@@ -47,19 +50,36 @@ from sm_records.settings import RecordsSettings
 router = APIRouter(route_class=RecordsErrorRoute)
 
 
-def _schedule_reindex_if_pending(
-    background: BackgroundTasks, request: Request, rtype: RecordType, settings: RecordsSettings
-) -> None:
-    """§8.9: the reindex runs out of request. Scheduled whenever the write
-    that just happened left something in ``reindex_pending`` — never
-    unconditionally, or an edit that changed nothing indexable would queue a
-    no-op background task on every save. ``request.app.state.sm.db`` rather
-    than the request's own session: the task runs after the response, on its
-    own session (:mod:`sm_records.services.reindex_runner`'s own docstring
-    says why), and the request's session is gone by then.
+def _defer_reindex(request: Request, rtype: RecordType, settings: RecordsSettings) -> None:
+    """§8.9: the reindex runs out of request, on its own session
+    (``request.app.state.sm.db`` rather than the request's — see
+    :mod:`sm_records.services.reindex_runner`).
+
+    :func:`sm_records.deferred.defer`, *not* FastAPI's background tasks. Such a
+    task runs inside the route's dependency teardown, so the request's session
+    still holds its transaction while the rebuild wants one: on SQLite that is
+    a deadlock the driver ends with ``database is locked`` after its busy
+    timeout, and on any backend the rebuild reads the schema row as it was
+    before the change it was scheduled for. :mod:`sm_records.deferred` explains
+    the ordering.
+
+    ``rtype.id`` is read here rather than inside the job: by the time the job
+    runs the session that loaded the row is closed.
     """
+    defer(
+        request,
+        partial(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings),
+    )
+
+
+def _schedule_reindex_if_pending(
+    request: Request, rtype: RecordType, settings: RecordsSettings
+) -> None:
+    """Deferred whenever the write that just happened left something in
+    ``reindex_pending`` — never unconditionally, or an edit that changed
+    nothing indexable would queue a no-op job on every save."""
     if rtype.reindex_pending:
-        background.add_task(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings)
+        _defer_reindex(request, rtype, settings)
 
 
 def _check_roles_for_discard(request: Request, rtype: RecordType, orphaned: str | None) -> None:
@@ -120,7 +140,6 @@ async def read_type(
 @router.put("/types/{key}", response_model=TypeRead, dependencies=[require_manage_types])
 async def update_type(
     body: TypeUpdate,
-    background: BackgroundTasks,
     request: Request,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
@@ -154,7 +173,7 @@ async def update_type(
         orphaned=body.orphaned,
         **changes,
     )
-    _schedule_reindex_if_pending(background, request, updated, settings)
+    _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
 
 
@@ -213,7 +232,6 @@ async def preview_schema(
 
 @router.post("/types/{key}/reindex", status_code=202, dependencies=[require_manage_types])
 async def reindex_type(
-    background: BackgroundTasks,
     request: Request,
     rtype: RecordType = Depends(load_type),
     settings: RecordsSettings = Depends(get_settings),
@@ -225,7 +243,7 @@ async def reindex_type(
     something is stuck, so a silent no-op here for "there's nothing pending
     any more" would look like the button did nothing.
     """
-    background.add_task(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings)
+    _defer_reindex(request, rtype, settings)
     return {"scheduled": True}
 
 
@@ -247,7 +265,6 @@ async def list_type_revisions(
 async def restore_type_revision(
     version: int,
     body: TypeRestoreRequest,
-    background: BackgroundTasks,
     request: Request,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
@@ -269,5 +286,5 @@ async def restore_type_revision(
         force=body.force,
         orphaned=body.orphaned,
     )
-    _schedule_reindex_if_pending(background, request, updated, settings)
+    _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))

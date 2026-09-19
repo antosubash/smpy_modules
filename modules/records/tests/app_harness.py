@@ -131,6 +131,11 @@ async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
     )
     app.state.inertia_dependency = inertia_dependency_factory(inertia_config)
 
+    # Wired through the hook the host calls, not by hand: the deferred-job
+    # drain is what makes the reindex run *after* the request's session has
+    # been committed and closed, and a harness without it would prove the
+    # endpoints work under an ordering production does not have.
+    module.register_middleware(app)
     app.add_middleware(_HeaderAuthMiddleware)
     return app, db_state
 

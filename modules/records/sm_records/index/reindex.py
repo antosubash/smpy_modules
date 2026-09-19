@@ -17,7 +17,7 @@ this finishes — with no row having been rewritten.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +46,7 @@ async def reindex_type(
     resolve_type_id: TypeResolver,
     batch_size: int,
     field_keys: Sequence[str] | None = None,
+    after_batch: Callable[[], Awaitable[None]] | None = None,
 ) -> int:
     """Rebuild the index for every record of ``rtype``. Returns the count.
 
@@ -65,7 +66,11 @@ async def reindex_type(
     Batching bounds the number of rows in memory, not the transaction: nothing
     here commits, and a long-running rebuild that wants to commit per batch
     does it in the caller, which is the only place that knows whether a partial
-    rebuild is acceptable. It is, in fact — the operation is idempotent.
+    rebuild is acceptable. It is, in fact — the operation is idempotent. That
+    caller passes ``after_batch``, which is called with the batch written and
+    before the next one is read: :func:`sm_records.services.reindex_runner.run_pending`
+    passes ``session.commit``, so a rebuild of a large type holds SQLite's
+    single write lock for one batch at a time rather than for the whole walk.
     """
     total = 0
     last_id = 0
@@ -91,6 +96,8 @@ async def reindex_type(
             await reindex_record(db, record, rtype, resolve_type_id=resolve_type_id)
             last_id = record.id or last_id
             total += 1
+        if after_batch is not None:
+            await after_batch()
 
 
 def pending_map(rtype: RecordType) -> dict[str, str]:

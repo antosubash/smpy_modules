@@ -2,27 +2,33 @@
 
 Design doc §8.5 and §8.9. The schema write is one row and is synchronous; the
 rebuild over records is not request work, and this repo has no Celery
-(``CLAUDE.md`` says so), so "deferred" means a FastAPI background task plus the
-resumable ``reindex`` CLI command — :mod:`sm_records.cli`.
+(``CLAUDE.md`` says so), so "deferred" means a job queued with
+:func:`sm_records.deferred.defer` plus the resumable ``reindex`` CLI command
+— :mod:`sm_records.cli`. Not FastAPI's ``BackgroundTasks``, which runs *inside*
+the scheduling request's dependency teardown and therefore inside its still-open
+transaction; :mod:`sm_records.deferred` has the ordering and what it cost.
 
 That is sufficient only because the operation is idempotent and restartable
 (§7.7): every record's rows are deleted and rewritten from ``data``, and
 ``reindex_pending`` is cleared last, so a crash anywhere leaves the markers set
-and a re-run converges. The worst case of a lost background task is a field
-that refuses filters until someone runs the command — recoverable, and made
-*visible* by the health check in :mod:`sm_records.health`.
+and a re-run converges. The worst case of a lost job is a field that refuses
+filters until someone runs the command — recoverable, and made *visible* by the
+health check in :mod:`sm_records.health`.
 
-**This module commits.** Everything else in the services layer refuses to,
-because the framework's ``get_db`` owns the request's transaction. A runner
-started from a background task has no request and no ``get_db``: nothing else
-would ever commit its session, and the rebuild would roll back silently.
+**This module commits**, per batch and again at the end. Everything else in the
+services layer refuses to, because the framework's ``get_db`` owns the request's
+transaction. A runner started from a deferred job has no request and no
+``get_db``: nothing else would ever commit its session, and the rebuild would
+roll back silently.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import REINDEX_ALL
@@ -41,6 +47,23 @@ from sm_records.settings import RecordsSettings
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
 
 logger = logging.getLogger(__name__)
+
+#: Backoff between attempts when the database refuses the rebuild's writes
+#: because somebody else is holding the write lock. Bounded and short: the
+#: rebuild is idempotent and restartable, so giving up is a delay rather than
+#: damage, and a run that keeps a pool connection busy for minutes is worse
+#: than one the CLI or the next schema change finishes.
+_LOCK_RETRY_DELAYS: tuple[float, ...] = (0.1, 0.5, 2.0)
+
+#: What SQLite says when it loses the race for its single write lock; the
+#: table-level wording is what the same contention looks like from an
+#: attached/temp table. Both are transient, and neither is a bug in the SQL.
+_LOCKED_MESSAGES = ("database is locked", "database table is locked")
+
+
+def _is_locked(exc: OperationalError) -> bool:
+    text = str(exc.orig or exc).lower()
+    return any(message in text for message in _LOCKED_MESSAGES)
 
 
 async def pending_type_ids(db: AsyncSession) -> list[int]:
@@ -89,7 +112,10 @@ async def _recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int
             db.add(record)
             last_id = record.id or last_id
             total += 1
-        await db.flush()
+        # Committed rather than flushed, for the reason ``run_pending`` gives
+        # ``reindex_type``'s ``after_batch``: one batch of the write lock at a
+        # time, and a half-finished title pass is repeated by the next run.
+        await db.commit()
 
 
 async def _clear_rebuilt(
@@ -118,6 +144,50 @@ async def _clear_rebuilt(
 
 
 async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> int:
+    """:func:`_run_pending_once`, retried while the database is merely busy.
+
+    SQLite takes one writer at a time, so a rebuild that overlaps any other
+    write — a record saved from another tab, a second schema change, the CLI —
+    can lose the race and come back ``database is locked`` rather than doing
+    nothing. That is contention, not failure: the run is restarted from the
+    top on a fresh session, which is safe because the whole operation is
+    idempotent (§7.7).
+
+    Attempts are bounded. When they run out the error is raised, with the
+    markers left exactly as they were — pending, which is the state a rebuild
+    that never ran is supposed to be in, and which the health check of §8.9
+    surfaces once it is stale.
+    """
+    for attempt, delay in enumerate(_LOCK_RETRY_DELAYS):
+        try:
+            return await _run_pending_once(db_state, type_id, settings=settings)
+        except OperationalError as exc:
+            if not _is_locked(exc):
+                raise
+            logger.warning(
+                "records: reindex of type %s found the database locked "
+                "(attempt %d/%d); retrying in %.2fs",
+                type_id,
+                attempt + 1,
+                len(_LOCK_RETRY_DELAYS) + 1,
+                delay,
+            )
+            await asyncio.sleep(delay)
+    try:
+        return await _run_pending_once(db_state, type_id, settings=settings)
+    except OperationalError as exc:
+        if not _is_locked(exc):
+            raise
+        logger.warning(
+            "records: reindex of type %s gave up after %d locked-database attempts; "
+            "its markers stay pending for the next run or the CLI",
+            type_id,
+            len(_LOCK_RETRY_DELAYS) + 1,
+        )
+        raise
+
+
+async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings) -> int:
     """Finish whatever ``reindex_pending`` says is outstanding for one type.
 
     Returns the number of records rebuilt (``0`` when nothing was pending, or
@@ -168,6 +238,12 @@ async def run_pending(db_state, type_id: int, *, settings: RecordsSettings) -> i
             resolve_type_id=await type_resolver(session),
             batch_size=settings.reindex_batch_size,
             field_keys=field_keys or None,
+            # Commit per batch. SQLite has one write lock for the whole file,
+            # so a rebuild that held its transaction for every record of a big
+            # type would refuse every concurrent write for that whole time;
+            # a partial rebuild is safe here precisely because the markers are
+            # cleared last, so an interrupted run is repeated rather than lost.
+            after_batch=session.commit,
         )
         if REINDEX_ALL in pending:
             await _recompute_titles(session, rtype, settings.reindex_batch_size)
