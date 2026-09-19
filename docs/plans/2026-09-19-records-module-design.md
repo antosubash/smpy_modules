@@ -3,6 +3,8 @@
 **Date:** 2026-09-19
 **Status:** design (proposed — not yet implemented)
 **Repo:** `smpy_modules` (a distributable add-on, published as `simple_module_records`)
+**Prior art this follows:** [YesSql](https://github.com/sebastienros/yessql) and the
+content layer Orchard Core builds on it.
 
 ## 1. The name
 
@@ -16,7 +18,7 @@
 | Table prefix | `records_` |
 | Route prefix / view prefix | `/api/records` / `/admin/records` |
 
-Two nouns, and they are load-bearing for every screen and endpoint below:
+Two nouns, load-bearing for every screen and endpoint below:
 
 - a **Record Type** is the schema — "Product", "FAQ Entry", "Team Member";
 - a **Record** is one instance of it.
@@ -24,21 +26,17 @@ Two nouns, and they are load-bearing for every screen and endpoint below:
 ### Why not the obvious names
 
 - **`collections`** — the Directus word, and the clearest one, but the import
-  package would shadow the Python standard library's `collections`. Even
-  namespaced as `sm_collections` it leaves "collection" describing the
-  container while the item still needs its own word.
-- **`entities`** — the word in the original request, but it's used for both
-  the type and the instance ("create an entity" / "the Product entity"), so
-  every API path and screen title stays ambiguous.
+  package would shadow the Python standard library's `collections`. It also
+  collides with YesSql's own meaning of "collection" (a document partition),
+  which this design borrows in §12.
+- **`entities`** — the word in the original request, but it names both the
+  type and the instance ("create an entity" / "the Product entity"), so every
+  API path and screen title stays ambiguous.
 - **`content`** — already taken conceptually. `pagebuilder` owns
   `/pagebuilder/content` and its settings talk about `content_locales`.
 - **`records`** as a bare import package — `records` is an existing PyPI
-  package (Reitz's SQL wrapper). Prefixing follows the precedent already set
-  in this repo by the `ai` module, which imports as `sm_ai` for exactly this
-  reason.
-
-"Record Type" / "Record" is unambiguous in both directions, survives being
-said out loud in a meeting, and leaves `entity` free as informal shorthand.
+  package. Prefixing follows the precedent the `ai` module already set in this
+  repo by importing as `sm_ai`.
 
 ## 2. Goal
 
@@ -50,148 +48,221 @@ module, a SQLModel table, or an Alembic migration for each one.
 
 - Record Types: create / edit / delete, each carrying an ordered list of typed
   field definitions.
-- Records: list (paginated, filterable, sortable), create, read, update,
-  soft-delete, restore, hard-delete.
+- Records: list (paginated, filtered, sorted), create, read, update,
+  soft-delete, restore, hard-delete — with optimistic concurrency.
+- **An index layer** that makes declared fields genuinely queryable in SQL.
 - A schema-driven admin UI — one generic list screen and one generic form
   screen serving every type.
-- A JSON API mirroring both, for scripting and for other modules.
+- A JSON API mirroring both.
 - Draft/published status per record, with an opt-in public read API per type.
 - Validation of every write against the type's current schema.
 - Schema evolution that is safe on a type that already holds records.
 
 ### Explicit non-goals (v1)
 
-- **Runtime DDL.** No table is created per Record Type. See §3.
-- **A query language.** Filtering is a fixed, small grammar (`eq`, `ne`, `in`,
-  `contains`, `gt`, `lt`, `is_null`) over declared fields. No arbitrary
-  expressions, no user-supplied SQL or JSONPath.
-- **Per-record ACLs.** Access is per type, by role. §8.
+- **Runtime DDL.** No table is created per Record Type. §4.
+- **Querying the document payload.** If a field is not indexed, it is not
+  queryable. §7.2 — this is a deliberate hard rule, not a limitation.
+- **Reduce indexes.** Map indexes only in v1. §7.5.
+- **Per-record ACLs.** Access is per type, by role. §10.
 - **Workflow.** Draft → published is a two-state flag, not pagebuilder's
-  submit/approve/reject machine. If a type needs editorial workflow it wants
-  pagebuilder, not this.
-- **Content i18n.** v1 records are monolingual. Deliberate — see §10.
-- **Rich text / visual composition.** A `longtext` field is plain text or
-  Markdown. Composed layouts are pagebuilder's job and duplicating that here
-  would give the repo two block editors.
+  submit/approve/reject machine.
+- **Content i18n.** v1 records are monolingual. §12.
+- **Rich text / visual composition.** Composed layouts are pagebuilder's job.
 
-## 3. The central decision: one table, not a table per type
+## 3. What YesSql is, and what transfers
 
-This is the decision everything else follows from, so it is worth being blunt
-about the alternative before accepting it.
+YesSql is a document database over a relational one. Its shape is four ideas:
 
-### The rejected option: a real table per Record Type
+1. **One global `Document` table.** Verified against the source, the whole
+   schema is four columns:
 
-Strapi and Directus both do this — "add a content type" issues `CREATE TABLE`.
-It buys real column types, real indexes, real unique constraints and fast
-queries with no JSON extraction.
+   | column | type | purpose |
+   |---|---|---|
+   | `Id` | `long` | identity |
+   | `Type` | `string` | which CLR type this document is |
+   | `Content` | `string` | the serialized JSON |
+   | `Version` | `long` | optimistic concurrency |
 
-It is the wrong shape *for this repo specifically*, and not by a small margin:
+2. **Indexes are separate, real, typed tables.** An index is a plain class;
+   each gets its own SQL table with real columns and real indexes.
+
+   ```csharp
+   public class BlogPostByAuthor : MapIndex
+   {
+       public string Author { get; set; }
+   }
+   ```
+
+3. **An `IndexProvider` declares the projection**, and it is the only place
+   that knows how a document becomes index rows:
+
+   ```csharp
+   public class BlogPostIndexProvider : IndexProvider<BlogPost>
+   {
+       public override void Describe(DescribeContext<BlogPost> context)
+       {
+           context.For<BlogPostByAuthor>()
+               .Map(blogPost => new BlogPostByAuthor { Author = blogPost.Author });
+       }
+   }
+   ```
+
+4. **Queries run against the index, and return documents.** The payload is
+   never searched:
+
+   ```csharp
+   var ps = await session
+       .Query<BlogPost, BlogPostByAuthor>(x => x.Author.StartsWith("B"))
+       .ListAsync();
+   ```
+
+   `MapIndex` is 1:1 or 1:N document→index and carries a `DocumentId`.
+   `ReduceIndex` is N:1 and adds a **bridge table** so many documents can
+   map to one aggregated row. Index tables are created in migrations via
+   `ISchemaBuilder.CreateMapIndexTableAsync` /
+   `CreateReduceIndexTableAsync`, both of which take a `collection` — YesSql's
+   way of partitioning documents across separate physical tables.
+
+### The part that does not transfer, and how Orchard Core solves it
+
+YesSql index tables are **defined in C# at compile time and created by
+migrations**. That is the whole reason its indexes can be strongly typed. Our
+Record Types are defined at runtime, from a web form. A type created on
+Tuesday cannot have had an index class written for it on Monday.
+
+Orchard Core hits this exact wall — its content types are runtime-defined too
+— and its answer is the single most valuable thing to take from this
+lineage. It is two layers:
+
+- **`ContentItemIndex`**: one fixed, code-defined index carrying what *every*
+  content item has regardless of type — content type, published, latest,
+  created date, owner, display text.
+- **`OrchardCore.ContentFields.Indexing.SQL`**: for user-defined fields, a
+  table **per value kind**, not per field. `TextFieldIndex`
+  (`Text nvarchar(766)` + `BigText nvarchar(max)`), `NumericFieldIndex`
+  (`decimal(19,5)`), `BooleanFieldIndex` (`bit`), `DateFieldIndex`,
+  `DateTimeFieldIndex`, `TimeFieldIndex`, `HtmlFieldIndex`, `LinkFieldIndex`,
+  `MultiTextFieldIndex`, `ContentPickerFieldIndex` (`SelectedContentItemId`),
+  `UserPickerFieldIndex`. Each row identifies *which* field it indexes with
+  three ordinary data columns: `ContentType`, `ContentPart`, `ContentField`.
+
+**The field's identity becomes data instead of a table name.** That is the
+whole trick, and it is what makes YesSql's architecture survive contact with
+runtime-defined schemas without a single `CREATE TABLE` at request time.
+
+## 4. Storage: one document table
+
+Every record of every type is a row in one `records_record` table with its
+field values in a `JSON` column.
+
+This is what YesSql does, and it is independently the right call here:
 
 - `CLAUDE.md` states the invariant plainly: **migrations live in
   `host/migrations/versions/`, never in a module**, and each consuming host
-  autogenerates its own revisions from the module's static SQLModel tables.
-  Runtime DDL produces tables no model describes, so the next
-  `alembic revision --autogenerate` in a host proposes to **drop every one of
-  them**. Avoiding that means teaching `make_include_object()` to ignore a
-  name pattern, and then the framework's own `SM010`/`SM011` drift checks
-  stop being able to tell a missing migration from a dynamic table.
-- DDL from an HTTP request races across workers, and neither Postgres nor
-  SQLite gives a clean story for a concurrent `ALTER TABLE` under load.
-- SQLite is the local-dev default here. Its `ALTER TABLE` support is narrow
-  enough that any column change becomes a table rebuild, and the module would
-  need two divergent evolution paths for the two supported backends.
+  autogenerates its own revisions from the module's static SQLModel tables. A
+  table created per Record Type at runtime produces tables no model describes,
+  so the next `alembic revision --autogenerate` in a host proposes to **drop
+  every one of them**. Working around that means teaching
+  `make_include_object()` a name pattern, after which `SM010`/`SM011` can no
+  longer distinguish a missing migration from a dynamic table.
+- DDL from an HTTP request races across workers.
+- SQLite is the local-dev default, and its narrow `ALTER TABLE` support turns
+  any column change into a table rebuild — two divergent evolution paths for
+  the two supported backends.
 
-### The chosen option: one `records_record` table, payload in a `JSON` column
+`pagebuilder` already stores whole page trees in `sqlalchemy.JSON` (`json` on
+SQLite, `jsonb` on Postgres), so the pattern is proven in this codebase on
+both backends under the existing migration story.
 
-Every record of every type is a row in one table, with its field values in a
-`JSON` column. `pagebuilder` already stores whole page trees this way
-(`Page.draft_data`, `Page.published_data` — `sqlalchemy.JSON`, which maps to
-`json` on SQLite and `jsonb` on Postgres), so the pattern is proven in this
-codebase, on both backends, under the existing migration story.
+## 5. Tables
 
-**Where this hurts, stated up front rather than discovered later.** Filtering
-and sorting on a custom field means extracting it from JSON at query time.
-That is unindexed, so it degrades linearly. It is fine into the low tens of
-thousands of records per type and it is not fine at a million. The mitigation
-is designed but deliberately *not built* in v1 — see §5.3 — because building
-an EAV index sidecar before anyone has hit the wall is speculative complexity
-that has to be maintained on every write forever.
-
-**What is not left to JSON.** The columns that every listing screen actually
-sorts and filters by are real columns on the row, not payload keys: `status`,
-`slug`, `display_title`, `position`, `published_at`, and the audit columns.
-Putting these in JSON would mean the default list view — the single most
-frequent query in the module — was the slow path.
-
-## 4. Tables
-
-Three, all under the module's own `Base` (`create_module_base("records")`),
-all prefixed `records_`.
+All under the module's own `Base` (`create_module_base("records")`), all
+prefixed `records_`.
 
 ### `records_type`
 
 | column | notes |
 |---|---|
 | `id` | int PK |
-| `key` | `str(64)`, **unique**, `^[a-z][a-z0-9_]*$`. The stable identifier used in URLs and the API. Immutable after creation. |
+| `key` | `str(64)`, **unique**, `^[a-z][a-z0-9_]*$`. Used in URLs, the API, and relation targets. Immutable after creation. |
 | `label`, `label_plural` | display names |
-| `description` | optional |
-| `icon` | lucide icon name, for the type list |
-| `fields` | `JSON` — ordered list of field definitions, §5 |
+| `description`, `icon` | optional; icon is a lucide name |
+| `fields` | `JSON` — ordered field definitions, §6 |
 | `schema_version` | int, bumped on every change to `fields` |
-| `display_field` | which field key supplies `Record.display_title` |
-| `slug_field` | optional; which field seeds `Record.slug` |
+| `display_field`, `slug_field` | which field supplies `display_title` / `slug` |
 | `is_public` | bool, default `False` — gates the anonymous read API |
-| `allowed_roles` | `JSON` list of role names permitted to write, §8 |
-| `record_count` | denormalised, maintained on write |
+| `allowed_roles` | `JSON` list of role names permitted to write, §10 |
 | + `AuditMixin` | |
 
 `key` is immutable because it appears in URLs, in the public API, and in
-`relation` field targets. A rename would strand all three, and the redirect
-machinery to fix that is a larger feature than the rename is worth. Renaming
-the *label* is free and is what people actually want.
+relation targets. A rename would strand all three.
 
-### `records_record`
+`record_count` is **not** a column here. The previous draft denormalised it;
+once the index layer exists, `COUNT(*)` against an indexed table is cheap and
+cannot go stale.
+
+### `records_record` — the document table
 
 | column | notes |
 |---|---|
 | `id` | int PK |
-| `uuid` | `str(32)`, unique — the identifier used in relations and the public API, so an export/import round trip doesn't depend on autoincrement |
+| `uuid` | `str(32)`, unique — the identifier used in relations and the public API, so export/import round-trips don't depend on autoincrement |
 | `type_id` | int, FK to `records_type`, indexed |
-| `data` | `JSON`, non-null, default `{}` — the field values |
-| `schema_version` | int — which version of the type's schema this row was written against |
+| `data` | `JSON`, non-null, default `{}` — **the payload, never queried** |
+| `schema_version` | int — which schema version this row was written against |
+| `version` | int, non-null, default 1 — **optimistic concurrency**, §5.1 |
 | `status` | enum `draft` / `published`, indexed |
 | `slug` | `str(200)`, nullable |
-| `display_title` | `str(300)` — denormalised from `display_field` on write, so the list screen never parses JSON to render a row |
+| `display_title` | `str(300)`, denormalised for the list screen |
 | `position` | int, for hand-ordered types |
 | `published_at` | tz-aware datetime, nullable, indexed |
 | + `AuditMixin`, `SoftDeleteMixin` | |
 
-Indexes: `(type_id, status, position)` for the ordered list, and a partial
-unique on `(type_id, slug)` where `slug is not null` for types that use one.
+Indexes: `(type_id, status, position)` and a partial unique on
+`(type_id, slug)` where `slug is not null`.
 
-`SoftDeleteMixin` is used and `MultiTenantMixin` is not. Deleting content
-should be recoverable; the framework's query filters exclude soft-deleted
-rows by default, and the trash view bypasses with
-`stmt.execution_options(include_deleted=True)`. Tenancy is left off because
-`MultiTenantMixin.tenant_id` is non-nullable at the DB level, so adopting it
-forces multi-tenancy on every host that installs the module. Neither
-`pagebuilder` nor `news` uses it, and this module has no more reason to.
+These fixed columns are this module's **`ContentItemIndex`** — the projection
+every record has regardless of its type, kept on the row itself because a
+join to reach "what type is this and is it published" would be on the hot path
+of every single query.
+
+`SoftDeleteMixin` is used; `MultiTenantMixin` is not. Deleting content should
+be recoverable, and the framework's query filters already exclude soft-deleted
+rows with `stmt.execution_options(include_deleted=True)` to bypass. Tenancy is
+left off because `MultiTenantMixin.tenant_id` is non-nullable at the DB level,
+so adopting it forces multi-tenancy on every host that installs the module —
+neither `pagebuilder` nor `news` does this.
+
+#### 5.1 `version` — the gap the previous draft had
+
+YesSql carries `Version` on every document and the previous draft of this
+design omitted the equivalent entirely. That is a real defect, not a nicety:
+two editors with the same record open in two tabs silently last-write-wins,
+and the loser's work is gone with no error and no trace outside the revision
+table.
+
+Every write sends the `version` it read. The service issues
+`UPDATE … WHERE id = :id AND version = :version` with `version = version + 1`,
+and a zero-rowcount result is a **409 Conflict** carrying the current row so
+the UI can offer a diff. This is one `WHERE` clause and it removes an entire
+category of silent data loss.
 
 ### `records_revision`
 
-`(id, record_id, schema_version, data JSON, display_title, event, created_at,
-created_by)` — an append-only snapshot written on every update and on delete.
+`(id, record_id, schema_version, version, data JSON, display_title, event,
+created_at, created_by)` — append-only, written on every update and delete.
 
-Included in v1, not deferred, because it is the cheapest possible insurance
-against the failure mode this module is most exposed to: a schema edit or a
-bad bulk write silently mangling content, discovered a week later. Retention
-is capped per record (`revision_limit`, §9); unbounded revisions on a
-frequently-edited type will outgrow the content table itself.
+In v1 rather than deferred, because it is the cheapest insurance against the
+failure this module is most exposed to: a schema edit or a bad bulk write
+mangling content, noticed a week later. Capped per record by `revision_limit`
+(§11); unbounded revisions on a busy type outgrow the document table itself.
 
-## 5. Field definitions and validation
+### The index tables — §7
 
-### 5.1 A closed field-type set, not arbitrary JSON Schema
+## 6. Field definitions and validation
+
+### 6.1 A closed field-type set
 
 A field definition is a small object:
 
@@ -202,7 +273,7 @@ A field definition is a small object:
   "label": "Price",
   "required": true,
   "unique": false,
-  "indexed": false,
+  "indexed": true,
   "default": null,
   "help": "Excluding tax",
   "constraints": { "min": 0 },
@@ -210,170 +281,266 @@ A field definition is a small object:
 }
 ```
 
-with `type` drawn from a closed set: `text`, `longtext`, `number`, `integer`,
+`type` comes from a closed set: `text`, `longtext`, `number`, `integer`,
 `boolean`, `date`, `datetime`, `select`, `multiselect`, `email`, `url`,
 `json`, `media`, `relation`.
 
-**Accepting raw JSON Schema from the user was considered and rejected.** It
-looks like a free win and is three problems: `$ref` makes it a remote-fetch
-and cycle-resolution surface that has to be defended against; a generic form
-renderer cannot render an arbitrary schema, so the UI would silently
-degrade to a JSON textarea for anything non-trivial; and arbitrary schemas
-cannot be diffed, which makes §6 impossible. A closed set is renderable,
-diffable, and validatable, and the escape hatch for genuinely unstructured
-data is the `json` field type.
+**Accepting raw JSON Schema was considered and rejected.** `$ref` makes it a
+remote-fetch and cycle-resolution surface; a generic form renderer cannot
+render an arbitrary schema, so the UI degrades to a JSON textarea for anything
+non-trivial; and arbitrary schemas cannot be diffed, which makes §8
+impossible. The escape hatch for genuinely unstructured data is the `json`
+field type — which, consistent with §7.2, is not indexable and therefore not
+queryable.
 
-### 5.2 Validation by a generated Pydantic model
+### 6.2 Validation by a generated Pydantic model
 
 Each `(type_id, schema_version)` compiles to a Pydantic model via
-`pydantic.create_model`, cached in a process-local dict.
+`pydantic.create_model`, cached per process. Chosen over a `jsonschema`
+dependency because it adds **no new dependency**, gives coercion and per-field
+error paths for free, and keeps the repo's Pydantic/SQLModel convention.
 
-Chosen over adding a `jsonschema` dependency because it adds **no new
-dependency**, gives coercion and per-field error paths for free, and keeps
-the repo's "SQLModel/Pydantic everywhere" convention intact.
+Two things that make it wrong if missed:
 
-Two things the implementation must get right or this backfires:
-
-- **Cache key includes `schema_version`,** and the version is bumped on every
-  `fields` write. A cache keyed on `type_id` alone serves the old validator
-  after a schema edit — writes then pass validation against a schema that no
+- **The cache key includes `schema_version`.** Keyed on `type_id` alone, a
+  schema edit leaves the old validator serving writes against a schema that no
   longer exists.
-- **Multi-worker invalidation.** The cache is per process. A schema edited in
-  worker A is stale in worker B until its next request. Fixed by reading the
-  type row (and thus its `schema_version`) inside the request that validates,
-  and treating the cache as keyed on the version that row reports — never on
-  a version cached alongside it.
+- **The cache is per process.** A schema edited in worker A is stale in worker
+  B. Fixed by reading the type row inside the request that validates and
+  keying on the version *that row* reports — never on a version cached
+  alongside it.
 
-### 5.3 Filtering, and the index sidecar that is *not* in v1
+## 7. The index layer
 
-v1 filters via SQLAlchemy's dialect-neutral JSON path access
-(`Record.data[key].as_string()`), which compiles to `json_extract` on SQLite
-and `->>` on Postgres. Unindexed, honest about it, documented in the README
-with the rough ceiling.
+This is the section the previous draft got wrong, and the reason for the
+revision.
 
-The planned v2, with its trigger condition written down now so the decision
-isn't re-litigated from scratch: a `records_record_index` sidecar
-`(record_id, type_id, field_key, text_value, num_value, bool_value,
-date_value)`, populated on write for fields marked `indexed: true`, with
-composite indexes per value column. **Build it when a real installation has a
-type over ~50k records that needs to filter or sort by a custom field, or
-needs a DB-enforced `unique` on one.** Not before — it doubles the write path
-and adds a join per filter term, permanently, for a problem no one has yet.
+### 7.1 What the previous draft proposed, and why it was worse
 
-Until then, `unique: true` on a field is enforced by the service with a
-`SELECT` before write. That is a check-then-act race under concurrency, and
-the README must say so rather than implying a guarantee the schema doesn't
-make.
+It deferred indexing to "v2" behind a generic EAV sidecar —
+`(record_id, field_key, text_value, num_value, bool_value, date_value)`, one
+row with four nullable polymorphic columns — and said meanwhile to filter by
+extracting from JSON at query time.
 
-## 6. Schema evolution — the part that decides whether this is usable
+Both halves were wrong:
 
-Everything above is straightforward. This section is where a generic content
-store either works or becomes the thing people route around. The rule: a
-schema change on a type holding 10,000 records must never be able to silently
-corrupt or orphan them.
+- **The EAV shape indexes badly.** Four nullable columns in one row means
+  every index is mostly NULLs, selectivity is poor, and `num_value` cannot be
+  a real `decimal` if it must also be null for every text row without wasting
+  width. Orchard Core's shape — **one table per value kind** — gives each a
+  single properly-typed, properly-indexed column, and a row exists in a table
+  only if it is of that kind.
+- **Deferring it was false economy.** The stated trigger ("build it at ~50k
+  rows") ignored that retrofitting means a backfill over every record in every
+  installation, and that "query works but gets slow" is a worse failure shape
+  than "query is not available", because it degrades in production rather
+  than failing in development.
 
-Every proposed change to `fields` is **diffed against the current version and
-classified** before anything is written:
+### 7.2 The rule
+
+**If a field is not indexed, it is not queryable.** `data` is opaque. No
+endpoint filters, sorts, or searches by extracting from it.
+
+This is stricter than the previous draft and better: it makes performance a
+property of the schema, visible on the type editor as a checkbox, rather than
+a cliff discovered under load. It is exactly YesSql's contract — the document
+payload is storage, the index is the query surface.
+
+### 7.3 The tables
+
+One per value kind, following Orchard Core's `*FieldIndex` families. Each
+carries the same discriminators, which is what lets runtime-defined fields
+work with compile-time tables:
+
+| column | notes |
+|---|---|
+| `id` | int PK |
+| `record_id` | int, FK → `records_record`, indexed, `ON DELETE CASCADE` |
+| `type_id` | int — denormalised so a query never joins to filter by type |
+| `field_key` | `str(64)` — **which field this row indexes** |
+| `status` | mirrored from the record, so a published-only query needs no join |
+| *(value column)* | the one typed column, below |
+
+| table | value column |
+|---|---|
+| `records_index_text` | `value str(512)` indexed + `value_full Text` unindexed — §7.4 |
+| `records_index_number` | `value Numeric(19, 5)` |
+| `records_index_bool` | `value Boolean` |
+| `records_index_datetime` | `value DateTime(timezone=True)` |
+| `records_index_ref` | `target_uuid str(32)` + `target_type_id int` — relations, §9 |
+
+Composite indexes on `(type_id, field_key, value)` per table, which is the
+shape every filter term actually uses.
+
+A `multiselect` or a to-many `relation` writes **several rows** for one
+`(record, field)` — YesSql's 1:N map index, and the reason `field_key` is a
+column rather than these being columns on the record.
+
+### 7.4 The truncation trap
+
+Orchard Core splits text into `Text nvarchar(766)` + `BigText nvarchar(max)`
+because 766 is an index-key length limit. Postgres has its own (~2704 bytes
+for a btree entry); SQLite has none. Carrying the split is right, but the
+correctness consequence has to be stated or it becomes a bug:
+
+**An equality match on a truncated index column can return false positives.**
+`records_index_text.value` holds the first 512 characters. A filter must
+therefore match on `value` — which is the indexed, selective part — *and then
+re-check the untruncated `value_full`* when `value_full IS NOT NULL`. Skipping
+the second half means two records whose field values differ only after
+character 512 are indistinguishable to every query.
+
+### 7.5 Map indexes only — no reduce, for now
+
+YesSql's `ReduceIndex` plus its bridge table is how it maintains aggregates
+(count of posts per day) incrementally on write.
+
+**Not in v1, deliberately.** Once §7.3 exists, the aggregates this module
+actually needs — records per type, per status, per relation target — are
+`COUNT(*)` with a `GROUP BY` against an indexed table, and a maintained
+aggregate would be a second source of truth that can drift. Reduce indexes
+earn their complexity when the aggregate is over a volume that makes the
+count itself too slow, which is a real threshold and a long way from here.
+
+Reconsider when a single type exceeds roughly a million records and a
+dashboard needs a live aggregate over all of them.
+
+### 7.6 Index providers — the extension point worth stealing
+
+YesSql's `IndexProvider` is the only place that knows how a document becomes
+index rows, which is what makes indexing extensible without touching the
+storage layer. The Python equivalent:
+
+```python
+IndexProvider = Callable[[Record, RecordType], Iterable[IndexEntry]]
+```
+
+The built-in provider projects every field marked `indexed: true`. A module
+registers its own via a `records.index_providers` registry to project
+something the schema alone doesn't express — a computed bucket, a
+normalised sort key, a denormalised value from a related record.
+
+This is a far better seam than the previous draft's `?expand=`, and it is the
+thing that would let `news` or a future module query records without this
+module knowing they exist.
+
+### 7.7 Reindexing
+
+Index rows are derived; `data` is the source of truth. That means a bug in the
+index-maintenance path produces **wrong query results, not slow ones**, which
+is the genuine cost of this whole section and the honest argument against it.
+
+The mitigation is the one YesSql and Orchard both ship: a rebuild. A
+`records reindex [--type KEY]` command drops and recreates index rows from
+documents, runnable per type, batched, and safe to run live because it is
+idempotent. §8 calls it on every schema change that alters which fields are
+indexed.
+
+## 8. Schema evolution
+
+A schema change on a type holding 10,000 records must never silently corrupt
+or orphan them. Every proposed change to `fields` is **diffed against the
+current version and classified** before anything is written:
 
 **Additive** — a new optional field, a new `select` option, a relaxed
-constraint, a label or help-text edit. Applied immediately. Existing records
-are untouched; their payloads simply lack the key, and the read path fills it
-from `default`.
+constraint, a label edit. Applied immediately; existing records are untouched
+and the read path fills the missing key from `default`.
 
-**Restrictive** — a new required field, a narrowed type (`text` → `number`),
-a tightened constraint, a removed `select` option, a newly `unique` field.
-Applied only after a **dry-run validation pass** over the existing records of
-that type. The response reports how many rows would fail and gives a sample.
-The API refuses the change unless the caller supplies either a `default` that
-makes every row valid, or `force: true`, which applies the change and marks
-the failing rows `invalid` rather than mutating them.
+**Restrictive** — a new required field, a narrowed type (`text` → `number`), a
+tightened constraint, a removed `select` option, a newly `unique` field.
+Applied only after a **dry-run validation pass** over the type's existing
+records, reporting how many rows would fail with a sample. Refused unless the
+caller supplies a `default` that makes every row valid, or `force: true` —
+which applies the change and *marks* failing rows rather than mutating them.
 
-**Destructive** — deleting a field. The field is removed from `fields` and
-the key is *retained in each record's payload* under a reserved `_orphaned`
-object. Costs storage; buys back the ability to undo a mis-click that
-otherwise destroys a column of content irreversibly. `_orphaned` is purged by
-an explicit, separately-permissioned action.
+**Destructive** — deleting a field. Removed from `fields`; the key is retained
+in each record's payload under a reserved `_orphaned` object. Costs storage,
+buys back the ability to undo a mis-click that otherwise destroys a column of
+content irreversibly. Purged only by a separately-permissioned action.
 
-Two invariants that make this hold together:
+**Index-affecting** — toggling `indexed`, or any type change on an indexed
+field, additionally enqueues a reindex of that `(type, field)` (§7.7). Until
+it completes the field is reported as `indexing` and is not offered as a
+filter, rather than being offered and silently returning partial results.
 
-- **The read path is lenient, the write path is strict.** A record stamped at
-  `schema_version` 3 read under version 5 renders with missing keys defaulted
-  and unknown keys ignored. Writing it back validates against 5 and restamps.
-  A record is therefore migrated lazily, on edit, and never in a bulk job that
-  can half-fail.
+Two invariants hold it together:
+
+- **Reads are lenient, writes are strict.** A record stamped at version 3 read
+  under version 5 renders with missing keys defaulted and unknown keys
+  ignored. Writing it back validates against 5 and restamps. Records migrate
+  lazily on edit, never in a bulk job that can half-fail.
 - **A record that cannot satisfy the current schema is marked, not hidden.**
-  `status` gains no third value; instead the list screen surfaces an "invalid
-  under current schema" badge derived at read time. A row that disappears from
-  the UI because someone tightened a constraint is the failure mode that makes
-  people stop trusting the module.
+  No third `status` value; the list screen derives an "invalid under current
+  schema" badge at read time. A row vanishing because someone tightened a
+  constraint is what makes people stop trusting the module.
 
-Deleting a Record Type that holds records requires either an empty type or an
-explicit `confirm_record_count` matching the actual count — the same shape of
-guard the field deletion uses, for the same reason.
+Deleting a Record Type that holds records requires an explicit
+`confirm_record_count` matching the actual count.
 
-## 7. Relations
+## 9. Relations
 
-A `relation` field stores `{"type": "<type_key>", "uuid": "<record uuid>"}`
-(or a list of those for a to-many). Validated on write: the target type must
-exist and the target record must exist and not be soft-deleted.
+A `relation` field stores `{"type": "<type_key>", "uuid": "<record uuid>"}` in
+the payload — and, because of §7.3, also writes a `records_index_ref` row.
 
-- **No automatic expansion.** A list of 50 records each expanding a relation
-  is 50 extra queries, and a type related to itself expands forever. Reads
-  expand only under an explicit `?expand=field_a,field_b`, one batched query
-  per named field, depth 1. Depth > 1 is not supported in v1 and should not be
-  added without a cycle guard.
+That index row is what makes relations useful rather than merely stored. It is
+Orchard Core's `ContentPickerFieldIndex.SelectedContentItemId`, and it buys
+the thing the previous draft could not answer: **"what references this
+record?"** is a single indexed query, so the delete dialog can show it.
+
+- **No automatic expansion.** Reads expand only under an explicit
+  `?expand=field_a,field_b`, one batched query per named field, depth 1.
+  Depth > 1 is unsupported in v1 and must not be added without a cycle guard.
 - **Delete behaviour is a property of the field** — `restrict` (default),
-  `set_null`, or `cascade` — enforced in the service layer, because there is
-  no foreign key to enforce it at the DB. `restrict` is the default because a
+  `set_null`, or `cascade` — enforced in the service, because there is no
+  foreign key to enforce it in the DB. `restrict` is the default because a
   cascade default across a user-defined graph deletes content nobody asked to
-  delete.
+  delete. With `records_index_ref`, `restrict` is now a cheap check rather
+  than a scan.
 - Soft-deleting a target leaves referrers pointing at a hidden row. Reads
-  resolve it to `null` with a `dangling: true` marker rather than erroring —
-  a restorable delete must not break the pages that reference it.
+  resolve it to `null` with `dangling: true` rather than erroring — a
+  restorable delete must not break what references it.
 
-## 8. Permissions, and an honest limitation
+## 10. Permissions, and an honest limitation
 
 `register_permissions` runs at app construction, before the database is open.
 Record Types are created at runtime. **Per-type permissions therefore cannot
-be registered as framework permissions** — there is no point in the boot
-sequence at which the list of types is both known and still registrable.
+be framework permissions** — there is no point in boot at which the type list
+is both known and still registrable.
 
-v1 accepts the consequence rather than working around it:
+v1 accepts the consequence:
 
-- Three static permissions: `records.view`, `records.edit`,
-  `records.manage_types`. These appear in the role editor and behave normally.
+- Three static permissions — `records.view`, `records.edit`,
+  `records.manage_types` — which appear in the role editor and behave
+  normally.
 - Per-type narrowing via `RecordType.allowed_roles`, enforced in `deps.py` on
-  top of the static permission. Empty means "any role with the static
+  top of the static permission. Empty means "any role holding the static
   permission".
 
-The limitation to write in the README, not bury: **per-type roles are not
-visible in the framework's role editor.** An admin editing roles there sees
-only the three coarse permissions and will not discover that Products is
-restricted to `editor`. The per-type UI lives on the type's own settings
-screen, which is discoverable but is a second place to look.
+The limitation goes in the README, not buried: **per-type roles are invisible
+in the framework's role editor.** An admin editing roles sees three coarse
+permissions and will not discover there that Products is restricted to
+`editor`.
 
-The alternative — a permission string per type registered at boot from a
-pre-app DB read — was considered. `_preapp_config` proves an early read is
-possible, but it would make type creation require a restart before its
-permission became grantable, which is worse.
+The alternative — a permission per type registered at boot from a pre-app DB
+read, which `_preapp_config` proves is possible — would make a newly created
+type require a restart before its permission became grantable. Worse.
 
 ### Public read API
 
 Off by default. A type with `is_public = True` exposes
-`GET /api/records/public/{type_key}` and
-`GET /api/records/public/{type_key}/{uuid}`, published records only, with
-`draft` rows and the audit columns stripped from the response shape rather
-than filtered in the query.
+`GET /api/records/public/{type_key}` and `…/{uuid}`, published records only,
+with draft rows and audit columns removed from the response shape rather than
+filtered in the query.
 
 Registered through `register_public_routes` with methods pinned to
-`{"GET", "HEAD"}` — and, because the set of public types is only known after
-settings hydration, filled from `on_startup` rather than the construction-time
-hook, exactly as `pagebuilder.boot.exempt_public_routes` does and for the same
-reason. The `startswith` prefix trap applies: the rule terminates in `/`, and
-the fixed `/api/records/public/` prefix keeps it from ever matching the admin
-surface.
+`{"GET", "HEAD"}` — and, because the set of public types is known only after
+settings hydration, filled from `on_startup` rather than the
+construction-time hook, exactly as `pagebuilder.boot.exempt_public_routes`
+does and for the same reason. The `startswith` prefix trap applies: the rule
+terminates in `/`, and the fixed `/api/records/public/` prefix cannot match
+the admin surface.
 
-## 9. Settings
+## 11. Settings
 
 DB-backed via `register_module_settings`, no environment variables — the rule
 `pagebuilder` and `news` already follow.
@@ -381,61 +548,78 @@ DB-backed via `register_module_settings`, no environment variables — the rule
 | setting | default | restart? |
 |---|---|---|
 | `public_route_prefix` | `/api/records/public` | yes (`_RESTART`) |
-| `default_page_size` | 25 | no |
-| `max_page_size` | 200 | no |
+| `default_page_size` / `max_page_size` | 25 / 200 | no |
 | `revision_limit` | 50 per record | no |
 | `max_payload_bytes` | 256 KB | no |
 | `max_fields_per_type` | 100 | no |
+| `max_indexed_fields_per_type` | 25 | no |
+| `reindex_batch_size` | 500 | no |
 
-`max_payload_bytes` and `max_fields_per_type` are not ceremony. A `json`
-field type accepts arbitrary nested documents; without a cap, one POST can
-write a multi-megabyte row that every subsequent list query has to load and
-every revision duplicates.
+`max_indexed_fields_per_type` is the one that is easy to omit and expensive to
+add later: every indexed field is a row written per record per save, so a type
+with 80 indexed fields turns one save into 81 inserts. A visible ceiling makes
+that a design conversation at schema-editing time instead of an incident.
 
-## 10. Frontend
+## 12. Frontend
 
 Four pages under `sm_records/pages/`, and nothing else in that directory —
 `import.meta.glob` derives page names from the path, so a helper dropped there
-silently registers a page. Field renderers, the filter bar and the schema
-editor go in `components/`.
+silently registers a page.
 
 | page | route |
 |---|---|
-| `Types.tsx` | `/admin/records` — the type list |
-| `TypeEditor.tsx` | `/admin/records/types/{key}` — the schema editor |
+| `Types.tsx` | `/admin/records` — type list |
+| `TypeEditor.tsx` | `/admin/records/types/{key}` — schema editor |
 | `RecordList.tsx` | `/admin/records/{key}` — generic, schema-driven list |
 | `RecordEditor.tsx` | `/admin/records/{key}/{uuid}` — generic, schema-driven form |
 
-A `components/fields/` directory holds one small component per field type
-behind a registry map, mirroring `pagebuilder/components/blockRegistry.ts`.
-The 300-line cap makes this the only workable shape anyway — a single
-switch-based renderer for fourteen field types does not fit.
+`components/fields/` holds one small component per field type behind a
+registry map, mirroring `pagebuilder/components/blockRegistry.ts`. The
+300-line cap makes this the only workable shape for fourteen field types
+anyway.
+
+The schema editor surfaces `indexed` as a first-class checkbox with its
+consequence spelled out next to it — filterable and sortable, at the cost of a
+write — because §7.2 makes it the single most consequential choice on the
+screen.
 
 **Writes go through `fetch()` against `/api/records/*`, never Inertia's
-`router.post()`.** `SM018` fires on exactly that combination, because Inertia
-rejects a non-Inertia JSON response. Navigation and flash-message redirects
-use Inertia; data mutations use `fetch` and update local state.
+`router.post()`.** `SM018` fires on exactly that pairing, because Inertia
+rejects a non-Inertia JSON response. Navigation and flash redirects use
+Inertia; mutations use `fetch`.
+
+A **409 from §5.1 must be a real UI state**, not a toast. The editor shows
+that the record changed underneath, what changed, and offers reload-or-
+overwrite. A concurrency check whose only surface is a red toast trains people
+to click through it.
 
 **This module ships `locales/en.json` and uses `t(keys.records.…)` from day
 one.** That diverges slightly from `CLAUDE.md`'s note that the three existing
 modules should convert together — but that note is about not doing piecemeal
-conversions during unrelated work, and it is not a reason to add a fourth
-module's worth of hardcoded English to the backlog. Retrofitting i18n costs
-several times what authoring it does. Zod schemas carrying translated
-messages are constructed inside `useT()`, never at module scope, or they
+conversions during unrelated work, and is not a reason to add a fourth
+module's worth of hardcoded English to the backlog. Zod schemas carrying
+translated messages are built inside `useT()`, never at module scope, or they
 freeze against the first render's locale.
 
-**Why content i18n is out of v1.** `pagebuilder` shows what it actually costs:
-locale on every row, uniqueness per `(locale, slug)`, a `translation_group`,
-locale-scoped redirects, and the hard rule that a page's language is fixed for
-its lifetime. Doing that for user-defined types means every one of those
-decisions again, generically. It is a v2 feature and the schema above leaves
-room for it — adding `locale` and `translation_group` to `records_record` is
-an additive migration. What must *not* happen is a half-version where records
-have a locale but slugs aren't scoped to it; that is precisely how `/de/p/x`
+**Content i18n is out of v1.** `pagebuilder` shows the real cost: locale on
+every row, uniqueness per `(locale, slug)`, a `translation_group`,
+locale-scoped redirects, and the rule that a page's language is fixed for its
+lifetime. Doing that generically for user-defined types is a v2 feature; the
+schema leaves room, since adding `locale` and `translation_group` to
+`records_record` is additive. What must not happen is a half-version where
+records have a locale but slugs aren't scoped to it — precisely how `/de/p/x`
 starts serving the English page.
 
-## 11. Module wiring
+### Collections, deferred
+
+YesSql partitions documents into separate physical tables per *collection*,
+and every schema-builder call takes one. The equivalent here is giving a
+high-volume type its own document and index tables instead of sharing the
+global ones. It is the right escape hatch for one type that dwarfs the others,
+and it is not v1 — but `type_id` being on every index row (§7.3) is what keeps
+the option open without a migration of the query layer.
+
+## 13. Module wiring
 
 ```python
 class RecordsModule(ModuleBase):
@@ -451,92 +635,118 @@ class RecordsModule(ModuleBase):
 
 Hooks overridden: `register_settings`, `register_permissions`,
 `register_menu_items` (section `ADMIN_SIDEBAR`, group `Content`),
-`register_routes`, `on_startup` (public-route exemptions + settings-dependent
-wiring).
+`register_routes`, `on_startup` (public-route exemptions, index-provider
+registry, settings-dependent wiring).
 
 `view_prefix` points at `/admin/records` directly rather than using
-`admin_view_prefix` — every screen this module serves is administrative, so it
-needs one router, not two. Per the framework docs, the `/admin` prefix is a
-URL convention and not a guard; the routes carry their permission dependencies
-regardless.
+`admin_view_prefix` — every screen here is administrative, so it needs one
+router, not two. The `/admin` prefix is a URL convention and not a guard; the
+routes carry their permission dependencies regardless.
 
-Menu items are registered without `roles`, matching `pagebuilder`'s
-reasoning: role filtering is a plain intersection with no admin bypass, so
-listing roles there hides the entry from an `admin` user.
+Menu items are registered without `roles`, matching `pagebuilder`'s reasoning:
+role filtering is a plain intersection with no admin bypass, so listing roles
+hides the entry from an `admin` user.
 
-## 12. Checklist against `docs/adding-a-module.md`
+## 14. Checklist against `docs/adding-a-module.md`
 
-All ten steps apply. The four that are most often missed here:
+All ten steps apply. The four most often missed:
 
-- `host/pyproject.toml` — dependency **and** `[tool.uv.sources...] workspace = true`.
-- Framework deps as **ranges** (`simple_module_core>=0.0.25,<0.1`), never `==`.
-  `version = "0.0.7"` to match `scripts/bump_version.py --check-current`.
-- `modules/records/tests` added to `testpaths` in the root `pyproject.toml`;
-  a pytest step in `.github/workflows/ci.yml`; and
-  `simple_module_records` added to the `publish-pypi` matrix in
-  `release.yml` — the last is what actually publishes it.
+- `host/pyproject.toml` — the dependency **and** `[tool.uv.sources...]
+  workspace = true`.
+- Framework deps as **ranges** (`simple_module_core>=0.0.25,<0.1`), never
+  `==`. `version = "0.0.7"` to match `scripts/bump_version.py
+  --check-current`.
+- `modules/records/tests` in root `testpaths`; a pytest step in
+  `.github/workflows/ci.yml`; and `simple_module_records` in the
+  `publish-pypi` matrix in `release.yml` — the last is what publishes it.
 - The first Alembic revision carries `branch_labels = ("records",)`.
 
-## 13. Tests
+## 15. Tests
 
-Beyond per-endpoint CRUD coverage, the cases that would actually catch a
-regression in the decisions above:
+The cases that would actually catch a regression:
 
-- Every field type: valid value, invalid value, missing-and-required,
+- Every field type: valid, invalid, missing-and-required,
   missing-and-optional-with-default.
+- **Index correctness**: a save writes the expected index rows; an update
+  replaces rather than appends them; a delete removes them; a reindex from
+  documents produces byte-identical rows to incremental maintenance. That last
+  one is the test that catches §7.7's real risk.
+- **Truncation**: two records whose text field differs only after character
+  512 are distinguishable by an equality filter (§7.4).
+- **Concurrency**: two writes from the same read `version` — second gets 409,
+  first record is intact, revision table shows one update (§5.1).
 - Schema diff classification — one test per additive / restrictive /
-  destructive case, asserting the classification, not just the outcome.
-- A restrictive change against a type holding records that would fail it:
-  refused without `force`, and with `force` marks rather than mutates.
+  destructive / index-affecting case, asserting the classification itself.
+- A restrictive change against records that would fail it: refused without
+  `force`; with `force`, marks rather than mutates.
 - A record stamped at an old `schema_version` reads leniently and restamps on
   write.
-- Validator cache: edit a schema, then write — the write validates against the
-  *new* version.
+- Validator cache: edit a schema, then write — validates against the *new*
+  version.
 - `restrict` blocks deleting a referenced record; `set_null` and `cascade` do
   what they say; soft-deleting a target yields `dangling: true`, not a 500.
-- `register_public_routes`: asserted against the registry directly, as
+- `register_public_routes` asserted against the registry directly, as
   `modules/pagebuilder/tests/test_public_routes.py` does. Playwright specs run
   authenticated and will not catch a missing exemption — and here the
-  consequence of one is anonymous read access to unpublished content.
-- A private type is not readable via the public endpoint even by uuid.
-- `max_payload_bytes` and `max_fields_per_type` are enforced.
+  consequence is anonymous read access to unpublished content.
+- A private type is unreadable via the public endpoint even by uuid.
+- `max_payload_bytes`, `max_fields_per_type`, `max_indexed_fields_per_type`
+  are enforced.
 
-## 14. Phasing
+## 16. Phasing
 
-**Phase 1 — the spine.** Tables, migration, field-type set, Pydantic
-compilation, type CRUD, record CRUD (no relations, no public API), the admin
-type list and a JSON-textarea record editor. Ugly but end-to-end, and it
-proves the storage decision before any UI is built on it.
+**Phase 1 — document + index spine.** Tables (including `version` and the
+index tables), migration, field-type set, Pydantic compilation, index
+maintenance on write, reindex command, type CRUD, record CRUD, and a
+JSON-textarea record editor. Ugly but end-to-end, and it proves the index
+layer before any UI is built on it. The index layer is in Phase 1, not bolted
+on later, for the reason in §7.1.
 
-**Phase 2 — the UI.** Schema editor, `components/fields/` registry, generic
-list with filter/sort/pagination, generic form, `locales/en.json`.
+**Phase 2 — the UI.** Schema editor (with `indexed`), `components/fields/`
+registry, generic list with filter/sort/pagination driven by the index tables,
+generic form, 409 conflict handling, `locales/en.json`.
 
 **Phase 3 — safety.** Schema diffing and classification, dry-run validation,
-revisions and restore, trash and restore.
+index-affecting reindex enqueue, revisions and restore, trash and restore.
 
-**Phase 4 — reach.** Relations with `?expand=`, the public read API,
-`is_public` and `allowed_roles`, the README and module docs.
+**Phase 4 — reach.** Relations and `records_index_ref` querying in both
+directions, `?expand=`, the public read API, `is_public` / `allowed_roles`,
+the index-provider registry as a public extension point, README and docs.
 
-Deferred with conditions attached: the index sidecar (§5.3), content i18n
-(§10), CSV/JSON import-export, and a `records` widget for pagebuilder — the
-last being the natural integration, and the reason `news` already has
-`integrations/pagebuilder.py` to copy the seam from.
+Deferred with conditions attached: reduce indexes (§7.5), collections (§12),
+content i18n (§12), CSV/JSON import-export, and a `records` widget for
+pagebuilder — the last being the natural integration, with `news`'s
+`integrations/pagebuilder.py` as the seam to copy.
 
-## 15. Open questions
+## 17. What is deliberately not taken from YesSql
 
-1. **Does `slug` belong here at all?** It only matters for types whose records
-   are addressable, and nothing in v1 addresses a record by slug — the public
-   API uses `uuid`. It may be premature. Cheap to add later; dead weight if
-   nobody uses it.
-2. **`display_title` denormalisation.** It makes the list screen fast and
-   creates a second source of truth that goes stale if the `display_field`
-   changes. Recomputing every record on a `display_field` edit is a bulk job
-   with exactly the half-failure property §6 tries to avoid. Leaning toward
-   recomputing lazily on read-if-stale, but it needs a decision.
-3. **Whether revisions should be in Phase 1 rather than Phase 3.** The risk
-   they insure against — a bad schema edit — is live from the moment schema
-   editing ships in Phase 2.
-4. **`media` field type** presumes `file_storage` from the framework repo.
-   That adds a dependency for one field type. Alternative: a plain `url` field
-   in v1 and `media` when the dependency is justified by more than this.
+Being explicit, so these aren't re-proposed later as oversights:
 
+- **Compile-time typed index classes.** The whole point of the Orchard Core
+  layer in §3 is that they can't work for runtime-defined types.
+- **A session/unit-of-work abstraction.** The framework already has one:
+  `get_db` with its `after_flush` auto-commit and
+  `CommitBeforeResponseMiddleware`. `ISession` would be a second, competing
+  transaction boundary.
+- **`CreateMapIndexTableAsync` / schema-builder migrations.** Index tables
+  here are static SQLModel tables in a host Alembic revision, because §4.
+- **Reduce indexes and bridge tables.** §7.5.
+- **Sharding.** Out of scope at any horizon this repo has.
+
+## 18. Open questions
+
+1. **Does `slug` belong in v1?** Nothing in v1 addresses a record by slug —
+   the public API uses `uuid`. Cheap to add later; dead weight if unused.
+2. **`display_title` denormalisation** creates a second source of truth that
+   goes stale if `display_field` changes. Recomputing every record on that
+   edit is a bulk job with exactly the half-failure property §8 avoids.
+   Leaning toward recompute-lazily-on-read-if-stale — but note that §7.7's
+   reindex already has the batched-rebuild machinery this would need, so
+   folding `display_title` into the reindex is probably the answer.
+3. **Should `status` really be mirrored onto every index row (§7.3)?** It
+   avoids a join on the most common filter and it is a denormalisation that
+   must be updated on every publish/unpublish. The alternative is a join to
+   `records_record`, which is by primary key and may well be cheap enough.
+   Worth measuring in Phase 1 rather than deciding now.
+4. **`media` field type** presumes `file_storage` from the framework repo —
+   a dependency for one field type. Alternative: a plain `url` field in v1.
