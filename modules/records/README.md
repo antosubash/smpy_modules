@@ -117,12 +117,63 @@ screen, that a given type is further restricted to specific roles.
   "unique enforced at the cost of serializing writes on that type," not a
   database-level uniqueness guarantee.
 
+## Changing a schema that already holds records
+
+Every change to a type's fields is diffed against the current schema and
+classified before anything is written — **additive**, **index-affecting**,
+**restrictive** or **destructive** — and `POST /api/records/types/{key}/schema/preview`
+returns that classification together with a dry run over every existing
+record (trash included) so you can see what would break before saving.
+
+- A **restrictive** change (a new required field, a narrowed type, a
+  tightened constraint, a removed choice, a newly unique field) is refused
+  with the report unless every record passes. Send `force: true` to apply it
+  anyway: the failing records are **marked, not rewritten** — they read back
+  with `invalid` naming the fields, and the editor shows it.
+- A **destructive** change (removing a field) keeps the value on each
+  record; it moves under the reserved `_orphaned` key on that record's next
+  write. Re-adding a key that still holds orphaned values is refused until
+  you choose `orphaned: "restore"` (the old values read back and index) or
+  `"discard"` (they are dropped — the one bulk write the module ever does,
+  and it touches only that sub-key).
+- An **index-affecting** change (toggling `indexed`, changing an indexed
+  field's type, or changing `display_field`) applies immediately and
+  enqueues a rebuild: the field appears in the type's `reindex_pending` and
+  refuses filters and sorts until the rebuild has moved its rows and cleared
+  the entry. The rebuild runs as a background task after the request.
+- `slug_field` changes never regenerate existing slugs — a slug is an
+  address, and regenerating could break links or collide with a slug handed
+  out since. Only records written after the change use the new pointer.
+
+Field keys are immutable: a "rename" is a remove plus an add, and is
+treated as one. Every schema change writes a type revision;
+`POST /api/records/types/{key}/revisions/{version}/restore` rolls back
+through the same pipeline, so a rollback that would fail records is refused
+like any other change.
+
 ## Development
 
 ```bash
 uv sync --extra dev
 uv run pytest
 ```
+
+
+### Rebuilding the index by hand
+
+The rebuild normally runs as a background task right after the schema change.
+If a worker was restarted mid-way, the field stays in `reindex_pending` and
+`/health/ready` degrades once an entry is older than
+`reindex_stale_after_seconds`, naming the type and fields. Run it yourself
+from the repo root:
+
+```
+python -m sm_records.cli reindex            # every type with pending keys
+python -m sm_records.cli reindex --type KEY # one type
+```
+
+It is idempotent and resumable — index rows are derived from the stored
+payloads, so running it twice converges.
 
 ## API-version contract
 
