@@ -44,6 +44,19 @@
     "filter_clear": "Clear",
     "reindexing_notice": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly."
   },
+  "filters": {
+    "op": {
+      "eq": "is",
+      "ne": "is not",
+      "contains": "contains",
+      "gt": ">",
+      "gte": ">=",
+      "lt": "<",
+      "lte": "<=",
+      "in": "is one of (comma-separated)",
+      "is_null": "is empty"
+    }
+  },
   "editor": {
     "title_new": "New record",
     "title_edit": "Edit record",

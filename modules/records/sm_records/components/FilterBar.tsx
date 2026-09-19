@@ -7,17 +7,32 @@ import { useState } from 'react';
 
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 
-const OP_LABELS: Record<FilterOp, string> = {
-  eq: 'is',
-  ne: 'is not',
-  contains: 'contains',
-  gt: '>',
-  gte: '>=',
-  lt: '<',
-  lte: '<=',
-  in: 'is one of (comma-separated)',
-  is_null: 'is empty',
-};
+/** Labels for the filter grammar's operators. A plain `t()` call per op
+ *  (rather than a module-scope `Record<FilterOp, string>`) so the strings
+ *  stay reachable by `make ci-check-untranslated` — a config object is
+ *  exactly the blind spot that check can't see through. */
+// `useT()`'s `t` is overloaded against a generated translation-key union;
+// typing this parameter against it (rather than accepting any translator)
+// either blows up TS with an "excessively deep" instantiation over the
+// template-literal key, or fails to unify with the real `TFunction`'s
+// overload set when called here.
+// biome-ignore lint/suspicious/noExplicitAny: see comment above
+type Translate = (...args: any[]) => string;
+
+function opLabel(t: Translate, op: FilterOp): string {
+  const defaults: Record<FilterOp, string> = {
+    eq: 'is',
+    ne: 'is not',
+    contains: 'contains',
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
+    in: 'is one of (comma-separated)',
+    is_null: 'is empty',
+  };
+  return t(`records.filters.op.${op}`, { defaultValue: defaults[op] });
+}
 
 export type FilterValue = { field: string; op: FilterOp; value: string } | null;
 
@@ -84,7 +99,7 @@ export function FilterBar({
         >
           {FILTER_OPS.map((candidate) => (
             <NativeSelectOption key={candidate} value={candidate}>
-              {OP_LABELS[candidate]}
+              {opLabel(t, candidate)}
             </NativeSelectOption>
           ))}
         </NativeSelect>

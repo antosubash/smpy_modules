@@ -24,19 +24,8 @@ import type {
 
 const BASE = '/api/records';
 
-/** Mirrors the naming the `ai`/`pagebuilder` modules use for their own CSRF
- *  cookie (`sm_ai_csrf`, `pagebuilder_csrf`): the view layer mints a token
- *  into the session and mirrors it here for JS to echo back. Tolerant when
- *  absent — same as those modules, the header is simply omitted and the
- *  server skips enforcement in that case. */
-const CSRF_COOKIE = 'sm_records_csrf';
-
-const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-function csrfHeader(): Record<string, string> {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
-  return match ? { 'X-CSRF-Token': decodeURIComponent(match[1]) } : {};
-}
+// Writes rely on the framework's SameSite=Lax session-cookie baseline.
+// A `RequiresCsrf`-style opt-in is a later phase.
 
 export class ApiError extends Error {
   readonly status: number;
@@ -79,17 +68,14 @@ function messageFor(status: number, statusText: string, body: ApiErrorBody | nul
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const method = (init.method ?? 'GET').toUpperCase();
-  const csrf = UNSAFE_METHODS.has(method) ? csrfHeader() : {};
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
   const response = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...csrf,
-      ...(init.headers ?? {}),
-    },
     ...init,
+    headers: { ...defaultHeaders, ...(init.headers ?? {}) },
   });
   if (!response.ok) {
     const body = await parseBody(response);

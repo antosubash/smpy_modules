@@ -37,6 +37,7 @@ export type TypeRead = {
   is_public: boolean;
   allowed_roles: string[];
   record_count: number;
+  trashed_record_count: number;
   fields_locked: boolean;
   created_at: string;
   updated_at: string | null;
@@ -69,9 +70,13 @@ export type RecordPage = {
 };
 
 export type RecordRevision = {
+  id: number;
   version: number;
-  data: Record<string, unknown>;
+  schema_version: number;
+  event: string;
+  display_title: string;
   created_at: string;
+  created_by: string | null;
 };
 
 /** The filter grammar's operators (`?filter=field:op:value`). Mirrors
