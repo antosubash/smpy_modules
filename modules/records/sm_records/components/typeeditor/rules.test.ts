@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { indexable, keyValid, normaliseOnToggle, uniqueAllowed } from './rules';
+import {
+  displayFieldAllowed,
+  indexable,
+  indexedForced,
+  keyValid,
+  normaliseOnToggle,
+  RESERVED_FIELD_KEYS,
+  slugFieldAllowed,
+  uniqueAllowed,
+} from './rules';
 
 describe('indexable', () => {
   it('is true for every field type with an index table', () => {
@@ -138,5 +147,94 @@ describe('normaliseOnToggle', () => {
       indexed: true,
     });
     expect(result).toEqual({ type: 'number', required: true, unique: false, indexed: true });
+  });
+});
+
+describe('reserved field keys', () => {
+  // Mirrors `sm_records.constants.RESERVED_FIELD_KEYS`, which derives itself
+  // from `Record.__table__.columns` + `index.query.FIXED_COLUMNS`. A key from
+  // that set is answered by the query layer from `records_record`, not from
+  // the field, so the save is refused on both sides.
+  it('refuses every column a record already has', () => {
+    for (const key of [
+      '_orphaned',
+      'id',
+      'uuid',
+      'type_id',
+      'data',
+      'schema_version',
+      'version',
+      'status',
+      'slug',
+      'display_title',
+      'position',
+      'published_at',
+      'created_at',
+      'updated_at',
+      'created_by',
+      'updated_by',
+      'is_deleted',
+      'deleted_at',
+    ]) {
+      expect(RESERVED_FIELD_KEYS.has(key)).toBe(true);
+      expect(keyValid(key, [])).toBe('reserved');
+    }
+  });
+
+  it('still accepts an ordinary key', () => {
+    expect(keyValid('order_status', [])).toBeNull();
+    expect(keyValid('title', [])).toBeNull();
+  });
+});
+
+describe('indexedForced', () => {
+  it('is true for a relation, however it is declared', () => {
+    expect(indexedForced({ type: 'relation', unique: false })).toBe(true);
+    expect(indexedForced({ type: 'relation', options: { many: true } })).toBe(true);
+  });
+
+  it('is true for a unique field and false otherwise', () => {
+    expect(indexedForced({ type: 'text', unique: true })).toBe(true);
+    expect(indexedForced({ type: 'text', unique: false })).toBe(false);
+  });
+});
+
+describe('normaliseOnToggle for a relation', () => {
+  it('forces indexed on, so on_delete has index rows to read', () => {
+    const result = normaliseOnToggle({
+      type: 'relation',
+      options: { many: false },
+      required: false,
+      unique: false,
+      indexed: false,
+    });
+    expect(result.indexed).toBe(true);
+  });
+
+  it('forces it on for a to-many relation too, which can never be unique', () => {
+    const result = normaliseOnToggle({
+      type: 'relation',
+      options: { many: true },
+      required: false,
+      unique: true,
+      indexed: false,
+    });
+    expect(result).toMatchObject({ indexed: true, unique: false });
+  });
+});
+
+describe('pointer field types', () => {
+  it('allows only what display_title can stringify sensibly', () => {
+    for (const type of ['text', 'select', 'email', 'url', 'integer', 'number', 'date', 'datetime'])
+      expect(displayFieldAllowed(type)).toBe(true);
+    for (const type of ['json', 'media', 'multiselect', 'relation', 'longtext', 'boolean'])
+      expect(displayFieldAllowed(type)).toBe(false);
+  });
+
+  it('allows only free text as a slug field', () => {
+    for (const type of ['text', 'select', 'email', 'url'])
+      expect(slugFieldAllowed(type)).toBe(true);
+    for (const type of ['integer', 'number', 'date', 'datetime', 'boolean', 'json', 'relation'])
+      expect(slugFieldAllowed(type)).toBe(false);
   });
 });

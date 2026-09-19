@@ -196,7 +196,11 @@ ORDER = TypeDef(
         _f("total", "number", "Total", indexed=True),
         _f("placed_at", "datetime", "Placed at", indexed=True),
         _f(
-            "status",
+            # Not ``status``: that is a column of every record, so it is a
+            # reserved field key (``constants._reserved_field_keys``) — the
+            # query layer would answer ``filter=status:...`` from
+            # ``records_record`` rather than from this field.
+            "order_status",
             "select",
             "Status",
             indexed=True,

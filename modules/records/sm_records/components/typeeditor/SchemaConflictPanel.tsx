@@ -40,7 +40,10 @@ export function SchemaConflictPanel({
   return (
     <div className="space-y-4">
       {report && (
-        <div className="space-y-3 rounded-md border border-destructive/50 p-4">
+        <div
+          className="space-y-3 rounded-md border border-destructive/50 p-4"
+          data-testid="records-schema-report"
+        >
           <p className="font-medium text-destructive">
             {t('records.type_editor.preview.report_title', {
               defaultValue: 'This change would leave records invalid',
@@ -76,7 +79,10 @@ export function SchemaConflictPanel({
       )}
 
       {conflicts && (
-        <div className="space-y-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-4">
+        <div
+          className="space-y-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-4"
+          data-testid="records-orphaned-conflicts"
+        >
           <p className="font-medium">
             {t('records.type_editor.preview.conflicts_title', {
               defaultValue: 'These fields still hold values from a previous delete',

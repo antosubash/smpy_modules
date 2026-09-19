@@ -152,7 +152,7 @@ export function RelationPicker({
   const removeLabel = t('records.relation.remove', { defaultValue: 'Remove' });
 
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-2" data-testid={`records-relation-${field.key}`}>
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selected.map((ref) => {

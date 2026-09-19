@@ -8,10 +8,10 @@ registers this class in ``register_settings`` via ``register_module_settings``,
 the host hydrates it from the DB at lifespan start, and the Settings screen
 writes it back.
 
-``public_route_prefix`` is read at boot to mount the anonymous read routes
-(design doc §10), so it carries ``requires_restart`` — the Settings screen
-surfaces that next to the input. Everything else here is read per request and
-takes effect on save.
+``public_route_prefix`` carries ``requires_restart`` because the anonymous
+read routes it configures would be mounted at boot — but that API is Phase 4
+of the design doc (§16) and has not shipped, so today nothing reads the field
+at all. Everything else here is read per request and takes effect on save.
 """
 
 from __future__ import annotations
@@ -56,10 +56,13 @@ class RecordsSettings(BaseSettings):
     public_route_prefix: str = Field(default="/api/records/public", json_schema_extra=_RESTART)
     """URL prefix for the anonymous read API of public record types.
 
-    Mounted via ``register_public_routes`` from ``on_startup`` (design doc
-    §10), because the set of public types is only known after settings
-    hydration. Changing the prefix remounts those routes, so it takes effect
-    on restart.
+    **Inert today.** The public read API is Phase 4 (design doc §16, "Phase 4
+    — reach"): nothing reads this field, and ``RecordType.is_public`` grants
+    no anonymous access. It is kept, and kept marked ``requires_restart``,
+    because when the routes land they are mounted via
+    ``register_public_routes`` from ``on_startup`` — the set of public types
+    is only known after settings hydration — and changing the prefix will
+    then need a restart.
     """
 
     default_page_size: int = 25

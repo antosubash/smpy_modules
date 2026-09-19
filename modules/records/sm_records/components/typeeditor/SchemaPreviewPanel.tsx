@@ -79,7 +79,7 @@ export function SchemaPreviewPanel({
         </p>
       )}
       {preview && !stale && (
-        <div className="space-y-3 rounded-md border p-4">
+        <div className="space-y-3 rounded-md border p-4" data-testid="records-schema-preview">
           <SchemaChangeList preview={preview} />
           <DryRunReportView report={preview.report} />
         </div>

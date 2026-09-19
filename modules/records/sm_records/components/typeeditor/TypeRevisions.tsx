@@ -107,6 +107,7 @@ export function TypeRevisions({
               {items.map((rev) => (
                 <li
                   key={rev.id}
+                  data-testid="records-type-revision-item"
                   className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
                 >
                   <div>

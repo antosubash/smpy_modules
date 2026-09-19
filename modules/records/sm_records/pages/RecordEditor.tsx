@@ -213,7 +213,11 @@ function RecordEditor({ type, record }: Props) {
           </div>
 
           {unplaceable.length > 0 && (
-            <ul className="space-y-1 text-sm text-destructive" role="alert">
+            <ul
+              className="space-y-1 text-sm text-destructive"
+              role="alert"
+              data-testid="records-unplaceable-errors"
+            >
               {unplaceable.map((entry) => (
                 <li key={`${entry.field}:${entry.message}`}>
                   {entry.field}: {entry.message}

@@ -9,7 +9,7 @@ import { ArrowDownIcon, ArrowUpIcon, XIcon } from 'lucide-react';
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
-import { indexable, keyValid, normaliseOnToggle, uniqueAllowed } from './rules';
+import { indexable, indexedForced, keyValid, normaliseOnToggle, uniqueAllowed } from './rules';
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
 // See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
@@ -24,7 +24,7 @@ function keyErrorMessage(
 ): string {
   const defaults = {
     required: 'A key is required.',
-    reserved: '"_orphaned" is reserved by the module.',
+    reserved: 'That key is reserved by the module: it names a column every record already has.',
     pattern:
       'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
     duplicate: 'Another field already uses this key.',
@@ -89,7 +89,11 @@ export function FieldRow({
   };
 
   return (
-    <div className="grid gap-3 rounded-lg border p-4">
+    <div
+      className="grid gap-3 rounded-lg border p-4"
+      data-testid="records-field-row"
+      data-field-index={index}
+    >
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
         <div className="grid gap-1.5">
           <Label htmlFor={`${idBase}-key`}>
@@ -207,7 +211,11 @@ export function FieldRow({
           <Checkbox
             id={`${idBase}-indexed`}
             checked={field.indexed}
-            disabled={disabled || !indexable(field.type)}
+            // Same treatment `unique` gets above: when the server normalises
+            // the flag on (a `unique` field, or any `relation` — see
+            // `rules.ts::indexedForced`) the box is checked and locked,
+            // rather than accepting a click that snaps straight back.
+            disabled={disabled || !indexable(field.type) || indexedForced(field)}
             onCheckedChange={(checked) => applyPatch({ indexed: checked === true })}
           />
           <Label htmlFor={`${idBase}-indexed`} className="font-normal">

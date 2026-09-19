@@ -35,6 +35,7 @@ from sm_records.deps import (
     load_type,
     parse_filters,
     parse_sorts,
+    parse_trashed,
     request_db,
     require_edit,
     require_view,
@@ -75,9 +76,25 @@ async def list_records(
     page_size: int | None = Query(default=None, ge=1),
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
+    trashed: bool = Depends(parse_trashed),
 ) -> RecordPage:
+    """The type's records, or — with ``?trashed=true`` — only its trash.
+
+    There is no other way to enumerate soft-deleted records: without it a
+    trashed record is reachable only by a caller who kept its uuid, which
+    makes "trash and restore" a feature you can use once. ``trashed`` costs
+    ``records.edit`` (``deps.parse_trashed``); every item comes back with
+    ``is_deleted: true``, so the shape needs nothing new.
+    """
     items, total = await record_service.list_records(
-        db, rtype, settings=settings, filters=filters, sorts=sorts, page=page, page_size=page_size
+        db,
+        rtype,
+        settings=settings,
+        filters=filters,
+        sorts=sorts,
+        page=page,
+        page_size=page_size,
+        trashed=trashed,
     )
     return RecordPage(
         # ``record_list_read``, not a comprehension over ``record_read``: a

@@ -8,6 +8,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { RolesMultiSelect } from './RolesMultiSelect';
+import { displayFieldAllowed, slugFieldAllowed } from './rules';
 import type { EditableField, TypeMetadataValues } from './types';
 
 const ID = {
@@ -50,6 +51,13 @@ export function TypeMetadataForm({
 }) {
   const { t } = useT();
   const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
+  // Only the field types the API accepts for each pointer
+  // (`services/_schema.py::DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`). Offering
+  // a `json` display field or a `boolean` slug field meant a 422 on save at
+  // best, and — before the server checked — every record titled `{'a': 1}`
+  // or slugged `true`.
+  const displayChoices = fields.filter((f) => displayFieldAllowed(f.type));
+  const slugChoices = fields.filter((f) => slugFieldAllowed(f.type));
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -173,7 +181,7 @@ export function TypeMetadataForm({
           onChange={(e) => onChange({ displayField: e.target.value })}
         >
           <NativeSelectOption value="">{none}</NativeSelectOption>
-          {fields.map((f) => (
+          {displayChoices.map((f) => (
             <NativeSelectOption key={f.key} value={f.key}>
               {f.label} ({f.key})
             </NativeSelectOption>
@@ -192,7 +200,7 @@ export function TypeMetadataForm({
           onChange={(e) => onChange({ slugField: e.target.value })}
         >
           <NativeSelectOption value="">{none}</NativeSelectOption>
-          {fields.map((f) => (
+          {slugChoices.map((f) => (
             <NativeSelectOption key={f.key} value={f.key}>
               {f.label} ({f.key})
             </NativeSelectOption>

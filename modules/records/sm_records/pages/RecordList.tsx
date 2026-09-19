@@ -158,7 +158,10 @@ function RecordList({ type, records }: Props) {
         </div>
 
         {filterErrorReason && (
-          <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+          <div
+            data-testid="records-filter-error"
+            className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm"
+          >
             {filterErrorMessage(t, filterErrorReason)}
           </div>
         )}

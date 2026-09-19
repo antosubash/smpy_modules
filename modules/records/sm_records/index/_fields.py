@@ -38,12 +38,20 @@ def read_field(raw: dict[str, Any]) -> IndexedField | None:
     Returns ``None`` for an unindexed field, an unindexable type, and a type
     this build does not know — a definition written by a newer version of the
     module must not stop the reindex of its siblings.
+
+    A ``relation`` is read as indexed whatever the stored definition says.
+    ``schema.fields._validate_flags`` normalises the flag on, because §9's
+    ``on_delete`` is enforced by looking up ``records_index_ref`` — but this
+    layer consumes *stored* JSON, including definitions written before that
+    normalisation existed, and an unindexed relation there would leave the
+    ref rows missing and the delete behaviour unenforced. Deciding it here as
+    well is what makes an already-stored definition behave.
     """
-    if not raw.get("indexed"):
-        return None
     try:
         field_type = FieldType(raw.get("type"))
     except ValueError:
+        return None
+    if not raw.get("indexed") and field_type is not FieldType.RELATION:
         return None
     kind = INDEX_KIND.get(field_type)
     if kind is None:

@@ -1,7 +1,7 @@
 """One pydantic annotation per field type, for the payload validator.
 
-Split out of ``compile.py`` so the per-type coercion rules live together and
-neither file approaches the 300-line cap. Everything here is an ``Annotated``
+Split out of ``compile.py``, with the scalar coercers themselves split again
+into ``_scalars.py`` for the 300-line cap. Everything here is an ``Annotated``
 carrying ``BeforeValidator``/``AfterValidator`` callables
 rather than a pydantic constraint object (``StringConstraints``,
 ``Field(ge=...)``). Two reasons, both load-bearing: an optional field's base is
@@ -10,6 +10,9 @@ hand-written validators let every refusal carry a message written for the
 person editing a record. Validators are therefore uniformly ``None``-tolerant,
 and ``_reject_none`` is added back for required fields whose base is ``Any``
 (``json``, ``relation``) — pydantic would otherwise accept a literal null.
+``_text_check`` takes ``required`` for the same reason one rule on: a blank
+string is not a value. ``select`` needs no equivalent (``""`` is not one of
+its choices) and nor do ``email``/``url`` (their own checks refuse it).
 """
 
 from __future__ import annotations
@@ -17,20 +20,26 @@ from __future__ import annotations
 import re
 from datetime import date as _date
 from datetime import datetime as _datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
 from pydantic import AfterValidator, BeforeValidator
 
-from sm_records.constants import NUMBER_PRECISION, NUMBER_SCALE, TYPE_KEY_PATTERN
+from sm_records.constants import TYPE_KEY_PATTERN
+from sm_records.schema._scalars import (
+    check_decimal,
+    to_bool,
+    to_date,
+    to_datetime,
+    to_decimal,
+    to_int,
+)
 from sm_records.schema.types import FieldType
 
 MEDIA_MAX_LEN = 500
 """A ``media`` value is an opaque id or URL; the cap stops a payload smuggling
 a base64 blob through a field the index never sees."""
-MAX_INT_DIGITS = NUMBER_PRECISION - NUMBER_SCALE
-"""Digits left of the point that ``Numeric(19, 5)`` can hold."""
 
 # Deliberately not RFC 5322: `email-validator` is not a dependency and adding
 # one for a single field type is not worth it. This catches the typo.
@@ -48,7 +57,7 @@ def _reject_none(value: Any) -> Any:
     return value
 
 
-def _text_check(constraints: dict[str, Any]):
+def _text_check(constraints: dict[str, Any], *, required: bool = False):
     minimum = constraints.get("min_length")
     maximum = constraints.get("max_length")
     pattern = re.compile(constraints["pattern"]) if constraints.get("pattern") else None
@@ -56,6 +65,10 @@ def _text_check(constraints: dict[str, Any]):
     def check(value: str | None) -> str | None:
         if value is None:
             return None
+        # ``required`` alone means "present and not null", which left ``""``
+        # satisfying a field the form marks with an asterisk.
+        if required and not value.strip():
+            raise ValueError("this field is required")
         if minimum is not None and len(value) < minimum:
             raise ValueError(f"must be at least {minimum} characters")
         if maximum is not None and len(value) > maximum:
@@ -102,106 +115,6 @@ def _check_media(value: str | None) -> str | None:
     if value is not None and len(value) > MEDIA_MAX_LEN:
         raise ValueError(f"must be at most {MEDIA_MAX_LEN} characters")
     return value
-
-
-def to_decimal(value: Any) -> Any:
-    """Accept int/float/str/Decimal; refuse bool, which is an int in Python."""
-    if value is None or isinstance(value, Decimal):
-        return value
-    if isinstance(value, bool):
-        raise ValueError("expected a number, got a boolean")
-    if isinstance(value, int):
-        return Decimal(value)
-    # str() first: Decimal(0.1) inherits the binary float's noise and would
-    # then fail the scale check below for a value the caller wrote as "0.1".
-    if isinstance(value, float):
-        return Decimal(str(value))
-    if isinstance(value, str):
-        try:
-            return Decimal(value.strip())
-        except InvalidOperation:
-            raise ValueError("not a number") from None
-    raise ValueError("expected a number")
-
-
-def _check_decimal(value: Decimal | None) -> Decimal | None:
-    """Enforce the ``Numeric(19, 5)`` contract of design §7.3. Refusing rather
-    than rounding is the point: payload and index row must agree, and an index
-    that silently rounds is a filter that silently returns the wrong rows."""
-    if value is None:
-        return None
-    if not value.is_finite():
-        raise ValueError("not a finite number")
-    exponent = value.as_tuple().exponent
-    if isinstance(exponent, int) and -exponent > NUMBER_SCALE:
-        raise ValueError(f"at most {NUMBER_SCALE} decimal places are stored")
-    if len(str(abs(int(value)))) > MAX_INT_DIGITS:
-        raise ValueError(f"at most {MAX_INT_DIGITS} digits before the decimal point")
-    return value
-
-
-def to_int(value: Any) -> Any:
-    if value is None:
-        return value
-    if isinstance(value, bool):
-        raise ValueError("expected an integer, got a boolean")
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float | Decimal):
-        if value != int(value):
-            raise ValueError("must be a whole number")
-        return int(value)
-    if isinstance(value, str):
-        try:
-            return int(value.strip())
-        except ValueError:
-            raise ValueError("not an integer") from None
-    raise ValueError("expected an integer")
-
-
-def to_bool(value: Any) -> Any:
-    """Narrow on purpose: ``"yes"`` is refused, so a form that sends it is a bug
-    caught at the boundary instead of a column of silent ``False``."""
-    if value is None or isinstance(value, bool):
-        return value
-    if isinstance(value, int) and value in (0, 1):
-        return bool(value)
-    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
-        return value.strip().lower() == "true"
-    raise ValueError("expected true or false")
-
-
-def to_date(value: Any) -> Any:
-    """A calendar date, never a datetime — §7.3 on why they index separately."""
-    if value is None:
-        return value
-    if isinstance(value, _datetime):
-        raise ValueError("expected a calendar date, not a datetime")
-    if isinstance(value, _date):
-        return value
-    if isinstance(value, str):
-        try:
-            return _date.fromisoformat(value.strip())
-        except ValueError:
-            raise ValueError("not an ISO date (YYYY-MM-DD)") from None
-    raise ValueError("expected a date")
-
-
-def to_datetime(value: Any) -> Any:
-    if value is None:
-        return value
-    if isinstance(value, _datetime):
-        parsed = value
-    elif isinstance(value, str):
-        try:
-            parsed = _datetime.fromisoformat(value.strip())
-        except ValueError:
-            raise ValueError("not an ISO 8601 datetime") from None
-    else:
-        raise ValueError("expected a datetime")
-    if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
-        raise ValueError("must carry a timezone offset; a naive datetime is never guessed")
-    return parsed
 
 
 def _select_check(options: dict[str, Any], *, many: bool):
@@ -252,14 +165,14 @@ def _check_ref_list(value: Any) -> Any:
 
 
 def _base_and_validators(
-    field_type: FieldType, constraints: dict[str, Any], options: dict[str, Any]
+    field_type: FieldType, constraints: dict[str, Any], options: dict[str, Any], required: bool
 ) -> tuple[Any, list[Any]]:
     if field_type in _TEXTLIKE:
         extra = {FieldType.EMAIL: _check_email, FieldType.URL: _check_url}.get(field_type)
-        return str, [_text_check(constraints), *([extra] if extra else [])]
+        return str, [_text_check(constraints, required=required), *([extra] if extra else [])]
     if field_type is FieldType.NUMBER:
         coerce = BeforeValidator(to_decimal)
-        return Decimal, [coerce, _check_decimal, _range_check(constraints, to_decimal)]
+        return Decimal, [coerce, check_decimal, _range_check(constraints, to_decimal)]
     if field_type is FieldType.INTEGER:
         return int, [BeforeValidator(to_int), _range_check(constraints, int)]
     if field_type is FieldType.BOOLEAN:
@@ -288,7 +201,7 @@ def annotation_for(field: Any, *, required: bool) -> Any:
     """
     field_type = FieldType(field.type)
     base, validators = _base_and_validators(
-        field_type, dict(field.constraints or {}), dict(field.options or {})
+        field_type, dict(field.constraints or {}), dict(field.options or {}), required
     )
     if base is Any:
         if required:

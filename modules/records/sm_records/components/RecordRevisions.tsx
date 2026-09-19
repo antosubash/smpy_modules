@@ -126,7 +126,11 @@ export function RecordRevisions({
           {items && items.length > 0 && (
             <ul className="space-y-2">
               {items.map((rev) => (
-                <li key={rev.id} className="rounded-md border p-3 text-sm">
+                <li
+                  key={rev.id}
+                  className="rounded-md border p-3 text-sm"
+                  data-testid="records-revision-item"
+                >
                   <button
                     type="button"
                     className="w-full text-left"

@@ -28,6 +28,7 @@ from sm_records.contracts.schemas import (
 )
 from sm_records.deps import (
     actor,
+    check_type_roles,
     get_settings,
     load_type,
     request_db,
@@ -36,9 +37,10 @@ from sm_records.deps import (
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.models import RecordType
-from sm_records.services import reindex_runner, schema_change
+from sm_records.services import _orphaned, reindex_runner, schema_change
 from sm_records.services import revisions as revision_service
 from sm_records.services import types as type_service
+from sm_records.services.errors import ValidationFailed
 from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
 
@@ -58,6 +60,18 @@ def _schedule_reindex_if_pending(
     """
     if rtype.reindex_pending:
         background.add_task(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings)
+
+
+def _check_roles_for_discard(request: Request, rtype: RecordType, orphaned: str | None) -> None:
+    """``orphaned="discard"`` is a bulk write over this type's records (§8.8),
+    so it meets the same ``allowed_roles`` narrowing a single record write
+    does — ``records.manage_types`` is a permission to change the schema, not
+    a way around a type whose records the caller may not touch. Every other
+    schema edit stays gated by ``records.manage_types`` alone: it writes the
+    type row, never the records.
+    """
+    if orphaned == _orphaned.DISCARD:
+        check_type_roles(request, rtype)
 
 
 @router.get("/types", response_model=TypeListResponse, dependencies=[require_view])
@@ -117,7 +131,17 @@ async def update_type(
     # "not None", since ``None`` is a legitimate value for e.g. ``description``.
     # ``force``/``orphaned`` are read straight off ``body`` below: they are
     # §8.2/§8.8's retry knobs, not columns, so they never belong in ``changes``.
+    _check_roles_for_discard(request, rtype, body.orphaned)
     changes = body.model_dump(exclude_unset=True, exclude={"expected_version", "force", "orphaned"})
+    # ``key`` is not a column ``update_type`` accepts, but it *is* a key
+    # clients send back with the rest of the type they just read. Dropping it
+    # silently (the SQLModel default before ``TypeUpdate`` declared it) let a
+    # caller believe it had renamed a type and get a 200; a value that differs
+    # from the path is refused instead, and one that matches is a no-op echo.
+    sent_key = changes.pop("key", None)
+    if sent_key is not None and sent_key != rtype.key:
+        problem = "key is immutable — it is in URLs, the API and every relation target"
+        raise ValidationFailed(problem, [{"field": "key", "message": problem}])
     if "fields" in changes:
         changes["fields_raw"] = changes.pop("fields")
     updated = await type_service.update_type(
@@ -136,10 +160,21 @@ async def update_type(
 
 @router.delete("/types/{key}", status_code=204, dependencies=[require_manage_types])
 async def delete_type(
+    request: Request,
     confirm_record_count: int = Query(...),
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
 ) -> None:
+    """``records.manage_types`` *and* the type's own ``allowed_roles``.
+
+    Deleting a type purges every record it holds, trash included — the widest
+    write in the module. A caller the list excludes is refused a single record
+    write and has a cascade into this type downgraded to ``restrict``
+    (``services._lifecycle._role_blocked``); letting the same caller destroy
+    all of it instead was the one gap in that rule, not a deliberate
+    exception. Same check, same admin semantics, as every record write.
+    """
+    check_type_roles(request, rtype)
     await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
 
 
@@ -223,6 +258,7 @@ async def restore_type_revision(
     :func:`schema_change.apply` under a new name (§8.6) — same 409 shapes as
     ``PUT``, mapped by the same ``RecordsErrorRoute``, and the same
     reindex-scheduling rule below it."""
+    _check_roles_for_discard(request, rtype, body.orphaned)
     updated, _ = await schema_change.rollback(
         db,
         rtype,

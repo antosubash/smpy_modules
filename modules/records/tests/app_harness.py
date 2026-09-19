@@ -80,9 +80,16 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-async def build_app(tmp_path: Any) -> tuple[FastAPI, Any]:
+async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
     """Every router mounted at its real prefix, exactly as
-    ``wire_module_routes`` does in production."""
+    ``wire_module_routes`` does in production.
+
+    ``db_state`` overrides the throwaway ``:memory:`` database with one the
+    caller already owns — the perf suite runs against a seeded file-backed
+    SQLite database and needs the endpoints wired to *that* one, not to a
+    fresh empty one. Its schema is assumed to exist; the default path still
+    creates it.
+    """
     module = RecordsModule()
     # Pre-seeded so ``register_settings`` hands the services container this
     # object instead of hydrating from a database the harness doesn't run a
@@ -99,10 +106,11 @@ async def build_app(tmp_path: Any) -> tuple[FastAPI, Any]:
     app.include_router(api_router)
     app.include_router(view_router)
 
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if db_state is None:
+        db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+        register_listeners(db_state)
+        async with db_state.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     registry = PermissionRegistry()
     module.register_permissions(registry)

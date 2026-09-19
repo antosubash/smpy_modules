@@ -15,6 +15,7 @@ export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
   if (errors.length === 0) return null;
   return (
     <div
+      data-testid="records-invalid-notice"
       className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm"
       role="alert"
     >

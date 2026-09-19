@@ -150,7 +150,7 @@ def gen_order(
         "products": [{"type": "product", "uuid": uuid} for uuid in chosen],
         "total": total,
         "placed_at": random_datetime(rng, 2021, 2026),
-        "status": status,
+        "order_status": status,
         "ship_state": state,
         "gift": rng.random() < 0.12,
     }

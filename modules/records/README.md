@@ -44,9 +44,19 @@ type and its fields. Each type gets a generic, schema-driven list screen and
 form at `/admin/records/{key}` and `/admin/records/{key}/{uuid}` — one pair of
 screens serves every type; nothing is generated per type.
 
-The same operations are available as a JSON API under `/api/records`, and a
-type marked `is_public` additionally exposes an anonymous, published-only
-read API (see Permissions below).
+The same operations are available as a JSON API under `/api/records`. Every
+route on it requires a session and one of the three permissions below — there
+is no anonymous surface yet.
+
+**`is_public` and `public_route_prefix` are stored but inert.** The public
+read API they configure is **Phase 4** of the design doc (§16, "Phase 4 —
+reach") and has not shipped: a type marked `is_public` is readable by exactly
+the callers a private one is, and nothing reads `public_route_prefix`. The
+flag is persisted and editable so the schema does not have to change when the
+API lands. Two more §9/§10 features are Phase 4 with it: `?expand=` on a read
+(depth-1 resolution of a relation, ignored today) and the `dangling: true`
+marker on a reference whose target has been trashed or purged (a reference
+like that reads back as the raw stored object).
 
 **If a field is not indexed, it is not queryable.** `data` is opaque storage;
 no endpoint filters, sorts, or searches by extracting from it. A field must
@@ -63,7 +73,7 @@ variables are read. Configure on the Settings screen or with
 
 | setting | default | restart? |
 |---|---|---|
-| `public_route_prefix` | `/api/records/public` | yes |
+| `public_route_prefix` | `/api/records/public` | yes — but see below |
 | `default_page_size` | 25 | no |
 | `max_page_size` | 200 | no |
 | `revision_limit` | 50 per record | no |
@@ -72,6 +82,10 @@ variables are read. Configure on the Settings screen or with
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
+
+`public_route_prefix` is read by nothing: it configures the Phase 4 public
+read API described under Usage, which has not shipped. Setting it changes no
+behaviour.
 
 ## Permissions
 
@@ -92,7 +106,10 @@ restricted type must list a role they actually hold, or else use
 `records.manage_types` to edit `allowed_roles` back before they can write its
 records. The same list also governs what a delete elsewhere may do to this
 type's records: a `cascade` or `set_null` relation pointing here is refused —
-reported as a `restrict` blocker — for a caller the list excludes.
+reported as a `restrict` blocker — for a caller the list excludes, and
+`DELETE /api/records/types/{key}` (which purges every record of the type,
+trash included) and an `orphaned: "discard"` schema edit are refused for them
+too, `records.manage_types` notwithstanding.
 
 **This is an honest limitation, not an oversight: per-type `allowed_roles`
 are invisible in the framework's role editor.** An admin editing roles sees
@@ -108,6 +125,29 @@ screen, that a given type is further restricted to specific roles.
   SQLAlchemy stores `Numeric` there as a floating-point `REAL` — exact on
   Postgres, approximate on SQLite. Callers wanting more precision want a
   `text` or `json` field instead.
+- **Some field keys are reserved.** A field may not be keyed `_orphaned`, nor
+  after any column a record already has — `id`, `uuid`, `type_id`, `data`,
+  `schema_version`, `version`, `status`, `slug`, `display_title`, `position`,
+  `published_at`, `created_at`, `updated_at`, `created_by`, `updated_by`,
+  `is_deleted`, `deleted_at`, `deleted_by`. The query layer resolves those
+  names against the record row before the type's own fields, so such a field
+  would index correctly and then be filtered and sorted from the wrong data.
+  The list is derived from the model, so it cannot drift.
+- **A `relation` field is always indexed**, whatever the checkbox says: the
+  flag is normalised on, exactly as `unique` is. `on_delete` is enforced by
+  asking the reference index who points at a record, so an unindexed relation
+  would accept `restrict`/`set_null`/`cascade` and enforce none of them.
+  Indexed relations count against `max_indexed_fields_per_type`.
+- **`display_field` must point at a `text`, `select`, `email`, `url`,
+  `integer`, `number`, `date` or `datetime` field, and `slug_field` at a
+  `text`, `select`, `email` or `url` one.** The rest do not stringify into
+  anything a title or an address should be.
+- **`required` on a `text`, `longtext`, `email`, `url` or `select` field is
+  not satisfied by `""` or whitespace.**
+- **The trash is enumerable**: `GET /api/records/types/{key}/records?trashed=true`
+  returns only that type's soft-deleted records, with `total` counted the same
+  way and the usual filters and sorts. It needs `records.edit`, not merely
+  `records.view` — enumerating the trash is how anything gets restored.
 - **`unique` is enforced by the application, not by a database constraint.**
   The index tables are shared across every field of a kind, so a partial
   unique index naming a runtime-chosen field key isn't possible. A `unique`

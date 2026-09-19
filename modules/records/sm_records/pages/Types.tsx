@@ -51,7 +51,7 @@ function Types({ types }: Props) {
             </TableHeader>
             <TableBody>
               {types.map((type) => (
-                <TableRow key={type.key}>
+                <TableRow key={type.key} data-testid="records-type-row" data-type-key={type.key}>
                   <TableCell className="font-medium">
                     <Link href={`/admin/records/types/${type.key}`} className="hover:underline">
                       {type.label}

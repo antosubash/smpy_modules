@@ -24,9 +24,10 @@ from sm_records.contracts.schemas import (
 from sm_records.deps import (
     get_settings,
     load_type,
-    parse_filters,
     parse_sorts,
+    parse_view_filters,
     request_db,
+    require_manage_types,
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
@@ -68,7 +69,13 @@ def _editor_context(request: Request, rtypes: list[RecordType]) -> dict[str, obj
 
 # Declared before the ``/{key}`` family: ``types`` is a reserved type key
 # (constants.RESERVED_TYPE_KEYS) precisely so these two never lose to it.
-@router.get("/types/new", response_model=None)
+#
+# Both carry ``require_manage_types`` on top of the router's ``require_view``:
+# the screen renders the whole type definition, its ``allowed_roles`` and the
+# install's role list, and every button on it calls an API that already
+# requires ``records.manage_types``. A ``records.view`` holder reaching it saw
+# all of that and could press none of it.
+@router.get("/types/new", response_model=None, dependencies=[require_manage_types])
 async def type_new(
     request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
 ) -> InertiaResponse:
@@ -79,7 +86,7 @@ async def type_new(
     )
 
 
-@router.get("/types/{key}", response_model=None)
+@router.get("/types/{key}", response_model=None, dependencies=[require_manage_types])
 async def type_edit(
     request: Request,
     inertia: InertiaDep,
@@ -135,7 +142,7 @@ async def record_list(
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
-    filters: list[Filter] = Depends(parse_filters),
+    parsed: tuple[list[Filter], str | None] = Depends(parse_view_filters),
     sorts: list[Sort] = Depends(parse_sorts),
 ) -> InertiaResponse:
     """First page, deep-linkable via the same ``page``/``sort``/``filter``
@@ -145,20 +152,32 @@ async def record_list(
     counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
     page_size = max(min(settings.default_page_size, settings.max_page_size), 1)
+    filters, malformed = parsed
     errors: dict[str, str] = {}
-    try:
-        items, total = await record_service.list_records(
-            db, rtype, settings=settings, filters=filters, sorts=effective_sorts, page=page
-        )
-    except QueryError as exc:
-        # A page navigation, not an API call: Inertia reserves 409 for its own
-        # asset-version handshake and shows any other error status in a modal,
-        # so a filter on a field that is mid-reindex (design §8.5), unknown or
-        # unindexed cannot be a status code here. The screen renders empty
-        # with the reason in Inertia's own ``errors`` bag — the same channel
-        # form validation uses — and the page shows it inline.
-        items, total = [], 0
-        errors["filter"] = exc.reason
+    items: list = []
+    total = 0
+    if malformed is not None:
+        # A ``?filter=`` term that does not parse at all, which the API answers
+        # with a 400 raised from the dependency. Here it joins the same
+        # ``errors`` bag a refused-but-well-formed filter uses, for the same
+        # reason: this is a page navigation, and a bare status code is an
+        # Inertia error modal over a screen that already knows how to say what
+        # is wrong with a filter.
+        errors["filter"] = malformed
+    else:
+        try:
+            items, total = await record_service.list_records(
+                db, rtype, settings=settings, filters=filters, sorts=effective_sorts, page=page
+            )
+        except QueryError as exc:
+            # A page navigation, not an API call: Inertia reserves 409 for its
+            # own asset-version handshake and shows any other error status in a
+            # modal, so a filter on a field that is mid-reindex (design §8.5),
+            # unknown or unindexed cannot be a status code here. The screen
+            # renders empty with the reason in Inertia's own ``errors`` bag —
+            # the same channel form validation uses — and shows it inline.
+            items, total = [], 0
+            errors["filter"] = exc.reason
     records_page = RecordPage(
         # One lenient read per row and no per-row validation — see
         # ``contracts.schemas.record_list_read``.

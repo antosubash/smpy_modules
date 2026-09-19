@@ -102,7 +102,12 @@ export function FilterBar({
       // comparison operators it doesn't vary by kind.
       ops: [...opsForFieldType(f.type).filter((op) => op !== 'in'), 'is_null'],
     }));
-  const filterable = [...indexed, ...fixedFilterFields(t)];
+  // A fixed column is dropped when a declared field already claims the key,
+  // so the dropdown can never list one twice. Moot since those names became
+  // reserved field keys (`typeeditor/rules.ts::RESERVED_FIELD_KEYS`), but a
+  // type saved before that still carries such a field.
+  const declared = new Set(indexed.map((f) => f.key));
+  const filterable = [...indexed, ...fixedFilterFields(t).filter((f) => !declared.has(f.key))];
   const fieldByKey = new Map(filterable.map((f) => [f.key, f]));
 
   const initialField = current?.field ?? filterable[0]?.key ?? '';

@@ -20,7 +20,7 @@ export function TypeConflictNotice({
 }) {
   const { t } = useT();
   return (
-    <Card className="border-destructive/50">
+    <Card className="border-destructive/50" data-testid="records-type-conflict">
       <CardHeader>
         <CardTitle className="text-destructive">
           {t('records.type_editor.conflict_title', {

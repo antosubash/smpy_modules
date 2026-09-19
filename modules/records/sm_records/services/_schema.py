@@ -48,15 +48,64 @@ def normalise(fields_raw: list[dict[str, Any]], settings: RecordsSettings):
     return defs, [field.model_dump(mode="json") for field in defs]
 
 
+DISPLAY_FIELD_TYPES: frozenset[FieldType] = frozenset(
+    {
+        FieldType.TEXT,
+        FieldType.SELECT,
+        FieldType.EMAIL,
+        FieldType.URL,
+        FieldType.INTEGER,
+        FieldType.NUMBER,
+        FieldType.DATE,
+        FieldType.DATETIME,
+    }
+)
+"""What ``display_field`` may point at: the types ``_payload.display_title``
+can ``str()`` into something a person reads in a list column. ``json`` and
+``media`` stringify to ``str(dict)`` truncated at 300 characters,
+``multiselect`` to a Python list literal, ``relation`` to ``{'type': ...}``,
+``boolean`` to ``True``/``False`` and ``longtext`` to a paragraph — all
+accepted silently before, all useless as a title."""
+
+SLUG_FIELD_TYPES: frozenset[FieldType] = frozenset(
+    {FieldType.TEXT, FieldType.SELECT, FieldType.EMAIL, FieldType.URL}
+)
+"""What ``slug_field`` may point at — narrower than ``display_field``: a slug
+is an address, so it has to be per-record distinct free text. A ``boolean``
+slug field gives every record the slug ``true`` or ``false`` and the second
+write 409s; a date or a number is barely better."""
+
+_POINTER_TYPES: dict[str, frozenset[FieldType]] = {
+    "display_field": DISPLAY_FIELD_TYPES,
+    "slug_field": SLUG_FIELD_TYPES,
+}
+
+
 def check_pointers(
     defs: list[FieldDefinition], display_field: str | None, slug_field: str | None
 ) -> None:
-    keys = {field.key for field in defs}
+    by_key = {field.key: field for field in defs}
     for name, value in (("display_field", display_field), ("slug_field", slug_field)):
-        if value is not None and value not in keys:
+        if value is None:
+            continue
+        field = by_key.get(value)
+        if field is None:
             raise ValidationFailed(
                 f"{name} {value!r} is not a field of this type",
                 [{"field": name, "message": f"{value!r} is not a declared field"}],
+            )
+        allowed = _POINTER_TYPES[name]
+        if field.type not in allowed:
+            kinds = sorted(member.value for member in allowed)
+            raise ValidationFailed(
+                f"{name} cannot point at a {field.type.value} field; it takes one of {kinds}",
+                [
+                    {
+                        "field": name,
+                        "message": f"{value!r} is a {field.type.value} field, "
+                        f"which cannot be used as {name}",
+                    }
+                ],
             )
 
 

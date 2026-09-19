@@ -66,7 +66,11 @@ export function FieldShell({
       {field.help && <p className="text-sm text-muted-foreground">{field.help}</p>}
       {children}
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p
+          className="text-sm text-destructive"
+          role="alert"
+          data-testid={`records-field-error-${field.key}`}
+        >
           {error}
         </p>
       )}

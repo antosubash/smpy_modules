@@ -53,7 +53,10 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-500/50 bg-blue-500/10 p-3 text-sm">
+    <div
+      data-testid="records-reindex-status"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-500/50 bg-blue-500/10 p-3 text-sm"
+    >
       <div>
         <p className="font-medium">
           {t('records.type_editor.reindex.notice', {

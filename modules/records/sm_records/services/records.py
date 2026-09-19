@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
-from sm_records.index.query import Filter, Sort, build_query, count_query
+from sm_records.index.query import Filter, Sort, build_query, count_query, only_trashed
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
 from sm_records.schema.fields import FieldDefinition
@@ -71,19 +71,28 @@ async def list_records(
     sorts: Sequence[Sort] = (),
     page: int = 1,
     page_size: int | None = None,
+    trashed: bool = False,
 ) -> tuple[list[Record], int]:
     """One page of records, and the unpaged total.
 
     ``QueryError`` from the builder is allowed to propagate: only the endpoint
     layer knows the difference it has to express — 409 while a field is being
     reindexed, 400 for a field that is simply not queryable (§8.5).
+
+    ``trashed=True`` lists the trash and *only* the trash (see
+    ``index.query.only_trashed``). Filters and sorts apply unchanged — index
+    rows survive a soft delete (§7.3), so the trash is as queryable as
+    anything else.
     """
     size = min(page_size or settings.default_page_size, settings.max_page_size)
     size = max(size, 1)
     offset = max(page - 1, 0) * size
     fields = list(rtype.fields or [])
-    total = int((await db.execute(count_query(rtype, fields, filters))).scalar_one())
+    count_stmt = count_query(rtype, fields, filters)
     stmt = build_query(rtype, fields, filters, sorts).offset(offset).limit(size)
+    if trashed:
+        count_stmt, stmt = only_trashed(count_stmt), only_trashed(stmt)
+    total = int((await db.execute(count_stmt)).scalar_one())
     return list((await db.execute(stmt)).scalars().all()), total
 
 

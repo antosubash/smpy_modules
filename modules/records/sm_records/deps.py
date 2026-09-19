@@ -158,6 +158,44 @@ def parse_filters(raw_filters: list[str] = Query(default=[], alias="filter")) ->
     return [_parse_filter(item) for item in raw_filters]
 
 
+MALFORMED_FILTER: Final = "malformed"
+"""The ``errors["filter"]`` reason a view reports for a filter term that does
+not parse, alongside ``QueryError.reason``'s ``unknown``/``not_indexed``/
+``reindexing``."""
+
+
+def parse_view_filters(
+    raw_filters: list[str] = Query(default=[], alias="filter"),
+) -> tuple[list[Filter], str | None]:
+    """:func:`parse_filters` for a *page navigation*, which cannot 400.
+
+    ``_parse_filter`` raises ``HTTPException(400)`` from inside a dependency,
+    so it escapes before the view handler runs and Inertia shows a bare error
+    modal — for a deep link with a typo'd ``?filter=``, on the one screen that
+    already has an ``errors`` bag for a filter it refuses. The parse failure
+    is returned as a reason instead, and the handler renders the list empty
+    with the notice, exactly as it does for ``unknown``/``not_indexed``.
+    """
+    try:
+        return [_parse_filter(item) for item in raw_filters], None
+    except HTTPException:
+        return [], MALFORMED_FILTER
+
+
+def parse_trashed(request: Request, trashed: bool = Query(default=False)) -> bool:
+    """``?trashed=true`` lists the trash, and costs ``records.edit``.
+
+    Enumerating soft-deleted records is how anything gets restored, so it is
+    not a read for the ``records.view`` audience: a viewer sees what the type
+    currently holds, an editor sees what it is holding *back*. Expressed as a
+    dependency rather than a router-level one because it is conditional on
+    the query parameter, which ``RequiresPermission`` cannot see.
+    """
+    if trashed:
+        RequiresPermission(constants.PERM_EDIT)(request)
+    return trashed
+
+
 def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[Sort]:
     """``?sort=`` repeats; a leading ``-`` means descending."""
     return [
@@ -167,6 +205,7 @@ def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[
 
 
 __all__ = [
+    "MALFORMED_FILTER",
     "REQUEST_SESSION_KEY",
     "actor",
     "caller_roles",
@@ -175,6 +214,8 @@ __all__ = [
     "load_type",
     "parse_filters",
     "parse_sorts",
+    "parse_trashed",
+    "parse_view_filters",
     "request_db",
     "request_session",
     "require_edit",

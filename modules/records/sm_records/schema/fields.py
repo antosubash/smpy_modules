@@ -101,8 +101,13 @@ def _validate_key(raw: dict[str, Any], seen: set[str]) -> str:
     _require(isinstance(raw_key, str) and raw_key, None, "every field needs a 'key'")
     key = str(raw_key)
     # Reserved first: `_orphaned` also fails the pattern, and "reserved by the
-    # module" tells the author why far better than a regex does.
-    _require(key not in RESERVED_FIELD_KEYS, key, "key is reserved by the module")
+    # module" tells the author why far better than a regex does. The rest is
+    # every ``Record`` column plus the fixed filter/sort columns
+    # (``constants._reserved_field_keys``), which the query layer resolves
+    # ahead of the type's own fields — so such a field indexed correctly and
+    # was then filtered and sorted from the wrong data, with a 200.
+    reserved = "key is reserved: it names a column every record already has, "
+    _require(key not in RESERVED_FIELD_KEYS, key, reserved + "so a filter would shadow it")
     _require(_KEY_RE.match(key), key, f"key must match {TYPE_KEY_PATTERN}")
     _require(len(key) <= MAX_KEY_LEN, key, f"key must be at most {MAX_KEY_LEN} characters")
     _require(key not in seen, key, "duplicate field key")
@@ -185,7 +190,7 @@ def _validate_constraints(key: str, field_type: FieldType, constraints: dict[str
 
 
 def _validate_flags(field: FieldDefinition) -> None:
-    """``indexed`` and ``unique``, including the one normalisation.
+    """``indexed`` and ``unique``, including the two normalisations.
 
     ``unique`` is enforced by a ``SELECT`` against the index table before the
     write (§7.8 — the index cannot carry a unique constraint, because every
@@ -193,8 +198,16 @@ def _validate_flags(field: FieldDefinition) -> None:
     nothing to select against, so ``unique`` is *normalised* to imply
     ``indexed`` rather than refused: the caller asked for something coherent
     and just left a checkbox unticked.
+
+    A ``relation`` is forced on for the same shape of reason: §9's
+    ``on_delete`` is enforced by ``_relations.referrers`` asking
+    ``records_index_ref`` who points at a record — rows only indexed fields
+    have — so an unindexed relation accepted all three behaviours and enforced
+    none. It counts against the indexed ceiling like any other indexed field.
     """
     key = field.key
+    if field.type is FieldType.RELATION:
+        field.indexed = True
     if field.indexed or field.unique:
         _require(
             indexable(field.type),

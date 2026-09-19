@@ -27,7 +27,7 @@ export function ConflictPanel({
 }) {
   const { t } = useT();
   return (
-    <Card className="border-destructive/50">
+    <Card className="border-destructive/50" data-testid="records-conflict-panel">
       <CardHeader>
         <CardTitle className="text-destructive">
           {t('records.editor.conflict_title', {

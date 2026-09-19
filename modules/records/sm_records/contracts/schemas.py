@@ -101,13 +101,15 @@ class TypeUpdate(SQLModel):
     caller actually sent should reach ``update_type`` — see
     ``endpoints/api/types.py``'s ``model_dump(exclude_unset=True)``.
 
-    ``force``/``orphaned`` are not columns and never reach ``**changes`` —
-    they are the two retries a 409 from :mod:`sm_records.services.schema_change`
-    asks for (design §8.2, §8.8), read separately by the endpoint and passed
-    to ``update_type`` as their own keyword arguments.
+    ``force``/``orphaned`` are not columns and never reach ``**changes`` — they
+    are the two retries a 409 from :mod:`sm_records.services.schema_change`
+    asks for (§8.2, §8.8), read separately by the endpoint and passed to
+    ``update_type`` as their own keyword arguments.
     """
 
     expected_version: int
+    #: Declared only so a body carrying one is refused, not dropped — see
+    key: str | None = None  # ``endpoints/api/types.py``'s ``update_type``.
     label: str | None = None
     label_plural: str | None = None
     description: str | None = None

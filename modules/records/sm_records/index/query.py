@@ -52,6 +52,7 @@ __all__ = [
     "Sort",
     "build_query",
     "count_query",
+    "only_trashed",
 ]
 
 
@@ -231,6 +232,19 @@ def build_query(
     for flt in filters:
         stmt = stmt.where(_term(rtype, indexed, declared, flt))
     return _sorted(stmt, rtype, indexed, declared, sorts)
+
+
+def only_trashed(stmt: Select) -> Select:
+    """Narrow a record query to the trash — the one place that predicate lives.
+
+    Two halves, both needed. ``include_deleted`` lifts the framework's
+    soft-delete filter, which is an ORM execute hook this statement never
+    mentions (see the module docstring); the explicit ``is_deleted`` is what
+    then narrows the result to the deleted rows rather than merging them into
+    the live ones. Applied to ``count_query`` as well as ``build_query``, so a
+    trash listing's ``total`` counts what its page shows.
+    """
+    return stmt.where(Record.is_deleted.is_(True)).execution_options(include_deleted=True)
 
 
 def count_query(

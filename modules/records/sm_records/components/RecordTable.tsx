@@ -90,7 +90,11 @@ export function RecordTable({
       </TableHeader>
       <TableBody>
         {records.map((record) => (
-          <TableRow key={record.uuid}>
+          <TableRow
+            key={record.uuid}
+            data-testid="records-record-row"
+            data-record-uuid={record.uuid}
+          >
             <TableCell className="font-medium">
               <Link href={`/admin/records/${type.key}/${record.uuid}`} className="hover:underline">
                 {record.display_title}

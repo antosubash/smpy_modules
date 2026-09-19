@@ -31,6 +31,68 @@ const NOT_UNIQUE_TYPES = new Set(['multiselect', 'longtext', 'json', 'media']);
 /** A field's `key` may never be this — `sm_records.constants.ORPHANED_KEY`. */
 export const ORPHANED_KEY = '_orphaned';
 
+/**
+ * Every field key the API refuses — `sm_records.constants.RESERVED_FIELD_KEYS`,
+ * which derives itself from `Record.__table__.columns` plus
+ * `index.query.FIXED_COLUMNS`. Each name is a column every record already has,
+ * and the query layer resolves those *before* the type's own fields: a field
+ * keyed `status` or `position` indexes correctly and is then filtered and
+ * sorted from `records_record` instead, silently and with a 200.
+ *
+ * The one list on this side — `FilterBar` and the key input both read it, so
+ * there is no second place for it to drift from.
+ */
+export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
+  ORPHANED_KEY,
+  'id',
+  'uuid',
+  'type_id',
+  'data',
+  'schema_version',
+  'version',
+  'status',
+  'slug',
+  'display_title',
+  'position',
+  'published_at',
+  'created_at',
+  'updated_at',
+  'created_by',
+  'updated_by',
+  'is_deleted',
+  'deleted_at',
+  'deleted_by',
+]);
+
+/** Field types `display_field` may point at — mirrors
+ *  `services/_schema.py::DISPLAY_FIELD_TYPES`. The rest stringify into
+ *  something no list column should show (`str(dict)`, `True`, a paragraph). */
+export const DISPLAY_FIELD_TYPES: ReadonlySet<string> = new Set([
+  'text',
+  'select',
+  'email',
+  'url',
+  'integer',
+  'number',
+  'date',
+  'datetime',
+]);
+
+/** Field types `slug_field` may point at — mirrors
+ *  `services/_schema.py::SLUG_FIELD_TYPES`. Narrower than `display_field`: a
+ *  slug is an address, so it has to be per-record distinct free text. */
+export const SLUG_FIELD_TYPES: ReadonlySet<string> = new Set(['text', 'select', 'email', 'url']);
+
+/** Whether a field of this `type` can be a type's `display_field`. */
+export function displayFieldAllowed(type: string): boolean {
+  return DISPLAY_FIELD_TYPES.has(type);
+}
+
+/** Whether a field of this `type` can be a type's `slug_field`. */
+export function slugFieldAllowed(type: string): boolean {
+  return SLUG_FIELD_TYPES.has(type);
+}
+
 /** A type or field key: lowercase identifier, URL- and JSON-safe. Mirrors
  *  `sm_records.constants.TYPE_KEY_PATTERN`. */
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -65,7 +127,7 @@ export type KeyError = 'required' | 'reserved' | 'pattern' | 'duplicate';
  *  collide with itself. */
 export function keyValid(key: string, existingKeys: readonly string[]): KeyError | null {
   if (!key) return 'required';
-  if (key === ORPHANED_KEY) return 'reserved';
+  if (RESERVED_FIELD_KEYS.has(key)) return 'reserved';
   if (!KEY_PATTERN.test(key)) return 'pattern';
   if (existingKeys.includes(key)) return 'duplicate';
   return null;
@@ -88,6 +150,11 @@ export type FieldFlags = FieldTypeAndOptions & {
  * - `unique` implies `indexed` — the server *normalises* this rather than
  *   refusing it (§6.1's `_validate_flags`), so the UI does the same instead
  *   of bouncing a save the API would have accepted.
+ * - a `relation` implies `indexed`, for the same shape of reason one rule
+ *   further on: §9's `on_delete` is enforced by asking `records_index_ref`
+ *   who points at a record, and an unindexed relation has no rows there. The
+ *   checkbox reads as being about query performance; unticking it used to
+ *   turn off referential integrity for the field.
  *
  * Idempotent — safe to call after every relevant change without tracking
  * which one happened.
@@ -100,6 +167,15 @@ export function normaliseOnToggle(flags: FieldFlags): FieldFlags {
     return next;
   }
   if (!uniqueAllowed(next)) next.unique = false;
-  if (next.unique) next.indexed = true;
+  if (indexedForced(next)) next.indexed = true;
   return next;
+}
+
+/** Whether `indexed` is not the operator's to choose for this field — it is
+ *  `true` and the checkbox should say so rather than silently snapping back.
+ *  `unique` needs an index row to `SELECT` against (§7.8) and a `relation`
+ *  needs one for `on_delete` (§9); both are normalised on by
+ *  `schema/fields.py::_validate_flags`. */
+export function indexedForced(field: FieldTypeAndOptions & { unique?: boolean }): boolean {
+  return field.type === 'relation' || field.unique === true;
 }
