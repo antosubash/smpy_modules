@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import { ConflictPanel } from '../components/ConflictPanel';
 import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
+import { RecordForm } from '../components/RecordForm';
+import { useRecordForm } from '../hooks/useRecordForm';
 import { ApiError, createRecord, updateRecord } from '../utils/api';
 import type { RecordRead, RecordStatus, TypeRead, ValidationError } from '../utils/types';
 
@@ -23,6 +25,8 @@ const SLUG_ID = 'record-slug';
 const POSITION_ID = 'record-position';
 const STATUS_ID = 'record-status';
 const DATA_ID = 'record-data';
+/** The 422 `field` values that belong to an input outside the schema form. */
+const ENVELOPE_KEYS = ['status', 'slug', 'position'];
 
 function fieldMessage(errors: ValidationError[], field: string): string | undefined {
   return errors.find((e) => e.field === field)?.message;
@@ -30,8 +34,13 @@ function fieldMessage(errors: ValidationError[], field: string): string | undefi
 
 /** `Records/RecordEditor` — `/admin/records/{key}/new` and `/…/{uuid}`.
  *
- * Phase 1's form: status, slug, position, and the record's `data` as raw
- * JSON. The schema-driven per-field form is Phase 2. */
+ * The schema-driven form of design §12: `type.fields` in declaration order,
+ * each rendered by `components/fields/`'s registry. The raw-JSON textarea it
+ * replaced is still here behind an "advanced" toggle, because a payload the
+ * generic form cannot express (a `json` field holding something exotic, a
+ * key left behind by a deleted field) still has to be editable — and because
+ * it round-trips, switching back re-populates the fields from what was typed.
+ */
 function RecordEditor({ type, record }: Props) {
   const { t } = useT();
   const isNew = record === null;
@@ -39,36 +48,16 @@ function RecordEditor({ type, record }: Props) {
   const [status, setStatus] = useState<RecordStatus>(record?.status ?? 'draft');
   const [slug, setSlug] = useState(record?.slug ?? '');
   const [position, setPosition] = useState(String(record?.position ?? 0));
-  const [dataText, setDataText] = useState(JSON.stringify(record?.data ?? {}, null, 2));
-  const [dataError, setDataError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<ValidationError[]>([]);
   const [conflict, setConflict] = useState<RecordRead | null>(null);
   const [pending, setPending] = useState(false);
+  const form = useRecordForm(type, record);
 
   const save = async () => {
-    setDataError(null);
-    setErrors([]);
     setConflict(null);
+    const data = form.validateAndBuild();
+    if (data === null) return;
 
-    let data: Record<string, unknown>;
-    try {
-      const parsed = JSON.parse(dataText);
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        throw new Error('not an object');
-      }
-      data = parsed as Record<string, unknown>;
-    } catch {
-      setDataError(t('records.editor.invalid_json', { defaultValue: 'Invalid JSON' }));
-      return;
-    }
-
-    const payload = {
-      data,
-      status,
-      slug: slug || null,
-      position: Number(position) || 0,
-    };
-
+    const payload = { data, status, slug: slug || null, position: Number(position) || 0 };
     setPending(true);
     try {
       const saved = isNew
@@ -79,12 +68,13 @@ function RecordEditor({ type, record }: Props) {
         return;
       }
       setCurrent(saved);
+      form.reset(saved);
       toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.body?.current) {
         setConflict(err.body.current as RecordRead);
       } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
-        setErrors(err.body.errors);
+        form.setServerErrors(err.body.errors);
       } else {
         toast.error(err instanceof Error ? err.message : String(err));
       }
@@ -98,18 +88,18 @@ function RecordEditor({ type, record }: Props) {
     setStatus(server.status);
     setSlug(server.slug ?? '');
     setPosition(String(server.position));
-    setDataText(JSON.stringify(server.data, null, 2));
+    form.reset(server);
     setConflict(null);
   };
 
-  const dataFieldErrors = errors.filter((e) => e.field === 'data' || e.field.startsWith('data.'));
-  const dataErrorText =
-    dataError ??
-    (dataFieldErrors.length
-      ? dataFieldErrors.map((e) => `${e.field}: ${e.message}`).join('; ')
-      : undefined);
-
   const backHref = `/admin/records/${type.key}`;
+  const envelope = form.envelopeErrors;
+  // Raw mode hides the per-field form, so the field-level 422s it would have
+  // carried are listed here instead — otherwise a save in raw mode is refused
+  // with nothing on screen saying why.
+  const unplaceable = (form.raw ? form.serverErrors : envelope).filter(
+    (entry) => !ENVELOPE_KEYS.includes(entry.field),
+  );
 
   return (
     <>
@@ -148,7 +138,11 @@ function RecordEditor({ type, record }: Props) {
           )}
 
           {conflict && (
-            <ConflictPanel current={conflict} yourData={dataText} onReload={reloadFromConflict} />
+            <ConflictPanel
+              current={conflict}
+              yourData={form.currentPayloadText()}
+              onReload={reloadFromConflict}
+            />
           )}
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -158,6 +152,7 @@ function RecordEditor({ type, record }: Props) {
               </Label>
               <NativeSelect
                 id={STATUS_ID}
+                className="w-full"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as RecordStatus)}
               >
@@ -168,8 +163,8 @@ function RecordEditor({ type, record }: Props) {
                   {t('records.records.published', { defaultValue: 'Published' })}
                 </NativeSelectOption>
               </NativeSelect>
-              {fieldMessage(errors, 'status') && (
-                <p className="text-sm text-destructive">{fieldMessage(errors, 'status')}</p>
+              {fieldMessage(envelope, 'status') && (
+                <p className="text-sm text-destructive">{fieldMessage(envelope, 'status')}</p>
               )}
             </div>
             <div className="grid gap-1.5">
@@ -177,8 +172,8 @@ function RecordEditor({ type, record }: Props) {
                 {t('records.editor.slug_label', { defaultValue: 'Slug' })}
               </Label>
               <Input id={SLUG_ID} value={slug} onChange={(e) => setSlug(e.target.value)} />
-              {fieldMessage(errors, 'slug') && (
-                <p className="text-sm text-destructive">{fieldMessage(errors, 'slug')}</p>
+              {fieldMessage(envelope, 'slug') && (
+                <p className="text-sm text-destructive">{fieldMessage(envelope, 'slug')}</p>
               )}
             </div>
             <div className="grid gap-1.5">
@@ -191,22 +186,54 @@ function RecordEditor({ type, record }: Props) {
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
               />
-              {fieldMessage(errors, 'position') && (
-                <p className="text-sm text-destructive">{fieldMessage(errors, 'position')}</p>
+              {fieldMessage(envelope, 'position') && (
+                <p className="text-sm text-destructive">{fieldMessage(envelope, 'position')}</p>
               )}
             </div>
           </div>
 
-          <JsonField
-            id={DATA_ID}
-            label={t('records.editor.data_label', { defaultValue: 'Data' })}
-            helpText={t('records.editor.data_help', {
-              defaultValue: "Raw JSON for this record's fields.",
-            })}
-            value={dataText}
-            onChange={setDataText}
-            error={dataErrorText}
-          />
+          {unplaceable.length > 0 && (
+            <ul className="space-y-1 text-sm text-destructive" role="alert">
+              {unplaceable.map((entry) => (
+                <li key={`${entry.field}:${entry.message}`}>
+                  {entry.field}: {entry.message}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium uppercase text-muted-foreground">
+              {t('records.editor.fields_heading', { defaultValue: 'Fields' })}
+            </h2>
+            <Button type="button" variant="ghost" size="sm" onClick={form.toggleRaw}>
+              {form.raw
+                ? t('records.editor.use_form', { defaultValue: 'Back to the form' })
+                : t('records.editor.use_raw_json', { defaultValue: 'Advanced: edit raw JSON' })}
+            </Button>
+          </div>
+
+          {form.raw ? (
+            <JsonField
+              id={DATA_ID}
+              label={t('records.editor.data_label', { defaultValue: 'Data' })}
+              helpText={t('records.editor.data_help', {
+                defaultValue:
+                  "Raw JSON for this record's fields. Switching back re-fills the form from it.",
+              })}
+              value={form.rawText}
+              onChange={form.setRawText}
+              error={form.rawError}
+            />
+          ) : (
+            <RecordForm
+              fields={type.fields}
+              values={form.values}
+              errors={form.fieldErrors}
+              disabled={pending}
+              onChange={form.setValue}
+            />
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" disabled={pending} onClick={() => void save()}>
@@ -219,7 +246,10 @@ function RecordEditor({ type, record }: Props) {
               <RecordActions
                 typeKey={type.key}
                 record={current}
-                onRestored={setCurrent}
+                onRestored={(restored) => {
+                  setCurrent(restored);
+                  form.reset(restored);
+                }}
                 onGone={() => router.visit(backHref)}
               />
             )}
