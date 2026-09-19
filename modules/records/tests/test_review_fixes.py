@@ -183,7 +183,9 @@ async def test_the_trash_still_counts_when_a_schema_change_is_classified(client)
     record still holds content the schema describes and a restore reads it
     back, so a change that would invalidate it is refused for it."""
     rtype = await _one_trashed(client, "f4thing")
-    assert (rtype["trashed_record_count"], rtype["fields_locked"]) == (1, True)
+    # ``fields_locked`` is gone (Phase 3 dropped it) — the trash still counts
+    # towards *this* rule via ``trashed_record_count`` alone.
+    assert rtype["trashed_record_count"] == 1
 
     # The trashed record has no ``alt`` value, so requiring it fails for the
     # only record the type has — which is in the trash.

@@ -24,7 +24,7 @@ async def test_create_list_get_round_trip(client, field_def):
     payload = created.json()
     assert payload["key"] == "product"
     assert payload["record_count"] == 0
-    assert payload["fields_locked"] is False
+    assert payload["reindex_pending"] == {}
     assert payload["version"] == 1
 
     listed = await client.get("/api/records/types", headers=roles(ADMIN))
@@ -111,15 +111,16 @@ async def test_update_with_stale_version_is_409_with_current(client, field_def):
 async def test_an_additive_fields_change_applies_to_a_populated_type(
     client, records_app, field_def
 ):
-    """The Phase 1 lock is gone (design §16 → §8). ``fields_locked`` still
-    reports that the type holds content — the editor shows it — but an
-    additive edit now goes through, classified rather than refused."""
+    """The Phase 1 lock is gone (design §16 → §8): a populated type's
+    ``fields`` are no longer flatly read-only — an additive edit goes
+    through, classified rather than refused, exactly as an empty type's
+    would."""
     _, db_state = records_app
     rtype = await seed_type(db_state, "product", [field_def("price", "number")])
     await seed_record(db_state, rtype, {"price": "1.00"})
 
     got = await client.get("/api/records/types/product", headers=roles(ADMIN))
-    assert got.json()["fields_locked"] is True
+    assert got.json()["record_count"] == 1
 
     resp = await client.put(
         "/api/records/types/product",

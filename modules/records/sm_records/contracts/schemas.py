@@ -1,10 +1,17 @@
-"""HTTP-facing DTOs for the Records API and admin views.
+"""HTTP-facing DTOs for the Records API and admin views — Record Type and
+Record CRUD.
 
 SQLModel throughout, per ``CLAUDE.md`` — never a plain pydantic ``BaseModel``.
 The read shapes (``TypeRead``, ``RecordRead``, ``RevisionRead``) are built by
 :func:`type_read` / :func:`record_read` / :func:`revision_read` rather than
 constructed ad hoc at each call site, so the API and the Inertia views render
 one serialisation of a row rather than two that can drift.
+
+The schema-change half of the contract — the dry-run report, a preview's
+response, and the two revision-listing shapes — lives in
+``contracts/schema_change.py``, split out for the 300-line cap. The seam is
+real: everything here is "what does one row look like on the wire", and that
+module is "what does a proposed change to one look like".
 """
 
 from __future__ import annotations
@@ -15,6 +22,7 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
+from sm_records.index.reindex import pending_map
 from sm_records.models import Record, RecordRevision, RecordType
 from sm_records.services.records import read_view
 
@@ -22,6 +30,8 @@ __all__ = [
     "RecordCreate",
     "RecordPage",
     "RecordRead",
+    "RecordRevisionDetailRead",
+    "RecordRevisionRestoreRequest",
     "RecordUpdate",
     "RevisionListResponse",
     "RevisionRead",
@@ -30,6 +40,7 @@ __all__ = [
     "TypeRead",
     "TypeUpdate",
     "record_read",
+    "record_revision_detail_read",
     "revision_read",
     "type_read",
 ]
@@ -54,12 +65,12 @@ class TypeRead(SQLModel):
     """Records in the trash. Separate from ``record_count`` because the two
     answer different questions: what the type shows, and what deleting it
     would destroy. ``DELETE /types/{key}`` confirms against the *sum*."""
-    fields_locked: bool
-    """``record_count + trashed_record_count > 0`` — design §16's Phase 1
-    rule: a type's ``fields`` (and its ``display_field``/``slug_field``) are
-    read-only once it holds a record. The trash counts: a trashed record still
-    holds content those fields describe. Carried here so the UI can disable
-    the field editor without a second request."""
+    reindex_pending: dict[str, str]
+    """Field key (or ``"*"`` for the whole type) -> ISO enqueue time — a
+    schema-affecting change that hasn't finished its out-of-request rebuild
+    yet (design §8.5/§8.9). Mirrors ``RecordType.reindex_pending`` exactly;
+    the UI reads it to grey out a field as a filter/sort target and to offer
+    the manual "Reindex" button."""
     created_at: datetime
     updated_at: datetime | None
 
@@ -84,7 +95,13 @@ class TypeCreate(SQLModel):
 class TypeUpdate(SQLModel):
     """Every field but ``expected_version`` is optional; only the ones the
     caller actually sent should reach ``update_type`` — see
-    ``endpoints/api/types.py``'s ``model_dump(exclude_unset=True)``."""
+    ``endpoints/api/types.py``'s ``model_dump(exclude_unset=True)``.
+
+    ``force``/``orphaned`` are not columns and never reach ``**changes`` —
+    they are the two retries a 409 from :mod:`sm_records.services.schema_change`
+    asks for (design §8.2, §8.8), read separately by the endpoint and passed
+    to ``update_type`` as their own keyword arguments.
+    """
 
     expected_version: int
     label: str | None = None
@@ -96,6 +113,8 @@ class TypeUpdate(SQLModel):
     slug_field: str | None = None
     is_public: bool | None = None
     allowed_roles: list[str] | None = None
+    force: bool = False
+    orphaned: str | None = None
 
 
 class RecordRead(SQLModel):
@@ -113,6 +132,11 @@ class RecordRead(SQLModel):
     created_at: datetime
     updated_at: datetime | None
     is_deleted: bool
+    invalid: list[dict[str, str]]
+    """Empty when the record satisfies the current schema. Non-empty marks it
+    "invalid under current schema" without hiding it (design §8.3) — set by a
+    ``force``d restrictive schema change or a rollback the record no longer
+    fits. Straight from ``read_view``'s own ``invalid`` list."""
 
 
 class RecordPage(SQLModel):
@@ -151,6 +175,17 @@ class RevisionListResponse(SQLModel):
     items: list[RevisionRead]
 
 
+class RecordRevisionDetailRead(RevisionRead):
+    """``GET .../revisions/{id}``'s response — the list entry plus the
+    payload it snapshotted, for the read-only preview before restoring it."""
+
+    data: dict[str, Any]
+
+
+class RecordRevisionRestoreRequest(SQLModel):
+    expected_version: int
+
+
 def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -> TypeRead:
     """Both counts are required rather than defaulted: a caller that forgot
     the trashed one would silently report a populated type as editable."""
@@ -169,7 +204,7 @@ def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -
         allowed_roles=list(rtype.allowed_roles or []),
         record_count=record_count,
         trashed_record_count=trashed_record_count,
-        fields_locked=(record_count + trashed_record_count) > 0,
+        reindex_pending=pending_map(rtype),
         created_at=rtype.created_at,
         updated_at=rtype.updated_at,
     )
@@ -195,6 +230,7 @@ def record_read(rtype: RecordType, record: Record) -> RecordRead:
         created_at=record.created_at,
         updated_at=record.updated_at,
         is_deleted=record.is_deleted,
+        invalid=view["invalid"],
     )
 
 
@@ -207,4 +243,17 @@ def revision_read(revision: RecordRevision) -> RevisionRead:
         display_title=revision.display_title,
         created_at=revision.created_at,
         created_by=revision.created_by,
+    )
+
+
+def record_revision_detail_read(revision: RecordRevision) -> RecordRevisionDetailRead:
+    return RecordRevisionDetailRead(
+        id=revision.id,
+        version=revision.version,
+        schema_version=revision.schema_version,
+        event=revision.event.value,
+        display_title=revision.display_title,
+        created_at=revision.created_at,
+        created_by=revision.created_by,
+        data=dict(revision.data or {}),
     )

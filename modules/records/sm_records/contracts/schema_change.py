@@ -1,0 +1,154 @@
+"""HTTP-facing DTOs for design §8's schema-change pipeline.
+
+Split from ``contracts/schemas.py`` for the 300-line cap — the seam is real:
+that module is "what does one row look like on the wire", this one is "what
+does a proposed change to one look like", mirroring
+:mod:`sm_records.schema.changes` field for field.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from sqlmodel import SQLModel
+
+from sm_records.models import RecordTypeRevision
+from sm_records.schema.changes import DryRunReport, SchemaChange, SchemaDiff
+from sm_records.schema.types import ChangeClass
+
+__all__ = [
+    "DryRunReportRead",
+    "FailingRecordRead",
+    "SchemaChangeRead",
+    "SchemaPreviewRead",
+    "SchemaPreviewRequest",
+    "TypeRestoreRequest",
+    "TypeRevisionListResponse",
+    "TypeRevisionRead",
+    "dry_run_report_read",
+    "schema_preview_read",
+    "type_revision_read",
+]
+
+
+class SchemaChangeRead(SQLModel):
+    """One entry of a ``SchemaPreviewRead.changes`` list. Mirrors
+    :class:`sm_records.schema.changes.SchemaChange` field for field."""
+
+    kind: ChangeClass
+    field_key: str
+    what: str
+    before: Any = None
+    after: Any = None
+
+
+class FailingRecordRead(SQLModel):
+    uuid: str
+    display_title: str
+    errors: list[dict[str, str]]
+
+
+class DryRunReportRead(SQLModel):
+    checked: int
+    failing: int
+    sample: list[FailingRecordRead]
+    orphaned_conflicts: dict[str, int]
+    clean: bool
+
+
+class SchemaPreviewRequest(SQLModel):
+    """``POST /types/{key}/schema/preview``'s body. ``display_field``/
+    ``slug_field`` are optional and only affect the diff when the caller
+    actually sends them — see ``endpoints/api/types.py``'s
+    ``model_dump(exclude_unset=True)``, which is what tells a pointer the
+    caller left out apart from one explicitly set back to its current value."""
+
+    fields: list[dict[str, Any]]
+    display_field: str | None = None
+    slug_field: str | None = None
+
+
+class SchemaPreviewRead(SQLModel):
+    """Writes nothing — classifies the proposed ``fields`` and dry-runs it
+    against the type's records (design §8.9)."""
+
+    kind: ChangeClass
+    changes: list[SchemaChangeRead]
+    report: DryRunReportRead
+
+
+class TypeRevisionRead(SQLModel):
+    """One snapshot of a type's schema, from ``GET /types/{key}/revisions``."""
+
+    id: int
+    version: int
+    schema_version: int
+    fields: list[dict[str, Any]]
+    display_field: str | None
+    slug_field: str | None
+    created_at: datetime
+    created_by: str | None
+
+
+class TypeRevisionListResponse(SQLModel):
+    items: list[TypeRevisionRead]
+
+
+class TypeRestoreRequest(SQLModel):
+    """A schema rollback goes through the same pipeline as any other change
+    (§8.6) — same body shape and 409s as ``TypeUpdate``."""
+
+    expected_version: int
+    force: bool = False
+    orphaned: str | None = None
+
+
+def type_revision_read(revision: RecordTypeRevision) -> TypeRevisionRead:
+    return TypeRevisionRead(
+        id=revision.id,
+        version=revision.version,
+        schema_version=revision.schema_version,
+        fields=list(revision.fields or []),
+        display_field=revision.display_field,
+        slug_field=revision.slug_field,
+        created_at=revision.created_at,
+        created_by=revision.created_by,
+    )
+
+
+def dry_run_report_read(report: DryRunReport) -> DryRunReportRead:
+    """The wire shape of a :class:`~sm_records.schema.changes.DryRunReport`.
+
+    Built rather than ``dataclasses.asdict``: ``clean`` is a computed
+    property, not a field, and ``asdict`` would drop it — the one thing the
+    UI's summary line actually reads (``DryRunReportView``).
+    """
+    return DryRunReportRead(
+        checked=report.checked,
+        failing=report.failing,
+        sample=[
+            FailingRecordRead(uuid=r.uuid, display_title=r.display_title, errors=list(r.errors))
+            for r in report.sample
+        ],
+        orphaned_conflicts=dict(report.orphaned_conflicts),
+        clean=report.clean,
+    )
+
+
+def _schema_change_read(change: SchemaChange) -> SchemaChangeRead:
+    return SchemaChangeRead(
+        kind=change.kind,
+        field_key=change.field_key,
+        what=change.what,
+        before=change.before,
+        after=change.after,
+    )
+
+
+def schema_preview_read(diff: SchemaDiff, report: DryRunReport) -> SchemaPreviewRead:
+    return SchemaPreviewRead(
+        kind=diff.kind,
+        changes=[_schema_change_read(c) for c in diff.changes],
+        report=dry_run_report_read(report),
+    )

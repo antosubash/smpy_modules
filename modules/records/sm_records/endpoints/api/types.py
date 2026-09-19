@@ -8,9 +8,17 @@ implementation plan exactly.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.contracts.schema_change import (
+    SchemaPreviewRead,
+    SchemaPreviewRequest,
+    TypeRestoreRequest,
+    TypeRevisionListResponse,
+    schema_preview_read,
+    type_revision_read,
+)
 from sm_records.contracts.schemas import (
     TypeCreate,
     TypeListResponse,
@@ -28,9 +36,28 @@ from sm_records.deps import (
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.models import RecordType
+from sm_records.services import reindex_runner, schema_change
+from sm_records.services import revisions as revision_service
 from sm_records.services import types as type_service
+from sm_records.services.schema_change import MISSING
+from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute)
+
+
+def _schedule_reindex_if_pending(
+    background: BackgroundTasks, request: Request, rtype: RecordType, settings: RecordsSettings
+) -> None:
+    """§8.9: the reindex runs out of request. Scheduled whenever the write
+    that just happened left something in ``reindex_pending`` — never
+    unconditionally, or an edit that changed nothing indexable would queue a
+    no-op background task on every save. ``request.app.state.sm.db`` rather
+    than the request's own session: the task runs after the response, on its
+    own session (:mod:`sm_records.services.reindex_runner`'s own docstring
+    says why), and the request's session is gone by then.
+    """
+    if rtype.reindex_pending:
+        background.add_task(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings)
 
 
 @router.get("/types", response_model=TypeListResponse, dependencies=[require_view])
@@ -79,19 +106,31 @@ async def read_type(
 @router.put("/types/{key}", response_model=TypeRead, dependencies=[require_manage_types])
 async def update_type(
     body: TypeUpdate,
+    background: BackgroundTasks,
+    request: Request,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
-    settings=Depends(get_settings),
+    settings: RecordsSettings = Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> TypeRead:
     # Only what the caller actually sent — ``exclude_unset`` and not merely
     # "not None", since ``None`` is a legitimate value for e.g. ``description``.
-    changes = body.model_dump(exclude_unset=True, exclude={"expected_version"})
+    # ``force``/``orphaned`` are read straight off ``body`` below: they are
+    # §8.2/§8.8's retry knobs, not columns, so they never belong in ``changes``.
+    changes = body.model_dump(exclude_unset=True, exclude={"expected_version", "force", "orphaned"})
     if "fields" in changes:
         changes["fields_raw"] = changes.pop("fields")
     updated = await type_service.update_type(
-        db, rtype, expected_version=body.expected_version, settings=settings, actor=who, **changes
+        db,
+        rtype,
+        expected_version=body.expected_version,
+        settings=settings,
+        actor=who,
+        force=body.force,
+        orphaned=body.orphaned,
+        **changes,
     )
+    _schedule_reindex_if_pending(background, request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
 
 
@@ -102,3 +141,97 @@ async def delete_type(
     db: AsyncSession = Depends(request_db),
 ) -> None:
     await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
+
+
+@router.post(
+    "/types/{key}/schema/preview",
+    response_model=SchemaPreviewRead,
+    dependencies=[require_manage_types],
+)
+async def preview_schema(
+    body: SchemaPreviewRequest,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+) -> SchemaPreviewRead:
+    """Writes nothing (design §8.9) — see ``endpoints/api/_errors.py``'s
+    module docstring on why this handler still has no ``try``/``except`` of
+    its own: nothing here can leave writes for ``RecordsErrorRoute`` to
+    discard, because nothing here writes.
+
+    ``exclude_unset`` is what lets a caller that only ever sends ``fields``
+    (today's UI) reach :func:`schema_change.preview` without its
+    ``display_field``/``slug_field`` arguments at all, rather than as an
+    explicit ``None`` that would misread as "clear the pointer".
+    """
+    sent = body.model_dump(exclude_unset=True)
+    diff, report = await schema_change.preview(
+        db,
+        rtype,
+        body.fields,
+        settings,
+        display_field=sent.get("display_field", MISSING),
+        slug_field=sent.get("slug_field", MISSING),
+    )
+    return schema_preview_read(diff, report)
+
+
+@router.post("/types/{key}/reindex", status_code=202, dependencies=[require_manage_types])
+async def reindex_type(
+    background: BackgroundTasks,
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    settings: RecordsSettings = Depends(get_settings),
+) -> dict[str, bool]:
+    """Manually kick a stuck reindex (§8.9's health check names it — this is
+    the fix). Schedules unconditionally, whether or not anything is actually
+    pending: the runner is idempotent (``run_pending`` is a no-op with
+    nothing to do), and an operator pressing this button already believes
+    something is stuck, so a silent no-op here for "there's nothing pending
+    any more" would look like the button did nothing.
+    """
+    background.add_task(reindex_runner.schedule, request.app.state.sm.db, rtype.id, settings)
+    return {"scheduled": True}
+
+
+@router.get(
+    "/types/{key}/revisions", response_model=TypeRevisionListResponse, dependencies=[require_view]
+)
+async def list_type_revisions(
+    rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
+) -> TypeRevisionListResponse:
+    revisions = await revision_service.list_type_revisions(db, rtype)
+    return TypeRevisionListResponse(items=[type_revision_read(r) for r in revisions])
+
+
+@router.post(
+    "/types/{key}/revisions/{version}/restore",
+    response_model=TypeRead,
+    dependencies=[require_manage_types],
+)
+async def restore_type_revision(
+    version: int,
+    body: TypeRestoreRequest,
+    background: BackgroundTasks,
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+    who: str | None = Depends(actor),
+) -> TypeRead:
+    """A schema rollback goes through :func:`schema_change.rollback`, which is
+    :func:`schema_change.apply` under a new name (§8.6) — same 409 shapes as
+    ``PUT``, mapped by the same ``RecordsErrorRoute``, and the same
+    reindex-scheduling rule below it."""
+    updated, _ = await schema_change.rollback(
+        db,
+        rtype,
+        to_version=version,
+        expected_version=body.expected_version,
+        settings=settings,
+        actor=who,
+        force=body.force,
+        orphaned=body.orphaned,
+    )
+    _schedule_reindex_if_pending(background, request, updated, settings)
+    return type_read(updated, *await type_service.record_counts(db, updated))

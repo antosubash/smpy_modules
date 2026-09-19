@@ -46,6 +46,21 @@ def tightened(field_def, **constraints) -> dict:
     return {**field_def("sku", "text", indexed=False), "constraints": constraints}
 
 
+async def apply_fields(db, settings, rtype, fields_raw=None, **kw):
+    """``apply`` against ``rtype``'s own current version — it mutates the
+    object it is given in place, so the caller's ``rtype.version`` is already
+    the right ``expected_version`` for whatever call comes next."""
+    return await schema_change.apply(
+        db, rtype, fields_raw=fields_raw, expected_version=rtype.version, settings=settings, **kw
+    )
+
+
+async def rollback_to(db, settings, rtype, to_version, **kw):
+    return await schema_change.rollback(
+        db, rtype, to_version=to_version, expected_version=rtype.version, settings=settings, **kw
+    )
+
+
 async def test_preview_reports_the_records_that_would_fail_and_writes_nothing(
     db, settings, fields, field_def
 ):
@@ -65,18 +80,41 @@ async def test_preview_reports_the_records_that_would_fail_and_writes_nothing(
     assert (rtype.schema_version, rtype.version) == (1, 1)
 
 
-async def test_preview_of_an_additive_change_skips_the_scan(db, settings, fields, field_def):
-    """Nothing additive can invalidate a record, so the pass that could only
-    ever report zero is not run at all — ``checked`` says so honestly."""
+async def test_preview_of_an_additive_change_skips_the_scan_but_reports_the_real_count(
+    db, settings, fields, field_def
+):
+    """Nothing additive can invalidate a record, so the scan that could only
+    ever report zero is skipped — but ``checked`` must still be the type's
+    real record count, or "N checked, 0 would fail" lies about N."""
     rtype = await make(db, settings, fields)
     await add(db, settings, rtype, {"title": "One"})
+    await add(db, settings, rtype, {"title": "Two"})
 
     diff, report = await schema_change.preview(
         db, rtype, [*fields, field_def("stock", "integer", indexed=False)], settings
     )
     assert diff.kind.value == "additive"
-    assert (report.checked, report.failing) == (0, 0)
+    assert (report.checked, report.failing) == (2, 0)
     assert report.clean
+
+
+async def test_a_display_field_only_preview_reports_an_index_affecting_change(db, settings, fields):
+    """A pointer-only preview (``fields`` unchanged, only ``display_field``
+    moved) must not come back empty: it enqueues a whole-type rebuild (§18
+    Q2) like any other index-affecting change. Omitting the argument, or
+    resending it unchanged, must not manufacture a change out of nothing."""
+    rtype = await make(db, settings, fields, display_field="title")
+    await add(db, settings, rtype, {"title": "One"})
+
+    diff, report = await schema_change.preview(db, rtype, fields, settings, display_field="sku")
+    assert diff.kind.value == "index_affecting"
+    assert [c.what for c in diff.changes] == ["display_field_changed"]
+    assert (diff.changes[0].before, diff.changes[0].after) == ("title", "sku")
+    assert (report.checked, report.failing) == (1, 0)  # not restrictive
+
+    unchanged, _ = await schema_change.preview(db, rtype, fields, settings)
+    same, _ = await schema_change.preview(db, rtype, fields, settings, display_field="title")
+    assert unchanged.changes == () == same.changes
 
 
 async def test_an_additive_change_applies_to_a_populated_type(db, settings, fields, field_def):
@@ -106,13 +144,7 @@ async def test_a_restrictive_change_is_refused_and_writes_nothing(db, settings, 
     await add(db, settings, rtype, {"title": "One", "sku": "AB"})
 
     with pytest.raises(SchemaChangeRefused) as excinfo:
-        await schema_change.apply(
-            db,
-            rtype,
-            fields_raw=[fields[0], tightened(field_def, min_length=5)],
-            expected_version=1,
-            settings=settings,
-        )
+        await apply_fields(db, settings, rtype, [fields[0], tightened(field_def, min_length=5)])
 
     assert excinfo.value.report.failing == 1
     assert excinfo.value.status_code == 409
@@ -129,13 +161,8 @@ async def test_force_applies_the_change_and_marks_the_failing_record(
     rtype = await make(db, settings, fields)
     record = await add(db, settings, rtype, {"title": "One", "sku": "AB"})
 
-    updated, _ = await schema_change.apply(
-        db,
-        rtype,
-        fields_raw=[fields[0], tightened(field_def, min_length=5)],
-        expected_version=1,
-        settings=settings,
-        force=True,
+    updated, _ = await apply_fields(
+        db, settings, rtype, [fields[0], tightened(field_def, min_length=5)], force=True
     )
     assert updated.schema_version == 2
 
@@ -165,13 +192,7 @@ async def test_a_type_change_on_an_indexed_field_enqueues_the_rebuild_and_refuse
     )
     await add(db, settings, rtype, {"price": "12"})
 
-    updated, diff = await schema_change.apply(
-        db,
-        rtype,
-        fields_raw=[field_def("price", "number")],
-        expected_version=1,
-        settings=settings,
-    )
+    updated, diff = await apply_fields(db, settings, rtype, [field_def("price", "number")])
 
     assert set(updated.reindex_pending) == {"price"}
     assert diff.keys(*{c.kind for c in diff.changes}) == ("price",)
@@ -186,13 +207,7 @@ async def test_a_display_field_change_enqueues_a_whole_type_rebuild(db, settings
     rtype = await make(db, settings, fields, display_field="title")
     await add(db, settings, rtype, {"title": "One"})
 
-    updated, _ = await schema_change.apply(
-        db,
-        rtype,
-        expected_version=1,
-        settings=settings,
-        changes={"display_field": "sku"},
-    )
+    updated, _ = await apply_fields(db, settings, rtype, changes={"display_field": "sku"})
     assert REINDEX_ALL in updated.reindex_pending
     assert updated.display_field == "sku"
     assert updated.schema_version == 1  # the fields did not change
@@ -206,9 +221,7 @@ async def test_a_slug_field_change_leaves_the_slugs_already_handed_out_alone(db,
     record = await add(db, settings, rtype, {"title": "One", "sku": "ABCDEF"})
     assert record.slug == "one"
 
-    updated, _ = await schema_change.apply(
-        db, rtype, expected_version=1, settings=settings, changes={"slug_field": "sku"}
-    )
+    updated, _ = await apply_fields(db, settings, rtype, changes={"slug_field": "sku"})
     assert updated.slug_field == "sku"
     assert record.slug == "one"
     assert REINDEX_ALL not in updated.reindex_pending
@@ -219,15 +232,10 @@ async def test_a_stale_expected_version_conflicts_before_anything_is_scanned(
 ):
     rtype = await make(db, settings, fields)
     await add(db, settings, rtype, {"title": "One"})
-    await schema_change.apply(
-        db,
-        rtype,
-        fields_raw=[*fields, field_def("stock", "integer", indexed=False)],
-        expected_version=1,
-        settings=settings,
-    )
+    await apply_fields(db, settings, rtype, [*fields, field_def("stock", "integer", indexed=False)])
 
     with pytest.raises(Conflict) as excinfo:
+        # Deliberately the *stale* version (1), not ``rtype.version`` (now 2).
         await schema_change.apply(
             db, rtype, fields_raw=fields, expected_version=1, settings=settings
         )
@@ -239,18 +247,10 @@ async def test_rollback_writes_an_earlier_revision_back_through_the_pipeline(
 ):
     rtype = await make(db, settings, fields)
     await add(db, settings, rtype, {"title": "One"})
-    await schema_change.apply(
-        db,
-        rtype,
-        fields_raw=[*fields, field_def("stock", "integer", indexed=False)],
-        expected_version=1,
-        settings=settings,
-    )
+    await apply_fields(db, settings, rtype, [*fields, field_def("stock", "integer", indexed=False)])
     assert [f["key"] for f in rtype.fields] == ["title", "sku", "stock"]
 
-    updated, diff = await schema_change.rollback(
-        db, rtype, to_version=1, expected_version=2, settings=settings
-    )
+    updated, diff = await rollback_to(db, settings, rtype, 1)
     assert [f["key"] for f in updated.fields] == ["title", "sku"]
     # Undoing an addition is a *deletion*, classified like any other.
     assert diff.kind.value == "destructive"
@@ -266,13 +266,11 @@ async def test_rollback_is_refused_when_it_would_invalidate_records(db, settings
     rtype = await type_service.create_type(
         db, key="product", label="Product", fields_raw=[required], settings=settings
     )
-    await schema_change.apply(
-        db, rtype, fields_raw=[optional], expected_version=1, settings=settings
-    )
+    await apply_fields(db, settings, rtype, [optional])
     await add(db, settings, rtype, {})
 
     with pytest.raises(SchemaChangeRefused) as excinfo:
-        await schema_change.rollback(db, rtype, to_version=1, expected_version=2, settings=settings)
+        await rollback_to(db, settings, rtype, 1)
     assert excinfo.value.report.failing == 1
     assert rtype.fields[0]["required"] is False
 
@@ -280,6 +278,4 @@ async def test_rollback_is_refused_when_it_would_invalidate_records(db, settings
 async def test_rollback_to_a_version_that_does_not_exist_is_a_404(db, settings, fields):
     rtype = await make(db, settings, fields)
     with pytest.raises(NotFound):
-        await schema_change.rollback(
-            db, rtype, to_version=99, expected_version=1, settings=settings
-        )
+        await rollback_to(db, settings, rtype, 99)

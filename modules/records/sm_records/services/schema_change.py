@@ -1,22 +1,17 @@
 """Changing a populated type's schema — the whole of design doc §8, applied.
 
-Three entry points, one pipeline:
+Three entry points, one pipeline: :func:`preview` classifies a proposed
+``fields`` list and reports what it would do to the records that exist,
+writing nothing; :func:`apply` re-runs that classification *inline* and then
+writes — re-run rather than trusting a report id, because a report taken
+minutes ago is a report about a different database (§8.9); :func:`rollback`
+writes an earlier :class:`RecordTypeRevision` back through :func:`apply`, so
+an undo is classified, and refusable, like any other change (§8.6).
 
-* :func:`preview` classifies a proposed ``fields`` list and reports what it
-  would do to the records that exist. It writes nothing and is the endpoint a
-  UI calls while the operator is still editing.
-* :func:`apply` re-runs that classification *inline* and then writes. It
-  re-runs rather than trusting a report id, because a report is taken against
-  records that may have changed since (§8.9) — persisting one would mean
-  trusting a snapshot of a different database.
-* :func:`rollback` writes an earlier :class:`RecordTypeRevision` back through
-  :func:`apply`, so an undo is classified like any other change (§8.6) and a
-  rollback that would invalidate records is refused like any other change.
-
-**The payload never migrates here.** A restrictive change that is applied with
-``force`` leaves the failing rows exactly as they were: they are *marked*, not
-mutated and not hidden (§8.3 — ``services.records.read_view`` reports them
-under ``invalid``). The only rows this module ever rewrites are the reserved
+**The payload never migrates here.** A restrictive change applied with
+``force`` leaves the failing rows exactly as they were: *marked*, not mutated
+and not hidden (§8.3 — ``services.records.read_view`` reports them under
+``invalid``). The only rows this module ever rewrites are the reserved
 ``_orphaned`` sub-key on an explicit ``discard``, and the index, which is
 derived and therefore rebuilt out of request (§8.5, :mod:`reindex_runner`).
 """
@@ -36,9 +31,10 @@ from sm_records.schema.diff import diff_fields
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
-from sm_records.services._common import guarded_bump, reload, utcnow
+from sm_records.services._common import guarded_bump, record_count, reload, utcnow
 from sm_records.services._dry_run import dry_run
 from sm_records.services._payload import field_defs, lock_type
+from sm_records.services._preview import MISSING, pointer_preview_changes
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
 from sm_records.services.errors import (
     Conflict,
@@ -48,7 +44,7 @@ from sm_records.services.errors import (
 )
 from sm_records.settings import RecordsSettings
 
-__all__ = ["apply", "preview", "rollback"]
+__all__ = ["MISSING", "apply", "preview", "rollback"]
 
 _POINTERS = ("display_field", "slug_field")
 
@@ -77,7 +73,11 @@ async def _report(
     drop_keys: frozenset[str] = frozenset(),
 ) -> DryRunReport:
     if not _needs_dry_run(diff):
-        return DryRunReport(checked=0, failing=0, orphaned_conflicts=conflicts)
+        # Skipped, but ``checked`` still has to be an honest count of what
+        # was skipped (incl. trash — §8.9's own reasoning for the delete
+        # confirmation), or "N records checked, 0 would fail" lies about N.
+        checked = await record_count(db, rtype, include_deleted=True)
+        return DryRunReport(checked=checked, failing=0, orphaned_conflicts=conflicts)
     return await dry_run(
         db,
         rtype,
@@ -93,16 +93,22 @@ async def preview(
     rtype: RecordType,
     fields_raw: list[dict[str, Any]],
     settings: RecordsSettings,
+    *,
+    display_field: Any = MISSING,
+    slug_field: Any = MISSING,
 ) -> tuple[SchemaDiff, DryRunReport]:
     """Classify a proposed ``fields`` list and dry-run it. Writes nothing.
 
-    ``checked`` is ``0`` for a change that cannot invalidate anything — see
-    :func:`_needs_dry_run`. ``orphaned_conflicts`` is always computed, because
-    it is about which *keys* exist rather than about whether they validate, and
-    it is what §8.8 refuses on.
+    ``display_field``/``slug_field`` default to :mod:`_preview`'s ``MISSING``
+    (re-exported here), not ``None`` — a caller that left a pointer out must
+    not be read as clearing it. A ``display_field`` change is folded into the
+    diff as an index-affecting entry, so a pointer-only edit still previews.
     """
     new_defs, _ = normalise(fields_raw, settings)
     diff = diff_fields(field_defs(rtype), new_defs)
+    pointer_changes = pointer_preview_changes(rtype, display_field, slug_field)
+    if pointer_changes:
+        diff = SchemaDiff(changes=(*diff.changes, *pointer_changes))
     conflicts = await _orphaned.count_conflicts(
         db, rtype, _added_keys(diff), batch_size=settings.reindex_batch_size
     )
@@ -120,12 +126,10 @@ def _refusal(rtype: RecordType, report: DryRunReport) -> str:
 async def _mark_pending(
     db: AsyncSession, rtype: RecordType, keys: list[str], *, whole_type: bool
 ) -> None:
-    """Step 1 of §8.5, in the same transaction as the ``fields`` write.
-
-    Every marked key is refused as a filter or a sort key — at the API, with a
-    409 naming it — until the rebuild clears it. Partial results returned
-    without comment are the failure mode the whole ceremony is for.
-    """
+    """Step 1 of §8.5, in the same transaction as the ``fields`` write. Every
+    marked key is refused as a filter or a sort key — a 409 naming it — until
+    the rebuild clears it; partial results without comment is the failure
+    mode this ceremony is for."""
     if not keys and not whole_type:
         return
     pending = pending_map(rtype)
@@ -153,29 +157,27 @@ async def apply(
 ) -> tuple[RecordType, SchemaDiff]:
     """Classify, refuse or write. Design §8.2, §8.5, §8.6, §8.8.
 
-    ``fields_raw`` omitted keeps the current field list — that is the
-    pointer-only edit (``display_field``/``slug_field``, passed in ``changes``
-    with any other plain column), which still belongs here because a
-    ``display_field`` change enqueues a whole-type rebuild.
+    ``fields_raw`` omitted keeps the current field list — the pointer-only
+    edit (``display_field``/``slug_field``, in ``changes`` with any other
+    plain column), which still belongs here because ``display_field`` alone
+    enqueues a whole-type rebuild.
 
     ``force=True`` applies a restrictive change **and leaves the failing rows
-    untouched**. They are not mutated, not hidden and not migrated: they read
-    back with an ``invalid`` list naming the fields (§8.2/§8.3), and the next
-    ordinary write of each one is what brings it up to the new shape.
+    untouched** — not mutated, not hidden, not migrated: they read back with
+    an ``invalid`` list naming the fields (§8.2/§8.3), and the next ordinary
+    write of each is what brings it up to the new shape.
 
-    ``orphaned`` is ``"restore"`` or ``"discard"``, and is required exactly
-    when the report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes
-    nothing: the read path already falls back to ``_orphaned`` for a declared
-    key, the rebuild below indexes it from there, and each record's next write
-    moves it back out. ``"discard"`` is the one bulk payload write in §8.
+    ``orphaned`` is ``"restore"`` or ``"discard"``, required exactly when the
+    report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes
+    nothing — the read path already falls back to ``_orphaned`` for a
+    declared key. ``"discard"`` is the one bulk payload write in §8.
 
     The version bump is deliberately *not* the first statement, though §8.6
-    describes it that way: the row lock is taken first and the version is
-    checked against it, so a stale caller still gets its 409 before the scan —
-    but the guarded ``UPDATE`` itself happens after the dry run, so a refusal
-    leaves the transaction with nothing in it at all. "Nothing is written" is a
-    property this module should have on its own, not one that depends on every
-    caller remembering to roll back.
+    describes it that way: the row lock and version check happen first, so a
+    stale caller gets its 409 before the scan — but the guarded ``UPDATE``
+    itself happens after the dry run, so a refusal leaves nothing written,
+    as a property of this module rather than of callers remembering to
+    roll back.
     """
     changes = dict(changes or {})
     new_defs, new_fields = (
@@ -240,10 +242,9 @@ async def apply(
     if orphaned == _orphaned.DISCARD and conflicts:
         await _orphaned.discard(db, rtype, list(conflicts), batch_size=settings.reindex_batch_size)
     # ``display_field`` feeds every record's denormalised ``display_title``
-    # (§18 Q2), so changing it is a whole-type rebuild. ``slug_field`` is not:
-    # a slug is an address, and regenerating the ones already handed out would
-    # break every link to them and can collide with a slug since taken. Only
-    # records written after the change take the new pointer.
+    # (§18 Q2), so changing it is a whole-type rebuild; ``slug_field`` is not
+    # — a slug is an address, and regenerating one already handed out would
+    # break every link to it (only records written after take the new one).
     await _mark_pending(
         db, rtype, list(diff.keys(ChangeClass.INDEX_AFFECTING)), whole_type=display_moved
     )
@@ -265,9 +266,9 @@ async def rollback(
 
     Not a restore in the "put the row back" sense: the earlier ``fields`` go
     through :func:`apply` and are classified against what is stored *now*.
-    Undoing a field deletion is therefore an addition — and one that will meet
-    §8.8's orphaned-key refusal, which is the point: the values are still
-    there, and whether they come back is the operator's call, not the undo's.
+    Undoing a field deletion is therefore an addition, which meets §8.8's
+    orphaned-key refusal — the point: the values are still there, and
+    whether they come back is the operator's call, not the undo's.
     """
     revision = (
         (

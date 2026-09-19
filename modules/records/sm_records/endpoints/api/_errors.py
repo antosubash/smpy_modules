@@ -37,6 +37,7 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
+from sm_records.contracts.schema_change import dry_run_report_read
 from sm_records.contracts.schemas import record_read, type_read
 from sm_records.deps import request_session
 from sm_records.index.query import QueryError
@@ -45,8 +46,10 @@ from sm_records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.services.errors import (
     Conflict,
     NotFound,
+    OrphanedKeyConflict,
     RecordsError,
     ReferencedByOthers,
+    SchemaChangeRefused,
     ValidationFailed,
 )
 from sm_records.services.types import get_type_by_id, record_counts
@@ -90,6 +93,18 @@ async def _response_for(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, ReferencedByOthers):
         return JSONResponse(
             {"detail": exc.detail, "referrers": exc.referrers}, status_code=exc.status_code
+        )
+    if isinstance(exc, SchemaChangeRefused):
+        # Checked ahead of the generic ``Conflict`` branch below: this is one,
+        # but its whole point is the dry-run report riding along with it
+        # (design §8.2), not a ``current`` row to reload.
+        report = dry_run_report_read(exc.report).model_dump(mode="json")
+        return JSONResponse({"detail": exc.detail, "report": report}, status_code=exc.status_code)
+    if isinstance(exc, OrphanedKeyConflict):
+        # Same reasoning as above: a ``Conflict`` subclass whose payload is
+        # its own (design §8.8), not the generic ``current`` row.
+        return JSONResponse(
+            {"detail": exc.detail, "conflicts": exc.conflicts}, status_code=exc.status_code
         )
     if isinstance(exc, Conflict):
         return JSONResponse(await _conflict_body(request, exc), status_code=exc.status_code)
