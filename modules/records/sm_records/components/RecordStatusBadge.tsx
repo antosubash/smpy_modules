@@ -18,3 +18,18 @@ export function RecordStatusBadge({ status }: { status: RecordStatus }) {
   }
   return <Badge variant="secondary">{t('records.records.draft', { defaultValue: 'Draft' })}</Badge>;
 }
+
+/** A record's `data` was last written against an older or newer version of
+ *  its type's schema than the type currently has (`schema_version !=
+ *  records_type.schema_version`) — it still reads leniently and restamps on
+ *  its next write, but the list flags it so an editor knows to open and
+ *  re-save it rather than assume it's fully in step with the current
+ *  fields. */
+export function SchemaStaleBadge() {
+  const { t } = useT();
+  return (
+    <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
+      {t('records.records.schema_stale', { defaultValue: 'Outdated schema' })}
+    </Badge>
+  );
+}

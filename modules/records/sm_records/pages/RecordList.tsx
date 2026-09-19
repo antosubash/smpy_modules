@@ -2,21 +2,13 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@simple-module-py/ui/components/ui/table';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { FilterBar, type FilterValue } from '../components/FilterBar';
-import { RecordStatusBadge } from '../components/RecordStatusBadge';
+import { RecordTable } from '../components/RecordTable';
 import { deleteRecord } from '../utils/api';
+import { buildSortParam, nextSort, parseSort } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
 type Props = { type: TypeRead; records: RecordPage };
@@ -36,27 +28,35 @@ function parseFilterParam(raw: string | null): FilterValue {
 }
 
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
- *  type's records, driven entirely by the URL (`?page=&filter=`) so it can
- *  be bookmarked or shared. Sorting is left to Phase 2's schema-driven list —
- *  nothing here reorders columns yet. */
+ *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
+ *  can be bookmarked or shared. */
 function RecordList({ type, records }: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string> }>();
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
+  const rawSort = search.get('sort');
   const currentFilter = parseFilterParam(rawFilter);
-  // Inertia's own `errors` bag — the Python view attaches `{filter:
-  // "reindexing"}` when the applied filter's field is mid-reindex (design
-  // doc §8.5) instead of failing the whole navigation. Real state, not a
-  // toast: it stays on screen until the filter changes.
+  const currentSort = parseSort(search.toString());
+  // Inertia's own `errors` bag — `record_list` (views.py) attaches
+  // `{filter: exc.reason}` whenever building the query raises `QueryError`,
+  // regardless of whether the offending term came from `?filter=` or
+  // `?sort=` — both are resolved through the same index-lookup call, so a
+  // sort on a field that's mid-reindex (design doc §8.5) lands on this same
+  // channel under the same "filter" key rather than failing the navigation
+  // outright. A sort on an *unindexed* field would 400 the same way, but
+  // `SortableHeader` never offers one, so that branch shouldn't be reachable
+  // from this UI short of a hand-edited URL.
   const reindexing = page.props.errors?.filter === 'reindexing';
 
-  const goTo = (next: { page?: number; filter?: string | null }) => {
+  const goTo = (next: { page?: number; filter?: string | null; sort?: string | null }) => {
     const params: Record<string, string> = {};
     const targetPage = next.page ?? records.page;
     if (targetPage > 1) params.page = String(targetPage);
     const targetFilter = next.filter === undefined ? rawFilter : next.filter;
     if (targetFilter) params.filter = targetFilter;
+    const targetSort = next.sort === undefined ? rawSort : next.sort;
+    if (targetSort) params.sort = targetSort;
     router.get(`/admin/records/${type.key}`, params, {
       only: ['records', 'errors'],
       preserveState: true,
@@ -68,6 +68,8 @@ function RecordList({ type, records }: Props) {
   const applyFilter = (field: string, op: FilterOp, value: string) =>
     goTo({ page: 1, filter: `${field}:${op}:${value}` });
   const clearFilter = () => goTo({ page: 1, filter: null });
+  const handleSort = (field: string) =>
+    goTo({ page: 1, sort: buildSortParam(nextSort(currentSort, field)) ?? null });
 
   const handleDelete = async (record: RecordRead) => {
     await deleteRecord(type.key, record.uuid);
@@ -122,60 +124,13 @@ function RecordList({ type, records }: Props) {
             {t('records.records.empty', { defaultValue: 'No records yet' })}
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  {t('records.records.display_title', { defaultValue: 'Title' })}
-                </TableHead>
-                <TableHead>{t('records.records.status', { defaultValue: 'Status' })}</TableHead>
-                <TableHead>
-                  {t('records.records.updated_at', { defaultValue: 'Updated' })}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('records.records.actions', { defaultValue: 'Actions' })}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.items.map((record) => (
-                <TableRow key={record.uuid}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/admin/records/${type.key}/${record.uuid}`}
-                      className="hover:underline"
-                    >
-                      {record.display_title}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <RecordStatusBadge status={record.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {record.updated_at ?? record.created_at}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ConfirmDialog
-                      trigger={
-                        <Button type="button" variant="ghost" size="sm">
-                          {t('records.records.delete', { defaultValue: 'Delete' })}
-                        </Button>
-                      }
-                      title={t('records.records.delete', { defaultValue: 'Delete' })}
-                      description={t('records.records.confirm_delete', {
-                        defaultValue: 'Delete this record?',
-                      })}
-                      confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
-                      cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                      pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
-                      destructive
-                      onConfirm={() => handleDelete(record)}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <RecordTable
+            type={type}
+            records={records.items}
+            sort={currentSort}
+            onSort={handleSort}
+            onDelete={handleDelete}
+          />
         )}
 
         {records.total > records.page_size && (

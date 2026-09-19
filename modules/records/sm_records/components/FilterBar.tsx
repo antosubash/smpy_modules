@@ -36,12 +36,37 @@ function opLabel(t: Translate, op: FilterOp): string {
 
 export type FilterValue = { field: string; op: FilterOp; value: string } | null;
 
+type FilterableField = { key: string; label: string; ops: readonly FilterOp[] };
+
+/** The two fixed columns every type can filter on regardless of its schema
+ *  (`sm_records.index.query.FIXED_COLUMNS`), narrowed to the one operator
+ *  each is actually useful with here: `status` is a two-value enum, so
+ *  anything but "is" is unhelpful noise, and `display_title` is free text,
+ *  where "contains" is the only op the fixed-column query layer accepts for
+ *  it (`_fixed_clause`: `contains` needs a text column, `gt`/`lt` need an
+ *  ordered one — `display_title` is neither). */
+function fixedFilterFields(t: Translate): FilterableField[] {
+  return [
+    {
+      key: 'display_title',
+      label: t('records.records.display_title', { defaultValue: 'Title' }),
+      ops: ['contains'],
+    },
+    {
+      key: 'status',
+      label: t('records.records.status', { defaultValue: 'Status' }),
+      ops: ['eq'],
+    },
+  ];
+}
+
 /**
  * One filter term — a field, an operator, and a value — that navigates via a
  * deep link (`?filter=field:op:value`) rather than filtering client-side.
- * Only `indexed` fields are offered: the API rejects a filter on anything
- * else with a `409`, and the design doc makes `indexed` the single most
- * consequential choice on the type's schema for exactly this reason.
+ * Besides the two fixed columns above, only `indexed` fields are offered:
+ * the API rejects a filter on anything else with a `409`, and the design
+ * doc makes `indexed` the single most consequential choice on the type's
+ * schema for exactly this reason.
  *
  * Initializes from `current` (the filter parsed out of the URL) and never
  * re-syncs to it afterwards — the caller remounts with a fresh `key` when
@@ -61,14 +86,28 @@ export function FilterBar({
   onClear: () => void;
 }) {
   const { t } = useT();
-  const indexed = fields.filter((f) => f.indexed);
-  const [field, setField] = useState(current?.field ?? indexed[0]?.key ?? '');
+  const indexed: FilterableField[] = fields
+    .filter((f) => f.indexed)
+    .map((f) => ({ key: f.key, label: f.label, ops: FILTER_OPS }));
+  const filterable = [...indexed, ...fixedFilterFields(t)];
+  const fieldByKey = new Map(filterable.map((f) => [f.key, f]));
+
+  const [field, setField] = useState(current?.field ?? filterable[0]?.key ?? '');
   const [op, setOp] = useState<FilterOp>(current?.op ?? 'eq');
   const [value, setValue] = useState(current?.value ?? '');
 
-  if (indexed.length === 0) return null;
+  if (filterable.length === 0) return null;
 
+  const allowedOps = fieldByKey.get(field)?.ops ?? FILTER_OPS;
   const needsValue = op !== 'is_null';
+  const isStatus = field === 'status';
+
+  const selectField = (nextField: string) => {
+    setField(nextField);
+    const nextOps = fieldByKey.get(nextField)?.ops ?? FILTER_OPS;
+    if (!nextOps.includes(op)) setOp(nextOps[0] ?? 'eq');
+    if (nextField === 'status' && value !== 'draft' && value !== 'published') setValue('draft');
+  };
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
@@ -79,9 +118,9 @@ export function FilterBar({
         <NativeSelect
           id="records-filter-field"
           value={field}
-          onChange={(e) => setField(e.target.value)}
+          onChange={(e) => selectField(e.target.value)}
         >
-          {indexed.map((f) => (
+          {filterable.map((f) => (
             <NativeSelectOption key={f.key} value={f.key}>
               {f.label}
             </NativeSelectOption>
@@ -97,14 +136,33 @@ export function FilterBar({
           value={op}
           onChange={(e) => setOp(e.target.value as FilterOp)}
         >
-          {FILTER_OPS.map((candidate) => (
+          {allowedOps.map((candidate) => (
             <NativeSelectOption key={candidate} value={candidate}>
               {opLabel(t, candidate)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
       </div>
-      {needsValue && (
+      {needsValue && isStatus && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="records-filter-value">
+            {t('records.records.filter_value', { defaultValue: 'Value' })}
+          </Label>
+          <NativeSelect
+            id="records-filter-value"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          >
+            <NativeSelectOption value="draft">
+              {t('records.records.draft', { defaultValue: 'Draft' })}
+            </NativeSelectOption>
+            <NativeSelectOption value="published">
+              {t('records.records.published', { defaultValue: 'Published' })}
+            </NativeSelectOption>
+          </NativeSelect>
+        </div>
+      )}
+      {needsValue && !isStatus && (
         <div className="grid gap-1.5">
           <Label htmlFor="records-filter-value">
             {t('records.records.filter_value', { defaultValue: 'Value' })}
