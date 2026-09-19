@@ -1,0 +1,137 @@
+"""HTTP tests for the Inertia view endpoints (``/admin/records``).
+
+Asserted as Inertia JSON (``X-Inertia: true``) rather than parsed HTML — the
+protocol's whole point is that a page navigation and a client-side refetch
+return the same ``{"component": ..., "props": ...}`` shape, and that shape is
+what a page component actually keys on.
+"""
+
+from __future__ import annotations
+
+from tests.app_harness import ADMIN, ROLE_VIEWER, roles, seed_record, seed_type
+
+_INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
+
+def _field(key: str, type_: str, **overrides) -> dict:
+    base = {
+        "key": key,
+        "type": type_,
+        "label": key.title(),
+        "required": False,
+        "unique": False,
+        "indexed": True,
+        "default": None,
+        "help": None,
+        "constraints": {},
+        "options": {},
+    }
+    base.update(overrides)
+    return base
+
+
+async def test_type_list_view(client, records_app):
+    _, db_state = records_app
+    await seed_type(db_state, "product", [_field("price", "number")])
+
+    resp = await client.get("/admin/records/", headers={**roles(ADMIN), **_INERTIA_HEADERS})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/Types"
+    assert set(body["props"]) >= {"types"}
+    assert [item["key"] for item in body["props"]["types"]] == ["product"]
+
+
+async def test_record_list_view(client, records_app):
+    _, db_state = records_app
+    rtype = await seed_type(db_state, "product", [_field("price", "number")])
+    await seed_record(db_state, rtype, {"price": "1"})
+
+    resp = await client.get("/admin/records/product", headers={**roles(ADMIN), **_INERTIA_HEADERS})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/RecordList"
+    assert set(body["props"]) == {"type", "records"}
+    assert body["props"]["type"]["key"] == "product"
+    assert body["props"]["records"]["total"] == 1
+
+
+async def test_record_new_view(client, records_app):
+    _, db_state = records_app
+    await seed_type(db_state, "product", [_field("price", "number")])
+
+    resp = await client.get(
+        "/admin/records/product/new", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/RecordEditor"
+    assert set(body["props"]) == {"type", "record"}
+    assert body["props"]["record"] is None
+    assert body["props"]["type"]["key"] == "product"
+
+
+async def test_record_edit_view(client, records_app):
+    _, db_state = records_app
+    rtype = await seed_type(db_state, "product", [_field("price", "number")])
+    record = await seed_record(db_state, rtype, {"price": "1"})
+
+    resp = await client.get(
+        f"/admin/records/product/{record.uuid}", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/RecordEditor"
+    assert body["props"]["record"]["uuid"] == record.uuid
+    assert body["props"]["type"]["key"] == "product"
+
+
+async def test_new_route_is_not_shadowed_by_uuid_route(client, records_app):
+    """Route order: ``/{key}/new`` must win over ``/{key}/{uuid}`` — a type
+    with no record literally named ``new`` still has to reach the editor's
+    "create" screen rather than a 404 from ``get_record``."""
+    _, db_state = records_app
+    await seed_type(db_state, "product", [_field("price", "number")])
+
+    resp = await client.get(
+        "/admin/records/product/new", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["props"]["record"] is None
+
+
+async def test_unknown_type_is_404(client):
+    resp = await client.get(
+        "/admin/records/does-not-exist", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 404
+
+
+async def test_unauthenticated_view_request_is_401(client):
+    resp = await client.get("/admin/records/", headers=_INERTIA_HEADERS)
+    assert resp.status_code == 401
+
+
+async def test_viewer_role_can_view(client, records_app):
+    """``records.view`` is enough for every screen — none of them writes."""
+    _, db_state = records_app
+    await seed_type(db_state, "product", [_field("price", "number")])
+    resp = await client.get("/admin/records/", headers={**roles(ROLE_VIEWER), **_INERTIA_HEADERS})
+    assert resp.status_code == 200
+
+
+async def test_record_list_view_reports_reindexing_filter_inline(client, records_app):
+    """A filter on a field mid-reindex must not become a 409 on a page visit —
+    Inertia would show a modal. The view renders an empty page and puts the
+    reason in Inertia's ``errors`` bag, which the screen reads."""
+    _, db_state = records_app
+    await seed_type(db_state, "product", [_field("price", "number")], reindex_pending=["price"])
+    resp = await client.get(
+        "/admin/records/product?filter=price:gt:1",
+        headers={**roles(ADMIN), **_INERTIA_HEADERS},
+    )
+    assert resp.status_code == 200
+    props = resp.json()["props"]
+    assert props["errors"] == {"filter": "reindexing"}
+    assert props["records"]["items"] == []
+    assert props["records"]["total"] == 0

@@ -30,6 +30,24 @@ from sm_records.models import Base, Record, RecordType
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import StaticPool
 
+# HTTP test harness — app + client fixtures, header-driven roles, and DB
+# seeding helpers for API/view tests. Split into its own module for the
+# 300-line cap; importing the names here is what makes pytest see them as
+# fixtures in this directory. See ``tests/app_harness.py``.
+from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_EDITOR_TWO,
+    ROLE_MANAGER,
+    ROLE_NONE,
+    ROLE_VIEWER,
+    client,
+    records_app,
+    roles,
+    seed_record,
+    seed_type,
+)
+
 
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:

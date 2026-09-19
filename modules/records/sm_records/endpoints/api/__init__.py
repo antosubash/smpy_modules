@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from sm_records.endpoints.api import records, types
+
 router = APIRouter()
+router.include_router(types.router)
+router.include_router(records.router)
 
 __all__ = ["router"]
