@@ -42,6 +42,7 @@ testpaths = [
     "modules/ai/tests",
     "modules/news/tests",
     "modules/pagebuilder/tests",
+    "modules/records/tests",
     "scripts/tests",
 ]
 addopts = "--durations=20"

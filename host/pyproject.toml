@@ -14,6 +14,7 @@ dependencies = [
     "simple_module_canopy_atlas",
     "simple_module_news",
     "simple_module_ai",
+    "simple_module_records",
 ]
 
 # Host is an application, not a distributable package.
@@ -31,6 +32,9 @@ workspace = true
 workspace = true
 
 [tool.uv.sources.simple_module_ai]
+workspace = true
+
+[tool.uv.sources.simple_module_records]
 workspace = true
 
 [dependency-groups]

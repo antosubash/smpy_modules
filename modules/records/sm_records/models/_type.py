@@ -1,0 +1,103 @@
+"""Record Types — the runtime-defined schemas — and their revision log."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from simple_module_db.mixins import AuditMixin
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index
+from sqlmodel import Field
+
+from sm_records.constants import MAX_KEY_LEN, MAX_LABEL_LEN
+from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
+
+
+class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+    """A user-defined content type.
+
+    ``fields`` is the whole schema, as JSON. Changing it is an ``UPDATE`` of
+    this one row — no DDL anywhere. What happens to the records already stored
+    against the old shape is the design doc's §8, and it hinges on two columns
+    here: ``schema_version``, stamped onto every record write so a row knows
+    which shape it was written in, and ``reindex_pending``, the operational
+    marker for fields whose index rows are mid-rebuild.
+    """
+
+    __tablename__ = TYPE_TABLE
+
+    id: int | None = Field(default=None, primary_key=True)
+
+    key: str = Field(max_length=MAX_KEY_LEN, unique=True, index=True)
+    """Stable identifier used in URLs, the API and relation targets.
+    Immutable after creation — a rename would strand all three."""
+
+    label: str = Field(max_length=MAX_LABEL_LEN)
+    label_plural: str = Field(max_length=MAX_LABEL_LEN)
+    description: str | None = Field(default=None, max_length=1000)
+    icon: str | None = Field(default=None, max_length=64)
+    """A lucide icon name, for the type list."""
+
+    fields: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, default=list),
+    )
+    """Ordered field definitions. Validated shape: ``sm_records.schema.fields``."""
+
+    schema_version: int = Field(default=1, sa_column_kwargs={"nullable": False})
+    """Bumped on every change to ``fields``. Every record stamps the version it
+    was last written against; the validator cache is keyed on it."""
+
+    display_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
+    """Which field's value becomes ``Record.display_title``."""
+    slug_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
+
+    is_public: bool = Field(default=False)
+    """Gates the anonymous read API. Off by default."""
+
+    allowed_roles: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, default=list),
+    )
+    """Roles permitted to write, on top of the static permission. Empty means
+    any role holding the permission. Invisible in the framework's role editor —
+    design doc §10."""
+
+    version: int = Field(default=1, sa_column_kwargs={"nullable": False})
+    """Optimistic concurrency on the schema itself. Design doc §8.6."""
+
+    reindex_pending: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, default=list),
+    )
+    """Field keys whose index rows are being rebuilt. Operational state kept
+    *outside* ``fields`` so a revision snapshot never captures it — a rollback
+    could otherwise resurrect an ``indexing`` marker. Design doc §8.5."""
+
+
+class RecordTypeRevision(Base, table=True):  # ty: ignore[unsupported-base]
+    """Append-only snapshot of a type's schema, one row per change.
+
+    Tiny by construction — types are few and schema edits are rare — and never
+    capped: it is what makes a bad schema edit reversible, and a bad schema
+    edit damages every row of the type at once.
+    """
+
+    __tablename__ = TYPE_REVISION_TABLE
+    __table_args__ = (Index("ix_records_type_revision_type_version", "type_id", "version"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    type_id: int = Field(
+        sa_column=Column(ForeignKey(f"{TYPE_TABLE}.id", ondelete="CASCADE"), nullable=False)
+    )
+    version: int = Field(sa_column_kwargs={"nullable": False})
+    """The ``RecordType.version`` this snapshot *produced*."""
+    schema_version: int = Field(sa_column_kwargs={"nullable": False})
+    fields: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, default=list),
+    )
+    display_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
+    slug_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+    created_by: str | None = Field(default=None, max_length=255)
