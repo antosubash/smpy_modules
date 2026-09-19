@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,13 +14,13 @@ import {
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 
-import { NewTypeDialog } from '../components/NewTypeDialog';
 import type { TypeRead } from '../utils/types';
 
 type Props = { types: TypeRead[] };
 
-/** `Records/Types` — `/admin/records`. Lists every Record Type with a link
- *  into its records, and a dialog to define a new one. */
+/** `Records/Types` — `/admin/records/`. Lists every Record Type with a link
+ *  to edit its schema and a link into its records; "New type" opens the
+ *  schema editor at `/admin/records/types/new`. */
 function Types({ types }: Props) {
   const { t } = useT();
   const fieldsLockedHint = t('records.types.fields_locked', {
@@ -30,7 +31,13 @@ function Types({ types }: Props) {
       <Head title={t('records.types.title', { defaultValue: 'Record Types' })} />
       <PageShell
         title={t('records.types.title', { defaultValue: 'Record Types' })}
-        actions={<NewTypeDialog />}
+        actions={
+          <Button type="button" asChild>
+            <Link href="/admin/records/types/new">
+              {t('records.types.new', { defaultValue: 'New type' })}
+            </Link>
+          </Button>
+        }
       >
         {types.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -50,7 +57,7 @@ function Types({ types }: Props) {
               {types.map((type) => (
                 <TableRow key={type.key}>
                   <TableCell className="font-medium">
-                    <Link href={`/admin/records/${type.key}`} className="hover:underline">
+                    <Link href={`/admin/records/types/${type.key}`} className="hover:underline">
                       {type.label}
                     </Link>
                   </TableCell>
@@ -63,13 +70,28 @@ function Types({ types }: Props) {
                       defaultValue: '{{count}} record',
                       defaultValue_other: '{{count}} records',
                     })}
+                    {type.trashed_record_count > 0 && (
+                      <span className="ml-1 text-muted-foreground">
+                        {t('records.types.trashed_record_count', {
+                          count: type.trashed_record_count,
+                          defaultValue: '({{count}} trashed)',
+                          defaultValue_other: '({{count}} trashed)',
+                        })}
+                      </span>
+                    )}
                     {type.fields_locked && (
                       <Badge variant="outline" className="ml-2" title={fieldsLockedHint}>
                         {t('records.types.fields_locked_badge', { defaultValue: 'Fields locked' })}
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-3">
+                    <Link
+                      href={`/admin/records/types/${type.key}`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      {t('records.types.edit', { defaultValue: 'Edit' })}
+                    </Link>
                     <Link
                       href={`/admin/records/${type.key}`}
                       className="text-sm text-primary hover:underline"
