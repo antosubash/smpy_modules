@@ -148,6 +148,7 @@ jobs:
           - simple_module_pagebuilder
           - simple_module_news
           - simple_module_ai
+          - simple_module_records
     steps:
       - uses: actions/download-artifact@v8
         with:

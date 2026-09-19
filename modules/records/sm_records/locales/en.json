@@ -1,0 +1,49 @@
+{
+  "nav": {
+    "types": "Record Types"
+  },
+  "types": {
+    "title": "Record Types",
+    "empty": "No record types yet",
+    "new": "New type",
+    "key": "Key",
+    "label": "Label",
+    "label_plural": "Plural label",
+    "description": "Description",
+    "record_count": "{{count}} record",
+    "record_count_one": "{{count}} record",
+    "record_count_other": "{{count}} records",
+    "fields_locked": "Fields are read-only while this type holds records."
+  },
+  "records": {
+    "title": "Records",
+    "empty": "No records yet",
+    "new": "New record",
+    "display_title": "Title",
+    "status": "Status",
+    "updated_at": "Updated",
+    "draft": "Draft",
+    "published": "Published",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm_delete": "Delete this record?"
+  },
+  "editor": {
+    "title_new": "New record",
+    "title_edit": "Edit record",
+    "data_label": "Data",
+    "data_help": "Raw JSON for this record's fields.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved",
+    "invalid_json": "Invalid JSON",
+    "conflict_title": "This record changed while you were editing",
+    "conflict_help": "Someone else saved a change to this record since you opened it. Reload to see the latest version, or overwrite it with what you have.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "not_found": "Not found",
+    "validation": "Validation failed",
+    "conflict": "Conflict"
+  }
+}

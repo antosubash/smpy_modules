@@ -76,6 +76,9 @@ jobs:
       - name: Run pytest (news)
         run: cd modules/news && uv run pytest
 
+      - name: Run pytest (records)
+        run: cd modules/records && uv run pytest
+
       - name: Run pytest (host)
         run: uv run pytest host/tests
 
