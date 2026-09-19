@@ -69,6 +69,11 @@ module, a SQLModel table, or an Alembic migration for each one.
   submit/approve/reject machine.
 - **Content i18n.** v1 records are monolingual. §12.
 - **Rich text / visual composition.** Composed layouts are pagebuilder's job.
+- **Full-text search.** v1's only text search is `contains` on an indexed
+  `text` field, an escaped `ILIKE` on `records_index_text.value` via
+  `simple_module_db.search.like_contains_pattern`. That is a prefix-less
+  scan of the index column, not a search engine, and `longtext` is not
+  indexable at all (§7.3). Real search over content is a separate design.
 
 ## 3. What YesSql is, and what transfers
 
@@ -194,6 +199,7 @@ prefixed `records_`.
 | `is_public` | bool, default `False` — gates the anonymous read API |
 | `allowed_roles` | `JSON` list of role names permitted to write, §10 |
 | `version` | int, non-null, default 1 — optimistic concurrency on the *schema*, §8.6 |
+| `reindex_pending` | `JSON` list of field keys mid-reindex, §8.5 — operational state, deliberately outside `fields` |
 | + `AuditMixin` | |
 
 `key` is immutable because it appears in URLs, in the public API, and in
@@ -222,6 +228,12 @@ cannot go stale.
 
 Indexes: `(type_id, status, position)` and a partial unique on
 `(type_id, slug)` where `slug is not null`.
+
+The unique index is on the row, not on live rows: **a soft-deleted record keeps
+its slug claimed.** This follows `pagebuilder`, which does the same for
+trashed pages deliberately — a slug that frees on delete is a slug that can be
+taken while the original sits restorable in the trash, and restore then
+fails or, worse, silently renames.
 
 These fixed columns are this module's **`ContentItemIndex`** — the projection
 every record has regardless of its type, kept on the row itself because a
@@ -299,6 +311,23 @@ A field definition is a small object:
 **`key` is immutable once the field exists; `label` is freely editable.** The
 same rule `RecordType.key` follows, for a sharper reason — see §8.7.
 
+`options` carries the per-type configuration the generic shape above cannot,
+and it is validated per `type`:
+
+```json
+{ "key": "category", "type": "select",
+  "options": { "choices": [ { "value": "book", "label": "Book" } ] } }
+
+{ "key": "author", "type": "relation",
+  "options": { "target_type": "person", "many": false, "on_delete": "restrict" } }
+```
+
+`target_type` is a `RecordType.key`, checked to exist when the field is
+saved; `on_delete` is one of §9's three. Combinations that cannot mean
+anything are refused at schema validation, not discovered at write time:
+`unique` on `multiselect` or a `many` relation, `indexed` on `longtext`,
+`json` or `media`.
+
 **Accepting raw JSON Schema was considered and rejected.** `$ref` makes it a
 remote-fetch and cycle-resolution surface; a generic form renderer cannot
 render an arbitrary schema, so the UI degrades to a JSON textarea for anything
@@ -372,16 +401,44 @@ work with compile-time tables:
 | `record_id` | int, FK → `records_record`, indexed, `ON DELETE CASCADE` |
 | `type_id` | int — denormalised so a query never joins to filter by type |
 | `field_key` | `str(64)` — **which field this row indexes** |
-| `status` | mirrored from the record, so a published-only query needs no join |
 | *(value column)* | the one typed column, below |
 
-| table | value column |
-|---|---|
-| `records_index_text` | `value str(512)` indexed + `value_full Text` unindexed — §7.4 |
-| `records_index_number` | `value Numeric(19, 5)` |
-| `records_index_bool` | `value Boolean` |
-| `records_index_datetime` | `value DateTime(timezone=True)` |
-| `records_index_ref` | `target_uuid str(32)` + `target_type_id int` — relations, §9 |
+**Index rows carry no record state** — no `status`, no `is_deleted`. Every
+query joins to `records_record` by primary key, and that join is what applies
+`status`, the framework's soft-delete filter (`with_loader_criteria` on
+`is_deleted`, installed by `register_listeners`), and any future tenant
+filter, for free. An earlier draft mirrored `status` onto index rows to skip
+the join; it would have had to mirror `is_deleted` too, or every `COUNT(*)`
+over an index table would count the trash — and then every publish, unpublish,
+trash and restore is an `UPDATE` across N index rows to keep two copies of
+two flags in step. A PK join is cheaper than that and cannot drift.
+
+| table | value column | holds |
+|---|---|---|
+| `records_index_text` | `value str(512)` indexed + `value_full Text` unindexed — §7.4 | `text`, `select`, `multiselect`, `email`, `url` |
+| `records_index_number` | `value Numeric(19, 5)` | `number`, `integer` |
+| `records_index_bool` | `value Boolean` | `boolean` |
+| `records_index_date` | `value Date` | `date` |
+| `records_index_datetime` | `value DateTime(timezone=True)` | `datetime` |
+| `records_index_ref` | `target_uuid str(32)` + `target_type_id int` — §9 | `relation` |
+
+Not indexable, and the schema editor refuses `indexed: true` on them:
+`longtext` (§2, search), `json`, `media`.
+
+`date` and `datetime` are **separate tables**, as Orchard's `DateFieldIndex`
+and `DateTimeFieldIndex` are. A calendar date stored as a timezone-aware
+midnight is a value that changes meaning with the connection's timezone — a
+`date = 2026-09-19` filter then matches or misses depending on where the query
+runs. A `Date` column has no such ambiguity.
+
+`Numeric(19, 5)` is Orchard's choice and it fixes the `number` type's
+contract: **five decimal places, validated by the Pydantic model on write**,
+so a value the index would round is refused rather than stored with the
+payload and index disagreeing. Callers wanting more precision want `text` or
+`json`. SQLite has no decimal type — SQLAlchemy stores `Numeric` as a
+floating-point `REAL` there, with a documented loss-of-precision warning —
+so this contract is exact on Postgres and approximate on SQLite, which is
+acceptable for a dev-default backend and must be written in the README.
 
 Composite indexes on `(type_id, field_key, value)` per table, which is the
 shape every filter term actually uses.
@@ -393,9 +450,12 @@ column rather than these being columns on the record.
 ### 7.4 The truncation trap
 
 Orchard Core splits text into `Text nvarchar(766)` + `BigText nvarchar(max)`
-because 766 is an index-key length limit. Postgres has its own (~2704 bytes
-for a btree entry); SQLite has none. Carrying the split is right, but the
-correctness consequence has to be stated or it becomes a bug:
+to sit under MySQL InnoDB's 767-byte index-key limit. Postgres's btree limit
+is 2704 bytes (a third of an 8 KB page); SQLite has none. Our `value str(512)`
+is 2048 bytes at four-byte UTF-8, under the Postgres ceiling with room —
+which is the arithmetic to redo before anyone raises 512. Carrying the split
+is right, but the correctness consequence has to be stated or it becomes a
+bug:
 
 **An equality match on a truncated index column can return false positives.**
 `records_index_text.value` holds the first 512 characters. A filter must
@@ -449,6 +509,24 @@ The mitigation is the one YesSql and Orchard both ship: a rebuild. A
 documents, runnable per type, batched, and safe to run live because it is
 idempotent. §8 calls it on every schema change that alters which fields are
 indexed.
+
+### 7.8 `unique`, which the index does not enforce
+
+The `(type_id, field_key, value)` index is not unique and cannot be: every
+field of a kind shares the table, and most are not unique. A partial unique
+index cannot name field keys that are chosen at runtime.
+
+So `unique: true` stays application-enforced: a `SELECT` against the index
+table for `(type_id, field_key, value)` before the write, inside the request's
+transaction. That is check-then-act, and two concurrent creates with the same
+value can both pass. The mitigation is to **serialise writes per type when the
+type has any unique field** — `SELECT … FOR UPDATE` on the `records_type` row
+at the start of the write. On SQLite the database is single-writer anyway. The
+README states it as "unique is enforced, at the cost of serialising writes
+on that type", not as a DB constraint it isn't.
+
+`unique` is refused on `multiselect` and `relation` (to-many): uniqueness of a
+set is not a meaningful constraint.
 
 ## 8. Schema migration
 
@@ -549,7 +627,10 @@ The previous draft said only that the field is "reported as `indexing` and not
 offered as a filter", which is necessary and not sufficient — it protects the
 UI and not the API. The mechanism:
 
-1. Bump `schema_version` and mark the field `indexing` in the same
+1. Bump `schema_version` and add the field key to
+   `records_type.reindex_pending` (a `JSON` list — **not** a flag inside
+   `fields`, or `records_type_revision` would snapshot transient operational
+   state and a rollback could resurrect an `indexing` marker) in the same
    transaction as the `fields` write.
 2. Reindex in batches of `reindex_batch_size` into the **new** table, carrying
    the new `schema_version` as a generation marker on each row.
@@ -625,8 +706,16 @@ This repo has no Celery (`CLAUDE.md` says so explicitly), so "deferred" means
 a FastAPI background task plus a resumable `reindex` CLI command, not a queue.
 That is sufficient precisely because §7.7 makes the reindex idempotent and
 restartable: the worst case of a lost background task is a field stuck in
-`indexing` until someone runs the command, which is a visible, recoverable
-state rather than silent corruption.
+`indexing` until someone runs the command, which is a recoverable state rather
+than silent corruption.
+
+"Recoverable" is not "visible", though — a field that refuses filters with a
+409 forever, because the worker that owned its background task was restarted
+mid-deploy, is only noticed by whoever next tries that filter. So the module
+contributes a check through `register_health_checks`: any `reindex_pending`
+entry older than `reindex_stale_after` (default 15 minutes) degrades
+`/health/ready` and names the type and field. That turns an orphaned reindex
+from a support ticket into an alert.
 
 Deleting a Record Type that holds records requires an explicit
 `confirm_record_count` matching the actual count.
@@ -644,6 +733,9 @@ record?"** is a single indexed query, so the delete dialog can show it.
 - **No automatic expansion.** Reads expand only under an explicit
   `?expand=field_a,field_b`, one batched query per named field, depth 1.
   Depth > 1 is unsupported in v1 and must not be added without a cycle guard.
+  The generic list screen is the one caller that always passes it, for every
+  relation column it renders — a column of bare UUIDs is not a list screen —
+  so "opt-in" describes the API, not the UI's default.
 - **Delete behaviour is a property of the field** — `restrict` (default),
   `set_null`, or `cascade` — enforced in the service, because there is no
   foreign key to enforce it in the DB. `restrict` is the default because a
@@ -686,6 +778,15 @@ Off by default. A type with `is_public = True` exposes
 with draft rows and audit columns removed from the response shape rather than
 filtered in the query.
 
+The public list accepts the same filter and sort grammar as the admin one,
+over indexed fields only, and **no `?expand=`** — an anonymous caller must not
+be able to turn one request into a batch of joins against other types, some of
+which may not be public. A filter on a field that is unindexed, mid-reindex,
+or non-existent is a `400` naming the field; the admin API's `409` for
+`indexing` is not reused here, because the difference between "cannot" and
+"cannot right now" is operational state an anonymous caller has no business
+seeing.
+
 Registered through `register_public_routes` with methods pinned to
 `{"GET", "HEAD"}` — and, because the set of public types is known only after
 settings hydration, filled from `on_startup` rather than the
@@ -708,6 +809,7 @@ DB-backed via `register_module_settings`, no environment variables — the rule
 | `max_fields_per_type` | 100 | no |
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
+| `reindex_stale_after` | 15 min | no |
 
 `max_indexed_fields_per_type` is the one that is easy to omit and expensive to
 add later: every indexed field is a row written per record per save, so a type
@@ -801,6 +903,26 @@ Menu items are registered without `roles`, matching `pagebuilder`'s reasoning:
 role filtering is a plain intersection with no admin bypass, so listing roles
 hides the entry from an `admin` user.
 
+### Package layout, sized for the 300-line cap
+
+Phase 1 alone is the schema compiler, five index tables with maintenance, the
+reindex, two CRUD surfaces and concurrency. Written as `service.py` it is a
+thousand lines on day one. The split that keeps each file a single
+responsibility:
+
+```
+sm_records/
+├── models/         _type.py  _record.py  _revision.py  _index.py
+├── schema/         fields.py (definitions + per-type options validation)
+│                   compile.py (Pydantic model cache)  diff.py (§8.2)
+├── index/          providers.py (§7.6)  writer.py (rows for one record)
+│                   query.py (filter grammar → SQL)  reindex.py (§7.7, §8.5)
+├── services/       types.py  records.py  revisions.py  relations.py
+├── endpoints/api/  types.py  records.py  public.py
+├── endpoints/views.py
+├── deps.py  settings.py  constants.py  module.py  cli.py
+```
+
 ## 14. Checklist against `docs/adding-a-module.md`
 
 All ten steps apply. The four most often missed:
@@ -867,6 +989,12 @@ JSON-textarea record editor. Ugly but end-to-end, and it proves the index
 layer before any UI is built on it. The index layer is in Phase 1, not bolted
 on later, for the reason in §7.1.
 
+Until Phase 3 lands, **a type's `fields` are read-only once it holds a
+record.** Phase 1 and 2 ship type editing without the classification, the
+dry-run, or the index-table migration, and exposing an unguarded `fields`
+write on a populated type is precisely the data-loss §8 exists to prevent.
+The guard is one check and it is removed by Phase 3, not by Phase 2's editor.
+
 **Phase 2 — the UI.** Schema editor (with `indexed`), `components/fields/`
 registry, generic list with filter/sort/pagination driven by the index tables,
 generic form, 409 conflict handling, `locales/en.json`.
@@ -906,16 +1034,12 @@ Being explicit, so these aren't re-proposed later as oversights:
 
 1. **Does `slug` belong in v1?** Nothing in v1 addresses a record by slug —
    the public API uses `uuid`. Cheap to add later; dead weight if unused.
-2. **`display_title` denormalisation** creates a second source of truth that
-   goes stale if `display_field` changes. Recomputing every record on that
-   edit is a bulk job with exactly the half-failure property §8 avoids.
-   Leaning toward recompute-lazily-on-read-if-stale — but note that §7.7's
-   reindex already has the batched-rebuild machinery this would need, so
-   folding `display_title` into the reindex is probably the answer.
-3. **Should `status` really be mirrored onto every index row (§7.3)?** It
-   avoids a join on the most common filter and it is a denormalisation that
-   must be updated on every publish/unpublish. The alternative is a join to
-   `records_record`, which is by primary key and may well be cheap enough.
-   Worth measuring in Phase 1 rather than deciding now.
+2. **`display_title` denormalisation** — *resolved*: it is recomputed by the
+   reindex (§7.7), which already has the batched, resumable machinery, and a
+   `display_field` change is classified index-affecting so it enqueues one.
+   Left here so the reasoning is not re-derived.
+3. **`status` on index rows** — *resolved* in §7.3: not mirrored; every query
+   joins to `records_record` by PK. The join is what applies the soft-delete
+   filter, which a mirror would have had to duplicate.
 4. **`media` field type** presumes `file_storage` from the framework repo —
    a dependency for one field type. Alternative: a plain `url` field in v1.
