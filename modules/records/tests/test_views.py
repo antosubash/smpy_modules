@@ -135,3 +135,38 @@ async def test_record_list_view_reports_reindexing_filter_inline(client, records
     assert props["errors"] == {"filter": "reindexing"}
     assert props["records"]["items"] == []
     assert props["records"]["total"] == 0
+
+
+async def test_type_editor_views_render_with_targets_and_roles(client, records_app):
+    _, db_state = records_app
+    await seed_type(db_state, "person", [_field("name", "text")])
+
+    resp = await client.get(
+        "/admin/records/types/new", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/TypeEditor"
+    assert body["props"]["type"] is None
+    assert body["props"]["target_types"] == [{"key": "person", "label": "Person"}]
+    assert isinstance(body["props"]["roles"], list)
+
+    resp = await client.get(
+        "/admin/records/types/person", headers={**roles(ADMIN), **_INERTIA_HEADERS}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["component"] == "Records/TypeEditor"
+    assert body["props"]["type"]["key"] == "person"
+    assert set(body["props"]) == {"type", "target_types", "roles"}
+
+
+async def test_reserved_type_keys_are_refused(client, records_app):
+    """``types`` as a type key would put its record list at the schema
+    editor's address; the API refuses it before the routes can collide."""
+    for key in ("types", "new"):
+        resp = await client.post(
+            "/api/records/types", json={"key": key, "label": "X"}, headers=roles(ADMIN)
+        )
+        assert resp.status_code == 422, key
+        assert resp.json()["errors"][0]["field"] == "key"

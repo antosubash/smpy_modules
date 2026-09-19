@@ -19,7 +19,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.constants import MAX_KEY_LEN, TYPE_KEY_PATTERN
+from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
 from sm_records.models import Record, RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
 from sm_records.services._common import guarded_bump, reload, type_id_map
@@ -138,6 +138,11 @@ async def create_type(
     allowed_roles: list[str] | None = None,
     actor: str | None = None,
 ) -> RecordType:
+    if key in RESERVED_TYPE_KEYS:
+        raise ValidationFailed(
+            f"key {key!r} is reserved: it would shadow a records screen",
+            [{"field": "key", "message": "reserved"}],
+        )
     if not _KEY_RE.match(key or "") or len(key) > MAX_KEY_LEN:
         raise ValidationFailed(
             f"key must match {TYPE_KEY_PATTERN} and be at most {MAX_KEY_LEN} characters",

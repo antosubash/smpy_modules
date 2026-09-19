@@ -40,6 +40,7 @@ PERM_MANAGE_TYPES: Final = "records.manage_types"
 _PAGE_TYPES: Final = f"{MODULE_NAME}/Types"
 _PAGE_RECORD_LIST: Final = f"{MODULE_NAME}/RecordList"
 _PAGE_RECORD_EDITOR: Final = f"{MODULE_NAME}/RecordEditor"
+_PAGE_TYPE_EDITOR: Final = f"{MODULE_NAME}/TypeEditor"
 
 TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 """A type key or field key: lowercase identifier, URL- and JSON-safe."""
@@ -62,3 +63,8 @@ ORPHANED_KEY: Final = "_orphaned"
 """Reserved payload key holding values of deleted fields. Design doc §8.2."""
 
 RESERVED_FIELD_KEYS: Final = frozenset({ORPHANED_KEY})
+
+RESERVED_TYPE_KEYS: Final = frozenset({"types", "new"})
+"""Type keys that would shadow a view route: ``/admin/records/types/...`` is
+the schema editor and ``/admin/records/{key}/new`` the record editor, and a
+type keyed ``types`` would put its record list at the editor's address."""

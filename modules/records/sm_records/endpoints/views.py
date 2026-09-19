@@ -9,7 +9,7 @@ would be swallowed by the generic editor route with ``uuid == "new"``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +46,50 @@ async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(request_db))
         for rtype in rtypes
     ]
     return await inertia.render(constants._PAGE_TYPES, {"types": types})
+
+
+def _editor_context(request: Request, rtypes: list[RecordType]) -> dict[str, object]:
+    """What the schema editor needs besides the type: the relation-target
+    choices and the role names ``allowed_roles`` can be drawn from. Roles come
+    from the framework's registry rather than a module list, so a role added
+    by another module is offered here without this one knowing it."""
+    registry = getattr(getattr(request.app.state, "sm", None), "permissions", None)
+    role_map = getattr(registry, "role_map", None) or {}
+    return {
+        "target_types": [{"key": t.key, "label": t.label} for t in rtypes],
+        "roles": sorted(role_map),
+    }
+
+
+# Declared before the ``/{key}`` family: ``types`` is a reserved type key
+# (constants.RESERVED_TYPE_KEYS) precisely so these two never lose to it.
+@router.get("/types/new", response_model=None)
+async def type_new(
+    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
+) -> InertiaResponse:
+    rtypes = await type_service.list_types(db)
+    return await inertia.render(
+        constants._PAGE_TYPE_EDITOR,
+        {"type": None, **_editor_context(request, rtypes)},
+    )
+
+
+@router.get("/types/{key}", response_model=None)
+async def type_edit(
+    request: Request,
+    inertia: InertiaDep,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+) -> InertiaResponse:
+    rtypes = await type_service.list_types(db)
+    live, trashed = await type_service.record_counts(db, rtype)
+    return await inertia.render(
+        constants._PAGE_TYPE_EDITOR,
+        {
+            "type": type_read(rtype, live, trashed).model_dump(mode="json"),
+            **_editor_context(request, rtypes),
+        },
+    )
 
 
 @router.get("/{key}/new", response_model=None)
