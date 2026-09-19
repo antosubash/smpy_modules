@@ -45,4 +45,5 @@ testpaths = [
     "modules/records/tests",
     "scripts/tests",
 ]
-addopts = "--durations=20"
+addopts = "--durations=20 -m 'not perf'"
+markers = ["perf: performance measurement, excluded from the default run"]

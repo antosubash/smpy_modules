@@ -44,3 +44,9 @@ artifacts = ["sm_records/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# The perf suite (``tests/perf``) seeds a file-backed SQLite database and
+# measures; it is minutes, not seconds, and it is not a correctness gate. It
+# is excluded here so ``pytest`` and CI keep running only the normal suite —
+# run it explicitly with ``pytest -m perf tests/perf``.
+markers = ["perf: performance measurement, excluded from the default run"]
+addopts = "-m 'not perf'"
