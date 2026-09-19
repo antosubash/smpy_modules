@@ -18,7 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN, ORPHANED_KEY
 from sm_records.index.query import Filter, FilterOp, QueryError, count_query
 from sm_records.models import Record, RecordType
-from sm_records.schema.compile import PayloadValidationError, get_model, to_jsonable
+from sm_records.schema.compile import (
+    PayloadValidationError,
+    from_stored,
+    get_model,
+    to_jsonable,
+)
 from sm_records.schema.compile import validate_payload as _validate_payload
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
 from sm_records.services.errors import Conflict, ValidationFailed
@@ -185,3 +190,37 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     the database is single-writer anyway; on Postgres it is the row lock.
     """
     await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())
+
+
+def read_view(rtype: RecordType, record: Record) -> dict[str, Any]:
+    """The lenient read of §8.3: what this row looks like under the *current*
+    schema, whether it is behind it, and what about it no longer validates.
+
+    ``data`` is nested rather than merged with ``schema_stale`` because a
+    field key may legally *be* ``schema_stale`` — ``TYPE_KEY_PATTERN`` allows
+    it — and a payload key silently overwriting a status flag is the kind of
+    collision that is only ever found in production.
+
+    ``invalid`` is the "marked, not hidden" badge §8.3 insists on. A record
+    that stops satisfying the schema — because a constraint was tightened,
+    a field became required, or a type change will not coerce for this value —
+    is still returned, still editable and still readable; it simply says which
+    fields are wrong. Hiding it is what makes people stop trusting the module,
+    and a third ``status`` value would make "invalid" a state someone can set.
+
+    Single-record only, on purpose: it compiles and runs the validator, which
+    is per-row work a list screen must not do for a page of fifty.
+    """
+    defs = field_defs(rtype)
+    view = from_stored(defs, dict(record.data or {}))
+    model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
+    try:
+        _validate_payload(model, view)
+        invalid: list[dict[str, str]] = []
+    except PayloadValidationError as exc:
+        invalid = exc.errors
+    return {
+        "data": view,
+        "schema_stale": record.schema_version != rtype.schema_version,
+        "invalid": invalid,
+    }

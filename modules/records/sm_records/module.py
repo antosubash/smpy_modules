@@ -48,6 +48,9 @@ class RecordsModule(ModuleBase):
         # the pydantic defaults, and with no hydration step to overwrite it,
         # it is what every hook then reads.
         self.settings = None
+        # Set in ``on_startup``; the health check reads it and answers HEALTHY
+        # while it is ``None`` (there is nothing to be stale during boot).
+        self.db = None
 
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
@@ -107,6 +110,25 @@ class RecordsModule(ModuleBase):
         from sm_records.health import stale_reindex_check
 
         registry.add(stale_reindex_check(self))
+
+    async def on_startup(self, app: FastAPI) -> None:
+        """Hand the health check what it cannot reach on its own.
+
+        ``register_health_checks`` runs before the lifespan opens the database,
+        and module settings are hydrated from the DB at lifespan start — so the
+        check closes over *this instance* and reads both from here, once they
+        exist. Storing them rather than capturing ``app`` keeps the check free
+        of the request/app object entirely, which is what lets a test call it
+        with a module whose ``db`` is a bare ``DatabaseState``.
+
+        ``settings`` is overwritten with the hydrated object: it was either
+        ``None`` or a test's pre-seeded stand-in until now, and the check wants
+        ``reindex_stale_after_seconds`` as the operator set it.
+        """
+        self.db = getattr(app.state, "sm", None) and app.state.sm.db
+        services = getattr(app.state, constants.PACKAGE, None)
+        if services is not None and getattr(services, "settings", None) is not None:
+            self.settings = services.settings
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

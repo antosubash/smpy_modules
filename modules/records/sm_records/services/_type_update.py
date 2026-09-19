@@ -1,0 +1,150 @@
+"""``update_type`` — one edit to a Record Type row, and where it is decided.
+
+Split from :mod:`sm_records.services.types` for the 300-line cap. The seam is
+the interesting rule rather than an arbitrary cut: a type with no records takes
+the fast path here (validate, guard the version, write, snapshot), and a type
+that holds any — the trash included — is handed to
+:mod:`sm_records.services.schema_change`, which owns the whole of design §8.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from sm_records.models import RecordType
+from sm_records.services._common import guarded_bump, record_count, reload
+from sm_records.services._payload import field_defs
+from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
+from sm_records.services.errors import Conflict, ValidationFailed
+from sm_records.services.schema_change import apply as apply_schema_change
+from sm_records.settings import RecordsSettings
+
+__all__ = ["update_type"]
+
+#: Everything ``update_type`` accepts. ``key`` is absent on purpose — it is in
+#: URLs, in the public API and in every relation target, so a rename would
+#: strand all three (design §5).
+_EDITABLE = frozenset(
+    {
+        "label",
+        "label_plural",
+        "description",
+        "icon",
+        "fields_raw",
+        "display_field",
+        "slug_field",
+        "is_public",
+        "allowed_roles",
+    }
+)
+
+#: A change to any of these is snapshotted in ``records_type_revision``. The
+#: rest are labels: they cannot damage a record, and a revision per typo would
+#: bury the schema edits the table exists to make reversible.
+_SNAPSHOT_TRIGGERS = ("fields_raw", "display_field", "slug_field")
+
+
+async def update_type(
+    db: AsyncSession,
+    rtype: RecordType,
+    *,
+    expected_version: int,
+    settings: RecordsSettings,
+    actor: str | None = None,
+    force: bool = False,
+    orphaned: str | None = None,
+    **changes: Any,
+) -> RecordType:
+    """Edit a type under optimistic concurrency (design §8.6).
+
+    ``version`` is bumped by every accepted edit; ``schema_version`` only by a
+    change to ``fields``, because it is what record rows stamp themselves with
+    and what the compiled-model cache is keyed on. Bumping it for a label edit
+    would invalidate every cached validator and mark every record stale for
+    nothing.
+
+    A ``fields_raw`` (or ``display_field``/``slug_field``) change on a type
+    that holds records — the trash included — is handed to
+    :func:`sm_records.services.schema_change.apply`, which classifies it,
+    dry-runs it over those records and refuses what would invalidate them.
+    ``force`` and ``orphaned`` are that path's two answers to a refusal (§8.2
+    and §8.8) and are ignored on every other edit; they are named here rather
+    than folded into ``**changes`` because they are not columns.
+    """
+    unknown = sorted(set(changes) - _EDITABLE)
+    if unknown:
+        problem = (
+            "key is immutable — it is in URLs, the API and every relation target"
+            if "key" in unknown
+            else f"cannot change {unknown}"
+        )
+        raise ValidationFailed(problem, [{"field": unknown[0], "message": problem}])
+
+    fields_raw = changes.pop("fields_raw", None)
+    fields: list[dict[str, Any]] | None = None
+    if fields_raw is not None:
+        defs, fields = normalise(fields_raw, settings)
+        if fields == list(rtype.fields or []):
+            # A normalised resend of the same list is not a change: the stored
+            # form is the validator's dump, so comparing raw input would make a
+            # no-op save bump ``schema_version`` and enqueue a rebuild.
+            fields, fields_raw = None, None
+    else:
+        defs = field_defs(rtype)
+
+    pointer_changed = any(
+        name in changes and changes[name] != getattr(rtype, name)
+        for name in ("display_field", "slug_field")
+    )
+    if fields is not None or pointer_changed:
+        # Including the trash: a trashed record still holds content these
+        # fields describe, and a restore reads it back under them.
+        held = await record_count(db, rtype, include_deleted=True)
+        if held:
+            # Design §8 in full — classification, dry run, ``_orphaned``
+            # decision, index migration. Only a populated type needs it: with
+            # no records there is nothing to invalidate and nothing to
+            # reindex, and routing an empty type through it would mark
+            # ``reindex_pending`` that only the out-of-request runner clears.
+            updated, _ = await apply_schema_change(
+                db,
+                rtype,
+                fields_raw=fields_raw,
+                expected_version=expected_version,
+                settings=settings,
+                actor=actor,
+                force=force,
+                orphaned=orphaned,
+                changes=changes,
+            )
+            return updated
+    if fields is not None:
+        await check_targets(db, defs, rtype.key)
+
+    check_pointers(
+        defs,
+        changes.get("display_field", rtype.display_field),
+        changes.get("slug_field", rtype.slug_field),
+    )
+
+    if not await guarded_bump(db, RecordType, rtype.id, expected_version):
+        raise Conflict(
+            f"record type {rtype.key!r} has changed since it was read",
+            current=await reload(db, RecordType, rtype.id),
+        )
+
+    needs_snapshot = fields is not None or any(n in changes for n in _SNAPSHOT_TRIGGERS)
+    for name, value in changes.items():
+        setattr(rtype, name, value)
+    if fields is not None:
+        rtype.fields = fields
+        rtype.schema_version = rtype.schema_version + 1
+    rtype.version = expected_version + 1
+    rtype.updated_by = actor
+    db.add(rtype)
+    await db.flush()
+    if needs_snapshot:
+        await snapshot(db, rtype, actor)
+    return rtype

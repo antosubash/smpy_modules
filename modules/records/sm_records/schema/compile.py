@@ -243,17 +243,32 @@ def from_stored(fields: list[FieldDefinition], data: dict[str, Any]) -> dict[str
     That last rule is the one that matters: a record that vanishes — or
     500s — because someone tightened a constraint is what makes people stop
     trusting the module. It is marked invalid at a higher layer, not hidden.
+
+    **A declared key absent from ``data`` but present under ``_orphaned`` reads
+    as the orphaned value.** That is restore-on-read for a re-added key (§8.8):
+    the payload migration is lazy, so a record whose ``price`` moved to
+    ``_orphaned`` when the field was deleted still carries it there when
+    ``price`` comes back, and the value has to become visible without a bulk
+    ``UPDATE`` over the type. An *undeclared* top-level key stays ignored —
+    that is a removed field whose value has not been migrated yet, and it is
+    not part of the current shape.
     """
     out: dict[str, Any] = {}
+    orphaned_values = data.get(ORPHANED_KEY)
+    if not isinstance(orphaned_values, dict):
+        orphaned_values = {}
     for field in fields:
         if field.key in data:
-            try:
-                out[field.key] = coerce_value(field, data[field.key])
-            except (PayloadValidationError, ValueError):
-                out[field.key] = data[field.key]
+            raw = data[field.key]
+        elif field.key in orphaned_values:
+            raw = orphaned_values[field.key]
         else:
             out[field.key] = field.default
-    orphaned = data.get(ORPHANED_KEY)
-    if isinstance(orphaned, dict) and orphaned:
-        out[ORPHANED_KEY] = orphaned
+            continue
+        try:
+            out[field.key] = coerce_value(field, raw)
+        except (PayloadValidationError, ValueError):
+            out[field.key] = raw
+    if orphaned_values:
+        out[ORPHANED_KEY] = orphaned_values
     return out

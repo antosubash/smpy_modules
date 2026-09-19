@@ -28,7 +28,6 @@ from sm_records.constants import ORPHANED_KEY
 from sm_records.index.query import Filter, Sort, build_query, count_query
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
-from sm_records.schema.compile import from_stored
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _payload, _relations
 from sm_records.services._common import guarded_bump, reload, type_id_map, type_resolver, utcnow
@@ -41,6 +40,10 @@ from sm_records.services._lifecycle import (
     restore_record,
     soft_delete_record,
 )
+
+# Re-exported: ``read_view`` lives in ``_payload`` with the rest of the
+# payload reading, and is imported from here by the contracts layer.
+from sm_records.services._payload import read_view
 from sm_records.services.errors import Conflict, NotFound
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
@@ -178,6 +181,38 @@ def _published_at(record: Record, new_status: RecordStatus):
     return utcnow()
 
 
+def _migrate_orphaned(
+    record: Record, defs: list[FieldDefinition], stored: dict[str, Any]
+) -> dict[str, Any]:
+    """The lazy destructive migration of §8.3, run on this one record.
+
+    Two moves, both against the *stored* payload and neither ever bulk:
+
+    * a top-level key the current schema no longer declares is a deleted
+      field's value. It moves under ``_orphaned`` — which is what makes a
+      mis-clicked field deletion undoable, at the cost of some storage, and
+      why nothing rewrites the whole type when a field goes (§8.2).
+    * a key the schema *does* declare is dropped from ``_orphaned``: the field
+      came back and its value is live again. The read path already served it
+      from there (``schema.compile.from_stored``), so by now it is in ``stored``
+      — either as the value the client sent back or as the field's default.
+
+    ``_orphaned`` itself is never client-supplied (``_payload.validate``
+    refuses a payload carrying it), so an update that does not mention it must
+    not be read as "delete it": what survives here is carried across.
+    """
+    previous = dict(record.data or {})
+    declared = {field.key for field in defs}
+    orphaned = dict(previous.get(ORPHANED_KEY) or {})
+    for key, value in previous.items():
+        if key == ORPHANED_KEY or key in declared:
+            continue
+        orphaned.setdefault(key, value)
+    for key in declared:
+        orphaned.pop(key, None)
+    return {**stored, ORPHANED_KEY: orphaned} if orphaned else stored
+
+
 async def update_record(
     db: AsyncSession,
     rtype: RecordType,
@@ -190,21 +225,21 @@ async def update_record(
     slug: str | None = None,
     position: int | None = None,
     actor: str | None = None,
+    event: RevisionEvent = RevisionEvent.UPDATE,
 ) -> Record:
     """Write a record, restamping it at the type's current schema version.
 
     That restamp is the lazy half of §8.3: a row written under schema 3 and
     edited under schema 5 validates against 5 and stamps 5, so payloads
     migrate one edit at a time and never in a job that can half-fail.
+
+    ``event`` is what the appended revision records. It is a parameter because
+    a restore (``services.revisions.restore``) is an ordinary write in every
+    respect except how the history should read: ``RESTORE`` rather than an
+    update that mysteriously repeats an older payload.
     """
-    _, values, stored = await _prepare(db, rtype, data, settings, exclude_id=record.id)
-    # §8.2: ``_orphaned`` belongs to the destructive schema path, not to the
-    # client. A write cannot supply it (``_payload.validate`` refuses one that
-    # tries), so an update that simply does not mention it must not be read as
-    # "delete it" — carried across unchanged.
-    orphaned = (record.data or {}).get(ORPHANED_KEY)
-    if orphaned:
-        stored = {**stored, ORPHANED_KEY: orphaned}
+    defs, values, stored = await _prepare(db, rtype, data, settings, exclude_id=record.id)
+    stored = _migrate_orphaned(record, defs, stored)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _payload.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
 
@@ -228,23 +263,6 @@ async def update_record(
     db.add(record)
     await db.flush()
 
-    await write_revision(
-        db, record, RevisionEvent.UPDATE, limit=settings.revision_limit, actor=actor
-    )
+    await write_revision(db, record, event, limit=settings.revision_limit, actor=actor)
     await write_index(db, record, rtype, resolve_type_id=await type_resolver(db))
     return record
-
-
-def read_view(rtype: RecordType, record: Record) -> dict[str, Any]:
-    """The lenient read of §8.3, plus whether this row is behind the schema.
-
-    ``data`` is nested rather than merged with ``schema_stale`` because a
-    field key may legally *be* ``schema_stale`` — ``TYPE_KEY_PATTERN`` allows
-    it — and a payload key silently overwriting a status flag is the kind of
-    collision that is only ever found in production.
-    """
-    defs = _payload.field_defs(rtype)
-    return {
-        "data": from_stored(defs, dict(record.data or {})),
-        "schema_stale": record.schema_version != rtype.schema_version,
-    }

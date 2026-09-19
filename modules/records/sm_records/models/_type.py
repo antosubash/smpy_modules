@@ -66,13 +66,28 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     version: int = Field(default=1, sa_column_kwargs={"nullable": False})
     """Optimistic concurrency on the schema itself. Design doc §8.6."""
 
-    reindex_pending: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False, default=list),
+    reindex_pending: dict[str, str] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False, default=dict),
     )
-    """Field keys whose index rows are being rebuilt. Operational state kept
-    *outside* ``fields`` so a revision snapshot never captures it — a rollback
-    could otherwise resurrect an ``indexing`` marker. Design doc §8.5."""
+    """Field keys whose index rows are being rebuilt, each mapped to the
+    ISO-8601 UTC instant the rebuild was enqueued at.
+
+    A mapping rather than the list design §8.5 first described, because §8.9's
+    health check has to answer "has this been pending *too long*" — an orphaned
+    reindex, whose background task died with the worker that owned it, is
+    recoverable but silent, and a bare list of keys cannot say when it started.
+    The column is plain ``JSON``, so this costs no migration.
+
+    The reserved key ``"*"`` means "rebuild the whole type", which is what a
+    ``display_field`` change enqueues: every record's ``display_title`` is
+    denormalised from it (§18 Q2). No field can collide with it —
+    ``TYPE_KEY_PATTERN`` requires a lowercase letter first — so a ``"*"``
+    marker never refuses a filter.
+
+    Operational state kept *outside* ``fields`` so a revision snapshot never
+    captures it: a rollback could otherwise resurrect an ``indexing`` marker.
+    """
 
 
 class RecordTypeRevision(Base, table=True):  # ty: ignore[unsupported-base]

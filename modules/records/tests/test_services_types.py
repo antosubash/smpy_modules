@@ -1,8 +1,11 @@
-"""Record Type CRUD: validation, optimistic concurrency, and the Phase 1 lock.
+"""Record Type CRUD: validation, optimistic concurrency, and what routes where.
 
 The interesting cases are the refusals. A type is a schema, so everything that
-goes wrong here goes wrong for every record of that type at once — which is
-why design §16 makes ``fields`` read-only the moment one exists.
+goes wrong here goes wrong for every record of that type at once. Phase 1
+answered that by locking ``fields`` the moment a record existed; Phase 3
+replaced the lock with design §8's pipeline, so what this file checks at the
+boundary is that a populated type's schema edit *goes* there — the pipeline
+itself is ``test_schema_change.py``.
 """
 
 from __future__ import annotations
@@ -13,7 +16,6 @@ from sm_records.services import records as record_service
 from sm_records.services import types as service
 from sm_records.services.errors import (
     Conflict,
-    FieldsLocked,
     NotFound,
     ReferencedByOthers,
     ValidationFailed,
@@ -216,24 +218,25 @@ async def test_resending_the_same_fields_is_not_a_schema_change(
     assert rtype.schema_version == 1
 
 
-async def test_fields_are_locked_once_the_type_holds_a_record(
+async def test_an_additive_change_applies_to_a_populated_type(
     db, settings, product_fields, make_record, field_def
 ):
+    """Phase 1 refused this outright (``FieldsLocked``). Phase 3 classifies it:
+    a new optional field cannot invalidate a record, so it is applied and the
+    records are left alone — design §8.2."""
     rtype = await service.create_type(
         db, key="product", label="Product", fields_raw=product_fields, settings=settings
     )
     await make_record(rtype, {"title": "held"})
-    with pytest.raises(FieldsLocked) as excinfo:
-        await service.update_type(
-            db,
-            rtype,
-            expected_version=1,
-            settings=settings,
-            fields_raw=[*product_fields, field_def("stock", "integer")],
-        )
-    assert excinfo.value.status_code == 409
-    assert "read-only" in excinfo.value.detail
-    assert rtype.schema_version == 1
+    updated = await service.update_type(
+        db,
+        rtype,
+        expected_version=1,
+        settings=settings,
+        fields_raw=[*product_fields, field_def("stock", "integer", indexed=False)],
+    )
+    assert updated.schema_version == 2
+    assert [f["key"] for f in updated.fields] == ["title", "price", "stock"]
 
 
 async def test_key_is_immutable(db, settings):

@@ -23,6 +23,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
+from sm_records.constants import ORPHANED_KEY
 from sm_records.index._coerce import (
     coerce_bool,
     coerce_date,
@@ -135,11 +136,24 @@ def make_schema_provider(resolve_type_id: TypeResolver) -> IndexProvider:
 
     def schema_provider(record: Record, rtype: RecordType) -> Iterator[IndexEntry]:
         data = record.data or {}
+        # The same fallback the read path takes (``schema.compile.from_stored``):
+        # a declared key that lives only under ``_orphaned`` is a value restored
+        # with a re-added field (§8.8), and the payload catches up lazily on the
+        # record's next write. Indexing from the top level only would leave that
+        # field queryable for nobody until every record happened to be edited.
+        orphaned = data.get(ORPHANED_KEY)
+        if not isinstance(orphaned, dict):
+            orphaned = {}
         for raw in rtype.fields or []:
             field = read_field(raw)
-            if field is None or field.key not in data:
+            if field is None:
                 continue
-            value = data[field.key]
+            if field.key in data:
+                value = data[field.key]
+            elif field.key in orphaned:
+                value = orphaned[field.key]
+            else:
+                continue
             if value is None:
                 continue
             # A to-many field given a scalar still indexes: the payload may

@@ -259,7 +259,7 @@ async def test_a_field_mid_reindex_is_refused_loudly(db, world):
     """Design doc §8.5: while the rows move between tables the answer would be
     partial, so the API refuses by name rather than returning half of it."""
     rtype, fields, _, _ = world
-    rtype.reindex_pending = ["price"]
+    rtype.reindex_pending = {"price": "2026-09-19T10:00:00+00:00"}
     with pytest.raises(QueryError) as caught:
         build_query(rtype, fields, [flt("price", "gt", 1)])
     assert caught.value.reason == "reindexing"

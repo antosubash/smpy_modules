@@ -19,12 +19,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeResolver
 from sm_records.index.writer import write_index
-from sm_records.models import Record, RecordType
+from sm_records.models import INDEX_TABLES, Record, RecordType
 
 
 async def reindex_record(
@@ -93,17 +93,59 @@ async def reindex_type(
             total += 1
 
 
+def pending_map(rtype: RecordType) -> dict[str, str]:
+    """``reindex_pending`` as a mapping, whatever is actually in the column.
+
+    It was a plain list of keys before Phase 3 and is a ``{key: enqueued-at}``
+    mapping now, on the same ``JSON`` column with no migration between them —
+    so a row written by the older code can still be sitting there mid-rebuild
+    at upgrade time. Reading it as a list and crashing would turn that into a
+    500 on the health check; reading it as "pending, start unknown" finishes
+    the rebuild, which is what the row is asking for.
+    """
+    raw = rtype.reindex_pending or {}
+    if isinstance(raw, list):
+        return {str(key): "" for key in raw}
+    return dict(raw)
+
+
 async def clear_pending(db: AsyncSession, rtype: RecordType, field_keys: Sequence[str]) -> None:
     """Drop ``field_keys`` from ``reindex_pending`` — step 4 of design doc §8.5.
 
     Separate from the rebuild because the service owns the sequence around it
     (bump ``schema_version``, mark pending, reindex into the new table, delete
-    the old rows, then this). Assigning a new list rather than mutating the old
-    one is not style: the column is plain ``JSON`` with no mutation tracking,
-    so an in-place ``remove()`` is a change SQLAlchemy never sees and never
-    writes — and the field stays refused as a filter forever.
+    the old rows, then this). Assigning a new mapping rather than mutating the
+    stored one is not style: the column is plain ``JSON`` with no mutation
+    tracking, so an in-place ``pop()`` is a change SQLAlchemy never sees and
+    never writes — and the field stays refused as a filter forever.
+
+    ``reindex_pending`` maps each key to the instant it was enqueued
+    (:class:`~sm_records.models.RecordType`), so a caller that cleared only the
+    keys it saw leaves any marker a *later* schema change added — which is the
+    behaviour a concurrent second edit needs.
     """
     dropped = set(field_keys)
-    rtype.reindex_pending = [key for key in (rtype.reindex_pending or []) if key not in dropped]
+    pending = pending_map(rtype)
+    rtype.reindex_pending = {key: at for key, at in pending.items() if key not in dropped}
     db.add(rtype)
     await db.flush()
+
+
+async def delete_field_rows(db: AsyncSession, rtype: RecordType, field_keys: Sequence[str]) -> int:
+    """Delete every index row of ``rtype`` for the named keys, across all six
+    tables. Returns the number of rows removed.
+
+    Step 3 of design doc §8.5, and the one step :func:`reindex_type` does not
+    already cover *by name*: it rewrites each record's rows whole, so a removed
+    field's rows do disappear with it — but only for records the rebuild
+    reaches. Doing it as one statement per table first means a field deleted
+    from a type with no records left, or a rebuild that dies halfway, still
+    leaves nothing behind that a query could read as truth.
+    """
+    removed = 0
+    for table in INDEX_TABLES:
+        result = await db.execute(
+            delete(table).where(table.type_id == rtype.id, table.field_key.in_(list(field_keys)))
+        )
+        removed += result.rowcount or 0
+    return removed

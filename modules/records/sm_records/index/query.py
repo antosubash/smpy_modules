@@ -145,8 +145,12 @@ def _resolve(rtype: RecordType, indexed: dict[str, IndexedField], declared: set[
     depends on where the sequence of §8.5 got to. The temporary answer (409)
     has to win over the permanent one (400), or a caller retries something
     that will never start working.
+
+    ``reindex_pending`` is a mapping of key → enqueued-at, so membership is a
+    key test. Its reserved ``"*"`` entry (a whole-type ``display_title``
+    rebuild) is unreachable here: no field key can be ``*``.
     """
-    if name in (rtype.reindex_pending or []):
+    if name in (rtype.reindex_pending or {}):
         raise QueryError(name, "reindexing", f"{name!r} is being reindexed")
     if name not in declared:
         raise QueryError(name, "unknown", f"{name!r} is not a field of {rtype.key!r}")

@@ -108,7 +108,12 @@ async def test_update_with_stale_version_is_409_with_current(client, field_def):
     assert body["current"]["key"] == "product"
 
 
-async def test_fields_are_locked_once_a_record_exists(client, records_app, field_def):
+async def test_an_additive_fields_change_applies_to_a_populated_type(
+    client, records_app, field_def
+):
+    """The Phase 1 lock is gone (design §16 → §8). ``fields_locked`` still
+    reports that the type holds content — the editor shows it — but an
+    additive edit now goes through, classified rather than refused."""
     _, db_state = records_app
     rtype = await seed_type(db_state, "product", [field_def("price", "number")])
     await seed_record(db_state, rtype, {"price": "1.00"})
@@ -124,8 +129,38 @@ async def test_fields_are_locked_once_a_record_exists(client, records_app, field
         },
         headers=roles(ADMIN),
     )
+    assert resp.status_code == 200, resp.text
+    assert [f["key"] for f in resp.json()["fields"]] == ["price", "sku"]
+    assert resp.json()["schema_version"] == 2
+
+
+async def test_a_restrictive_fields_change_is_refused_on_a_populated_type(
+    client, records_app, field_def
+):
+    """A newly required field with no default invalidates every record that
+    predates it, so the write is refused with a 409 (§8.2) and nothing moves."""
+    _, db_state = records_app
+    rtype = await seed_type(db_state, "product", [field_def("price", "number")])
+    await seed_record(db_state, rtype, {"price": "1.00"})
+    version = (await client.get("/api/records/types/product", headers=roles(ADMIN))).json()[
+        "version"
+    ]
+
+    resp = await client.put(
+        "/api/records/types/product",
+        json={
+            "expected_version": version,
+            "fields": [
+                field_def("price", "number"),
+                {**field_def("sku", "text"), "required": True},
+            ],
+        },
+        headers=roles(ADMIN),
+    )
     assert resp.status_code == 409
-    assert "current" not in resp.json()
+    after = await client.get("/api/records/types/product", headers=roles(ADMIN))
+    assert after.json()["schema_version"] == 1
+    assert after.json()["version"] == version
 
 
 async def test_delete_requires_matching_confirm_record_count(client, records_app, field_def):

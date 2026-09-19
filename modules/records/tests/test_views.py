@@ -12,6 +12,10 @@ from tests.app_harness import ADMIN, ROLE_VIEWER, roles, seed_record, seed_type
 
 _INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
+_NOW = "2026-09-19T10:00:00+00:00"
+"""``reindex_pending`` maps a field key to when its rebuild was enqueued
+(design doc §8.5/§8.9); the instant only matters to the health check."""
+
 
 def _field(key: str, type_: str, **overrides) -> dict:
     base = {
@@ -127,7 +131,9 @@ async def test_record_list_view_reports_reindexing_filter_inline(client, records
     Inertia would show a modal. The view renders an empty page and puts the
     reason in Inertia's ``errors`` bag, which the screen reads."""
     _, db_state = records_app
-    await seed_type(db_state, "product", [_field("price", "number")], reindex_pending=["price"])
+    await seed_type(
+        db_state, "product", [_field("price", "number")], reindex_pending={"price": _NOW}
+    )
     resp = await client.get(
         "/admin/records/product?filter=price:gt:1",
         headers={**roles(ADMIN), **_INERTIA_HEADERS},

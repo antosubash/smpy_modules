@@ -2,12 +2,18 @@
 
 A type's ``fields`` is a JSON column on one row, so changing it is an
 ``UPDATE`` and never DDL (design §4, §8.1). What that ``UPDATE`` is allowed to
-be is the whole of §8, and Phase 1 ships exactly one rule of it: **a type's
-``fields`` are read-only once it holds a record** (§16). The classification,
-the dry-run and the index-table migration arrive in Phase 3; until they do,
-an unguarded ``fields`` write on a populated type is the data loss they exist
-to prevent, so :class:`~sm_records.services.errors.FieldsLocked` stands in
-for them.
+be is the whole of §8, and Phase 3 ships it: a ``fields`` edit on a type that
+already holds records is classified, dry-run and — if it would leave rows
+invalid — refused with a report, by
+:mod:`sm_records.services.schema_change`. ``update_type`` routes there rather
+than re-implementing any of it; what stays here is the row lifecycle around
+the schema (labels, flags, the delete) and the fast path for a type with no
+records, where there is nothing to classify against and nothing to reindex.
+
+Phase 1's blanket refusal, :class:`~sm_records.services.errors.FieldsLocked`,
+is gone from this path. The class stays importable: it is part of the error
+vocabulary the endpoints layer maps, and a host pinned to an older contract
+should not get an ``ImportError`` for it.
 """
 
 from __future__ import annotations
@@ -16,18 +22,17 @@ import re
 from typing import Any
 
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
-from sm_records.models import Record, RecordType, RecordTypeRevision
+from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
-from sm_records.services._common import guarded_bump, reload, type_id_map
-from sm_records.services._payload import field_defs
+from sm_records.services._common import record_count, record_counts, type_id_map
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
+from sm_records.services._type_update import update_type
 from sm_records.services.errors import (
     Conflict,
-    FieldsLocked,
     NotFound,
     ReferencedByOthers,
     ValidationFailed,
@@ -49,28 +54,6 @@ __all__ = [
 
 _KEY_RE = re.compile(TYPE_KEY_PATTERN)
 
-#: Everything ``update_type`` accepts. ``key`` is absent on purpose — it is in
-#: URLs, in the public API and in every relation target, so a rename would
-#: strand all three (design §5).
-_EDITABLE = frozenset(
-    {
-        "label",
-        "label_plural",
-        "description",
-        "icon",
-        "fields_raw",
-        "display_field",
-        "slug_field",
-        "is_public",
-        "allowed_roles",
-    }
-)
-
-#: A change to any of these is snapshotted in ``records_type_revision``. The
-#: rest are labels: they cannot damage a record, and a revision per typo would
-#: bury the schema edits the table exists to make reversible.
-_SNAPSHOT_TRIGGERS = ("fields_raw", "display_field", "slug_field")
-
 
 async def list_types(db: AsyncSession) -> list[RecordType]:
     stmt = select(RecordType).order_by(RecordType.label, RecordType.key)
@@ -89,37 +72,6 @@ async def get_type_by_id(db: AsyncSession, type_id: int) -> RecordType:
     if rtype is None:
         raise NotFound(f"no record type with id {type_id!r}")
     return rtype
-
-
-async def record_count(
-    db: AsyncSession, rtype: RecordType, *, include_deleted: bool = False
-) -> int:
-    """How many records the type holds — live only, or the trash as well.
-
-    Not a column: the previous draft denormalised it and §5 removed it,
-    because a ``COUNT`` over an indexed column is cheap and cannot go stale.
-    ``func.count(Record.id)`` rather than a bare ``count()`` so the statement
-    names the mapper — that is what the framework's soft-delete filter attaches
-    to, and without it this would always count the trash.
-
-    Which count a caller wants is not a detail. "Live" is what an operator is
-    shown on a screen; but §16's ``fields`` lock and §8.9's delete
-    confirmation are about *content the schema describes*, and a trashed
-    record still holds a payload written against those fields and is one
-    restore away from being read under them. Both of those pass
-    ``include_deleted=True``.
-    """
-    stmt = select(func.count(Record.id)).where(Record.type_id == rtype.id)
-    if include_deleted:
-        stmt = stmt.execution_options(include_deleted=True)
-    return int((await db.execute(stmt)).scalar_one())
-
-
-async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int]:
-    """``(live, trashed)`` — the pair every ``TypeRead`` is built from."""
-    live = await record_count(db, rtype)
-    total = await record_count(db, rtype, include_deleted=True)
-    return live, total - live
 
 
 async def create_type(
@@ -173,87 +125,6 @@ async def create_type(
     db.add(rtype)
     await db.flush()
     await snapshot(db, rtype, actor)
-    return rtype
-
-
-async def update_type(
-    db: AsyncSession,
-    rtype: RecordType,
-    *,
-    expected_version: int,
-    settings: RecordsSettings,
-    actor: str | None = None,
-    **changes: Any,
-) -> RecordType:
-    """Edit a type under optimistic concurrency (design §8.6).
-
-    ``version`` is bumped by every accepted edit; ``schema_version`` only by a
-    change to ``fields``, because it is what record rows stamp themselves with
-    and what the compiled-model cache is keyed on. Bumping it for a label edit
-    would invalidate every cached validator and mark every record stale for
-    nothing.
-    """
-    unknown = sorted(set(changes) - _EDITABLE)
-    if unknown:
-        problem = (
-            "key is immutable — it is in URLs, the API and every relation target"
-            if "key" in unknown
-            else f"cannot change {unknown}"
-        )
-        raise ValidationFailed(problem, [{"field": unknown[0], "message": problem}])
-
-    fields: list[dict[str, Any]] | None = None
-    if "fields_raw" in changes:
-        defs, fields = normalise(changes.pop("fields_raw"), settings)
-        if fields == list(rtype.fields or []):
-            fields = None
-    else:
-        defs = field_defs(rtype)
-
-    # ``display_field``/``slug_field`` are locked with ``fields`` and for the
-    # same reason. They are not labels: ``display_title`` and ``slug`` are
-    # denormalised onto every record row from them (§5), and Phase 1 has
-    # nothing that recomputes those for records already written — so an edit
-    # here on a populated type leaves every existing row titled and slugged
-    # from the old pointer while new rows use the new one. Phase 3 reindexes
-    # instead of refusing.
-    pointer_changed = any(
-        name in changes and changes[name] != getattr(rtype, name)
-        for name in ("display_field", "slug_field")
-    )
-    if fields is not None or pointer_changed:
-        # Including the trash: a trashed record still holds content these
-        # fields describe, and a restore reads it back under them.
-        held = await record_count(db, rtype, include_deleted=True)
-        if held:
-            raise FieldsLocked(rtype.key, held)
-    if fields is not None:
-        await check_targets(db, defs, rtype.key)
-
-    check_pointers(
-        defs,
-        changes.get("display_field", rtype.display_field),
-        changes.get("slug_field", rtype.slug_field),
-    )
-
-    if not await guarded_bump(db, RecordType, rtype.id, expected_version):
-        raise Conflict(
-            f"record type {rtype.key!r} has changed since it was read",
-            current=await reload(db, RecordType, rtype.id),
-        )
-
-    needs_snapshot = fields is not None or any(n in changes for n in _SNAPSHOT_TRIGGERS)
-    for name, value in changes.items():
-        setattr(rtype, name, value)
-    if fields is not None:
-        rtype.fields = fields
-        rtype.schema_version = rtype.schema_version + 1
-    rtype.version = expected_version + 1
-    rtype.updated_by = actor
-    db.add(rtype)
-    await db.flush()
-    if needs_snapshot:
-        await snapshot(db, rtype, actor)
     return rtype
 
 

@@ -1,7 +1,7 @@
-"""Revision history — reading it, and the one write every record change makes.
+"""Revision history — reading it, restoring from it, and the one write every
+record change makes.
 
-Restoring *from* a revision is Phase 3 (design §16), so this module is
-deliberately thin. The write helper lives here rather than in ``records`` so
+The write helper lives here rather than in ``records`` so
 that the cap of :attr:`RecordsSettings.revision_limit` has one owner: a trim
 that ran on create but not on update is the bug this module exists to make
 impossible.
@@ -16,8 +16,11 @@ from __future__ import annotations
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.constants import ORPHANED_KEY
 from sm_records.models import Record, RecordRevision, RecordType, RecordTypeRevision, RevisionEvent
 from sm_records.services._common import utcnow
+from sm_records.services.errors import NotFound
+from sm_records.settings import RecordsSettings
 
 
 async def list_revisions(db: AsyncSession, record: Record) -> list[RecordRevision]:
@@ -94,3 +97,69 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
     )
     if stale:
         await db.execute(delete(RecordRevision).where(RecordRevision.id.in_(list(stale))))
+
+
+async def restore(
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    *,
+    revision_id: int,
+    expected_version: int,
+    settings: RecordsSettings,
+    actor: str | None = None,
+) -> Record:
+    """Write a past revision's payload back as a new version of the record.
+
+    **It validates against the schema as it is now, not as it was.** A revision
+    written under an older ``schema_version`` may therefore be refused — a
+    field that has since become required and is absent from it, a value the
+    type no longer accepts — and that is the correct answer rather than a
+    limitation: the alternative is storing a payload that the current schema
+    says cannot exist, which is exactly the state §8.3 keeps records *out* of
+    by restamping on every write. The operator's recourse is the same as for
+    any other invalid content: fix the value, or change the schema.
+
+    The revision must belong to this record. Nothing else in the API takes a
+    revision id, so an id from another record is a 404 rather than a 403 —
+    there is no resource here the caller is being refused access to.
+
+    ``RevisionEvent.RESTORE`` is stamped on the revision this write itself
+    appends, so the history shows "restored from" as its own event rather than
+    as an ordinary update that happens to repeat an older payload.
+    """
+    revision = (
+        (
+            await db.execute(
+                select(RecordRevision).where(
+                    RecordRevision.id == revision_id,
+                    RecordRevision.record_id == record.id,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if revision is None:
+        raise NotFound(f"record {record.uuid} has no revision {revision_id!r}")
+
+    # Imported here, not at the top: ``records`` imports this module for
+    # ``write_revision``, so the pair can only be acyclic one way round.
+    from sm_records.services.records import update_record
+
+    # ``_orphaned`` is never a client-writable key (``_payload.validate``
+    # refuses it outright), and the record's own copy is carried forward by
+    # the write anyway — a revision that snapshotted one would otherwise make
+    # every restore a 422.
+    data = {k: v for k, v in (revision.data or {}).items() if k != ORPHANED_KEY}
+
+    return await update_record(
+        db,
+        rtype,
+        record,
+        expected_version=expected_version,
+        data=data,
+        settings=settings,
+        actor=actor,
+        event=RevisionEvent.RESTORE,
+    )

@@ -156,12 +156,15 @@ async def test_field_keys_is_accepted_and_still_rebuilds_the_record(db, catalogu
 
 async def test_clear_pending_removes_only_the_named_keys(db, make_type, field_def):
     rtype = await make_type("item", [field_def("price", "number")])
-    rtype.reindex_pending = ["price", "name"]
+    rtype.reindex_pending = {
+        "price": "2026-09-19T10:00:00+00:00",
+        "name": "2026-09-19T10:00:00+00:00",
+    }
     db.add(rtype)
     await db.flush()
 
     await clear_pending(db, rtype, ["price"])
-    assert rtype.reindex_pending == ["name"]
+    assert rtype.reindex_pending == {"name": "2026-09-19T10:00:00+00:00"}
 
     # Read it back from the database: a JSON column has no mutation tracking,
     # so an in-place edit would pass the assertion above and never be written.
@@ -170,4 +173,4 @@ async def test_clear_pending_removes_only_the_named_keys(db, make_type, field_de
     stored = (
         await db.execute(select(RecordType.reindex_pending).where(RecordType.id == rtype.id))
     ).scalar_one()
-    assert stored == ["name"]
+    assert stored == {"name": "2026-09-19T10:00:00+00:00"}

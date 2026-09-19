@@ -16,6 +16,10 @@ from __future__ import annotations
 
 from tests.app_harness import ADMIN, roles, seed_type
 
+_NOW = "2026-09-19T10:00:00+00:00"
+"""``reindex_pending`` maps a field key to when its rebuild was enqueued
+(design doc §8.5/§8.9); the instant only matters to the health check."""
+
 
 def _field(
     key: str, type_: str, *, required: bool = False, indexed: bool = True, **options
@@ -219,7 +223,9 @@ async def test_filter_bad_op_is_400(client):
 
 async def test_filter_on_reindexing_field_is_409(client, records_app):
     _, db_state = records_app
-    await seed_type(db_state, "product", [_field("price", "number")], reindex_pending=["price"])
+    await seed_type(
+        db_state, "product", [_field("price", "number")], reindex_pending={"price": _NOW}
+    )
     resp = await client.get(
         "/api/records/types/product/records",
         params=[("filter", "price:gt:1")],

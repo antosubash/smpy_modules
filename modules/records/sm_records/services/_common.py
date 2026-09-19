@@ -20,11 +20,11 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import RecordType
+from sm_records.models import Record, RecordType
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
     from simple_module_db.listeners import SESSION_HAS_WRITES_KEY
@@ -104,3 +104,34 @@ async def reload[T](db: AsyncSession, model: type[T], row_id: int) -> T | None:
         .execution_options(include_deleted=True, populate_existing=True)
     )
     return (await db.execute(stmt)).scalars().first()
+
+
+async def record_count(
+    db: AsyncSession, rtype: RecordType, *, include_deleted: bool = False
+) -> int:
+    """How many records the type holds — live only, or the trash as well.
+
+    Not a column: the previous draft denormalised it and §5 removed it,
+    because a ``COUNT`` over an indexed column is cheap and cannot go stale.
+    ``func.count(Record.id)`` rather than a bare ``count()`` so the statement
+    names the mapper — that is what the framework's soft-delete filter attaches
+    to, and without it this would always count the trash.
+
+    Which count a caller wants is not a detail. "Live" is what an operator is
+    shown on a screen; but §16's ``fields`` lock and §8.9's delete
+    confirmation are about *content the schema describes*, and a trashed
+    record still holds a payload written against those fields and is one
+    restore away from being read under them. Both of those pass
+    ``include_deleted=True``.
+    """
+    stmt = select(func.count(Record.id)).where(Record.type_id == rtype.id)
+    if include_deleted:
+        stmt = stmt.execution_options(include_deleted=True)
+    return int((await db.execute(stmt)).scalar_one())
+
+
+async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int]:
+    """``(live, trashed)`` — the pair every ``TypeRead`` is built from."""
+    live = await record_count(db, rtype)
+    total = await record_count(db, rtype, include_deleted=True)
+    return live, total - live

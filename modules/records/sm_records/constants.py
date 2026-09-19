@@ -64,6 +64,13 @@ ORPHANED_KEY: Final = "_orphaned"
 
 RESERVED_FIELD_KEYS: Final = frozenset({ORPHANED_KEY})
 
+REINDEX_ALL: Final = "*"
+"""The ``reindex_pending`` entry meaning "rebuild the whole type", enqueued by
+a ``display_field`` change — every record's ``display_title`` is denormalised
+from it (design doc §18 Q2). Safe as a sentinel because ``TYPE_KEY_PATTERN``
+requires a lowercase letter first, so no field key can be ``*`` and a
+whole-type rebuild therefore never refuses a filter."""
+
 RESERVED_TYPE_KEYS: Final = frozenset({"types", "new"})
 """Type keys that would shadow a view route: ``/admin/records/types/...`` is
 the schema editor and ``/admin/records/{key}/new`` the record editor, and a

@@ -163,7 +163,7 @@ async def test_a_relation_payload_naming_another_type_is_refused_and_still_index
     assert blocked.status_code == 409
 
 
-# --- F4/F5/F6: the trash counts, and the pointers are locked too ------------
+# --- F4/F5/F6: the trash counts, and the pointers are editable now ----------
 
 
 async def _one_trashed(client, key: str) -> dict:
@@ -177,17 +177,29 @@ async def _one_trashed(client, key: str) -> dict:
     return read.json()
 
 
-async def test_fields_stay_locked_while_the_only_record_is_in_the_trash(client):
+async def test_the_trash_still_counts_when_a_schema_change_is_classified(client):
+    """F4 was "the lock counts the trash". Phase 3 replaced the lock with the
+    dry run of design §8.2, and the rule survives the replacement: a trashed
+    record still holds content the schema describes and a restore reads it
+    back, so a change that would invalidate it is refused for it."""
     rtype = await _one_trashed(client, "f4thing")
     assert (rtype["trashed_record_count"], rtype["fields_locked"]) == (1, True)
 
+    # The trashed record has no ``alt`` value, so requiring it fails for the
+    # only record the type has — which is in the trash.
     resp = await client.put(
         f"{API}/types/f4thing",
-        json={"expected_version": rtype["version"], "fields": [_field("name", "text")]},
+        json={
+            "expected_version": rtype["version"],
+            "fields": [_field("name", "text"), {**_field("alt", "text"), "required": True}],
+        },
         headers=roles(ADMIN),
     )
     assert resp.status_code == 409
-    assert "read-only" in resp.json()["detail"]
+    assert "would not satisfy the new schema" in resp.json()["detail"]
+
+    after = await client.get(f"{API}/types/f4thing", headers=roles(ADMIN))
+    assert after.json()["schema_version"] == 1
 
 
 async def test_delete_type_confirms_against_the_trash_too(client):
@@ -203,9 +215,14 @@ async def test_delete_type_confirms_against_the_trash_too(client):
     ).status_code == 204
 
 
-async def test_display_and_slug_field_are_locked_on_a_populated_type(client):
+async def test_display_and_slug_field_are_editable_on_a_populated_type(client):
+    """F6 locked both pointers on a populated type, because Phase 1 had nothing
+    that recomputed ``display_title`` for records already written. Phase 3
+    does: a ``display_field`` change enqueues a whole-type rebuild (``"*"`` in
+    ``reindex_pending``, design §18 Q2), and ``slug_field`` deliberately
+    changes nothing already stored — a slug is an address."""
     await _type(client, "f6thing", [_field("name", "text"), _field("alt", "text")])
-    await _record(client, "f6thing", {"name": "One", "alt": "Other"})
+    record = await _record(client, "f6thing", {"name": "One", "alt": "Other"})
     version = (await client.get(f"{API}/types/f6thing", headers=roles(ADMIN))).json()["version"]
 
     for pointer in ("display_field", "slug_field"):
@@ -214,8 +231,16 @@ async def test_display_and_slug_field_are_locked_on_a_populated_type(client):
             json={"expected_version": version, pointer: "alt"},
             headers=roles(ADMIN),
         )
-        assert resp.status_code == 409, pointer
-        assert "read-only" in resp.json()["detail"]
+        assert resp.status_code == 200, (pointer, resp.text)
+        version = resp.json()["version"]
+
+    # Neither pointer rewrote the record: the title waits for the rebuild and
+    # the slug is not regenerated at all.
+    unchanged = await client.get(
+        f"{API}/types/f6thing/records/{record['uuid']}", headers=roles(ADMIN)
+    )
+    assert unchanged.json()["slug"] == record["slug"]
+    assert unchanged.json()["version"] == 1
 
     # A label edit on the same populated type still goes through.
     ok = await client.put(
@@ -224,48 +249,4 @@ async def test_display_and_slug_field_are_locked_on_a_populated_type(client):
         headers=roles(ADMIN),
     )
     assert ok.status_code == 200
-
-
-# --- F7: ``_orphaned`` is the schema path's, not the client's ---------------
-
-
-async def test_orphaned_is_refused_on_write_and_survives_an_update_that_omits_it(client):
-    await _type(client, "f7thing", [_field("name", "text")])
-    refused = await client.post(
-        f"{API}/types/f7thing/records",
-        json={"data": {"name": "X", "_orphaned": {"gone": 1}}},
-        headers=roles(ADMIN),
-    )
-    assert refused.status_code == 422
-    assert [item["field"] for item in refused.json()["errors"]] == ["_orphaned"]
-
-    record = await _record(client, "f7thing", {"name": "X"})
-    # Only the destructive schema path writes this key, and it does not exist
-    # yet — so the stored value is planted directly, as that path would.
-    async with client.db_state.session_factory() as session:  # type: ignore[attr-defined]
-        from sm_records.models import Record
-        from sqlalchemy import select
-
-        row = (
-            (await session.execute(select(Record).where(Record.uuid == record["uuid"])))
-            .scalars()
-            .one()
-        )
-        row.data = {**row.data, "_orphaned": {"dropped": "kept"}}
-        session.add(row)
-        await session.commit()
-
-    updated = await client.put(
-        f"{API}/types/f7thing/records/{record['uuid']}",
-        json={"expected_version": 1, "data": {"name": "Y"}},
-        headers=roles(ADMIN),
-    )
-    assert updated.status_code == 200, updated.text
-    assert updated.json()["data"]["_orphaned"] == {"dropped": "kept"}
-
-    rejected = await client.put(
-        f"{API}/types/f7thing/records/{record['uuid']}",
-        json={"expected_version": 2, "data": {"name": "Z", "_orphaned": {}}},
-        headers=roles(ADMIN),
-    )
-    assert rejected.status_code == 422
+    assert ok.json()["label"] == "Renamed"
