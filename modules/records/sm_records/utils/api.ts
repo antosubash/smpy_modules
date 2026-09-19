@@ -110,11 +110,20 @@ export async function listTypes(): Promise<{ items: TypeRead[] }> {
   return request('/types');
 }
 
+/** Mirrors the API's `TypeCreate`: everything the schema editor collects
+ *  goes in one POST — a type must never exist for a moment with half its
+ *  settings, and a second request would give that moment a failure mode. */
 export type CreateTypePayload = {
   key: string;
   label: string;
-  label_plural: string;
-  fields: FieldDef[];
+  label_plural?: string;
+  fields?: FieldDef[];
+  description?: string;
+  icon?: string;
+  is_public?: boolean;
+  allowed_roles?: string[];
+  display_field?: string;
+  slug_field?: string;
 };
 
 export function createType(payload: CreateTypePayload): Promise<TypeRead> {

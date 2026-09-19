@@ -18,7 +18,7 @@ import {
   type TypeEditorProps,
   type TypeMetadataValues,
 } from '../components/typeeditor/types';
-import { ApiError, createType, updateType } from '../utils/api';
+import { ApiError, type CreateTypePayload, createType, updateType } from '../utils/api';
 import type { TypeRead, ValidationError } from '../utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
@@ -44,10 +44,10 @@ function sameStringSet(a: string[], b: string[]): boolean {
   return sa.every((v, i) => v === sb[i]);
 }
 
-/** Metadata `createType`'s narrow payload type has no room for, sent as a
- *  follow-up `PUT` right after creation — see the comment at its call site. */
-function extraCreateFields(values: TypeMetadataValues): Record<string, unknown> {
-  const extra: Record<string, unknown> = {};
+/** The optional metadata the editor collects for a new type, in the shape
+ *  `createType` sends. Absent keys are left to the server's defaults. */
+function extraCreateFields(values: TypeMetadataValues): Partial<CreateTypePayload> {
+  const extra: Partial<CreateTypePayload> = {};
   if (values.description) extra.description = values.description;
   if (values.icon) extra.icon = values.icon;
   if (values.isPublic) extra.is_public = true;
@@ -124,33 +124,13 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
     setPending(true);
     try {
       if (isNew) {
-        // `createType`'s payload type (`utils/api.ts`) only covers Phase 1's
-        // `key`/`label`/`label_plural`/`fields` — the dialog it was written
-        // for never sent more. Rather than widen that shared, un-owned type,
-        // anything else this screen collects (description, icon, is_public,
-        // allowed_roles, the field pointers) rides a follow-up `PUT`, which
-        // already accepts an arbitrary change set.
         const created = await createType({
           key: values.key,
           label: values.label,
           label_plural: values.labelPlural,
           fields,
+          ...extraCreateFields(values),
         });
-        const extra = extraCreateFields(values);
-        if (Object.keys(extra).length === 0) {
-          router.visit(`/admin/records/types/${created.key}`);
-          return;
-        }
-        try {
-          await updateType(created.key, created.version, extra);
-        } catch {
-          toast.error(
-            t('records.type_editor.create_partial', {
-              defaultValue:
-                'The type was created, but some of the other settings could not be saved. Edit it to try again.',
-            }),
-          );
-        }
         router.visit(`/admin/records/types/${created.key}`);
         return;
       }
