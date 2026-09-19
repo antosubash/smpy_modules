@@ -541,8 +541,14 @@ eight static SQLModel tables: `records_type`, `records_type_revision`,
 ordinary tables and they change only when the *module* ships a new version. A
 consuming host runs `make migration msg="add records"`, gets one revision,
 adds `branch_labels = ("records",)`, and applies it — identical to `news` or
-`pagebuilder`, and the reason §4 refuses runtime DDL. The module can then be
-removed on its own with `alembic downgrade records@base`.
+`pagebuilder`, and the reason §4 refuses runtime DDL.
+
+The label does **not** buy an isolated rollback, despite what the repo's docs
+said until now: autogenerate chains the revision off the current head, so
+`downgrade records@base` walks the whole linear history (verified — 13
+downgrades, every table gone). This follows the repo convention rather than
+making `records` the first true branch; the discrepancy is filed upstream as
+antosubash/simple_module_python#333.
 
 **User-defined schemas — not Alembic at all.** A Record Type's `fields` is a
 JSON column on one row. Changing it is an `UPDATE` of that row. Nothing is

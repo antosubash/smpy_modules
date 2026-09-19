@@ -30,8 +30,12 @@ workspace = true
 ```
 
 Then run `make migration msg="add records"` and apply it with `make migrate`.
-The module's first revision is labelled `records`, so it can be removed on
-its own with `alembic downgrade records@base`.
+The module's first revision is labelled `records`. Note that
+`alembic downgrade records@base` does **not** remove only this module: the
+revision chains off your host's current head, so that command rolls back
+every revision beneath it as well. To drop this module's tables alone,
+downgrade to the revision *before* the records one, or drop the ten
+`records_*` tables directly.
 
 ## Usage
 
