@@ -32,9 +32,15 @@ class Referrer:
     on_delete: str
 
 
-def _targets(defs: list[FieldDefinition], values: dict[str, Any]) -> list[tuple[str, str, str]]:
-    """``(field key, declared target type, target uuid)`` for every reference."""
-    out: list[tuple[str, str, str]] = []
+def _targets(
+    defs: list[FieldDefinition], values: dict[str, Any]
+) -> list[tuple[str, str, str, str]]:
+    """``(field key, declared target type, payload type, target uuid)`` per reference.
+
+    The payload's own ``type`` travels alongside the declared one because the
+    two are allowed to disagree and must not be: see :func:`check_targets`.
+    """
+    out: list[tuple[str, str, str, str]] = []
     for field in defs:
         if field.type is not FieldType.RELATION:
             continue
@@ -45,7 +51,8 @@ def _targets(defs: list[FieldDefinition], values: dict[str, Any]) -> list[tuple[
         items = value if isinstance(value, list) else [value]
         for item in items:
             if isinstance(item, dict) and item.get("uuid"):
-                out.append((field.key, declared, str(item["uuid"])))
+                claimed = str(item.get("type") or "")
+                out.append((field.key, declared, claimed, str(item["uuid"])))
     return out
 
 
@@ -57,27 +64,42 @@ async def check_targets(
 ) -> None:
     """Every relation value must name a live record of the declared type.
 
-    Three failures, one message each, because a generic form renders them
-    against the field: a payload pointing at a type the field was not declared
-    for, a uuid that does not exist, and a uuid that exists as a record of some
+    Four failures, one message each, because a generic form renders them
+    against the field: a payload naming a *different* type than the field
+    declares, a payload pointing at a type the field was not declared for, a
+    uuid that does not exist, and a uuid that exists as a record of some
     *other* type. A soft-deleted target counts as missing — the soft-delete
     filter applies to the lookup — which is deliberate: design §9 lets an
     *existing* reference dangle through a trash-and-restore cycle, but a new
     write should not be allowed to point at something already in the bin.
+
+    The first of those is not cosmetic. ``records_index_ref`` is written
+    against the declared target, and a payload whose ``type`` names something
+    else used to pass this check on the declared type's uuid while the writer
+    indexed — or failed to index — under the payload's key. The reference then
+    existed in the document and nowhere in the index, so ``restrict`` saw no
+    referrer and the target was deletable out from under it.
     """
     wanted = _targets(defs, values)
     if not wanted:
         return
-    uuids = {uuid for _, _, uuid in wanted}
+    uuids = {uuid for *_, uuid in wanted}
     rows = (
         await db.execute(select(Record.uuid, Record.type_id).where(Record.uuid.in_(uuids)))
     ).all()
     live = {uuid: int(type_id) for uuid, type_id in rows}
 
     errors: list[dict[str, str]] = []
-    for key, declared, uuid in wanted:
+    for key, declared, claimed, uuid in wanted:
         target_id = type_ids.get(declared)
-        if target_id is None:
+        if claimed and claimed != declared:
+            errors.append(
+                {
+                    "field": key,
+                    "message": f"field {key!r} points at {declared!r}, not {claimed!r}",
+                }
+            )
+        elif target_id is None:
             errors.append({"field": key, "message": f"target type {declared!r} does not exist"})
         elif uuid not in live:
             errors.append({"field": key, "message": f"no record with uuid {uuid!r}"})

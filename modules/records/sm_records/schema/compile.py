@@ -50,7 +50,9 @@ CACHE_MAX = 256
 without limit. Eviction is oldest-first, which for this access pattern means
 the version nobody writes against any more."""
 
-_MODEL_CACHE: dict[tuple[str, int], type[BaseModel]] = {}
+# Keyed exactly as :func:`get_model` builds it: ``(type_id, type_key,
+# schema_version)``, with ``type_id`` absent for a caller that has no row.
+_MODEL_CACHE: dict[tuple[int | None, str, int], type[BaseModel]] = {}
 _ADAPTER_CACHE: dict[tuple[str, bool, str, str], TypeAdapter[Any]] = {}
 
 

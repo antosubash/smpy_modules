@@ -49,9 +49,16 @@ class TypeRead(SQLModel):
     is_public: bool
     allowed_roles: list[str]
     record_count: int
+    """Live records only — the number a list screen shows."""
+    trashed_record_count: int
+    """Records in the trash. Separate from ``record_count`` because the two
+    answer different questions: what the type shows, and what deleting it
+    would destroy. ``DELETE /types/{key}`` confirms against the *sum*."""
     fields_locked: bool
-    """``record_count > 0`` — design §16's Phase 1 rule: a type's ``fields``
-    are read-only once it holds a record. Carried here so the UI can disable
+    """``record_count + trashed_record_count > 0`` — design §16's Phase 1
+    rule: a type's ``fields`` (and its ``display_field``/``slug_field``) are
+    read-only once it holds a record. The trash counts: a trashed record still
+    holds content those fields describe. Carried here so the UI can disable
     the field editor without a second request."""
     created_at: datetime
     updated_at: datetime | None
@@ -144,7 +151,9 @@ class RevisionListResponse(SQLModel):
     items: list[RevisionRead]
 
 
-def type_read(rtype: RecordType, record_count: int) -> TypeRead:
+def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -> TypeRead:
+    """Both counts are required rather than defaulted: a caller that forgot
+    the trashed one would silently report a populated type as editable."""
     return TypeRead(
         key=rtype.key,
         label=rtype.label,
@@ -159,7 +168,8 @@ def type_read(rtype: RecordType, record_count: int) -> TypeRead:
         is_public=rtype.is_public,
         allowed_roles=list(rtype.allowed_roles or []),
         record_count=record_count,
-        fields_locked=record_count > 0,
+        trashed_record_count=trashed_record_count,
+        fields_locked=(record_count + trashed_record_count) > 0,
         created_at=rtype.created_at,
         updated_at=rtype.updated_at,
     )

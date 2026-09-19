@@ -10,7 +10,7 @@ deep-link into exactly the state the API would show for the same query.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from fastapi import Depends, HTTPException, Query, Request
 from simple_module_db import get_db
@@ -40,7 +40,37 @@ def get_settings(request: Request) -> RecordsSettings:
     return request.app.state.sm_records.settings
 
 
-async def load_type(key: str, db: AsyncSession = Depends(get_db)) -> RecordType:
+REQUEST_SESSION_KEY: Final = "sm_records.request_session"
+"""``request.scope`` key holding this request's session — see :func:`request_db`."""
+
+
+async def request_db(request: Request, db: AsyncSession = Depends(get_db)) -> AsyncSession:
+    """``get_db``, with the session findable from outside the dependency tree.
+
+    ``RecordsErrorRoute`` turns a service exception into a JSON response
+    *inside* the route handler, which means ``get_db`` never sees an exception
+    and commits whatever the refused write already wrote. To roll that back it
+    has to reach the session, and a route wrapper has no dependency tree to
+    ask — so the session is parked on ``request.scope`` on the way in.
+
+    Registering it here rather than taking it from the framework is a version
+    thing: ``simple_module_db`` at the range this module depends on
+    (``CLAUDE.md``: published modules pin ranges, never ``==``) exposes no
+    request-scoped session accessor. ``get_db`` is still the dependency doing
+    the work, and FastAPI caches it per request, so a route mixing
+    ``Depends(get_db)`` and ``Depends(request_db)`` gets one session, not two.
+    """
+    request.scope[REQUEST_SESSION_KEY] = db
+    return db
+
+
+def request_session(request: Request) -> AsyncSession | None:
+    """The session :func:`request_db` parked, or ``None`` outside a route that
+    uses it."""
+    return request.scope.get(REQUEST_SESSION_KEY)
+
+
+async def load_type(key: str, db: AsyncSession = Depends(request_db)) -> RecordType:
     """Resolve ``{key}`` from the URL. ``NotFound`` maps to 404 — see
     ``endpoints/api/_errors.py`` and the equivalent path in ``views.py``."""
     return await get_type(db, key)
@@ -65,6 +95,17 @@ def check_type_roles(request: Request, rtype: RecordType) -> None:
             f"type {rtype.key!r} is restricted to roles {sorted(allowed)}; "
             f"caller holds none of them"
         )
+
+
+def caller_roles(request: Request) -> list[str]:
+    """The roles :func:`check_type_roles` narrows against, as a plain list.
+
+    Handed to ``soft_delete_record`` so the same narrowing reaches the
+    referrers a cascade or a set_null would touch — types the URL never
+    names, and which ``check_type_roles`` therefore cannot see.
+    """
+    user = getattr(request.state, "user", None)
+    return list(getattr(user, "roles", None) or [])
 
 
 def actor(request: Request) -> str | None:
@@ -126,12 +167,16 @@ def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[
 
 
 __all__ = [
+    "REQUEST_SESSION_KEY",
     "actor",
+    "caller_roles",
     "check_type_roles",
     "get_settings",
     "load_type",
     "parse_filters",
     "parse_sorts",
+    "request_db",
+    "request_session",
     "require_edit",
     "require_manage_types",
     "require_view",

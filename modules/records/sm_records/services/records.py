@@ -24,6 +24,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.constants import ORPHANED_KEY
 from sm_records.index.query import Filter, Sort, build_query, count_query
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
@@ -197,6 +198,13 @@ async def update_record(
     migrate one edit at a time and never in a job that can half-fail.
     """
     _, values, stored = await _prepare(db, rtype, data, settings, exclude_id=record.id)
+    # §8.2: ``_orphaned`` belongs to the destructive schema path, not to the
+    # client. A write cannot supply it (``_payload.validate`` refuses one that
+    # tries), so an update that simply does not mention it must not be read as
+    # "delete it" — carried across unchanged.
+    orphaned = (record.data or {}).get(ORPHANED_KEY)
+    if orphaned:
+        stored = {**stored, ORPHANED_KEY: orphaned}
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _payload.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
 

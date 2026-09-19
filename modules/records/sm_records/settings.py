@@ -70,12 +70,17 @@ class RecordsSettings(BaseSettings):
     """Largest ``limit`` a caller may request on a list endpoint. Must be at
     least :attr:`default_page_size`."""
 
-    revision_limit: int = 50
+    revision_limit: int = Field(default=50, ge=1)
     """How many ``records_revision`` rows are kept per record.
 
     Append-only revisions are cheap insurance against a bad edit, but
     unbounded on a busy type they outgrow the document table itself — the
     oldest revisions beyond this count are pruned on write.
+
+    At least 1: there is no "unlimited" setting, and ``0`` — which an operator
+    would read as "keep no history" — is not representable rather than
+    silently meaning the opposite. Every write appends a revision, so a limit
+    of 1 keeps exactly the current one.
     """
 
     max_payload_bytes: int = 262144

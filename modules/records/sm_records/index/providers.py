@@ -105,11 +105,23 @@ def _entry(kind: IndexKind, key: str, value: object) -> IndexEntry | None:
 def _ref_entry(key: str, value: object, declared_target: str | None, resolve: TypeResolver):
     """A relation indexes to ``(uuid, type_id)``; an unknown target type is
     skipped rather than raised, exactly as a failed coercion is — a type
-    deleted out from under a stale payload must not stop the reindex."""
+    deleted out from under a stale payload must not stop the reindex.
+
+    The row is keyed on the *declared* target — the field's ``target_type`` —
+    and only falls back to the key the payload carries when the definition
+    names none. Trusting the payload's key made a made-up ``type`` index
+    nowhere (or, worse, against another type), which is a reference that
+    exists in the document and not in ``records_index_ref``: ``restrict``
+    would then find no referrer and let the target be deleted. The payload's
+    key cannot disagree with the declared one on any write
+    (``services._relations.check_targets``), so this only ever picks the same
+    value — for rows written before that check existed, it picks the right one.
+    """
     parsed = coerce_ref(value)
     if parsed is None:
         return None
-    target_key, uuid = parsed if isinstance(parsed, tuple) else (declared_target, parsed)
+    claimed, uuid = parsed if isinstance(parsed, tuple) else (None, parsed)
+    target_key = declared_target or claimed
     if not target_key:
         return None
     type_id = resolve(target_key)

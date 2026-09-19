@@ -42,6 +42,7 @@ __all__ = [
     "get_type_by_id",
     "list_types",
     "record_count",
+    "record_counts",
     "type_id_map",
     "update_type",
 ]
@@ -90,17 +91,35 @@ async def get_type_by_id(db: AsyncSession, type_id: int) -> RecordType:
     return rtype
 
 
-async def record_count(db: AsyncSession, rtype: RecordType) -> int:
-    """How many live records the type holds.
+async def record_count(
+    db: AsyncSession, rtype: RecordType, *, include_deleted: bool = False
+) -> int:
+    """How many records the type holds — live only, or the trash as well.
 
     Not a column: the previous draft denormalised it and §5 removed it,
     because a ``COUNT`` over an indexed column is cheap and cannot go stale.
     ``func.count(Record.id)`` rather than a bare ``count()`` so the statement
     names the mapper — that is what the framework's soft-delete filter attaches
-    to, and without it this would count the trash.
+    to, and without it this would always count the trash.
+
+    Which count a caller wants is not a detail. "Live" is what an operator is
+    shown on a screen; but §16's ``fields`` lock and §8.9's delete
+    confirmation are about *content the schema describes*, and a trashed
+    record still holds a payload written against those fields and is one
+    restore away from being read under them. Both of those pass
+    ``include_deleted=True``.
     """
     stmt = select(func.count(Record.id)).where(Record.type_id == rtype.id)
+    if include_deleted:
+        stmt = stmt.execution_options(include_deleted=True)
     return int((await db.execute(stmt)).scalar_one())
+
+
+async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int]:
+    """``(live, trashed)`` — the pair every ``TypeRead`` is built from."""
+    live = await record_count(db, rtype)
+    total = await record_count(db, rtype, include_deleted=True)
+    return live, total - live
 
 
 async def create_type(
@@ -183,13 +202,28 @@ async def update_type(
         defs, fields = normalise(changes.pop("fields_raw"), settings)
         if fields == list(rtype.fields or []):
             fields = None
-        else:
-            held = await record_count(db, rtype)
-            if held:
-                raise FieldsLocked(rtype.key, held)
-            await check_targets(db, defs, rtype.key)
     else:
         defs = field_defs(rtype)
+
+    # ``display_field``/``slug_field`` are locked with ``fields`` and for the
+    # same reason. They are not labels: ``display_title`` and ``slug`` are
+    # denormalised onto every record row from them (§5), and Phase 1 has
+    # nothing that recomputes those for records already written — so an edit
+    # here on a populated type leaves every existing row titled and slugged
+    # from the old pointer while new rows use the new one. Phase 3 reindexes
+    # instead of refusing.
+    pointer_changed = any(
+        name in changes and changes[name] != getattr(rtype, name)
+        for name in ("display_field", "slug_field")
+    )
+    if fields is not None or pointer_changed:
+        # Including the trash: a trashed record still holds content these
+        # fields describe, and a restore reads it back under them.
+        held = await record_count(db, rtype, include_deleted=True)
+        if held:
+            raise FieldsLocked(rtype.key, held)
+    if fields is not None:
+        await check_targets(db, defs, rtype.key)
 
     check_pointers(
         defs,
@@ -225,8 +259,14 @@ async def delete_type(db: AsyncSession, rtype: RecordType, *, confirm_record_cou
     the count is what the operator was shown, and a mismatch means content
     arrived between the dialog and the click. Refusing is the only honest
     answer — the confirmation they gave was for a different amount of data.
+
+    "Holds" counts the trash, because :func:`purge_type_records` purges it —
+    a type with nothing live and fifty restorable records used to be deletable
+    on a confirmation of ``0``, which destroyed all fifty. ``TypeRead`` carries
+    ``trashed_record_count`` alongside ``record_count`` so the dialog can show
+    the operator the number this check will actually compare against.
     """
-    held = await record_count(db, rtype)
+    held = await record_count(db, rtype, include_deleted=True)
     if confirm_record_count != held:
         raise Conflict(
             f"type {rtype.key!r} holds {held} record(s), not {confirm_record_count}; "

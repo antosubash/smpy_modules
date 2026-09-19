@@ -11,7 +11,6 @@ can see at route-registration time.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schemas import (
@@ -25,11 +24,13 @@ from sm_records.contracts.schemas import (
 )
 from sm_records.deps import (
     actor,
+    caller_roles,
     check_type_roles,
     get_settings,
     load_type,
     parse_filters,
     parse_sorts,
+    request_db,
     require_edit,
     require_view,
 )
@@ -63,7 +64,7 @@ def _page_size(settings: RecordsSettings, page_size: int | None) -> int:
 @router.get("/records", response_model=RecordPage, dependencies=[require_view])
 async def list_records(
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
     page_size: int | None = Query(default=None, ge=1),
@@ -86,7 +87,7 @@ async def create_record(
     body: RecordCreate,
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> RecordRead:
@@ -106,7 +107,7 @@ async def create_record(
 
 @router.get("/records/{uuid}", response_model=RecordRead, dependencies=[require_view])
 async def get_record(
-    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(get_db)
+    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
 ) -> RecordRead:
     record = await record_service.get_record(db, rtype, uuid)
     return record_read(rtype, record)
@@ -118,7 +119,7 @@ async def update_record(
     body: RecordUpdate,
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> RecordRead:
@@ -144,13 +145,18 @@ async def delete_record(
     uuid: str,
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> None:
     check_type_roles(request, rtype)
     record = await record_service.get_record(db, rtype, uuid)
-    await record_service.soft_delete_record(db, rtype, record, actor=who, settings=settings)
+    # ``roles`` and not only ``check_type_roles``: the delete may cascade into
+    # — or rewrite — records of types this URL never names, and design §10's
+    # narrowing has to reach those too. See ``services._lifecycle``.
+    await record_service.soft_delete_record(
+        db, rtype, record, actor=who, settings=settings, roles=caller_roles(request)
+    )
 
 
 @router.post("/records/{uuid}/restore", response_model=RecordRead, dependencies=[require_edit])
@@ -158,7 +164,7 @@ async def restore_record(
     uuid: str,
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> RecordRead:
@@ -173,7 +179,7 @@ async def purge_record(
     uuid: str,
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
 ) -> None:
     check_type_roles(request, rtype)
     record = await record_service.get_deleted_record(db, rtype, uuid)
@@ -184,7 +190,7 @@ async def purge_record(
     "/records/{uuid}/revisions", response_model=RevisionListResponse, dependencies=[require_view]
 )
 async def list_revisions(
-    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(get_db)
+    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
 ) -> RevisionListResponse:
     record = await record_service.get_record(db, rtype, uuid)
     revisions = await revision_service.list_revisions(db, record)

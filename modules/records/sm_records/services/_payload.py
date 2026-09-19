@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN
+from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN, ORPHANED_KEY
 from sm_records.index.query import Filter, FilterOp, QueryError, count_query
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import PayloadValidationError, get_model, to_jsonable
@@ -59,7 +59,21 @@ def validate(
 
     ``get_model`` is keyed on ``(key, schema_version)`` and never on the key
     alone, so a schema edit cannot leave an old validator serving writes.
+
+    ``_orphaned`` is refused outright. Design §8.2 makes it the destructive
+    schema path's own storage — the keys of deleted fields, kept so a
+    mis-clicked field deletion is undoable — which means an inbound payload
+    has two ways to ruin it and no way to improve it: inventing content nobody
+    ever wrote, or (far likelier) omitting the key on an ordinary edit and
+    erasing the recovery data for every field the type has ever dropped.
+    :func:`~sm_records.services.records.update_record` carries the stored
+    value forward instead.
     """
+    if ORPHANED_KEY in data:
+        raise ValidationFailed(
+            f"{ORPHANED_KEY!r} is reserved and cannot be written directly",
+            [{"field": ORPHANED_KEY, "message": f"{ORPHANED_KEY!r} is a reserved key"}],
+        )
     model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
     try:
         values = _validate_payload(model, data)

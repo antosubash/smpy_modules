@@ -71,9 +71,15 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
     Postgres and SQLite do not, and a correlated subquery with ``OFFSET`` is
     harder to read than the select it would inline. The set is bounded by
     ``limit`` plus the one row just written, so the round trip is cheap.
+
+    ``limit`` is clamped to 1 rather than treated as unlimited below it.
+    :attr:`RecordsSettings.revision_limit` is validated ``ge=1`` so the
+    setting cannot express 0 at all; the clamp covers a direct caller, for
+    which "keep none beyond the current" is the reading of 0 nobody is
+    surprised by — "0 means keep everything" is how a cap quietly stops
+    capping.
     """
-    if limit <= 0:
-        return
+    limit = max(limit, 1)
     stale = (
         (
             await db.execute(

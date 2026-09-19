@@ -105,6 +105,28 @@ async def test_set_null_clears_the_reference_and_its_index_row(db, settings, fie
     assert (await db.execute(select(IndexRef))).scalars().first() is None
 
 
+async def test_set_null_bumps_the_referrer_and_writes_it_a_revision(db, settings, field_def):
+    """Nulling somebody else's reference is an edit of their record, so it
+    goes through the same bump-and-revise path a PUT does — or a client
+    holding the pre-delete version overwrites it under optimistic concurrency
+    that reports no conflict, and the history panel never mentions it."""
+    brand, _, target, referrer = await relation_setup(db, settings, field_def, "set_null")
+    assert referrer.version == 1
+    before = len(await list_revisions(db, referrer))
+
+    await service.soft_delete_record(db, brand, target, settings=settings, actor="admin")
+
+    # ``updated_by`` is the framework listener's to stamp, from the request's
+    # user context — the actor is asserted on the revision, which this module
+    # writes itself.
+    assert referrer.version == 2
+    revisions = await list_revisions(db, referrer)
+    assert len(revisions) == before + 1
+    latest = revisions[0]
+    assert (latest.event, latest.version, latest.created_by) == (RevisionEvent.UPDATE, 2, "admin")
+    assert latest.data["maker"] is None
+
+
 async def test_cascade_trashes_the_referrer(db, settings, field_def):
     brand, _, target, referrer = await relation_setup(db, settings, field_def, "cascade")
     await service.soft_delete_record(db, brand, target, settings=settings, actor="admin")

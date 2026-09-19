@@ -10,6 +10,8 @@ callers still import one module.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.index.reindex import reindex_record
 from sm_records.index.writer import delete_index, write_index
 from sm_records.models import Record, RecordRevision, RecordType, RevisionEvent
-from sm_records.services import _relations
-from sm_records.services._common import mark_written, type_resolver, utcnow
+from sm_records.services import _payload, _relations
+from sm_records.services._common import (
+    guarded_bump,
+    mark_written,
+    reload,
+    type_resolver,
+    utcnow,
+)
 from sm_records.services.errors import Conflict, ReferencedByOthers
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
@@ -28,13 +36,30 @@ _SET_NULL = "set_null"
 _CASCADE = "cascade"
 
 
-async def _apply_set_null(db: AsyncSession, ref: _relations.Referrer, uuid: str) -> None:
-    """Drop the reference and rewrite the referrer's index rows.
+async def _apply_set_null(
+    db: AsyncSession,
+    ref: _relations.Referrer,
+    uuid: str,
+    *,
+    actor: str | None,
+    settings: RecordsSettings,
+) -> None:
+    """Drop the reference, then rewrite the referrer as any other edit would.
 
     A to-many field loses only the entry that pointed at the deleted record;
     a to-one field goes to ``None``. Nulling the whole list would delete
     references to records nobody asked to delete, which is the mistake
     ``restrict``-by-default exists to avoid one level up.
+
+    The rewrite goes through the same bump-and-revise path
+    :func:`~sm_records.services.records.update_record` uses, and not a bare
+    ``data`` assignment: this *is* an edit of somebody else's record. Without
+    the version bump a client holding the pre-delete version writes straight
+    over it under optimistic concurrency that reports no conflict; without the
+    revision the change is absent from the history panel that is supposed to
+    explain where the reference went; and without recomputing
+    ``display_title`` a type whose ``display_field`` *is* the relation keeps a
+    list-screen title naming a record that is now in the trash.
     """
     data = dict(ref.record.data or {})
     value = data.get(ref.field_key)
@@ -43,10 +68,90 @@ async def _apply_set_null(db: AsyncSession, ref: _relations.Referrer, uuid: str)
         data[ref.field_key] = kept or None
     else:
         data[ref.field_key] = None
+
+    expected = ref.record.version
+    if not await guarded_bump(db, Record, ref.record.id, expected):
+        raise Conflict(
+            f"record {ref.record.uuid} has changed since it was read",
+            current=await reload(db, Record, ref.record.id),
+        )
     ref.record.data = data
+    ref.record.version = expected + 1
+    ref.record.updated_by = actor
+    # The stored payload, not a revalidated one: the referrer may be stamped at
+    # an older ``schema_version`` than its type now carries (§8.3), and a
+    # delete elsewhere is not the event that gets to refuse it.
+    ref.record.display_title = _payload.display_title(ref.rtype, data)
     db.add(ref.record)
     await db.flush()
+    await write_revision(
+        db, ref.record, RevisionEvent.UPDATE, limit=settings.revision_limit, actor=actor
+    )
     await write_index(db, ref.record, ref.rtype, resolve_type_id=await type_resolver(db))
+
+
+def _role_blocked(rtype: RecordType, roles: Sequence[str] | None) -> bool:
+    """Design §10's ``allowed_roles`` narrowing, for a type the caller never named.
+
+    ``deps.check_type_roles`` only ever sees the type in the URL, so a cascade
+    or a set_null into a *different* type used to trash or rewrite records the
+    caller is not allowed to write at all — the narrowing was one relation
+    field away from being decorative. ``roles is None`` means "no caller":
+    the CLI and any system path keep the unrestricted behaviour.
+    """
+    if roles is None:
+        return False
+    allowed = rtype.allowed_roles or []
+    return bool(allowed) and not set(roles).intersection(allowed)
+
+
+async def _plan_delete(
+    db: AsyncSession, rtype: RecordType, record: Record, roles: Sequence[str] | None
+) -> tuple[list[tuple[Record, RecordType]], list[tuple[_relations.Referrer, str]], list[str]]:
+    """Walk the whole referrer graph without touching a row.
+
+    Returns ``(records to trash, set_null rewrites, restrict blockers)``. The
+    walk is breadth-first with a visited set, because a user-defined graph can
+    hold a cycle — two types each relating to the other — and without the set
+    the first such cycle is a ``RecursionError`` in a delete handler.
+    """
+    trash: list[tuple[Record, RecordType]] = [(record, rtype)]
+    set_nulls: list[tuple[_relations.Referrer, str]] = []
+    blockers: list[str] = []
+    seen_blockers: set[str] = set()
+    visited: set[int] = {record.id}
+    queue: list[Record] = [record]
+
+    while queue:
+        current = queue.pop(0)
+        for ref in await _relations.referrers(db, current):
+            behaviour = ref.on_delete
+            if behaviour != _RESTRICT and _role_blocked(ref.rtype, roles):
+                behaviour = _RESTRICT
+            if behaviour == _RESTRICT:
+                if ref.record.uuid not in seen_blockers:
+                    seen_blockers.add(ref.record.uuid)
+                    blockers.append(ref.record.uuid)
+            elif behaviour == _SET_NULL:
+                set_nulls.append((ref, current.uuid))
+            elif behaviour == _CASCADE and ref.record.id not in visited:
+                visited.add(ref.record.id)
+                trash.append((ref.record, ref.rtype))
+                queue.append(ref.record)
+    return trash, set_nulls, blockers
+
+
+async def _trash(
+    db: AsyncSession, record: Record, *, actor: str | None, settings: RecordsSettings
+) -> None:
+    record.is_deleted = True
+    record.deleted_at = utcnow()
+    record.deleted_by = actor
+    db.add(record)
+    await db.flush()
+    await write_revision(
+        db, record, RevisionEvent.DELETE, limit=settings.revision_limit, actor=actor
+    )
 
 
 async def soft_delete_record(
@@ -56,46 +161,33 @@ async def soft_delete_record(
     *,
     actor: str | None = None,
     settings: RecordsSettings,
-    _visited: set[int] | None = None,
+    roles: Sequence[str] | None = None,
 ) -> None:
     """Trash a record, honouring the ``on_delete`` of everything pointing at it.
 
-    ``restrict`` is checked for *every* referrer before anything is mutated:
-    a delete that nulls two references and then refuses on a third would leave
-    the caller's data changed by an operation that reported failure.
+    Plan, then apply. The whole referrer graph is walked first and *every*
+    ``restrict`` in it collected — not only the ones one level down — before a
+    single row is touched. Checking level by level meant a delete could null a
+    ``set_null`` referrer, cascade into a second type, and only then meet a
+    ``restrict`` it had to refuse: the caller got a 409 for an operation that
+    had already rewritten their data, and (until the endpoint layer learned to
+    roll back) committed it.
 
-    ``_visited`` guards the ``cascade`` recursion. A user-defined graph can
-    hold a cycle — two types each relating to the other — and without it the
-    first such cycle is a ``RecursionError`` in a delete handler.
+    ``roles`` is the caller's role list, and ``None`` means unrestricted —
+    the CLI, a background task, any path with no user behind it. Given a list,
+    a referrer whose *type* narrows writes to roles the caller does not hold
+    is treated as ``restrict`` however its field is declared: see
+    :func:`_role_blocked`.
     """
-    visited = _visited if _visited is not None else set()
-    if record.id in visited:
-        return
-    visited.add(record.id)
-
-    refs = await _relations.referrers(db, record)
-    blocked = [ref for ref in refs if ref.on_delete == _RESTRICT]
-    if blocked:
+    trash, set_nulls, blockers = await _plan_delete(db, rtype, record, roles)
+    if blockers:
         raise ReferencedByOthers(
-            f"{len(blocked)} record(s) still reference {record.uuid}",
-            [ref.record.uuid for ref in blocked],
+            f"{len(blockers)} record(s) still reference {record.uuid}", blockers
         )
-    for ref in refs:
-        if ref.on_delete == _SET_NULL:
-            await _apply_set_null(db, ref, record.uuid)
-        elif ref.on_delete == _CASCADE:
-            await soft_delete_record(
-                db, ref.rtype, ref.record, actor=actor, settings=settings, _visited=visited
-            )
-
-    record.is_deleted = True
-    record.deleted_at = utcnow()
-    record.deleted_by = actor
-    db.add(record)
-    await db.flush()
-    await write_revision(
-        db, record, RevisionEvent.DELETE, limit=settings.revision_limit, actor=actor
-    )
+    for ref, target_uuid in set_nulls:
+        await _apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
+    for doomed, _ in trash:
+        await _trash(db, doomed, actor=actor, settings=settings)
 
 
 async def restore_record(

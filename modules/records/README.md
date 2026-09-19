@@ -85,6 +85,15 @@ carries its own `allowed_roles`, narrowing which roles may write records of
 that type on top of the static `records.edit`/`records.manage_types`
 permission; an empty list means "any role holding the static permission".
 
+`allowed_roles` narrows, and narrowing has no exceptions: a caller holding
+the `admin` wildcard is refused writes on a type whose `allowed_roles` is
+non-empty unless `admin` is one of the roles listed. So an admin creating a
+restricted type must list a role they actually hold, or else use
+`records.manage_types` to edit `allowed_roles` back before they can write its
+records. The same list also governs what a delete elsewhere may do to this
+type's records: a `cascade` or `set_null` relation pointing here is refused —
+reported as a `restrict` blocker — for a caller the list excludes.
+
 **This is an honest limitation, not an oversight: per-type `allowed_roles`
 are invisible in the framework's role editor.** An admin editing roles sees
 only the three coarse permissions above and has no way to discover, from that

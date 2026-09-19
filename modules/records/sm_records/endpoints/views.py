@@ -11,13 +11,19 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 from inertia import InertiaResponse
-from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
 from sm_records.contracts.schemas import RecordPage, record_read, type_read
-from sm_records.deps import get_settings, load_type, parse_filters, parse_sorts, require_view
+from sm_records.deps import (
+    get_settings,
+    load_type,
+    parse_filters,
+    parse_sorts,
+    request_db,
+    require_view,
+)
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.index.query import Filter, QueryError, Sort
 from sm_records.models import RecordType
@@ -33,10 +39,10 @@ _DEFAULT_SORTS: tuple[Sort, ...] = (Sort(field="position"), Sort(field="updated_
 
 
 @router.get("/", response_model=None)
-async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(get_db)) -> InertiaResponse:
+async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(request_db)) -> InertiaResponse:
     rtypes = await type_service.list_types(db)
     types = [
-        type_read(rtype, await type_service.record_count(db, rtype)).model_dump(mode="json")
+        type_read(rtype, *await type_service.record_counts(db, rtype)).model_dump(mode="json")
         for rtype in rtypes
     ]
     return await inertia.render(constants._PAGE_TYPES, {"types": types})
@@ -46,12 +52,12 @@ async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(get_db)) -> 
 async def record_new(
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
-    held = await type_service.record_count(db, rtype)
+    counts = await type_service.record_counts(db, rtype)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
-        {"type": type_read(rtype, held).model_dump(mode="json"), "record": None},
+        {"type": type_read(rtype, *counts).model_dump(mode="json"), "record": None},
     )
 
 
@@ -60,14 +66,14 @@ async def record_edit(
     uuid: str,
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
-    held = await type_service.record_count(db, rtype)
+    counts = await type_service.record_counts(db, rtype)
     record = await record_service.get_record(db, rtype, uuid)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
         {
-            "type": type_read(rtype, held).model_dump(mode="json"),
+            "type": type_read(rtype, *counts).model_dump(mode="json"),
             "record": record_read(rtype, record).model_dump(mode="json"),
         },
     )
@@ -77,7 +83,7 @@ async def record_edit(
 async def record_list(
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
     filters: list[Filter] = Depends(parse_filters),
@@ -87,7 +93,7 @@ async def record_list(
     grammar as ``GET /api/records/types/{key}/records`` — the UI reads the
     list client-side thereafter, but the initial render has to match what a
     shared URL promises."""
-    held = await type_service.record_count(db, rtype)
+    counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
     page_size = max(min(settings.default_page_size, settings.max_page_size), 1)
     errors: dict[str, str] = {}
@@ -111,7 +117,7 @@ async def record_list(
         page_size=page_size,
     )
     props: dict[str, object] = {
-        "type": type_read(rtype, held).model_dump(mode="json"),
+        "type": type_read(rtype, *counts).model_dump(mode="json"),
         "records": records_page.model_dump(mode="json"),
     }
     if errors:

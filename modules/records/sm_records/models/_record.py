@@ -53,6 +53,15 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
         # have one. The index is on the row, not on live rows — a soft-deleted
         # record keeps its slug claimed, as pagebuilder does for trashed pages,
         # so a restore can never find its address taken.
+        #
+        # Alembic autogenerate does not compare an index's ``WHERE``: it sees
+        # the name and the columns and reports no change. So if this predicate
+        # is edited — or the deployed index was created without one — nothing
+        # will tell you. ``SM010``/``SM011`` are about revisions and tables and
+        # are equally blind to it. Changing the predicate therefore means
+        # hand-writing the drop-and-recreate into a revision, and verifying the
+        # deployed definition (``\di+`` / ``sqlite_master``) rather than
+        # trusting a clean autogenerate.
         Index(
             "ix_records_record_type_slug",
             "type_id",
