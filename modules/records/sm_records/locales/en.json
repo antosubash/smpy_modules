@@ -19,7 +19,10 @@
     "fields_label": "Fields",
     "fields_help": "A JSON array of field definitions.",
     "create": "Create",
-    "view_records": "View records"
+    "view_records": "View records",
+    "edit": "Edit",
+    "trashed_record_count": "({{count}} trashed)",
+    "trashed_record_count_other": "({{count}} trashed)"
   },
   "records": {
     "title": "Records",
@@ -42,7 +45,10 @@
     "filter_value": "Value",
     "filter_apply": "Apply",
     "filter_clear": "Clear",
-    "reindexing_notice": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly."
+    "reindexing_notice": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly.",
+    "position": "Position",
+    "published_at": "Published",
+    "schema_stale": "Outdated schema"
   },
   "filters": {
     "op": {
@@ -61,7 +67,7 @@
     "title_new": "New record",
     "title_edit": "Edit record",
     "data_label": "Data",
-    "data_help": "Raw JSON for this record's fields.",
+    "data_help": "Raw JSON for this record's fields. Switching back re-fills the form from it.",
     "slug_label": "Slug",
     "position_label": "Position",
     "save": "Save",
@@ -79,11 +85,123 @@
     "restore": "Restore",
     "purge": "Delete permanently",
     "confirm_restore": "Restore this record?",
-    "confirm_purge": "This cannot be undone. Delete this record permanently?"
+    "confirm_purge": "This cannot be undone. Delete this record permanently?",
+    "fields_heading": "Fields",
+    "use_raw_json": "Advanced: edit raw JSON",
+    "use_form": "Back to the form"
   },
   "errors": {
     "not_found": "Not found",
     "validation": "Validation failed",
     "conflict": "Conflict"
+  },
+  "type_editor": {
+    "title_new": "New type",
+    "title_edit": "Edit {{label}}",
+    "section_details": "Details",
+    "section_fields": "Fields",
+    "key_immutable": "The key can't be changed once the type is created.",
+    "icon": "Icon",
+    "icon_help": "The name of a lucide-react icon, e.g. \"database\".",
+    "is_public": "Public",
+    "is_public_help": "Exposes a read-only public API for this type's published records (design §10).",
+    "allowed_roles": "Allowed roles",
+    "allowed_roles_help": "Leave empty to allow anyone holding \"Manage record types\". Selecting one or more roles narrows access to those roles as well.",
+    "display_field": "Display field",
+    "slug_field": "Slug field",
+    "pointer_none": "None",
+    "add_field": "Add field",
+    "no_fields": "No fields yet.",
+    "locked_counts": "{{count}} live, {{trashed}} trashed.",
+    "field_key": "Key",
+    "field_key_locked": "Can't be changed after the field is created.",
+    "field_type": "Type",
+    "field_required": "Required",
+    "field_unique": "Unique",
+    "field_indexed": "Indexed",
+    "field_indexed_hint": "The single most consequential choice on this screen: filterable and sortable, at the cost of a write per save.",
+    "field_help": "Help text",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "remove_field": "Remove field",
+    "key_error": {
+      "required": "A key is required.",
+      "reserved": "\"_orphaned\" is reserved by the module.",
+      "pattern": "Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.",
+      "duplicate": "Another field already uses this key."
+    },
+    "min_length": "Minimum length",
+    "max_length": "Maximum length",
+    "pattern": "Pattern (regex)",
+    "min": "Minimum",
+    "max": "Maximum",
+    "choices": "Choices",
+    "choice_value": "Value",
+    "choice_label": "Label",
+    "remove_choice": "Remove choice",
+    "add_choice": "Add choice",
+    "target_type": "Target type",
+    "target_type_pick": "Choose a type…",
+    "many": "Many (a list of records)",
+    "on_delete_label": "When the target is deleted",
+    "on_delete": {
+      "restrict": "Restrict (block the delete)",
+      "set_null": "Set null",
+      "cascade": "Cascade (delete this record too)"
+    },
+    "default_label": "Default value",
+    "no_default": "No default",
+    "default_true": "True",
+    "default_false": "False",
+    "conflict_title": "This type changed while you were editing",
+    "conflict_help": "Someone else saved a change to this type since you opened it. Reload to see the latest version, then reapply your changes.",
+    "conflict_server_label": "Current label on the server",
+    "danger_zone": "Danger zone",
+    "delete_help": "Deletes this type and every record stored against it, including the trash. This cannot be undone.",
+    "delete_type": "Delete this type",
+    "delete_confirm_description": "This permanently deletes \"{{label}}\" and its {{count}} record(s) (live and trashed). Type {{count}} to confirm.",
+    "delete_confirm_label": "Record count",
+    "delete_count_mismatch": "That doesn't match. Type the exact number to confirm.",
+    "referrers_notice": "Other types still have a relation field pointing at this one:"
+  },
+  "fields": {
+    "required": "Required",
+    "choose": "— choose —",
+    "no_choices": "This field has no choices yet.",
+    "unknown_type": "This field type ({{type}}) is not editable in this version."
+  },
+  "form": {
+    "no_fields": "This type has no fields yet. Add some on its schema screen."
+  },
+  "relation": {
+    "missing": "Missing record",
+    "remove": "Remove",
+    "search_placeholder": "Search by title…",
+    "search_label": "Search for a record",
+    "searching": "Searching…",
+    "no_results": "No matching records",
+    "no_target": "This relation field has no target type configured."
+  },
+  "validation": {
+    "required": "This field is required",
+    "min_length": "Must be at least {{min}} characters",
+    "max_length": "Must be at most {{max}} characters",
+    "pattern": "Does not match the required format",
+    "email": "Not a valid email address",
+    "url": "Must be an http:// or https:// URL with a host",
+    "not_a_number": "Not a number",
+    "decimals": "At most {{scale}} decimal places are stored",
+    "int_digits": "At most {{digits}} digits before the decimal point",
+    "not_an_integer": "Must be a whole number",
+    "min": "Must be at least {{min}}",
+    "max": "Must be at most {{max}}",
+    "boolean": "Expected true or false",
+    "date": "Not a valid date (YYYY-MM-DD)",
+    "datetime": "Not a valid date and time",
+    "choice": "Not one of the configured choices",
+    "duplicate_choice": "Contains duplicate values",
+    "json": "Not valid JSON",
+    "json_shape": "Must be a JSON object or array, not a scalar",
+    "relation": "Not a valid link to a record"
   }
 }
