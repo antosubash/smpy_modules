@@ -85,10 +85,11 @@ class RecordsModule(ModuleBase):
         intersection with no admin bypass, so listing roles here would hide
         the entry from an ``admin`` user. The views carry their own
         permission dependencies."""
+        # ``label_key`` is not on the released framework's ``MenuItem`` yet
+        # (0.0.26); the literal label stands until it is, as in every sibling.
         registry.add(
             MenuItem(
                 label="Records",
-                label_key="records.nav.types",
                 url=constants.MENU_URL,
                 icon=constants.MENU_ICON,
                 order=constants.MENU_ORDER,
