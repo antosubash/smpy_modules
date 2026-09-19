@@ -30,9 +30,10 @@ from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
+from sm_records.services._claims import lock_type
 from sm_records.services._common import guarded_bump, reload, utcnow
 from sm_records.services._dry_run import change_report
-from sm_records.services._payload import field_defs, lock_type
+from sm_records.services._payload import field_defs
 from sm_records.services._preview import MISSING, pointer_preview_changes
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
 from sm_records.services.errors import (

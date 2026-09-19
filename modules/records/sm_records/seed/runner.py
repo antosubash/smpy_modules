@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from sm_records.index._analyze import OWNED_TABLE_NAMES, analyze_tables
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.seed import generate
 from sm_records.seed.types import TYPE_DEFS
@@ -272,6 +273,12 @@ async def run(
         summary.created["order"] = orders
 
         await committer.finish()
+        # A bulk load is exactly the state SQLite has no statistics for, and a
+        # seeded database's first act is to be queried. One pass here, out of
+        # any request, is worth orders of magnitude on the filters that read
+        # the index tables — see :mod:`sm_records.index._analyze`.
+        await analyze_tables(db, OWNED_TABLE_NAMES)
+        await db.commit()
 
     summary.elapsed_seconds = time.monotonic() - started
     _log(

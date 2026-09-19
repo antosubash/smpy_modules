@@ -1,9 +1,13 @@
 """Everything a record write does to its payload before the row is touched.
 
 Validation, the size ceiling, the denormalised ``display_title`` and ``slug``,
-and the two application-enforced uniqueness rules — the field one of §7.8 and
-the slug one of §5. Kept out of :mod:`sm_records.services.records` so that
-module reads as the lifecycle it is rather than as a wall of checks.
+the ``_orphaned`` migration of §8.3, and the lenient read of §8.2. Kept out of
+:mod:`sm_records.services.records` so that module reads as the lifecycle it is
+rather than as a wall of checks.
+
+The two claims a write makes about the *rest of the type* — the ``unique``
+rule of §7.8 and the slug rule of §5, plus the lock that makes them hold —
+live next door in :mod:`sm_records.services._claims`.
 """
 
 from __future__ import annotations
@@ -12,11 +16,7 @@ import json
 import re
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN, ORPHANED_KEY
-from sm_records.index.query import Filter, FilterOp, QueryError, count_query
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -26,7 +26,7 @@ from sm_records.schema.compile import (
 )
 from sm_records.schema.compile import validate_payload as _validate_payload
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
-from sm_records.services.errors import Conflict, ValidationFailed
+from sm_records.services.errors import ValidationFailed
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -119,91 +119,49 @@ def slug_for(rtype: RecordType, values: dict[str, Any], slug: str | None) -> str
     return (slugify(str(value)) or None) if value is not None else None
 
 
-async def ensure_slug_free(
-    db: AsyncSession, rtype: RecordType, slug: str | None, *, exclude_id: int | None = None
-) -> None:
-    """A slug is unique within its type, **including the trash** (design §5).
-
-    ``include_deleted`` is the whole point: a slug that frees on delete is a
-    slug that can be taken while the original sits restorable, and the restore
-    then fails or silently renames. The partial unique index would catch this
-    at the DB anyway — checking here turns an ``IntegrityError`` at flush into
-    a 409 that names the field.
-    """
-    if slug is None:
-        return
-    stmt = select(Record.id).where(Record.type_id == rtype.id, Record.slug == slug)
-    if exclude_id is not None:
-        stmt = stmt.where(Record.id != exclude_id)
-    taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
-    if taken is not None:
-        raise Conflict(f"slug {slug!r} is already used by another {rtype.key} record")
-
-
-async def ensure_unique(
-    db: AsyncSession,
-    rtype: RecordType,
+def migrate_orphaned(
+    record: Record,
     defs: list[FieldDefinition],
-    values: dict[str, Any],
-    *,
-    exclude_id: int | None = None,
-) -> None:
-    """Design §7.8: ``unique`` is application-enforced, against the index.
+    stored: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The lazy destructive migration of §8.3, run on this one record.
 
-    The ``(type_id, field_key, value)`` index cannot carry a unique constraint
-    — every field of a kind shares the table and the keys are chosen at
-    runtime — so this is a ``SELECT`` before the write, inside the request's
-    transaction, serialised per type by :func:`lock_type`.
+    Two moves, both against the *stored* payload and neither ever bulk:
 
-    ``count_query`` rather than a hand-written select, so the truncation
-    re-check of §7.4 (``value`` *and* ``value_full``) is the same code a
-    filter uses. ``include_deleted`` for the same reason as the slug: index
-    rows survive a soft delete (§7.3) and the trash keeps its claims, so a
-    trashed record still owns its unique value until it is purged.
+    * a top-level key the current schema no longer declares is a deleted
+      field's value. It moves under ``_orphaned`` — which is what makes a
+      mis-clicked field deletion undoable, at the cost of some storage, and
+      why nothing rewrites the whole type when a field goes (§8.2).
+    * a key the schema *does* declare is dropped from ``_orphaned``: the field
+      came back and its value is live again. The read path already served it
+      from there (``schema.compile.from_stored``), so by now it is in ``stored``
+      — either as the value the client sent back or as the field's default.
 
-    **The statement is built inside the ``try``**, because that is where the
-    failure is: ``count_query`` refuses a field with a ``reindex_pending``
-    marker (§8.5) while it is being *built*, not when it runs. Built outside,
-    the ``QueryError`` escaped as the query grammar's own 400/409 about a
-    filter the caller never wrote — and this branch, which says the true
-    thing (the write cannot be checked, so it is refused), was unreachable.
-    A ``QueryError`` for any other reason is re-raised untouched: a ``unique``
-    field that is somehow not indexed is a broken definition, not a rebuild.
+    ``_orphaned`` itself is never client-supplied (``_payload.validate``
+    refuses a payload carrying it), so an update that does not mention it must
+    not be read as "delete it": what survives here is carried across.
+
+    ``extra`` is this module's own contribution to that sub-key, and the only
+    way anything reaches it besides the record's own payload — see
+    ``services.records.update_record``'s ``orphaned_extra``. It wins over what the record
+    carried, because the one caller is a revision restore: putting an older
+    payload back means putting back *its* value for a key the schema has since
+    dropped, not the one a later edit left behind.
     """
-    for field in defs:
-        if not field.unique:
+    previous = dict(record.data or {})
+    declared = {field.key for field in defs}
+    orphaned = dict(previous.get(ORPHANED_KEY) or {})
+    for key, value in previous.items():
+        if key == ORPHANED_KEY or key in declared:
             continue
-        value = values.get(field.key)
-        if value is None:
-            continue
-        try:
-            stmt = count_query(
-                rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)]
-            )
-            if exclude_id is not None:
-                stmt = stmt.where(Record.id != exclude_id)
-            taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalar_one()
-        except QueryError as exc:
-            if exc.reason != "reindexing":
-                raise
-            raise Conflict(
-                f"{field.key!r} is being reindexed, so its uniqueness cannot be checked; "
-                "writes to this type are refused until the rebuild completes"
-            ) from exc
-        if taken:
-            raise Conflict(f"{field.key!r} must be unique; {value!r} is already taken")
-
-
-async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
-    """Serialise writes of one type — the mitigation design §7.8 names.
-
-    The ``unique`` check is check-then-act, so two concurrent creates carrying
-    the same value can both pass it. Taking the type row ``FOR UPDATE`` first
-    makes the window empty: the second writer waits for the first to commit
-    and then sees its index row. On SQLite this compiles to nothing, because
-    the database is single-writer anyway; on Postgres it is the row lock.
-    """
-    await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())
+        orphaned.setdefault(key, value)
+    for key, value in (extra or {}).items():
+        if key != ORPHANED_KEY and key not in declared:
+            orphaned[key] = value
+    for key in declared:
+        orphaned.pop(key, None)
+    return {**stored, ORPHANED_KEY: orphaned} if orphaned else stored
 
 
 def read_view(

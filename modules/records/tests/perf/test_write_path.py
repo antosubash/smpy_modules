@@ -100,6 +100,12 @@ async def test_create_throughput_and_statements(perf_db, perf_session, settings)
         # The ceiling is loose on purpose; the assertion that matters is that
         # it does not scale with the table.
         assert box.count < 40, f"{key}: {box.count} statements per create"
+        # A create cannot have index rows to delete: the row was inserted a
+        # statement ago. ``write_index(fresh=True)`` is what skips the pass,
+        # and six guaranteed-empty DELETEs per create is what it used to cost.
+        assert box.matching("DELETE FROM records_index") == [], (
+            f"{key}: a create still issues index DELETEs"
+        )
 
 
 async def test_create_statement_count_is_flat(perf_db, perf_session, settings):
@@ -196,12 +202,24 @@ async def test_delete_restore_purge(perf_db, perf_session, settings):
     )
 
 
-async def test_type_id_map_per_write(perf_db, perf_session):
-    """``type_id_map`` is a full read of ``records_type`` and the write path
-    calls it twice per record (once for the relation check, once to build the
-    index writer's resolver). Recorded, not asserted — the table is tiny, but
-    the count is the evidence for the finding."""
+async def test_type_id_map_is_resolved_once_per_write(perf_db, perf_session, settings):
+    """``type_id_map`` is a full read of ``records_type``.
+
+    The write path needs it twice — once for the relation check, once as the
+    index writer's resolver — and used to *read* it twice. ``_prepare`` now
+    resolves it once and threads the mapping through, so a create issues
+    exactly one of these. Asserted rather than noted: the table is tiny, but
+    "how many round trips does one write cost" is a property of the code and
+    the same on any backend.
+    """
     with capture(perf_db.engine) as box:
         await type_id_map(perf_session)
     assert box.count == 1
-    Results.note("type_id_map is 1 SELECT over records_type; create_record runs it twice")
+    probe = box.statements[0][0]
+
+    rtype = await load_type(perf_session, "company")
+    with capture(perf_db.engine) as box:
+        await _create(perf_session, rtype, settings, _company(_next()))
+    reads = box.matching(probe)
+    assert len(reads) == 1, f"create_record read records_type {len(reads)} time(s)"
+    Results.note(f"create_record resolves type_id_map once ({box.count} statements per create)")

@@ -8,11 +8,23 @@ cliff found under load.
 
 Three shapes are load-bearing:
 
-*EXISTS, not JOIN.* A ``multiselect`` has one index row per value. A join
-would return the record once per matching row; an EXISTS asks whether any row
-matches and returns it once.
+*A semi-join, not a JOIN and not a correlated EXISTS.* A ``multiselect`` has
+one index row per value, so an inner join would return the record once per
+matching row; ``Record.id IN (SELECT record_id FROM idx WHERE …)`` asks whether
+any row matches and returns the record once, because ``IN`` deduplicates. It is
+not the correlated ``EXISTS`` it replaced either: that form made the subquery a
+function of the outer row, so its cost was (records of the type) x (work per
+probe) and SQLite — given two usable indexes and no ``sqlite_stat1`` — regularly
+picked the value index and then filtered its whole matching range by
+``record_id`` once per record of the type. The semi-join runs once, from the
+index rows that match, and is therefore proportional to *what matches* rather
+than to how big the type is, on every backend and with or without statistics.
 
 *The truncation re-check* of §7.4, in ``_predicates._text_eq``.
+
+*The fixed columns are somebody else's job.* ``status``, ``slug`` and the
+rest of §7.2's projection are real columns and need none of this machinery;
+they live in :mod:`sm_records.index._fixed`.
 
 *No soft-delete predicate anywhere.* The statement selects the ``Record``
 entity, so the framework's ``with_loader_criteria`` hook adds ``is_deleted IS
@@ -25,24 +37,21 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, func, literal, nulls_last, or_, select
+from sqlalchemy import Select, func, nulls_last, select
 from sqlalchemy.sql import ColumnElement
 
-from sm_records.index._coerce import coerce_datetime, coerce_text
 from sm_records.index._fields import IndexedField, declared_keys, indexed_map
+from sm_records.index._fixed import FIXED_COLUMNS, fixed_clause
 from sm_records.index._predicates import (
     INDEX_TABLE,
-    LIKE_ESCAPE_CHAR,
     SORT_COLUMN,
     FilterOp,
     QueryError,
-    like_contains_pattern,
     value_clause,
 )
-from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.models import Record, RecordType
 
 __all__ = [
     "FIXED_COLUMNS",
@@ -52,6 +61,7 @@ __all__ = [
     "Sort",
     "build_query",
     "count_query",
+    "exists_query",
     "only_trashed",
 ]
 
@@ -67,75 +77,6 @@ class Filter:
 class Sort:
     field: str
     desc: bool = False
-
-
-FIXED_COLUMNS: frozenset[str] = frozenset(
-    {"status", "display_title", "slug", "position", "published_at", "created_at", "updated_at"}
-)
-"""The projection every record has regardless of its type — the module's
-``ContentItemIndex``. Filterable and sortable directly, with no index table
-and no ``indexed: true`` anywhere."""
-
-_FIXED_TEXT = frozenset({"display_title", "slug"})
-_FIXED_ORDERED = frozenset({"position", "published_at", "created_at", "updated_at"})
-_ORDER_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
-
-
-def _fixed_value(field: str, value: Any) -> Any:
-    if field == "status":
-        try:
-            return RecordStatus(value)
-        except ValueError as exc:
-            raise QueryError(field, "bad_value", f"unknown status {value!r}") from exc
-    if field == "position":
-        try:
-            return int(value)
-        except (TypeError, ValueError) as exc:
-            raise QueryError(field, "bad_value", f"{field!r} takes an integer") from exc
-    if field in _FIXED_ORDERED:
-        moment: datetime | None = coerce_datetime(value)
-        if moment is None:
-            raise QueryError(field, "bad_value", f"{field!r} takes an aware datetime")
-        return moment
-    text = coerce_text(value)
-    if text is None:
-        raise QueryError(field, "bad_value", f"{field!r} takes a string")
-    return text
-
-
-def _fixed_clause(flt: Filter) -> ColumnElement[bool]:
-    """Fixed columns are real columns, so these are ordinary predicates —
-    except for ``ne``, which also matches a NULL. SQL's ``<> NULL`` is unknown
-    and would drop rows with no slug from a "slug is not 'x'" filter, which is
-    not what anybody means by it and disagrees with how ``ne`` reads on an
-    index table (absence matches)."""
-    column = getattr(Record, flt.field)
-    op = flt.op
-    if op is FilterOp.IS_NULL:
-        return column.is_(None) if flt.value in (None, True) else column.isnot(None)
-    if op is FilterOp.CONTAINS:
-        if flt.field not in _FIXED_TEXT:
-            raise QueryError(flt.field, "unsupported_op", "contains needs a text column")
-        pattern = like_contains_pattern(_fixed_value(flt.field, flt.value))
-        return column.ilike(pattern, escape=LIKE_ESCAPE_CHAR)
-    if op in _ORDER_OPS and flt.field not in _FIXED_ORDERED:
-        raise QueryError(flt.field, "unsupported_op", f"{op.value} needs an ordered column")
-    if op is FilterOp.IN:
-        raw = (
-            flt.value if isinstance(flt.value, Sequence) and not isinstance(flt.value, str) else []
-        )
-        return column.in_([_fixed_value(flt.field, item) for item in raw])
-    coerced = _fixed_value(flt.field, flt.value)
-    if op is FilterOp.EQ:
-        return column == coerced
-    if op is FilterOp.NE:
-        return or_(column != coerced, column.is_(None))
-    return {
-        FilterOp.GT: column > coerced,
-        FilterOp.GTE: column >= coerced,
-        FilterOp.LT: column < coerced,
-        FilterOp.LTE: column <= coerced,
-    }[op]
 
 
 def _resolve(rtype: RecordType, indexed: dict[str, IndexedField], declared: set[str], name: str):
@@ -161,31 +102,47 @@ def _resolve(rtype: RecordType, indexed: dict[str, IndexedField], declared: set[
     return field
 
 
-def _exists(field: IndexedField, type_id: int, clause: ColumnElement[bool] | None):
+def _holders(field: IndexedField, type_id: int, clause: ColumnElement[bool] | None) -> Select:
+    """The ids of the records holding an index row that matches.
+
+    Uncorrelated on purpose — see the module docstring. ``record_id`` is
+    ``NOT NULL`` on every index table, which is what makes the negated form
+    (``NOT IN``) safe: a NULL anywhere in this result would make ``NOT IN``
+    unknown for every row and silently empty the page.
+    """
     table = INDEX_TABLE[field.kind]
-    conditions = [
-        table.record_id == Record.id,
-        table.type_id == type_id,
-        table.field_key == field.key,
-    ]
+    conditions = [table.type_id == type_id, table.field_key == field.key]
     if clause is not None:
         conditions.append(clause)
-    return select(literal(1)).select_from(table).where(*conditions).correlate(Record).exists()
+    return select(table.record_id).where(*conditions)
 
 
 def _term(rtype: RecordType, indexed, declared, flt: Filter) -> ColumnElement[bool]:
     if flt.field in FIXED_COLUMNS:
-        return _fixed_clause(flt)
+        return fixed_clause(flt.field, flt.op, flt.value)
     field = _resolve(rtype, indexed, declared, flt.field)
     if flt.op is FilterOp.IS_NULL:
-        present = _exists(field, rtype.id, None)
-        return ~present if flt.value in (None, True) else present
+        holders = _holders(field, rtype.id, None)
+        # "has no value" is the absence of any row, so it is the negation of
+        # the whole semi-join — not a predicate over one row.
+        return Record.id.not_in(holders) if flt.value in (None, True) else Record.id.in_(holders)
     clause = value_clause(field.kind, flt.op, flt.value, flt.field)
-    term = _exists(field, rtype.id, clause)
-    # ``ne`` is the negation of the whole EXISTS: "no value equals x". On a
+    holders = _holders(field, rtype.id, clause)
+    # ``ne`` negates the whole semi-join: "no value equals x". On a
     # multi-valued field the other reading — "some value differs" — matches a
-    # record that also holds x, which nobody asking for ``ne`` wants.
-    return ~term if flt.op is FilterOp.NE else term
+    # record that also holds x, which nobody asking for ``ne`` wants. ``eq``
+    # on the same field is the ``any`` reading, which ``IN`` gives directly.
+    return Record.id.not_in(holders) if flt.op is FilterOp.NE else Record.id.in_(holders)
+
+
+def _filtered(stmt: Select, rtype: RecordType, fields: list[dict[str, Any]], filters) -> Select:
+    """Apply every filter to ``stmt`` — the one place a term is built, so the
+    page, its total and the ``unique`` check of §7.8 cannot drift apart."""
+    indexed = indexed_map(fields)
+    declared = declared_keys(fields)
+    for flt in filters:
+        stmt = stmt.where(_term(rtype, indexed, declared, flt))
+    return stmt
 
 
 def _sorted(stmt: Select, rtype: RecordType, indexed, declared, sorts: Iterable[Sort]) -> Select:
@@ -226,12 +183,8 @@ def build_query(
     sorts: Sequence[Sort] = (),
 ) -> Select:
     """The record list for one type, filtered and ordered through the index."""
-    indexed = indexed_map(fields)
-    declared = declared_keys(fields)
-    stmt = select(Record).where(Record.type_id == rtype.id)
-    for flt in filters:
-        stmt = stmt.where(_term(rtype, indexed, declared, flt))
-    return _sorted(stmt, rtype, indexed, declared, sorts)
+    stmt = _filtered(select(Record).where(Record.type_id == rtype.id), rtype, fields, filters)
+    return _sorted(stmt, rtype, indexed_map(fields), declared_keys(fields), sorts)
 
 
 def only_trashed(stmt: Select) -> Select:
@@ -261,9 +214,30 @@ def count_query(
     trash. Taking the same ``sorts`` as ``build_query`` and ignoring them
     keeps the two callable with one argument set.
     """
-    stmt = select(func.count(Record.id)).where(Record.type_id == rtype.id)
-    indexed = indexed_map(fields)
-    declared = declared_keys(fields)
-    for flt in filters:
-        stmt = stmt.where(_term(rtype, indexed, declared, flt))
-    return stmt
+    return _filtered(
+        select(func.count(Record.id)).where(Record.type_id == rtype.id), rtype, fields, filters
+    )
+
+
+def exists_query(
+    rtype: RecordType,
+    fields: list[dict[str, Any]],
+    filters: Sequence[Filter] = (),
+) -> Select:
+    """Whether ``build_query`` would return **anything** — the same question as
+    ``count_query`` without the unbounded aggregate.
+
+    Every term is built by the same :func:`_term`, so the §7.4 truncation
+    re-check and the refusals of :func:`_resolve` are shared with the filter
+    grammar rather than copied. The difference is only the projection and the
+    ``LIMIT 1``: a caller asking "is this value taken" made the database count
+    every record of the type to learn a fact one row settles, which is what
+    made a write to a type with a ``unique`` field O(rows in that type).
+
+    ``select(Record.id)`` and not ``select(literal(1))``: naming the mapper is
+    what the framework's soft-delete filter attaches to (see
+    :func:`count_query`), and a caller that wants the trash included — the
+    ``unique`` check does — lifts it with ``include_deleted`` as usual.
+    """
+    stmt = _filtered(select(Record.id).where(Record.type_id == rtype.id), rtype, fields, filters)
+    return stmt.limit(1)

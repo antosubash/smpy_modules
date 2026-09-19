@@ -182,23 +182,27 @@ async def test_an_interrupted_run_leaves_the_markers_set_and_converges_on_the_ne
     )
     await db.commit()
 
-    real = reindex_module.reindex_record
+    # The rebuild writes a *batch* at a time (one DELETE and one bulk INSERT
+    # per index table), so the seam a half-finished run is simulated at is the
+    # batch, not the record. With ``reindex_batch_size=2`` over four records
+    # that is still "two records written, then the worker dies".
+    real = reindex_module.reindex_batch
     seen = {"count": 0}
 
-    async def flaky(db_, record, rtype_, **kwargs):
+    async def flaky(db_, records, rtype_, **kwargs):
         seen["count"] += 1
-        if seen["count"] > 2:
+        if seen["count"] > 1:
             raise RuntimeError("worker died mid-rebuild")
-        await real(db_, record, rtype_, **kwargs)
+        await real(db_, records, rtype_, **kwargs)
 
-    monkeypatch.setattr(reindex_module, "reindex_record", flaky)
+    monkeypatch.setattr(reindex_module, "reindex_batch", flaky)
     small = RecordsSettings(reindex_batch_size=2)
     with pytest.raises(RuntimeError):
         await run_pending(db_state, type_id, settings=small)
 
     assert set((await fresh_type(db, type_id)).reindex_pending) == {"price"}
 
-    monkeypatch.setattr(reindex_module, "reindex_record", real)
+    monkeypatch.setattr(reindex_module, "reindex_batch", real)
     assert await run_pending(db_state, type_id, settings=settings) == 4
 
     assert (await fresh_type(db, type_id)).reindex_pending == {}
@@ -228,7 +232,7 @@ async def test_schedule_swallows_a_failure_so_a_background_task_cannot_escape(
     async def boom(*args, **kwargs):
         raise RuntimeError("no")
 
-    monkeypatch.setattr(reindex_module, "reindex_record", boom)
+    monkeypatch.setattr(reindex_module, "reindex_batch", boom)
     assert await schedule(db_state, type_id, settings) == 0
 
     assert set((await fresh_type(db, type_id)).reindex_pending) == {"price"}

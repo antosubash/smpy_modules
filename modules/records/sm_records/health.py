@@ -65,7 +65,7 @@ def _unique_keys(fields: object) -> set[str]:
 
     A stale marker on one of them is worse than a slow filter: the uniqueness
     check of §7.8 is a query over the index, ``count_query`` refuses a pending
-    field, and ``_payload.ensure_unique`` therefore turns *every* write to the
+    field, and ``_claims.ensure_unique`` therefore turns *every* write to the
     type into a 409 until the rebuild finishes. That is worth saying out loud
     in the health detail rather than leaving an operator to discover it from a
     support ticket.

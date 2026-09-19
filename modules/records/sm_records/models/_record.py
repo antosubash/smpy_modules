@@ -15,6 +15,28 @@ from sqlmodel import Field
 from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN
 from sm_records.models._base import RECORD_TABLE, REVISION_TABLE, TYPE_TABLE, Base
 
+SLUG_INDEX_NAME = "ix_records_record_type_slug"
+"""The partial unique index of §5, named here because two layers need it: the
+table definition below, and :func:`sm_records.services._claims.flush_write`,
+which recognises the database's own refusal and raises the 409 the application
+check raises. A rename that reached only one of them would turn every lost slug
+race back into a 500, so the name has one owner."""
+
+SLUG_CONFLICT_SIGNATURES: tuple[str, ...] = (
+    SLUG_INDEX_NAME,
+    f"{RECORD_TABLE}.type_id, {RECORD_TABLE}.slug",
+)
+"""How each backend says "that slug is taken" in an ``IntegrityError``.
+
+Two spellings because the two dialects report a different thing. Postgres
+names the constraint (``duplicate key value violates unique constraint
+"ix_records_record_type_slug"``); SQLite names the *columns*
+(``UNIQUE constraint failed: records_record.type_id, records_record.slug``)
+and never mentions the index at all. Matching the driver's whole message shape
+would be worse than either — this matches the one substring each backend does
+put in it, and anything matching neither is re-raised, because an
+``IntegrityError`` this module cannot explain is a bug rather than a 409."""
+
 
 def _new_uuid() -> str:
     return uuid4().hex
@@ -63,7 +85,7 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
         # deployed definition (``\di+`` / ``sqlite_master``) rather than
         # trusting a clean autogenerate.
         Index(
-            "ix_records_record_type_slug",
+            SLUG_INDEX_NAME,
             "type_id",
             "slug",
             unique=True,

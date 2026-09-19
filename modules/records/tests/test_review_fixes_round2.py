@@ -69,16 +69,17 @@ async def test_a_marker_added_during_a_rebuild_is_not_erased_by_it(db_state, mon
             session.add(row)
             await session.commit()
 
-    real, raced = reindex_mod.write_index, []
+    # Wrapped at the batch, which is the unit the rebuild writes in.
+    real, raced = reindex_mod.reindex_batch, []
 
-    async def racing(db, record, rtype_, **kwargs):
-        out = await real(db, record, rtype_, **kwargs)
+    async def racing(db, records, rtype_, **kwargs):
+        out = await real(db, records, rtype_, **kwargs)
         if not raced:
             raced.append(True)
             await commit_a_second_change()
         return out
 
-    monkeypatch.setattr(reindex_mod, "write_index", racing)
+    monkeypatch.setattr(reindex_mod, "reindex_batch", racing)
     await run_pending(db_state, rtype.id, settings=RecordsSettings())
 
     # The fields moved underneath this run, so it clears nothing at all: what

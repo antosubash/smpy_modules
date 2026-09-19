@@ -19,11 +19,11 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeResolver
-from sm_records.index.writer import write_index
+from sm_records.index.writer import project, row_values, write_index
 from sm_records.models import INDEX_TABLES, Record, RecordType
 
 
@@ -39,6 +39,61 @@ async def reindex_record(
     await write_index(db, record, rtype, resolve_type_id=resolve_type_id)
 
 
+async def reindex_batch(
+    db: AsyncSession,
+    records: Sequence[Record],
+    rtype: RecordType,
+    *,
+    resolve_type_id: TypeResolver,
+    touched: set[str] | None = None,
+) -> None:
+    """Rebuild the index rows of a whole batch: **one statement per table**.
+
+    Same delete-then-insert as :func:`~sm_records.index.writer.write_index`
+    and the same projection (:func:`~sm_records.index.writer.project` and
+    :func:`~sm_records.index.writer.row_values`), so a rebuilt row is
+    byte-for-byte what an ordinary write would have produced — pinned by
+    ``tests/test_index_reindex.py``, which compares the two snapshots
+    id-free. What changes is only how many round trips it takes: six
+    ``DELETE``s, a handful of ORM inserts and a flush *per record* became six
+    ``DELETE … WHERE record_id IN (:batch)`` and at most six executemany
+    ``INSERT``s *per batch*. That is where the rebuild's ~130 rec/s went.
+
+    The delete pass covers **all six tables** and not only the ones this batch
+    has rows for: a field that changed kind, or stopped being indexed, has
+    rows in a table the new projection yields nothing for, and those are
+    exactly the rows a rebuild exists to remove.
+
+    It is keyed on ``record_id`` alone, as ``delete_index`` is — a record's
+    rows all belong to it, and scoping by ``type_id`` as well would only
+    hide rows written under a type id the record no longer has.
+
+    ``touched`` collects the table names actually written, for a caller that
+    wants to ``ANALYZE`` them afterwards.
+
+    **Core DML does not fire the framework's ``after_flush`` listener**, so a
+    caller inside a request must mark the session written itself. Every caller
+    today is :func:`reindex_type` under
+    :mod:`sm_records.services.reindex_runner`, which owns its own session and
+    commits explicitly.
+    """
+    ids = [record.id for record in records if record.id is not None]
+    if not ids:
+        return
+    rows: dict[type, list[dict]] = {}
+    for record in records:
+        for entry in project(record, rtype, resolve_type_id):
+            table, values = row_values(entry, record.id, rtype.id)
+            rows.setdefault(table, []).append(values)
+
+    for table in INDEX_TABLES:
+        await db.execute(delete(table).where(table.record_id.in_(ids)))
+    for table, values_list in rows.items():
+        await db.execute(insert(table), values_list)
+        if touched is not None:
+            touched.add(str(table.__tablename__))
+
+
 async def reindex_type(
     db: AsyncSession,
     rtype: RecordType,
@@ -47,6 +102,7 @@ async def reindex_type(
     batch_size: int,
     field_keys: Sequence[str] | None = None,
     after_batch: Callable[[], Awaitable[None]] | None = None,
+    touched: set[str] | None = None,
 ) -> int:
     """Rebuild the index for every record of ``rtype``. Returns the count.
 
@@ -62,6 +118,11 @@ async def reindex_type(
     ``records_record``, where the framework's filter hides them (§7.3) — so
     skipping them here would quietly empty the index of a record that a restore
     is supposed to bring back whole.
+
+    A batch is also the unit of *writing* (:func:`reindex_batch`), not only of
+    reading: one ``DELETE`` and one bulk ``INSERT`` per index table per batch.
+    ``touched`` is passed through to it and names the tables written, for a
+    caller that wants to ``ANALYZE`` them once the walk is done.
 
     Batching bounds the number of rows in memory, not the transaction: nothing
     here commits, and a long-running rebuild that wants to commit per batch
@@ -92,8 +153,8 @@ async def reindex_type(
         )
         if not batch:
             return total
+        await reindex_batch(db, batch, rtype, resolve_type_id=resolve_type_id, touched=touched)
         for record in batch:
-            await reindex_record(db, record, rtype, resolve_type_id=resolve_type_id)
             last_id = record.id or last_id
             total += 1
         if after_batch is not None:

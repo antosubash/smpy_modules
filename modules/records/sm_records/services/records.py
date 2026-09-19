@@ -19,18 +19,17 @@ having in front of you while reading it:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.constants import ORPHANED_KEY
 from sm_records.index.query import Filter, Sort, build_query, count_query, only_trashed
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
 from sm_records.schema.fields import FieldDefinition
-from sm_records.services import _payload, _relations
-from sm_records.services._common import guarded_bump, reload, type_id_map, type_resolver, utcnow
+from sm_records.services import _claims, _payload, _relations
+from sm_records.services._common import guarded_bump, reload, type_id_map, utcnow
 
 # Re-exported so the delete lifecycle is importable from the one module
 # endpoints already use; it lives in ``_lifecycle`` only for the file cap.
@@ -118,6 +117,25 @@ async def get_deleted_record(db: AsyncSession, rtype: RecordType, uuid: str) -> 
     return record
 
 
+class _Prepared(NamedTuple):
+    """What both write paths need out of :func:`_prepare`.
+
+    ``types`` rides along rather than being looked up again: ``{key: id}`` is
+    read once here for the relation check and is the same mapping the index
+    writer's resolver needs (``index.providers.TypeResolver``), which used to
+    make ``SELECT key, id FROM records_type`` a twice-per-write statement.
+    Threaded through an argument and not cached on the module: types are
+    created and deleted at runtime, and a process-global map would hand a
+    stale id to the one thing that must not have one — the ``relation`` rows
+    ``on_delete`` is enforced from (§9).
+    """
+
+    defs: list[FieldDefinition]
+    values: dict[str, Any]
+    stored: dict[str, Any]
+    types: dict[str, int]
+
+
 async def _prepare(
     db: AsyncSession,
     rtype: RecordType,
@@ -125,7 +143,7 @@ async def _prepare(
     settings: RecordsSettings,
     *,
     exclude_id: int | None,
-) -> tuple[list[FieldDefinition], dict[str, Any], dict[str, Any]]:
+) -> _Prepared:
     """Validate, then the two checks no database constraint can make.
 
     The type row is locked before them and not before validation: the lock
@@ -136,10 +154,11 @@ async def _prepare(
     values, stored = _payload.validate(
         rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
     )
-    await _payload.lock_type(db, rtype)
-    await _relations.check_targets(db, defs, values, await type_id_map(db))
-    await _payload.ensure_unique(db, rtype, defs, values, exclude_id=exclude_id)
-    return defs, values, stored
+    await _claims.lock_type(db, rtype)
+    types = await type_id_map(db)
+    await _relations.check_targets(db, defs, values, types)
+    await _claims.ensure_unique(db, rtype, defs, values, exclude_id=exclude_id)
+    return _Prepared(defs, values, stored, types)
 
 
 async def create_record(
@@ -153,9 +172,9 @@ async def create_record(
     position: int = 0,
     actor: str | None = None,
 ) -> Record:
-    _, values, stored = await _prepare(db, rtype, data, settings, exclude_id=None)
+    _, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=None)
     resolved_slug = _payload.slug_for(rtype, values, slug)
-    await _payload.ensure_slug_free(db, rtype, resolved_slug)
+    await _claims.ensure_slug_free(db, rtype, resolved_slug)
 
     record = Record(
         type_id=rtype.id,
@@ -170,12 +189,14 @@ async def create_record(
         created_by=actor,
     )
     db.add(record)
-    await db.flush()
+    await _claims.flush_write(db, rtype, resolved_slug)
 
     await write_revision(
         db, record, RevisionEvent.CREATE, limit=settings.revision_limit, actor=actor
     )
-    await write_index(db, record, rtype, resolve_type_id=await type_resolver(db))
+    # ``fresh``: the row was inserted by the flush above, so it cannot own
+    # index rows yet and the writer's six-table delete pass is skipped.
+    await write_index(db, record, rtype, resolve_type_id=types.get, fresh=True)
     return record
 
 
@@ -188,51 +209,6 @@ def _published_at(record: Record, new_status: RecordStatus):
     if record.status is RecordStatus.PUBLISHED and record.published_at is not None:
         return record.published_at
     return utcnow()
-
-
-def _migrate_orphaned(
-    record: Record,
-    defs: list[FieldDefinition],
-    stored: dict[str, Any],
-    extra: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """The lazy destructive migration of §8.3, run on this one record.
-
-    Two moves, both against the *stored* payload and neither ever bulk:
-
-    * a top-level key the current schema no longer declares is a deleted
-      field's value. It moves under ``_orphaned`` — which is what makes a
-      mis-clicked field deletion undoable, at the cost of some storage, and
-      why nothing rewrites the whole type when a field goes (§8.2).
-    * a key the schema *does* declare is dropped from ``_orphaned``: the field
-      came back and its value is live again. The read path already served it
-      from there (``schema.compile.from_stored``), so by now it is in ``stored``
-      — either as the value the client sent back or as the field's default.
-
-    ``_orphaned`` itself is never client-supplied (``_payload.validate``
-    refuses a payload carrying it), so an update that does not mention it must
-    not be read as "delete it": what survives here is carried across.
-
-    ``extra`` is this module's own contribution to that sub-key, and the only
-    way anything reaches it besides the record's own payload — see
-    ``update_record``'s ``orphaned_extra``. It wins over what the record
-    carried, because the one caller is a revision restore: putting an older
-    payload back means putting back *its* value for a key the schema has since
-    dropped, not the one a later edit left behind.
-    """
-    previous = dict(record.data or {})
-    declared = {field.key for field in defs}
-    orphaned = dict(previous.get(ORPHANED_KEY) or {})
-    for key, value in previous.items():
-        if key == ORPHANED_KEY or key in declared:
-            continue
-        orphaned.setdefault(key, value)
-    for key, value in (extra or {}).items():
-        if key != ORPHANED_KEY and key not in declared:
-            orphaned[key] = value
-    for key in declared:
-        orphaned.pop(key, None)
-    return {**stored, ORPHANED_KEY: orphaned} if orphaned else stored
 
 
 async def update_record(
@@ -270,10 +246,10 @@ async def update_record(
     (``extra="forbid"`` would otherwise make every revision older than a field
     deletion a permanent 422).
     """
-    defs, values, stored = await _prepare(db, rtype, data, settings, exclude_id=record.id)
-    stored = _migrate_orphaned(record, defs, stored, orphaned_extra)
+    defs, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=record.id)
+    stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
-    await _payload.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
+    await _claims.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
 
     if not await guarded_bump(db, Record, record.id, expected_version):
         raise Conflict(
@@ -293,8 +269,8 @@ async def update_record(
     record.updated_by = actor
     record.version = expected_version + 1
     db.add(record)
-    await db.flush()
+    await _claims.flush_write(db, rtype, resolved_slug)
 
     await write_revision(db, record, event, limit=settings.revision_limit, actor=actor)
-    await write_index(db, record, rtype, resolve_type_id=await type_resolver(db))
+    await write_index(db, record, rtype, resolve_type_id=types.get)
     return record

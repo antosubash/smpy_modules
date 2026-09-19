@@ -32,6 +32,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import REINDEX_ALL
+from sm_records.index._analyze import INDEX_TABLE_NAMES, analyze_tables
 from sm_records.index.reindex import (
     clear_pending,
     delete_field_rows,
@@ -40,8 +41,9 @@ from sm_records.index.reindex import (
 )
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import from_stored
+from sm_records.services._claims import lock_type
 from sm_records.services._common import mark_written, reload, type_resolver
-from sm_records.services._payload import display_title, field_defs, lock_type
+from sm_records.services._payload import display_title, field_defs
 from sm_records.settings import RecordsSettings
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
@@ -232,12 +234,14 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
         if removed:
             await delete_field_rows(session, rtype, removed)
 
+        touched: set[str] = set(INDEX_TABLE_NAMES) if removed else set()
         count = await reindex_type(
             session,
             rtype,
             resolve_type_id=await type_resolver(session),
             batch_size=settings.reindex_batch_size,
             field_keys=field_keys or None,
+            touched=touched,
             # Commit per batch. SQLite has one write lock for the whole file,
             # so a rebuild that held its transaction for every record of a big
             # type would refuse every concurrent write for that whole time;
@@ -249,11 +253,20 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
             await _recompute_titles(session, rtype, settings.reindex_batch_size)
 
         await _clear_rebuilt(session, rtype, keys, started_at_schema)
-        # The rebuild's own statements are ORM writes, but the row deletes above
-        # are core DML, which never fires the listener the framework commits on.
-        # This session has no request behind it either way, so say so explicitly.
+        # Every statement the rebuild issues is core DML, which never fires the
+        # listener the framework commits on. This session has no request behind
+        # it either way, so say so explicitly.
         mark_written(session)
         await session.commit()
+
+        # After the commit, not inside it: ``ANALYZE`` takes the write lock,
+        # and the rebuild has no reason to keep holding one while it runs. The
+        # index of this type was just rewritten wholesale, which is the moment
+        # the planner's statistics are most out of date and cheapest to refresh
+        # — see :mod:`sm_records.index._analyze`.
+        if touched:
+            await analyze_tables(session, touched)
+            await session.commit()
         return count
 
 

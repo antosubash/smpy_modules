@@ -151,11 +151,13 @@ screen, that a given type is further restricted to specific roles.
 - **`unique` is enforced by the application, not by a database constraint.**
   The index tables are shared across every field of a kind, so a partial
   unique index naming a runtime-chosen field key isn't possible. A `unique`
-  field is checked with a `SELECT` inside the write's transaction, and writes
-  to a type with any unique field are serialized (a row lock on the type)
-  to close the check-then-act race between two concurrent creates. This is
-  "unique enforced at the cost of serializing writes on that type," not a
-  database-level uniqueness guarantee.
+  field is checked with a `SELECT ... LIMIT 1` inside the write's transaction,
+  and writes to the type are serialized to close the check-then-act race
+  between two concurrent creates: a row lock on the type on Postgres, and a
+  write against the type row — which takes SQLite's `RESERVED` lock — on
+  SQLite, where `FOR UPDATE` locks nothing. This is "unique enforced at the
+  cost of serializing writes on that type," not a database-level uniqueness
+  guarantee.
 
 ## Changing a schema that already holds records
 
@@ -239,13 +241,16 @@ type's current record count, not the seed alone. `--reset` hard-deletes the
 five types and everything in them (including the trash) before reseeding.
 
 Every record goes through `services.records.create_record`, so this is the
-slow path, not a bulk insert — 10,000 records took a little over three
-minutes on SQLite in testing (relation checks and the `unique` `SELECT`
-dominate, most visibly on `order`, the largest and most relation-heavy
-type). For an in-process caller (a test, a perf harness) that already has a
-`db_state`/`settings` pair, call `sm_records.seed.seed_database(db_state,
-settings, records=..., seed=..., reset=...)` directly instead of shelling
-out.
+slow path, not a bulk insert — 10,000 records took **1 minute 46 seconds
+(94 records/s)** on SQLite in testing, and the rate no longer falls away as
+the dataset grows now that the `unique` check is an existence test rather
+than a `COUNT` over the whole type (see [docs/performance.md](docs/performance.md)).
+The run finishes with one `ANALYZE` pass over the module's own tables: a bulk
+load is exactly the state SQLite has no planner statistics for, and a seeded
+database's first act is to be queried. For an in-process caller (a test, a
+perf harness) that already has a `db_state`/`settings` pair, call
+`sm_records.seed.seed_database(db_state, settings, records=..., seed=...,
+reset=...)` directly instead of shelling out.
 
 ## API-version contract
 
