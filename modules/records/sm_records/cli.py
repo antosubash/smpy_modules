@@ -1,4 +1,5 @@
-"""``python -m sm_records.cli reindex [--type KEY]`` — design doc §7.7, §8.9.
+"""``python -m sm_records.cli reindex [--type KEY]`` / ``seed [...]`` — design
+doc §7.7, §8.9, and the demo-data seeder in ``sm_records/seed/``.
 
 The recovery path for an index that is wrong, and the other half of "deferred"
 in a repo with no queue: a background task that died with its worker leaves
@@ -25,6 +26,7 @@ from sqlalchemy import select
 
 from sm_records.constants import PACKAGE
 from sm_records.models import RecordType
+from sm_records.seed.runner import SeedSummary
 from sm_records.services.reindex_runner import pending_type_ids, run_pending
 from sm_records.settings import RecordsSettings
 
@@ -135,6 +137,35 @@ def _force_pending(database_url: str, type_key: str) -> None:
     asyncio.run(run())
 
 
+async def seed(database_url: str, *, records: int, seed_value: int, reset: bool) -> SeedSummary:
+    """Create the demo types (if missing) and write ``records`` records.
+
+    Delegates entirely to :mod:`sm_records.seed` — this wrapper only owns the
+    database connection, the same division of labour as :func:`reindex`
+    above, so :func:`sm_records.seed.seed_database` stays callable in-process
+    (a test, a perf harness) without a subprocess or a settings-from-env
+    detour.
+    """
+    from sm_records.seed import seed_database
+
+    db_state = init_db(database_url)
+    register_listeners(db_state)
+    try:
+        settings = await _load_settings(db_state)
+        summary = await seed_database(
+            db_state, settings, records=records, seed=seed_value, reset=reset
+        )
+        print(
+            f"records seed: {summary.total} record(s) in "
+            f"{summary.elapsed_seconds:.1f}s ({summary.records_per_second:.0f}/s)"
+        )
+        for key, count in summary.created.items():
+            print(f"records seed: {key} — {count}")
+        return summary
+    finally:
+        await db_state.engine.dispose()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m sm_records.cli",
@@ -150,9 +181,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="one record type's key; omit to finish every pending rebuild",
     )
+    seed_parser = sub.add_parser(
+        "seed", help="write demo data (company/contact/product/order/store records)"
+    )
+    seed_parser.add_argument(
+        "--records",
+        type=int,
+        default=5000,
+        help="total record count across all five demo types (default: 5000)",
+    )
+    seed_parser.add_argument(
+        "--seed",
+        dest="seed_value",
+        type=int,
+        default=42,
+        help="RNG seed; the same value regenerates the same dataset (default: 42)",
+    )
+    seed_parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="purge the demo types and their records first, then reseed from empty",
+    )
+    seed_parser.add_argument(
+        "--database-url",
+        dest="database_url",
+        default=None,
+        help="override SM_DATABASE_URL / .env for this run",
+    )
     args = parser.parse_args(argv)
 
     from simple_module_hosting.settings import Settings
+
+    if args.command == "seed":
+        database_url = args.database_url or Settings().database_url
+        asyncio.run(
+            seed(database_url, records=args.records, seed_value=args.seed_value, reset=args.reset)
+        )
+        return 0
 
     database_url = Settings().database_url
     if args.type_key is not None:

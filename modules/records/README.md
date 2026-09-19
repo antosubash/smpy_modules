@@ -175,6 +175,38 @@ python -m sm_records.cli reindex --type KEY # one type
 It is idempotent and resumable — index rows are derived from the stored
 payloads, so running it twice converges.
 
+### Demo data
+
+`sm_records.seed` writes a small US-flavoured business dataset — five Record
+Types (`company`, `contact`, `product`, `store`, `order`, with relations
+between them) and however many records you ask for — through the real
+services, so a seeded install has the same index rows, revisions and
+relation checks a hand-built one would. Run it from the repo root:
+
+```
+python -m sm_records.cli seed                         # 5000 records, seed 42
+python -m sm_records.cli seed --records 2000 --seed 7  # a smaller, different run
+python -m sm_records.cli seed --reset                  # purge the five demo types first
+python -m sm_records.cli seed --database-url sqlite+aiosqlite:///path/to.db
+```
+
+`--records` is the *total* across all five types (roughly 5% company / 25%
+contact / 15% product / 45% order / 10% store, minimum one each). It is
+deterministic for a given `--seed`; re-running without `--reset` tops up the
+dataset with more records, and unique fields (`contact.email`, `product.sku`,
+`order.order_no`) stay collision-free because their values are keyed off each
+type's current record count, not the seed alone. `--reset` hard-deletes the
+five types and everything in them (including the trash) before reseeding.
+
+Every record goes through `services.records.create_record`, so this is the
+slow path, not a bulk insert — 10,000 records took a little over three
+minutes on SQLite in testing (relation checks and the `unique` `SELECT`
+dominate, most visibly on `order`, the largest and most relation-heavy
+type). For an in-process caller (a test, a perf harness) that already has a
+`db_state`/`settings` pair, call `sm_records.seed.seed_database(db_state,
+settings, records=..., seed=..., reset=...)` directly instead of shelling
+out.
+
 ## API-version contract
 
 `ModuleMeta.requires_framework` declares which `simple_module_core` versions
