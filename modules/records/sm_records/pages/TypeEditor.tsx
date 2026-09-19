@@ -5,111 +5,54 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
 import { FieldList } from '../components/typeeditor/FieldList';
+import {
+  buildChanges,
+  extraCreateFields,
+  metadataFrom,
+  schemaIsDirty,
+} from '../components/typeeditor/formHelpers';
+import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
+import { SchemaConflictPanel } from '../components/typeeditor/SchemaConflictPanel';
+import { SchemaPreviewPanel } from '../components/typeeditor/SchemaPreviewPanel';
 import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
 import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
+import { TypeRevisions } from '../components/typeeditor/TypeRevisions';
 import {
   type EditableField,
   TOP_LEVEL_ERROR_FIELDS,
   type TypeEditorProps,
-  type TypeMetadataValues,
 } from '../components/typeeditor/types';
-import { ApiError, type CreateTypePayload, createType, updateType } from '../utils/api';
+import type { SchemaApplyBody } from '../hooks/useSchemaApply';
+import { useSchemaApply } from '../hooks/useSchemaApply';
+import { ApiError, createType, updateType } from '../utils/api';
 import type { TypeRead, ValidationError } from '../utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
-
-function metadataFrom(type: TypeRead | null): TypeMetadataValues {
-  return {
-    key: type?.key ?? '',
-    label: type?.label ?? '',
-    labelPlural: type?.label_plural ?? '',
-    description: type?.description ?? '',
-    icon: type?.icon ?? '',
-    isPublic: type?.is_public ?? false,
-    allowedRoles: type?.allowed_roles ?? [],
-    displayField: type?.display_field ?? '',
-    slugField: type?.slug_field ?? '',
-  };
-}
-
-function sameStringSet(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const sa = [...a].sort();
-  const sb = [...b].sort();
-  return sa.every((v, i) => v === sb[i]);
-}
-
-/** The optional metadata the editor collects for a new type, in the shape
- *  `createType` sends. Absent keys are left to the server's defaults. */
-function extraCreateFields(values: TypeMetadataValues): Partial<CreateTypePayload> {
-  const extra: Partial<CreateTypePayload> = {};
-  if (values.description) extra.description = values.description;
-  if (values.icon) extra.icon = values.icon;
-  if (values.isPublic) extra.is_public = true;
-  if (values.allowedRoles.length > 0) extra.allowed_roles = values.allowedRoles;
-  if (values.displayField) extra.display_field = values.displayField;
-  if (values.slugField) extra.slug_field = values.slugField;
-  return extra;
-}
-
-/** Only what changed, top-level, against `current` — `updateType` sends
- *  exactly these as `PUT`'s body alongside `expected_version` (design's
- *  contract: send only changed top-level keys). */
-function buildChanges(
-  current: TypeRead,
-  values: TypeMetadataValues,
-  fields: EditableField[],
-): Record<string, unknown> {
-  const changes: Record<string, unknown> = {};
-  if (values.label !== current.label) changes.label = values.label;
-  if (values.labelPlural !== current.label_plural) changes.label_plural = values.labelPlural;
-  if (values.description !== (current.description ?? '')) {
-    changes.description = values.description || null;
-  }
-  if (values.icon !== (current.icon ?? '')) changes.icon = values.icon || null;
-  if (values.isPublic !== current.is_public) changes.is_public = values.isPublic;
-  if (!sameStringSet(values.allowedRoles, current.allowed_roles)) {
-    changes.allowed_roles = values.allowedRoles;
-  }
-  if (values.displayField !== (current.display_field ?? '')) {
-    changes.display_field = values.displayField || null;
-  }
-  if (values.slugField !== (current.slug_field ?? '')) {
-    changes.slug_field = values.slugField || null;
-  }
-  if (JSON.stringify(fields) !== JSON.stringify(current.fields)) {
-    changes.fields = fields;
-  }
-  return changes;
-}
 
 /** `Records/TypeEditor` — `/admin/records/types/new` and `/…/types/{key}`.
  *
  * The schema editor from design §6.1/§7.2/§16: type metadata, the field
  * list (with `indexed` — "the single most consequential choice on the
  * screen", §7.2 — front and center), and, on an existing type, the danger
- * zone. A populated type's `fields`/`display_field`/`slug_field` are
- * read-only (`fields_locked`); everything else stays editable. */
+ * zone. Phase 3 lifts the Phase 1 lock: a populated type's `fields`,
+ * `display_field` and `slug_field` are editable here too, checked by
+ * "Preview changes" before saving and by the save itself, which the server
+ * enforces with a dry-run (§8.2) rather than trusting the client to have run
+ * one. */
 function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
   const [current, setCurrent] = useState<TypeRead | null>(type);
-  const [values, setValues] = useState<TypeMetadataValues>(metadataFrom(type));
+  const [values, setValues] = useState(metadataFrom(type));
   const [fields, setFields] = useState<EditableField[]>(type?.fields ?? []);
   const [originalKeys] = useState<Set<string>>(new Set((type?.fields ?? []).map((f) => f.key)));
-  const [errors, setErrors] = useState<ValidationError[]>([]);
-  const [conflict, setConflict] = useState<TypeRead | null>(null);
-  const [lockedNotice, setLockedNotice] = useState<string | null>(null);
+  const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
-
-  const fieldsLocked = current?.fields_locked ?? false;
-  const topLevelErrors = errors.filter((e) => TOP_LEVEL_ERROR_FIELDS.has(e.field));
-  const fieldErrors = errors.filter((e) => !TOP_LEVEL_ERROR_FIELDS.has(e.field));
 
   const applySaved = (saved: TypeRead) => {
     setCurrent(saved);
@@ -117,13 +60,30 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
     setFields(saved.fields);
   };
 
+  const schemaApply = useSchemaApply((result) => {
+    applySaved(result);
+    toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
+  });
+
+  const attemptUpdate = useCallback(
+    (body: SchemaApplyBody) => {
+      if (!current) return Promise.reject(new Error('No type loaded to update'));
+      const { expected_version, ...rest } = body;
+      return updateType(current.key, expected_version, rest);
+    },
+    [current],
+  );
+
+  const activeErrors = isNew ? createErrors : schemaApply.errors;
+  const topLevelErrors = activeErrors.filter((e) => TOP_LEVEL_ERROR_FIELDS.has(e.field));
+  const fieldErrors = activeErrors.filter((e) => !TOP_LEVEL_ERROR_FIELDS.has(e.field));
+  const dirty = !isNew && schemaIsDirty(current, values, fields);
+
   const save = async () => {
-    setErrors([]);
-    setConflict(null);
-    setLockedNotice(null);
     setPending(true);
     try {
       if (isNew) {
+        setCreateErrors([]);
         const created = await createType({
           key: values.key,
           label: values.label,
@@ -140,16 +100,11 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
         toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
         return;
       }
-      const updated = await updateType(current.key, current.version, changes);
-      applySaved(updated);
-      toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
+      schemaApply.reset();
+      await schemaApply.run(attemptUpdate, { expected_version: current.version, ...changes });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409 && err.body?.current) {
-        setConflict(err.body.current as TypeRead);
-      } else if (err instanceof ApiError && err.status === 409) {
-        setLockedNotice(err.body?.detail ?? err.message);
-      } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
-        setErrors(err.body.errors);
+      if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
+        setCreateErrors(err.body.errors);
       } else {
         toast.error(err instanceof Error ? err.message : String(err));
       }
@@ -160,7 +115,7 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
 
   const reloadFromConflict = (server: TypeRead) => {
     applySaved(server);
-    setConflict(null);
+    schemaApply.reset();
   };
 
   return (
@@ -188,15 +143,14 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
         }
       >
         <div className="space-y-6">
-          {conflict && <TypeConflictNotice current={conflict} onReload={reloadFromConflict} />}
-          {lockedNotice && (
-            <p
-              className="rounded-md border border-destructive/50 p-3 text-sm text-destructive"
-              role="alert"
-            >
-              {lockedNotice}
-            </p>
+          {schemaApply.versionConflict && (
+            <TypeConflictNotice
+              current={schemaApply.versionConflict}
+              onReload={reloadFromConflict}
+            />
           )}
+
+          {!isNew && current && <ReindexStatus type={current} />}
 
           <Card>
             <CardHeader>
@@ -207,7 +161,6 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
             <CardContent>
               <TypeMetadataForm
                 isNew={isNew}
-                fieldsLocked={fieldsLocked}
                 fields={fields}
                 roles={roles}
                 values={values}
@@ -223,17 +176,28 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
                 {t('records.type_editor.section_fields', { defaultValue: 'Fields' })}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {!isNew && current && (
+                <p className="text-sm text-muted-foreground">
+                  {t('records.type_editor.live_notice', {
+                    count: current.record_count,
+                    trashed: current.trashed_record_count,
+                    defaultValue:
+                      '{{count}} live, {{trashed}} trashed records — changes are checked against them before they apply.',
+                  })}
+                </p>
+              )}
               <FieldList
                 fields={fields}
                 originalKeys={originalKeys}
                 targetTypes={target_types}
-                locked={fieldsLocked}
-                recordCount={current?.record_count ?? 0}
-                trashedRecordCount={current?.trashed_record_count ?? 0}
+                disabled={pending}
                 errors={fieldErrors}
                 onChange={setFields}
               />
+              {!isNew && current && (
+                <SchemaPreviewPanel typeKey={current.key} fields={fields} dirty={dirty} />
+              )}
             </CardContent>
           </Card>
 
@@ -244,6 +208,16 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
                 : t('records.editor.save', { defaultValue: 'Save' })}
             </Button>
           </div>
+
+          <SchemaConflictPanel
+            report={schemaApply.report}
+            conflicts={schemaApply.conflicts}
+            pending={schemaApply.pending || pending}
+            onForce={() => schemaApply.retryWith({ force: true })}
+            onOrphaned={(choice) => schemaApply.retryWith({ orphaned: choice })}
+          />
+
+          {!isNew && current && <TypeRevisions type={current} onRestored={applySaved} />}
 
           {!isNew && current && (
             <DeleteTypeSection type={current} onDeleted={() => router.visit(TYPES_LIST_HREF)} />

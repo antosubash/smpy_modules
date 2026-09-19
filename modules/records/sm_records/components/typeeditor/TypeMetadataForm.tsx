@@ -27,16 +27,14 @@ function FieldError({ message }: { message?: string }) {
 }
 
 /**
- * The type's own labels, visibility and field pointers — everything
- * `update_type` keeps editable even on a `fields_locked` type (design §16).
- * `displayField`/`slugField` are the exception: they are locked with
- * `fields` because `display_title`/`slug` are denormalised from them onto
- * every existing record, so `fieldsLocked` disables those two selects here
- * even though the rest of the form stays live.
+ * The type's own labels, visibility and field pointers. Phase 3 lifts the
+ * Phase 1 lock (design §16): `displayField`/`slugField` are editable even on
+ * a populated type now, same as `fields` — changing either is classified and
+ * dry-run like any other schema write, since `display_title`/`slug` are
+ * denormalised from them onto every existing record.
  */
 export function TypeMetadataForm({
   isNew,
-  fieldsLocked,
   fields,
   roles,
   values,
@@ -44,7 +42,6 @@ export function TypeMetadataForm({
   errors,
 }: {
   isNew: boolean;
-  fieldsLocked: boolean;
   fields: EditableField[];
   roles: string[];
   values: TypeMetadataValues;
@@ -173,7 +170,6 @@ export function TypeMetadataForm({
         <NativeSelect
           id={ID.displayField}
           value={values.displayField}
-          disabled={fieldsLocked}
           onChange={(e) => onChange({ displayField: e.target.value })}
         >
           <NativeSelectOption value="">{none}</NativeSelectOption>
@@ -193,7 +189,6 @@ export function TypeMetadataForm({
         <NativeSelect
           id={ID.slugField}
           value={values.slugField}
-          disabled={fieldsLocked}
           onChange={(e) => onChange({ slugField: e.target.value })}
         >
           <NativeSelectOption value="">{none}</NativeSelectOption>

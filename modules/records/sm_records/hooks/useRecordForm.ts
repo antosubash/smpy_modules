@@ -46,6 +46,12 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
   const [original, setOriginal] = useState<Record<string, unknown> | null>(record?.data ?? null);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
+  // `record.invalid` — "marked, not hidden" (design §8.3): a record a
+  // restrictive schema change or a schema rollback no longer fits. Kept
+  // separate from `serverErrors` so a fresh 422 (checked below) can override
+  // it without a save first having to clear it, and so `reset()` can
+  // re-derive it from whatever the next response actually says.
+  const [invalidErrors, setInvalidErrors] = useState<ValidationError[]>(record?.invalid ?? []);
   const [raw, setRaw] = useState(false);
   const [rawText, setRawText] = useState(() => pretty(record?.data ?? null));
   const [rawError, setRawError] = useState<string | null>(null);
@@ -57,9 +63,17 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
 
   const fieldKeys = useMemo(() => new Set(fields.map((field) => field.key)), [fields]);
 
-  /** Per-field messages, with the server's winning any tie. */
+  /** Per-field messages. Precedence, low to high: the record's own
+   *  `invalid` marker (stale until the next save), the client validator's
+   *  courtesy check, then the server's 422 — the freshest server opinion
+   *  always wins the tie. */
   const fieldErrors = useMemo(() => {
-    const merged: Record<string, string> = { ...clientErrors };
+    const merged: Record<string, string> = {};
+    for (const entry of invalidErrors) {
+      const key = entry.field.startsWith('data.') ? entry.field.slice(5) : entry.field;
+      if (fieldKeys.has(key)) merged[key] = entry.message;
+    }
+    Object.assign(merged, clientErrors);
     for (const entry of serverErrors) {
       // The API reports a bare field key; tolerate a `data.`-prefixed one so
       // a future change to the error envelope cannot silently hide messages.
@@ -67,7 +81,7 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
       if (fieldKeys.has(key)) merged[key] = entry.message;
     }
     return merged;
-  }, [clientErrors, serverErrors, fieldKeys]);
+  }, [invalidErrors, clientErrors, serverErrors, fieldKeys]);
 
   /** The 422s that are about the record envelope, not a schema field —
    *  `status`, `slug`, `position`, and anything this build cannot place. */
@@ -99,6 +113,7 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
       setRawText(pretty(next.data));
       setClientErrors({});
       setServerErrors([]);
+      setInvalidErrors(next.invalid ?? []);
       setRawError(null);
     },
     [fields],

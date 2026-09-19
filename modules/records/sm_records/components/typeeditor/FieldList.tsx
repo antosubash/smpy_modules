@@ -1,5 +1,4 @@
 import { useT } from '@simple-module-py/i18n';
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { ValidationError } from '../../utils/types';
@@ -26,10 +25,9 @@ function move<T>(list: T[], from: number, to: number): T[] {
 }
 
 /**
- * The field list, plus the `fields_locked` notice (design §16 — Phase 1
- * ships type editing with a populated type's `fields`, `display_field` and
- * `slug_field` frozen, because the classification and dry-run that would
- * make a live schema edit safe are Phase 3). `originalKeys` is the field
+ * The field list editor. Phase 3 lifts the Phase 1 lock (design §16): a
+ * populated type's fields are editable here too, `disabled` only reflects
+ * whether a save/preview request is in flight. `originalKeys` is the field
  * keys the type had when this page loaded — the immutable-key rule (§8.7)
  * only bites those; a field added in this session can still have its key
  * fixed before the first save ever sends it.
@@ -38,18 +36,14 @@ export function FieldList({
   fields,
   originalKeys,
   targetTypes,
-  locked,
-  recordCount,
-  trashedRecordCount,
+  disabled,
   errors,
   onChange,
 }: {
   fields: EditableField[];
   originalKeys: ReadonlySet<string>;
   targetTypes: TargetType[];
-  locked: boolean;
-  recordCount: number;
-  trashedRecordCount: number;
+  disabled: boolean;
   errors: ValidationError[];
   onChange: (next: EditableField[]) => void;
 }) {
@@ -62,24 +56,6 @@ export function FieldList({
 
   return (
     <div className="grid gap-4">
-      {locked && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-          <Badge variant="outline" className="border-amber-500 text-amber-600">
-            {t('records.types.fields_locked_badge', { defaultValue: 'Fields locked' })}
-          </Badge>
-          <span>
-            {t('records.types.fields_locked', {
-              defaultValue: 'Fields are read-only while this type holds records.',
-            })}{' '}
-            {t('records.type_editor.locked_counts', {
-              count: recordCount,
-              trashed: trashedRecordCount,
-              defaultValue: '{{count}} live, {{trashed}} trashed.',
-            })}
-          </span>
-        </div>
-      )}
-
       {fields.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t('records.type_editor.no_fields', { defaultValue: 'No fields yet.' })}
@@ -96,7 +72,7 @@ export function FieldList({
               keyLocked={originalKeys.has(field.key)}
               siblingKeys={fields.filter((_, i) => i !== index).map((f) => f.key)}
               targetTypes={targetTypes}
-              disabled={locked}
+              disabled={disabled}
               errors={errors}
               onChange={(patch) => updateAt(index, patch)}
               onRemove={() => removeAt(index)}
@@ -108,7 +84,7 @@ export function FieldList({
       )}
 
       <div>
-        <Button type="button" variant="outline" disabled={locked} onClick={addField}>
+        <Button type="button" variant="outline" disabled={disabled} onClick={addField}>
           {t('records.type_editor.add_field', { defaultValue: 'Add field' })}
         </Button>
       </div>

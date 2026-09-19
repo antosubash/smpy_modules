@@ -13,8 +13,6 @@
     "record_count": "{{count}} record",
     "record_count_one": "{{count}} record",
     "record_count_other": "{{count}} records",
-    "fields_locked": "Fields are read-only while this type holds records.",
-    "fields_locked_badge": "Fields locked",
     "view_records": "View records",
     "edit": "Edit",
     "trashed_record_count": "({{count}} trashed)",
@@ -93,7 +91,19 @@
     "confirm_purge": "This cannot be undone. Delete this record permanently?",
     "fields_heading": "Fields",
     "use_raw_json": "Advanced: edit raw JSON",
-    "use_form": "Back to the form"
+    "use_form": "Back to the form",
+    "invalid": {
+      "title": "This record does not satisfy the current schema"
+    },
+    "revisions": {
+      "title": "History",
+      "empty": "No earlier versions yet.",
+      "restore": "Restore this version",
+      "restore_confirm": "Restore the data from v{{version}}?",
+      "restored": "Version restored",
+      "restore_schema_mismatch": "This version no longer fits the type's current schema.",
+      "restore_schema_mismatch_detail": "This version no longer fits the type's current schema: {{detail}}"
+    }
   },
   "errors": {
     "not_found": "Not found",
@@ -118,7 +128,7 @@
     "pointer_none": "None",
     "add_field": "Add field",
     "no_fields": "No fields yet.",
-    "locked_counts": "{{count}} live, {{trashed}} trashed.",
+    "live_notice": "{{count}} live, {{trashed}} trashed records — changes are checked against them before they apply.",
     "field_key": "Key",
     "field_key_locked": "Can't be changed after the field is created.",
     "field_type": "Type",
@@ -168,7 +178,65 @@
     "delete_confirm_description": "This permanently deletes \"{{label}}\" and its {{count}} record(s) (live and trashed). Type {{count}} to confirm.",
     "delete_confirm_label": "Record count",
     "delete_count_mismatch": "That doesn't match. Type the exact number to confirm.",
-    "referrers_notice": "Other types still have a relation field pointing at this one:"
+    "referrers_notice": "Other types still have a relation field pointing at this one:",
+    "change": {
+      "field_added": "Field added",
+      "field_removed": "Field removed",
+      "type_changed": "Type changed",
+      "required_added": "Made required",
+      "required_removed": "No longer required",
+      "unique_added": "Made unique",
+      "unique_removed": "No longer unique",
+      "indexed_on": "Indexing turned on",
+      "indexed_off": "Indexing turned off",
+      "constraint_tightened": "Constraint tightened",
+      "constraint_relaxed": "Constraint relaxed",
+      "choice_added": "Choice added",
+      "choice_removed": "Choice removed",
+      "options_changed": "Options changed",
+      "label_changed": "Label changed"
+    },
+    "preview": {
+      "button": "Preview changes",
+      "checking": "Checking…",
+      "no_changes": "No changes.",
+      "kind_additive": "Additive",
+      "kind_index_affecting": "Rebuilds index",
+      "kind_restrictive": "Restrictive",
+      "kind_destructive": "Removes data",
+      "report_summary": "{{checked}} records checked, {{failing}} would fail",
+      "report_title": "This change would leave records invalid",
+      "orphaned_conflict": "{{key}}: {{count}} records still hold a removed value",
+      "apply_anyway": "Apply anyway — {{count}} records will be marked invalid",
+      "apply_anyway_title": "Apply this change anyway?",
+      "apply_anyway_description": "{{count}} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.",
+      "apply_anyway_confirm": "Apply anyway",
+      "conflicts_title": "These fields still hold values from a previous delete",
+      "conflicts_help": "Restore brings those values back into the field; discard drops them for good.",
+      "orphaned_restore": "Restore",
+      "orphaned_discard": "Discard"
+    },
+    "reindex": {
+      "notice": "Rebuilding the index for:",
+      "whole_type": "Whole type",
+      "since": "since {{time}}",
+      "reindex_now": "Reindex now"
+    },
+    "revisions": {
+      "title": "Schema history",
+      "show": "Show",
+      "hide": "Hide",
+      "loading": "Loading…",
+      "empty": "No earlier versions yet.",
+      "version_label": "v{{version}}",
+      "schema_version_label": "schema v{{version}}",
+      "field_count": "{{count}} field",
+      "field_count_one": "{{count}} field",
+      "field_count_other": "{{count}} fields",
+      "restore": "Restore this schema",
+      "restore_confirm": "Restore the schema from v{{version}}? This is checked the same way any other schema change is.",
+      "restored": "Schema restored"
+    }
   },
   "fields": {
     "required": "Required",

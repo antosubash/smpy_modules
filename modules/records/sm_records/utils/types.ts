@@ -38,9 +38,65 @@ export type TypeRead = {
   allowed_roles: string[];
   record_count: number;
   trashed_record_count: number;
-  fields_locked: boolean;
   created_at: string;
   updated_at: string | null;
+  /** Field key (or `"*"` for the whole type) -> ISO timestamp since a
+   *  schema-affecting change enqueued a reindex that hasn't finished (design
+   *  §8.5/§8.9). Non-empty while that field can't be filtered or sorted on. */
+  reindex_pending: Record<string, string>;
+};
+
+/** The classification a schema-`fields` diff falls into (design §8.2). */
+export type ChangeClass = 'additive' | 'index_affecting' | 'restrictive' | 'destructive';
+
+/** One entry of a `SchemaPreview.changes` list — one line of "what changed
+ *  on this field and how consequential it is". */
+export type SchemaChange = {
+  kind: ChangeClass;
+  field_key: string;
+  what: string;
+  before: unknown;
+  after: unknown;
+};
+
+/** One record the dry-run found would fail validation under the proposed
+ *  schema. */
+export type FailingRecord = {
+  uuid: string;
+  display_title: string;
+  errors: { field: string; message: string }[];
+};
+
+/** The dry-run's report over a type's records against a proposed schema
+ *  (design §8.9) — returned both by `POST .../schema/preview` and inline on
+ *  a `409` from `PUT`/`.../restore` when a restrictive change would leave
+ *  records invalid. */
+export type DryRunReport = {
+  checked: number;
+  failing: number;
+  sample: FailingRecord[];
+  orphaned_conflicts: Record<string, number>;
+  clean: boolean;
+};
+
+/** `POST /types/{key}/schema/preview`'s response: writes nothing, just
+ *  classifies the proposed `fields` and dry-runs it. */
+export type SchemaPreview = {
+  kind: ChangeClass;
+  changes: SchemaChange[];
+  report: DryRunReport;
+};
+
+/** One snapshot of a type's schema, from `GET /types/{key}/revisions`. */
+export type TypeRevision = {
+  id: number;
+  version: number;
+  schema_version: number;
+  fields: FieldDef[];
+  display_field: string | null;
+  slug_field: string | null;
+  created_at: string;
+  created_by: string | null;
 };
 
 export type RecordStatus = 'draft' | 'published';
@@ -60,6 +116,11 @@ export type RecordRead = {
   created_at: string;
   updated_at: string | null;
   is_deleted: boolean;
+  /** Empty when the record satisfies the current schema. Non-empty marks it
+   *  "invalid under current schema" without hiding it (design §8.3) — set by
+   *  a `force`d restrictive schema change or a schema rollback the record no
+   *  longer fits. */
+  invalid: { field: string; message: string }[];
 };
 
 export type RecordPage = {
@@ -78,6 +139,10 @@ export type RecordRevision = {
   created_at: string;
   created_by: string | null;
 };
+
+/** `GET .../revisions/{id}`'s response — the list entry plus the payload it
+ *  snapshotted, for the read-only preview before restoring it. */
+export type RecordRevisionDetail = RecordRevision & { data: Record<string, unknown> };
 
 /** The filter grammar's operators (`?filter=field:op:value`). Mirrors
  *  `sm_records.index._predicates.FilterOp`. */
@@ -109,4 +174,10 @@ export type ApiErrorBody = {
   referrers?: string[];
   field?: string;
   reason?: string;
+  /** A restrictive schema change would leave records invalid — re-send with
+   *  `force: true` (§8.2) or change the fields. */
+  report?: DryRunReport;
+  /** Re-adding a key that still holds `_orphaned` values on some records
+   *  (§8.8) — re-send with `orphaned: 'restore' | 'discard'`. */
+  conflicts?: Record<string, number>;
 };

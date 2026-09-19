@@ -1,7 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Table,
@@ -23,9 +22,6 @@ type Props = { types: TypeRead[] };
  *  schema editor at `/admin/records/types/new`. */
 function Types({ types }: Props) {
   const { t } = useT();
-  const fieldsLockedHint = t('records.types.fields_locked', {
-    defaultValue: 'Fields are read-only while this type holds records.',
-  });
   return (
     <>
       <Head title={t('records.types.title', { defaultValue: 'Record Types' })} />
@@ -78,11 +74,6 @@ function Types({ types }: Props) {
                           defaultValue_other: '({{count}} trashed)',
                         })}
                       </span>
-                    )}
-                    {type.fields_locked && (
-                      <Badge variant="outline" className="ml-2" title={fieldsLockedHint}>
-                        {t('records.types.fields_locked_badge', { defaultValue: 'Fields locked' })}
-                      </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right space-x-3">

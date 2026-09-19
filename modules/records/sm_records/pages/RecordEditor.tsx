@@ -12,9 +12,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConflictPanel } from '../components/ConflictPanel';
+import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
 import { RecordForm } from '../components/RecordForm';
+import { RecordRevisions } from '../components/RecordRevisions';
 import { useRecordForm } from '../hooks/useRecordForm';
 import { ApiError, createRecord, updateRecord } from '../utils/api';
 import type { RecordRead, RecordStatus, TypeRead, ValidationError } from '../utils/types';
@@ -97,6 +99,17 @@ function RecordEditor({ type, record }: Props) {
     setPosition(String(server.position));
     form.reset(server);
     setConflict(null);
+  };
+
+  /** Both a trash-restore (`RecordActions`) and a revision restore
+   *  (`RecordRevisions`) hand back a fresh `RecordRead` the same way a save
+   *  does — the envelope inputs and the form both have to re-sync from it. */
+  const applyRestored = (restored: RecordRead) => {
+    setCurrent(restored);
+    setStatus(restored.status);
+    setSlug(restored.slug ?? '');
+    setPosition(String(restored.position));
+    form.reset(restored);
   };
 
   const backHref = `/admin/records/${type.key}`;
@@ -209,6 +222,8 @@ function RecordEditor({ type, record }: Props) {
             </ul>
           )}
 
+          <InvalidNotice errors={current?.invalid ?? []} />
+
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium uppercase text-muted-foreground">
               {t('records.editor.fields_heading', { defaultValue: 'Fields' })}
@@ -253,14 +268,20 @@ function RecordEditor({ type, record }: Props) {
               <RecordActions
                 typeKey={type.key}
                 record={current}
-                onRestored={(restored) => {
-                  setCurrent(restored);
-                  form.reset(restored);
-                }}
+                onRestored={applyRestored}
                 onGone={() => router.visit(backHref)}
               />
             )}
           </div>
+
+          {current && (
+            <RecordRevisions
+              typeKey={type.key}
+              uuid={current.uuid}
+              currentVersion={current.version}
+              onRestored={applyRestored}
+            />
+          )}
         </div>
       </PageShell>
     </>

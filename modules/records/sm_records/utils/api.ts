@@ -18,8 +18,11 @@ import type {
   RecordPage,
   RecordRead,
   RecordRevision,
+  RecordRevisionDetail,
   RecordStatus,
+  SchemaPreview,
   TypeRead,
+  TypeRevision,
 } from './types';
 
 const BASE = '/api/records';
@@ -138,10 +141,19 @@ export function getType(key: string): Promise<TypeRead> {
   return request(`/types/${encodeURIComponent(key)}`);
 }
 
+/** `PUT`'s body beyond the changed top-level keys — Phase 3's two retry
+ *  paths for the two 409 shapes §8.2/§8.8 define: `force` applies a
+ *  restrictive change anyway and marks failing records invalid, `orphaned`
+ *  resolves a re-added key that still holds `_orphaned` values. */
+export type UpdateTypeChanges = Record<string, unknown> & {
+  force?: boolean;
+  orphaned?: 'restore' | 'discard';
+};
+
 export function updateType(
   key: string,
   expectedVersion: number,
-  changes: Record<string, unknown>,
+  changes: UpdateTypeChanges,
 ): Promise<TypeRead> {
   return request(`/types/${encodeURIComponent(key)}`, {
     method: 'PUT',
@@ -152,6 +164,39 @@ export function updateType(
 export function deleteType(key: string, confirmRecordCount: number): Promise<void> {
   const qs = new URLSearchParams({ confirm_record_count: String(confirmRecordCount) });
   return request(`/types/${encodeURIComponent(key)}?${qs.toString()}`, { method: 'DELETE' });
+}
+
+/** `POST /types/{key}/schema/preview` — writes nothing; classifies the
+ *  proposed `fields` and dry-runs it against the type's records (design
+ *  §8.9). */
+export function previewSchema(key: string, fields: FieldDef[]): Promise<SchemaPreview> {
+  return request(`/types/${encodeURIComponent(key)}/schema/preview`, {
+    method: 'POST',
+    body: JSON.stringify({ fields }),
+  });
+}
+
+/** Manually kick a stuck reindex (§8.9's health check names it; this button
+ *  is the fix). */
+export function reindexType(key: string): Promise<{ scheduled: boolean }> {
+  return request(`/types/${encodeURIComponent(key)}/reindex`, { method: 'POST' });
+}
+
+export function listTypeRevisions(key: string): Promise<{ items: TypeRevision[] }> {
+  return request(`/types/${encodeURIComponent(key)}/revisions`);
+}
+
+/** A schema rollback goes through the same pipeline as any other change
+ *  (§8.6) — same body shape and 409s as `updateType`. */
+export function restoreTypeRevision(
+  key: string,
+  version: number,
+  body: { expected_version: number; force?: boolean; orphaned?: 'restore' | 'discard' },
+): Promise<TypeRead> {
+  return request(`/types/${encodeURIComponent(key)}/revisions/${version}/restore`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 // ---- Records --------------------------------------------------------------
@@ -226,5 +271,27 @@ export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
 export function listRevisions(typeKey: string, uuid: string): Promise<{ items: RecordRevision[] }> {
   return request(
     `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions`,
+  );
+}
+
+export function getRecordRevision(
+  typeKey: string,
+  uuid: string,
+  id: number,
+): Promise<RecordRevisionDetail> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions/${id}`,
+  );
+}
+
+export function restoreRecordRevision(
+  typeKey: string,
+  uuid: string,
+  id: number,
+  expectedVersion: number,
+): Promise<RecordRead> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions/${id}/restore`,
+    { method: 'POST', body: JSON.stringify({ expected_version: expectedVersion }) },
   );
 }
