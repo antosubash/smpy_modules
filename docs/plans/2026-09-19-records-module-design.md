@@ -193,6 +193,7 @@ prefixed `records_`.
 | `display_field`, `slug_field` | which field supplies `display_title` / `slug` |
 | `is_public` | bool, default `False` — gates the anonymous read API |
 | `allowed_roles` | `JSON` list of role names permitted to write, §10 |
+| `version` | int, non-null, default 1 — optimistic concurrency on the *schema*, §8.6 |
 | + `AuditMixin` | |
 
 `key` is immutable because it appears in URLs, in the public API, and in
@@ -258,6 +259,16 @@ failure this module is most exposed to: a schema edit or a bad bulk write
 mangling content, noticed a week later. Capped per record by `revision_limit`
 (§11); unbounded revisions on a busy type outgrow the document table itself.
 
+### `records_type_revision`
+
+`(id, type_id, version, fields JSON, display_field, slug_field, created_at,
+created_by)` — append-only, written on every change to a type's `fields`.
+
+The previous draft versioned record *content* and not the *schema*, which is
+backwards: a bad record edit damages one row, a bad schema edit damages every
+row of that type at once. Types are few and schema edits are rare, so this
+table stays tiny and is never capped. It is what makes §8's rollback possible.
+
 ### The index tables — §7
 
 ## 6. Field definitions and validation
@@ -284,6 +295,9 @@ A field definition is a small object:
 `type` comes from a closed set: `text`, `longtext`, `number`, `integer`,
 `boolean`, `date`, `datetime`, `select`, `multiselect`, `email`, `url`,
 `json`, `media`, `relation`.
+
+**`key` is immutable once the field exists; `label` is freely editable.** The
+same rule `RecordType.key` follows, for a sharper reason — see §8.7.
 
 **Accepting raw JSON Schema was considered and rejected.** `$ref` makes it a
 remote-fetch and cycle-resolution surface; a generic form renderer cannot
@@ -436,21 +450,43 @@ documents, runnable per type, batched, and safe to run live because it is
 idempotent. §8 calls it on every schema change that alters which fields are
 indexed.
 
-## 8. Schema evolution
+## 8. Schema migration
 
-A schema change on a type holding 10,000 records must never silently corrupt
-or orphan them. Every proposed change to `fields` is **diffed against the
-current version and classified** before anything is written:
+### 8.1 Two migrations, and they share no machinery
+
+The word covers two entirely separate mechanisms here, and conflating them is
+the fastest way to design this wrong.
+
+**Physical tables — Alembic, once, owned by the host.** This module ships
+eight static SQLModel tables: `records_type`, `records_type_revision`,
+`records_record`, `records_revision`, and the five index tables. They are
+ordinary tables and they change only when the *module* ships a new version. A
+consuming host runs `make migration msg="add records"`, gets one revision,
+adds `branch_labels = ("records",)`, and applies it — identical to `news` or
+`pagebuilder`, and the reason §4 refuses runtime DDL. The module can then be
+removed on its own with `alembic downgrade records@base`.
+
+**User-defined schemas — not Alembic at all.** A Record Type's `fields` is a
+JSON column on one row. Changing it is an `UPDATE` of that row. Nothing is
+created, altered or dropped in the database. The entire problem is what
+happens to the 10,000 records already stored against the old shape.
+
+Everything below is the second kind.
+
+### 8.2 The classification
+
+Every proposed `fields` write is diffed against the current version and each
+change classified before anything is persisted:
 
 **Additive** — a new optional field, a new `select` option, a relaxed
-constraint, a label edit. Applied immediately; existing records are untouched
-and the read path fills the missing key from `default`.
+constraint, a label or help-text edit. Applied immediately; existing records
+are untouched and the read path fills the missing key from `default`.
 
 **Restrictive** — a new required field, a narrowed type (`text` → `number`), a
 tightened constraint, a removed `select` option, a newly `unique` field.
-Applied only after a **dry-run validation pass** over the type's existing
-records, reporting how many rows would fail with a sample. Refused unless the
-caller supplies a `default` that makes every row valid, or `force: true` —
+Applied only after a **dry-run validation pass** over the type's records,
+reporting how many would fail with a sample. Refused unless the caller
+supplies a `default` that makes every row valid, or passes `force: true` —
 which applies the change and *marks* failing rows rather than mutating them.
 
 **Destructive** — deleting a field. Removed from `fields`; the key is retained
@@ -459,20 +495,138 @@ buys back the ability to undo a mis-click that otherwise destroys a column of
 content irreversibly. Purged only by a separately-permissioned action.
 
 **Index-affecting** — toggling `indexed`, or any type change on an indexed
-field, additionally enqueues a reindex of that `(type, field)` (§7.7). Until
-it completes the field is reported as `indexing` and is not offered as a
-filter, rather than being offered and silently returning partial results.
+field. Additionally enqueues a reindex (§8.5).
 
-Two invariants hold it together:
+### 8.3 Payloads migrate lazily, indexes migrate eagerly
 
-- **Reads are lenient, writes are strict.** A record stamped at version 3 read
-  under version 5 renders with missing keys defaulted and unknown keys
-  ignored. Writing it back validates against 5 and restamps. Records migrate
-  lazily on edit, never in a bulk job that can half-fail.
-- **A record that cannot satisfy the current schema is marked, not hidden.**
-  No third `status` value; the list screen derives an "invalid under current
-  schema" badge at read time. A row vanishing because someone tightened a
-  constraint is what makes people stop trusting the module.
+This is the rule the whole section reduces to, and the previous draft never
+stated it plainly enough to be implementable:
+
+- **`data` is never bulk-rewritten.** A record stamped at `schema_version` 3
+  read under version 5 renders with missing keys defaulted and unknown keys
+  ignored. Writing it back validates against 5 and restamps. Records therefore
+  migrate one at a time, on edit, and never in a job that can half-fail.
+- **Index rows are always rewritten** to match the current schema, because
+  they are derived and they are what queries read. A stale index is not a
+  cosmetic lag; it is a wrong answer.
+
+So the payload is *history* and the index is *truth for queries*. Both are
+correct at once, and they are allowed to disagree.
+
+A record that cannot satisfy the current schema is **marked, not hidden** — no
+third `status` value, just an "invalid under current schema" badge derived at
+read time. A row vanishing because someone tightened a constraint is what
+makes people stop trusting the module.
+
+### 8.4 Type changes and coercion — resolving an apparent contradiction
+
+`text` → `number` on a field holding `"123"` looks like it forces a choice
+between two rules: validate-then-rewrite contradicts "never bulk-rewrite".
+
+It does not, and the resolution needs stating or an implementer will "fix" it
+with a bulk `UPDATE`:
+
+- The payload keeps the string `"123"`. Forever, if the record is never
+  edited again.
+- The **read path coerces** it to `123` using the current field definition.
+- The **reindex writes the coerced value** — `123` into
+  `records_index_number`, not `"123"` into `records_index_text`.
+- The next write of that record restamps it and the payload catches up.
+
+A filter on `price > 100` is therefore correct the moment the reindex
+finishes, with no row having been rewritten. If coercion fails for a row, that
+row is the "marked, not hidden" case above and is simply absent from the
+index for that field — which is why the dry-run reports the count first.
+
+### 8.5 Moving between index tables — the window the previous draft missed
+
+A type change on an *indexed* field moves its rows from one index table to
+another: `records_index_text` → `records_index_number`. Both sets exist
+mid-reindex, and a query run in that window can read the old table, the new
+one, or both.
+
+The previous draft said only that the field is "reported as `indexing` and not
+offered as a filter", which is necessary and not sufficient — it protects the
+UI and not the API. The mechanism:
+
+1. Bump `schema_version` and mark the field `indexing` in the same
+   transaction as the `fields` write.
+2. Reindex in batches of `reindex_batch_size` into the **new** table, carrying
+   the new `schema_version` as a generation marker on each row.
+3. Delete the field's rows from the **old** table.
+4. Clear `indexing`.
+
+While `indexing` is set, the field is rejected as a filter or sort key with a
+`409` naming it — at the API, not just hidden in the UI. Partial results
+returned without comment are the failure mode worth this much ceremony; a
+loud refusal for a few seconds is not.
+
+Because the reindex is idempotent and rebuilds from `data` (§7.7), a crash at
+any step is recovered by running it again.
+
+### 8.6 Rollback and concurrent schema edits
+
+Two gaps the previous draft left open, both with one-line fixes:
+
+- **Rollback.** `records_type_revision` (§5) snapshots `fields` on every
+  change, so a bad schema edit is undone by writing an earlier revision back
+  as a new one — which re-enters this same pipeline and is classified like any
+  other change. Reverting a delete restores the field definition; whether the
+  *values* come back depends on §8.8.
+- **Concurrency.** `records_type.version` gets exactly the treatment
+  `records_record.version` gets in §5.1: the editor sends the version it read,
+  the update is `WHERE id = :id AND version = :version`, and a zero rowcount
+  is a 409. Two admins reordering fields in two tabs otherwise silently lose
+  one of the edits — the same defect §5.1 fixes for records, which the
+  previous draft fixed there and left open here.
+
+### 8.7 Field keys are immutable — because renaming is not in the taxonomy
+
+The previous draft had no classification for renaming a field, which means a
+rename would have been implemented as a delete plus an add. Under §8.2 that is
+"destructive then additive": every value moves to `_orphaned` and the new
+field is empty. A rename would silently blank a column of content.
+
+The fix is to remove the operation rather than to add a fifth class:
+**a field's `key` is immutable; its `label` is freely editable.** This is the
+rule `RecordType.key` already follows, and here it is cheaper still, because
+`field_key` is a column in every index table (§7.3) and a target of the
+relation index — a rename would have to be transactional across all of them.
+
+If a genuine rename is ever needed, it is add-new + migrate-values +
+delete-old, which is three explicit operations the operator can see and abort
+between. It should not masquerade as an edit.
+
+### 8.8 Re-adding an orphaned key
+
+Delete `price`, and its values sit in `_orphaned.price`. Someone later adds a
+field called `price` again. Both silent behaviours are wrong: restoring makes
+deleted content reappear unannounced, and shadowing makes the old values
+permanently unreachable while still occupying storage.
+
+So neither is silent. Adding a field whose key exists in `_orphaned` on any
+record of that type is refused with a `409` reporting how many records carry
+an orphaned value, and the caller re-sends with an explicit
+`orphaned: "restore"` or `orphaned: "discard"`. Restore is only offered when
+the values validate against the *new* definition — re-adding `price` as a
+`number` after deleting it as a `text` reuses §8.4's coercion and reports what
+would fail.
+
+### 8.9 Where this actually runs
+
+A dry-run over 10,000 records and a reindex over the same are not HTTP
+request work. Both run batched at `reindex_batch_size`, and the API is
+shaped for it: the dry-run is its own endpoint returning a report, and
+applying the change is a second call carrying the report's id. The schema
+write itself — one row — is synchronous and transactional; only the passes
+over records are deferred.
+
+This repo has no Celery (`CLAUDE.md` says so explicitly), so "deferred" means
+a FastAPI background task plus a resumable `reindex` CLI command, not a queue.
+That is sufficient precisely because §7.7 makes the reindex idempotent and
+restartable: the worst case of a lost background task is a field stuck in
+`indexing` until someone runs the command, which is a visible, recoverable
+state rather than silent corruption.
 
 Deleting a Record Type that holds records requires an explicit
 `confirm_record_count` matching the actual count.
@@ -677,6 +831,17 @@ The cases that would actually catch a regression:
   first record is intact, revision table shows one update (§5.1).
 - Schema diff classification — one test per additive / restrictive /
   destructive / index-affecting case, asserting the classification itself.
+- **Index-table migration** (§8.5): a `text` → `number` change on an indexed
+  field leaves no rows in `records_index_text` and a correctly coerced set in
+  `records_index_number`; the field is refused as a filter with 409 while
+  `indexing`; a reindex interrupted mid-batch and re-run converges.
+- **Coercion without rewriting** (§8.4): after a `text` → `number` change, the
+  payload still holds the string, the read coerces, the index holds the
+  number, and `price > 100` returns the right rows.
+- **Schema concurrency** (§8.6): two `fields` writes from the same read
+  version — second gets 409, first survives, one type revision recorded.
+- **Orphaned key** (§8.8): re-adding a deleted field key is refused; `restore`
+  brings values back only where they validate; `discard` drops them.
 - A restrictive change against records that would fail it: refused without
   `force`; with `force`, marks rather than mutates.
 - A record stamped at an old `schema_version` reads leniently and restamps on
@@ -706,8 +871,12 @@ on later, for the reason in §7.1.
 registry, generic list with filter/sort/pagination driven by the index tables,
 generic form, 409 conflict handling, `locales/en.json`.
 
-**Phase 3 — safety.** Schema diffing and classification, dry-run validation,
-index-affecting reindex enqueue, revisions and restore, trash and restore.
+**Phase 3 — safety.** Schema diffing and classification (§8.2), dry-run
+validation, the index-table migration and its `indexing` gate (§8.5), type
+revisions and schema rollback (§8.6), record revisions and restore, trash and
+restore. `records_type.version` and `records_type_revision` ship in Phase 1
+with the other tables — retrofitting a version column onto a row people are
+already editing is the awkward case §8.6 exists to avoid.
 
 **Phase 4 — reach.** Relations and `records_index_ref` querying in both
 directions, `?expand=`, the public read API, `is_public` / `allowed_roles`,
