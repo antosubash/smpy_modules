@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
+from simple_module_core.health import HealthRegistry
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
@@ -97,6 +98,15 @@ class RecordsModule(ModuleBase):
                 group=constants.MENU_GROUP,
             )
         )
+
+    def register_health_checks(self, registry: HealthRegistry) -> None:
+        """A reindex orphaned by a worker restart is recoverable but silent —
+        the field just refuses filters until someone runs the CLI. This
+        degrades /health/ready when a ``reindex_pending`` entry is older
+        than ``reindex_stale_after_seconds``. Design doc §8.9."""
+        from sm_records.health import stale_reindex_check
+
+        registry.add(stale_reindex_check(self))
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

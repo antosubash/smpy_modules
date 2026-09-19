@@ -96,12 +96,36 @@ class ReferencedByOthers(Conflict):
         super().__init__(detail)
 
 
+class SchemaChangeRefused(Conflict):
+    """A restrictive change would leave records invalid (§8.2). Carries the
+    dry-run report so the response can show the count and a sample; the
+    caller re-sends with a ``default`` that makes every row valid, or
+    ``force=True`` to apply and mark the failures rather than mutate them."""
+
+    def __init__(self, report: object, detail: str) -> None:
+        super().__init__(detail)
+        self.report = report
+
+
+class OrphanedKeyConflict(Conflict):
+    """A field is being added whose key still holds orphaned values on some
+    records (§8.8). Neither restoring nor discarding may happen silently;
+    the caller re-sends with ``orphaned="restore"`` or ``orphaned="discard"``."""
+
+    def __init__(self, conflicts: dict[str, int]) -> None:
+        keys = ", ".join(f"{k} ({n} record(s))" for k, n in conflicts.items())
+        super().__init__(f"orphaned values exist for: {keys}; choose restore or discard")
+        self.conflicts = conflicts
+
+
 __all__ = [
     "Conflict",
     "FieldsLocked",
     "Forbidden",
     "NotFound",
+    "OrphanedKeyConflict",
     "RecordsError",
     "ReferencedByOthers",
+    "SchemaChangeRefused",
     "ValidationFailed",
 ]

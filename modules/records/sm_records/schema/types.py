@@ -71,3 +71,33 @@ relation joins this set per field."""
 
 def indexable(field_type: FieldType) -> bool:
     return field_type in INDEX_KIND
+
+
+class ChangeClass(str, enum.Enum):  # noqa: UP042
+    """How a schema change is classified before anything is written.
+    Design doc §8.2. Ordered by severity: the class of a whole diff is the
+    highest class of any change in it."""
+
+    ADDITIVE = "additive"
+    """A new optional field, a new select choice, a relaxed constraint, a
+    label/help edit. Applied immediately; existing records untouched."""
+    INDEX_AFFECTING = "index_affecting"
+    """Toggling ``indexed``, or a type change on an indexed field. Applied,
+    then the field's index rows are rebuilt (§8.5) — the field is refused as
+    a filter until that finishes."""
+    RESTRICTIVE = "restrictive"
+    """A new required field, a narrowed type, a tightened constraint, a
+    removed choice, a newly unique field. Applied only after a dry run over
+    existing records; refused unless every row passes, a default makes it
+    pass, or ``force`` marks the failures instead."""
+    DESTRUCTIVE = "destructive"
+    """Deleting a field. The key leaves ``fields``; its values move to
+    ``_orphaned`` lazily, on each record's next write (§8.3)."""
+
+
+CHANGE_SEVERITY: Final[dict[ChangeClass, int]] = {
+    ChangeClass.ADDITIVE: 0,
+    ChangeClass.INDEX_AFFECTING: 1,
+    ChangeClass.RESTRICTIVE: 2,
+    ChangeClass.DESTRUCTIVE: 3,
+}

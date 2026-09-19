@@ -703,10 +703,14 @@ would fail.
 
 A dry-run over 10,000 records and a reindex over the same are not HTTP
 request work. Both run batched at `reindex_batch_size`, and the API is
-shaped for it: the dry-run is its own endpoint returning a report, and
-applying the change is a second call carrying the report's id. The schema
-write itself — one row — is synchronous and transactional; only the passes
-over records are deferred.
+shaped for it: the dry-run is its own endpoint returning a report, and the
+apply re-runs the same validation inline before writing — refusing with the
+report unless the caller supplies a `default` or `force`. (An earlier
+revision of this section had the apply carry a *report id*; that would mean
+persisting reports and trusting one taken against records that may have
+changed since. Re-validating at apply time is the honest version and costs
+one more batched pass.) The schema write itself — one row — is synchronous
+and transactional; only the reindex over records is deferred.
 
 This repo has no Celery (`CLAUDE.md` says so explicitly), so "deferred" means
 a FastAPI background task plus a resumable `reindex` CLI command, not a queue.
