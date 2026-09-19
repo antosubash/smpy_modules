@@ -160,12 +160,15 @@ async def record_list(
         page=page,
         page_size=page_size,
     )
+    # ``errors`` is sent on every render, empty or not: the list refetches
+    # with ``only: ["records", "errors"]`` and Inertia merges partial props
+    # over the page it has, so a prop that is simply absent when the filter
+    # is clean would leave the previous request's notice on screen.
     props: dict[str, object] = {
         "type": type_read(rtype, *counts).model_dump(mode="json"),
         "records": records_page.model_dump(mode="json"),
+        "errors": errors,
     }
-    if errors:
-        props["errors"] = errors
     return await inertia.render(constants._PAGE_RECORD_LIST, props)
 
 

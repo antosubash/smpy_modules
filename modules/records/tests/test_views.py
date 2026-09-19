@@ -51,9 +51,11 @@ async def test_record_list_view(client, records_app):
     assert resp.status_code == 200
     body = resp.json()
     assert body["component"] == "Records/RecordList"
-    assert set(body["props"]) == {"type", "records"}
+    assert set(body["props"]) == {"type", "records", "errors"}
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
+    # Always present, so a partial reload after a bad filter clears the notice.
+    assert body["props"]["errors"] == {}
 
 
 async def test_record_new_view(client, records_app):
