@@ -5,6 +5,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { useState } from 'react';
 
+import { opsForFieldType } from '../utils/filters';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 
 /** Labels for the filter grammar's operators. A plain `t()` call per op
@@ -88,12 +89,33 @@ export function FilterBar({
   const { t } = useT();
   const indexed: FilterableField[] = fields
     .filter((f) => f.indexed)
-    .map((f) => ({ key: f.key, label: f.label, ops: FILTER_OPS }));
+    .map((f) => ({
+      key: f.key,
+      label: f.label,
+      // `in` is grammar-valid for most kinds (`_ALLOWED`) but is never
+      // offered here — see the comment on `buildFilterParam` in
+      // `utils/api.ts` (F6): the wire format joins an `in` list on a bare
+      // comma with no escape, so a value containing one would silently
+      // split into two terms. `is_null` is appended unconditionally because
+      // the index layer answers it without ever consulting `_ALLOWED`
+      // (`query._term` short-circuits before `value_clause`), so unlike the
+      // comparison operators it doesn't vary by kind.
+      ops: [...opsForFieldType(f.type).filter((op) => op !== 'in'), 'is_null'],
+    }));
   const filterable = [...indexed, ...fixedFilterFields(t)];
   const fieldByKey = new Map(filterable.map((f) => [f.key, f]));
 
-  const [field, setField] = useState(current?.field ?? filterable[0]?.key ?? '');
-  const [op, setOp] = useState<FilterOp>(current?.op ?? 'eq');
+  const initialField = current?.field ?? filterable[0]?.key ?? '';
+  const initialOps = fieldByKey.get(initialField)?.ops ?? filterable[0]?.ops ?? FILTER_OPS;
+  // A `current` filter parsed out of the URL might name an op the field
+  // doesn't actually allow (a hand-edited link, or a field whose `indexed`
+  // kind changed since); fall back to the field's first allowed op rather
+  // than trusting it, the same way `selectField` resets `op` below (F5).
+  const initialOp =
+    current?.op && initialOps.includes(current.op) ? current.op : (initialOps[0] ?? 'eq');
+
+  const [field, setField] = useState(initialField);
+  const [op, setOp] = useState<FilterOp>(initialOp);
   const [value, setValue] = useState(current?.value ?? '');
 
   if (filterable.length === 0) return null;

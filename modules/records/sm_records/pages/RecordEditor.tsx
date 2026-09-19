@@ -68,6 +68,13 @@ function RecordEditor({ type, record }: Props) {
         return;
       }
       setCurrent(saved);
+      // The server can derive its own `slug` (and, in principle, adjust
+      // `status`/`position`), so the envelope inputs have to re-sync from
+      // what it actually stored — otherwise a server-derived slug doesn't
+      // show until the next full reload.
+      setStatus(saved.status);
+      setSlug(saved.slug ?? '');
+      setPosition(String(saved.position));
       form.reset(saved);
       toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
     } catch (err) {

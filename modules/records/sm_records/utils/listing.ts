@@ -28,22 +28,6 @@ export type SortDir = 'asc' | 'desc';
 export type SortState = { field: string; dir: SortDir } | null;
 
 /**
- * The list's fixed sortable columns — `sm_records.index.query.FIXED_COLUMNS`
- * minus `slug`/`created_at`, which this screen doesn't give a header to.
- * Kept as a plain literal here rather than imported: this is TS reaching for
- * a constant that lives in a Python module, and the two sides are kept in
- * sync by hand (and by `record_list`'s 400/409 handling being exercised by
- * only ever emitting one of these, or an indexed field, as `?sort=`).
- */
-export const FIXED_SORT_COLUMNS = [
-  'display_title',
-  'status',
-  'updated_at',
-  'published_at',
-  'position',
-] as const;
-
-/**
  * The click-cycle for one column header: none → asc → desc → none.
  * Clicking a *different* column always lands on `asc` for it — this UI
  * keeps a single sort key even though the server grammar (`?sort=` repeats)
@@ -77,4 +61,36 @@ export function parseSort(search: string): SortState {
 export function buildSortParam(sort: SortState): string | undefined {
   if (!sort) return undefined;
   return sort.dir === 'desc' ? `-${sort.field}` : sort.field;
+}
+
+// ---- Filter errors ------------------------------------------------------
+
+/**
+ * The `reason` values `sm_records.index._predicates.QueryError` can carry —
+ * see `index/query.py` and `index/_predicates.py` for every call site.
+ * `record_list` (`endpoints/views.py`) attaches `{filter: exc.reason}` to the
+ * Inertia `errors` bag whenever building the query fails, regardless of
+ * whether the offending term came from `?filter=` or `?sort=`.
+ */
+const FILTER_ERROR_REASONS = [
+  'reindexing',
+  'unsupported_op',
+  'not_indexed',
+  'unknown',
+  'bad_value',
+] as const;
+
+export type FilterErrorReason = (typeof FILTER_ERROR_REASONS)[number] | 'generic';
+
+/**
+ * Normalises a `?filter=`/`?sort=` failure's `reason` to a translation-key
+ * suffix, falling back to `'generic'` for anything not in the closed set
+ * above — a reason this build doesn't recognise (a future server addition
+ * this build predates) still needs a message, just not a wrong one for
+ * something specific it isn't.
+ */
+export function filterErrorReasonKey(reason: string | undefined): FilterErrorReason {
+  return reason && (FILTER_ERROR_REASONS as readonly string[]).includes(reason)
+    ? (reason as FilterErrorReason)
+    : 'generic';
 }

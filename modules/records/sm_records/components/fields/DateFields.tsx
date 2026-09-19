@@ -21,6 +21,11 @@ function DateInput({
       <Input
         id={id}
         type={inputType}
+        // Seconds matter for `datetime` (F4): without `step="1"` the browser
+        // never shows a seconds field to type into, so anything typed by
+        // hand loses them even though `isoToLocalInput` now preserves them
+        // for a value opened from storage.
+        step={inputType === 'datetime-local' ? '1' : undefined}
         value={typeof value === 'string' ? value : ''}
         disabled={disabled}
         aria-invalid={!!error}

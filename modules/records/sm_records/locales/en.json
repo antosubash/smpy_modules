@@ -6,7 +6,6 @@
     "title": "Record Types",
     "empty": "No record types yet",
     "new": "New type",
-    "new_dialog_help": "Define a key, its labels, and the fields it starts with.",
     "key": "Key",
     "label": "Label",
     "label_plural": "Plural label",
@@ -16,12 +15,10 @@
     "record_count_other": "{{count}} records",
     "fields_locked": "Fields are read-only while this type holds records.",
     "fields_locked_badge": "Fields locked",
-    "fields_label": "Fields",
-    "fields_help": "A JSON array of field definitions.",
-    "create": "Create",
     "view_records": "View records",
     "edit": "Edit",
     "trashed_record_count": "({{count}} trashed)",
+    "trashed_record_count_one": "({{count}} trashed)",
     "trashed_record_count_other": "({{count}} trashed)"
   },
   "records": {
@@ -33,7 +30,6 @@
     "updated_at": "Updated",
     "draft": "Draft",
     "published": "Published",
-    "edit": "Edit",
     "delete": "Delete",
     "confirm_delete": "Delete this record?",
     "actions": "Actions",
@@ -45,10 +41,19 @@
     "filter_value": "Value",
     "filter_apply": "Apply",
     "filter_clear": "Clear",
-    "reindexing_notice": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly.",
     "position": "Position",
     "published_at": "Published",
     "schema_stale": "Outdated schema"
+  },
+  "list": {
+    "filter_error": {
+      "reindexing": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly.",
+      "unsupported_op": "That condition isn't supported for this field.",
+      "not_indexed": "That field isn't indexed, so it can't be filtered or sorted on.",
+      "unknown": "That field doesn't exist on this record type.",
+      "bad_value": "That value isn't valid for this field.",
+      "generic": "That filter couldn't be applied."
+    }
   },
   "filters": {
     "op": {
@@ -102,6 +107,7 @@
     "section_fields": "Fields",
     "key_immutable": "The key can't be changed once the type is created.",
     "icon": "Icon",
+    "icon_placeholder": "database",
     "icon_help": "The name of a lucide-react icon, e.g. \"database\".",
     "is_public": "Public",
     "is_public_help": "Exposes a read-only public API for this type's published records (design §10).",

@@ -70,12 +70,18 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-/** ISO-with-offset → the naive local string a `datetime-local` input wants. */
+/** ISO-with-offset → the naive local string a `datetime-local` input wants.
+ *
+ * Includes seconds (`HH:MM:SS`) so a value that carries them survives an
+ * open-and-save round trip unchanged — an input truncated to `HH:MM` silently
+ * zeroes them on every save. Pair with `step="1"` on the input itself, or the
+ * browser's own UI never offers a seconds field to type into. */
 export function isoToLocalInput(iso: string): string {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return '';
   const date = `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
-  return `${date}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  const time = `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+  return `${date}T${time}`;
 }
 
 /** A `datetime-local` string → ISO 8601 carrying the browser's own offset.
@@ -141,12 +147,15 @@ export function toApiValue(field: FieldDef, value: unknown): unknown {
       return text === '' ? undefined : text;
     }
     case 'integer': {
+      // Also a string on the wire, and for the same reason as `number`:
+      // `to_int` in `schema/_builders.py` parses the string itself
+      // (`int(value.strip())`), so routing it through `Number()` first — as
+      // this used to — silently rounds anything past 2**53 (§ header,
+      // `"99999999999999999"` becoming `"100000000000000000"`) before the
+      // server ever sees it. Non-integer text still goes out untouched so
+      // the server's own message ("must be a whole number") is what shows.
       const text = asText(value).trim();
-      if (text === '') return undefined;
-      const parsed = Number(text);
-      // Anything that is not a whole number goes out as the typed text so the
-      // server's own message ("must be a whole number") is what comes back.
-      return Number.isInteger(parsed) ? parsed : text;
+      return text === '' ? undefined : text;
     }
     case 'date': {
       const text = asText(value).trim();
@@ -200,9 +209,11 @@ export function toFormValues(fields: FieldDef[], data: Record<string, unknown> |
  * test as "the stored value was explicitly null" *and* it makes clearing a
  * field send `null` instead of silently restoring its default.
  *
- * `_orphaned` is carried through untouched: it holds values whose field was
- * deleted (design §8.2) and the write model accepts it, so dropping it here
- * would destroy them on the next save.
+ * `_orphaned` is never included, even when `original` carries one: it holds
+ * values whose field was deleted (design §8.2), and `services/_payload.py`
+ * refuses the key outright on any write — `update_record`
+ * (`services/records.py`) carries the stored value forward itself, so a
+ * client-sent copy is not merely redundant, it 422s the save.
  */
 export function buildPayload(
   fields: FieldDef[],
@@ -215,7 +226,5 @@ export function buildPayload(
     if (wire !== undefined) data[field.key] = wire;
     else if (original && Object.hasOwn(original, field.key)) data[field.key] = null;
   }
-  const orphaned = original?._orphaned;
-  if (orphaned && typeof orphaned === 'object') data._orphaned = orphaned;
   return data;
 }

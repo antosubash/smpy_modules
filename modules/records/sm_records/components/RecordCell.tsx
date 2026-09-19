@@ -19,7 +19,12 @@ function choiceLabel(field: FieldDef, raw: unknown): string {
 }
 
 function isRef(value: unknown): value is { type: string; uuid: string } {
-  return typeof value === 'object' && value !== null && 'uuid' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'uuid' in value &&
+    typeof (value as { uuid: unknown }).uuid === 'string'
+  );
 }
 
 /**

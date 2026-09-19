@@ -114,6 +114,11 @@ describe('integer', () => {
       'records.validation.max',
     );
   });
+
+  it('caps at the same 14 digits as number (F8)', () => {
+    expect(check(field('integer'), '1'.repeat(14))).toBeUndefined();
+    expect(check(field('integer'), '1'.repeat(15))).toBe('records.validation.int_digits');
+  });
 });
 
 describe('boolean, date and datetime', () => {

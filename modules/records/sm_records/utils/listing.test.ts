@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSortParam, listColumns, nextSort, parseSort } from './listing';
+import { buildSortParam, filterErrorReasonKey, listColumns, nextSort, parseSort } from './listing';
 import type { FieldDef } from './types';
 
 function field(overrides: Partial<FieldDef>): FieldDef {
@@ -99,5 +99,21 @@ describe('buildSortParam', () => {
   it('round-trips through parseSort', () => {
     const sort = { field: 'published_at', dir: 'desc' as const };
     expect(parseSort(`?sort=${buildSortParam(sort)}`)).toEqual(sort);
+  });
+});
+
+describe('filterErrorReasonKey', () => {
+  it('passes every known QueryError reason through unchanged (F1)', () => {
+    for (const reason of ['reindexing', 'unsupported_op', 'not_indexed', 'unknown', 'bad_value']) {
+      expect(filterErrorReasonKey(reason)).toBe(reason);
+    }
+  });
+
+  it('falls back to "generic" for a reason outside the closed set', () => {
+    expect(filterErrorReasonKey('something_new')).toBe('generic');
+  });
+
+  it('falls back to "generic" for an absent reason', () => {
+    expect(filterErrorReasonKey(undefined)).toBe('generic');
   });
 });

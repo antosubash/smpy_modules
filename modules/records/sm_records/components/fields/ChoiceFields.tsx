@@ -47,10 +47,22 @@ export function MultiSelectField({ field, value, onChange, error, disabled }: Fi
   const groupId = fieldInputId(field);
 
   const toggle = (choiceValue: string, checked: boolean) => {
-    const next = checked
-      ? [...selected.filter((item) => item !== choiceValue), choiceValue]
-      : selected.filter((item) => item !== choiceValue);
-    onChange(next);
+    if (!checked) {
+      onChange(selected.filter((item) => item !== choiceValue));
+      return;
+    }
+    if (selected.includes(choiceValue)) return;
+    // Re-order to the schema's own choice order rather than appending at the
+    // end: unchecking then re-checking a value used to move it past every
+    // choice checked in between, even though its checkbox never moved on
+    // screen. A value that is no longer (or never was) a real choice — data
+    // from before the schema changed — keeps its place at the end instead of
+    // being dropped.
+    const known = new Set(choices.map((c) => c.value));
+    const withNext = new Set([...selected, choiceValue]);
+    const ordered = choices.map((c) => c.value).filter((v) => withNext.has(v));
+    const unknown = selected.filter((v) => !known.has(v));
+    onChange([...ordered, ...unknown]);
   };
 
   return (

@@ -83,6 +83,11 @@ describe('RecordCell', () => {
     expect(out).not.toContain('89abcdef');
   });
 
+  it('falls back to a dash rather than crashing on a non-string uuid', () => {
+    const f = field({ type: 'relation', options: { target_type: 'author' } });
+    expect(html(f, { type: 'author', uuid: 12345 })).toContain('—');
+  });
+
   it('truncates long text and keeps the full value in a title attribute', () => {
     const long = 'x'.repeat(80);
     const out = html(field({ type: 'text' }), long);

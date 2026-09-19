@@ -214,6 +214,16 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
       if (!INTEGER_RE.test(text)) {
         return t('records.validation.not_an_integer', { defaultValue: 'Must be a whole number' });
       }
+      // Same cap `number` gets (F8): the wire value is the trimmed digit
+      // string now, not a parsed JS number, so a value past
+      // `Number.isSafeInteger` needs its own length check rather than
+      // relying on `Number()` to have already lost precision on the way in.
+      if (text.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '').length > MAX_INT_DIGITS) {
+        return t('records.validation.int_digits', {
+          defaultValue: 'At most {{digits}} digits before the decimal point',
+          digits: MAX_INT_DIGITS,
+        });
+      }
       return checkRange(t, field, Number(text));
     }
     case 'boolean':

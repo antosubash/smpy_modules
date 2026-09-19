@@ -147,7 +147,12 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
         return null;
       }
       setClientErrors({});
-      return parsed;
+      // `_orphaned` stays visible in the raw editor — it's part of what the
+      // record actually stores — but it is never the caller's to write
+      // (services/_payload.py 422s the whole save if it's present). Strip it
+      // from what's submitted rather than from the display.
+      const { _orphaned: _submittedOrphaned, ...submittable } = parsed;
+      return submittable;
     }
     const found = validator(values);
     setClientErrors(found);

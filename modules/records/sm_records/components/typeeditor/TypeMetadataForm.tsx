@@ -108,7 +108,7 @@ export function TypeMetadataForm({
           id={ID.icon}
           value={values.icon}
           onChange={(e) => onChange({ icon: e.target.value })}
-          placeholder="database"
+          placeholder={t('records.type_editor.icon_placeholder', { defaultValue: 'database' })}
           aria-invalid={!!fieldMessage(errors, 'icon')}
         />
         <p className="text-sm text-muted-foreground">

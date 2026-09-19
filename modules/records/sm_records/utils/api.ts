@@ -92,9 +92,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** Encode one filter term as the API's `field:op:value` grammar.
  *
  * `in` joins its values with a comma; every other op takes a single scalar.
- * Neither the field, op, nor value is escaped — none of the callers in this
- * module produce a value containing `:` or `,`, and the API has no escape
- * syntax to receive one if they did. */
+ * Neither the field, op, nor value is escaped — the API has no escape syntax
+ * to receive one if a value contained `:` or `,`. This module's own UI
+ * (`FilterBar`) works around that for `,` by never offering `in` in the
+ * first place (F6): `deps._parse_filter` does a bare `value.split(",")`, so
+ * any value that itself contains a comma would silently split into extra
+ * terms. `in` stays here, and in `FilterOp`, for a caller outside the UI
+ * that controls its own values and knows they're comma-free. */
 export function buildFilterParam(
   field: string,
   op: FilterOp,
@@ -184,7 +188,7 @@ export function createRecord(typeKey: string, payload: RecordWritePayload): Prom
 }
 
 export function getRecord(typeKey: string, uuid: string): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}`);
+  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`);
 }
 
 export function updateRecord(
@@ -193,28 +197,34 @@ export function updateRecord(
   expectedVersion: number,
   payload: RecordWritePayload,
 ): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}`, {
+  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`, {
     method: 'PUT',
     body: JSON.stringify({ expected_version: expectedVersion, ...payload }),
   });
 }
 
 export function deleteRecord(typeKey: string, uuid: string): Promise<void> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}`, { method: 'DELETE' });
-}
-
-export function restoreRecord(typeKey: string, uuid: string): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}/restore`, {
-    method: 'POST',
-  });
-}
-
-export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}/purge`, {
+  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`, {
     method: 'DELETE',
   });
 }
 
+export function restoreRecord(typeKey: string, uuid: string): Promise<RecordRead> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/restore`,
+    { method: 'POST' },
+  );
+}
+
+export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/purge`,
+    { method: 'DELETE' },
+  );
+}
+
 export function listRevisions(typeKey: string, uuid: string): Promise<{ items: RecordRevision[] }> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${uuid}/revisions`);
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions`,
+  );
 }

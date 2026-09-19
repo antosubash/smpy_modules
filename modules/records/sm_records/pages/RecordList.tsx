@@ -8,10 +8,52 @@ import type React from 'react';
 import { FilterBar, type FilterValue } from '../components/FilterBar';
 import { RecordTable } from '../components/RecordTable';
 import { deleteRecord } from '../utils/api';
-import { buildSortParam, nextSort, parseSort } from '../utils/listing';
+import { buildSortParam, filterErrorReasonKey, nextSort, parseSort } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
 type Props = { type: TypeRead; records: RecordPage };
+
+// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
+// against `useT()`'s real, key-union-overloaded signature either blows up TS
+// with an "excessively deep" instantiation or fails to unify when called.
+// biome-ignore lint/suspicious/noExplicitAny: see comment above
+type Translate = (...args: any[]) => string;
+
+/** One term of the filter/sort grammar failed to build into a query —
+ *  `filterErrorReasonKey` narrows `reason` to the closed set this maps.
+ *  Every branch keeps its own literal `t()` call (rather than a
+ *  `Record<FilterErrorReason, string>` built once) for the same reason
+ *  `FilterBar`'s `opLabel` does: `make ci-check-untranslated` can't see
+ *  through a config object, only a call it can find. */
+function filterErrorMessage(t: Translate, reason: string | undefined): string {
+  switch (filterErrorReasonKey(reason)) {
+    case 'reindexing':
+      return t('records.list.filter_error.reindexing', {
+        defaultValue:
+          'That field is being reindexed right now and cannot be filtered on yet. Try again shortly.',
+      });
+    case 'unsupported_op':
+      return t('records.list.filter_error.unsupported_op', {
+        defaultValue: "That condition isn't supported for this field.",
+      });
+    case 'not_indexed':
+      return t('records.list.filter_error.not_indexed', {
+        defaultValue: "That field isn't indexed, so it can't be filtered or sorted on.",
+      });
+    case 'unknown':
+      return t('records.list.filter_error.unknown', {
+        defaultValue: "That field doesn't exist on this record type.",
+      });
+    case 'bad_value':
+      return t('records.list.filter_error.bad_value', {
+        defaultValue: "That value isn't valid for this field.",
+      });
+    default:
+      return t('records.list.filter_error.generic', {
+        defaultValue: "That filter couldn't be applied.",
+      });
+  }
+}
 
 /** Split on the first two colons — the value half of `field:op:value` may
  *  itself contain one (an ISO datetime), and the field/op halves never do. */
@@ -44,10 +86,15 @@ function RecordList({ type, records }: Props) {
   // `?sort=` — both are resolved through the same index-lookup call, so a
   // sort on a field that's mid-reindex (design doc §8.5) lands on this same
   // channel under the same "filter" key rather than failing the navigation
-  // outright. A sort on an *unindexed* field would 400 the same way, but
-  // `SortableHeader` never offers one, so that branch shouldn't be reachable
-  // from this UI short of a hand-edited URL.
-  const reindexing = page.props.errors?.filter === 'reindexing';
+  // outright. This is shown for *any* reason `QueryError` carries (F1), not
+  // only `reindexing`: `unsupported_op` (an operator this build stopped
+  // offering, or a hand-edited URL), `not_indexed`, `unknown` and
+  // `bad_value` all land here too, and without a message the list rendered
+  // identically to a type with no matching records — indistinguishable from
+  // an actually-empty result. A sort on an *unindexed* field would land here
+  // as well, but `SortableHeader` never offers one, so that branch shouldn't
+  // be reachable from this UI short of a hand-edited URL.
+  const filterErrorReason = page.props.errors?.filter;
 
   const goTo = (next: { page?: number; filter?: string | null; sort?: string | null }) => {
     const params: Record<string, string> = {};
@@ -110,12 +157,9 @@ function RecordList({ type, records }: Props) {
           />
         </div>
 
-        {reindexing && (
+        {filterErrorReason && (
           <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-            {t('records.records.reindexing_notice', {
-              defaultValue:
-                'That field is being reindexed right now and cannot be filtered on yet. Try again shortly.',
-            })}
+            {filterErrorMessage(t, filterErrorReason)}
           </div>
         )}
 

@@ -47,12 +47,25 @@ describe('number values stay strings', () => {
 });
 
 describe('integer values', () => {
-  it('goes out as a JSON number', () => {
-    expect(toApiValue(field('integer'), '42')).toBe(42);
+  it('goes out as a string, like number, not a JS number', () => {
+    expect(toApiValue(field('integer'), '42')).toBe('42');
+  });
+
+  it('preserves every digit past Number.isSafeInteger', () => {
+    // Number("99999999999999999") rounds to 100000000000000000.
+    expect(toApiValue(field('integer'), '99999999999999999')).toBe('99999999999999999');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(toApiValue(field('integer'), ' 42 ')).toBe('42');
   });
 
   it('hands non-integer text through so the server names the problem', () => {
     expect(toApiValue(field('integer'), '1.5')).toBe('1.5');
+  });
+
+  it('treats an empty integer field as absent', () => {
+    expect(toApiValue(field('integer'), '')).toBeUndefined();
   });
 });
 
@@ -65,8 +78,17 @@ describe('datetime never leaves naive', () => {
 
   it('round-trips an offset-carrying value through the local input shape', () => {
     const local = isoToLocalInput(new Date('2026-09-19T10:30:00Z').toISOString());
-    expect(local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
     expect(new Date(localInputToIso(local)).toISOString()).toBe('2026-09-19T10:30:00.000Z');
+  });
+
+  it('keeps seconds across the round trip instead of dropping them (F4)', () => {
+    // Compared as instants (via getTime()), not strings: `localInputToIso`
+    // stamps the *test runner's* offset, which isn't necessarily UTC.
+    const original = '2024-03-10T12:30:45+00:00';
+    const local = isoToLocalInput(original);
+    expect(local).toMatch(/:45$/);
+    expect(new Date(localInputToIso(local)).getTime()).toBe(new Date(original).getTime());
   });
 
   it('hands unparseable text back rather than inventing a timestamp', () => {
@@ -127,11 +149,13 @@ describe('buildPayload', () => {
     });
   });
 
-  it('carries _orphaned through untouched', () => {
-    const original = { title: 'Hi', _orphaned: { gone: 1 } };
+  it('never re-sends _orphaned, even when the original record carried one (F2)', () => {
+    // services/_payload.py refuses the key outright on any write;
+    // update_record carries the stored value forward itself.
+    const original = { title: 'Hi', subtitle: 'was here', _orphaned: { gone: 1 } };
     expect(buildPayload(fields, { title: 'Hi', subtitle: '' }, original)).toEqual({
       title: 'Hi',
-      _orphaned: { gone: 1 },
+      subtitle: null,
     });
   });
 });

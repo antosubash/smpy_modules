@@ -3,6 +3,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 
+import { isoToLocalInput, localInputToIso } from '../../utils/values';
 import { type Choice, DEFAULT_EDITABLE_TYPES } from './types';
 
 const NULLABLE = '__no_default__';
@@ -95,7 +96,29 @@ export function DefaultInput({
     );
   }
 
-  const inputType = type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text';
+  if (type === 'datetime') {
+    // A `datetime` default is stored the same as any `datetime` value — an
+    // ISO string carrying an offset (the server refuses a naive one, design
+    // §7.3) — so it has to go through the same local ⇄ ISO conversion the
+    // record form uses, not straight through like `date`, which has no zone
+    // to lose.
+    const local = typeof value === 'string' ? isoToLocalInput(value) : '';
+    return (
+      <div className="grid gap-1.5">
+        <Label htmlFor={id}>{label}</Label>
+        <Input
+          id={id}
+          type="datetime-local"
+          step="1"
+          value={local}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value === '' ? null : localInputToIso(e.target.value))}
+        />
+      </div>
+    );
+  }
+
+  const inputType = type === 'date' ? 'date' : 'text';
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{label}</Label>
