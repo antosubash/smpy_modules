@@ -33,7 +33,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import RecordType, table_sets, tables_for
 
-__all__ = ["uuid_claim_message", "uuids_claimed_elsewhere"]
+__all__ = [
+    "uuid_claim_message",
+    "uuid_match_message",
+    "uuids_claimed_elsewhere",
+    "uuids_claimed_here",
+]
 
 
 def uuid_claim_message(uuid: str, collection: str | None) -> str:
@@ -48,6 +53,48 @@ def uuid_claim_message(uuid: str, collection: str | None) -> str:
         f"uuid {uuid} already exists in {where}; a record's uuid is unique across every "
         "table set, so a file cannot create a record under one that is already in use"
     )
+
+
+def uuid_match_message(uuid: str, match_by: str) -> str:
+    """Why a row that matched nothing may still not be created.
+
+    ``match_by`` other than ``uuid`` asks one question ("which record has this
+    slug / this unique value?") and the create then asserts another ("no
+    record has this uuid"). When the file's uuid is already here, the second
+    answer contradicts the first, and the reason is nearly always that the
+    matched-on value moved after the file was exported. Said as a row error
+    with the key in it, because the operator's fix is to re-export or to
+    import with ``match_by=uuid``, and neither is guessable from a bare
+    unique-constraint failure.
+    """
+    return (
+        f"uuid {uuid} already exists; match_by={match_by!r} did not find it — "
+        f"has the record's {match_by} changed since this file was written? "
+        "Re-export the file, or import with match_by=uuid"
+    )
+
+
+async def uuids_claimed_here(db: AsyncSession, rtype: RecordType, uuids: Iterable[str]) -> set[str]:
+    """Which of ``uuids`` already name a record in **this** type's own tables.
+
+    The complement of :func:`uuids_claimed_elsewhere`, and needed for the same
+    reason: a create keeps the file's uuid verbatim, so a row planned as a
+    create whose uuid is already in this table set is an ``IntegrityError``
+    waiting to happen rather than a create. It cannot arise under
+    ``match_by=uuid`` — the match *is* this lookup — which is why the planning
+    pass only spends the statement for the other match keys.
+
+    Unscoped by ``type_id``, like the uuid match itself: the unique index is
+    on the table, so a uuid held by another type of the same set refuses the
+    insert just as surely. ``include_deleted``, because a trashed record keeps
+    its uuid until it is purged.
+    """
+    wanted = {uuid for uuid in uuids if uuid}
+    if not wanted:
+        return set()
+    cls = tables_for(rtype).record
+    stmt = select(cls.uuid).where(cls.uuid.in_(wanted)).execution_options(include_deleted=True)
+    return {str(found) for found in (await db.execute(stmt)).scalars().all()}
 
 
 async def uuids_claimed_elsewhere(

@@ -28,6 +28,7 @@ from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._import_parse import ImportRow
 from sm_records.services._import_rows import envelope_for
+from sm_records.services._payload import slugify
 from sm_records.services.errors import ValidationFailed
 
 __all__ = ["MATCH_SLUG", "MATCH_UUID", "match_field", "resolve_matches"]
@@ -117,10 +118,19 @@ async def _by_slug(
     rewriting the English records. ``row.locale`` is the resolved content
     locale ``import_._validate`` put there; a row that never reached validation
     is not in ``rows``.
+
+    **The cell is slugified before it is matched.** ``match_by=slug`` matches
+    on the canonical form, because that is the only form a record can hold:
+    every write path stores ``_payload.slug_for``'s output, so a hand-written
+    file saying ``Hello World`` is asking about the record whose slug is
+    ``hello-world``. Comparing the raw cell instead made such a row match
+    nothing — the dry run promised a create, and the apply then failed it at
+    ``ensure_slug_free`` with the slug already taken, which is the preview /
+    apply disagreement ``_import_plan.plan_rows`` exists to prevent.
     """
     wanted: dict[int, tuple[str, str]] = {}
     for row in rows:
-        slug = envelope_for(row).slug or None
+        slug = slugify(envelope_for(row).slug or "") or None
         if slug and row.locale:
             wanted[row.number] = (row.locale, slug)
     cls = tables_for(rtype).record

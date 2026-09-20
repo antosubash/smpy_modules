@@ -160,7 +160,7 @@ async def test_a_stale_version_is_not_reused(client):
     )
     assert (
         preview_jobs.reusable(
-            type_key="note",
+            type_id=1,
             type_version=rtype["version"],
             signature=job.signature,
             ttl_seconds=600,

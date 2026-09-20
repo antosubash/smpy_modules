@@ -115,7 +115,26 @@ def relation(old: FieldDefinition, new: FieldDefinition) -> list[SchemaChange]:
     """``target_type`` and ``many`` are restrictive: the first invalidates
     every stored reference at once, the second changes the *shape* of the
     stored value (one object ↔ a list of them). ``on_delete`` only decides
-    what a future delete does, so it is additive."""
+    what a future delete does, so it is additive.
+
+    Both are **also index-affecting** (§8.5), for the same reason a type change
+    on an indexed field is: what the ref index holds is a projection of the
+    *definition*, not only of the payload.
+    ``records_index_ref.target_type_id`` is resolved from the declared target
+    when the row is written (``index.providers._ref_entry``), so a retarget
+    leaves every ref row naming the type the field no longer points at — and
+    ``services._referrers`` then refuses a delete, or cascades one, through a
+    field that does not target that type any more. A ``many`` flip changes the
+    projection the other way: one row where there were several, or several
+    where there was one. Neither rewrites the payload, so nothing but the
+    rebuild marker enqueues the pass that rewrites the rows.
+
+    A second change rather than a second class on the first:
+    :class:`SchemaChange` carries one ``kind``, and both readers have to see
+    this one (``diff`` module docstring). Its ``what`` is its own label so a
+    report still distinguishes the operator-visible edit from the rebuild it
+    implies.
+    """
     before, after = old.options or {}, new.options or {}
     out: list[SchemaChange] = []
     for name in ("target_type", "many"):
@@ -125,6 +144,15 @@ def relation(old: FieldDefinition, new: FieldDefinition) -> list[SchemaChange]:
                     kind=ChangeClass.RESTRICTIVE,
                     field_key=new.key,
                     what="options_changed",
+                    before={name: before.get(name)},
+                    after={name: after.get(name)},
+                )
+            )
+            out.append(
+                SchemaChange(
+                    kind=ChangeClass.INDEX_AFFECTING,
+                    field_key=new.key,
+                    what="relation_retargeted",
                     before={name: before.get(name)},
                     after={name: after.get(name)},
                 )

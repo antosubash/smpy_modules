@@ -81,7 +81,7 @@ def reused_report(
     if drop_keys:
         return None
     job = preview_jobs.reusable(
-        type_key=rtype.key,
+        type_id=rtype.id,
         type_version=current_version,
         signature=preview_jobs.fields_hash(fields_raw, display_field, slug_field),
         ttl_seconds=settings.preview_job_ttl_seconds,

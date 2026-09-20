@@ -176,7 +176,7 @@ def fail(job_id: str, message: str) -> None:
 
 
 def reusable(
-    *, type_key: str, type_version: int, signature: str, ttl_seconds: int
+    *, type_id: int, type_version: int, signature: str, ttl_seconds: int
 ) -> PreviewJob | None:
     """A finished job ``apply`` may take its report from instead of re-scanning.
 
@@ -197,6 +197,14 @@ def reusable(
     of that record resolves either way (§8.3 — marked, not mutated). A caller
     that wants the guarantee unconditionally sets ``preview_job_ttl_seconds``
     to 0, which turns every ``PUT`` back into its own inline pass.
+
+    **Same type means the same ``type_id``, never the same key.** A key is not
+    an identity (``schema.compile.get_model``): a type can be deleted and
+    recreated under the same key inside the TTL, restarting at ``version = 1``
+    — and a job taken against the old rows would then satisfy a key-and-version
+    match exactly, handing ``apply`` a ``checked``/``failing`` count computed
+    over records that no longer exist and skipping the scan of the ones that
+    do. The id is what the registry already stores, and it never comes back.
     """
     if ttl_seconds <= 0:
         return None
@@ -204,7 +212,7 @@ def reusable(
     for job in _jobs.values():
         if (
             job.done
-            and job.type_key == type_key
+            and job.type_id == type_id
             and job.type_version == type_version
             and job.signature == signature
             and job.report is not None

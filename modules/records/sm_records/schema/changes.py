@@ -24,7 +24,8 @@ class SchemaChange:
     ``type_changed``, ``required_added``, ``required_removed``,
     ``unique_added``, ``unique_removed``, ``indexed_on``, ``indexed_off``,
     ``constraint_tightened``, ``constraint_relaxed``, ``choice_added``,
-    ``choice_removed``, ``options_changed``, ``label_changed``."""
+    ``choice_removed``, ``options_changed``, ``relation_retargeted``,
+    ``label_changed``."""
     before: Any = None
     after: Any = None
 

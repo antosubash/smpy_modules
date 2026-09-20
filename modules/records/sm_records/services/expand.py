@@ -22,7 +22,9 @@ Four rules, all of them load-bearing:
   can hold that are not a resolvable reference: an entry that is not a
   ``{"type", "uuid"}`` object at all, and one whose uuid is not a record of
   the *declared* target type. Both keep their slot (:func:`_refs`), because
-  a to-many expansion is rendered positionally against ``data``.
+  a to-many expansion is rendered positionally against ``data``. A field
+  holding *nothing* — ``None``, or an empty list — is not one of them and
+  expands to no entries at all.
 * **A target the caller may not see is ``restricted``, decided from the
   field's declared ``target_type`` alone.** Nothing about the row is read, so
   a restricted expansion leaks neither its content nor whether the uuid still
@@ -87,16 +89,26 @@ def _refs(record: Record, field_key: str, declared: str) -> list[tuple[str, str,
     positionally — the UI renders the two together — so the list is built
     from the payload and never from the index rows, which carry no order.
 
-    **Every entry produces one tuple, including one that is not a reference
-    at all.** A ``null`` (or anything else that is not ``{"type", "uuid"}``)
-    used to be skipped, which shortened the list and put every later
-    expansion one slot out of step with the payload it is rendered beside —
-    ``expanded[1]`` labelling ``data[2]``. Such an entry is marked
-    unresolvable here and comes back ``dangling``, carrying the stored value
-    stringified as its ``uuid`` so the position is visible rather than
-    silently plausible. Writes cannot create one any more
+    **A field that holds nothing expands to nothing.** ``validate_payload``
+    dumps every declared key, so a relation nobody filled in is stored as
+    ``None`` — on every record of the type, to-one and to-many alike — and an
+    empty to-many is stored as ``[]``. Neither is a reference the caller left
+    broken, so neither produces an entry: the alternative was one phantom
+    ``dangling`` chip reading ``uuid: "None"`` on every unset relation, and a
+    "dangling references" count that was really a count of empty fields.
+
+    **Every entry of a list produces one tuple, including one that is not a
+    reference at all.** That is the positional rule, and it is about entries
+    *inside* a list: a ``null`` in the middle of a to-many used to be skipped,
+    which shortened the expansion and put every later slot out of step with
+    the payload it is rendered beside — ``expanded[1]`` labelling ``data[2]``.
+    Such an entry is marked unresolvable here and comes back ``dangling``,
+    carrying the stored value stringified as its ``uuid`` so the position is
+    visible rather than silently plausible. Writes cannot create one any more
     (``schema._builders._check_ref_list``); rows written before that check
-    can.
+    can. A single (non-list) value that is not a reference object keeps the
+    same treatment for the same reason — it is a corrupt value and saying so
+    is the point — but ``None`` is not corrupt, it is empty.
 
     The stored ``type`` is echoed when the payload has one and the field's
     declared target substituted when it does not. The two are allowed to
@@ -104,6 +116,8 @@ def _refs(record: Record, field_key: str, declared: str) -> list[tuple[str, str,
     and :func:`_targets` is what refuses to resolve such a row.
     """
     value = (record.data or {}).get(field_key)
+    if value is None:
+        return []
     items = value if isinstance(value, list) else [value]
     out: list[tuple[str, str, bool]] = []
     for item in items:

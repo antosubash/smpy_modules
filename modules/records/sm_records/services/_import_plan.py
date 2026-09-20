@@ -24,7 +24,7 @@ from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _import_checks as _checks
 from sm_records.services import _payload, _relations, _uuids
 from sm_records.services._common import type_id_map
-from sm_records.services._import_match import resolve_matches
+from sm_records.services._import_match import MATCH_UUID, resolve_matches
 from sm_records.services._import_parse import ImportRow, refuses_orphaned
 from sm_records.services._import_rows import (
     Envelope,
@@ -167,8 +167,19 @@ async def plan_rows(
     )
     # One batched lookup for the whole file rather than one per row, and none
     # at all on a host with no collections declared (Phase 5 §6.5).
-    elsewhere = await _uuids.uuids_claimed_elsewhere(
-        db, rtype, [row.uuid for row, _ in pairs if row.uuid and matches.get(row.number) is None]
+    unmatched = [row.uuid for row, _ in pairs if row.uuid and matches.get(row.number) is None]
+    elsewhere = await _uuids.uuids_claimed_elsewhere(db, rtype, unmatched)
+    # And the same question about this type's own tables, which
+    # ``uuids_claimed_elsewhere`` skips because under ``match_by=uuid`` it is
+    # the match. Under any other match key it is not: the row matched nothing,
+    # so it is planned as a create, and the create keeps the file's uuid — one
+    # the database already holds. That used to be an ``IntegrityError`` out of
+    # ``_import_rows.write_row``, i.e. a 500 escaping the report, the
+    # ``skip`` savepoint and the dry run that had just promised the create.
+    here = (
+        set()
+        if options.match_by == MATCH_UUID
+        else await _uuids.uuids_claimed_here(db, rtype, unmatched)
     )
     taken = await _checks.groups_in_type(
         db,
@@ -198,6 +209,11 @@ async def plan_rows(
             # importer used to do happily, because it keeps a file's uuid
             # verbatim. See :mod:`sm_records.services._uuids`.
             problem = _uuids.uuid_claim_message(row.uuid, elsewhere[row.uuid])
+        elif problem is None and row.uuid in here:
+            # This type's own tables already hold the uuid, but ``match_by``
+            # did not find the record — its match key has moved since the file
+            # was written. See :func:`_uuids.uuid_match_message`.
+            problem = _uuids.uuid_match_message(row.uuid, options.match_by)
         elif problem is None:
             problem = _checks.forged_group(rtype, row, envelope, claims, taken)
         problem = problem or mode_error(options.mode, record)

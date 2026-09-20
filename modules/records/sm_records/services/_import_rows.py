@@ -24,6 +24,7 @@ row and its counterpart in the database:
 
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
@@ -31,7 +32,7 @@ from sm_records.contracts.io import ImportMode
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.services._import_parse import ImportRow
 from sm_records.services._payload import slug_for
-from sm_records.services.errors import ValidationFailed
+from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
 
@@ -236,7 +237,22 @@ async def write_row(
                 # uuid it generated has just been replaced by the file's.
                 created.translation_group = row.uuid
             db.add(created)
-            await db.flush()
+            # Not a bare ``flush``: this statement re-stamps two columns that
+            # carry unique indexes (``uuid``, and ``(type_id,
+            # translation_group, locale)``) with values the *file* chose, so
+            # its refusal is a row error and not a bug. The planning pass
+            # refuses the case it can see (``_import_plan.plan_rows``, via
+            # ``_uuids.uuids_claimed_here``); this is what keeps a race, or a
+            # direct caller that never planned, a 409 rather than an
+            # ``IntegrityError`` escaping the report. ``row.uuid`` is a plain
+            # string, so nothing is read off an expired instance.
+            try:
+                await db.flush()
+            except IntegrityError as exc:
+                raise Conflict(
+                    f"uuid {row.uuid} is already in use by another record, or its "
+                    "translation group already has a record in this language"
+                ) from exc
         return "created"
 
     expected = row.version
