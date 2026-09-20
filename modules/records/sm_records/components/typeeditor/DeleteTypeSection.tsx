@@ -83,16 +83,14 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
             </Button>
           }
           title={t('records.type_editor.delete_type', { defaultValue: 'Delete this type' })}
-          description={
+          description={t('records.type_editor.delete_confirm_description', {
+            count: total,
+            defaultValue:
+              'This permanently deletes "{label}" and its {count} record(s) (live and trashed). Type {count} to confirm.',
+            label: type.label,
+          })}
+          body={
             <div className="grid gap-2">
-              <p>
-                {t('records.type_editor.delete_confirm_description', {
-                  count: total,
-                  defaultValue:
-                    'This permanently deletes "{label}" and its {count} record(s) (live and trashed). Type {count} to confirm.',
-                  label: type.label,
-                })}
-              </p>
               <Label htmlFor={inputId}>
                 {t('records.type_editor.delete_confirm_label', { defaultValue: 'Record count' })}
               </Label>

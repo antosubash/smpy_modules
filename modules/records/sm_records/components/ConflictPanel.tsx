@@ -9,21 +9,24 @@ import type { RecordRead } from '../utils/types';
  *
  * Shows what the server now has (`current`) next to the JSON the person was
  * about to overwrite it with (`yourData`, read-only — editing continues in
- * the main form once they choose). "Reload" replaces local state with
- * `current`; there is no "overwrite anyway" button here because that is just
- * saving again with the new `expected_version`, which the caller does once
- * `RecordEditor` re-reads `current.version` — this panel only needs to get
- * out of the way for that.
+ * the main form once they choose). Two ways out: "Reload" replaces local
+ * state with `current`, discarding the person's edits; "Overwrite anyway"
+ * keeps the edits and re-saves with `current.version` as the caller's next
+ * `expected_version` (H1) — so it can 409 again if someone saved a third
+ * time in between, which just reopens this panel with the newer `current`.
  */
 export function ConflictPanel({
   current,
   yourData,
   onReload,
+  onOverwrite,
 }: {
   current: RecordRead;
   /** The data the person had typed, pretty-printed, shown read-only. */
   yourData: string;
   onReload: (current: RecordRead) => void;
+  /** Re-saves the form's own (unread) values against `current.version`. */
+  onOverwrite: () => void;
 }) {
   const { t } = useT();
   return (
@@ -62,9 +65,19 @@ export function ConflictPanel({
             </pre>
           </div>
         </div>
-        <Button type="button" variant="outline" onClick={() => onReload(current)}>
-          {t('records.editor.reload', { defaultValue: 'Reload' })}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => onReload(current)}>
+            {t('records.editor.reload', { defaultValue: 'Reload' })}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="records-conflict-overwrite"
+            onClick={onOverwrite}
+          >
+            {t('records.editor.overwrite', { defaultValue: 'Overwrite anyway' })}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

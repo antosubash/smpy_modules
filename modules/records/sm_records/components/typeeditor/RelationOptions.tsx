@@ -26,7 +26,7 @@ function onDeleteLabel(t: Translate, choice: RelationOnDelete): string {
  *  delete across a user-defined graph destroys content nobody asked to
  *  delete). */
 export function RelationOptions({
-  fieldKey,
+  index,
   targetType,
   many,
   onDelete,
@@ -34,7 +34,10 @@ export function RelationOptions({
   onChange,
   disabled = false,
 }: {
-  fieldKey: string;
+  /** The row's position in the field list — see `FieldOptions`'s own
+   *  `index` doc comment (L5): deriving these ids from `field.key` collided
+   *  across rows sharing an empty or duplicate key. */
+  index: number;
   targetType: string;
   many: boolean;
   onDelete: RelationOnDelete;
@@ -43,9 +46,9 @@ export function RelationOptions({
   disabled?: boolean;
 }) {
   const { t } = useT();
-  const targetId = `field-${fieldKey}-target-type`;
-  const manyId = `field-${fieldKey}-many`;
-  const onDeleteId = `field-${fieldKey}-on-delete`;
+  const targetId = `field-row-${index}-target-type`;
+  const manyId = `field-row-${index}-many`;
+  const onDeleteId = `field-row-${index}-on-delete`;
 
   return (
     <div className="grid gap-3 sm:grid-cols-3">

@@ -146,11 +146,11 @@ test.describe('Records — collections', () => {
     await expect.poll(() => rowTitles(page)).toEqual(['Closing night', 'Matinee', 'Opening night']);
 
     // Filtering does too — the semi-join is against `records_c_events_index_*`.
+    // Polled against the *exact* set: the unfiltered list also contains both
+    // titles, so an `arrayContaining` poll resolves before the filtered
+    // reload lands and a plain "Closing night is absent" check then races it.
     await applyFilter(page, 'venue', 'eq', 'Barbican');
-    await expect
-      .poll(() => rowTitles(page))
-      .toEqual(expect.arrayContaining(['Matinee', 'Opening night']));
-    await expect(rowTitles(page)).resolves.not.toContain('Closing night');
+    await expect.poll(() => rowTitles(page)).toEqual(['Matinee', 'Opening night']);
     await page.getByRole('button', { name: 'Clear' }).click();
 
     // Edit, then delete, from the editor.

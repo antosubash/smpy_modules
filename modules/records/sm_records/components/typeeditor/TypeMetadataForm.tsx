@@ -4,6 +4,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
+import { useEffect } from 'react';
 import type { ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
@@ -78,6 +79,24 @@ export function TypeMetadataForm({
   // or slugged `true`.
   const displayChoices = fields.filter((f) => displayFieldAllowed(f.type));
   const slugChoices = fields.filter((f) => slugFieldAllowed(f.type));
+
+  // A pointer's target can stop being allowed out from under it — its type
+  // changed (e.g. `text` to `longtext`) after it was picked (L7). Left
+  // alone, the `<select>` drops the option and falls back to showing "None"
+  // while `values.displayField`/`slugField` still hold the old key, so the
+  // save that follows sends a pointer the control no longer shows and the
+  // server refuses it (`DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`,
+  // `services/_schema.py`) with an error that contradicts the screen.
+  // Clearing it here keeps the visible "None" and the actual form state in
+  // agreement.
+  useEffect(() => {
+    if (values.displayField && !displayChoices.some((f) => f.key === values.displayField)) {
+      onChange({ displayField: '' });
+    }
+    if (values.slugField && !slugChoices.some((f) => f.key === values.slugField)) {
+      onChange({ slugField: '' });
+    }
+  }, [displayChoices, slugChoices, values.displayField, values.slugField, onChange]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">

@@ -132,6 +132,11 @@ export function RelationPicker({
     if (!target || term === '') {
       setResults([]);
       setSearchError(null);
+      // A request emptied mid-flight otherwise leaves `searching` stuck
+      // `true` forever (L8) — currently invisible (the results box is gated
+      // on `query.trim() !== ''`), but the two branches should agree on this
+      // flag regardless.
+      setSearching(false);
       return;
     }
     let cancelled = false;

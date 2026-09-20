@@ -69,6 +69,12 @@ export function RecordRevisions({
     }
   };
 
+  // A successful restore creates a new revision snapshot on the server (of
+  // the data *before* the restore), so the list this panel is already
+  // showing is stale the moment `onRestored` fires — reload it here (mirrors
+  // `typeeditor/TypeRevisions.tsx`'s own restore handler, M4) so the new
+  // revision shows up without the admin having to collapse and reopen the
+  // panel.
   const restore = async (revision: RecordRevisionDetail) => {
     setRestoreError(null);
     try {
@@ -76,6 +82,7 @@ export function RecordRevisions({
       onRestored(restored);
       setSelected(null);
       toast.success(t('records.editor.revisions.restored', { defaultValue: 'Version restored' }));
+      void load();
     } catch (err) {
       if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         setRestoreError(

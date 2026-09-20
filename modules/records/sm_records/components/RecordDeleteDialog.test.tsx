@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import type { ReferrerRead } from '../utils/types';
-import { DialogBody } from './RecordDeleteDialog';
+import { DialogDescription, DialogDetails } from './RecordDeleteDialog';
 
 /** A minimal stand-in for `useT()`'s `t`: applies `{name}` interpolation and
  *  picks `defaultValue_other` over `defaultValue` for a `count` other than
@@ -30,13 +30,20 @@ function referrer(overrides: Partial<ReferrerRead>): ReferrerRead {
   };
 }
 
+/** `description` (a sentence) and `body` (block content), the way
+ *  `RecordDeleteDialog` hands both to `ConfirmDialog` (L6) — concatenated
+ *  here since these tests only assert on substrings, not on where the split
+ *  falls. */
 function html(referrers: ReferrerRead[] | null, loading = false, loadError: string | null = null) {
   return renderToStaticMarkup(
-    <DialogBody t={fakeT} loading={loading} loadError={loadError} referrers={referrers} />,
+    <>
+      <DialogDescription t={fakeT} loading={loading} loadError={loadError} />
+      <DialogDetails t={fakeT} loading={loading} loadError={loadError} referrers={referrers} />
+    </>,
   );
 }
 
-describe('RecordDeleteDialog / DialogBody', () => {
+describe('RecordDeleteDialog / DialogDescription + DialogDetails', () => {
   it('shows a checking message while the referrer fetch is in flight', () => {
     const out = html(null, true);
     expect(out).toContain('Checking what references this record…');

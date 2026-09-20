@@ -2,7 +2,7 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const ID = 'type-editor-is-public';
 
@@ -36,12 +36,23 @@ export function PublicField({
   const [copied, setCopied] = useState(false);
   const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
   const publicUrl = `${publicRoutePrefix}/${typeKey || none}`;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The only timer in this module with no cleanup (L10) — a copy followed by
+  // an unmount (navigating away, or toggling "Public" off) would otherwise
+  // set state on a gone component.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard access can be denied; the code line is still selectable.
     }
@@ -61,8 +72,7 @@ export function PublicField({
       </div>
       <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
         {t('records.type_editor.is_public_help', {
-          defaultValue:
-            "Exposes a read-only public API for this type's published records (design §10).",
+          defaultValue: "Exposes a read-only public API for this type's published records.",
         })}
       </p>
 

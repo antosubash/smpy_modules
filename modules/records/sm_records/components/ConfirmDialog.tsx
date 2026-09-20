@@ -26,6 +26,7 @@ export function ConfirmDialog({
   trigger,
   title,
   description,
+  body,
   confirmLabel,
   cancelLabel,
   pendingLabel,
@@ -36,18 +37,26 @@ export function ConfirmDialog({
 }: {
   trigger: ReactNode;
   title: string;
+  /** A sentence, rendered inside Radix's `AlertDialogDescription` — a real
+   *  `<p>` (L6). Block markup (a list, another paragraph) or anything
+   *  focusable nested in here is both invalid HTML and gets read by
+   *  `aria-describedby` as though it were the description itself. */
   description: ReactNode;
+  /** Extra content — a list of consequences, a confirmation input — rendered
+   *  after the description but outside it, so it can be a `<div>`, a `<ul>`,
+   *  or hold a focusable control without nesting inside that `<p>` (L6). */
+  body?: ReactNode;
   confirmLabel: string;
   cancelLabel: string;
   pendingLabel: string;
   destructive?: boolean;
   /** Disables the confirm button without hiding it — for a caller (the
    *  referrer-aware delete dialog) that still wants the reason visible in
-   *  `description` rather than the dialog refusing to open at all. */
+   *  `description`/`body` rather than the dialog refusing to open at all. */
   confirmDisabled?: boolean;
   /** Fires with the new open state, before anything else in this component
    *  reacts to it — a caller that needs to fetch something to fill in
-   *  `description` starts that fetch here, on open. */
+   *  `description`/`body` starts that fetch here, on open. */
   onOpenChange?: (open: boolean) => void;
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
@@ -84,6 +93,7 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {body}
         {error && (
           <p className="text-sm text-destructive" role="alert">
             {error}

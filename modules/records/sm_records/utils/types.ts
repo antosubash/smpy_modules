@@ -285,7 +285,10 @@ export type ApiErrorBody = {
   detail?: string;
   errors?: ValidationError[];
   current?: RecordRead | TypeRead;
+  /** A `409` on delete: visible referrers (capped), plus `hidden`/`more`. */
   referrers?: string[];
+  hidden?: number;
+  more?: number;
   field?: string;
   reason?: string;
   /** A restrictive schema change would leave records invalid — re-send with

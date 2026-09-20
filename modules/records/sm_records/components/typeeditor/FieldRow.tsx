@@ -21,15 +21,16 @@ type Translate = (...args: any[]) => string;
 function keyErrorMessage(
   t: Translate,
   code: 'required' | 'reserved' | 'pattern' | 'duplicate',
+  key: string,
 ): string {
   const defaults = {
     required: 'A key is required.',
-    reserved: 'That key is reserved by the module: it names a column every record already has.',
+    reserved: '"{key}" is reserved by the module: it names a column every record already has.',
     pattern:
       'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
     duplicate: 'Another field already uses this key.',
   };
-  return t(`records.type_editor.key_error.${code}`, { defaultValue: defaults[code] });
+  return t(`records.type_editor.key_error.${code}`, { key, defaultValue: defaults[code] });
 }
 
 /** One row of the field list editor: the field's own inputs (key/type/label,
@@ -114,7 +115,9 @@ export function FieldRow({
               })}
             </p>
           )}
-          {keyError && <p className="text-sm text-destructive">{keyErrorMessage(t, keyError)}</p>}
+          {keyError && (
+            <p className="text-sm text-destructive">{keyErrorMessage(t, keyError, field.key)}</p>
+          )}
           {!keyError && serverKeyError && (
             <p className="text-sm text-destructive">{serverKeyError}</p>
           )}
@@ -244,6 +247,7 @@ export function FieldRow({
 
       <FieldOptions
         field={field}
+        index={index}
         targetTypes={targetTypes}
         disabled={disabled}
         onChange={applyPatch}

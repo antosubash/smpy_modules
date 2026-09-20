@@ -90,16 +90,30 @@ export function RecordCell({
    *  expand this column. */
   expanded?: ExpandedRef[];
 }) {
+  const { t } = useT();
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">{DASH}</span>;
   }
 
   switch (field.type) {
     case 'boolean':
+      // The glyph alone is `aria-hidden` (L1): unpaired, `true` announced as
+      // empty and `false` as a bare en-dash, so a screen-reader user could
+      // not tell true/false/missing apart in a boolean column. The `sr-only`
+      // word next to it is the same pattern `fields/FieldShell.tsx` uses for
+      // the required-field marker.
       return value ? (
-        <span aria-hidden="true">✓</span>
+        <span>
+          <span aria-hidden="true">✓</span>
+          <span className="sr-only">
+            {t('records.fields.boolean_yes', { defaultValue: 'Yes' })}
+          </span>
+        </span>
       ) : (
-        <span className="text-muted-foreground">–</span>
+        <span className="text-muted-foreground">
+          <span aria-hidden="true">–</span>
+          <span className="sr-only">{t('records.fields.boolean_no', { defaultValue: 'No' })}</span>
+        </span>
       );
 
     case 'number':

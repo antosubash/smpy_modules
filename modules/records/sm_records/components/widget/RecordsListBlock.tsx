@@ -13,6 +13,7 @@
  */
 
 import type { ComponentConfig, CustomField, SelectField } from '@puckeditor/core';
+import { t } from '@simple-module-py/i18n';
 import { listTypes } from '../../utils/api';
 import { DEFAULT_PUBLIC_PREFIX } from '../../utils/public-api';
 import { choicesOf } from '../../utils/values';
@@ -21,12 +22,6 @@ import { RecordsListRender, type RecordsListRenderProps } from './RecordsListRen
 import type { FieldMetaEntry, RecordsListProps } from './types';
 
 type BlockFields = NonNullable<ComponentConfig<RecordsListProps>['fields']>;
-
-const LAYOUT_OPTIONS = [
-  { label: 'List', value: 'list' },
-  { label: 'Cards', value: 'cards' },
-  { label: 'Table', value: 'table' },
-];
 
 /** A `Fields<T>` entry for a prop with no editor UI of its own —
  *  `fieldMeta`/`typeIsPublic` below are written only by `resolveData`.
@@ -37,11 +32,103 @@ function hiddenField<Value>(): CustomField<Value> {
   return { type: 'custom', visible: false, render: () => <></> };
 }
 
-// `satisfies`, not a type annotation: an annotation would widen each entry
-// to the `Field<T>` union immediately, and `resolveFields` below needs the
-// concrete literal type of `.fields` (a `CustomField`) to spread it safely —
-// spreading a widened union would mix in members (`TextField`, …) that don't
-// have a `render` to spread from.
+/**
+ * The Puck field labels for this block (L2), built fresh on every call
+ * rather than as a module-scope constant: the host globs every module's
+ * `puck-blocks.ts` eagerly, before `configureI18n()` ever runs
+ * (`host/client_app/app.tsx`/`blocks.ts`), so a `t()` call baked into a
+ * top-level object literal here would run before i18next has any messages
+ * and freeze that way forever (the same risk CLAUDE.md flags for a Zod
+ * schema built at module scope). `resolveFields` below is a function Puck
+ * calls later, well after boot, so calling the non-hook `t` inside it is
+ * safe and picks up the active locale each time.
+ *
+ * `satisfies`, not a type annotation: an annotation would widen each entry
+ * to the `Field<T>` union immediately, and `resolveFields` needs the
+ * concrete literal type of `.fields` (a `CustomField`) to spread it safely —
+ * spreading a widened union would mix in members (`TextField`, …) that don't
+ * have a `render` to spread from.
+ */
+function buildBaseFields() {
+  return {
+    typeKey: {
+      type: 'select',
+      label: t('records.widget.field_type_key', { defaultValue: 'Record type' }),
+      options: [{ label: t('records.fields.choose', { defaultValue: '— choose —' }), value: '' }],
+    },
+    fields: {
+      type: 'custom',
+      label: t('records.widget.field_fields', {
+        defaultValue: 'Fields to show (beyond the title)',
+      }),
+      render: FieldsPicker,
+    },
+    filter: {
+      type: 'text',
+      label: t('records.widget.field_filter', {
+        defaultValue: 'Filter (e.g. status:eq:paid — one term, indexed fields only)',
+      }),
+    },
+    sort: {
+      type: 'text',
+      label: t('records.widget.field_sort', {
+        defaultValue: 'Sort (e.g. -published_at for newest first)',
+      }),
+    },
+    locale: {
+      type: 'text',
+      label: t('records.widget.field_locale', {
+        defaultValue: 'Locale (blank = default content locale)',
+      }),
+    },
+    limit: {
+      type: 'number',
+      label: t('records.widget.field_limit', { defaultValue: 'How many' }),
+      min: 1,
+      max: 50,
+    },
+    layout: {
+      type: 'select',
+      label: t('records.widget.field_layout', { defaultValue: 'Layout' }),
+      options: [
+        { label: t('records.widget.layout_list', { defaultValue: 'List' }), value: 'list' },
+        { label: t('records.widget.layout_cards', { defaultValue: 'Cards' }), value: 'cards' },
+        { label: t('records.widget.layout_table', { defaultValue: 'Table' }), value: 'table' },
+      ],
+    },
+    title: { type: 'text', label: t('records.widget.field_title', { defaultValue: 'Heading' }) },
+    emptyText: {
+      type: 'text',
+      label: t('records.widget.field_empty_text', {
+        defaultValue: 'Text shown when there are no records',
+      }),
+    },
+    linkTemplate: {
+      type: 'text',
+      label: t('records.widget.field_link_template', {
+        defaultValue: 'Link template ({slug} or {uuid}; blank = no link)',
+      }),
+    },
+    apiPrefix: {
+      type: 'text',
+      label: t('records.widget.field_api_prefix', {
+        defaultValue:
+          'Public API prefix (advanced — only change if the Records settings screen shows a different one)',
+      }),
+    },
+    fieldMeta: hiddenField<FieldMetaEntry[]>(),
+    typeIsPublic: hiddenField<boolean | null>(),
+  } satisfies BlockFields;
+}
+
+// The static field shape `ComponentConfig.fields` needs at module-evaluation
+// time — before `resolveFields` has ever run and before i18n is configured
+// (see `buildBaseFields`'s own comment). English literals here are the
+// accepted gap (L2): Puck calls `resolveFields` to get the real, translated
+// labels as soon as the block is added to a page or its data changes, so
+// these are only ever visible, if at all, for the first paint of a brand
+// new block in the editor — never on the public page, and never to an
+// anonymous visitor.
 const BASE_FIELDS = {
   typeKey: {
     type: 'select',
@@ -66,7 +153,15 @@ const BASE_FIELDS = {
     label: 'Locale (blank = default content locale)',
   },
   limit: { type: 'number', label: 'How many', min: 1, max: 50 },
-  layout: { type: 'select', label: 'Layout', options: LAYOUT_OPTIONS },
+  layout: {
+    type: 'select',
+    label: 'Layout',
+    options: [
+      { label: 'List', value: 'list' },
+      { label: 'Cards', value: 'cards' },
+      { label: 'Table', value: 'table' },
+    ],
+  },
   title: { type: 'text', label: 'Heading' },
   emptyText: { type: 'text', label: 'Text shown when there are no records' },
   linkTemplate: {
@@ -98,6 +193,11 @@ async function loadTypes() {
 }
 
 export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
+  // The block's own name in Puck's block palette — module-scope, evaluated
+  // before i18n is configured (see `buildBaseFields`'s comment), and Puck
+  // has no per-render hook for a `ComponentConfig`'s own `label` the way
+  // `resolveFields` gives one for field labels. Left English (L2's accepted
+  // gap), same reasoning as `BASE_FIELDS` below.
   label: 'Records list (live, from a Record Type)',
   fields: BASE_FIELDS,
   defaultProps: {
@@ -121,10 +221,16 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
   },
   resolveFields: async (data) => {
     const types = await loadTypes();
+    const fields = buildBaseFields();
     const typeOptions = [
-      { label: '— choose —', value: '' },
+      { label: t('records.fields.choose', { defaultValue: '— choose —' }), value: '' },
       ...types.map((rtype) => ({
-        label: rtype.is_public ? rtype.label : `${rtype.label} (not public)`,
+        label: rtype.is_public
+          ? rtype.label
+          : t('records.widget.type_not_public', {
+              label: rtype.label,
+              defaultValue: '{label} (not public)',
+            }),
         value: rtype.key,
       })),
     ];
@@ -134,9 +240,9 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
       label: field.label,
     }));
     return {
-      ...BASE_FIELDS,
-      typeKey: { ...BASE_FIELDS.typeKey, options: typeOptions } as SelectField,
-      fields: { ...BASE_FIELDS.fields, availableFields } satisfies FieldsPickerField,
+      ...fields,
+      typeKey: { ...fields.typeKey, options: typeOptions } as SelectField,
+      fields: { ...fields.fields, availableFields } satisfies FieldsPickerField,
     };
   },
   resolveData: async ({ props }, { changed, trigger }) => {
@@ -152,7 +258,7 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
       // baked in last time rather than wiping it.
       return { props };
     }
-    const rtype = types.find((t) => t.key === props.typeKey);
+    const rtype = types.find((candidate) => candidate.key === props.typeKey);
     if (!rtype) {
       return { props: { ...props, fieldMeta: [], typeIsPublic: null } };
     }

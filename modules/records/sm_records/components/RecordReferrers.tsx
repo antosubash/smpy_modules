@@ -184,7 +184,7 @@ export function RecordReferrers({
               data-testid="records-referrers-load-more"
             >
               {loading
-                ? t('records.editor.saving', { defaultValue: 'Saving…' })
+                ? t('records.common.loading', { defaultValue: 'Loading…' })
                 : t('records.referrers.load_more', { defaultValue: 'Load more' })}
             </Button>
           )}

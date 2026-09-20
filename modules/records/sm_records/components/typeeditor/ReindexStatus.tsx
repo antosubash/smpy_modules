@@ -86,7 +86,7 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
         onClick={() => void triggerReindex()}
       >
         {pending
-          ? t('records.editor.saving', { defaultValue: 'Saving…' })
+          ? t('records.type_editor.reindex.scheduling', { defaultValue: 'Scheduling…' })
           : t('records.type_editor.reindex.reindex_now', { defaultValue: 'Reindex now' })}
       </Button>
     </div>

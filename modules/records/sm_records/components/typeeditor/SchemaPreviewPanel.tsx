@@ -58,12 +58,18 @@ export function SchemaPreviewPanel({
   const [failed, setFailed] = useState(false);
   const [expired, setExpired] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
-  const fieldsRef = useRef<FieldDef[]>(fields);
-  fieldsRef.current = fields;
+  // The exact `fields` array `runPreview` was called with — snapshotted once,
+  // at request time, and read back only by the deferred (job) branch below.
+  // Unlike a ref reassigned every render, this can't drift to whatever the
+  // admin has typed by the time a long-running preview job lands (M1): both
+  // the sync and deferred paths then mark `previewedFields` against the
+  // draft that was actually sent, not the latest one.
+  const requestedFieldsRef = useRef<FieldDef[]>(fields);
 
   const stale = preview !== null && previewedFields !== fields;
 
   const runPreview = async () => {
+    requestedFieldsRef.current = fields;
     setPending(true);
     setError(null);
     setProgress(null);
@@ -103,7 +109,7 @@ export function SchemaPreviewPanel({
         setPending(false);
         if (state.preview) {
           setPreview(state.preview);
-          setPreviewedFields(fieldsRef.current);
+          setPreviewedFields(requestedFieldsRef.current);
         } else {
           setFailed(true);
         }

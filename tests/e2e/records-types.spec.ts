@@ -118,7 +118,20 @@ test.describe('Records — types', () => {
     const keyInput = row.getByLabel('Key', { exact: true });
 
     await keyInput.fill('_orphaned');
-    await expect(row.getByText('"_orphaned" is reserved by the module.')).toBeVisible();
+    await expect(
+      row.getByText(
+        '"_orphaned" is reserved by the module: it names a column every record already has.',
+      ),
+    ).toBeVisible();
+
+    // The message names whichever reserved key was actually typed, not a
+    // fixed example (M2) — `status` is also in `RESERVED_FIELD_KEYS`.
+    await keyInput.fill('status');
+    await expect(
+      row.getByText(
+        '"status" is reserved by the module: it names a column every record already has.',
+      ),
+    ).toBeVisible();
 
     await keyInput.fill('Bad-Key');
     await expect(row.getByText(/Must start with a lowercase letter/)).toBeVisible();

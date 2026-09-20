@@ -90,7 +90,16 @@ export async function importRecords(
   } catch {
     parsed = null;
   }
-  if (response.ok) return parsed as ImportReport;
+  if (response.ok) {
+    // An empty or unparseable 2xx body (L9) would otherwise hand the caller
+    // a `null` typed as `ImportReport`, which `RecordIoMenu` dereferences
+    // (`result.failed`) — a `TypeError` surfacing as a raw, unhelpful toast
+    // instead of a message that says what actually went wrong.
+    if (parsed === null) {
+      throw new Error(`Import response was empty or unreadable (${response.status})`);
+    }
+    return parsed as ImportReport;
+  }
   const report = (parsed as { report?: ImportReport } | null)?.report;
   if (report) return report;
   const detail = (parsed as { detail?: string } | null)?.detail;

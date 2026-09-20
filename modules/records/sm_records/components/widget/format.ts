@@ -104,9 +104,24 @@ export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unkno
   }
 }
 
+/** Whether `href` is safe to render as a real `<a>` on the public page
+ *  (M5): a relative path (`/...`, not scheme-relative `//...`), or an
+ *  absolute `http:`/`https:` URL. Everything else — `javascript:`, `data:`,
+ *  a bare scheme-relative `//host` (which inherits the page's own protocol),
+ *  or anything with no leading slash and no `http(s)` scheme — is rejected.
+ *  The *template* this builds from is free text a pagebuilder editor types
+ *  into a Puck field (`RecordsListBlock.tsx`'s `linkTemplate`), not trusted
+ *  record data, so this has to hold even though every stored `slug`/`uuid`
+ *  is already safe on its own. */
+function safeHref(href: string): boolean {
+  if (href.startsWith('/')) return !href.startsWith('//');
+  return /^https:\/\//i.test(href) || /^http:\/\//i.test(href);
+}
+
 /** Fill `{slug}`/`{uuid}` in a link template. Empty template (or a record
  *  missing the placeholder's value) means "no link", per the field's own
- *  prop help. */
+ *  prop help — and so does a template that resolves to an unsafe scheme
+ *  (M5), which renders the title as plain text instead of an anchor. */
 export function buildRecordHref(
   template: string,
   record: { slug: string | null; uuid: string },
@@ -114,5 +129,6 @@ export function buildRecordHref(
   const trimmed = template.trim();
   if (trimmed === '') return null;
   if (trimmed.includes('{slug}') && !record.slug) return null;
-  return trimmed.replace('{slug}', record.slug ?? '').replace('{uuid}', record.uuid);
+  const href = trimmed.replace('{slug}', record.slug ?? '').replace('{uuid}', record.uuid);
+  return safeHref(href) ? href : null;
 }

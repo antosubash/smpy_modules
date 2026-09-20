@@ -4,8 +4,6 @@ import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
-import { useState } from 'react';
-import { toast } from 'sonner';
 
 import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
@@ -18,9 +16,8 @@ import { RecordRevisions } from '../components/RecordRevisions';
 import { RecordEditorHeaderBadges } from '../components/RecordStatusBadge';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTranslations } from '../components/RecordTranslations';
-import { useRecordForm } from '../hooks/useRecordForm';
-import { ApiError, createRecord, updateRecord } from '../utils/api';
-import type { RecordRead, RecordStatus, TranslationRead, TypeRead } from '../utils/types';
+import { useRecordEditor } from '../hooks/useRecordEditor';
+import type { RecordRead, TranslationRead, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
@@ -57,83 +54,29 @@ function RecordEditor({
   default_locale,
 }: Props) {
   const { t } = useT();
-  const isNew = record === null;
   const contentLocales = content_locales ?? [];
   const defaultLocale = default_locale ?? contentLocales[0] ?? 'en';
   // Only a new record on a translatable type with several locales gets to
   // pick one — an existing record's language is fixed for its lifetime.
-  const showLocalePicker = isNew && type.translatable && contentLocales.length > 1;
-  const [current, setCurrent] = useState<RecordRead | null>(record);
-  const [status, setStatus] = useState<RecordStatus>(record?.status ?? 'draft');
-  const [slug, setSlug] = useState(record?.slug ?? '');
-  const [position, setPosition] = useState(String(record?.position ?? 0));
-  const [locale, setLocale] = useState(defaultLocale);
-  const [conflict, setConflict] = useState<RecordRead | null>(null);
-  const [pending, setPending] = useState(false);
-  const form = useRecordForm(type, record);
-
-  const save = async () => {
-    setConflict(null);
-    const data = form.validateAndBuild();
-    if (data === null) return;
-
-    const payload = {
-      data,
-      status,
-      slug: slug || null,
-      position: Number(position) || 0,
-      ...(showLocalePicker ? { locale } : {}),
-    };
-    setPending(true);
-    try {
-      const saved = isNew
-        ? await createRecord(type.key, payload)
-        : await updateRecord(type.key, current?.uuid ?? '', current?.version ?? 0, payload);
-      if (isNew) {
-        router.visit(`/admin/records/${type.key}/${saved.uuid}`);
-        return;
-      }
-      setCurrent(saved);
-      // The server can derive its own `slug` (and, in principle, adjust
-      // `status`/`position`), so the envelope inputs have to re-sync from
-      // what it actually stored — otherwise a server-derived slug doesn't
-      // show until the next full reload.
-      setStatus(saved.status);
-      setSlug(saved.slug ?? '');
-      setPosition(String(saved.position));
-      form.reset(saved);
-      toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409 && err.body?.current) {
-        setConflict(err.body.current as RecordRead);
-      } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
-        form.setServerErrors(err.body.errors);
-      } else {
-        toast.error(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const reloadFromConflict = (server: RecordRead) => {
-    setCurrent(server);
-    setStatus(server.status);
-    setSlug(server.slug ?? '');
-    setPosition(String(server.position));
-    form.reset(server);
-    setConflict(null);
-  };
-
-  /** A trash-restore (`RecordActions`) and a revision restore (`RecordRevisions`)
-   *  both hand back a fresh `RecordRead`, so the envelope inputs and form re-sync. */
-  const applyRestored = (restored: RecordRead) => {
-    setCurrent(restored);
-    setStatus(restored.status);
-    setSlug(restored.slug ?? '');
-    setPosition(String(restored.position));
-    form.reset(restored);
-  };
+  const showLocalePicker = record === null && type.translatable && contentLocales.length > 1;
+  const {
+    isNew,
+    current,
+    status,
+    slug,
+    position,
+    locale,
+    conflict,
+    pending,
+    form,
+    setStatus,
+    setSlug,
+    setPosition,
+    setLocale,
+    save,
+    reloadFromConflict,
+    applyRestored,
+  } = useRecordEditor(type, record, { showLocalePicker, defaultLocale });
 
   const backHref = `/admin/records/${type.key}`;
   const envelope = form.envelopeErrors;
@@ -174,6 +117,7 @@ function RecordEditor({
               current={conflict}
               yourData={form.currentPayloadText()}
               onReload={reloadFromConflict}
+              onOverwrite={() => void save(conflict.version)}
             />
           )}
 

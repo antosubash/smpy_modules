@@ -105,4 +105,33 @@ describe('buildRecordHref', () => {
   it('still resolves {uuid} when there is no slug and the template does not need one', () => {
     expect(buildRecordHref('/things/{uuid}', { slug: null, uuid: 'u1' })).toBe('/things/u1');
   });
+
+  it('accepts an absolute http(s) URL', () => {
+    expect(buildRecordHref('https://example.com/{slug}', { slug: 'a', uuid: 'u' })).toBe(
+      'https://example.com/a',
+    );
+    expect(buildRecordHref('http://example.com/{slug}', { slug: 'a', uuid: 'u' })).toBe(
+      'http://example.com/a',
+    );
+  });
+
+  it('rejects a javascript: template (M5)', () => {
+    expect(
+      buildRecordHref('javascript:alert(document.cookie)', { slug: 'a', uuid: 'u' }),
+    ).toBeNull();
+  });
+
+  it('rejects a data: template (M5)', () => {
+    expect(
+      buildRecordHref('data:text/html,<script>alert(1)</script>', { slug: 'a', uuid: 'u' }),
+    ).toBeNull();
+  });
+
+  it('rejects a scheme-relative // template (M5)', () => {
+    expect(buildRecordHref('//evil.example/{slug}', { slug: 'a', uuid: 'u' })).toBeNull();
+  });
+
+  it('rejects a non-http(s) scheme template (M5)', () => {
+    expect(buildRecordHref('vbscript:msgbox(1)', { slug: 'a', uuid: 'u' })).toBeNull();
+  });
 });

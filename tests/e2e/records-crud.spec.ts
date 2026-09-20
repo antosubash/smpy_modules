@@ -241,6 +241,10 @@ test.describe('Records — record CRUD', () => {
       .toBe('Agreed');
   });
 
+  // The "Overwrite anyway" branch of the same conflict (H1) lives in
+  // `records-crud-conflict.spec.ts` — this file was already near the
+  // 300-line cap.
+
   test('confirms a successful save on screen', async ({ page }) => {
     await login(page);
     const { key } = await seedSinkType(page);

@@ -28,18 +28,20 @@ type Translate = (...args: any[]) => string;
 /** Exported only for `RecordDeleteDialog.test.tsx`: the dialog's own text is
  *  pure given `loading`/`loadError`/`referrers`, so it is tested directly
  *  rather than through the interactive `ConfirmDialog` this file has no
- *  DOM/testing-library setup to drive. */
-export function DialogBody({
+ *  DOM/testing-library setup to drive.
+ *
+ * A sentence, always — `ConfirmDialog`'s `description` renders inside a real
+ * `<p>` (L6), so this never returns block markup (a list, another `<p>`);
+ * that lives in `DialogDetails` instead, passed as `body`. */
+export function DialogDescription({
   t,
   loading,
   loadError,
-  referrers,
 }: {
   t: Translate;
   loading: boolean;
   loadError: string | null;
-  referrers: ReferrerRead[] | null;
-}) {
+}): ReactNode {
   if (loading) {
     return (
       <span data-testid="records-delete-dialog-checking">
@@ -52,13 +54,31 @@ export function DialogBody({
   if (loadError) {
     return <span className="text-destructive">{loadError}</span>;
   }
-  const plain = t('records.records.confirm_delete', { defaultValue: 'Delete this record?' });
-  if (!referrers || referrers.length === 0) return plain;
+  return t('records.records.confirm_delete', { defaultValue: 'Delete this record?' });
+}
+
+/** The consequences of deleting, when there are any worth naming — `null`
+ *  while still loading, on an error, or when nothing points at this record
+ *  in a way that matters. Block content (lists, several paragraphs) on
+ *  purpose: rendered as `ConfirmDialog`'s `body`, outside the description
+ *  `<p>` (L6), never inside it. */
+export function DialogDetails({
+  t,
+  loading,
+  loadError,
+  referrers,
+}: {
+  t: Translate;
+  loading: boolean;
+  loadError: string | null;
+  referrers: ReferrerRead[] | null;
+}): ReactNode {
+  if (loading || loadError || !referrers || referrers.length === 0) return null;
 
   const restrictors = livingByOnDelete(referrers, 'restrict');
   const setNulls = livingByOnDelete(referrers, 'set_null');
   const cascades = livingByOnDelete(referrers, 'cascade');
-  if (restrictors.length === 0 && setNulls.length === 0 && cascades.length === 0) return plain;
+  if (restrictors.length === 0 && setNulls.length === 0 && cascades.length === 0) return null;
 
   return (
     <div className="space-y-2" data-testid="records-delete-dialog-referrers">
@@ -112,7 +132,6 @@ export function DialogBody({
           </ul>
         </>
       )}
-      {restrictors.length === 0 && <p>{plain}</p>}
     </div>
   );
 }
@@ -169,9 +188,8 @@ export function RecordDeleteDialog({
     <ConfirmDialog
       trigger={trigger}
       title={t('records.records.delete', { defaultValue: 'Delete' })}
-      description={
-        <DialogBody t={t} loading={loading} loadError={loadError} referrers={referrers} />
-      }
+      description={<DialogDescription t={t} loading={loading} loadError={loadError} />}
+      body={<DialogDetails t={t} loading={loading} loadError={loadError} referrers={referrers} />}
       confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
       cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
       pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}

@@ -1,4 +1,7 @@
 {
+  "common": {
+    "loading": "Loading…"
+  },
   "nav": {
     "types": "Record Types"
   },
@@ -127,6 +130,7 @@
     "conflict_title": "This record changed while you were editing",
     "conflict_help": "Someone else saved a change to this record since you opened it. Reload to see the latest version, or overwrite it with what you have.",
     "reload": "Reload",
+    "overwrite": "Overwrite anyway",
     "server_version": "Current on the server",
     "your_version": "Your unsaved version",
     "schema_stale": "Fields changed since this was saved",
@@ -166,7 +170,7 @@
     "icon_placeholder": "database",
     "icon_help": "The name of a lucide-react icon, e.g. \"database\".",
     "is_public": "Public",
-    "is_public_help": "Exposes a read-only public API for this type's published records (design §10).",
+    "is_public_help": "Exposes a read-only public API for this type's published records.",
     "is_public_url_help": "Published records only, filterable only on indexed fields, and never expanded.",
     "public_url_copy": "Copy",
     "public_url_copied": "Copied",
@@ -197,7 +201,7 @@
     "remove_field": "Remove field",
     "key_error": {
       "required": "A key is required.",
-      "reserved": "\"_orphaned\" is reserved by the module.",
+      "reserved": "\"{key}\" is reserved by the module: it names a column every record already has.",
       "pattern": "Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.",
       "duplicate": "Another field already uses this key."
     },
@@ -280,7 +284,8 @@
       "notice": "Rebuilding the index for:",
       "whole_type": "Whole type",
       "since": "since {time}",
-      "reindex_now": "Reindex now"
+      "reindex_now": "Reindex now",
+      "scheduling": "Scheduling…"
     },
     "revisions": {
       "title": "Schema history",
@@ -302,7 +307,9 @@
     "required": "Required",
     "choose": "— choose —",
     "no_choices": "This field has no choices yet.",
-    "unknown_type": "This field type ({type}) is not editable in this version."
+    "unknown_type": "This field type ({type}) is not editable in this version.",
+    "boolean_yes": "Yes",
+    "boolean_no": "No"
   },
   "form": {
     "no_fields": "This type has no fields yet. Add some on its schema screen."
@@ -381,6 +388,22 @@
     "error": "Couldn't load records right now.",
     "empty": "No records to show.",
     "hint_not_public": "Only public types render on the site.",
-    "title_column": "Title"
+    "title_column": "Title",
+    "type_not_public": "{label} (not public)",
+    "fields_picker_empty": "Pick a record type above to choose its fields.",
+    "field_type_key": "Record type",
+    "field_fields": "Fields to show (beyond the title)",
+    "field_filter": "Filter (e.g. status:eq:paid — one term, indexed fields only)",
+    "field_sort": "Sort (e.g. -published_at for newest first)",
+    "field_locale": "Locale (blank = default content locale)",
+    "field_limit": "How many",
+    "field_layout": "Layout",
+    "layout_list": "List",
+    "layout_cards": "Cards",
+    "layout_table": "Table",
+    "field_title": "Heading",
+    "field_empty_text": "Text shown when there are no records",
+    "field_link_template": "Link template ({slug} or {uuid}; blank = no link)",
+    "field_api_prefix": "Public API prefix (advanced — only change if the Records settings screen shows a different one)"
   }
 }

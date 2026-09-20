@@ -100,8 +100,14 @@ export function RecordIoMenu({
       setReport(result);
       if (!dryRun && result.failed === 0) {
         toast.success(t('records.io.applied', { defaultValue: 'Import applied' }));
-        // Nothing else refreshes the list behind the dialog (UX-1) — the
-        // same partial reload a delete/restore uses (`pages/RecordList.tsx`).
+      }
+      // Reload whenever the apply actually wrote a row, not only on a
+      // clean run (M3): `on_error: 'skip'` can write every good row and
+      // still report `failed > 0`, and gating on `failed === 0` alone left
+      // those writes invisible behind the dialog until a manual page
+      // reload. Same partial reload a delete/restore uses
+      // (`pages/RecordList.tsx`).
+      if (!dryRun && result.created + result.updated > 0) {
         router.reload({ only: ['records'] });
       }
     } catch (error) {

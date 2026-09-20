@@ -16,14 +16,17 @@ const NULLABLE = '__no_default__';
  * rather than guessed at with a textarea.
  */
 export function DefaultInput({
-  fieldKey,
+  index,
   type,
   value,
   choices,
   onChange,
   disabled = false,
 }: {
-  fieldKey: string;
+  /** The row's position in the field list — see `FieldOptions`'s own
+   *  `index` doc comment (L5): deriving this input's `id` from `field.key`
+   *  collided across rows sharing an empty or duplicate key. */
+  index: number;
   type: string;
   value: unknown;
   choices: Choice[];
@@ -31,7 +34,7 @@ export function DefaultInput({
   disabled?: boolean;
 }) {
   const { t } = useT();
-  const id = `field-${fieldKey}-default`;
+  const id = `field-row-${index}-default`;
   const label = t('records.type_editor.default_label', { defaultValue: 'Default value' });
 
   if (!(DEFAULT_EDITABLE_TYPES as readonly string[]).includes(type)) return null;

@@ -14,6 +14,7 @@
  */
 
 import type { CustomField } from '@puckeditor/core';
+import { useT } from '@simple-module-py/i18n';
 
 export type FieldOption = { value: string; label: string };
 
@@ -32,11 +33,18 @@ export function FieldsPicker({
   onChange: (value: string[]) => void;
   readOnly?: boolean;
 }) {
+  const { t } = useT();
   const options = field.availableFields ?? [];
   const selected = value ?? [];
 
   if (options.length === 0) {
-    return <p className="text-xs text-gray-500">Pick a record type above to choose its fields.</p>;
+    return (
+      <p className="text-xs text-gray-500">
+        {t('records.widget.fields_picker_empty', {
+          defaultValue: 'Pick a record type above to choose its fields.',
+        })}
+      </p>
+    );
   }
 
   function toggle(key: string, checked: boolean) {
