@@ -17,6 +17,11 @@ export type TypeEditorProps = {
   type: TypeRead | null;
   target_types: TargetType[];
   roles: string[];
+  /** The module's `public_route_prefix` setting (`views.py::_editor_context`)
+   *  — `TypeMetadataForm` shows `{public_route_prefix}/{key}` when `is_public`
+   *  is on, since the prefix is a DB-backed setting the browser has no other
+   *  way to know (design §11). */
+  public_route_prefix: string;
 };
 
 /** A field row's local editing state. Identical in shape to the wire

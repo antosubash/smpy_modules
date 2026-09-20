@@ -4,6 +4,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api';
 import type { RecordRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
+import { RecordDeleteDialog } from './RecordDeleteDialog';
 
 /** Delete / restore / purge for `RecordEditor` — split out so the editor's
  *  main body stays readable and under the 300-line cap. Exactly one of the
@@ -26,20 +27,14 @@ export function RecordActions({
   if (!record.is_deleted) {
     const label = t('records.records.delete', { defaultValue: 'Delete' });
     return (
-      <ConfirmDialog
+      <RecordDeleteDialog
+        typeKey={typeKey}
+        uuid={record.uuid}
         trigger={
           <Button type="button" variant="outline">
             {label}
           </Button>
         }
-        title={label}
-        description={t('records.records.confirm_delete', {
-          defaultValue: 'Delete this record?',
-        })}
-        confirmLabel={label}
-        cancelLabel={cancelLabel}
-        pendingLabel={pendingLabel}
-        destructive
         onConfirm={async () => {
           await deleteRecord(typeKey, record.uuid);
           onGone();

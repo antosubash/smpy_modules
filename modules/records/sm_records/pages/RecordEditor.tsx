@@ -3,9 +3,6 @@ import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { Input } from '@simple-module-py/ui/components/ui/input';
-import { Label } from '@simple-module-py/ui/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 import { useState } from 'react';
@@ -15,25 +12,26 @@ import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
+import { RecordEnvelopeFields } from '../components/RecordEnvelopeFields';
 import { RecordForm } from '../components/RecordForm';
+import { RecordReferrers } from '../components/RecordReferrers';
 import { RecordRevisions } from '../components/RecordRevisions';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { useRecordForm } from '../hooks/useRecordForm';
 import { ApiError, createRecord, updateRecord } from '../utils/api';
-import type { RecordRead, RecordStatus, TypeRead, ValidationError } from '../utils/types';
+import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 
-type Props = { type: TypeRead; record: RecordRead | null };
+type Props = {
+  type: TypeRead;
+  record: RecordRead | null;
+  /** "Referenced by" badge count (`views.py::record_edit`) — absent on the
+   *  new-record screen, which has no uuid anything could reference yet. */
+  referrer_count?: number;
+};
 
-const SLUG_ID = 'record-slug';
-const POSITION_ID = 'record-position';
-const STATUS_ID = 'record-status';
 const DATA_ID = 'record-data';
 /** The 422 `field` values that belong to an input outside the schema form. */
 const ENVELOPE_KEYS = ['status', 'slug', 'position'];
-
-function fieldMessage(errors: ValidationError[], field: string): string | undefined {
-  return errors.find((e) => e.field === field)?.message;
-}
 
 /** `Records/RecordEditor` — `/admin/records/{key}/new` and `/…/{uuid}`.
  *
@@ -43,7 +41,7 @@ function fieldMessage(errors: ValidationError[], field: string): string | undefi
  * back re-populates the fields from what was typed. A trashed record loads
  * here too (for `records.edit`): the `Deleted` badge above and the
  * restore/purge buttons in `RecordActions` are how it's reached from the UI. */
-function RecordEditor({ type, record }: Props) {
+function RecordEditor({ type, record, referrer_count }: Props) {
   const { t } = useT();
   const isNew = record === null;
   const [current, setCurrent] = useState<RecordRead | null>(record);
@@ -164,52 +162,15 @@ function RecordEditor({ type, record }: Props) {
             />
           )}
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor={STATUS_ID}>
-                {t('records.records.status', { defaultValue: 'Status' })}
-              </Label>
-              <NativeSelect
-                id={STATUS_ID}
-                className="w-full"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as RecordStatus)}
-              >
-                <NativeSelectOption value="draft">
-                  {t('records.records.draft', { defaultValue: 'Draft' })}
-                </NativeSelectOption>
-                <NativeSelectOption value="published">
-                  {t('records.records.published', { defaultValue: 'Published' })}
-                </NativeSelectOption>
-              </NativeSelect>
-              {fieldMessage(envelope, 'status') && (
-                <p className="text-sm text-destructive">{fieldMessage(envelope, 'status')}</p>
-              )}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor={SLUG_ID}>
-                {t('records.editor.slug_label', { defaultValue: 'Slug' })}
-              </Label>
-              <Input id={SLUG_ID} value={slug} onChange={(e) => setSlug(e.target.value)} />
-              {fieldMessage(envelope, 'slug') && (
-                <p className="text-sm text-destructive">{fieldMessage(envelope, 'slug')}</p>
-              )}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor={POSITION_ID}>
-                {t('records.editor.position_label', { defaultValue: 'Position' })}
-              </Label>
-              <Input
-                id={POSITION_ID}
-                type="number"
-                value={position}
-                onChange={(e) => setPosition(e.target.value)}
-              />
-              {fieldMessage(envelope, 'position') && (
-                <p className="text-sm text-destructive">{fieldMessage(envelope, 'position')}</p>
-              )}
-            </div>
-          </div>
+          <RecordEnvelopeFields
+            status={status}
+            slug={slug}
+            position={position}
+            envelope={envelope}
+            onStatusChange={setStatus}
+            onSlugChange={setSlug}
+            onPositionChange={setPosition}
+          />
 
           {unplaceable.length > 0 && (
             <ul
@@ -257,6 +218,7 @@ function RecordEditor({ type, record }: Props) {
               errors={form.fieldErrors}
               disabled={pending}
               onChange={form.setValue}
+              expanded={current?.expanded ?? undefined}
             />
           )}
 
@@ -276,6 +238,14 @@ function RecordEditor({ type, record }: Props) {
               />
             )}
           </div>
+
+          {current && (
+            <RecordReferrers
+              typeKey={type.key}
+              uuid={current.uuid}
+              referrerCount={referrer_count ?? 0}
+            />
+          )}
 
           {current && (
             <RecordRevisions

@@ -5,7 +5,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError, buildFilterParam, getRecord, listRecords } from '../utils/api';
-import type { FieldDef, RecordRead } from '../utils/types';
+import type { ExpandedRef, FieldDef, RecordRead } from '../utils/types';
 import {
   isRelationValue,
   type RelationValue,
@@ -18,10 +18,23 @@ import {
 const DEBOUNCE_MS = 250;
 const RESULT_LIMIT = 10;
 
-/** `null` means "looked up and not there" — a dangling reference, which a
- *  soft-deleted target legitimately produces (design §9). It renders as a
- *  marked chip; it never throws. */
-type LabelMap = Record<string, string | null>;
+/** `title: null` means "looked up and not there" — a dangling reference,
+ *  which a soft-deleted target legitimately produces (design §9). `restricted`
+ *  marks a target this caller may not view: `title` is `null` there too, but
+ *  it renders as a different, non-alarming chip — nothing here failed, the
+ *  caller just isn't allowed to see it. */
+type LabelEntry = { title: string | null; restricted: boolean };
+type LabelMap = Record<string, LabelEntry>;
+
+/** `expanded` keyed by `uuid` rather than trusted to line up positionally
+ *  with `selected`: the caller may have picked a new value since the page's
+ *  own `?expand=` was resolved, and a uuid the map does not know is exactly
+ *  the signal to fall back to this component's own lookup below. */
+function expandedByUuid(expanded: ExpandedRef[] | undefined): Record<string, ExpandedRef> {
+  const map: Record<string, ExpandedRef> = {};
+  for (const ref of expanded ?? []) map[ref.uuid] = ref;
+  return map;
+}
 
 function valuesOf(value: unknown, many: boolean): RelationValue[] {
   if (many) return Array.isArray(value) ? value.filter(isRelationValue) : [];
@@ -41,16 +54,23 @@ export function RelationPicker({
   value,
   onChange,
   disabled,
+  expanded,
 }: {
   field: FieldDef;
   value: unknown;
   onChange: (next: unknown) => void;
   disabled?: boolean;
+  /** This field's slice of the record's `expanded` (design §9), when the
+   *  page already resolved it — the editor's own load always does. Consulted
+   *  before falling back to this component's per-uuid lookup, so a value the
+   *  page expanded is never fetched twice. */
+  expanded?: ExpandedRef[];
 }) {
   const { t } = useT();
   const target = relationTarget(field);
   const many = relationIsMany(field);
   const selected = useMemo(() => valuesOf(value, many), [value, many]);
+  const expandedMap = useMemo(() => expandedByUuid(expanded), [expanded]);
 
   const [labels, setLabels] = useState<LabelMap>({});
   const [query, setQuery] = useState('');
@@ -60,37 +80,56 @@ export function RelationPicker({
   const labelsRef = useRef<LabelMap>({});
   labelsRef.current = labels;
 
-  // Resolve the display title of whatever is already selected. A 404 is an
-  // expected answer here, not a failure: it marks the chip and moves on.
+  // Resolve the display title of whatever is already selected: from the
+  // page's own `expanded` first (no request at all), and only fetched here
+  // for a uuid it does not cover — a value picked this session, or a record
+  // whose page never expanded it. A 404 is an expected answer either way,
+  // not a failure: it marks the chip and moves on.
   useEffect(() => {
     if (!target) return;
     let cancelled = false;
-    const missing = selected.map((ref) => ref.uuid).filter((uuid) => !(uuid in labelsRef.current));
+    const seeded: [string, LabelEntry][] = [];
+    const missing: string[] = [];
+    for (const ref of selected) {
+      if (ref.uuid in labelsRef.current) continue;
+      const exp = expandedMap[ref.uuid];
+      if (!exp) {
+        missing.push(ref.uuid);
+      } else if (exp.restricted) {
+        seeded.push([ref.uuid, { title: null, restricted: true }]);
+      } else {
+        seeded.push([
+          ref.uuid,
+          { title: exp.dangling ? null : exp.display_title, restricted: false },
+        ]);
+      }
+    }
+    if (seeded.length > 0) setLabels((prev) => ({ ...prev, ...Object.fromEntries(seeded) }));
     if (missing.length === 0) return;
     void Promise.all(
-      missing.map(async (uuid): Promise<readonly [string, string | null] | null> => {
+      missing.map(async (uuid): Promise<readonly [string, LabelEntry] | null> => {
         try {
           const record = await getRecord(target, uuid);
-          return [uuid, record.display_title] as const;
+          return [uuid, { title: record.display_title, restricted: false }] as const;
         } catch (err) {
           // A 404 is a *fact* about the reference and is cached as one. Any
           // other failure is about the network, so nothing is cached and the
           // chip keeps showing the raw uuid until a later render retries.
-          if (err instanceof ApiError && err.status === 404) return [uuid, null] as const;
+          if (err instanceof ApiError && err.status === 404) {
+            return [uuid, { title: null, restricted: false }] as const;
+          }
           return null;
         }
       }),
     ).then((pairs) => {
       if (cancelled) return;
-      const resolved = pairs.filter(
-        (pair): pair is readonly [string, string | null] => pair !== null,
-      );
+      const resolved = pairs.filter((pair): pair is readonly [string, LabelEntry] => pair !== null);
       if (resolved.length > 0) setLabels((prev) => ({ ...prev, ...Object.fromEntries(resolved) }));
     });
     return () => {
       cancelled = true;
     };
-  }, [target, selected]);
+  }, [target, selected, expandedMap]);
 
   useEffect(() => {
     const term = query.trim();
@@ -128,7 +167,10 @@ export function RelationPicker({
 
   const pick = useCallback(
     (record: RecordRead) => {
-      setLabels((prev) => ({ ...prev, [record.uuid]: record.display_title }));
+      setLabels((prev) => ({
+        ...prev,
+        [record.uuid]: { title: record.display_title, restricted: false },
+      }));
       const ref: RelationValue = { type: target, uuid: record.uuid };
       if (!many) {
         onChange(ref);
@@ -149,6 +191,7 @@ export function RelationPicker({
   );
 
   const missingLabel = t('records.relation.missing', { defaultValue: 'Missing record' });
+  const restrictedLabel = t('records.relation.restricted', { defaultValue: 'Restricted' });
   const removeLabel = t('records.relation.remove', { defaultValue: 'Remove' });
 
   return (
@@ -156,15 +199,22 @@ export function RelationPicker({
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selected.map((ref) => {
-            const label = labels[ref.uuid];
-            const gone = ref.uuid in labels && label === null;
+            const entry = labels[ref.uuid];
+            const restricted = entry?.restricted ?? false;
+            const gone = entry !== undefined && !restricted && entry.title === null;
+            const chipText = restricted
+              ? restrictedLabel
+              : gone
+                ? missingLabel
+                : (entry?.title ?? ref.uuid);
             return (
               <Badge
                 key={ref.uuid}
-                variant={gone ? 'destructive' : 'secondary'}
-                className="gap-1 py-1"
+                variant={gone ? 'destructive' : restricted ? 'outline' : 'secondary'}
+                className={`gap-1 py-1 ${restricted ? 'text-muted-foreground' : ''}`}
+                data-testid={restricted ? 'records-relation-chip-restricted' : undefined}
               >
-                <span>{gone ? missingLabel : (label ?? ref.uuid)}</span>
+                <span>{chipText}</span>
                 <button
                   type="button"
                   disabled={disabled}

@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useSchemaApply } from '../../hooks/useSchemaApply';
-import { listTypeRevisions, restoreTypeRevision } from '../../utils/api';
+import { listTypeRevisions, restoreTypeRevision } from '../../utils/api-history';
 import type { TypeRead, TypeRevision } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { SchemaConflictPanel } from './SchemaConflictPanel';

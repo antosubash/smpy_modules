@@ -2,7 +2,7 @@ import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import type { ReactElement, ReactNode } from 'react';
 
-import type { FieldDef } from '../../utils/types';
+import type { ExpandedRef, FieldDef } from '../../utils/types';
 
 /**
  * The contract every field component in this directory implements, and the
@@ -21,6 +21,9 @@ export type FieldComponentProps = {
   onChange: (next: unknown) => void;
   error?: string;
   disabled?: boolean;
+  /** This field's slice of the record's `expanded` (design §9) — only
+   *  meaningful to `RelationField`; every other component ignores it. */
+  expanded?: ExpandedRef[];
 };
 
 export type FieldComponent = (props: FieldComponentProps) => ReactElement;

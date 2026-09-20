@@ -41,7 +41,34 @@
     "filter_clear": "Clear",
     "position": "Position",
     "published_at": "Published",
-    "schema_stale": "Outdated schema"
+    "schema_stale": "Outdated schema",
+    "delete_checking": "Checking what references this record…",
+    "delete_blocked": "{count} record will block this delete",
+    "delete_blocked_one": "{count} record will block this delete",
+    "delete_blocked_other": "{count} records will block this delete",
+    "delete_blocked_help": "Detach or change these references before deleting.",
+    "delete_set_null": "{count} record will have this reference cleared",
+    "delete_set_null_one": "{count} record will have this reference cleared",
+    "delete_set_null_other": "{count} records will have this reference cleared",
+    "delete_cascade": "{count} record will be deleted too",
+    "delete_cascade_one": "{count} record will be deleted too",
+    "delete_cascade_other": "{count} records will be deleted too"
+  },
+  "referrers": {
+    "title": "Referenced by {count} record",
+    "title_one": "Referenced by {count} record",
+    "title_other": "Referenced by {count} records",
+    "show": "Expand",
+    "hide": "Collapse",
+    "empty": "Nothing references this record.",
+    "trashed": "Trashed",
+    "load_more": "Load more",
+    "hidden_note": "Some referrers are not visible to you.",
+    "on_delete": {
+      "restrict": "Restrict",
+      "set_null": "Set null",
+      "cascade": "Cascade"
+    }
   },
   "trash": {
     "view": "Trash",
@@ -126,6 +153,9 @@
     "icon_help": "The name of a lucide-react icon, e.g. \"database\".",
     "is_public": "Public",
     "is_public_help": "Exposes a read-only public API for this type's published records (design §10).",
+    "is_public_url_help": "Published records only, filterable only on indexed fields, and never expanded.",
+    "public_url_copy": "Copy",
+    "public_url_copied": "Copied",
     "allowed_roles": "Allowed roles",
     "allowed_roles_help": "Leave empty to allow anyone holding \"Manage record types\". Selecting one or more roles narrows access to those roles as well.",
     "display_field": "Display field",
@@ -255,6 +285,9 @@
   },
   "relation": {
     "missing": "Missing record",
+    "deleted": "Deleted",
+    "deleted_title": "The record this pointed at has been deleted.",
+    "restricted": "Restricted",
     "remove": "Remove",
     "search_placeholder": "Search by title…",
     "search_label": "Search for a record",

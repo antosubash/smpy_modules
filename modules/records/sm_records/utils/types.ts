@@ -101,6 +101,47 @@ export type TypeRevision = {
 
 export type RecordStatus = 'draft' | 'published';
 
+/** One stored relation reference, resolved under `?expand=` (design §9).
+ *  Mirrors `contracts/relations.py::ExpandedRef` — exactly one of the three
+ *  states holds: resolved (`display_title` set), `dangling` (target trashed
+ *  or gone) or `restricted` (target's type narrows `allowed_roles` past the
+ *  caller). */
+export type ExpandedRef = {
+  type_key: string;
+  uuid: string;
+  display_title: string | null;
+  slug: string | null;
+  status: string | null;
+  dangling: boolean;
+  restricted: boolean;
+};
+
+/** One record pointing at the record being read, and what deleting the
+ *  target would do to it — mirrors `contracts/relations.py::ReferrerRead`. */
+export type ReferrerRead = {
+  type_key: string;
+  type_label: string;
+  uuid: string;
+  display_title: string;
+  field_key: string;
+  field_label: string;
+  on_delete: string;
+  is_deleted: boolean;
+};
+
+/** `GET .../records/{uuid}/referrers`'s response. `total` counts every
+ *  *distinct referring record* — live and trashed, including ones this
+ *  caller may not view (a record referencing via two fields counts once).
+ *  `hidden` is how many of those `total` this caller may not view; `items`
+ *  (capped by page size) is paginated over the visible ones only, so
+ *  `items.length` across every page sums to `total - hidden` (design
+ *  §9/§10). */
+export type ReferrersResponse = {
+  items: ReferrerRead[];
+  total: number;
+  hidden: number;
+};
+
 export type RecordRead = {
   uuid: string;
   type_key: string;
@@ -121,6 +162,11 @@ export type RecordRead = {
    *  a `force`d restrictive schema change or a schema rollback the record no
    *  longer fits. */
   invalid: { field: string; message: string }[];
+  /** Relation targets resolved under an explicit `?expand=a,b` (design §9):
+   *  field key -> one `ExpandedRef` per stored reference, in payload order.
+   *  `undefined`/`null` when the caller did not ask (a plain list row, or a
+   *  record freshly returned by a create/update, which does not expand). */
+  expanded?: Record<string, ExpandedRef[]> | null;
 };
 
 export type RecordPage = {

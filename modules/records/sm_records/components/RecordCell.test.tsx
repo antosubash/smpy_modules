@@ -88,6 +88,80 @@ describe('RecordCell', () => {
     expect(html(f, { type: 'author', uuid: 12345 })).toContain('—');
   });
 
+  it('renders an expanded relation as a link to the target title', () => {
+    const f = field({ type: 'relation', options: { target_type: 'author' } });
+    const value = { type: 'author', uuid: '0123456789abcdef' };
+    const out = renderToStaticMarkup(
+      <RecordCell
+        field={f}
+        value={value}
+        expanded={[
+          {
+            type_key: 'author',
+            uuid: '0123456789abcdef',
+            display_title: 'Herbert',
+            slug: 'herbert',
+            status: 'published',
+            dangling: false,
+            restricted: false,
+          },
+        ]}
+      />,
+    );
+    expect(out).toContain('Herbert');
+    expect(out).toContain('href="/admin/records/author/0123456789abcdef"');
+  });
+
+  it('shows a muted marker for a dangling expanded relation, not the raw uuid', () => {
+    const f = field({ type: 'relation', options: { target_type: 'author' } });
+    const value = { type: 'author', uuid: '0123456789abcdef' };
+    const out = renderToStaticMarkup(
+      <RecordCell
+        field={f}
+        value={value}
+        expanded={[
+          {
+            type_key: 'author',
+            uuid: '0123456789abcdef',
+            display_title: null,
+            slug: null,
+            status: null,
+            dangling: true,
+            restricted: false,
+          },
+        ]}
+      />,
+    );
+    expect(out).toContain('Deleted');
+    expect(out).toContain('01234567');
+    expect(out).not.toContain('href=');
+  });
+
+  it('shows a muted marker for a restricted expanded relation, with no title or link', () => {
+    const f = field({ type: 'relation', options: { target_type: 'author' } });
+    const value = { type: 'author', uuid: '0123456789abcdef' };
+    const out = renderToStaticMarkup(
+      <RecordCell
+        field={f}
+        value={value}
+        expanded={[
+          {
+            type_key: 'author',
+            uuid: '0123456789abcdef',
+            display_title: null,
+            slug: null,
+            status: null,
+            dangling: false,
+            restricted: true,
+          },
+        ]}
+      />,
+    );
+    expect(out).toContain('Restricted');
+    expect(out).not.toContain('href=');
+    expect(out).not.toContain('01234567');
+  });
+
   it('truncates long text and keeps the full value in a title attribute', () => {
     const long = 'x'.repeat(80);
     const out = html(field({ type: 'text' }), long);

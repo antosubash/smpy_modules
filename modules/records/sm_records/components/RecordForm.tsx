@@ -1,6 +1,6 @@
 import { useT } from '@simple-module-py/i18n';
 
-import type { FieldDef } from '../utils/types';
+import type { ExpandedRef, FieldDef } from '../utils/types';
 import type { FormValues } from '../utils/values';
 import { getFieldComponent } from './fields';
 
@@ -13,12 +13,16 @@ export function RecordForm({
   errors,
   disabled,
   onChange,
+  expanded,
 }: {
   fields: FieldDef[];
   values: FormValues;
   errors: Record<string, string>;
   disabled?: boolean;
   onChange: (key: string, next: unknown) => void;
+  /** The record's `expanded`, keyed by field — passed through to whichever
+   *  field component uses it (currently only `RelationField`). */
+  expanded?: Record<string, ExpandedRef[]>;
 }) {
   const { t } = useT();
   if (fields.length === 0) {
@@ -41,6 +45,7 @@ export function RecordForm({
             value={values[field.key]}
             error={errors[field.key]}
             disabled={disabled}
+            expanded={expanded?.[field.key]}
             onChange={(next) => onChange(field.key, next)}
           />
         );

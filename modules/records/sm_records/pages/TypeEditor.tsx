@@ -45,7 +45,7 @@ const TYPES_LIST_HREF = '/admin/records/';
  * "Preview changes" before saving and by the save itself, which the server
  * enforces with a dry-run (§8.2) rather than trusting the client to have run
  * one. */
-function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
+function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
   const [current, setCurrent] = useState<TypeRead | null>(type);
@@ -178,6 +178,7 @@ function TypeEditor({ type, target_types, roles }: TypeEditorProps) {
                 values={values}
                 onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
                 errors={topLevelErrors}
+                publicRoutePrefix={public_route_prefix}
               />
             </CardContent>
           </Card>

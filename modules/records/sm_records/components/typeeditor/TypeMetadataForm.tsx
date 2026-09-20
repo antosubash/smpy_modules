@@ -1,9 +1,11 @@
 import { useT } from '@simple-module-py/i18n';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
+import { useState } from 'react';
 
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
@@ -41,6 +43,7 @@ export function TypeMetadataForm({
   values,
   onChange,
   errors,
+  publicRoutePrefix,
 }: {
   isNew: boolean;
   fields: EditableField[];
@@ -48,9 +51,24 @@ export function TypeMetadataForm({
   values: TypeMetadataValues;
   onChange: (patch: Partial<TypeMetadataValues>) => void;
   errors: ValidationError[];
+  /** The module's `public_route_prefix` setting — shown next to "Public"
+   *  once it's switched on, since the prefix is DB-backed and the browser
+   *  has no other way to know it (design §11). */
+  publicRoutePrefix: string;
 }) {
   const { t } = useT();
+  const [copied, setCopied] = useState(false);
   const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
+  const publicUrl = `${publicRoutePrefix}/${values.key || none}`;
+  const copyPublicUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access can be denied; the code line is still selectable.
+    }
+  };
   // Only the field types the API accepts for each pointer
   // (`services/_schema.py::DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`). Offering
   // a `json` display field or a `boolean` slug field meant a 422 on save at
@@ -153,6 +171,25 @@ export function TypeMetadataForm({
             "Exposes a read-only public API for this type's published records (design §10).",
         })}
       </p>
+
+      {values.isPublic && (
+        <div className="-mt-2 grid gap-1.5 sm:col-span-2" data-testid="records-public-url">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="w-fit rounded-md border bg-muted px-2 py-1 text-sm">{publicUrl}</code>
+            <Button type="button" variant="outline" size="sm" onClick={() => void copyPublicUrl()}>
+              {copied
+                ? t('records.type_editor.public_url_copied', { defaultValue: 'Copied' })
+                : t('records.type_editor.public_url_copy', { defaultValue: 'Copy' })}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {t('records.type_editor.is_public_url_help', {
+              defaultValue:
+                'Published records only, filterable only on indexed fields, and never expanded.',
+            })}
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-1.5 sm:col-span-2">
         <Label>{t('records.type_editor.allowed_roles', { defaultValue: 'Allowed roles' })}</Label>

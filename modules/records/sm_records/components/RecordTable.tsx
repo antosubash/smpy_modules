@@ -14,6 +14,7 @@ import { listColumns, type SortState } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RecordCell } from './RecordCell';
+import { RecordDeleteDialog } from './RecordDeleteDialog';
 import { RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
 
@@ -115,7 +116,11 @@ export function RecordTable({
             </TableCell>
             {columns.map((field) => (
               <TableCell key={field.key} className="text-muted-foreground">
-                <RecordCell field={field} value={record.data[field.key]} />
+                <RecordCell
+                  field={field}
+                  value={record.data[field.key]}
+                  expanded={record.expanded?.[field.key] ?? undefined}
+                />
               </TableCell>
             ))}
             <TableCell className="text-muted-foreground">{record.position}</TableCell>
@@ -141,20 +146,14 @@ export function RecordTable({
                   onConfirm={() => onRestore(record)}
                 />
               ) : (
-                <ConfirmDialog
+                <RecordDeleteDialog
+                  typeKey={type.key}
+                  uuid={record.uuid}
                   trigger={
                     <Button type="button" variant="ghost" size="sm">
                       {t('records.records.delete', { defaultValue: 'Delete' })}
                     </Button>
                   }
-                  title={t('records.records.delete', { defaultValue: 'Delete' })}
-                  description={t('records.records.confirm_delete', {
-                    defaultValue: 'Delete this record?',
-                  })}
-                  confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
-                  cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                  pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
-                  destructive
                   onConfirm={() => onDelete(record)}
                 />
               )}

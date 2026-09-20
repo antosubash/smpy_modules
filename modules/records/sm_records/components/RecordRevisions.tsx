@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/c
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { ApiError, getRecordRevision, listRevisions, restoreRecordRevision } from '../utils/api';
+import { ApiError } from '../utils/api';
+import { getRecordRevision, listRevisions, restoreRecordRevision } from '../utils/api-history';
 import type {
   RecordRead,
   RecordRevision,

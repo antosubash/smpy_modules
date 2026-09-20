@@ -1,4 +1,7 @@
-import type { FieldDef } from '../utils/types';
+import { Link } from '@inertiajs/react';
+import { useT } from '@simple-module-py/i18n';
+
+import type { ExpandedRef, FieldDef } from '../utils/types';
 
 const DASH = '—';
 
@@ -27,19 +30,66 @@ function isRef(value: unknown): value is { type: string; uuid: string } {
   );
 }
 
+/** One resolved relation target, rendered as a link, or a muted marker for
+ *  the two states that are not a live, visible record (design §9). */
+function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
+  const { t } = useT();
+  if (exp.restricted) {
+    return (
+      <span className="text-muted-foreground" data-testid="records-relation-restricted">
+        {t('records.relation.restricted', { defaultValue: 'Restricted' })}
+      </span>
+    );
+  }
+  if (exp.dangling) {
+    return (
+      <span
+        className="text-muted-foreground"
+        title={t('records.relation.deleted_title', {
+          defaultValue: 'The record this pointed at has been deleted.',
+        })}
+        data-testid="records-relation-deleted"
+      >
+        {t('records.relation.deleted', { defaultValue: 'Deleted' })} ({exp.uuid.slice(0, 8)})
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/records/${exp.type_key}/${exp.uuid}`}
+      className="hover:underline"
+      data-testid="records-relation-link"
+    >
+      {exp.display_title}
+    </Link>
+  );
+}
+
 /**
  * Renders one indexed-field column's value in the record list, by field
  * type (design doc §7.3's coercions, reversed for display).
  *
- * Relations show only the target uuid's first eight characters — Phase 2
- * has no batch "expand" of relation targets (design doc §16, Phase 4), so
- * there is no target record here to pull a display title from without an
- * extra query per row per relation column.
+ * A relation renders its `expanded[field.key]` entry when the caller passed
+ * one — the target's `display_title` as a link, or a muted marker for a
+ * `dangling`/`restricted` target (design §9) — and falls back to the target
+ * uuid's first eight characters when there is none (no `?expand=` was asked,
+ * or this is an older payload with nothing to look it up in).
  *
  * `json`, `media` and `longtext` never reach this component: they are not
  * indexable (design doc §7.3), so `listColumns` never selects them.
  */
-export function RecordCell({ field, value }: { field: FieldDef; value: unknown }) {
+export function RecordCell({
+  field,
+  value,
+  expanded,
+}: {
+  field: FieldDef;
+  value: unknown;
+  /** This field's slice of `RecordRead.expanded`, one entry per stored
+   *  reference in payload order — `undefined` when the caller did not
+   *  expand this column. */
+  expanded?: ExpandedRef[];
+}) {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">{DASH}</span>;
   }
@@ -101,8 +151,34 @@ export function RecordCell({ field, value }: { field: FieldDef; value: unknown }
     case 'relation': {
       const refs = Array.isArray(value) ? value : [value];
       if (refs.length === 0) return <span className="text-muted-foreground">{DASH}</span>;
-      const short = refs.map((r) => (isRef(r) ? r.uuid.slice(0, 8) : DASH)).join(', ');
-      return <span className="font-mono text-xs">{short}</span>;
+      if (!expanded) {
+        const short = refs.map((r) => (isRef(r) ? r.uuid.slice(0, 8) : DASH)).join(', ');
+        return <span className="font-mono text-xs">{short}</span>;
+      }
+      // Matched by position: `expanded[field.key]` carries one `ExpandedRef`
+      // per stored reference, in payload order (design §9) — the same order
+      // `refs` is already in.
+      return (
+        <span className="flex flex-wrap items-center gap-x-1">
+          {refs.map((r, index) => {
+            const exp = expanded[index];
+            const key = isRef(r) ? r.uuid : String(index);
+            if (!exp) {
+              return (
+                <span key={key} className="font-mono text-xs">
+                  {isRef(r) ? r.uuid.slice(0, 8) : DASH}
+                </span>
+              );
+            }
+            return (
+              <span key={exp.uuid} className="contents">
+                {index > 0 && <span className="text-muted-foreground">,</span>}
+                <ExpandedRefChip ref={exp} />
+              </span>
+            );
+          })}
+        </span>
+      );
     }
 
     default: {

@@ -17,12 +17,9 @@ import type {
   FilterOp,
   RecordPage,
   RecordRead,
-  RecordRevision,
-  RecordRevisionDetail,
   RecordStatus,
   SchemaPreview,
   TypeRead,
-  TypeRevision,
 } from './types';
 
 const BASE = '/api/records';
@@ -70,7 +67,11 @@ function messageFor(status: number, statusText: string, body: ApiErrorBody | nul
   return fallback;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Exported for `utils/api-history.ts`, split out of this file to stay under
+ *  the 300-line cap — same `fetch` plumbing, a different slice of the API
+ *  surface (schema/record revisions, referrers). Not meant as a public
+ *  export beyond this package. */
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const defaultHeaders = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -185,21 +186,8 @@ export function reindexType(key: string): Promise<{ scheduled: boolean }> {
   return request(`/types/${encodeURIComponent(key)}/reindex`, { method: 'POST' });
 }
 
-export function listTypeRevisions(key: string): Promise<{ items: TypeRevision[] }> {
-  return request(`/types/${encodeURIComponent(key)}/revisions`);
-}
-
-/** A schema rollback shares `updateType`'s body shape and 409s (§8.6). */
-export function restoreTypeRevision(
-  key: string,
-  version: number,
-  body: { expected_version: number; force?: boolean; orphaned?: 'restore' | 'discard' },
-): Promise<TypeRead> {
-  return request(`/types/${encodeURIComponent(key)}/revisions/${version}/restore`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
+// Type-schema revisions, record revisions and referrers live in
+// `utils/api-history.ts` — kept out of here for the 300-line cap.
 
 // ---- Records --------------------------------------------------------------
 
@@ -270,30 +258,4 @@ export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
   );
 }
 
-export function listRevisions(typeKey: string, uuid: string): Promise<{ items: RecordRevision[] }> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions`,
-  );
-}
-
-export function getRecordRevision(
-  typeKey: string,
-  uuid: string,
-  id: number,
-): Promise<RecordRevisionDetail> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions/${id}`,
-  );
-}
-
-export function restoreRecordRevision(
-  typeKey: string,
-  uuid: string,
-  id: number,
-  expectedVersion: number,
-): Promise<RecordRead> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/revisions/${id}/restore`,
-    { method: 'POST', body: JSON.stringify({ expected_version: expectedVersion }) },
-  );
-}
+// Record revisions live in `utils/api-history.ts` alongside the type ones.

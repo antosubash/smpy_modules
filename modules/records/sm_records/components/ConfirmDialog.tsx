@@ -30,6 +30,8 @@ export function ConfirmDialog({
   cancelLabel,
   pendingLabel,
   destructive = false,
+  confirmDisabled = false,
+  onOpenChange,
   onConfirm,
 }: {
   trigger: ReactNode;
@@ -39,6 +41,14 @@ export function ConfirmDialog({
   cancelLabel: string;
   pendingLabel: string;
   destructive?: boolean;
+  /** Disables the confirm button without hiding it — for a caller (the
+   *  referrer-aware delete dialog) that still wants the reason visible in
+   *  `description` rather than the dialog refusing to open at all. */
+  confirmDisabled?: boolean;
+  /** Fires with the new open state, before anything else in this component
+   *  reacts to it — a caller that needs to fetch something to fill in
+   *  `description` starts that fetch here, on open. */
+  onOpenChange?: (open: boolean) => void;
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
@@ -50,6 +60,7 @@ export function ConfirmDialog({
     if (pending) return;
     setOpen(next);
     if (!next) setError(null);
+    onOpenChange?.(next);
   };
 
   const confirm = async () => {
@@ -81,7 +92,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             className={destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
             onClick={(e) => {
               e.preventDefault();
