@@ -272,9 +272,10 @@ async def test_record_revision_restore_requires_edit_and_allowed_roles(client):
         json={"expected_version": 1, "data": {"name": "Widget v2", "price": 2}},
         headers=roles(ROLE_EDITOR),
     )
-    revisions = await client.get(
-        f"/api/records/types/product/records/{uuid}/revisions", headers=roles(ADMIN)
-    )
+    # ``allowed_roles`` narrows reads too, wildcard included (README § Permissions).
+    history = f"/api/records/types/product/records/{uuid}/revisions"
+    assert (await client.get(history, headers=roles(ADMIN))).status_code == 403
+    revisions = await client.get(history, headers=roles(ROLE_EDITOR))
     create_id = next(item["id"] for item in revisions.json()["items"] if item["event"] == "create")
 
     viewer = await client.post(

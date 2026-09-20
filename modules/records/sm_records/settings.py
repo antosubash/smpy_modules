@@ -20,11 +20,60 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+from sm_records import constants
 
 _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 """Marks a field the module reads once, while booting. See the module docstring."""
+
+DEFAULT_PUBLIC_ROUTE_PREFIX: Final = "/api/records/public"
+"""Where the anonymous read API lives unless an operator moves it. Named
+because :mod:`sm_records.boot` falls back to it for a stored value that does
+not validate — see :func:`check_public_route_prefix`."""
+
+_FORBIDDEN_PREFIXES: Final = (
+    constants.ROUTE_PREFIX_API,
+    constants.VIEW_PREFIX,
+    "/api",
+    "/admin",
+)
+"""Paths the anonymous exemption may not cover. The rule is *ancestry*, not
+equality: the exemption is a ``startswith`` over a prefix terminating in
+``/``, so a value that is a parent of any of these hands every ``GET`` under
+it to anonymous callers — ``AuthMiddleware`` is disabled for the whole
+subtree, other modules' routes included."""
+
+
+def check_public_route_prefix(value: str) -> str:
+    """The rule :attr:`RecordsSettings.public_route_prefix` must satisfy.
+
+    A function rather than only a validator body because :mod:`sm_records.boot`
+    needs the same answer about a value that reached it anyway — a row stored
+    before this rule existed — without a pydantic exception and without
+    taking the host down at ``on_startup``.
+
+    Three refusals, each with a failure mode behind it: a value with no
+    leading ``/`` made ``PublicRouteRegistry.add_prefix`` assert and killed
+    the lifespan, leaving the setting editable only through the app that
+    would not start; ``/`` (or an empty value, which normalises to it)
+    exempted every ``GET`` in the host; and a parent of the admin API or the
+    admin views exempted those. Anything *under* the admin API's prefix is
+    fine — the exemption cannot reach upwards.
+    """
+    if not value.startswith("/"):
+        raise ValueError("must start with '/'")
+    trimmed = value.rstrip("/")
+    if not trimmed:
+        raise ValueError("must name at least one path segment, so it cannot be '/'")
+    for reserved in _FORBIDDEN_PREFIXES:
+        if reserved == trimmed or reserved.startswith(f"{trimmed}/"):
+            raise ValueError(
+                f"{value!r} is {reserved!r} or a parent of it, so exempting it from "
+                "authentication would expose the admin surface to anonymous callers"
+            )
+    return value
 
 
 class RecordsSettings(BaseSettings):
@@ -55,7 +104,9 @@ class RecordsSettings(BaseSettings):
         """
         return (init_settings,)
 
-    public_route_prefix: str = Field(default="/api/records/public", json_schema_extra=_RESTART)
+    public_route_prefix: str = Field(
+        default=DEFAULT_PUBLIC_ROUTE_PREFIX, json_schema_extra=_RESTART
+    )
     """URL prefix for the anonymous read API of public record types.
 
     ``GET {prefix}/{type_key}`` and ``GET {prefix}/{type_key}/{uuid}`` serve
@@ -68,8 +119,10 @@ class RecordsSettings(BaseSettings):
     value needs a restart — which is what ``requires_restart`` tells the
     operator on the Settings screen. The exemption is registered as a prefix
     rule terminating in ``/``; a value sharing its first characters with the
-    admin API (``/api/records``) is therefore still safe, but a value that is
-    a *parent* of it would not be.
+    admin API (``/api/records``) is therefore still safe, and a value that is
+    a *parent* of it — or of ``/admin`` — is refused outright by
+    :func:`check_public_route_prefix`, as are ``/`` and a value with no
+    leading slash.
     """
 
     default_page_size: int = 25
@@ -133,6 +186,13 @@ class RecordsSettings(BaseSettings):
         ceiling learns nothing and gets a usable page either way.
         """
         return max(min(requested or self.default_page_size, self.max_page_size), 1)
+
+    @field_validator("public_route_prefix")
+    @classmethod
+    def _check_prefix(cls, value: str) -> str:
+        """Refuse a prefix that would exempt the admin surface — or the whole
+        host — from ``AuthMiddleware``. See :func:`check_public_route_prefix`."""
+        return check_public_route_prefix(value)
 
     @model_validator(mode="after")
     def _check_limits(self) -> RecordsSettings:

@@ -60,9 +60,23 @@ class ReferrerRead(SQLModel):
 
 class ReferrersResponse(SQLModel):
     items: list[ReferrerRead]
+    """The referrers this caller may see, one page of them. A record pointing
+    at the target from two relation fields is two entries — the panel names
+    the field — and one referrer as far as :attr:`total` is concerned."""
+
     total: int
-    """Every referrer, live and trashed; ``items`` is capped by the caller's
-    page size so a record with ten thousand referrers still answers."""
+    """Every referring *record*, live and trashed, visible to this caller or
+    not. It is the number a ``restrict`` refusal and the delete dialog speak,
+    so it cannot shrink per caller."""
+
+    hidden: int = 0
+    """How many of :attr:`total` this caller may not view, because their type
+    narrows ``allowed_roles`` past them (design §10).
+
+    Stated rather than left to be inferred: the count was always derivable by
+    subtraction, and a panel that showed four of seven with no explanation
+    reads as a bug. *Which* records they are does not leak — ``items`` is
+    paginated over the visible set alone, so paging cannot locate them."""
 
 
 def expanded_ref(

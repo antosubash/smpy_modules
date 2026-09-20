@@ -15,10 +15,17 @@ a convenience:
   anonymous caller turn one request into a batch of joins against other types,
   some of which are not public.
 
-The filter and sort grammar is the admin one unchanged — refusing a field the
-index cannot answer is ``index.query``'s job and this adds nothing to it. What
-the *endpoint* does with the refusal differs (§10: 400 naming the field, never
-the admin's 409), and that mapping lives in ``endpoints/api/public.py``.
+The filter and sort grammar is the admin one **narrowed to the public shape**.
+Refusing a field the index cannot answer is ``index.query``'s job and this adds
+nothing to it; what this adds is an allow-list over the *fixed* columns, which
+are queryable on every type whatever it declares. ``status``, ``position``,
+``created_at`` and ``updated_at`` are removed from the response shape
+(``contracts.public``) and would otherwise still answer a filter — an
+anonymous caller can binary-search a timestamp it cannot read. They are
+refused by name instead, exactly as an unindexed field is.
+
+What the *endpoint* does with the refusal differs (§10: 400 naming the field,
+never the admin's 409), and that mapping lives in ``endpoints/api/public.py``.
 """
 
 from __future__ import annotations
@@ -29,7 +36,8 @@ from typing import Final
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.index.query import Filter, Sort, build_query, count_query
+from sm_records.index._fixed import FIXED_COLUMNS, PUBLIC_FIXED_COLUMNS
+from sm_records.index.query import Filter, QueryError, Sort, build_query, count_query
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
@@ -46,6 +54,25 @@ content by its absence (§10).
 """
 
 _PUBLISHED = Record.status == RecordStatus.PUBLISHED
+
+_HIDDEN_COLUMNS: Final[frozenset[str]] = FIXED_COLUMNS - PUBLIC_FIXED_COLUMNS
+"""Fixed columns this surface will not answer about — the projection every
+record has, minus the part the public shape publishes."""
+
+
+def _check_columns(rtype: RecordType, filters: Sequence[Filter], sorts: Sequence[Sort]) -> None:
+    """Refuse a filter or sort naming a column the public shape removes.
+
+    ``QueryError`` with the same ``unknown`` reason ``index.query._resolve``
+    gives a key no type declares — the endpoint flattens every reason into one
+    400 naming the field (§10), and these columns have to be indistinguishable
+    from a field that simply is not there. A declared field can never be
+    keyed after one of them (``constants.RESERVED_FIELD_KEYS``), so this
+    refuses nothing a type could have meant.
+    """
+    for name in [flt.field for flt in filters] + [sort.field for sort in sorts]:
+        if name in _HIDDEN_COLUMNS:
+            raise QueryError(name, "unknown", f"{name!r} is not a field of {rtype.key!r}")
 
 
 async def get_public_type(db: AsyncSession, key: str) -> RecordType:
@@ -83,11 +110,13 @@ async def list_public_records(
 ) -> tuple[list[Record], int]:
     """One page of a public type's published records, and the matching total.
 
-    ``QueryError`` from the builder propagates — the endpoint turns every
-    reason into the same 400 naming the field, because "not indexed" and
-    "being reindexed" are the same answer to someone who cannot see the
+    ``QueryError`` from the builder — or from :func:`_check_columns`, which
+    runs first — propagates: the endpoint turns every reason into the same 400
+    naming the field, because "not indexed", "being reindexed" and "not part
+    of the public shape" are the same answer to someone who cannot see the
     schema (§10).
     """
+    _check_columns(rtype, filters, sorts)
     size = settings.clamp_page_size(page_size)
     offset = max(page - 1, 0) * size
     fields = list(rtype.fields or [])

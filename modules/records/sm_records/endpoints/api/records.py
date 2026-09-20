@@ -26,6 +26,7 @@ from sm_records.deps import (
     caller_roles,
     check_type_roles,
     get_settings,
+    load_allowed_type,
     load_type,
     parse_expand,
     parse_filters,
@@ -61,7 +62,7 @@ def _status(raw: str | None) -> RecordStatus | None:
 @router.get("/records", response_model=RecordPage, dependencies=[require_view])
 async def list_records(
     request: Request,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
@@ -82,6 +83,9 @@ async def list_records(
     ``?expand=a,b`` resolves those relation fields for the whole page in one
     query each (design §9) — never per row, which is the difference between a
     list screen and fifty round trips.
+
+    ``load_allowed_type`` and not ``load_type``: the type's ``allowed_roles``
+    narrow this read exactly as they narrow the writes below it (§10).
     """
     items, total = await record_service.list_records(
         db,
@@ -137,7 +141,7 @@ async def create_record(
 async def get_record(
     uuid: str,
     request: Request,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     expand: list[str] = Depends(parse_expand),
 ) -> RecordRead:

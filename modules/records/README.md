@@ -80,6 +80,17 @@ routes it configures are mounted — and exempted from authentication — while
 the app boots, because the prefix only exists as the operator set it once the
 host has hydrated these settings from the database.
 
+It is validated on save: it must start with `/`, must name at least one path
+segment, and may not be `/api`, `/admin`, `/api/records`, `/admin/records` or
+a parent of any of them. The exemption it registers disables `AuthMiddleware`
+for every `GET`/`HEAD` under it — host-wide, not just for this module — so a
+parent path would hand the admin surface to anonymous callers and an empty
+value would hand them the whole site. A value *under* the admin API's prefix
+is harmless; the exemption cannot reach upwards. A stored value that predates
+this rule is logged as an error at boot and replaced by the default rather
+than failing the lifespan: the only screen that could fix it lives in the app
+that would not start.
+
 ## Relations
 
 A `relation` field stores `{"type": "<type_key>", "uuid": "<record uuid>"}` —
@@ -92,9 +103,12 @@ Each reference comes back under `expanded[field_key]`, in payload order, in
 exactly one of three states:
 
 - **resolved** — `display_title`, `slug` and `status` are filled;
-- **dangling** — the target is in the trash or gone; `display_title` is
-  `null`. A restorable delete must not break what references it, so this is a
-  flag rather than an error or a dropped entry;
+- **dangling** — the target is in the trash, gone, or not a record of the
+  type the field declares; `display_title` is `null`. A restorable delete must
+  not break what references it, so this is a flag rather than an error or a
+  dropped entry. A to-many entry that is not a reference at all (a `null` left
+  by a payload written before that was refused) keeps its slot as one of
+  these, because `expanded[key]` is rendered positionally against `data[key]`;
 - **restricted** — the target's type narrows `allowed_roles` past the caller.
   Nothing but the uuid the caller already holds in `data` comes back.
 
@@ -109,9 +123,22 @@ answers "what points at this record", from the reference index rather than a
 scan, and each entry carries the referring field's label and its `on_delete`
 so a delete dialog can say *why* a delete would be blocked. Trashed referrers
 are listed and flagged `is_deleted` (the delete path itself still ignores
-them). A referrer whose type the caller may not view is **counted in `total`
-and omitted from `items`** — the count stays honest, because it is the count a
-`restrict` refusal will produce, and the row itself does not leak.
+them), and a trashed *target* answers too for a caller holding `records.edit`
+— that is the screen where "what still points at this?" decides between
+restore and purge.
+
+Three numbers come back, and each means something different:
+
+- `total` counts every referring **record**, live, trashed, visible or not.
+  One record pointing at the target from two relation fields is one referrer
+  here and two `items` (the panel names the field). It is the number a
+  `restrict` refusal and the delete dialog speak, and the editor's
+  "Referenced by" badge is the same number from the same helper.
+- `hidden` is how many of those the caller may not view, because their type
+  narrows `allowed_roles` past them. Stated rather than left to subtraction —
+  a panel showing two of four with no explanation reads as a bug.
+- `items` is the visible rows, **paginated over the visible set alone**, so
+  walking pages cannot locate the hidden ones.
 
 ## Public read API
 
@@ -136,11 +163,15 @@ The rules worth knowing before you point a site at it:
   exist**, by key and by uuid alike. A draft, a trashed record and an unknown
   uuid answer with that same body, so nothing here can be used to enumerate
   what an install holds.
-- **The filter and sort grammar is the admin one, over indexed fields only.**
-  A filter or sort naming a field that is unindexed, non-existent, or
-  mid-reindex is a `400` naming the field — never the admin API's `409`:
-  "cannot" and "cannot right now" are the same answer to a caller who has no
-  business seeing operational state.
+- **The filter and sort grammar is the admin one, over indexed fields and the
+  public shape's own columns only.** Indexed declared fields, plus `slug`,
+  `display_title` and `published_at`. `status`, `position`, `created_at` and
+  `updated_at` are removed from the shape and therefore from the grammar —
+  otherwise an anonymous caller could binary-search an audit timestamp it
+  cannot read. A filter or sort naming one of those, or a field that is
+  unindexed, non-existent or mid-reindex, is the same `400` naming the field —
+  never the admin API's `409`: "cannot" and "cannot right now" are the same
+  answer to a caller who has no business seeing operational state.
 - **No `?expand=`** — an anonymous caller must not be able to turn one request
   into a batch of joins against other types, some of which may not be public.
   `expand` and `trashed` are simply not parameters here; unknown ones are
@@ -160,16 +191,36 @@ that type on top of the static `records.edit`/`records.manage_types`
 permission; an empty list means "any role holding the static permission".
 
 `allowed_roles` narrows, and narrowing has no exceptions: a caller holding
-the `admin` wildcard is refused writes on a type whose `allowed_roles` is
-non-empty unless `admin` is one of the roles listed. So an admin creating a
-restricted type must list a role they actually hold, or else use
-`records.manage_types` to edit `allowed_roles` back before they can write its
-records. The same list also governs what a delete elsewhere may do to this
-type's records: a `cascade` or `set_null` relation pointing here is refused —
-reported as a `restrict` blocker — for a caller the list excludes, and
+the `admin` wildcard is refused on a type whose `allowed_roles` is non-empty
+unless `admin` is one of the roles listed. So an admin creating a restricted
+type must list a role they actually hold, or else use `records.manage_types`
+to edit `allowed_roles` back before they can work with its records. The same
+list also governs what a delete elsewhere may do to this type's records: a
+`cascade` or `set_null` relation pointing here is refused — reported as a
+`restrict` blocker — for a caller the list excludes, and
 `DELETE /api/records/types/{key}` (which purges every record of the type,
 trash included) and an `orphaned: "discard"` schema edit are refused for them
 too, `records.manage_types` notwithstanding.
+
+**It narrows reads exactly as it narrows writes — same rule, same `403`.** A
+caller the list excludes is refused every *record* surface of that type:
+
+- `GET /api/records/types/{key}/records`, `…/records/{uuid}`, its
+  `…/referrers` and its `…/revisions`;
+- the admin screens over them — `/admin/records/{key}`, `/{key}/new` and
+  `/{key}/{uuid}`;
+- `GET /api/records/types` and the Record Types screen *omit* the type
+  altogether, rather than listing a card that 403s when opened.
+
+Two things stay visible, and both are about the schema rather than the
+records: `GET /api/records/types/{key}` and the type editor at
+`/admin/records/types/{key}`, which need `records.manage_types`. A manager
+locked out of the screen that edits `allowed_roles` would be a one-way door.
+
+A relation pointing *at* a narrowed type is a different question and is not a
+refusal: an `?expand=` of it comes back `restricted` (see Relations), because
+the caller is reading a record they are entitled to see that happens to point
+somewhere they are not.
 
 **This is an honest limitation, not an oversight: per-type `allowed_roles`
 are invisible in the framework's role editor.** An admin editing roles sees
@@ -198,12 +249,13 @@ screen, that a given type is further restricted to specific roles.
   asking the reference index who points at a record, so an unindexed relation
   would accept `restrict`/`set_null`/`cascade` and enforce none of them.
   Indexed relations count against `max_indexed_fields_per_type`.
-- **`allowed_roles` narrows reads as well as writes, but it narrows them
-  differently.** A caller the list excludes is *refused* a write and is
-  *redacted* on a read: an expanded reference to such a type comes back
-  `restricted`, and a referrer of one is counted without being listed. Neither
-  is an error, because in both cases the caller is reading a record they are
-  entitled to see that happens to point somewhere they are not.
+- **`allowed_roles` narrows reads and writes the same way: a `403`.** What is
+  *redacted* rather than refused is a reference **to** a narrowed type from a
+  record the caller may read — an `?expand=` of it comes back `restricted`,
+  and a referrer of one is counted in `total`, reported in `hidden` and left
+  out of `items`. That is not a weaker rule applied to the same resource: the
+  caller is reading a record they are entitled to see that happens to point
+  somewhere they are not, and asking that type directly is still a `403`.
 - **`display_field` must point at a `text`, `select`, `email`, `url`,
   `integer`, `number`, `date` or `datetime` field, and `slug_field` at a
   `text`, `select`, `email` or `url` one.** The rest do not stringify into
@@ -319,14 +371,32 @@ cannot be removed.
 
 A few consequences worth knowing before you use it:
 
-- **A virtual key is global, so it is reserved.** Every type's records are
-  queryable by it, and a type declaring a field of the same key would shadow
-  it — so `validate_fields` refuses that key with a 422 naming it. The type
-  editor cannot grey the key out: what a host registered is not knowable to
-  the browser, and the key list it mirrors is static per process. A 422 on
-  save is the contract. (A key that collides with a record column or a fixed
-  filter column — `status`, `slug`, `created_at` … — is shadowed by that
-  column instead and never queryable; don't name one that.)
+- **A virtual key must be a field key, and one nothing else resolves first.**
+  `register_index_provider` refuses a key that does not match
+  `^[a-z][a-z0-9_]*$`, is over 64 characters, or names a record column or
+  fixed filter column (`status`, `slug`, `position`, `created_at` …) — the
+  query grammar resolves those before it ever looks at the registry, so such
+  rows would be written on every save and never be readable. The refusal is a
+  `ValueError` at registration: your code is what registers it, and there is a
+  person reading the traceback.
+- **A virtual key is global, so a type may not declare a field of the same
+  key.** Saving a type with one is a 422 naming it. The type editor cannot
+  grey the key out — what a host registered is not knowable to the browser —
+  so a 422 on save is the contract. Registering a provider whose key collides
+  with a field some type *already* declares is not retroactive: that type
+  keeps working, its own definition wins the filter grammar, and the collision
+  is logged once per type. (Taking a stored type offline because of a deploy
+  elsewhere is not a trade this module makes.)
+- **The rows must match what you declared.** An `IndexEntry` whose `kind`
+  disagrees with the `VirtualField` registered for that key is dropped and
+  logged once per provider and key, because it would land in a table no filter
+  over that key reads — a key answering `is_null: true` for a record that has
+  a value.
+- **`REF` entries are load-bearing, and cannot be invented.** They are how
+  `on_delete` is enforced and what the "what references this?" panel reads, so
+  a `REF` entry naming a `target_type_id` that is not a record type is dropped
+  too: a provider projects rows, it does not get to make unrelated records
+  undeletable.
 - **Changing what a provider projects does not mark anything.** A provider is
   code the host deploys, not a schema edit this module can see, so no
   `reindex_pending` entry appears and no filter is refused while the rows are

@@ -250,10 +250,17 @@ class TestRegistry:
         assert providers_registry.providers() == (providers_registry.schema_provider,)
         assert virtual_fields() == {}
 
-    def test_a_virtual_key_is_refused_as_a_declared_field(self, registered, field_def):
+    def test_a_virtual_key_is_refused_as_a_declared_field_on_save(self, registered, field_def):
         with pytest.raises(FieldSchemaError, match="index provider") as exc:
-            validate_fields([field_def(BUCKET, "number")])
+            validate_fields([field_def(BUCKET, "number")], on_save=True)
         assert exc.value.key == BUCKET
+
+    def test_the_same_definition_still_loads(self, registered, field_def):
+        """A provider registered *after* a type was stored must not take that
+        type offline: ``field_defs`` re-validates the stored definitions on
+        every read, so refusing here would make every read — and the anonymous
+        public endpoint — a 422 for a type that works."""
+        assert validate_fields([field_def(BUCKET, "number")])[0].key == BUCKET
 
     def test_the_same_key_is_fine_once_the_provider_is_gone(self, registered, field_def):
         providers_registry.clear()

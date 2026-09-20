@@ -18,7 +18,11 @@ Four rules, all of them load-bearing:
   because §9 says a restorable delete must not break what references it. The
   lookup runs with ``include_deleted`` so a trashed row is *found* and marked
   by this pass — a second query to tell "trashed" from "purged" apart would be
-  a query per read to produce the same word.
+  a query per read to produce the same word. So do the two things a payload
+  can hold that are not a resolvable reference: an entry that is not a
+  ``{"type", "uuid"}`` object at all, and one whose uuid is not a record of
+  the *declared* target type. Both keep their slot (:func:`_refs`), because
+  a to-many expansion is rendered positionally against ``data``.
 * **A target the caller may not see is ``restricted``, decided from the
   field's declared ``target_type`` alone.** Nothing about the row is read, so
   a restricted expansion leaks neither its content nor whether the uuid still
@@ -35,6 +39,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.constants import MAX_DISPLAY_TITLE_LEN
 from sm_records.contracts.relations import ExpandedRef, expanded_ref
 from sm_records.index.query import QueryError
 from sm_records.models import Record, RecordType
@@ -75,23 +80,37 @@ def relation_field_keys(rtype: RecordType) -> list[str]:
     return list(_relation_defs(rtype))
 
 
-def _refs(record: Record, field_key: str, declared: str) -> list[tuple[str, str]]:
-    """``(type key, uuid)`` per stored reference, **in payload order**.
+def _refs(record: Record, field_key: str, declared: str) -> list[tuple[str, str, bool]]:
+    """``(type key, uuid, resolvable)`` per stored entry, **in payload order**.
 
-    A to-many field's expansion has to line up with ``data[key]`` positionally
-    — the UI renders the two together — so the list is built from the payload
-    and never from the index rows, which carry no order.
+    A to-many field's expansion has to line up with ``data[key]``
+    positionally — the UI renders the two together — so the list is built
+    from the payload and never from the index rows, which carry no order.
+
+    **Every entry produces one tuple, including one that is not a reference
+    at all.** A ``null`` (or anything else that is not ``{"type", "uuid"}``)
+    used to be skipped, which shortened the list and put every later
+    expansion one slot out of step with the payload it is rendered beside —
+    ``expanded[1]`` labelling ``data[2]``. Such an entry is marked
+    unresolvable here and comes back ``dangling``, carrying the stored value
+    stringified as its ``uuid`` so the position is visible rather than
+    silently plausible. Writes cannot create one any more
+    (``schema._builders._check_ref_list``); rows written before that check
+    can.
 
     The stored ``type`` is echoed when the payload has one and the field's
-    declared target substituted when it does not; the two cannot disagree on
-    anything written through this module (``_relations.check_targets``).
+    declared target substituted when it does not. The two are allowed to
+    disagree on a row written before ``_relations.check_targets`` existed,
+    and :func:`_targets` is what refuses to resolve such a row.
     """
     value = (record.data or {}).get(field_key)
     items = value if isinstance(value, list) else [value]
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, bool]] = []
     for item in items:
         if isinstance(item, dict) and item.get("uuid"):
-            out.append((str(item.get("type") or declared), str(item["uuid"])))
+            out.append((str(item.get("type") or declared), str(item["uuid"]), True))
+        else:
+            out.append((declared, str(item)[:MAX_DISPLAY_TITLE_LEN], False))
     return out
 
 
@@ -122,16 +141,29 @@ async def _types_by_key(db: AsyncSession, keys: set[str]) -> dict[str, RecordTyp
     return {row.key: row for row in rows}
 
 
-async def _targets(db: AsyncSession, uuids: list[str]) -> dict[str, Record]:
+async def _targets(db: AsyncSession, uuids: list[str], type_id: int) -> dict[str, Record]:
     """Every target of one field, in one ``IN``.
 
     ``include_deleted``: see the module docstring — a trashed target has to be
     *found* here, or telling it from a purged one costs a second query per
     read to produce the same ``dangling`` either way.
+
+    ``type_id`` is the **declared** target type's, and it is a predicate and
+    not a filter applied afterwards: ``restricted`` is decided from the
+    declared target alone, so a row found under any *other* type would carry
+    a decision that was never made about it — which is how a stored ref
+    saying ``{"type": "secret", ...}`` on a field declared ``author`` came
+    back with the secret record's title and ``restricted: false``. A uuid
+    that is not a record of the declared type is simply not found, and reads
+    as ``dangling`` like every other unresolvable reference (§9).
     """
     if not uuids:
         return {}
-    stmt = select(Record).where(Record.uuid.in_(uuids)).execution_options(include_deleted=True)
+    stmt = (
+        select(Record)
+        .where(Record.uuid.in_(uuids), Record.type_id == type_id)
+        .execution_options(include_deleted=True)
+    )
     return {row.uuid: row for row in (await db.execute(stmt)).scalars().all()}
 
 
@@ -169,17 +201,24 @@ async def expand(
         target_type = types.get(declared_targets[key])
         restricted = target_type is not None and role_blocked(target_type, roles)
         per_record = {record.uuid: _refs(record, key, declared_targets[key]) for record in records}
-        wanted = {uuid for refs in per_record.values() for _, uuid in refs}
-        found = {} if restricted else await _targets(db, sorted(wanted))
+        wanted = {uuid for refs in per_record.values() for _, uuid, ok in refs if ok}
+        # No declared target type (it names a type that no longer exists):
+        # nothing can be resolved *as* it, so nothing is read — the same
+        # answer the type predicate in ``_targets`` gives for a mismatch.
+        found = (
+            {}
+            if restricted or target_type is None
+            else await _targets(db, sorted(wanted), target_type.id)
+        )
         for record in records:
             out[record.uuid][key] = [
                 expanded_ref(
                     type_key,
                     uuid,
-                    _live(found.get(uuid)),
+                    _live(found.get(uuid)) if resolvable else None,
                     restricted=restricted,
                 )
-                for type_key, uuid in per_record[record.uuid]
+                for type_key, uuid, resolvable in per_record[record.uuid]
             ]
     return out
 

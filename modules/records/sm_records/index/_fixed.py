@@ -31,7 +31,7 @@ from sm_records.index._predicates import (
 )
 from sm_records.models import Record, RecordStatus
 
-__all__ = ["FIXED_COLUMNS", "fixed_clause"]
+__all__ = ["FIXED_COLUMNS", "PUBLIC_FIXED_COLUMNS", "fixed_clause"]
 
 FIXED_COLUMNS: frozenset[str] = frozenset(
     {"status", "display_title", "slug", "position", "published_at", "created_at", "updated_at"}
@@ -39,6 +39,23 @@ FIXED_COLUMNS: frozenset[str] = frozenset(
 """The projection every record has regardless of its type — the module's
 ``ContentItemIndex``. Filterable and sortable directly, with no index table
 and no ``indexed: true`` anywhere."""
+
+PUBLIC_FIXED_COLUMNS: frozenset[str] = FIXED_COLUMNS & frozenset(
+    {"slug", "display_title", "published_at"}
+)
+"""The fixed columns the **anonymous** read API may be asked about (§10).
+
+Exactly the ones its response shape carries
+(:class:`~sm_records.contracts.public.PublicRecordRead`), and derived from
+:data:`FIXED_COLUMNS` so a column renamed out of the record row cannot
+survive here. The rest of the projection — ``status``, ``position``,
+``created_at``, ``updated_at`` — is removed from the public *shape* on
+purpose, and a grammar that still answered about it would let an anonymous
+caller binary-search an audit timestamp to arbitrary precision and read the
+internal ``position`` ordering of content it is only supposed to be able to
+list. They are refused by name, the same 400 an unindexed field gets, rather
+than answered.
+"""
 
 _FIXED_TEXT = frozenset({"display_title", "slug"})
 _FIXED_ORDERED = frozenset({"position", "published_at", "created_at", "updated_at"})

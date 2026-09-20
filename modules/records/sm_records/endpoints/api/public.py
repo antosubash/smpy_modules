@@ -31,6 +31,9 @@ the auth exemption cheerfully allows it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any, TypeVar
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +52,8 @@ from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute)
 
+_Handler = TypeVar("_Handler", bound=Callable[..., Any])
+
 
 def _refused(exc: QueryError) -> HTTPException:
     """A filter or sort this surface will not answer, flattened to one 400.
@@ -65,7 +70,32 @@ _READ = sorted(constants.PUBLIC_ROUTE_METHODS)
 so a verb cannot be answered here and refused there (or the reverse)."""
 
 
-@router.api_route("/{type_key}", methods=_READ, response_model=PublicRecordPage)
+def _read_route(path: str, **kwargs: Any) -> Callable[[_Handler], _Handler]:
+    """Register one handler at ``path`` under every verb in ``_READ``.
+
+    **One route per verb, not one route with two verbs.** FastAPI derives an
+    ``operationId`` from the route's name and path and appends the method, but
+    it does so per *operation* from a single ``APIRoute`` — so a route
+    declaring ``GET`` and ``HEAD`` together emits two operations with the same
+    id, warns twice when the schema is built, and breaks any generated client
+    for this API. A route each, with the id spelled out, keeps the one
+    constant above as the single source of the verb list.
+    """
+
+    def decorate(func: _Handler) -> _Handler:
+        for method in _READ:
+            router.api_route(
+                path,
+                methods=[method],
+                operation_id=f"{func.__name__}_{method.lower()}",
+                **kwargs,
+            )(func)
+        return func
+
+    return decorate
+
+
+@_read_route("/{type_key}", response_model=PublicRecordPage)
 async def list_public_records(
     type_key: str,
     db: AsyncSession = Depends(request_db),
@@ -103,7 +133,7 @@ async def list_public_records(
     )
 
 
-@router.api_route("/{type_key}/{uuid}", methods=_READ, response_model=PublicRecordRead)
+@_read_route("/{type_key}/{uuid}", response_model=PublicRecordRead)
 async def get_public_record(
     type_key: str, uuid: str, db: AsyncSession = Depends(request_db)
 ) -> PublicRecordRead:

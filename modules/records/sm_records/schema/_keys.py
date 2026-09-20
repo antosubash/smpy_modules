@@ -43,7 +43,21 @@ def require(condition: Any, key: str | None, problem: str) -> None:
         raise FieldSchemaError(key, problem)
 
 
-def validate_key(raw: dict[str, Any], seen: set[str]) -> str:
+def validate_key(raw: dict[str, Any], seen: set[str], *, on_save: bool = False) -> str:
+    """Validate one field key. ``on_save`` is what separates the two callers.
+
+    Every rule below is a property of the definition itself and holds forever
+    — except the virtual-key refusal, which is a property of *what the host
+    happens to have registered right now*. A provider registered after a type
+    was stored would otherwise retroactively invalidate that type, and since
+    ``services._payload.field_defs`` re-validates the stored definitions on
+    every read, the type would answer 422 to every caller including the
+    anonymous public endpoint. So that one check runs only when a schema is
+    being *saved* (``services._schema.normalise``, the one path a type
+    create, update or rollback goes through); a stored definition that
+    collides is loaded as it stands and the declared field wins the filter
+    grammar, with one warning per type (``index.query._resolve``).
+    """
     raw_key = raw.get("key")
     require(isinstance(raw_key, str) and raw_key, None, "every field needs a 'key'")
     key = str(raw_key)
@@ -59,14 +73,16 @@ def validate_key(raw: dict[str, Any], seen: set[str]) -> str:
     # one cannot join ``RESERVED_FIELD_KEYS`` — that set is static per process
     # and mirrored by hand in the TypeScript editor, which has no way to know
     # what the host installed. The editor therefore cannot grey the key out;
-    # refusing it here with a message that names the owner is the contract,
-    # and the README says so.
-    require(
-        key not in virtual_fields(),
-        key,
-        "key is reserved by an index provider: it is a virtual field, queryable on every "
-        "type's records, so a declared field of the same key would shadow it",
-    )
+    # refusing it on save with a message that names the reason is the
+    # contract, and the README says so. ``on_save`` is why it is the only
+    # check here that a *load* skips — see the docstring.
+    if on_save:
+        require(
+            key not in virtual_fields(),
+            key,
+            "key is reserved by an index provider: it is a virtual field, queryable on every "
+            "type's records, so a declared field of the same key would shadow it",
+        )
     require(KEY_RE.match(key), key, f"key must match {TYPE_KEY_PATTERN}")
     require(len(key) <= MAX_KEY_LEN, key, f"key must be at most {MAX_KEY_LEN} characters")
     require(key not in seen, key, "duplicate field key")

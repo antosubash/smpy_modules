@@ -26,6 +26,7 @@ from sm_records.deps import (
     actor,
     check_type_roles,
     get_settings,
+    load_allowed_type,
     load_type,
     request_db,
     require_edit,
@@ -45,8 +46,13 @@ router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
     "/records/{uuid}/revisions", response_model=RevisionListResponse, dependencies=[require_view]
 )
 async def list_revisions(
-    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
+    uuid: str,
+    rtype: RecordType = Depends(load_allowed_type),
+    db: AsyncSession = Depends(request_db),
 ) -> RevisionListResponse:
+    """``load_allowed_type``: a revision is the record's own past payload, so
+    a type whose ``allowed_roles`` exclude the caller hides its history with
+    its records (§10)."""
     record = await record_service.get_record(db, rtype, uuid)
     revisions = await revision_service.list_revisions(db, record)
     return RevisionListResponse(items=[revision_read(revision) for revision in revisions])
@@ -60,7 +66,7 @@ async def list_revisions(
 async def get_record_revision(
     uuid: str,
     revision_id: int,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
 ) -> RecordRevisionDetailRead:
     """The read-only preview before restoring: the list entry plus the

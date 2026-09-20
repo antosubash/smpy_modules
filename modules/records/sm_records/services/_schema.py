@@ -29,7 +29,12 @@ def normalise(fields_raw: list[dict[str, Any]], settings: RecordsSettings):
     edit's "did the fields change?" comparison answer yes to a no-op.
     """
     try:
-        defs = validate_fields(list(fields_raw or []))
+        # ``on_save``: this is the one path a proposed schema takes (type
+        # create, update, rollback and the preview of any of them), and the
+        # only one where a field key colliding with a registered index
+        # provider's virtual key may be refused — refusing it on a *load*
+        # takes an already-stored type offline. See ``schema._keys``.
+        defs = validate_fields(list(fields_raw or []), on_save=True)
     except FieldSchemaError as exc:
         raise ValidationFailed(
             str(exc), [{"field": exc.key or "__root__", "message": exc.problem}]

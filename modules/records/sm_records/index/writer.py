@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,9 +25,11 @@ from sm_records.constants import TEXT_INDEX_LEN
 from sm_records.index.providers import (
     IndexEntry,
     TypeResolver,
+    note_dropped,
     providers,
     schema_provider,
     use_type_resolver,
+    virtual_fields,
 )
 from sm_records.models import (
     INDEX_TABLES,
@@ -88,11 +91,76 @@ def _row(entry: IndexEntry, record_id: int, type_id: int):
     return table(**values)
 
 
+def _keep(
+    entry: IndexEntry,
+    provider_name: str,
+    declared: dict[str, Any],
+    known_type_ids: frozenset[int] | None,
+) -> bool:
+    """Whether one entry from a *host's* provider is written, with a reason
+    logged once per provider and key when it is not.
+
+    Two ways a provider's entry is not what it says it is, both of which
+    produce wrong answers rather than errors — which §7.7 is the argument
+    against:
+
+    * its ``kind`` disagrees with the :class:`~sm_records.index.providers.VirtualField`
+      the same key was registered with. The row lands in one table and every
+      filter over the key reads another, so the key answers ``is_null: true``
+      for a record that has a value and never matches an ``eq``.
+    * it is a ``REF`` naming a ``target_type_id`` that is not a type. A
+      reference is load-bearing here — ``_relations`` reads
+      ``records_index_ref`` to answer "what points at this record", and
+      ``on_delete`` falls back to ``restrict`` for a field key it cannot
+      find — so an invented one makes an unrelated record undeletable and
+      puts a row nobody wrote in the delete dialog. §7.6 sells a provider as
+      additive projection; participating in referential integrity is not
+      part of that.
+
+    ``declared`` is the virtual-field registry, read once per projection
+    rather than per entry. ``known_type_ids`` is ``None`` when the caller's
+    resolver cannot say (a
+    bare callable rather than a
+    :class:`~sm_records.index.providers.TypeIndex`), and the ``REF`` check is
+    then skipped rather than guessed at.
+    """
+    virtual = declared.get(entry.field_key)
+    if virtual is not None and entry.kind is not virtual.kind:
+        if note_dropped(provider_name, entry.field_key):
+            logger.warning(
+                "records: index provider %s yields %s rows under virtual field %r, which is "
+                "registered as %s; those rows are dropped — nothing could ever read them",
+                provider_name,
+                entry.kind.value,
+                entry.field_key,
+                virtual.kind.value,
+            )
+        return False
+    if entry.kind is not IndexKind.REF:
+        return True
+    pair = entry.value if isinstance(entry.value, tuple) and len(entry.value) == 2 else None
+    target_type_id = pair[1] if pair is not None else None
+    if pair is not None and (known_type_ids is None or target_type_id in known_type_ids):
+        return True
+    if note_dropped(provider_name, entry.field_key):
+        logger.warning(
+            "records: index provider %s yields a reference under %r targeting %r, which is "
+            "not a record type; those rows are dropped — a provider may not create "
+            "references, which block deletes and appear as referrers",
+            provider_name,
+            entry.field_key,
+            target_type_id if pair is not None else entry.value,
+        )
+    return False
+
+
 def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) -> list[IndexEntry]:
     """Every index entry ``record`` yields under ``rtype``'s definitions.
 
     The registry walk of §7.6 in one place, so the incremental writer and the
-    batched rebuild see the same providers in the same order. A list and not a
+    batched rebuild see the same providers in the same order, and the one
+    place a host provider's entries are checked against what it registered
+    (:func:`_keep`). A list and not a
     generator: the resolver is bound in a context variable for the duration of
     the walk (:func:`~sm_records.index.providers.use_type_resolver`), and a
     generator would leave that binding's lifetime to whoever happens to stop
@@ -106,6 +174,8 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
     missing index rows, which §7.7 is the argument against.
     """
     entries: list[IndexEntry] = []
+    declared = virtual_fields()
+    known_type_ids = getattr(resolve_type_id, "known_ids", None)
     with use_type_resolver(resolve_type_id):
         for provider in providers():
             if provider is schema_provider:
@@ -130,8 +200,9 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
             # Materialised before it is appended: a generator that raises
             # halfway would otherwise leave the entries it had already
             # yielded in the set, which is half a projection written as if
-            # it were whole.
-            entries.extend(produced)
+            # it were whole. Filtered on the way in — see :func:`_keep`.
+            name = getattr(provider, "__qualname__", None) or repr(provider)
+            entries.extend(e for e in produced if _keep(e, name, declared, known_type_ids))
     return entries
 
 

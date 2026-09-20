@@ -3,21 +3,31 @@
 Three kinds of thing live here, and all of them are about turning a raw
 request into something a service function can take: the three static
 permissions (design doc §10), the per-type ``allowed_roles`` narrowing that
-sits on top of them, and the query-string grammar (``filter=``/``sort=``) so
-the API and the record-list view parse it identically — the view has to
-deep-link into exactly the state the API would show for the same query.
+sits on top of them, and the request-scoped session.
+
+The third kind — the query-string grammar (``filter=``/``sort=``/``expand=``)
+— moved to :mod:`sm_records._grammar` for the 300-line cap and is re-exported
+here, so an endpoint still imports one module. It is the API and the
+record-list view parsing a query identically that lets the view deep-link
+into exactly the state the API would show for the same query.
 """
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Final
 
 from fastapi import Depends, HTTPException, Query, Request
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
-from sm_records.index.query import Filter, FilterOp, Sort
+from sm_records._grammar import (
+    MALFORMED_FILTER,
+    parse_expand,
+    parse_filters,
+    parse_sorts,
+    parse_view_filters,
+)
 from sm_records.models import RecordType
 from sm_records.services._common import role_blocked
 from sm_records.services.errors import Forbidden
@@ -102,24 +112,39 @@ async def load_type(key: str, db: AsyncSession = Depends(request_db)) -> RecordT
 
 
 def check_type_roles(request: Request, rtype: RecordType) -> None:
-    """Design §10: a type's ``allowed_roles`` narrows the static ``records.edit``
-    permission a caller already holds. Empty means any role holding the
-    permission may write; this is invisible in the framework's role editor,
-    which is the documented limitation, not a bug here.
+    """Design §10: a type's ``allowed_roles`` narrows the static ``records.view``
+    and ``records.edit`` permissions a caller already holds. Empty means any
+    role holding the permission may read and write; this is invisible in the
+    framework's role editor, which is the documented limitation, not a bug here.
 
-    Applied on every *record* write, never on type management — narrowing is a
-    property of a type's own records, not of the schema that defines it.
+    Applied on every *record* read (:func:`load_allowed_type`) and write, never
+    on type management — narrowing is a property of a type's own records, and a
+    ``records.manage_types`` holder has to stay able to open the schema screen
+    and widen ``allowed_roles`` again.
 
     The predicate itself is ``services._common.role_blocked`` and is not
-    re-implemented here: the read paths that report a target as ``restricted``
-    rather than refusing (``services.expand``, the referrers listing) have to
-    answer the *same* question this raises on, admin wildcard included.
+    re-implemented here: the read paths that report a relation *target* as
+    ``restricted`` rather than refusing (``services.expand``, the referrers
+    listing) answer the *same* question, admin wildcard included.
     """
     if role_blocked(rtype, caller_roles(request)):
         allowed = sorted(rtype.allowed_roles or [])
         raise Forbidden(
             f"type {rtype.key!r} is restricted to roles {allowed}; caller holds none of them"
         )
+
+
+async def load_allowed_type(request: Request, rtype: RecordType = Depends(load_type)) -> RecordType:
+    """:func:`load_type` plus the ``allowed_roles`` narrowing of design §10.
+
+    The read-side twin of :func:`check_type_roles`, with deliberately the same
+    refusal: redacting a read instead protects nothing when the caller can ask
+    the narrowed type directly one request later. A dependency rather than a
+    call per handler, so it replaces ``Depends(load_type)`` at the one place a
+    read route resolves the type and cannot be forgotten.
+    """
+    check_type_roles(request, rtype)
+    return rtype
 
 
 def caller_roles(request: Request) -> list[str]:
@@ -145,66 +170,6 @@ def actor(request: Request) -> str | None:
     """
     user = getattr(request.state, "user", None)
     return getattr(user, "id", None) if user is not None else None
-
-
-def _parse_filter(raw: str) -> Filter:
-    """``field:op:value``, split on the first two colons — a value carrying
-    its own colon (a URL, a timestamp) must not be truncated by it."""
-    parts = raw.split(":", 2)
-    if len(parts) != 3:
-        raise HTTPException(
-            status_code=400, detail=f"invalid filter {raw!r}: expected 'field:op:value'"
-        )
-    field, op_raw, value = parts
-    try:
-        op = FilterOp(op_raw)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"invalid filter {raw!r}: unknown operator {op_raw!r}"
-        ) from exc
-    parsed_value: Any
-    if op is FilterOp.IN:
-        parsed_value = value.split(",")
-    elif op is FilterOp.IS_NULL:
-        low = value.strip().lower()
-        if low not in ("true", "false"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid filter {raw!r}: is_null takes 'true' or 'false'",
-            )
-        parsed_value = low == "true"
-    else:
-        parsed_value = value
-    return Filter(field=field, op=op, value=parsed_value)
-
-
-def parse_filters(raw_filters: list[str] = Query(default=[], alias="filter")) -> list[Filter]:
-    """``?filter=`` repeats; each is one term, ANDed together."""
-    return [_parse_filter(item) for item in raw_filters]
-
-
-MALFORMED_FILTER: Final = "malformed"
-"""The ``errors["filter"]`` reason a view reports for a filter term that does
-not parse, alongside ``QueryError.reason``'s ``unknown``/``not_indexed``/
-``reindexing``."""
-
-
-def parse_view_filters(
-    raw_filters: list[str] = Query(default=[], alias="filter"),
-) -> tuple[list[Filter], str | None]:
-    """:func:`parse_filters` for a *page navigation*, which cannot 400.
-
-    ``_parse_filter`` raises ``HTTPException(400)`` from inside a dependency,
-    so it escapes before the view handler runs and Inertia shows a bare error
-    modal — for a deep link with a typo'd ``?filter=``, on the one screen that
-    already has an ``errors`` bag for a filter it refuses. The parse failure
-    is returned as a reason instead, and the handler renders the list empty
-    with the notice, exactly as it does for ``unknown``/``not_indexed``.
-    """
-    try:
-        return [_parse_filter(item) for item in raw_filters], None
-    except HTTPException:
-        return [], MALFORMED_FILTER
 
 
 async def parse_trashed(
@@ -239,40 +204,6 @@ async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
     return True
 
 
-def parse_expand(
-    raw_expand: list[str] = Query(default=[], alias=constants.EXPAND_PARAM),
-) -> list[str]:
-    """``?expand=a,b`` (and ``?expand=a&expand=b``) — the relation fields to
-    resolve on this read, design §9.
-
-    Both spellings, because both are what a client reaches for and neither is
-    ambiguous: the grammar is a list of field keys, and a field key cannot
-    contain a comma (``TYPE_KEY_PATTERN``). Order is preserved and duplicates
-    are dropped here rather than in the service, so ``expand=a,a`` cannot cost
-    two queries.
-
-    No validation of the keys themselves: whether a key names a relation field
-    is a question about the *type*, which this dependency cannot see — it is
-    ``services.expand``'s, and it answers with the same ``QueryError`` the
-    filter grammar refuses an unknown field with.
-    """
-    keys: list[str] = []
-    for raw in raw_expand:
-        for item in raw.split(","):
-            key = item.strip()
-            if key and key not in keys:
-                keys.append(key)
-    return keys
-
-
-def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[Sort]:
-    """``?sort=`` repeats; a leading ``-`` means descending."""
-    return [
-        Sort(field=item[1:], desc=True) if item.startswith("-") else Sort(field=item, desc=False)
-        for item in raw_sorts
-    ]
-
-
 __all__ = [
     "MALFORMED_FILTER",
     "REQUEST_SESSION_KEY",
@@ -281,6 +212,7 @@ __all__ = [
     "check_type_roles",
     "get_settings",
     "has_edit_permission",
+    "load_allowed_type",
     "load_type",
     "parse_expand",
     "parse_filters",

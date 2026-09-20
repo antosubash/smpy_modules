@@ -204,14 +204,22 @@ def _validate_default(field: FieldDefinition) -> None:
         raise FieldSchemaError(field.key, f"default is invalid: {detail}") from exc
 
 
-def validate_fields(raw: list[dict[str, Any]]) -> list[FieldDefinition]:
-    """Validate and normalise a proposed ``RecordType.fields`` list."""
+def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list[FieldDefinition]:
+    """Validate and normalise a ``RecordType.fields`` list.
+
+    ``on_save=True`` is the *proposal* path — a type create, update or
+    rollback, which all reach this through ``services._schema.normalise``.
+    The default is the *load* path (``services._payload.field_defs``, run on
+    every read and write of a record), and it skips the one check that
+    depends on runtime state outside the definition: see
+    :func:`~sm_records.schema._keys.validate_key`.
+    """
     _require(isinstance(raw, list), None, "fields must be a list")
     out: list[FieldDefinition] = []
     seen: set[str] = set()
     for entry in raw:
         _require(isinstance(entry, dict), None, "each field definition must be an object")
-        key = validate_key(entry, seen)
+        key = validate_key(entry, seen, on_save=on_save)
         seen.add(key)
 
         raw_type = entry.get("type")

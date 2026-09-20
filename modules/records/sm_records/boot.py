@@ -23,10 +23,48 @@ The cost is that changing the prefix needs a restart, which is exactly what
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 
 from sm_records import constants
-from sm_records.settings import RecordsSettings
+from sm_records.settings import (
+    DEFAULT_PUBLIC_ROUTE_PREFIX,
+    RecordsSettings,
+    check_public_route_prefix,
+)
+
+logger = logging.getLogger(__name__)
+
+_PREFIX_KIND = "prefix"
+"""``PublicRoute.kind`` for the rule this module registers — named so the
+idempotence check below compares against the same word ``add_prefix`` uses."""
+
+
+def public_prefix(settings: RecordsSettings) -> str:
+    """The prefix to mount at, with a bad stored value demoted to a log line.
+
+    ``RecordsSettings`` refuses a prefix that would exempt the admin surface
+    (:func:`~sm_records.settings.check_public_route_prefix`), so an operator
+    cannot save one. A row written before that rule existed can still reach
+    here, and ``on_startup`` is the wrong place to discover it: raising takes
+    the whole host down, and the only way to correct the setting is the
+    Settings screen inside the app that will not start. So the default is
+    used instead, loudly — the anonymous API moves, and everything else keeps
+    working.
+    """
+    try:
+        return check_public_route_prefix(settings.public_route_prefix)
+    except ValueError as exc:
+        logger.error(
+            "records: stored public_route_prefix %r is invalid (%s); falling back to %r. "
+            "Fix it on the Settings screen — the anonymous read API is mounted at the "
+            "fallback until you do.",
+            settings.public_route_prefix,
+            exc,
+            DEFAULT_PUBLIC_ROUTE_PREFIX,
+        )
+        return DEFAULT_PUBLIC_ROUTE_PREFIX
 
 
 def dir_prefix(prefix: str) -> str:
@@ -56,9 +94,18 @@ def exempt_public_routes(app: FastAPI, settings: RecordsSettings) -> None:
         # A bare test app, or a host that mounts no auth middleware. Nothing
         # is gating these paths in that case, so there is nothing to exempt.
         return
-    registry.add_prefix(
-        dir_prefix(settings.public_route_prefix), methods=set(constants.PUBLIC_ROUTE_METHODS)
-    )
+    prefix = dir_prefix(public_prefix(settings))
+    methods = set(constants.PUBLIC_ROUTE_METHODS)
+    # Idempotent, because ``on_startup`` is not guaranteed to run once: a host
+    # that restarts the lifespan in-process would otherwise grow one identical
+    # rule per restart. Matching is ``any(...)``, so duplicates are harmless
+    # today and are only ever cost and noise.
+    if any(
+        rule.pattern == prefix and rule.kind == _PREFIX_KIND and rule.methods == frozenset(methods)
+        for rule in registry.routes
+    ):
+        return
+    registry.add_prefix(prefix, methods=methods)
 
 
 def mount_public_router(app: FastAPI, settings: RecordsSettings) -> None:
@@ -70,4 +117,4 @@ def mount_public_router(app: FastAPI, settings: RecordsSettings) -> None:
     """
     from sm_records.endpoints.api.public import router
 
-    app.include_router(router, prefix=dir_prefix(settings.public_route_prefix).rstrip("/"))
+    app.include_router(router, prefix=dir_prefix(public_prefix(settings)).rstrip("/"))

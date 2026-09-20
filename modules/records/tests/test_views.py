@@ -158,6 +158,7 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
     assert body["props"]["type"] is None
     assert body["props"]["target_types"] == [{"key": "person", "label": "Person"}]
     assert isinstance(body["props"]["roles"], list)
+    assert body["props"]["public_route_prefix"] == "/api/records/public"
 
     resp = await client.get(
         "/admin/records/types/person", headers={**roles(ADMIN), **_INERTIA_HEADERS}
@@ -166,7 +167,7 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
     body = resp.json()
     assert body["component"] == "Records/TypeEditor"
     assert body["props"]["type"]["key"] == "person"
-    assert set(body["props"]) == {"type", "target_types", "roles"}
+    assert set(body["props"]) == {"type", "target_types", "roles", "public_route_prefix"}
 
 
 async def test_reserved_type_keys_are_refused(client, records_app):

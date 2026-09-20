@@ -154,7 +154,7 @@ async def test_a_self_reference_is_not_its_own_referrer(client):
     resp = await client.get(
         f"/api/records/types/node/records/{node['uuid']}/referrers", headers=roles(ADMIN)
     )
-    assert resp.json() == {"items": [], "total": 0}
+    assert resp.json() == {"items": [], "total": 0, "hidden": 0}
 
     view = await client.get(
         f"/admin/records/node/{node['uuid']}", headers={**roles(ADMIN), **INERTIA}

@@ -24,6 +24,7 @@ from typing import Any, NamedTuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.index.providers import TypeIndex
 from sm_records.index.query import Filter, Sort, build_query, count_query, only_trashed
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
@@ -196,7 +197,7 @@ async def create_record(
     )
     # ``fresh``: the row was inserted by the flush above, so it cannot own
     # index rows yet and the writer's six-table delete pass is skipped.
-    await write_index(db, record, rtype, resolve_type_id=types.get, fresh=True)
+    await write_index(db, record, rtype, resolve_type_id=TypeIndex(types), fresh=True)
     return record
 
 
@@ -272,5 +273,5 @@ async def update_record(
     await _claims.flush_write(db, rtype, resolved_slug)
 
     await write_revision(db, record, event, limit=settings.revision_limit, actor=actor)
-    await write_index(db, record, rtype, resolve_type_id=types.get)
+    await write_index(db, record, rtype, resolve_type_id=TypeIndex(types))
     return record

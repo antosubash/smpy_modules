@@ -13,7 +13,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import IndexRef, Record, RecordType
@@ -189,6 +189,19 @@ def field_label(rtype: RecordType, field_key: str) -> str:
     return field_key
 
 
+def _distinct_records(refs: Iterable[Referrer]) -> int:
+    """How many *records* these referrer rows represent.
+
+    One definition of "how many things reference this", used by both the
+    panel's ``total`` and the editor's badge. A record pointing at the target
+    from two relation fields is two rows in ``records_index_ref`` and two
+    entries in ``items`` — the panel names the field, so it has to be — but
+    it is **one** record, and a badge reading "Referenced by 2" over a list
+    of one record is a disagreement nobody can act on.
+    """
+    return len({ref.record.id for ref in refs})
+
+
 async def paged_referrers(
     db: AsyncSession,
     record: Record,
@@ -196,20 +209,26 @@ async def paged_referrers(
     roles: Sequence[str] | None = None,
     page: int = 1,
     page_size: int = 25,
-) -> tuple[list[Referrer], int]:
-    """One page of "what references this record", and the honest total.
+) -> tuple[list[Referrer], int, int]:
+    """One page of "what references this record": ``(items, total, hidden)``.
 
-    Two rules, and the order they are applied in is the point:
+    Three numbers, each with its own definition and none of them derivable
+    from another:
 
-    * ``total`` counts **every** referrer — live, trashed, and the ones this
-      caller may not see. A count that shrank per caller would tell the
-      restricted caller exactly how many rows they are missing only by
-      comparing with somebody else, and would make the delete dialog's "3
-      records reference this" disagree with what the delete actually refuses.
-    * the page window is taken *before* the role filter, so every caller sees
-      the same rows at the same offsets; a referrer whose type narrows
-      ``allowed_roles`` past this caller simply is not in the page it falls
-      in (design §10 — nothing about it leaks, not even its type).
+    * ``total`` counts every referring **record** — live, trashed, and the
+      ones this caller may not see (:func:`_distinct_records`). A count that
+      shrank per caller would make the delete dialog's "3 records reference
+      this" disagree with what the delete actually refuses.
+    * ``hidden`` is how many of those the caller may not view, so the panel
+      can say "and 2 you cannot see" rather than leaving the reader to
+      subtract and guess. The count was always inferable from ``total``; what
+      was not, and must not be, is *which*.
+    * ``items`` is the visible rows, and the page window is taken **over the
+      visible set**. Windowing before the role filter (which is what this
+      used to do) made ``page_size=1`` an exact oracle: an empty page with a
+      non-zero total said "slot *n* is a row you may not see", and since the
+      list is sorted by insertion, the positions ordered the hidden records
+      against the visible ones.
 
     The window is applied in Python rather than in SQL because the underlying
     query is already one indexed lookup over ``records_index_ref`` plus two
@@ -217,25 +236,25 @@ async def paged_referrers(
     record", which is bounded by the graph an editor built by hand.
     """
     rows = await referrers(db, record, include_deleted=True)
+    visible = [ref for ref in rows if not role_blocked(ref.rtype, roles)]
+    total = _distinct_records(rows)
     offset = max(page - 1, 0) * page_size
-    window = rows[offset : offset + page_size]
-    return [ref for ref in window if not role_blocked(ref.rtype, roles)], len(rows)
+    return visible[offset : offset + page_size], total, total - _distinct_records(visible)
 
 
 async def referrer_count(db: AsyncSession, record: Record) -> int:
-    """How many distinct records point at this one — one ``COUNT`` and no joins.
+    """The editor's "Referenced by" badge: **the same number** the panel's
+    ``total`` reports, from the same helper.
 
-    The editor shows a number next to its "Referenced by" panel on every
-    record it opens, and :func:`paged_referrers` is too much work for that:
-    it loads the referring records and their types to decide what each one
-    would cost on delete. This counts index rows instead, which is the
-    question the badge asks.
+    It was one ``COUNT`` over ``records_index_ref`` and cheaper for it, and
+    cheaper was the whole problem: counting index rows counted a referring
+    record once per relation field, and counted rows whose record no longer
+    exists at all. The badge is what a reader compares against the panel they
+    open next, so the two have to answer the same question —
+    :func:`paged_referrers` is where that question is defined.
 
-    Deliberately *not* filtered by the caller's roles or by the trash. Both
-    would cost the loads this exists to avoid, and the number is a prompt to
-    open the panel — where both rules do apply — rather than an answer.
+    Still deliberately *not* filtered by the caller's roles or by the trash:
+    the badge is a prompt to open the panel, where ``hidden`` says how much
+    of it is not for this reader.
     """
-    stmt = select(func.count(func.distinct(IndexRef.record_id))).where(
-        IndexRef.target_uuid == record.uuid, IndexRef.record_id != record.id
-    )
-    return int((await db.execute(stmt)).scalar_one())
+    return _distinct_records(await referrers(db, record, include_deleted=True))

@@ -157,11 +157,30 @@ def _check_ref(value: Any) -> Any:
 
 
 def _check_ref_list(value: Any) -> Any:
+    """A to-many relation, entry by entry — and **no ``null`` entries**.
+
+    ``_check_ref`` is ``None``-tolerant because every validator here is (an
+    optional field's value may be absent). Inside a list that tolerance means
+    something else entirely: a hole. ``expanded[key]`` is rendered positionally
+    against ``data[key]``, so a null in the middle of the list used to be
+    accepted on write and then mislabel every entry after it. The position is
+    named in the message, because a form showing five relation pickers has to
+    say *which* one.
+    """
     if value is None:
         return None
     if not isinstance(value, list):
         raise ValueError("expected a list of relation values")
-    return [_check_ref(item) for item in value]
+    out = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"entry {index} is {'null' if item is None else 'not an object'}; "
+                "every entry of a to-many relation must be "
+                "{'type': <type key>, 'uuid': <32 hex chars>}"
+            )
+        out.append(_check_ref(item))
+    return out
 
 
 def _base_and_validators(

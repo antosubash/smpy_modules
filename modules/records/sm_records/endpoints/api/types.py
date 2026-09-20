@@ -31,6 +31,7 @@ from sm_records.contracts.schemas import (
 from sm_records.deferred import defer
 from sm_records.deps import (
     actor,
+    caller_roles,
     check_type_roles,
     get_settings,
     load_type,
@@ -43,6 +44,7 @@ from sm_records.models import RecordType
 from sm_records.services import _orphaned, reindex_runner, schema_change
 from sm_records.services import revisions as revision_service
 from sm_records.services import types as type_service
+from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
 from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
@@ -95,8 +97,16 @@ def _check_roles_for_discard(request: Request, rtype: RecordType, orphaned: str 
 
 
 @router.get("/types", response_model=TypeListResponse, dependencies=[require_view])
-async def list_types(db: AsyncSession = Depends(request_db)) -> TypeListResponse:
-    rtypes = await type_service.list_types(db)
+async def list_types(request: Request, db: AsyncSession = Depends(request_db)) -> TypeListResponse:
+    """Every type this caller may read records of. One whose ``allowed_roles``
+    exclude them is *omitted* rather than listed-and-then-403: every screen
+    this feeds links straight to the type's record list, which
+    ``deps.load_allowed_type`` refuses (§10). Reading one type by key is a
+    different question — see :func:`read_type`."""
+    roles = caller_roles(request)
+    rtypes = [
+        rtype for rtype in await type_service.list_types(db) if not role_blocked(rtype, roles)
+    ]
     items = [type_read(rtype, *await type_service.record_counts(db, rtype)) for rtype in rtypes]
     return TypeListResponse(items=items)
 

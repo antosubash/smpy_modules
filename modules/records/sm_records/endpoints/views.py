@@ -25,6 +25,7 @@ from sm_records.deps import (
     caller_roles,
     get_settings,
     has_edit_permission,
+    load_allowed_type,
     load_type,
     parse_sorts,
     parse_trashed,
@@ -40,6 +41,7 @@ from sm_records.services import _relations
 from sm_records.services import expand as expand_service
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
+from sm_records.services._common import role_blocked
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
@@ -51,8 +53,17 @@ _DEFAULT_SORTS: tuple[Sort, ...] = (Sort(field="position"), Sort(field="updated_
 
 
 @router.get("/", response_model=None)
-async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(request_db)) -> InertiaResponse:
-    rtypes = await type_service.list_types(db)
+async def type_list(
+    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
+) -> InertiaResponse:
+    """The same omission ``GET /api/records/types`` makes: a type whose
+    ``allowed_roles`` exclude the caller is not a card they can open, so it is
+    not a card (§10)."""
+    rtypes = [
+        rtype
+        for rtype in await type_service.list_types(db)
+        if not role_blocked(rtype, caller_roles(request))
+    ]
     types = [
         type_read(rtype, *await type_service.record_counts(db, rtype)).model_dump(mode="json")
         for rtype in rtypes
@@ -60,16 +71,24 @@ async def type_list(inertia: InertiaDep, db: AsyncSession = Depends(request_db))
     return await inertia.render(constants._PAGE_TYPES, {"types": types})
 
 
-def _editor_context(request: Request, rtypes: list[RecordType]) -> dict[str, object]:
+def _editor_context(
+    request: Request, rtypes: list[RecordType], settings: RecordsSettings
+) -> dict[str, object]:
     """What the schema editor needs besides the type: the relation-target
     choices and the role names ``allowed_roles`` can be drawn from. Roles come
     from the framework's registry rather than a module list, so a role added
-    by another module is offered here without this one knowing it."""
+    by another module is offered here without this one knowing it.
+
+    ``public_route_prefix`` rides along too: it is a DB-backed setting (design
+    §11), so the browser has no other way to build the URL the "Public"
+    toggle's help text shows once it is switched on.
+    """
     registry = getattr(getattr(request.app.state, "sm", None), "permissions", None)
     role_map = getattr(registry, "role_map", None) or {}
     return {
         "target_types": [{"key": t.key, "label": t.label} for t in rtypes],
         "roles": sorted(role_map),
+        "public_route_prefix": settings.public_route_prefix,
     }
 
 
@@ -83,12 +102,15 @@ def _editor_context(request: Request, rtypes: list[RecordType]) -> dict[str, obj
 # all of that and could press none of it.
 @router.get("/types/new", response_model=None, dependencies=[require_manage_types])
 async def type_new(
-    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
+    request: Request,
+    inertia: InertiaDep,
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     rtypes = await type_service.list_types(db)
     return await inertia.render(
         constants._PAGE_TYPE_EDITOR,
-        {"type": None, **_editor_context(request, rtypes)},
+        {"type": None, **_editor_context(request, rtypes, settings)},
     )
 
 
@@ -98,6 +120,7 @@ async def type_edit(
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     rtypes = await type_service.list_types(db)
     live, trashed = await type_service.record_counts(db, rtype)
@@ -105,7 +128,7 @@ async def type_edit(
         constants._PAGE_TYPE_EDITOR,
         {
             "type": type_read(rtype, live, trashed).model_dump(mode="json"),
-            **_editor_context(request, rtypes),
+            **_editor_context(request, rtypes, settings),
         },
     )
 
@@ -113,9 +136,12 @@ async def type_edit(
 @router.get("/{key}/new", response_model=None)
 async def record_new(
     inertia: InertiaDep,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
+    """``load_allowed_type`` here and on the two screens below: design §10's
+    ``allowed_roles`` narrow the record surface, views included, or the same
+    caller reads on one screen what the JSON API refuses them on the next."""
     counts = await type_service.record_counts(db, rtype)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
@@ -128,7 +154,7 @@ async def record_edit(
     request: Request,
     uuid: str,
     inertia: InertiaDep,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
     """The editor, with its relation fields already resolved.
@@ -138,10 +164,11 @@ async def record_edit(
     second request per field to turn them into titles is the round-trip
     ``?expand=`` exists to avoid.
 
-    ``referrer_count`` is the "Referenced by" badge — one ``COUNT`` over
-    ``records_index_ref`` (``_relations.referrer_count``) and deliberately not
-    part of ``RecordRead``: the list screen would pay it per row for a number
-    only this screen shows, and the panel behind it is its own endpoint.
+    ``referrer_count`` is the "Referenced by" badge — ``_relations.referrer_count``,
+    which is by construction the same number the panel behind it reports as
+    ``total`` (both are distinct referring records). Deliberately not part of
+    ``RecordRead``: the list screen would pay it per row for a number only
+    this screen shows, and the panel is its own endpoint.
     """
     counts = await type_service.record_counts(db, rtype)
     try:
@@ -177,7 +204,7 @@ async def record_edit(
 async def record_list(
     request: Request,
     inertia: InertiaDep,
-    rtype: RecordType = Depends(load_type),
+    rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),

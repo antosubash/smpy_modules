@@ -16,7 +16,7 @@ map does not go stale behind the caller's back.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,6 +24,7 @@ from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.index.providers import TypeIndex
 from sm_records.models import Record, RecordType
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
@@ -76,9 +77,15 @@ async def type_id_map(db: AsyncSession) -> dict[str, int]:
     return {key: int(type_id) for key, type_id in rows if type_id is not None}
 
 
-async def type_resolver(db: AsyncSession) -> Callable[[str], int | None]:
-    """The ``resolve_type_id`` argument ``write_index`` and the reindex take."""
-    return (await type_id_map(db)).get
+async def type_resolver(db: AsyncSession) -> TypeIndex:
+    """The ``resolve_type_id`` argument ``write_index`` and the reindex take.
+
+    A :class:`~sm_records.index.providers.TypeIndex` rather than the map's
+    ``.get``: it *is* the resolver (it is callable), and it also carries the
+    id set the writer checks a provider's ``REF`` entries against — an index
+    provider may project rows, not invent references (§7.6).
+    """
+    return TypeIndex(await type_id_map(db))
 
 
 def mark_written(db: AsyncSession) -> None:

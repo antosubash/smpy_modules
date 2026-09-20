@@ -13,6 +13,12 @@ holds is simply absent from the index for that field (design doc §8.4) — that
 is what makes a ``text`` → ``number`` change safe to reindex without
 rewriting a single payload, and it is why the dry-run reports how many rows
 would drop out before anything runs.
+
+The *keys* a provider may claim, and who owns each one, live next door in
+:mod:`sm_records.index._registry` — split for the 300-line cap along the seam
+between a projection and the registry of names it projects under. Everything
+that module exports is re-exported here, so ``providers.virtual_fields()``
+still means what it always did.
 """
 
 from __future__ import annotations
@@ -24,6 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sm_records.constants import ORPHANED_KEY
+from sm_records.index import _registry
 from sm_records.index._coerce import (
     coerce_bool,
     coerce_date,
@@ -33,8 +40,26 @@ from sm_records.index._coerce import (
     coerce_text,
 )
 from sm_records.index._fields import read_field, relation_target
+from sm_records.index._registry import VirtualField, note_dropped, note_shadowed, virtual_fields
 from sm_records.models import Record, RecordType
 from sm_records.schema.types import IndexKind
+
+__all__ = [
+    "IndexEntry",
+    "IndexProvider",
+    "TypeIndex",
+    "TypeResolver",
+    "VirtualField",
+    "clear",
+    "current_type_resolver",
+    "note_dropped",
+    "note_shadowed",
+    "providers",
+    "register",
+    "schema_provider",
+    "use_type_resolver",
+    "virtual_fields",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +81,30 @@ IndexProvider = Callable[[Record, RecordType], Iterable[IndexEntry]]
 TypeResolver = Callable[[str], int | None]
 """Type key → ``records_type.id``. A ``relation`` is stored by type *key* and
 indexed by type *id*, and resolving one to the other needs the session."""
+
+
+class TypeIndex:
+    """The install's ``{type key: id}`` map, callable as a :data:`TypeResolver`.
+
+    A plain ``dict.get`` was the resolver everywhere until the writer needed
+    one thing more than "what is this key's id": whether an id a *provider*
+    put on a ``REF`` entry is a type id at all (design §7.6 — a provider
+    projects rows, it does not get to invent references). That question needs
+    the ids, and a ``Callable[[str], int | None]`` cannot be asked it.
+
+    Still exactly a resolver, so nothing a provider calls changes, and
+    :attr:`known_ids` is precomputed because ``project`` runs once per record
+    and a reindex runs it per batch.
+    """
+
+    __slots__ = ("by_key", "known_ids")
+
+    def __init__(self, by_key: dict[str, int]) -> None:
+        self.by_key = dict(by_key)
+        self.known_ids = frozenset(self.by_key.values())
+
+    def __call__(self, key: str) -> int | None:
+        return self.by_key.get(key)
 
 
 def _unresolvable(_key: str) -> int | None:
@@ -177,41 +226,10 @@ schema_provider: IndexProvider = make_schema_provider(lambda key: current_type_r
 write bound, so one module-level provider serves every session."""
 
 
-@dataclass(frozen=True, slots=True)
-class VirtualField:
-    """A key a provider projects that no Record Type declares (design §7.6).
-
-    Declaring it is what makes the key *queryable*: the filter grammar resolves
-    a field key to an index table through the type's ``fields``, and a
-    provider-only key would otherwise be written and never readable. ``many``
-    says one record may hold several rows for the key (a multiselect-style
-    projection), which decides ``eq``'s any-of reading and ``ne``'s none-of.
-
-    The key is global — every type's records may carry it — so it is refused
-    as a declared field key on any type (``schema.fields.validate_fields``),
-    exactly as the document-table columns are.
-
-    **A virtual field is never refused as ``reindexing``.** The 409 of design
-    §8.5 belongs to a key sitting in a type's ``reindex_pending``, and a
-    provider has no entry there: changing what it projects is the host
-    redeploying, not a schema edit this module can see. The rows go stale
-    silently until someone runs ``python -m sm_records.cli reindex``, which is
-    the trade for an extension point the schema knows nothing about.
-    """
-
-    key: str
-    kind: IndexKind
-    many: bool = False
-
-
 _providers: list[IndexProvider] = [schema_provider]
-_virtual: dict[str, VirtualField] = {}
-_owners: dict[str, IndexProvider] = {}
-_shadowed: set[tuple[str, str]] = set()
-
-
-def _name(provider: IndexProvider) -> str:
-    return getattr(provider, "__qualname__", None) or repr(provider)
+"""Every registered projection, the built-in first. The *virtual fields* each
+one claims live in :mod:`sm_records.index._registry`, which is also where the
+rules about a key are — this module is the projection and the list of them."""
 
 
 def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) -> None:
@@ -222,7 +240,9 @@ def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) ->
     a *different* provider is a ``ValueError``: two projections under one key
     would answer a filter with the union of both, silently. The ownership is
     what is checked, not the declaration: two providers agreeing on kind and
-    ``many`` still write two sets of rows under one key.
+    ``many`` still write two sets of rows under one key. A key that is not a
+    usable field key, or is one the query grammar resolves elsewhere, is a
+    ``ValueError`` too — see :func:`sm_records.index._registry._check_key`.
 
     Every key is checked before any is recorded, so a rejected call leaves the
     registry exactly as it found it rather than half-registered.
@@ -230,26 +250,13 @@ def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) ->
     Call it at import time or from a module's ``on_startup``; the built-in
     ``schema_provider`` is always first and cannot be removed.
     """
-    claimed = list(fields)
-    for field in claimed:
-        owner = _owners.get(field.key)
-        if owner is not None and owner is not provider:
-            raise ValueError(f"virtual field {field.key!r} is already registered by {_name(owner)}")
-    for field in claimed:
-        _virtual[field.key] = field
-        _owners[field.key] = provider
+    _registry.claim(provider, list(fields))
     if provider not in _providers:
         _providers.append(provider)
 
 
 def providers() -> tuple[IndexProvider, ...]:
     return tuple(_providers)
-
-
-def virtual_fields() -> dict[str, VirtualField]:
-    """Every provider-projected key, by key. Read by the filter grammar and by
-    ``validate_fields`` — one registry, so the two cannot disagree."""
-    return dict(_virtual)
 
 
 def clear() -> None:
@@ -261,24 +268,5 @@ def clear() -> None:
     with an empty index — a wrong-answer failure a long way from its cause.
     Virtual fields go with their providers.
     """
-    _virtual.clear()
-    _owners.clear()
-    _shadowed.clear()
+    _registry.clear_virtual()
     _providers[:] = [schema_provider]
-
-
-def note_shadowed(type_key: str, field_key: str) -> bool:
-    """Record that ``type_key`` declares a field shadowing a virtual key, and
-    say whether this is the first time — so the query layer logs the collision
-    once per type rather than once per request.
-
-    Kept next to the registry because the registry is what creates the
-    collision and :func:`clear` is what ends it: a test that clears the
-    providers gets a clean slate here too, instead of a memo from an earlier
-    test silently swallowing the warning it asserts.
-    """
-    seen = (type_key, field_key)
-    if seen in _shadowed:
-        return False
-    _shadowed.add(seen)
-    return True
