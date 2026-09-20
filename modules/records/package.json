@@ -9,6 +9,7 @@
     "@inertiajs/react": "^2.0.0",
     "@simple-module-py/ui": "*",
     "@simple-module-py/i18n": "*",
+    "@simple-module-py/pagebuilder": "*",
     "sonner": "^2.0.0"
   },
   "devDependencies": {

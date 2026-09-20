@@ -57,6 +57,46 @@ this is a deliberate hard rule, not a v1 limitation, and it is what keeps
 performance a property of the schema rather than a cliff discovered under
 load.
 
+### Showing records on a page
+
+When `simple_module_pagebuilder` is also installed, this module contributes a
+**Records list** block to its Puck editor palette (category **Data**),
+registered through `puck-blocks.ts` the same way `news`'s `NewsFeed` block is
+— records knows about pagebuilder, pagebuilder does not know about records.
+
+Drop the block on a page and pick:
+
+| prop | meaning |
+|---|---|
+| **Record type** | any type this account can see; one that isn't public is still selectable, and shows "(not public)" in the list |
+| **Fields to show** | which of the type's declared fields render beyond the title, and in what order — nothing beyond the title by default |
+| **Filter** | one `field:op:value` term, e.g. `status:eq:paid` — indexed fields only, same grammar as the admin list |
+| **Sort** | one field, e.g. `-published_at` for newest first |
+| **How many** | 1–50 |
+| **Layout** | list, cards, or table |
+| **Heading**, **Text shown when there are no records** | freely edited copy |
+| **Link template** | `{slug}` / `{uuid}` placeholders; blank means the title isn't a link |
+| **Public API prefix** | advanced — only touch it if `public_route_prefix` (above) has been changed from its default |
+
+**Only a public type's records ever reach a visitor.** The block fetches from
+the anonymous read API (`GET {public_route_prefix}/{type_key}`), so a type
+that is not (yet) marked `is_public` renders the empty state on the live site
+— the editor additionally shows *why*, with a "only public types render on
+the site" hint that a visitor never sees. The `typeKey` picker still lists
+every type on purpose: it is what lets an author build the block ahead of
+flipping the type public, and see the hint rather than a confusing blank
+result.
+
+**The public API never expands a relation** (see [Relations](#relations)), so
+a `relation` field shown in the widget renders as its stored `type:uuid`, not
+a linked title — the block's own field help says so. Everything else formats
+the way the admin list does: booleans as `✓`/`–`, dates and datetimes in the
+visitor's own locale, `select`/`multiselect` through their configured labels.
+
+The block renders identically in the editor's live preview and on the
+published page — both call the same anonymous endpoint with the same query,
+so what an author sees while building the page is what a visitor gets.
+
 ## Settings
 
 DB-backed via the framework's settings module — no `SM_RECORDS_*` environment
@@ -310,6 +350,96 @@ treated as one. Every schema change writes a type revision;
 `POST /api/records/types/{key}/revisions/{version}/restore` rolls back
 through the same pipeline, so a rollback that would fail records is refused
 like any other change.
+
+## Import and export
+
+Records and type definitions both move as files. Everything below goes through
+the same service code the UI and the API use — an import writes with
+`create_record`/`update_record`, so revisions, index rows, `unique` and slug
+claims and the per-type lock all behave exactly as they do for a single save.
+
+| route | permission | notes |
+|---|---|---|
+| `GET /api/records/types/{key}/records/export?format=json\|csv` | `records.view` | streaming; takes the list screen's `filter`/`sort`, and `trashed=true` (which costs `records.edit`) |
+| `POST /api/records/types/{key}/records/import` | `records.edit` | multipart `file=`, or a raw body with `Content-Type: application/json` / `text/csv` |
+| `GET /api/records/types/{key}/export` | `records.view` | the type definition alone, shaped for the route below |
+| `POST /api/records/types/import` | `records.manage_types` | `mode=create` (default) or `mode=update` + `expected_version` |
+
+The record export **streams**. It walks the type keyset-paged by `id` in
+batches of `reindex_batch_size`, on a session of its own, so a 100k-record
+type is exported in constant memory rather than assembled in one list. (An
+export with an explicit `?sort=` cannot be keyset-paged — the sort key lives
+in an index table — and pages by `OFFSET` instead; it is meant for exporting a
+*selection*, and the unsorted default is what a round trip should use.)
+
+**What travels.** Each record carries `uuid`, `slug`, `status`, `position`,
+`published_at` and `data`; `data` is the lenient read, so defaults are filled
+in and a record stamped at an older schema version exports under the current
+one. Relations travel as stored (`{"type": …, "uuid": …}`), never expanded.
+The reserved `_orphaned` key, the audit columns, `version` and `is_deleted` do
+not travel: they describe this install's copy of the row. `uuid` does, which
+is what makes a round trip independent of autoincrement.
+
+**CSV.** Columns are `uuid, slug, status, position, published_at` and then one
+per declared field in declaration order; import is header-driven, so order and
+missing columns are fine (a missing column means "leave it alone", an empty
+cell means null). Values use the module's own wire forms — a `number` is its
+decimal string, a boolean is `true`/`false`, a date is ISO. `multiselect`,
+`json` and `media` cells are JSON-encoded; a relation is `type:uuid`, and a
+to-many relation a JSON list of those. UTF-8 with **no** BOM, `\r\n` line
+endings per RFC 4180.
+
+> **No CSV formula-injection mitigation is applied**, deliberately. A cell
+> beginning `=`, `+`, `-` or `@` is written verbatim rather than prefixed with
+> an apostrophe. The prefix is not lossless — an importer cannot tell it from
+> a value that genuinely starts with one — and these files are meant to round
+> trip. Treat an export from an untrusted source the way you would any other
+> CSV before opening it in a spreadsheet.
+
+**Import options** (query string, or multipart form fields, which win):
+
+- `dry_run` — **`true` by default.** A dry run parses, validates and matches
+  every row and returns the full report, writing nothing.
+- `mode` — `upsert` (default; match, else create), `create`, `update`.
+- `on_error` — `abort` (default) is all-or-nothing: the request's transaction
+  is rolled back and the 422 carries the report. `skip` writes the valid rows,
+  each under its own savepoint, and reports the rest.
+- `match_by` — `uuid` (default), `slug`, or the key of a **`unique`** field.
+  Matching on a non-unique field is refused rather than resolved arbitrarily.
+- `force` — an update whose row carries no `version` is refused, because the
+  export deliberately does not carry one; `force=true` accepts last-write-wins.
+- `max_import_bytes` (a setting, 50 MB by default) refuses a larger body with
+  `413` **before** parsing it.
+
+The report is `{dry_run, mode, total, created, updated, skipped, failed,
+errors: [{row, uuid, field, message}], errors_truncated, duration_ms}`, with
+`created + updated + skipped + failed == total` and at most 200 errors listed.
+**`skipped` is why re-importing an export is a no-op**: a row the record
+already agrees with is not written at all, so versions do not move.
+
+A row is refused for carrying `_orphaned`, naming an unknown field, pointing
+at a relation target that does not exist, repeating a `uuid` already used
+earlier in the same file, naming a `uuid` that belongs to another type, or
+matching a record in the trash (restore or purge it first).
+
+**Type definitions.** `POST /api/records/types/import` with `mode=update` and
+an `expected_version` routes through the ordinary `update_type` path, so
+importing a definition onto a populated type is classified, dry-run and
+refused with the same report — and answered with the same `force` /
+`orphaned` — as the same change made in the schema editor.
+
+**From the command line** (from the repo root, like every entry point here):
+
+```bash
+python -m sm_records.cli export --type order --format json --out order.json
+python -m sm_records.cli export --type order --format csv          # stdout
+python -m sm_records.cli import --type order order.json            # dry run
+python -m sm_records.cli import --type order order.json --apply
+```
+
+`import` is a dry run unless `--apply`, takes `--mode`, `--on-error`,
+`--match-by` and `--force`, and exits non-zero with the report printed when an
+`abort` run is refused.
 
 ## Development
 

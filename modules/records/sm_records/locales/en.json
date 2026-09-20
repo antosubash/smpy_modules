@@ -316,5 +316,26 @@
     "json": "Not valid JSON",
     "json_shape": "Must be a JSON object or array, not a scalar",
     "relation": "Not a valid link to a record"
+  },
+  "io": {
+    "export": "Export",
+    "export_json": "Download JSON",
+    "export_csv": "Download CSV",
+    "import": "Import",
+    "preview_title": "Import preview",
+    "result_title": "Import result",
+    "summary": "{total} row(s): {created} to create, {updated} to update, {skipped} unchanged, {failed} failed",
+    "error_row": "Row {row} ({field}): {message}",
+    "errors_truncated": "Only the first errors are listed; fix these and try again.",
+    "apply": "Apply import",
+    "applied": "Import applied",
+    "close": "Close"
+  },
+  "widget": {
+    "loading": "Loading records…",
+    "error": "Couldn't load records right now.",
+    "empty": "No records to show.",
+    "hint_not_public": "Only public types render on the site.",
+    "title_column": "Title"
   }
 }

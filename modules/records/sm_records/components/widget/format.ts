@@ -1,0 +1,118 @@
+/**
+ * Value formatting for the `RecordsList` widget's public render.
+ *
+ * Deliberately its own module rather than a reuse of `components/RecordCell`:
+ * that component renders an Inertia `<Link>` to `/admin/records/...` for a
+ * relation and reads `useT()` for a handful of labels, both of which are
+ * admin-editor concerns a public page has no business pulling in (an
+ * anonymous visitor following an admin link would just hit the login wall).
+ * The value *coercions* it applies are copied faithfully — same dash for
+ * empty, same ✓/– for booleans, same UTC-anchored date, same locale-aware
+ * datetime — from `components/RecordCell.tsx`, which is the admin list's
+ * formatting and the thing the design doc's "same value formatting" means.
+ *
+ * `utils/values.ts`'s `choicesOf` *is* reused, by `RecordsListBlock.tsx`'s
+ * `resolveData` when it bakes a field's choices into `FieldMetaEntry`: it is
+ * a pure function with no React or admin-only dependency, so there is no
+ * reason to fork it.
+ */
+
+import type { FieldMetaEntry } from './types';
+
+const DASH = '—';
+
+function isRelationRef(value: unknown): value is { type: string; uuid: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { type?: unknown }).type === 'string' &&
+    typeof (value as { uuid?: unknown }).uuid === 'string'
+  );
+}
+
+/** `type:uuid` — the stored reference, verbatim. The public API never
+ *  expands a relation (design §10), so there is no `display_title` to show
+ *  in its place; the block's own prop help says as much. */
+function formatRelationRef(value: unknown): string {
+  if (isRelationRef(value)) return `${value.type}:${value.uuid}`;
+  return DASH;
+}
+
+function choiceLabel(meta: FieldMetaEntry, raw: unknown): string {
+  const match = meta.choices.find((c) => c.value === raw);
+  return match ? match.label : String(raw);
+}
+
+function formatDate(raw: string): string {
+  // A bare calendar day has no timezone of its own (design §7.3) — anchor
+  // at UTC midnight and format in UTC so the displayed day cannot shift a
+  // day for a visitor west of UTC. Locale is the viewer's own (`undefined`).
+  const parsed = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(
+    parsed,
+  );
+}
+
+function formatDatetime(raw: string): string {
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    parsed,
+  );
+}
+
+/** One column's display value, formatted the way the admin list's
+ *  `RecordCell` formats it — minus the two things a public page cannot do
+ *  (link a relation, read `useT()`). `meta` is `undefined` for a value whose
+ *  field definition wasn't baked in (an older saved block, or a schema
+ *  change since); it still renders, just without type-specific formatting. */
+export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unknown): string {
+  if (value === null || value === undefined) return DASH;
+  const type = meta?.type ?? typeof value;
+
+  switch (type) {
+    case 'boolean':
+      return value ? '✓' : '–';
+    case 'number':
+    case 'integer':
+      // `number` arrives as a string (Decimal's JSON encoding, design §7.3);
+      // `integer` as a JSON number. Either way the wire value is the display
+      // value.
+      return String(value);
+    case 'date':
+      return typeof value === 'string' ? formatDate(value) : String(value);
+    case 'datetime':
+      return typeof value === 'string' ? formatDatetime(value) : String(value);
+    case 'select':
+      return meta ? choiceLabel(meta, value) : String(value);
+    case 'multiselect': {
+      const values = Array.isArray(value) ? value : [value];
+      if (values.length === 0) return DASH;
+      return values.map((v) => (meta ? choiceLabel(meta, v) : String(v))).join(', ');
+    }
+    case 'relation': {
+      const refs = Array.isArray(value) ? value : [value];
+      if (refs.length === 0) return DASH;
+      return refs.map(formatRelationRef).join(', ');
+    }
+    default: {
+      const text = String(value);
+      return text.length > 80 ? `${text.slice(0, 80)}…` : text;
+    }
+  }
+}
+
+/** Fill `{slug}`/`{uuid}` in a link template. Empty template (or a record
+ *  missing the placeholder's value) means "no link", per the field's own
+ *  prop help. */
+export function buildRecordHref(
+  template: string,
+  record: { slug: string | null; uuid: string },
+): string | null {
+  const trimmed = template.trim();
+  if (trimmed === '') return null;
+  if (trimmed.includes('{slug}') && !record.slug) return null;
+  return trimmed.replace('{slug}', record.slug ?? '').replace('{uuid}', record.uuid);
+}
