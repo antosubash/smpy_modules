@@ -91,7 +91,7 @@ class _DescNullsLast(UnaryExpression):
     inherit_cache = True
 
     def __init__(self, element: Any) -> None:
-        super().__init__(element, modifier=operators.desc_op, wraps_column_expression=False)
+        super().__init__(element, modifier=operators.desc_op)
 
 
 @compiles(_DescNullsLast)

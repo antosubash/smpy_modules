@@ -14,7 +14,7 @@ row and its counterpart in the database:
   appends a revision, rewrites six index tables and invalidates every
   optimistic-concurrency token a client is holding. :func:`unchanged` is what
   makes the second run a no-op, and it is also where ``skipped`` in the report
-  comes from. It answers by hashing two normalised payloads rather than by
+  comes from. It compares two normalised payloads directly rather than
   rendering the stored one through the schema, which is S4 and most of what a
   no-op import used to cost.
 * **An update never last-write-wins.** :func:`version_required` is the rule;
@@ -23,10 +23,6 @@ row and its counterpart in the database:
 """
 
 from __future__ import annotations
-
-import hashlib
-import json
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,14 +35,7 @@ from sm_records.services.errors import ValidationFailed
 from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
 
-__all__ = [
-    "Envelope",
-    "envelope_for",
-    "payload_digest",
-    "unchanged",
-    "version_required",
-    "write_row",
-]
+__all__ = ["Envelope", "envelope_for", "unchanged", "version_required", "write_row"]
 
 
 class Envelope:
@@ -122,24 +111,6 @@ def envelope_for(row: ImportRow) -> Envelope:
     )
 
 
-def payload_digest(stored: Any) -> str:
-    """A stable fingerprint of one *stored* payload — S4.
-
-    ``json.dumps`` with ``sort_keys`` is the normalisation: a JSON object has
-    no order, so two equal payloads can differ as text, and the stored form
-    holds only what JSON holds (``to_jsonable`` has already turned every
-    ``Decimal`` into a string and every date into an ISO string). ``default=str``
-    is a backstop for a payload a host wrote by hand with ``psql`` — it must not
-    raise here, because the caller's answer to "did this change" is then simply
-    "yes" and the row is rewritten.
-
-    Hashed rather than compared as text because the text of a 9,000-row import
-    is the file twice over; a 16-byte digest per row is not.
-    """
-    raw = json.dumps(stored, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.blake2b(raw.encode("utf-8"), digest_size=16).hexdigest()
-
-
 def unchanged(
     rtype: RecordType,
     record: Record,
@@ -148,12 +119,16 @@ def unchanged(
 ) -> bool:
     """Would writing this row change anything at all?
 
-    **The envelope first, then one digest against another.** The stored payload
-    and the incoming one are both in *stored* form — ``record.data`` is what
-    ``_payload.validate`` produced the last time this row was written, and
-    ``row.stored`` is what it produced for this file's row a moment ago — so
-    the comparison is between two normalised dictionaries and needs no schema
-    pass at all. :func:`payload_digest` is what makes it one.
+    **The envelope first, then one stored payload against the other.** The
+    stored payload and the incoming one are both in *stored* form —
+    ``record.data`` is what ``_payload.validate`` produced the last time this
+    row was written, and ``row.stored`` is what it produced for this file's row
+    a moment ago — so the comparison is between two normalised dictionaries
+    (``to_jsonable`` has already turned every ``Decimal`` into a string and
+    every date into an ISO string) and needs no schema pass at all. A plain
+    ``==`` is that comparison: dict equality is key-order-blind, walks the
+    payload once and allocates nothing, where serialising and hashing both
+    sides would cost two ``json.dumps`` per row to learn the same answer.
 
     This used to render the record through ``read_view`` on every row and
     compare the result field by field, which is a lenient coercion of the whole
@@ -190,7 +165,7 @@ def unchanged(
         return False
     stored = dict(record.data or {})
     stored.pop(ORPHANED_KEY, None)
-    return payload_digest(stored) == payload_digest(row.stored or {})
+    return stored == (row.stored or {})
 
 
 def version_required(record: Record, row: ImportRow) -> str | None:

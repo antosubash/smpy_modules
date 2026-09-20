@@ -61,6 +61,18 @@ async def referring_sets(db: AsyncSession, type_id: int) -> tuple[TableSet, ...]
     relation at all, so the schema stops being the whole answer the moment one
     is registered: the narrowing is switched off rather than made wrong.
 
+    **And a type mid-rebuild counts as a holder whatever its fields say.** A
+    relation field that was removed or retargeted is index-affecting
+    (``schema.diff._removed``): its ``REF`` rows are deleted by the
+    out-of-request runner, not by the schema write, so between the two the
+    rows are still there and the *current* ``fields`` no longer name them.
+    ``referrers()`` used to find those rows in every set and ``field_label``
+    still falls back to the key for exactly that case; narrowing on the schema
+    alone would have made a ``restrict`` in a collection let a delete through
+    that the same field in the global set still blocked. ``reindex_pending``
+    is the column that says the rebuild has not happened yet, so a set holding
+    a type with anything pending is asked until the runner clears it.
+
     **Not memoised**, although ``plan_delete`` walks a cascade one record at a
     time and asks this for each of them. A memo on ``Session.info`` would make
     the second call of a request free and the number a test can assert depend
@@ -76,15 +88,21 @@ async def referring_sets(db: AsyncSession, type_id: int) -> tuple[TableSet, ...]
         return sets
     rows = (
         await db.execute(
-            select(RecordType.id, RecordType.key, RecordType.collection, RecordType.fields)
+            select(
+                RecordType.id,
+                RecordType.key,
+                RecordType.collection,
+                RecordType.fields,
+                RecordType.reindex_pending,
+            )
         )
     ).all()
-    target = next((str(key) for rid, key, _c, _f in rows if int(rid) == int(type_id)), None)
+    target = next((str(key) for rid, key, _c, _f, _p in rows if int(rid) == int(type_id)), None)
     if target is None:
         return sets
     holders = {
         collection
-        for _rid, _key, collection, fields in rows
-        if _declares_a_relation_to(fields, target)
+        for _rid, _key, collection, fields, pending in rows
+        if pending or _declares_a_relation_to(fields, target)
     }
     return tuple(tables for tables in sets if tables.name in holders)
