@@ -41,7 +41,7 @@ from sm_records.contracts.schema_change import dry_run_report_read
 from sm_records.contracts.schemas import record_read, type_read
 from sm_records.deps import request_session
 from sm_records.index.query import QueryError
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, table_sets
 from sm_records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.services.errors import (
     Conflict,
@@ -58,11 +58,23 @@ from sm_records.services.types import get_type_by_id, record_counts
 __all__ = ["RecordsErrorRoute"]
 
 
+def _document_classes() -> tuple[type, ...]:
+    """Every declared table set's document class.
+
+    ``isinstance(current, Record)`` was enough while there was one; since
+    Phase 5 §6 a conflict may carry a collection's record, whose class is a
+    sibling of the global one and not a subclass of it. Read per call rather
+    than memoised at import, because a host declares its collections before
+    ``create_app`` and this module may be imported either side of that.
+    """
+    return tuple(tables.record for tables in table_sets())
+
+
 async def _current_dto(db: Any, current: Any) -> Any:
     if isinstance(current, RecordType):
         live, trashed = await record_counts(db, current)
         return type_read(current, live, trashed).model_dump(mode="json")
-    if isinstance(current, Record):
+    if isinstance(current, _document_classes()):
         rtype = await get_type_by_id(db, current.type_id)
         return record_read(rtype, current).model_dump(mode="json")
     return current

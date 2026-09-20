@@ -26,6 +26,11 @@ export type TypeEditorProps = {
    *  toggle's help text names them, since that list is DB-backed configuration
    *  the browser has no other way to know. */
   content_locales: string[];
+  /** Every record collection this host declared (Phase 5 §6.1). Empty on a
+   *  host that declares none, and the new-type form then offers no control —
+   *  which collections exist is decided by the host's Python and is not
+   *  derivable from anything the browser holds. */
+  collections: string[];
 };
 
 /** A field row's local editing state. Identical in shape to the wire
@@ -104,6 +109,9 @@ export type TypeMetadataValues = {
   displayField: string;
   slugField: string;
   translatable: boolean;
+  /** `''` means the shared tables. Editable only while the type is new —
+   *  `TypeMetadataForm` renders it as text once it exists (Phase 5 §6.2). */
+  collection: string;
 };
 
 export const TOP_LEVEL_ERROR_FIELDS = new Set([
@@ -118,4 +126,5 @@ export const TOP_LEVEL_ERROR_FIELDS = new Set([
   'allowed_roles',
   'fields',
   'translatable',
+  'collection',
 ]);

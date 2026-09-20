@@ -49,6 +49,24 @@ TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 """A type key or field key: lowercase identifier, URL- and JSON-safe."""
 MAX_KEY_LEN: Final = 64
 MAX_LABEL_LEN: Final = 200
+
+MAX_COLLECTION_NAME_LEN: Final = 32
+"""A collection's name, which obeys ``TYPE_KEY_PATTERN`` too (Phase 5 §6.1).
+
+Shorter than a key because the name is a table-name *prefix*: Postgres
+truncates an identifier at 63 bytes, and the longest thing built on it —
+``ix_records_c_<name>_index_datetime_lookup`` — has to fit under that."""
+
+RESERVED_COLLECTION_NAMES: Final = frozenset(
+    {"default", "global", "records", "type", "index", "reduce"}
+)
+"""Names a collection may not take.
+
+``default`` and ``global`` because they are what a reader would expect to mean
+"the shared tables", which is exactly the thing that has no name. The rest
+because ``records_c_type_record`` reads as a table about types rather than a
+collection called ``type`` — the ``c_`` infix already prevents the collision,
+and this prevents the confusion."""
 MAX_DISPLAY_TITLE_LEN: Final = 300
 MAX_SLUG_LEN: Final = 200
 

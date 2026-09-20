@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
-from sm_records.models import Record, RecordType
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.changes import DRY_RUN_SAMPLE, DryRunReport, FailingRecord, SchemaDiff
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -49,14 +49,15 @@ async def _batches(db: AsyncSession, rtype: RecordType, batch_size: int):
     to skips rows — the same reason :func:`sm_records.index.reindex.reindex_type`
     pages this way.
     """
+    cls = tables_for(rtype).record
     last_id = 0
     while True:
         rows = (
             (
                 await db.execute(
-                    select(Record)
-                    .where(Record.type_id == rtype.id, Record.id > last_id)
-                    .order_by(Record.id)
+                    select(cls)
+                    .where(cls.type_id == rtype.id, cls.id > last_id)
+                    .order_by(cls.id)
                     .limit(batch_size)
                     .execution_options(include_deleted=True)
                 )

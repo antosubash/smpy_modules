@@ -39,8 +39,8 @@ from sqlalchemy.sql import ColumnElement
 
 from sm_records.index._fields import IndexedField
 from sm_records.index._fixed import NOT_NULL_FIXED_COLUMNS, SORT_INDEXED_FIXED_COLUMNS
-from sm_records.index._predicates import INDEX_TABLE, SORT_ATTR
-from sm_records.models import Record
+from sm_records.index._predicates import SORT_ATTR
+from sm_records.models import TableSet
 from sm_records.schema.types import IndexKind
 
 __all__ = [
@@ -83,8 +83,9 @@ class SortTerm:
     no index on ``records_record`` knows about it."""
 
 
-def fixed_term(name: str, desc: bool) -> SortTerm:
-    column = getattr(Record, name)
+def fixed_term(record: Any, name: str, desc: bool) -> SortTerm:
+    """A sort on a column every record has, in the caller's table set."""
+    column = getattr(record, name)
     return SortTerm(
         expr=column,
         desc=desc,
@@ -96,8 +97,14 @@ def fixed_term(name: str, desc: bool) -> SortTerm:
     )
 
 
-def indexed_term(field: IndexedField, type_id: int, desc: bool) -> SortTerm:
-    table = INDEX_TABLE[field.kind]
+def indexed_term(tables: TableSet, field: IndexedField, type_id: int, desc: bool) -> SortTerm:
+    """A sort on an indexed field, joined out of ``tables``'s own index table.
+
+    Both halves of the join belong to one table set: a record's index rows live
+    beside it, so an ordering never crosses a collection (Phase 5 §6.3).
+    """
+    record = tables.record
+    table = tables.index[field.kind]
     attr = SORT_ATTR[field.kind]
     if field.many:
         sub = (
@@ -115,7 +122,7 @@ def indexed_term(field: IndexedField, type_id: int, desc: bool) -> SortTerm:
             nullable=True,
             kind=field.kind,
             fixed=None,
-            join=(sub, sub.c.record_id == Record.id),
+            join=(sub, sub.c.record_id == record.id),
         )
     alias = aliased(table)
     # ``record_id`` and ``field_key``, and deliberately **not** ``type_id``.
@@ -132,7 +139,7 @@ def indexed_term(field: IndexedField, type_id: int, desc: bool) -> SortTerm:
     # lookup per row again. Design §7.3's "denormalised so a query never
     # joins to filter by type" is about the *filter* semi-join, which still
     # uses all three.
-    onclause = and_(alias.record_id == Record.id, alias.field_key == field.key)
+    onclause = and_(alias.record_id == record.id, alias.field_key == field.key)
     return SortTerm(
         expr=getattr(alias, attr),
         desc=desc,
@@ -173,15 +180,15 @@ def tiebreak_desc(terms: Sequence[SortTerm]) -> bool:
     return len(terms) == 1 and terms[0].desc and terms[0].index_served
 
 
-def ordered(stmt: Select, terms: list[SortTerm]) -> Select:
-    """Join whatever the terms need and order by them, ``Record.id`` last."""
+def ordered(record: Any, stmt: Select, terms: list[SortTerm]) -> Select:
+    """Join whatever the terms need and order by them, the record id last."""
     order: list[Any] = []
     for term in terms:
         if term.join is not None:
             stmt = stmt.outerjoin(*term.join)
         direction = term.expr.desc() if term.desc else term.expr.asc()
         order.append(nulls_last(direction) if term.nullable else direction)
-    order.append(Record.id.desc() if tiebreak_desc(terms) else Record.id.asc())
+    order.append(record.id.desc() if tiebreak_desc(terms) else record.id.asc())
     return stmt.order_by(*order)
 
 
@@ -202,7 +209,7 @@ def _same(term: SortTerm, value: Any) -> ColumnElement[bool]:
     return term.expr.is_(None) if value is None else term.expr == value
 
 
-def keyset_clause(terms: list[SortTerm], values: list[Any]) -> ColumnElement[bool]:
+def keyset_clause(record: Any, terms: list[SortTerm], values: list[Any]) -> ColumnElement[bool]:
     """ "Everything the order puts after this row" — design §"F11".
 
     ``values`` is one per term plus the ``Record.id`` tiebreaker, exactly the
@@ -220,7 +227,7 @@ def keyset_clause(terms: list[SortTerm], values: list[Any]) -> ColumnElement[boo
     claims to run on.
     """
     clause: ColumnElement[bool] = (
-        Record.id < values[-1] if tiebreak_desc(terms) else Record.id > values[-1]
+        record.id < values[-1] if tiebreak_desc(terms) else record.id > values[-1]
     )
     for term, value in zip(reversed(terms), reversed(values[:-1]), strict=True):
         clause = or_(_after(term, value), and_(_same(term, value), clause))

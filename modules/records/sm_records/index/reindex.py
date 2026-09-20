@@ -18,6 +18,7 @@ this finishes — with no row having been rewritten.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from typing import Any
 
 from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,12 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.index.providers import TypeResolver
 from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.writer import project, row_values, write_index
-from sm_records.models import INDEX_TABLES, Record, RecordType
+from sm_records.models import RecordType, tables_for
 
 
 async def reindex_record(
     db: AsyncSession,
-    record: Record,
+    record,
     rtype: RecordType,
     *,
     resolve_type_id: TypeResolver,
@@ -42,7 +43,7 @@ async def reindex_record(
 
 async def reindex_batch(
     db: AsyncSession,
-    records: Sequence[Record],
+    records: Sequence[Any],
     rtype: RecordType,
     *,
     resolve_type_id: TypeResolver,
@@ -81,13 +82,14 @@ async def reindex_batch(
     ids = [record.id for record in records if record.id is not None]
     if not ids:
         return
+    tables = tables_for(rtype)
     rows: dict[type, list[dict]] = {}
     for record in records:
         for entry in project(record, rtype, resolve_type_id):
-            table, values = row_values(entry, record.id, rtype.id)
+            table, values = row_values(tables, entry, record.id, rtype.id)
             rows.setdefault(table, []).append(values)
 
-    for table in INDEX_TABLES:
+    for table in tables.index_tables:
         await db.execute(delete(table).where(table.record_id.in_(ids)))
     for table, values_list in rows.items():
         await db.execute(insert(table), values_list)
@@ -134,15 +136,16 @@ async def reindex_type(
     passes ``session.commit``, so a rebuild of a large type holds SQLite's
     single write lock for one batch at a time rather than for the whole walk.
     """
+    record_cls = tables_for(rtype).record
     total = 0
     last_id = 0
     while True:
         batch = (
             (
                 await db.execute(
-                    select(Record)
-                    .where(Record.type_id == rtype.id, Record.id > last_id)
-                    .order_by(Record.id)
+                    select(record_cls)
+                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
+                    .order_by(record_cls.id)
                     .limit(batch_size)
                     # Keyset, not OFFSET: the rebuild writes as it reads, and an
                     # offset walk over a table being written to skips rows.
@@ -251,7 +254,7 @@ async def delete_field_rows(db: AsyncSession, rtype: RecordType, field_keys: Seq
     leaves nothing behind that a query could read as truth.
     """
     removed = 0
-    for table in INDEX_TABLES:
+    for table in tables_for(rtype).index_tables:
         result = await db.execute(
             delete(table).where(table.type_id == rtype.id, table.field_key.in_(list(field_keys)))
         )

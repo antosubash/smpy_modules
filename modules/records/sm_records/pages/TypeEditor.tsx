@@ -51,6 +51,7 @@ function TypeEditor({
   roles,
   public_route_prefix,
   content_locales,
+  collections,
 }: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
@@ -198,6 +199,7 @@ function TypeEditor({
                 errors={topLevelErrors}
                 publicRoutePrefix={public_route_prefix}
                 contentLocales={content_locales}
+                collections={collections}
                 translatableError={translatableError}
               />
             </CardContent>

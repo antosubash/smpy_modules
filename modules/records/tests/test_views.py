@@ -197,6 +197,9 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
         # would be turning on, and that list is configuration (§4.2).
         "content_locales",
         "default_locale",
+        # Which collections the host declared, which is a fact about the host's
+        # Python and nothing the browser can derive (§6.1).
+        "collections",
     }
 
 

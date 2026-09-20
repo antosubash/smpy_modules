@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.query import Filter, FilterOp, build_query
-from sm_records.models import Record, RecordType
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._import_parse import ImportRow
 from sm_records.services._import_rows import envelope_for
@@ -79,12 +79,17 @@ async def resolve_matches(
     see it would try to *create* a duplicate and be refused by the unique
     index with a message naming nothing the operator can see.
     """
+    cls = tables_for(rtype).record
     if match_by == MATCH_UUID:
-        # Unscoped: ``uuid`` is unique across the whole install, so a file
-        # naming one that belongs to *another* type must be reported as that
-        # rather than pass the lookup and fail at the unique index as a 500.
-        # ``import_`` checks ``type_id`` on what comes back.
-        return await _by_column(db, rtype, rows, Record.uuid, lambda row: row.uuid, scoped=False)
+        # Unscoped **by type**, and scoped to this type's table set: ``uuid`` is
+        # unique within a record table, so a file naming one that belongs to
+        # *another type in the same set* must be reported as that rather than
+        # pass the lookup and fail at the unique index as a 500 — ``import_``
+        # checks ``type_id`` on what comes back. A uuid belonging to a type in a
+        # *different* collection is simply not found, and a create carrying it
+        # succeeds: the two tables have separate unique indexes and uuid4s do
+        # not collide in practice (Phase 5 §6.4).
+        return await _by_column(db, rtype, rows, cls.uuid, lambda row: row.uuid, scoped=False)
     if match_by == MATCH_SLUG:
         return await _by_slug(db, rtype, rows)
     field = match_field(rtype, defs, match_by)
@@ -118,11 +123,12 @@ async def _by_slug(
         slug = envelope_for(row).slug or None
         if slug and row.locale:
             wanted[row.number] = (row.locale, slug)
+    cls = tables_for(rtype).record
     slugs = sorted({slug for _, slug in wanted.values()})
     found: dict[tuple[str, str], Record] = {}
     for start in range(0, len(slugs), _CHUNK):
-        stmt = select(Record).where(
-            Record.type_id == rtype.id, Record.slug.in_(slugs[start : start + _CHUNK])
+        stmt = select(cls).where(
+            cls.type_id == rtype.id, cls.slug.in_(slugs[start : start + _CHUNK])
         )
         matches = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().all()
         for record in matches:
@@ -139,14 +145,15 @@ async def _by_column(
     *,
     scoped: bool = True,
 ) -> dict[int, Record]:
+    cls = tables_for(rtype).record
     wanted = {row.number: key_of(row) for row in rows}
     keys = sorted({value for value in wanted.values() if value})
     found: dict[str, Record] = {}
     for start in range(0, len(keys), _CHUNK):
         chunk = keys[start : start + _CHUNK]
-        stmt = select(Record).where(column.in_(chunk))
+        stmt = select(cls).where(column.in_(chunk))
         if scoped:
-            stmt = stmt.where(Record.type_id == rtype.id)
+            stmt = stmt.where(cls.type_id == rtype.id)
         rows_found = (
             (await db.execute(stmt.execution_options(include_deleted=True))).scalars().all()
         )

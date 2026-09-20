@@ -20,6 +20,7 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, locales
+from sm_records.collections import collections
 from sm_records.contracts.schemas import type_read
 from sm_records.deps import (
     caller_roles,
@@ -70,6 +71,12 @@ def _editor_context(
     there for the same reason: the "Translatable" toggle has to be able to say
     which languages it would be turning on, and that list is configuration the
     browser cannot see.
+
+    ``collections`` is the same kind of fact and the most invisible of them
+    all: which collections exist is decided by the *host's Python*
+    (Phase 5 §6.1), so it is not derivable from anything the browser holds.
+    Empty on a host that declares none, and the new-type form then offers no
+    control at all — the inert case of §6.5, visible in the UI.
     """
     registry = getattr(getattr(request.app.state, "sm", None), "permissions", None)
     role_map = getattr(registry, "role_map", None) or {}
@@ -79,6 +86,7 @@ def _editor_context(
         "public_route_prefix": settings.public_route_prefix,
         "content_locales": list(locales.supported(settings)),
         "default_locale": locales.default(settings),
+        "collections": list(collections()),
     }
 
 

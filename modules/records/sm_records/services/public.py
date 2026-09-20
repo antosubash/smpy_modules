@@ -36,7 +36,7 @@ never the admin's 409), and that mapping lives in ``endpoints/api/public.py``.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final
+from typing import Any, Final
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,7 +53,7 @@ from sm_records.index.query import (
     sort_plan,
     sort_signature,
 )
-from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.services._listing import RecordListPage
 from sm_records.services._translations import published_siblings
 from sm_records.services.errors import NotFound
@@ -76,17 +76,26 @@ answer with this. A caller who can tell the five apart can enumerate private
 content by its absence (§10).
 """
 
-_PUBLISHED = Record.status == RecordStatus.PUBLISHED
+
+def _published(record: Any):
+    """ "published", against one table set's document class.
+
+    A function since Phase 5 §6.3 rather than the module-level predicate it was:
+    a public collection type's rows are in that collection's table, and a bound
+    column from the global class would name a table the statement does not
+    have."""
+    return record.status == RecordStatus.PUBLISHED
 
 
-def _published_only(stmt):
-    """The one predicate this whole surface is defined by, as a callable —
-    which is the shape ``bounded_count_query``'s ``narrow`` takes, so the page
-    and both halves of its count cannot disagree about what "public" means."""
-    return stmt.where(_PUBLISHED)
+def _published_only(record: Any, stmt):
+    """The one predicate this whole surface is defined by. Bound to a document
+    class it becomes the shape ``bounded_count_query``'s ``narrow`` takes, so
+    the page and both halves of its count cannot disagree about what "public"
+    means."""
+    return stmt.where(_published(record))
 
 
-def _narrow_for(locale: str):
+def _narrow_for(record: Any, locale: str):
     """``_published_only`` plus "and in this language".
 
     One callable so the page and both halves of its bounded count cannot
@@ -95,7 +104,7 @@ def _narrow_for(locale: str):
     """
 
     def narrow(stmt):
-        return _published_only(stmt).where(Record.locale == locale)
+        return _published_only(record, stmt).where(record.locale == locale)
 
     return narrow
 
@@ -136,7 +145,8 @@ async def get_public_record(db: AsyncSession, rtype: RecordType, uuid: str) -> R
     after the fact is one refactor away from leaking the difference in a log
     line or a timing.
     """
-    stmt = select(Record).where(Record.uuid == uuid, Record.type_id == rtype.id, _PUBLISHED)
+    cls = tables_for(rtype).record
+    stmt = select(cls).where(cls.uuid == uuid, cls.type_id == rtype.id, _published(cls))
     record = (await db.execute(stmt)).scalars().first()
     if record is None:
         raise NotFound(NOT_FOUND)
@@ -171,17 +181,17 @@ async def list_public_records(
     statement and not as a caller ``Filter``, for two reasons — ``locale`` is
     not in :data:`PUBLIC_FIXED_COLUMNS`, so :func:`_check_columns` refuses it
     from a caller; and narrowing both halves of the bounded count is what a
-    ``narrow`` callable is for, exactly as with ``_PUBLISHED``.
+    ``narrow`` callable is for, exactly as with the published predicate.
 
     The bound on ``total`` (F4), the ``?after=`` cursor (F11) and
     ``total=false`` are the admin listing's, unchanged — an anonymous caller
-    walking a large public type is exactly who wants them. ``_PUBLISHED``
-    narrows **both** halves of the bounded count, for the reason
+    walking a large public type is exactly who wants them. The published
+    predicate narrows **both** halves of the bounded count, for the reason
     ``bounded_count_query`` gives: a bound whose inner ``LIMIT`` fills with
     rows the outer then discards under-counts near the cap.
     """
     _check_columns(rtype, filters, sorts)
-    narrow = _narrow_for(locale)
+    narrow = _narrow_for(tables_for(rtype).record, locale)
     size = settings.clamp_page_size(page_size)
     fields = list(rtype.fields or [])
     signature = sort_signature(rtype.key, sorts)

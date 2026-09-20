@@ -76,8 +76,20 @@ class RecordsModule(ModuleBase):
         it from the DB at lifespan start — it assigns the result onto the
         container this creates, which is why every later read goes through
         ``app.state.sm_records`` rather than a captured local.
+
+        It is also where the **collection registry is sealed** (Phase 5 §6.1).
+        This is the first hook the host calls, so by the time it runs the
+        host's own ``declare_collection`` calls have long since happened at
+        import; anything declaring one after this point would be creating
+        tables that no migration wrote and no ``create_all`` reached, and
+        every write to them would be a ``no such table`` found at runtime
+        rather than a ``RuntimeError`` found at boot.
         """
         from settings.registration import register_module_settings
+
+        from sm_records.models._tables import seal
+
+        seal()
 
         from sm_records.services import RecordsServices
         from sm_records.settings import RecordsSettings

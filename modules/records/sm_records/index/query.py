@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from functools import cache
 from typing import Any
 
 from sqlalchemy import Select, func, select
@@ -37,7 +38,7 @@ from sm_records.index._filters import Filter, filtered, resolve
 from sm_records.index._fixed import FIXED_COLUMNS, fixed_clause
 from sm_records.index._predicates import FilterOp, QueryError
 from sm_records.index._sorting import SortTerm, fixed_term, indexed_term, keyset_clause, ordered
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, TableSet, tables_for
 
 __all__ = [
     "FIXED_COLUMNS",
@@ -47,8 +48,10 @@ __all__ = [
     "QueryError",
     "Sort",
     "SortTerm",
+    "TableSet",
     "bounded_count_query",
     "build_query",
+    "count_columns",
     "count_query",
     "decode_cursor",
     "encode_cursor",
@@ -59,6 +62,7 @@ __all__ = [
     "sort_plan",
     "sort_signature",
     "sort_terms",
+    "tables_for",
 ]
 
 
@@ -75,14 +79,18 @@ def sort_terms(rtype: RecordType, indexed, declared, sorts: Iterable[Sort]) -> l
     a sort on a field that is mid-reindex is the same 409 a filter on it is,
     and one on an unindexed field the same 400. What a term *is* once
     resolved, and what it costs, is ``_sorting``'s subject.
+
+    The table set comes from ``rtype`` (Phase 5 §6.3), so a sort on a
+    collection type joins that collection's index tables.
     """
+    tables = tables_for(rtype)
     terms: list[SortTerm] = []
     for sort in sorts:
         if sort.field in FIXED_COLUMNS:
-            terms.append(fixed_term(sort.field, sort.desc))
+            terms.append(fixed_term(tables.record, sort.field, sort.desc))
             continue
         terms.append(
-            indexed_term(resolve(rtype, indexed, declared, sort.field), rtype.id, sort.desc)
+            indexed_term(tables, resolve(rtype, indexed, declared, sort.field), rtype.id, sort.desc)
         )
     return terms
 
@@ -102,8 +110,11 @@ def build_query(
     sorts: Sequence[Sort] = (),
 ) -> Select:
     """The record list for one type, filtered and ordered through the index."""
-    stmt = filtered(select(Record).where(Record.type_id == rtype.id), rtype, fields, filters)
-    return ordered(stmt, sort_terms(rtype, indexed_map(fields), declared_keys(fields), sorts))
+    record = tables_for(rtype).record
+    stmt = filtered(select(record).where(record.type_id == rtype.id), rtype, fields, filters)
+    return ordered(
+        record, stmt, sort_terms(rtype, indexed_map(fields), declared_keys(fields), sorts)
+    )
 
 
 def page_query(
@@ -126,15 +137,16 @@ def page_query(
     it narrows the statement to what the order puts strictly after that row,
     with no ``OFFSET`` anywhere.
     """
-    stmt = filtered(select(Record).where(Record.type_id == rtype.id), rtype, fields, filters)
+    record = tables_for(rtype).record
+    stmt = filtered(select(record).where(record.type_id == rtype.id), rtype, fields, filters)
     terms = sort_terms(rtype, indexed_map(fields), declared_keys(fields), sorts)
     if after is not None:
-        stmt = stmt.where(keyset_clause(terms, after))
-    stmt = ordered(stmt, terms)
+        stmt = stmt.where(keyset_clause(record, terms, after))
+    stmt = ordered(record, stmt, terms)
     return stmt.add_columns(*[term.expr for term in terms]), terms
 
 
-def only_trashed(stmt: Select) -> Select:
+def only_trashed(record: Any, stmt: Select) -> Select:
     """Narrow a record query to the trash — the one place that predicate lives.
 
     Two halves, both needed. ``include_deleted`` lifts the framework's
@@ -144,7 +156,7 @@ def only_trashed(stmt: Select) -> Select:
     the live ones. Applied to the count as well as to the page, so a trash
     listing's ``total`` counts what its page shows.
     """
-    return stmt.where(Record.is_deleted.is_(True)).execution_options(include_deleted=True)
+    return stmt.where(record.is_deleted.is_(True)).execution_options(include_deleted=True)
 
 
 def count_query(
@@ -165,34 +177,41 @@ def count_query(
     the callers that genuinely want the whole number and know the type is
     small — and as the thing the bounded form is defined against.
     """
+    record = tables_for(rtype).record
     return filtered(
-        select(func.count(Record.id)).where(Record.type_id == rtype.id), rtype, fields, filters
+        select(func.count(record.id)).where(record.type_id == rtype.id), rtype, fields, filters
     )
 
 
-_COUNT_COLUMNS = tuple(
-    getattr(Record, column.key) for column in Record.__table__.c if column.name != "data"
-)
-"""What the bounded count's inner query selects: every column of a record
-except the payload.
+@cache
+def count_columns(record: Any) -> tuple[Any, ...]:
+    """What the bounded count's inner query selects: every column of a record
+    except the payload.
 
-**Mapped attributes and not ``Record.__table__.c``.** The Core columns compile
-to the same SQL and are *not* ORM entity references, so a statement selecting
-them names no mapper and the framework's filter skips it — the inner ``LIMIT``
-then fills with trashed rows the outer discards, and ``total`` under-counts.
-That is a wrong answer rather than a slow one, and
-``test_the_bound_does_not_fill_with_trashed_rows`` is what catches it.
+    A function of the table set (Phase 5 §6.3) and memoised: there are as many
+    of these tuples as there are declared collections plus one, and none of
+    them changes after import.
 
-Not ``Record.id`` alone, and not ``select(Record)`` either. The outer
-aggregate below runs against an ``aliased(Record, <that subquery>)``, so the
-framework's soft-delete filter — and any other per-mapper criterion it grows
-— is rendered against the *alias*, i.e. against whatever columns the subquery
-exposed. Exposing only ``id`` would make a criterion on any other column a
-``no such column`` at execute time; exposing all of them would drag ``data``,
-the JSON payload (up to ``max_payload_bytes`` each), through a subquery of
-10,000 rows. ``data`` is the one column no filter can ever be expressed over
-(§7.2), so it is the one that can be left out.
-"""
+    **Mapped attributes and not ``Record.__table__.c``.** The Core columns compile
+    to the same SQL and are *not* ORM entity references, so a statement selecting
+    them names no mapper and the framework's filter skips it — the inner ``LIMIT``
+    then fills with trashed rows the outer discards, and ``total`` under-counts.
+    That is a wrong answer rather than a slow one, and
+    ``test_the_bound_does_not_fill_with_trashed_rows`` is what catches it.
+
+    Not ``Record.id`` alone, and not ``select(Record)`` either. The outer
+    aggregate below runs against an ``aliased(Record, <that subquery>)``, so the
+    framework's soft-delete filter — and any other per-mapper criterion it grows
+    — is rendered against the *alias*, i.e. against whatever columns the subquery
+    exposed. Exposing only ``id`` would make a criterion on any other column a
+    ``no such column`` at execute time; exposing all of them would drag ``data``,
+    the JSON payload (up to ``max_payload_bytes`` each), through a subquery of
+    10,000 rows. ``data`` is the one column no filter can ever be expressed over
+    (§7.2), so it is the one that can be left out.
+    """
+    return tuple(
+        getattr(record, column.key) for column in record.__table__.c if column.name != "data"
+    )
 
 
 def bounded_count_query(
@@ -234,11 +253,17 @@ def bounded_count_query(
     statement, because ``include_deleted`` is read off the statement being
     executed and a nested one is never that.
     """
+    record = tables_for(rtype).record
     apply = narrow if narrow is not None else (lambda stmt: stmt)
     inner = apply(
-        filtered(select(*_COUNT_COLUMNS).where(Record.type_id == rtype.id), rtype, fields, filters)
+        filtered(
+            select(*count_columns(record)).where(record.type_id == rtype.id),
+            rtype,
+            fields,
+            filters,
+        )
     ).limit(cap + 1)
-    counted = aliased(Record, inner.subquery())
+    counted = aliased(record, inner.subquery())
     stmt = select(func.count(counted.id)).select_from(counted)
     options = inner.get_execution_options()
     return stmt.execution_options(**options) if options else stmt
@@ -265,5 +290,6 @@ def exists_query(
     :func:`count_query`), and a caller that wants the trash included — the
     ``unique`` check does — lifts it with ``include_deleted`` as usual.
     """
-    stmt = filtered(select(Record.id).where(Record.type_id == rtype.id), rtype, fields, filters)
+    record = tables_for(rtype).record
+    stmt = filtered(select(record.id).where(record.type_id == rtype.id), rtype, fields, filters)
     return stmt.limit(1)

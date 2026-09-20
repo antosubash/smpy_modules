@@ -29,18 +29,36 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import INDEX_TABLES
-from sm_records.models._base import RECORD_TABLE, TYPE_TABLE
+from sm_records.models import TableSet, table_set, table_sets
+from sm_records.models._base import TYPE_TABLE
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["INDEX_TABLE_NAMES", "OWNED_TABLE_NAMES", "analyze_tables"]
+__all__ = ["analyze_tables", "index_table_names", "owned_table_names"]
 
-INDEX_TABLE_NAMES: frozenset[str] = frozenset(str(table.__tablename__) for table in INDEX_TABLES)
-"""The six kind tables — what a reindex rewrites."""
 
-OWNED_TABLE_NAMES: frozenset[str] = INDEX_TABLE_NAMES | {RECORD_TABLE, TYPE_TABLE}
-"""Everything a bulk load touches that a query later plans against."""
+def index_table_names(tables: TableSet | None = None) -> frozenset[str]:
+    """The six kind tables of one table set — what a reindex rewrites.
+
+    A function of the set rather than a module constant since Phase 5 §6: a
+    rebuild of a collection type rewrites that collection's tables, and
+    ``ANALYZE``-ing the global ones instead would refresh statistics for rows
+    nothing touched while leaving the stale ones stale. ``None`` is the global
+    set, for a caller with no type in hand.
+    """
+    return frozenset(str(table.__tablename__) for table in (tables or table_set(None)).index_tables)
+
+
+def owned_table_names() -> frozenset[str]:
+    """Everything a bulk load touches that a query later plans against —
+    **every** declared table set's documents and index rows, plus the shared
+    type table. The seeder writes across whatever collections its types name,
+    so this cannot be narrowed to one of them."""
+    names = {TYPE_TABLE}
+    for tables in table_sets():
+        names.add(str(tables.record.__tablename__))
+        names |= index_table_names(tables)
+    return frozenset(names)
 
 
 async def analyze_tables(db: AsyncSession, tables: Iterable[str]) -> None:

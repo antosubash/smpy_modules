@@ -13,8 +13,8 @@ counts a different set from the one the list shows is worse than no dashboard:
   grammar's, not a second copy of them. ``group_by`` is resolved through the
   *same* :func:`sm_records.index._filters.resolve`, so grouping by a field
   that is mid-rebuild is the 409 filtering by it is.
-* **The same soft-delete rule.** Every statement here names the ``Record``
-  mapper — ``select_from(Record)`` and ``count(distinct(Record.id))`` — which
+* **The same soft-delete rule.** Every statement here names the document
+  mapper — ``select_from(record)`` and ``count(distinct(record.id))`` — which
   is what the framework's ``with_loader_criteria`` hook attaches
   ``is_deleted IS false`` to. A bare ``select(func.count())`` names none and
   counts the trash; that is F4's trap in ``docs/performance.md``, and it
@@ -37,8 +37,8 @@ from sqlalchemy.orm import aliased
 from sm_records.index._fields import declared_keys, indexed_map
 from sm_records.index._filters import filtered, resolve
 from sm_records.index._fixed import FIXED_COLUMNS
-from sm_records.index._predicates import INDEX_TABLE, SORT_ATTR, QueryError
-from sm_records.models import Record
+from sm_records.index._predicates import SORT_ATTR, QueryError
+from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
 
 __all__ = ["Metric", "aggregate_query", "parse_metric"]
@@ -105,27 +105,30 @@ def parse_metric(raw: str | None) -> Metric:
     return Metric(op, field)
 
 
-def _column(rtype, indexed, declared, name: str) -> tuple[Any, IndexKind, Any, bool]:
+def _column(
+    tables: TableSet, rtype, indexed, declared, name: str
+) -> tuple[Any, IndexKind, Any, bool]:
     """``(expression, kind, index table or None, multi-valued)`` for one name.
 
-    A fixed column is a real column on ``records_record`` and needs no join;
+    A fixed column is a real column on the document table and needs no join;
     anything else is resolved through the filter grammar and read out of its
     index table, whose sortable attribute per kind is already decided once in
     ``_predicates.SORT_ATTR`` (``target_uuid`` for a relation, ``value`` for
-    everything else).
+    everything else). Both come out of ``tables``, so an aggregate over a
+    collection type reads that collection's tables (Phase 5 §6.3).
     """
     if name in FIXED_COLUMNS:
-        return getattr(Record, name), FIXED_KIND[name], None, False
+        return getattr(tables.record, name), FIXED_KIND[name], None, False
     field = resolve(rtype, indexed, declared, name)
-    table = INDEX_TABLE[field.kind]
+    table = tables.index[field.kind]
     return getattr(table, SORT_ATTR[field.kind]), field.kind, (table, field.key), field.many
 
 
-def _on(table: Any, type_id: int, key: str):
+def _on(record: Any, table: Any, type_id: int, key: str):
     """The join condition every index table is reached through here: this
     record, this type, this field key. One spelling, so the group join and the
     metric join cannot drift into meaning different things."""
-    return and_(table.record_id == Record.id, table.type_id == type_id, table.field_key == key)
+    return and_(table.record_id == record.id, table.type_id == type_id, table.field_key == key)
 
 
 def _check_metric(metric: Metric, kind: IndexKind, many: bool) -> None:
@@ -171,14 +174,16 @@ def aggregate_query(
     order — without the tiebreaker two groups of equal size swap places
     between requests and a dashboard's rows jump.
     """
+    tables = tables_for(rtype)
+    record = tables.record
     indexed, declared = indexed_map(fields), declared_keys(fields)
-    group_expr, group_kind, group_join, _ = _column(rtype, indexed, declared, group_by)
+    group_expr, group_kind, group_join, _ = _column(tables, rtype, indexed, declared, group_by)
 
-    counted = func.count(distinct(Record.id)).label("group_count")
+    counted = func.count(distinct(record.id)).label("group_count")
     columns: list[Any] = [group_expr.label("group_value"), counted]
     metric_join = None
     if metric.field is not None:
-        expr, kind, join, many = _column(rtype, indexed, declared, metric.field)
+        expr, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
         _check_metric(metric, kind, many)
         if join is not None:
             # Always aliased: the metric may read the *same* table as the
@@ -189,11 +194,11 @@ def aggregate_query(
             metric_join = (alias, join[1])
         columns.append(getattr(func, metric.op)(expr).label("metric_value"))
 
-    stmt = select(*columns).select_from(Record).where(Record.type_id == rtype.id)
+    stmt = select(*columns).select_from(record).where(record.type_id == rtype.id)
     if group_join is not None:
-        stmt = stmt.join(group_join[0], _on(group_join[0], rtype.id, group_join[1]))
+        stmt = stmt.join(group_join[0], _on(record, group_join[0], rtype.id, group_join[1]))
     if metric_join is not None:
-        stmt = stmt.outerjoin(metric_join[0], _on(metric_join[0], rtype.id, metric_join[1]))
+        stmt = stmt.outerjoin(metric_join[0], _on(record, metric_join[0], rtype.id, metric_join[1]))
     stmt = filtered(stmt, rtype, fields, filters)
     stmt = stmt.group_by(group_expr).order_by(desc(counted), group_expr).limit(cap + 1)
     return stmt, group_kind

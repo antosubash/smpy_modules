@@ -1,9 +1,15 @@
-"""The five demo Record Types, as ``create_type``-ready field lists.
+"""The demo Record Types, as ``create_type``-ready field lists.
 
 Kept as data rather than a builder function per type: the shapes are what the
-task asked for, and reading the five side by side here is the fastest way to
-check them against ``schema/fields.py``'s rules (allowed options per type,
+task asked for, and reading them side by side here is the fastest way to check
+them against ``schema/fields.py``'s rules (allowed options per type,
 ``on_delete`` choices, unique-implies-indexed) without running anything.
+
+Five live in the global tables. The sixth, ``event``, lives in the ``events``
+**collection** (Phase 5 §6) and is therefore seeded only on a host that
+declares it — see :func:`active_type_defs`. It exists to make the demo dataset
+exercise the cross-collection paths the unit tests cover in isolation: it
+relates to ``store``, which is global.
 """
 
 from __future__ import annotations
@@ -11,7 +17,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from sm_records.seed.data import ORDER_STATUSES, PRODUCT_CATEGORIES, TAG_POOL, US_STATES
+from sm_records.collections import collections
+from sm_records.seed.data import (
+    EVENT_KINDS,
+    ORDER_STATUSES,
+    PRODUCT_CATEGORIES,
+    TAG_POOL,
+    US_STATES,
+)
 
 
 def _choices(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
@@ -70,6 +83,9 @@ class TypeDef:
     fields: list[dict[str, Any]] = field(default_factory=list)
     display_field: str | None = None
     slug_field: str | None = None
+    collection: str | None = None
+    """Which table set the type is created in (Phase 5 §6.2). ``None`` — the
+    global tables — for every type but ``event``."""
 
 
 COMPANY = TypeDef(
@@ -217,8 +233,54 @@ ORDER = TypeDef(
     ],
 )
 
+EVENT = TypeDef(
+    key="event",
+    label="Event",
+    label_plural="Events",
+    display_field="name",
+    slug_field="name",
+    collection="events",
+    fields=[
+        _f("name", "text", "Name", required=True, indexed=True),
+        _f("starts_at", "datetime", "Starts at", indexed=True),
+        _f(
+            "kind",
+            "select",
+            "Kind",
+            indexed=True,
+            options={"choices": _self_choices(EVENT_KINDS)},
+        ),
+        # **The cross-collection relation** (Phase 5 §6.4). ``event`` lives in
+        # the ``events`` collection and ``store`` in the global tables, so the
+        # ref row is written into ``records_c_events_index_ref`` and names a
+        # record of ``records_record``. ``set_null`` rather than ``restrict``
+        # so deleting a seeded store exercises the *write* half of the
+        # cross-collection delete path rather than merely refusing.
+        _f(
+            "venue",
+            "relation",
+            "Venue",
+            indexed=True,
+            options=_relation("store", on_delete="set_null"),
+        ),
+    ],
+)
+
 #: Dependency order: every relation's target is defined earlier in this list
 #: (design doc §9) — company before contact, contact and product before order
-#: and store. ``runner.py`` creates types and records in exactly this order,
-#: and reverses it to delete them on ``--reset``.
-TYPE_DEFS: list[TypeDef] = [COMPANY, CONTACT, PRODUCT, STORE, ORDER]
+#: and store, and store before event. ``runner.py`` creates types and records
+#: in exactly this order, and reverses it to delete them on ``--reset``.
+TYPE_DEFS: list[TypeDef] = [COMPANY, CONTACT, PRODUCT, STORE, ORDER, EVENT]
+
+
+def active_type_defs() -> list[TypeDef]:
+    """The demo types this process can actually create.
+
+    A type in a collection the host did not declare has no tables, so creating
+    it would be refused by ``create_type`` (a 422 naming the declared set) —
+    and rightly. Filtering here is what keeps the seeder's default behaviour
+    exactly Phase 4's on a host with no collections: five types, five weights,
+    the same counts (§6.5).
+    """
+    declared = set(collections())
+    return [td for td in TYPE_DEFS if td.collection is None or td.collection in declared]

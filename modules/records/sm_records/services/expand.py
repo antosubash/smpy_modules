@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.constants import MAX_DISPLAY_TITLE_LEN
 from sm_records.contracts.relations import ExpandedRef, expanded_ref
 from sm_records.index.query import QueryError
-from sm_records.models import Record, RecordType
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.types import FieldType
 from sm_records.services._common import role_blocked
 
@@ -141,8 +141,16 @@ async def _types_by_key(db: AsyncSession, keys: set[str]) -> dict[str, RecordTyp
     return {row.key: row for row in rows}
 
 
-async def _targets(db: AsyncSession, uuids: list[str], type_id: int) -> dict[str, Record]:
+async def _targets(
+    db: AsyncSession, target_type: RecordType, uuids: list[str]
+) -> dict[str, Record]:
     """Every target of one field, in one ``IN``.
+
+    **The target type decides the table** (Phase 5 §6.3): a relation from a
+    collection type to a global one reads the global record table and back the
+    other way reads the collection's, and either way it is still one batched
+    query per field. The type is a resolved row here rather than an id because
+    the row is what carries ``collection``.
 
     ``include_deleted``: see the module docstring — a trashed target has to be
     *found* here, or telling it from a purged one costs a second query per
@@ -159,9 +167,10 @@ async def _targets(db: AsyncSession, uuids: list[str], type_id: int) -> dict[str
     """
     if not uuids:
         return {}
+    cls = tables_for(target_type).record
     stmt = (
-        select(Record)
-        .where(Record.uuid.in_(uuids), Record.type_id == type_id)
+        select(cls)
+        .where(cls.uuid.in_(uuids), cls.type_id == target_type.id)
         .execution_options(include_deleted=True)
     )
     return {row.uuid: row for row in (await db.execute(stmt)).scalars().all()}
@@ -208,7 +217,7 @@ async def expand(
         found = (
             {}
             if restricted or target_type is None
-            else await _targets(db, sorted(wanted), target_type.id)
+            else await _targets(db, target_type, sorted(wanted))
         )
         for record in records:
             out[record.uuid][key] = [

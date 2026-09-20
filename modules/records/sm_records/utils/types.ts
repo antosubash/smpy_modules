@@ -36,6 +36,10 @@ export type TypeRead = {
   slug_field: string | null;
   is_public: boolean;
   allowed_roles: string[];
+  /** Which table set this type's documents live in (Phase 5 §6.2), or `null`
+   *  for the shared ones. Set once, at creation: the API answers a `PUT`
+   *  that changes it with a 409, so the editor shows it read-only. */
+  collection: string | null;
   record_count: number;
   trashed_record_count: number;
   created_at: string;

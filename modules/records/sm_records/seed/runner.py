@@ -9,33 +9,25 @@ nothing here bypasses the per-record work the module always does.
 
 from __future__ import annotations
 
-import math
 import random
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from sm_records.index._analyze import OWNED_TABLE_NAMES, analyze_tables
+from sm_records.index._analyze import analyze_tables, owned_table_names
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.seed import generate
 from sm_records.seed._i18n import seed_translations
 from sm_records.seed.log import log
-from sm_records.seed.types import TYPE_DEFS
+
+# Split out for the file cap: how many records of each type a run writes is
+# arithmetic with its own reasons, and this module is the writing.
+from sm_records.seed.plan import distribute, weights_for
+from sm_records.seed.types import active_type_defs
 from sm_records.services.errors import NotFound
 from sm_records.services.records import create_record
 from sm_records.services.types import create_type, delete_type, get_type, record_count
 from sm_records.settings import RecordsSettings
-
-#: Total record count is split across the five types by these weights
-#: (task spec: 5% / 25% / 15% / 45% / 10%), each type getting at least one
-#: record regardless of how small ``records`` is.
-_WEIGHTS: dict[str, float] = {
-    "company": 0.05,
-    "contact": 0.25,
-    "product": 0.15,
-    "store": 0.10,
-    "order": 0.45,
-}
 
 _BATCH_SIZE = 200
 
@@ -57,48 +49,13 @@ class SeedSummary:
         return self.total / self.elapsed_seconds if self.elapsed_seconds > 0 else float(self.total)
 
 
-def _distribute(total: int, weights: dict[str, float]) -> dict[str, int]:
-    """Split ``total`` across ``weights``' keys, each getting at least one.
-
-    Largest-remainder rounding: floor every share, hand out the leftover to
-    the keys with the biggest fractional part, and — for a ``total`` too
-    small to give every key its floor plus its forced minimum of one — claw
-    back from the keys least entitled to the extra. Exact for any
-    ``total >= len(weights)``, which every sane invocation satisfies.
-    """
-    keys = list(weights)
-    if total <= 0:
-        return dict.fromkeys(keys, 0)
-    if total < len(keys):
-        return {key: (1 if i < total else 0) for i, key in enumerate(keys)}
-
-    raw = {key: total * weight for key, weight in weights.items()}
-    counts = {key: max(1, math.floor(raw[key])) for key in keys}
-    diff = total - sum(counts.values())
-
-    by_frac_desc = sorted(keys, key=lambda k: raw[k] - math.floor(raw[k]), reverse=True)
-    by_frac_asc = list(reversed(by_frac_desc))
-    i = 0
-    while diff > 0:
-        counts[by_frac_desc[i % len(keys)]] += 1
-        diff -= 1
-        i += 1
-    i = 0
-    while diff < 0:
-        key = by_frac_asc[i % len(keys)]
-        if counts[key] > 1:
-            counts[key] -= 1
-            diff += 1
-        i += 1
-    return counts
-
-
 async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordType]:
-    """Create the five demo types that don't already exist, in dependency
-    order (``TYPE_DEFS``) — a relation's target must exist before the type
-    naming it does (design doc §9)."""
+    """Create the demo types that don't already exist, in dependency order
+    (``active_type_defs``) — a relation's target must exist before the type
+    naming it does (design doc §9), and that holds across a collection
+    boundary too: ``event`` points at ``store`` (Phase 5 §6.4)."""
     types: dict[str, RecordType] = {}
-    for type_def in TYPE_DEFS:
+    for type_def in active_type_defs():
         try:
             rtype = await get_type(db, type_def.key)
         except NotFound:
@@ -111,6 +68,7 @@ async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordT
                 fields_raw=type_def.fields,
                 display_field=type_def.display_field,
                 slug_field=type_def.slug_field,
+                collection=type_def.collection,
                 actor="records-seed-cli",
             )
             log(f"created type {type_def.key!r}")
@@ -120,16 +78,17 @@ async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordT
 
 
 async def _reset(db: Any) -> None:
-    """Purge the five demo types and their records, deepest referrer first.
+    """Purge the demo types and their records, deepest referrer first.
 
-    Reversing ``TYPE_DEFS`` is exactly the safe order: ``order`` and ``store``
-    are never a relation's target among these five, so they can go first;
-    ``product`` and ``contact`` only after; ``company`` — the one every other
-    type may point at — last. ``delete_type`` itself purges (hard-deletes,
-    trash included) before dropping the row, so this really empties the
-    tables rather than leaving soft-deleted rows behind.
+    Reversing the list is exactly the safe order: ``event`` and ``order`` are
+    never a relation's target, so they go first; ``store`` — which ``event``
+    points at from another collection — only after; then ``product`` and
+    ``contact``; ``company``, the one every other type may point at, last.
+    ``delete_type`` itself purges (hard-deletes, trash included) before
+    dropping the row, so this really empties the tables rather than leaving
+    soft-deleted rows behind.
     """
-    for type_def in reversed(TYPE_DEFS):
+    for type_def in reversed(active_type_defs()):
         try:
             rtype = await get_type(db, type_def.key)
         except NotFound:
@@ -202,7 +161,8 @@ async def run(
     """
     started = time.monotonic()
     rng = random.Random(seed)
-    counts = _distribute(records, _WEIGHTS)
+    weights = weights_for({td.key for td in active_type_defs()})
+    counts = distribute(records, weights)
     summary = SeedSummary(reset=reset)
 
     async with db_state.session_factory() as db:
@@ -210,9 +170,7 @@ async def run(
             await _reset(db)
         types = await _ensure_types(db, settings)
 
-        offsets = {
-            key: await record_count(db, types[key], include_deleted=True) for key in _WEIGHTS
-        }
+        offsets = {key: await record_count(db, types[key], include_deleted=True) for key in weights}
         committer = _BatchCommitter(db, records)
 
         companies: list[Record] = []
@@ -272,12 +230,26 @@ async def run(
             orders += 1
         summary.created["order"] = orders
 
+        # The collection's type, last and only when the host declared it. It
+        # goes through exactly the same ``create_record`` as the five above —
+        # the only difference is which tables ``tables_for`` hands the writer
+        # (Phase 5 §6.3), which is the point.
+        if "event" in counts:
+            events = 0
+            store_uuids = [store.uuid for store in stores]
+            for i in range(counts["event"]):
+                venue = rng.choice(store_uuids) if store_uuids else None
+                payload, slug = generate.gen_event(rng, offsets["event"] + i, store_uuid=venue)
+                await _create(db, committer, types["event"], payload, settings=settings, slug=slug)
+                events += 1
+            summary.created["event"] = events
+
         await committer.finish()
         # A bulk load is exactly the state SQLite has no statistics for, and a
         # seeded database's first act is to be queried. One pass here, out of
         # any request, is worth orders of magnitude on the filters that read
         # the index tables — see :mod:`sm_records.index._analyze`.
-        await analyze_tables(db, OWNED_TABLE_NAMES)
+        await analyze_tables(db, owned_table_names())
         await db.commit()
 
     summary.elapsed_seconds = time.monotonic() - started

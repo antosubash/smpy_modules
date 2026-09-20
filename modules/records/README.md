@@ -449,6 +449,134 @@ screen, that a given type is further restricted to specific roles.
   nothing. This is "unique enforced at the cost of serializing writes on that
   type," not a database-level uniqueness guarantee.
 
+## Collections
+
+Off by default, and off for every host that does not write a line of Python to
+turn it on. A **collection** gives one Record Type (or several) its own
+document, revision and index tables instead of sharing the global ones — the
+escape hatch for a type that dwarfs the others.
+
+### Declaring one
+
+The tables have to exist in the host's Alembic history, so a collection cannot
+be a setting read from the database at boot. It is declared in code, in a
+module the host imports **before** `create_app`:
+
+```python
+# host/records_collections.py
+from sm_records.collections import declare_collection
+
+declare_collection("events")
+```
+
+```python
+# host/main.py
+import records_collections  # noqa: F401 - declares this host's collections
+
+app = create_app(settings)
+```
+
+That call builds a full table set on the module's metadata with the prefix
+`records_c_events_`: `record`, `revision` and the six index tables. Each one is
+built by the same factory that builds the global set, so it is identical in
+shape modulo the prefix — same columns, same indexes, same partial unique slug
+index, same foreign keys pointing at the collection's own record table. The
+host then autogenerates **one migration** for the new tables, exactly as it did
+for the module itself:
+
+```
+alembic -c host/alembic.ini revision --autogenerate -m "records events collection tables"
+alembic -c host/alembic.ini upgrade head
+```
+
+The host's `alembic/env.py` has to import that declaration module, or
+autogenerate cannot see the tables. In this repo `host/alembic.ini` sets
+`prepend_sys_path = %(here)s` and `env.py` imports `records_collections` when
+it exists.
+
+A name must match `^[a-z][a-z0-9_]*$`, be at most 32 characters (it is a
+table-name prefix, and the longest index built on it has to fit inside
+Postgres's 63-byte identifier limit), and not be one of `default`, `global`,
+`records`, `type`, `index`, `reduce`. Declaring the same name twice is a no-op;
+declaring one **after** the app has been built is a `RuntimeError`, because
+those tables are in no migration and every write to them would be a
+`no such table` found at runtime instead.
+
+### Assigning a type to one
+
+`POST /api/records/types` takes `collection`, and that is the only request that
+may set it:
+
+```json
+{"key": "event", "label": "Event", "collection": "events", "fields": [...]}
+```
+
+An undeclared name is a `422` naming what *is* declared. Omitting it — or
+sending `null` — puts the type in the shared tables, which is what every type
+created before this existed carries.
+
+**A type cannot be moved between collections.** `PUT /api/records/types/{key}`
+answers a changed `collection` with a `409` and the sentence *"moving a
+populated type between collections is not supported"*. It would mean copying
+the type's records, revisions and index rows into other tables and re-pointing
+every reference at them, with no rollback story; the honest answer is to export
+the type, delete it and re-import under a new one. An echo of the current value
+is accepted, so a client that sends back the whole type it just read still
+saves. The type editor shows the collection read-only once the type exists and
+offers the declared set only on the "new type" form.
+
+### What stays global
+
+`records_type`, `records_type_revision`, the reduce table, the settings, the
+permissions, the health check and the CLI. The reduce table in particular:
+a reduce row is a *fold* keyed by `type_id` with no `record_id` to partition
+on, so a collection would gain nothing from its own copy and gain one more
+table to rebuild. The CLI takes a type and follows its collection.
+
+### Relations across a collection
+
+They work in both directions, and nothing about declaring a relation mentions
+a collection. A `relation` names its target by `(type, uuid)`, the **target
+type** decides which tables are read, and `on_delete` — `restrict`, `set_null`
+and `cascade` alike — crosses the boundary like any other edge.
+
+Two consequences are worth knowing:
+
+- **"Who references this record" asks every table set.** A reference row lives
+  in the *referrer's* collection tables and names `target_uuid` +
+  `target_type_id`, so the rows pointing at one record are scattered across
+  every set that holds a type relating to it. The referrers query is a loop —
+  one indexed lookup per declared collection plus one for the global set —
+  rather than a `UNION`, because the ids a reference table returns are ids in
+  *its own* record table and a union would merge them and lose which is which.
+  That is a query per declared collection on the delete path and on the
+  referrers panel; it is the cost of the partition, and it is why collections
+  are a per-type escape hatch rather than a default.
+- **`?expand=` is still one batched query per field.** The target type decides
+  the table, so expanding a field that points into a collection reads that
+  collection's record table once for the whole page.
+
+### `uuid` across collections
+
+A record's `uuid` is unique **within its own table**: each record table carries
+its own unique index, and nothing at the database level stops the same uuid
+existing in two collections. Nothing at the generator level makes it plausible
+either — every uuid is a `uuid4`, generated the same way by the writer, the
+seeder and the importer — so the cross-collection reads that resolve a target
+by uuid (referrers, `?expand=`, a relation write check) treat it as globally
+unique. Stated here rather than relied on silently: an importer that invents
+uuids some other way is the one thing that could break it.
+
+### Inert when unused
+
+With no `declare_collection` call, the module's metadata holds exactly the
+tables it held before collections existed, `alembic check` reports no
+operations beyond the one nullable `records_type.collection` column,
+`tables_for` always returns the global set, and the query layer runs the same
+statements it always did. There is one migration such a host applies (the
+column) and one it can skip (whatever tables a *different* host's collections
+needed).
+
 ## Content languages
 
 Off by default, per host **and** per type. An install that leaves
@@ -911,17 +1039,26 @@ relation checks a hand-built one would. Run it from the repo root:
 ```
 python -m sm_records.cli seed                         # 5000 records, seed 42
 python -m sm_records.cli seed --records 2000 --seed 7  # a smaller, different run
-python -m sm_records.cli seed --reset                  # purge the five demo types first
+python -m sm_records.cli seed --reset                  # purge the demo types first
 python -m sm_records.cli seed --database-url sqlite+aiosqlite:///path/to.db
 ```
 
-`--records` is the *total* across all five types (roughly 5% company / 25%
-contact / 15% product / 45% order / 10% store, minimum one each). It is
+On a host that declares the `events` [collection](#collections) the seeder adds
+a sixth type, `event`, in that collection: a `datetime`, a `select` and a
+`venue` relation pointing at the **global** `store` type, so the demo dataset
+exercises a relation across a collection boundary. On a host that declares no
+collection the type is skipped entirely and the dataset is exactly what it
+always was.
+
+`--records` is the *total* across all the types (roughly 5% company / 25%
+contact / 15% product / 45% order / 10% store, minimum one each; `event` takes
+5% proportionally from the five where it exists, so `--records N` still means
+N). It is
 deterministic for a given `--seed`; re-running without `--reset` tops up the
 dataset with more records, and unique fields (`contact.email`, `product.sku`,
 `order.order_no`) stay collision-free because their values are keyed off each
 type's current record count, not the seed alone. `--reset` hard-deletes the
-five types and everything in them (including the trash) before reseeding.
+demo types and everything in them (including the trash) before reseeding.
 
 On an install with more than one `content_locale`, the seeder also marks the
 `company` type `translatable` and gives roughly a tenth of the companies a

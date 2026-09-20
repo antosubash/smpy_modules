@@ -145,13 +145,19 @@ def _fixed_value(field: str, value: Any) -> Any:
     return text
 
 
-def fixed_clause(field: str, op: FilterOp, value: Any) -> ColumnElement[bool]:
+def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnElement[bool]:
     """Fixed columns are real columns, so these are ordinary predicates —
     except for ``ne``, which also matches a NULL. SQL's ``<> NULL`` is unknown
     and would drop rows with no slug from a "slug is not 'x'" filter, which is
     not what anybody means by it and disagrees with how ``ne`` reads on an
-    index table (absence matches)."""
-    column = getattr(Record, field)
+    index table (absence matches).
+
+    ``record`` is the document class of the caller's table set (Phase 5 §6.3).
+    The three derived sets above stay read off the **global** class on purpose:
+    every set is built by one factory, so which columns exist, which are
+    ``NOT NULL`` and which carry a ``(type_id, col, id)`` index are facts about
+    the *shape*, and a collection cannot differ in any of them."""
+    column = getattr(record, field)
     if op is FilterOp.IS_NULL:
         return column.is_(None) if value in (None, True) else column.isnot(None)
     if op is FilterOp.CONTAINS:

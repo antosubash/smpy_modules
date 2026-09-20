@@ -20,6 +20,7 @@ export function metadataFrom(type: TypeRead | null): TypeMetadataValues {
     displayField: type?.display_field ?? '',
     slugField: type?.slug_field ?? '',
     translatable: type?.translatable ?? false,
+    collection: type?.collection ?? '',
   };
 }
 
@@ -41,6 +42,10 @@ export function extraCreateFields(values: TypeMetadataValues): Partial<CreateTyp
   if (values.displayField) extra.display_field = values.displayField;
   if (values.slugField) extra.slug_field = values.slugField;
   if (values.translatable) extra.translatable = true;
+  // Omitted rather than sent as `null` when empty: `''` is this form's
+  // spelling of "the shared tables", and the server's default is the same
+  // thing said once (Phase 5 §6.2).
+  if (values.collection) extra.collection = values.collection;
   return extra;
 }
 

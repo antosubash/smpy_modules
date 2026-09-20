@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
 from sm_records.constants import MAX_SLUG_LEN, ORPHANED_KEY
-from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.services import _claims
 from sm_records.services.errors import Conflict
 from sm_records.settings import RecordsSettings
@@ -53,10 +53,11 @@ async def list_translations(db: AsyncSession, rtype: RecordType, group: str) -> 
     Ordered by locale, so a language switcher does not reshuffle itself between
     two loads of the same record.
     """
+    cls = tables_for(rtype).record
     stmt = (
-        select(Record)
-        .where(Record.type_id == rtype.id, Record.translation_group == group)
-        .order_by(Record.locale)
+        select(cls)
+        .where(cls.type_id == rtype.id, cls.translation_group == group)
+        .order_by(cls.locale)
         .execution_options(include_deleted=True)
     )
     return list((await db.execute(stmt)).scalars().all())
@@ -80,14 +81,15 @@ async def published_siblings(
     groups = sorted({record.translation_group for record in records})
     if not groups:
         return {}
+    cls = tables_for(rtype).record
     stmt = (
-        select(Record)
+        select(cls)
         .where(
-            Record.type_id == rtype.id,
-            Record.translation_group.in_(groups),
-            Record.status == RecordStatus.PUBLISHED,
+            cls.type_id == rtype.id,
+            cls.translation_group.in_(groups),
+            cls.status == RecordStatus.PUBLISHED,
         )
-        .order_by(Record.locale)
+        .order_by(cls.locale)
     )
     out: dict[str, list[Record]] = {group: [] for group in groups}
     for sibling in (await db.execute(stmt)).scalars().all():
@@ -102,12 +104,13 @@ async def _sibling(db: AsyncSession, rtype: RecordType, group: str, locale: str)
     still holds while a record sits restorable, so treating one as absent would
     offer to create a translation the database then refuses.
     """
+    cls = tables_for(rtype).record
     stmt = (
-        select(Record)
+        select(cls)
         .where(
-            Record.type_id == rtype.id,
-            Record.translation_group == group,
-            Record.locale == locale,
+            cls.type_id == rtype.id,
+            cls.translation_group == group,
+            cls.locale == locale,
         )
         .execution_options(include_deleted=True)
     )
@@ -125,12 +128,13 @@ async def _free_slug(db: AsyncSession, rtype: RecordType, base: str, locale: str
 
     ``include_deleted``, because the trash keeps its claim per locale.
     """
+    cls = tables_for(rtype).record
     stmt = (
-        select(Record.slug)
+        select(cls.slug)
         .where(
-            Record.type_id == rtype.id,
-            Record.locale == locale,
-            Record.slug.startswith(base[: _stem(base)]),
+            cls.type_id == rtype.id,
+            cls.locale == locale,
+            cls.slug.startswith(base[: _stem(base)]),
         )
         .execution_options(include_deleted=True)
     )

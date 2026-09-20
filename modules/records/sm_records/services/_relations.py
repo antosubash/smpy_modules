@@ -16,9 +16,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import IndexRef, Record, RecordType
+from sm_records.models import Record, RecordType, table_sets, tables_of
 from sm_records.schema.fields import ON_DELETE_DEFAULT, FieldDefinition
-from sm_records.schema.types import FieldType
+from sm_records.schema.types import FieldType, IndexKind
 from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
 
@@ -85,10 +85,16 @@ async def check_targets(
     if not wanted:
         return
     uuids = {uuid for *_, uuid in wanted}
-    rows = (
-        await db.execute(select(Record.uuid, Record.type_id).where(Record.uuid.in_(uuids)))
-    ).all()
-    live = {uuid: int(type_id) for uuid, type_id in rows}
+    # Every table set, because a relation may point into a collection or out of
+    # one (Phase 5 §6.4): the declared target type decides which set holds the
+    # target, and this check runs before that type has been resolved to a row.
+    # A uuid is unique inside each set and generated as a uuid4, so the merged
+    # mapping cannot hold two different records under one key in practice.
+    live: dict[str, int] = {}
+    for tables in table_sets():
+        cls = tables.record
+        rows = (await db.execute(select(cls.uuid, cls.type_id).where(cls.uuid.in_(uuids)))).all()
+        live.update({uuid: int(type_id) for uuid, type_id in rows})
 
     errors: list[dict[str, str]] = []
     for key, declared, claimed, uuid in wanted:
@@ -126,6 +132,8 @@ async def referrers(
     otherwise make its own ``restrict`` field refuse its own delete, which is
     not a referential-integrity problem anybody has.
 
+    **Every declared table set is asked** — see the loop below.
+
     Records already in the trash are dropped too, by the framework's
     soft-delete filter and not by a predicate here. Their index rows survive
     (§7.3) so they are found, but a trashed referrer neither blocks a
@@ -140,26 +148,44 @@ async def referrers(
     pretend it is not there. The delete path keeps the default, because
     including the trash there would change delete semantics — see above.
     """
-    rows = (
-        await db.execute(
-            select(IndexRef.record_id, IndexRef.type_id, IndexRef.field_key).where(
-                IndexRef.target_uuid == record.uuid
-            )
-        )
-    ).all()
-    pairs = {(int(rid), str(key)) for rid, _, key in rows if int(rid) != record.id}
-    if not pairs:
-        return []
-
-    records = await _by_id(db, Record, {rid for rid, _ in pairs}, include_deleted=include_deleted)
-    types = await _by_id(db, RecordType, {r.type_id for r in records.values()})
+    own = tables_of(record)
     out: list[Referrer] = []
-    for record_id, field_key in sorted(pairs):
-        referring = records.get(record_id)
-        rtype = types.get(referring.type_id) if referring is not None else None
-        if referring is None or rtype is None:
+    # **One query per declared table set, not one query.** A ref row lives in
+    # the *referrer's* tables and names its target by ``(target_uuid,
+    # target_type_id)``, so the rows pointing at this record are scattered across
+    # every set that holds a type with a relation to it (Phase 5 §6.4). A UNION
+    # would collapse them into one result and lose the one thing the ids need to
+    # be read with — *which* record table each ``record_id`` belongs to — so the
+    # loop keeps each set's ids with that set's class. It is the global set plus
+    # one query per declared collection, in ``table_sets()`` order, which is why
+    # that order is the global set first and then alphabetical: adding a
+    # collection must not reorder an existing referrer list.
+    for tables in table_sets():
+        ref = tables.index[IndexKind.REF]
+        rows = (
+            await db.execute(
+                select(ref.record_id, ref.field_key).where(ref.target_uuid == record.uuid)
+            )
+        ).all()
+        pairs = {
+            (int(rid), str(key))
+            for rid, key in rows
+            # A record referencing itself is dropped, and "itself" is a row in
+            # *this* set with this id — two collections can hold the same id.
+            if not (tables is own and int(rid) == record.id)
+        }
+        if not pairs:
             continue
-        out.append(Referrer(referring, rtype, field_key, _on_delete(rtype, field_key)))
+        records = await _by_id(
+            db, tables.record, {rid for rid, _ in pairs}, include_deleted=include_deleted
+        )
+        types = await _by_id(db, RecordType, {r.type_id for r in records.values()})
+        for record_id, field_key in sorted(pairs):
+            referring = records.get(record_id)
+            rtype = types.get(referring.type_id) if referring is not None else None
+            if referring is None or rtype is None:
+                continue
+            out.append(Referrer(referring, rtype, field_key, _on_delete(rtype, field_key)))
     return out
 
 
@@ -189,6 +215,16 @@ def field_label(rtype: RecordType, field_key: str) -> str:
     return field_key
 
 
+def _key(ref: Referrer) -> tuple[str | None, int]:
+    """What makes two referrer rows the same *record*.
+
+    The id alone does not: two collections number their records independently,
+    so ``(collection, id)`` is the identity and an id-keyed set would silently
+    merge a global record with a collection one (Phase 5 §6.4).
+    """
+    return (ref.rtype.collection, ref.record.id)
+
+
 def _distinct_records(refs: Iterable[Referrer]) -> int:
     """How many *records* these referrer rows represent.
 
@@ -199,7 +235,7 @@ def _distinct_records(refs: Iterable[Referrer]) -> int:
     it is **one** record, and a badge reading "Referenced by 2" over a list
     of one record is a disagreement nobody can act on.
     """
-    return len({ref.record.id for ref in refs})
+    return len({_key(ref) for ref in refs})
 
 
 async def paged_referrers(

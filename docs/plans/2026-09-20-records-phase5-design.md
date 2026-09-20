@@ -302,6 +302,69 @@ With no `declare_collection` call the module's metadata is byte-identical to
 Phase 4's, no migration is generated, and `tables_for` always returns the
 global set. That is the acceptance test for "opt-in".
 
+### 6.6 As built — where this deviated, and why
+
+Shipped as specified above except for the following. Each is a decision taken
+while building, recorded here so the design and the code do not disagree.
+
+**One migration for every host, one for this one.** §6.1 says the host
+autogenerates "one migration for the new tables". It is two revisions, and the
+split is load-bearing: `records_type.collection` is a nullable column *every*
+host needs (`5e2a32dccc22`), and the `records_c_events_*` tables exist only
+because this repo's demo host declares that collection (`3b4733cf5444`). A
+host that declares none applies the first and skips the second, which is the
+§6.5 property expressed in the migration history rather than only in the
+metadata. Autogenerate also needs to *see* the declaration, so `host/alembic.ini`
+gained `prepend_sys_path = %(here)s` and `env.py` imports `records_collections`
+when it exists — a host-level import, not the module-specific one that file's
+docstring warns against.
+
+**Index and enum names are derived from the prefix, not only the table names.**
+§6.1 says "same indexes". They cannot literally be the same: index names and
+Postgres enum type names are schema-global, so `ix_records_record_type_slug`
+and `records_record_status` can exist exactly once. Every such name is built
+from the table prefix, which is why the DDL test compares modulo the prefix
+rather than literally. The one thing that cannot be rewritten that way is a
+generated *foreign-key constraint* name, which the framework's naming
+convention truncates with a hash once the table name grows past Postgres's
+63-byte limit; the test elides that name and compares the FK's shape.
+
+**Collection names are bounded and partly reserved.** §6.1 gives
+`TYPE_KEY_PATTERN` and ≤ 32. Added: `default`, `global`, `records`, `type`,
+`index` and `reduce` are refused, the first two because they are what a reader
+would expect to mean "the shared tables" — which is the one thing that has no
+name — and the rest because `records_c_type_record` reads as a table about
+types.
+
+**Referrers is a loop, and the design's "union or loop" is settled as a loop.**
+§6.3 says a ref row "stores `target_uuid` and `target_type_id`; the referrers
+query already resolves the type". It does — but the `record_id` a reference
+table returns is an id in *that set's* record table, and two collections number
+their records independently. A `UNION` would merge ids that mean different
+rows. So `referrers()` asks one table set at a time and keeps each set's ids
+with that set's class; for the same reason the identity of a referring record
+is `(collection, id)` rather than `id`, in the `_distinct_records` count and in
+the cascade's visited set.
+
+**Per-record helpers resolve their table set from the record's class.** §6.3
+says every place that names `Record` "takes its tables from `TableSet`". Three
+places hold a row and no type — the revision writer, the revision trim and the
+purge — and threading a `TableSet` into them would have changed signatures the
+whole module calls. They use `tables_of(record)` instead, a reverse lookup from
+the generated class, which cannot disagree with the row about where it came
+from because the class *is* the table.
+
+**Type annotations still say `Record`.** The generated classes are siblings of
+the global one, not subclasses, so an annotation naming `Record` documents the
+shape rather than the table. The one place that mattered was an
+`isinstance(current, Record)` in the 409 body builder, which now asks
+`table_sets()`.
+
+**The seeder's sixth type.** `event` is declared with `collection="events"` and
+created only where that collection is declared. Its share of `--records N` is
+taken *proportionally* from the five rather than added on top, so `N` still
+means `N` either way — which is the §6.5 property as the seeder sees it.
+
 ## 7. Sequencing
 
 Waves, because these rewrite the same files:

@@ -17,129 +17,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._reduce_write import apply_delta, drop_type_rows
-from sm_records.index.reduce import snapshot
 from sm_records.index.reindex import reindex_record
-from sm_records.index.writer import delete_index, write_index
-from sm_records.models import Record, RecordRevision, RecordType, RevisionEvent
-from sm_records.services import _payload, _relations
-from sm_records.services._common import (
-    guarded_bump,
-    mark_written,
-    reload,
-    role_blocked,
-    type_resolver,
-    utcnow,
-)
+from sm_records.index.writer import delete_index
+from sm_records.models import Record, RecordType, RevisionEvent, TableSet, tables_for
+from sm_records.services._common import mark_written, type_resolver, utcnow
+
+# Split out for the file cap: everything about the referrer graph — walking
+# it, and rewriting the records that point at the one being deleted — lives
+# there, and everything about a record's own existence lives here.
+from sm_records.services._delete_plan import apply_set_null, plan_delete
 from sm_records.services.errors import Conflict, ReferencedByOthers
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
-
-_RESTRICT = "restrict"
-_SET_NULL = "set_null"
-_CASCADE = "cascade"
-
-
-async def _apply_set_null(
-    db: AsyncSession,
-    ref: _relations.Referrer,
-    uuid: str,
-    *,
-    actor: str | None,
-    settings: RecordsSettings,
-) -> None:
-    """Drop the reference, then rewrite the referrer as any other edit would.
-
-    A to-many field loses only the entry that pointed at the deleted record;
-    a to-one field goes to ``None``. Nulling the whole list would delete
-    references to records nobody asked to delete, which is the mistake
-    ``restrict``-by-default exists to avoid one level up.
-
-    The rewrite goes through the same bump-and-revise path
-    :func:`~sm_records.services.records.update_record` uses, and not a bare
-    ``data`` assignment: this *is* an edit of somebody else's record. Without
-    the version bump a client holding the pre-delete version writes straight
-    over it under optimistic concurrency that reports no conflict; without the
-    revision the change is absent from the history panel that is supposed to
-    explain where the reference went; and without recomputing
-    ``display_title`` a type whose ``display_field`` *is* the relation keeps a
-    list-screen title naming a record that is now in the trash.
-    """
-    previous_data = dict(ref.record.data or {})
-    data = dict(previous_data)
-    value = data.get(ref.field_key)
-    if isinstance(value, list):
-        kept = [item for item in value if not (isinstance(item, dict) and item.get("uuid") == uuid)]
-        data[ref.field_key] = kept or None
-    else:
-        data[ref.field_key] = None
-
-    expected = ref.record.version
-    if not await guarded_bump(db, Record, ref.record.id, expected):
-        raise Conflict(
-            f"record {ref.record.uuid} has changed since it was read",
-            current=await reload(db, Record, ref.record.id),
-        )
-    ref.record.data = data
-    ref.record.version = expected + 1
-    ref.record.updated_by = actor
-    # The stored payload, not a revalidated one: the referrer may be stamped at
-    # an older ``schema_version`` than its type now carries (§8.3), and a
-    # delete elsewhere is not the event that gets to refuse it.
-    ref.record.display_title = _payload.display_title(ref.rtype, data)
-    db.add(ref.record)
-    await db.flush()
-    await write_revision(
-        db, ref.record, RevisionEvent.UPDATE, limit=settings.revision_limit, actor=actor
-    )
-    # ``previous``: an ordinary edit of somebody else's record, so a reduce
-    # index moves it off the group its old payload put it in (Phase 5 §5.2).
-    await write_index(
-        db,
-        ref.record,
-        ref.rtype,
-        resolve_type_id=await type_resolver(db),
-        previous=snapshot(ref.record, previous_data),
-    )
-
-
-async def _plan_delete(
-    db: AsyncSession, rtype: RecordType, record: Record, roles: Sequence[str] | None
-) -> tuple[list[tuple[Record, RecordType]], list[tuple[_relations.Referrer, str]], list[str]]:
-    """Walk the whole referrer graph without touching a row.
-
-    Returns ``(records to trash, set_null rewrites, restrict blockers)``. The
-    walk is breadth-first with a visited set, because a user-defined graph can
-    hold a cycle — two types each relating to the other — and without the set
-    the first such cycle is a ``RecursionError`` in a delete handler.
-    """
-    trash: list[tuple[Record, RecordType]] = [(record, rtype)]
-    set_nulls: list[tuple[_relations.Referrer, str]] = []
-    blockers: list[str] = []
-    seen_blockers: set[str] = set()
-    visited: set[int] = {record.id}
-    queue: list[Record] = [record]
-
-    while queue:
-        current = queue.pop(0)
-        for ref in await _relations.referrers(db, current):
-            behaviour = ref.on_delete
-            # ``role_blocked`` and not a local copy: design §10's narrowing has
-            # to reach a type the URL never names — a cascade or a set_null into
-            # a *different* type would otherwise trash or rewrite records this
-            # caller may not write at all. Same predicate as the read paths.
-            if behaviour != _RESTRICT and role_blocked(ref.rtype, roles):
-                behaviour = _RESTRICT
-            if behaviour == _RESTRICT:
-                if ref.record.uuid not in seen_blockers:
-                    seen_blockers.add(ref.record.uuid)
-                    blockers.append(ref.record.uuid)
-            elif behaviour == _SET_NULL:
-                set_nulls.append((ref, current.uuid))
-            elif behaviour == _CASCADE and ref.record.id not in visited:
-                visited.add(ref.record.id)
-                trash.append((ref.record, ref.rtype))
-                queue.append(ref.record)
-    return trash, set_nulls, blockers
 
 
 async def _trash(
@@ -195,13 +84,13 @@ async def soft_delete_record(
     is treated as ``restrict`` however its field is declared: see
     :func:`~sm_records.services._common.role_blocked`.
     """
-    trash, set_nulls, blockers = await _plan_delete(db, rtype, record, roles)
+    trash, set_nulls, blockers = await plan_delete(db, rtype, record, roles)
     if blockers:
         raise ReferencedByOthers(
             f"{len(blockers)} record(s) still reference {record.uuid}", blockers
         )
     for ref, target_uuid in set_nulls:
-        await _apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
+        await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
     for doomed, doomed_type in trash:
         await _trash(db, doomed, doomed_type, actor=actor, settings=settings)
 
@@ -237,8 +126,9 @@ async def restore_record(
     return record
 
 
-async def _purge(db: AsyncSession, records: list[Record]) -> None:
-    """Really delete rows, by core statement, and detach what is left holding them.
+async def _purge(db: AsyncSession, tables: TableSet, records: list[Record]) -> None:
+    """Really delete rows of one table set, by core statement, and detach what
+    is left holding them.
 
     ``session.delete()`` cannot do this: the framework's ``before_flush``
     listener intercepts the delete of any ``SoftDeleteMixin`` row, expunges it
@@ -257,8 +147,8 @@ async def _purge(db: AsyncSession, records: list[Record]) -> None:
     ids = [record.id for record in records if record.id is not None]
     if not ids:
         return
-    await db.execute(sa_delete(RecordRevision).where(RecordRevision.record_id.in_(ids)))
-    await db.execute(sa_delete(Record).where(Record.id.in_(ids)))
+    await db.execute(sa_delete(tables.revision).where(tables.revision.record_id.in_(ids)))
+    await db.execute(sa_delete(tables.record).where(tables.record.id.in_(ids)))
     await db.flush()
     for record in records:
         db.expunge(record)
@@ -277,8 +167,9 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     # **No reduce delta**: the record was decremented when it was trashed, and
     # the refusal above guarantees only a trashed record reaches here, so a
     # second decrement would take the group below the truth (Phase 5 §5.2).
-    await delete_index(db, record.id)
-    await _purge(db, [record])
+    tables = tables_for(rtype)
+    await delete_index(db, tables, record.id)
+    await _purge(db, tables, [record])
 
 
 async def purge_type_records(db: AsyncSession, rtype: RecordType) -> int:
@@ -288,13 +179,15 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> int:
     cannot go through :func:`hard_delete_record` — which refuses anything not
     already in the trash, on purpose.
     """
-    stmt = select(Record).where(Record.type_id == rtype.id).execution_options(include_deleted=True)
+    tables = tables_for(rtype)
+    cls = tables.record
+    stmt = select(cls).where(cls.type_id == rtype.id).execution_options(include_deleted=True)
     records = list((await db.execute(stmt)).scalars().all())
     for record in records:
-        await delete_index(db, record.id)
+        await delete_index(db, tables, record.id)
     # One statement rather than a delta per live record: the type is going
     # away, so every group of every spec on it goes with it. A reduce row has
     # no foreign key to cascade through, so this is what removes them.
     await drop_type_rows(db, rtype.id)
-    await _purge(db, records)
+    await _purge(db, tables, records)
     return len(records)

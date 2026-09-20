@@ -24,12 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.query import Filter, FilterOp, QueryError, exists_query
-from sm_records.models import (
-    GROUP_LOCALE_CONFLICT_SIGNATURES,
-    SLUG_CONFLICT_SIGNATURES,
-    Record,
-    RecordType,
-)
+from sm_records.models import RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services.errors import Conflict
 
@@ -90,11 +85,12 @@ async def ensure_slug_free(
     """
     if slug is None:
         return
-    stmt = select(Record.id).where(
-        Record.type_id == rtype.id, Record.locale == locale, Record.slug == slug
+    record = tables_for(rtype).record
+    stmt = select(record.id).where(
+        record.type_id == rtype.id, record.locale == locale, record.slug == slug
     )
     if exclude_id is not None:
-        stmt = stmt.where(Record.id != exclude_id)
+        stmt = stmt.where(record.id != exclude_id)
     taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
     if taken is not None:
         raise _slug_taken(rtype.key, slug, locale)
@@ -113,23 +109,26 @@ async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None, loc
     database-level failure and the application-level check produce the same
     error, and neither is the authority on the wording.
 
-    Recognised by :data:`~sm_records.models.SLUG_CONFLICT_SIGNATURES` and
-    :data:`~sm_records.models.GROUP_LOCALE_CONFLICT_SIGNATURES`, which is where
-    the per-dialect wording lives; anything else is re-raised, because an
-    ``IntegrityError`` this module cannot explain is a bug rather than a 409.
+    Recognised by the type's own :class:`~sm_records.models.TableSet`, which
+    carries both signature pairs — a collection's indexes are named after *its*
+    tables, so the global spellings would not match its refusals and every lost
+    slug race inside a collection would be a 500 again (Phase 5 §6.3). Anything
+    matching neither is re-raised, because an ``IntegrityError`` this module
+    cannot explain is a bug rather than a 409.
 
     ``rtype.key`` is read **before** the flush. A flush that raises expires
     every instance in the session, so reading it afterwards would emit a
     refresh on a transaction that now accepts nothing but a rollback.
     """
     type_key = rtype.key
+    tables = tables_for(rtype)
     try:
         await db.flush()
     except IntegrityError as exc:
         message = str(exc.orig or exc)
-        if any(sig in message for sig in GROUP_LOCALE_CONFLICT_SIGNATURES):
+        if any(sig in message for sig in tables.group_locale_signatures):
             raise _group_locale_taken(type_key, locale) from exc
-        if slug is None or not any(sig in message for sig in SLUG_CONFLICT_SIGNATURES):
+        if slug is None or not any(sig in message for sig in tables.slug_signatures):
             raise
         raise _slug_taken(type_key, slug, locale) from exc
 
@@ -188,6 +187,7 @@ async def ensure_unique(
     *non*-sibling still blocks, because ``include_deleted`` keeps the trash's
     claims and a restore must find them intact.
     """
+    record = tables_for(rtype).record
     for field in defs:
         if not field.unique:
             continue
@@ -199,9 +199,9 @@ async def ensure_unique(
                 rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)]
             )
             if exclude_id is not None:
-                stmt = stmt.where(Record.id != exclude_id)
+                stmt = stmt.where(record.id != exclude_id)
             if exclude_group is not None:
-                stmt = stmt.where(Record.translation_group != exclude_group)
+                stmt = stmt.where(record.translation_group != exclude_group)
             taken = (
                 (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
             )

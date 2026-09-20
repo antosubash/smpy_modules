@@ -72,6 +72,32 @@ def _create_missing_indexes(conn: Any) -> None:
                 index.create(conn)
 
 
+def _create_missing_columns(conn: Any) -> None:
+    """Add any **column** the model declares that a reused database lacks.
+
+    The sibling of :func:`_create_missing_indexes`, and for the same reason:
+    ``create_all`` is ``checkfirst`` per *table*, so a file seeded before an
+    additive migration is skipped whole and every later query selects a column
+    the file does not have — which is a ``no such column`` on the first read,
+    not a wrong measurement. Phase 5 §6.2's nullable ``records_type.collection``
+    is what made this concrete.
+
+    Only additive, nullable columns can be recovered this way, which is exactly
+    the class of change a reusable perf fixture can absorb: anything else means
+    the cached database is the wrong dataset and should be deleted.
+    """
+    for table in Base.metadata.tables.values():
+        rows = conn.exec_driver_sql(f"PRAGMA table_info('{table.name}')").fetchall()
+        if not rows:
+            continue
+        have = {row[1] for row in rows}
+        for column in table.columns:
+            if column.name in have or not column.nullable:
+                continue
+            ddl = column.type.compile(dialect=conn.dialect)
+            conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {ddl}')
+
+
 async def _record_total(db_state: Any) -> int:
     async with db_state.session_factory() as session:
         return int((await session.execute(select(func.count(Record.id)))).scalar_one())
@@ -92,6 +118,7 @@ async def perf_db() -> AsyncIterator[Any]:
     register_listeners(state)
     async with state.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_missing_columns)
         await conn.run_sync(_create_missing_indexes)
 
     if str(path) not in _seeded:

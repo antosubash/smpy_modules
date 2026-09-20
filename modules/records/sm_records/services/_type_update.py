@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, tables_for
 from sm_records.services._common import guarded_bump, record_count, reload
 from sm_records.services._payload import field_defs
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
@@ -48,6 +48,29 @@ _EDITABLE = frozenset(
 #: bury the schema edits the table exists to make reversible.
 _SNAPSHOT_TRIGGERS = ("fields_raw", "display_field", "slug_field")
 
+_UNSET = object()
+"""Distinguishes "the caller did not send ``collection``" from "the caller sent
+``null``", which is a legal value meaning the global tables."""
+
+
+def _check_collection_unchanged(rtype: RecordType, changes: dict[str, Any]) -> None:
+    """``collection`` is set at creation and never after — Phase 5 §6.2.
+
+    A 409 and not the 422 ``_EDITABLE`` would otherwise give, because this is
+    not a malformed request: the caller asked for something coherent that this
+    module will not do. Moving a populated type between collections means
+    copying its records, revisions and index rows into other tables and
+    re-pointing every reference at them, with no rollback story — so the
+    refusal is the honest answer and the message says exactly that.
+
+    An echo of the current value is dropped rather than refused: clients send
+    back the whole type they just read, and a 409 for changing nothing would
+    make every save of an unmodified form fail.
+    """
+    sent = changes.pop("collection", _UNSET)
+    if sent is not _UNSET and sent != rtype.collection:
+        raise Conflict("moving a populated type between collections is not supported")
+
 
 async def _check_translatable(
     db: AsyncSession,
@@ -72,9 +95,10 @@ async def _check_translatable(
     """
     if translatable is not False or not rtype.translatable:
         return
+    cls = tables_for(rtype).record
     stmt = (
-        select(func.count(Record.id))
-        .where(Record.type_id == rtype.id, Record.locale != locales.default(settings))
+        select(func.count(cls.id))
+        .where(cls.type_id == rtype.id, cls.locale != locales.default(settings))
         .execution_options(include_deleted=True)
     )
     held = int((await db.execute(stmt)).scalar_one())
@@ -114,6 +138,7 @@ async def update_type(
     than folded into ``**changes`` because they are not columns.
     """
     await _check_translatable(db, rtype, settings, changes.get("translatable"))
+    _check_collection_unchanged(rtype, changes)
     unknown = sorted(set(changes) - _EDITABLE)
     if unknown:
         problem = (

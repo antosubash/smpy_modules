@@ -32,7 +32,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import REINDEX_ALL
-from sm_records.index._analyze import INDEX_TABLE_NAMES, analyze_tables
+from sm_records.index._analyze import analyze_tables, index_table_names
 from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.reindex import (
     clear_pending,
@@ -40,7 +40,7 @@ from sm_records.index.reindex import (
     pending_map,
     reindex_type,
 )
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, tables_for
 from sm_records.schema.compile import from_stored
 from sm_records.services._claims import lock_type
 from sm_records.services._common import mark_written, reload, type_resolver
@@ -92,14 +92,15 @@ async def _recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int
     that was replaced months ago is exactly the staleness this fixes.
     """
     defs = field_defs(rtype)
+    record_cls = tables_for(rtype).record
     last_id, total = 0, 0
     while True:
         batch = (
             (
                 await db.execute(
-                    select(Record)
-                    .where(Record.type_id == rtype.id, Record.id > last_id)
-                    .order_by(Record.id)
+                    select(record_cls)
+                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
+                    .order_by(record_cls.id)
                     .limit(batch_size)
                     .execution_options(include_deleted=True)
                 )
@@ -244,7 +245,7 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
         if removed:
             await delete_field_rows(session, rtype, removed)
 
-        touched: set[str] = set(INDEX_TABLE_NAMES) if removed else set()
+        touched: set[str] = set(index_table_names(tables_for(rtype))) if removed else set()
         count = await reindex_type(
             session,
             rtype,

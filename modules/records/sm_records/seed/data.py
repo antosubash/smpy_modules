@@ -159,4 +159,8 @@ TAG_POOL: list[str] = [
 ]  # fmt: skip
 
 ORDER_STATUSES: list[str] = ["pending", "paid", "shipped", "delivered", "cancelled"]  # fmt: skip
+
+#: Kinds of in-store event, for the ``event`` demo type of the ``events``
+#: collection (Phase 5 §6). Seeded only on a host that declares it.
+EVENT_KINDS: list[str] = ["launch", "workshop", "signing", "sale", "meetup"]  # fmt: skip
 ORDER_STATUS_WEIGHTS: list[float] = [0.10, 0.20, 0.20, 0.40, 0.10]

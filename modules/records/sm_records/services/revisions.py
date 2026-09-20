@@ -17,7 +17,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
-from sm_records.models import Record, RecordRevision, RecordType, RecordTypeRevision, RevisionEvent
+from sm_records.models import (
+    Record,
+    RecordRevision,
+    RecordType,
+    RecordTypeRevision,
+    RevisionEvent,
+    tables_of,
+)
 from sm_records.services._common import utcnow
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import NotFound
@@ -25,12 +32,15 @@ from sm_records.settings import RecordsSettings
 
 
 async def list_revisions(db: AsyncSession, record: Record) -> list[RecordRevision]:
-    """Newest first — the order a history panel reads in."""
-    stmt = (
-        select(RecordRevision)
-        .where(RecordRevision.record_id == record.id)
-        .order_by(RecordRevision.id.desc())
-    )
+    """Newest first — the order a history panel reads in.
+
+    The revision table is the record's own (Phase 5 §6.3), found from the
+    record's *class* rather than from a ``RecordType`` argument: these three
+    helpers are called from places that hold a row and no type, and the class
+    cannot disagree with the row about which table it came from.
+    """
+    revision = tables_of(record).revision
+    stmt = select(revision).where(revision.record_id == record.id).order_by(revision.id.desc())
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -52,7 +62,7 @@ async def write_revision(
     actor: str | None = None,
 ) -> RecordRevision:
     """Append one snapshot and prune anything past ``limit``."""
-    revision = RecordRevision(
+    revision = tables_of(record).revision(
         record_id=record.id,
         schema_version=record.schema_version,
         version=record.version,
@@ -84,12 +94,13 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
     capping.
     """
     limit = max(limit, 1)
+    revision = tables_of(record).revision
     stale = (
         (
             await db.execute(
-                select(RecordRevision.id)
-                .where(RecordRevision.record_id == record.id)
-                .order_by(RecordRevision.id.desc())
+                select(revision.id)
+                .where(revision.record_id == record.id)
+                .order_by(revision.id.desc())
                 .offset(limit)
             )
         )
@@ -97,7 +108,7 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
         .all()
     )
     if stale:
-        await db.execute(delete(RecordRevision).where(RecordRevision.id.in_(list(stale))))
+        await db.execute(delete(revision).where(revision.id.in_(list(stale))))
 
 
 def _split(rtype: RecordType, snapshot: dict) -> tuple[dict, dict]:

@@ -133,6 +133,29 @@ def gen_store(
     return payload, f"{_slugish(name)}-{seq}"
 
 
+def gen_event(
+    rng: random.Random, seq: int, *, store_uuid: str | None
+) -> tuple[dict[str, Any], str]:
+    """One ``event`` — the demo type of the ``events`` collection.
+
+    Its ``venue`` points at a ``store``, which is a **global** type, so a
+    seeded database exercises a relation across a collection boundary in both
+    directions: the ref row lands in ``records_c_events_index_ref`` and
+    "who references this store" finds it from the global side.
+    """
+    city, _state = rng.choice(data.CITIES)
+    kind = rng.choice(data.EVENT_KINDS)
+    name = f"{city} {kind.title()} {seq}"
+    payload: dict[str, Any] = {
+        "name": name,
+        "starts_at": random_datetime(rng, 2024, 2027),
+        "kind": kind,
+    }
+    if store_uuid is not None:
+        payload["venue"] = {"type": "store", "uuid": store_uuid}
+    return payload, f"{_slugish(name)}-{seq}"
+
+
 def gen_order(
     rng: random.Random,
     seq: int,

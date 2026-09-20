@@ -21,6 +21,7 @@ Nothing here commits, like everything else in this layer.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import partial
 from typing import NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +37,7 @@ from sm_records.index.query import (
     sort_plan,
     sort_signature,
 )
-from sm_records.models import Record, RecordType
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.settings import RecordsSettings
 
 __all__ = ["RecordListPage", "list_records"]
@@ -52,6 +53,8 @@ class RecordListPage(NamedTuple):
     """
 
     items: list[Record]
+    """Rows of whichever table set the type lives in — the global ``Record``
+    class names the shape, not the table (Phase 5 §6.3)."""
     total: int | None
     total_capped: bool
     next_cursor: str | None
@@ -95,7 +98,11 @@ async def list_records(
     """
     size = settings.clamp_page_size(page_size)
     fields = list(rtype.fields or [])
-    narrow = only_trashed if trashed else None
+    # ``only_trashed`` takes the document class because a collection type's
+    # trash lives in that collection's table (Phase 5 §6.3); the ``narrow``
+    # contract downstream is still one-argument, so it is bound here.
+    record = tables_for(rtype).record
+    narrow = partial(only_trashed, record) if trashed else None
     signature = sort_signature(rtype.key, sorts, trashed=trashed)
     decoded = decode_cursor(after, signature, sort_plan(rtype, fields, sorts)) if after else None
 

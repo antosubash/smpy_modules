@@ -29,7 +29,7 @@ from sm_records.index import providers as providers_registry
 from sm_records.index.query import Filter, FilterOp, QueryError, Sort, build_query
 from sm_records.index.reindex import reindex_type
 from sm_records.index.writer import delete_index, write_index
-from sm_records.models import INDEX_TABLES, IndexNumber, IndexText
+from sm_records.models import INDEX_TABLES, IndexNumber, IndexText, tables_for
 from sm_records.schema.fields import FieldSchemaError, validate_fields
 from sqlalchemy import delete, select
 
@@ -133,8 +133,8 @@ class TestWritePath:
         assert mine == ["GREEN"]
 
     async def test_purge_removes_provider_rows_too(self, db, catalogue):
-        _rtype, records = catalogue
-        await delete_index(db, records[0].id)
+        rtype, records = catalogue
+        await delete_index(db, tables_for(rtype), records[0].id)
         remaining = {row.record_id for row in await rows(db, IndexNumber, BUCKET)}
         assert records[0].id not in remaining
         assert not [

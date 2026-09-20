@@ -33,6 +33,10 @@ class TypeRead(SQLModel):
     version: int
     display_field: str | None
     slug_field: str | None
+    collection: str | None
+    """Which table set this type's documents live in (Phase 5 §6.2), or
+    ``null`` for the shared ones. Read-only after creation — the editor shows
+    it and offers no control."""
     is_public: bool
     translatable: bool
     """Whether this type's records may be authored in more than one content
@@ -71,6 +75,10 @@ class TypeCreate(SQLModel):
     is_public: bool = False
     translatable: bool = False
     allowed_roles: list[str] = SQLField(default_factory=list)
+    collection: str | None = None
+    """The only request that may set it (Phase 5 §6.2). Validated against the
+    host's declared collections by ``services.types.create_type``; ``None`` is
+    the global tables and is what every host that declares none ever sends."""
 
 
 class TypeUpdate(SQLModel):
@@ -97,6 +105,12 @@ class TypeUpdate(SQLModel):
     is_public: bool | None = None
     translatable: bool | None = None
     allowed_roles: list[str] | None = None
+    collection: str | None = None
+    """Declared only so a body carrying one is refused rather than dropped —
+    a client sends back the whole type it read, and silently ignoring a changed
+    ``collection`` would report a move that never happened. An echo of the
+    current value is accepted; anything else is a 409 from ``PUT``
+    (``services._type_update``)."""
     force: bool = False
     orphaned: str | None = None
 
@@ -115,6 +129,7 @@ def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -
         version=rtype.version,
         display_field=rtype.display_field,
         slug_field=rtype.slug_field,
+        collection=rtype.collection,
         is_public=rtype.is_public,
         translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),

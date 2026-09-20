@@ -133,6 +133,10 @@ export type CreateTypePayload = {
   display_field?: string;
   slug_field?: string;
   translatable?: boolean;
+  /** The one request that may set it (Phase 5 §6.2). Omitted — never sent as
+   *  `null` — when the new type goes in the shared tables, so the server's
+   *  own default is what decides. */
+  collection?: string;
 };
 
 export function createType(payload: CreateTypePayload): Promise<TypeRead> {

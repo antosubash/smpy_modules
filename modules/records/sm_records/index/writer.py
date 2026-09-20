@@ -32,17 +32,7 @@ from sm_records.index.providers import (
     use_type_resolver,
     virtual_fields,
 )
-from sm_records.models import (
-    INDEX_TABLES,
-    IndexBool,
-    IndexDate,
-    IndexDatetime,
-    IndexNumber,
-    IndexRef,
-    IndexText,
-    Record,
-    RecordType,
-)
+from sm_records.models import Record, RecordType, TableSet, tables_for
 from sm_records.schema.types import IndexKind
 from sm_records.services._common import utcnow
 
@@ -60,8 +50,10 @@ def _text_values(value: str) -> dict:
     }
 
 
-def row_values(entry: IndexEntry, record_id: int, type_id: int) -> tuple[type, dict]:
-    """One index row as ``(table, column values)``.
+def row_values(
+    tables: TableSet, entry: IndexEntry, record_id: int, type_id: int
+) -> tuple[type, dict]:
+    """One index row as ``(table, column values)``, in ``tables``'s own set.
 
     Split from :func:`_row` so the two writers project identically. The
     incremental path turns this into an ORM instance; the batched rebuild
@@ -72,24 +64,25 @@ def row_values(entry: IndexEntry, record_id: int, type_id: int) -> tuple[type, d
     ``tests/test_index_reindex.py`` pins that they do.
     """
     base = {"record_id": record_id, "type_id": type_id, "field_key": entry.field_key}
+    table = tables.index[entry.kind]
     if entry.kind is IndexKind.TEXT:
-        return IndexText, {**base, **_text_values(str(entry.value))}
+        return table, {**base, **_text_values(str(entry.value))}
     if entry.kind is IndexKind.NUMBER:
-        return IndexNumber, {**base, "value": Decimal(entry.value)}
+        return table, {**base, "value": Decimal(entry.value)}
     if entry.kind is IndexKind.BOOL:
-        return IndexBool, {**base, "value": bool(entry.value)}
+        return table, {**base, "value": bool(entry.value)}
     if entry.kind is IndexKind.DATE:
         value: date = entry.value
-        return IndexDate, {**base, "value": value}
+        return table, {**base, "value": value}
     if entry.kind is IndexKind.DATETIME:
         moment: datetime = entry.value
-        return IndexDatetime, {**base, "value": moment}
+        return table, {**base, "value": moment}
     target_uuid, target_type_id = entry.value
-    return IndexRef, {**base, "target_uuid": target_uuid, "target_type_id": int(target_type_id)}
+    return table, {**base, "target_uuid": target_uuid, "target_type_id": int(target_type_id)}
 
 
-def _row(entry: IndexEntry, record_id: int, type_id: int):
-    table, values = row_values(entry, record_id, type_id)
+def _row(tables: TableSet, entry: IndexEntry, record_id: int, type_id: int):
+    table, values = row_values(tables, entry, record_id, type_id)
     return table(**values)
 
 
@@ -208,8 +201,8 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
     return entries
 
 
-async def delete_index(db: AsyncSession, record_id: int) -> None:
-    """Remove every index row of a record, across all six tables.
+async def delete_index(db: AsyncSession, tables: TableSet, record_id: int) -> None:
+    """Remove every index row of a record, across all six of its tables.
 
     Called on a **hard** delete only. A soft delete leaves the rows in place on
     purpose: index rows carry no record state, and every query joins back to
@@ -217,7 +210,7 @@ async def delete_index(db: AsyncSession, record_id: int) -> None:
     hides the row (design doc §7.3). Deleting them on a soft delete would mean
     rebuilding them on restore, from a payload that may no longer validate.
     """
-    for table in INDEX_TABLES:
+    for table in tables.index_tables:
         await db.execute(delete(table).where(table.record_id == record_id))
 
 
@@ -257,6 +250,7 @@ async def write_index(
     """
     if fresh and previous is not None:
         raise ValueError("write_index: 'fresh' is a create, which has no previous state")
+    tables = tables_for(rtype)
     if record.id is None:
         # A freshly-created record has no id until it hits the DB, and index
         # rows are keyed on it. Flushing here rather than making the caller
@@ -264,9 +258,12 @@ async def write_index(
         await db.flush()
 
     if not fresh:
-        await delete_index(db, record.id)
+        await delete_index(db, tables, record.id)
 
-    rows = [_row(entry, record.id, rtype.id) for entry in project(record, rtype, resolve_type_id)]
+    rows = [
+        _row(tables, entry, record.id, rtype.id)
+        for entry in project(record, rtype, resolve_type_id)
+    ]
     if rows:
         db.add_all(rows)
     await db.flush()

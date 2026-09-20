@@ -130,6 +130,7 @@ async def create_type(
         is_public=body.is_public,
         translatable=body.translatable,
         allowed_roles=body.allowed_roles,
+        collection=body.collection,
         actor=who,
     )
     # A freshly created type holds no records, trashed or otherwise — skip

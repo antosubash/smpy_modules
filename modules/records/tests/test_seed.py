@@ -5,6 +5,14 @@ test file uses (``tests/conftest.py``) rather than a fresh ``:memory:``
 database of its own — this *is* the in-process entry point
 (``sm_records.seed.seed_database``) a test or perf harness is meant to call,
 so exercising it any other way would test something else.
+
+**Which types exist depends on the process.** ``event`` lives in the ``events``
+collection (Phase 5 §6) and is created only where that collection is declared,
+which in the default test run it is (``tests/collections_harness.py``, imported
+by the collection suites). Everything here therefore reads types and record
+counts through ``active_type_defs`` and ``tables_for`` rather than assuming one
+table — ``test_collections_seed.py`` is the file that asserts what the
+collection adds, and this one is about the seeder itself either way.
 """
 
 from __future__ import annotations
@@ -12,9 +20,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, table_sets, tables_for
 from sm_records.seed import seed_database
-from sm_records.seed.types import TYPE_DEFS
+from sm_records.seed.types import active_type_defs
 from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,21 +38,38 @@ async def _types_by_key(db: AsyncSession) -> dict[str, RecordType]:
     return {row.key: row for row in rows}
 
 
-async def _records_of(db: AsyncSession, rtype: RecordType) -> list[Record]:
-    stmt = select(Record).where(Record.type_id == rtype.id).execution_options(include_deleted=True)
+async def _records_of(db: AsyncSession, rtype: RecordType) -> list[Any]:
+    cls = tables_for(rtype).record
+    stmt = select(cls).where(cls.type_id == rtype.id).execution_options(include_deleted=True)
     return list((await db.execute(stmt)).scalars().all())
 
 
 async def _total_record_count(db: AsyncSession) -> int:
-    return int((await db.execute(select(func.count(Record.id)))).scalar_one())
+    """Across every declared table set: a seeded ``event`` is a record of this
+    run like any other, and counting only the shared table would report a run
+    that wrote exactly N records as having written fewer."""
+    total = 0
+    for tables in table_sets():
+        total += int((await db.execute(select(func.count(tables.record.id)))).scalar_one())
+    return total
 
 
-async def test_seed_creates_the_five_types_with_declared_fields(db_state, settings, db):
+def _expected_type_keys() -> set[str]:
+    return {type_def.key for type_def in active_type_defs()}
+
+
+async def test_seed_creates_every_declared_type_with_its_declared_fields(db_state, settings, db):
+    """Five, plus ``event`` wherever the ``events`` collection is declared.
+
+    ``active_type_defs`` is what decides, and it is the same helper the seeder
+    itself uses — so this cannot pass by agreeing with a list written here
+    while the seeder creates something else.
+    """
     await seed_database(db_state, settings, records=60, seed=1, reset=True)
 
     types = await _types_by_key(db)
-    assert set(types) == {"company", "contact", "product", "store", "order"}
-    for type_def in TYPE_DEFS:
+    assert set(types) == _expected_type_keys()
+    for type_def in active_type_defs():
         stored_keys = {field["key"] for field in types[type_def.key].fields}
         expected_keys = {field["key"] for field in type_def.fields}
         assert stored_keys == expected_keys
@@ -137,7 +162,7 @@ async def test_reset_purges_every_seeded_record(db_state, settings, db):
     # The types themselves are recreated empty, not left missing — a second
     # ``--reset``-less run should be able to top them up immediately.
     types = await _types_by_key(db)
-    assert set(types) == {"company", "contact", "product", "store", "order"}
+    assert set(types) == _expected_type_keys()
 
 
 async def test_deterministic_for_the_same_seed(db_state, settings, db):

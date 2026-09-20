@@ -9,7 +9,7 @@ from simple_module_db.mixins import AuditMixin
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index
 from sqlmodel import Field
 
-from sm_records.constants import MAX_KEY_LEN, MAX_LABEL_LEN
+from sm_records.constants import MAX_COLLECTION_NAME_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
 from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
 
 
@@ -51,6 +51,26 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     display_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
     """Which field's value becomes ``Record.display_title``."""
     slug_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
+
+    collection: str | None = Field(default=None, max_length=MAX_COLLECTION_NAME_LEN)
+    """Which **table set** this type's documents live in — Phase 5 §6.2.
+
+    ``None`` is the global tables, which is what every type written before this
+    column existed carries and what every type carries on a host that declares
+    no collection. A non-null value names a collection the host declared in
+    code (:func:`sm_records.collections.declare_collection`); every read and
+    write resolves it through ``models.tables_for(rtype)``.
+
+    **Set on create and never changed.** ``PUT /types/{key}`` refuses it with a
+    409:
+    moving a populated type between collections would mean copying its records,
+    revisions and index rows into other tables and re-pointing every reference
+    at them, with no rollback story — so the refusal is the honest answer, and
+    a host that wants the move exports and re-imports under a new type.
+
+    Nullable with no backfill on purpose: that is what makes the migration
+    additive and the feature inert on a host that never uses it (§6.5).
+    """
 
     is_public: bool = Field(default=False)
     """Gates the anonymous read API. Off by default."""

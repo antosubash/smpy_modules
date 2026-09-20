@@ -36,8 +36,8 @@ from sqlalchemy.sql import ColumnElement
 from sm_records.index import providers
 from sm_records.index._fields import IndexedField, declared_keys, indexed_map, virtual_field
 from sm_records.index._fixed import FIXED_COLUMNS, fixed_clause
-from sm_records.index._predicates import INDEX_TABLE, FilterOp, QueryError, value_clause
-from sm_records.models import Record, RecordType
+from sm_records.index._predicates import FilterOp, QueryError, value_clause
+from sm_records.models import RecordType, TableSet, tables_for
 
 logger = logging.getLogger(__name__)
 
@@ -100,44 +100,59 @@ def resolve(rtype: RecordType, indexed: dict[str, IndexedField], declared: set[s
     return field
 
 
-def _holders(field: IndexedField, type_id: int, clause: ColumnElement[bool] | None) -> Select:
+def _holders(
+    tables: TableSet, field: IndexedField, type_id: int, clause: ColumnElement[bool] | None
+) -> Select:
     """The ids of the records holding an index row that matches.
 
     Uncorrelated on purpose — see the module docstring. ``record_id`` is
     ``NOT NULL`` on every index table, which is what makes the negated form
     (``NOT IN``) safe: a NULL anywhere in this result would make ``NOT IN``
     unknown for every row and silently empty the page.
+
+    ``tables`` decides *which* index table, and the ids it returns are ids in
+    that same set's record table — a semi-join never crosses a collection
+    (Phase 5 §6.3).
     """
-    table = INDEX_TABLE[field.kind]
+    table = tables.index[field.kind]
     conditions = [table.type_id == type_id, table.field_key == field.key]
     if clause is not None:
         conditions.append(clause)
     return select(table.record_id).where(*conditions)
 
 
-def _term(rtype: RecordType, indexed, declared, flt: Filter) -> ColumnElement[bool]:
+def _term(
+    tables: TableSet, rtype: RecordType, indexed, declared, flt: Filter
+) -> ColumnElement[bool]:
+    record = tables.record
     if flt.field in FIXED_COLUMNS:
-        return fixed_clause(flt.field, flt.op, flt.value)
+        return fixed_clause(record, flt.field, flt.op, flt.value)
     field = resolve(rtype, indexed, declared, flt.field)
     if flt.op is FilterOp.IS_NULL:
-        holders = _holders(field, rtype.id, None)
+        holders = _holders(tables, field, rtype.id, None)
         # "has no value" is the absence of any row, so it is the negation of
         # the whole semi-join — not a predicate over one row.
-        return Record.id.not_in(holders) if flt.value in (None, True) else Record.id.in_(holders)
-    clause = value_clause(field.kind, flt.op, flt.value, flt.field)
-    holders = _holders(field, rtype.id, clause)
+        return record.id.not_in(holders) if flt.value in (None, True) else record.id.in_(holders)
+    clause = value_clause(tables.index[field.kind], field.kind, flt.op, flt.value, flt.field)
+    holders = _holders(tables, field, rtype.id, clause)
     # ``ne`` negates the whole semi-join: "no value equals x". On a
     # multi-valued field the other reading — "some value differs" — matches a
     # record that also holds x, which nobody asking for ``ne`` wants. ``eq``
     # on the same field is the ``any`` reading, which ``IN`` gives directly.
-    return Record.id.not_in(holders) if flt.op is FilterOp.NE else Record.id.in_(holders)
+    return record.id.not_in(holders) if flt.op is FilterOp.NE else record.id.in_(holders)
 
 
 def filtered(stmt: Select, rtype: RecordType, fields: list[dict[str, Any]], filters) -> Select:
     """Apply every filter to ``stmt`` — the one place a term is built, so the
-    page, its total and the ``unique`` check of §7.8 cannot drift apart."""
+    page, its total and the ``unique`` check of §7.8 cannot drift apart.
+
+    The table set is resolved from ``rtype`` here rather than threaded in by
+    every caller (Phase 5 §6.3): a filter is always about one type, and the
+    type is what says which tables its documents live in.
+    """
+    tables = tables_for(rtype)
     indexed = indexed_map(fields)
     declared = declared_keys(fields)
     for flt in filters:
-        stmt = stmt.where(_term(rtype, indexed, declared, flt))
+        stmt = stmt.where(_term(tables, rtype, indexed, declared, flt))
     return stmt

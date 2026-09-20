@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sm_records.index.reindex import clear_pending, reindex_record, reindex_type
 from sm_records.index.writer import delete_index, write_index
-from sm_records.models import INDEX_TABLES, IndexNumber, IndexText
+from sm_records.models import INDEX_TABLES, IndexNumber, IndexText, tables_for
 from sqlalchemy import delete, select
 
 NOTHING = staticmethod(lambda _key: None)
@@ -142,7 +142,7 @@ async def test_reindex_of_an_empty_type_is_a_no_op(db, make_type, field_def):
 async def test_field_keys_is_accepted_and_still_rebuilds_the_record(db, catalogue):
     rtype, records = catalogue
     await reindex_type(db, rtype, resolve_type_id=lambda _k: None, batch_size=10)
-    await delete_index(db, records[0].id)
+    await delete_index(db, tables_for(rtype), records[0].id)
     await reindex_type(
         db, rtype, resolve_type_id=lambda _k: None, batch_size=10, field_keys=["price"]
     )

@@ -40,7 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.index.query import Filter, Sort, build_query, only_trashed
-from sm_records.models import Record, RecordType
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.compile import to_jsonable
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
@@ -128,13 +128,14 @@ async def walk_records(
     """
     batch = max(settings.reindex_batch_size, 1)
     fields = list(rtype.fields or [])
+    record = tables_for(rtype).record
     last_id = 0
     offset = 0
     while True:
         stmt = build_query(rtype, fields, filters, sorts).limit(batch)
-        stmt = stmt.offset(offset) if sorts else stmt.where(Record.id > last_id)
+        stmt = stmt.offset(offset) if sorts else stmt.where(record.id > last_id)
         if trashed:
-            stmt = only_trashed(stmt)
+            stmt = only_trashed(record, stmt)
         rows = list((await db.execute(stmt)).scalars().all())
         if not rows:
             return

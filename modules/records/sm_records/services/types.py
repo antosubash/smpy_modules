@@ -25,6 +25,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
@@ -74,6 +75,28 @@ async def get_type_by_id(db: AsyncSession, type_id: int) -> RecordType:
     return rtype
 
 
+def _check_collection(collection: str | None) -> None:
+    """A type may only be created in a collection this process declares
+    (Phase 5 §6.2).
+
+    422 and not 409: the name is a value in the request body that does not
+    name anything, which is what 422 is for, and the message lists what *is*
+    declared because the answer is a property of the host's code rather than of
+    anything the caller can create. ``None`` — the global tables — is always
+    valid and is what a host that declares none can ever use.
+    """
+    if collection is None:
+        return
+    declared = collections()
+    if collection not in declared:
+        named = ", ".join(declared) or "none — this host declares no collections"
+        raise ValidationFailed(
+            f"collection {collection!r} is not declared by this host (declared: {named}); "
+            "a collection's tables come from declare_collection() at import time",
+            [{"field": "collection", "message": f"{collection!r} is not a declared collection"}],
+        )
+
+
 async def create_type(
     db: AsyncSession,
     *,
@@ -89,6 +112,7 @@ async def create_type(
     is_public: bool = False,
     translatable: bool = False,
     allowed_roles: list[str] | None = None,
+    collection: str | None = None,
     actor: str | None = None,
 ) -> RecordType:
     if key in RESERVED_TYPE_KEYS:
@@ -104,6 +128,7 @@ async def create_type(
     if (await db.execute(select(RecordType.id).where(RecordType.key == key))).scalars().first():
         raise Conflict(f"a record type with key {key!r} already exists")
 
+    _check_collection(collection)
     defs, fields = normalise(fields_raw or [], settings)
     check_pointers(defs, display_field, slug_field)
     await check_targets(db, defs, key)
@@ -122,6 +147,7 @@ async def create_type(
         is_public=is_public,
         translatable=translatable,
         allowed_roles=list(allowed_roles or []),
+        collection=collection,
         created_by=actor,
     )
     db.add(rtype)

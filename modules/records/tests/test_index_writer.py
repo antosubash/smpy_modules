@@ -18,6 +18,7 @@ from sm_records.models import (
     IndexNumber,
     IndexRef,
     IndexText,
+    tables_for,
 )
 from sm_records.schema.types import IndexKind
 from sqlalchemy import select
@@ -181,7 +182,7 @@ async def test_many_relation_yields_one_row_per_target(
 async def test_delete_index_clears_every_table(db, article):
     record, rtype, resolve = article
     await write_index(db, record, rtype, resolve_type_id=resolve)
-    await delete_index(db, record.id)
+    await delete_index(db, tables_for(rtype), record.id)
     for table in INDEX_TABLES:
         assert await rows(db, table) == []
 

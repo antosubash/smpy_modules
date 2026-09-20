@@ -27,14 +27,6 @@ from sm_records.index._coerce import (
     coerce_ref,
     coerce_text,
 )
-from sm_records.models import (
-    IndexBool,
-    IndexDate,
-    IndexDatetime,
-    IndexNumber,
-    IndexRef,
-    IndexText,
-)
 from sm_records.schema.types import IndexKind
 
 LIKE_ESCAPE_CHAR = "\\"
@@ -124,15 +116,6 @@ class QueryError(ValueError):
         self.reason = reason
 
 
-INDEX_TABLE: dict[IndexKind, Any] = {
-    IndexKind.TEXT: IndexText,
-    IndexKind.NUMBER: IndexNumber,
-    IndexKind.BOOL: IndexBool,
-    IndexKind.DATE: IndexDate,
-    IndexKind.DATETIME: IndexDatetime,
-    IndexKind.REF: IndexRef,
-}
-
 SORT_ATTR: dict[IndexKind, str] = {
     IndexKind.TEXT: "value",
     IndexKind.NUMBER: "value",
@@ -143,20 +126,18 @@ SORT_ATTR: dict[IndexKind, str] = {
 }
 """Which *attribute name* carries the sortable value, per kind.
 
-The name and not the bound column, because a sort joins an ``aliased()`` copy
-of the table (:mod:`sm_records.index._sorting`) and the column on the alias is
-a different object from the one on the class. :data:`SORT_COLUMN` below is the
-same mapping already resolved against the class, for the predicate builders,
-which never alias."""
+The name and not the bound column, for two reasons that became one. A sort
+joins an ``aliased()`` copy of the table (:mod:`sm_records.index._sorting`) and
+the column on the alias is a different object from the one on the class; and
+since Phase 5 §6 the class itself depends on which **table set** the type lives
+in, so there is no one bound column left to name. Every builder below resolves
+it with :func:`sort_column` against the table it was handed."""
 
-SORT_COLUMN: dict[IndexKind, Any] = {
-    IndexKind.TEXT: IndexText.value,
-    IndexKind.NUMBER: IndexNumber.value,
-    IndexKind.BOOL: IndexBool.value,
-    IndexKind.DATE: IndexDate.value,
-    IndexKind.DATETIME: IndexDatetime.value,
-    IndexKind.REF: IndexRef.target_uuid,
-}
+
+def sort_column(table: Any, kind: IndexKind) -> Any:
+    """The sortable/comparable column of one index table, per kind."""
+    return getattr(table, SORT_ATTR[kind])
+
 
 _ORDERED = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
 _ALLOWED: dict[IndexKind, frozenset[FilterOp]] = {
@@ -198,15 +179,15 @@ def _coerce(kind: IndexKind, value: Any, field: str) -> Any:
     return out
 
 
-def _text_eq(value: str) -> ColumnElement[bool]:
+def _text_eq(table: Any, value: str) -> ColumnElement[bool]:
     """Design doc §7.4. ``value_full IS NULL`` *is* the assertion that the
     indexed column holds the whole string, so a short needle must demand it —
     otherwise a 600-character value whose first 512 match is a false positive.
     """
     head = value[:TEXT_INDEX_LEN]
     if len(value) <= TEXT_INDEX_LEN:
-        return and_(IndexText.value == head, IndexText.value_full.is_(None))
-    return and_(IndexText.value == head, IndexText.value_full == value)
+        return and_(table.value == head, table.value_full.is_(None))
+    return and_(table.value == head, table.value_full == value)
 
 
 def starts_with_clause(column: Any, value: str) -> ColumnElement[bool]:
@@ -215,7 +196,7 @@ def starts_with_clause(column: Any, value: str) -> ColumnElement[bool]:
     return and_(column >= low, column < high) if high is not None else column >= low
 
 
-def _text_starts_with(value: str) -> ColumnElement[bool]:
+def _text_starts_with(table: Any, value: str) -> ColumnElement[bool]:
     """Design doc §7.4 again, and the easy half of it.
 
     ``value`` holds the first :data:`~sm_records.constants.TEXT_INDEX_LEN`
@@ -228,28 +209,30 @@ def _text_starts_with(value: str) -> ColumnElement[bool]:
     value was long enough to match at all.
     """
     if len(value) <= TEXT_INDEX_LEN:
-        return starts_with_clause(IndexText.value, value)
+        return starts_with_clause(table.value, value)
     return and_(
-        IndexText.value == value[:TEXT_INDEX_LEN],
-        starts_with_clause(IndexText.value_full, value),
+        table.value == value[:TEXT_INDEX_LEN],
+        starts_with_clause(table.value_full, value),
     )
 
 
-def _text_clause(op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
+def _text_clause(table: Any, op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
     if op is FilterOp.CONTAINS:
         pattern = like_contains_pattern(_coerce(IndexKind.TEXT, value, field))
         # ``value_full`` too, or a match straddling the cut is invisible.
         return or_(
-            IndexText.value.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
-            IndexText.value_full.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
+            table.value.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
+            table.value_full.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
         )
     if op is FilterOp.STARTS_WITH:
-        return _text_starts_with(_coerce(IndexKind.TEXT, value, field))
-    return _text_eq(_coerce(IndexKind.TEXT, value, field))
+        return _text_starts_with(table, _coerce(IndexKind.TEXT, value, field))
+    return _text_eq(table, _coerce(IndexKind.TEXT, value, field))
 
 
-def _scalar_clause(kind: IndexKind, op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
-    column = SORT_COLUMN[kind]
+def _scalar_clause(
+    table: Any, kind: IndexKind, op: FilterOp, value: Any, field: str
+) -> ColumnElement[bool]:
+    column = sort_column(table, kind)
     coerced = _coerce(kind, value, field)
     if op is FilterOp.GT:
         return column > coerced
@@ -262,12 +245,19 @@ def _scalar_clause(kind: IndexKind, op: FilterOp, value: Any, field: str) -> Col
     return column == coerced
 
 
-def value_clause(kind: IndexKind, op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
+def value_clause(
+    table: Any, kind: IndexKind, op: FilterOp, value: Any, field: str
+) -> ColumnElement[bool]:
     """The predicate over one index row, for every op but ``is_null``.
 
     ``ne`` returns the *positive* clause: the caller negates the whole EXISTS,
     which is the only correct reading for a multi-valued field — "no value
     equals x", not "some value differs from x".
+
+    ``table`` is the index class of the caller's table set (Phase 5 §6.3) — the
+    global ``records_index_text`` or a collection's copy of it. A parameter
+    rather than a lookup here, because this module knows nothing about types
+    and a kind on its own no longer names a table.
     """
     if op not in _ALLOWED[kind]:
         raise QueryError(
@@ -277,11 +267,11 @@ def value_clause(kind: IndexKind, op: FilterOp, value: Any, field: str) -> Colum
         values = (
             value if isinstance(value, Sequence) and not isinstance(value, str | bytes) else [value]
         )
-        clauses = [value_clause(kind, FilterOp.EQ, item, field) for item in values]
+        clauses = [value_clause(table, kind, FilterOp.EQ, item, field) for item in values]
         return or_(*clauses) if clauses else _never()
     if kind is IndexKind.TEXT:
-        return _text_clause(op, value, field)
-    return _scalar_clause(kind, op, value, field)
+        return _text_clause(table, op, value, field)
+    return _scalar_clause(table, kind, op, value, field)
 
 
 def _never() -> ColumnElement[bool]:

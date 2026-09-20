@@ -1,14 +1,13 @@
 import { useT } from '@simple-module-py/i18n';
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
-import { useState } from 'react';
-
 import type { ValidationError } from '../../utils/types';
+import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
+import { PublicField } from './PublicField';
 import { RolesMultiSelect } from './RolesMultiSelect';
 import { displayFieldAllowed, slugFieldAllowed } from './rules';
 import type { EditableField, TypeMetadataValues } from './types';
@@ -19,7 +18,6 @@ const ID = {
   labelPlural: 'type-editor-label-plural',
   description: 'type-editor-description',
   icon: 'type-editor-icon',
-  isPublic: 'type-editor-is-public',
   translatable: 'type-editor-translatable',
   displayField: 'type-editor-display-field',
   slugField: 'type-editor-slug-field',
@@ -46,6 +44,7 @@ export function TypeMetadataForm({
   errors,
   publicRoutePrefix,
   contentLocales,
+  collections,
   translatableError,
 }: {
   isNew: boolean;
@@ -61,24 +60,17 @@ export function TypeMetadataForm({
   /** Every content locale the module runs — named in "Translatable"'s help
    *  text, since that list is DB-backed configuration (design §4.4). */
   contentLocales: string[];
+  /** Every collection the host declared (Phase 5 §6.1). Empty means this host
+   *  declares none, and the control is not rendered at all — there is nothing
+   *  to choose and a disabled select saying so would only puzzle. */
+  collections: string[];
   /** A 409 from turning "Translatable" off while records in another locale
    *  exist (design §4.1) — not a field-scoped `422`, so it doesn't arrive
    *  through `errors` and is shown here instead. */
   translatableError?: string | null;
 }) {
   const { t } = useT();
-  const [copied, setCopied] = useState(false);
   const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
-  const publicUrl = `${publicRoutePrefix}/${values.key || none}`;
-  const copyPublicUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access can be denied; the code line is still selectable.
-    }
-  };
   // Only the field types the API accepts for each pointer
   // (`services/_schema.py::DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`). Offering
   // a `json` display field or a `boolean` slug field meant a 422 on save at
@@ -152,6 +144,14 @@ export function TypeMetadataForm({
         <FieldError message={fieldMessage(errors, 'icon')} />
       </div>
 
+      <CollectionField
+        isNew={isNew}
+        value={values.collection}
+        collections={collections}
+        onChange={(collection) => onChange({ collection })}
+        error={fieldMessage(errors, 'collection')}
+      />
+
       <div className="grid gap-1.5 sm:col-span-2">
         <Label htmlFor={ID.description}>
           {t('records.types.description', { defaultValue: 'Description' })}
@@ -165,41 +165,12 @@ export function TypeMetadataForm({
         <FieldError message={fieldMessage(errors, 'description')} />
       </div>
 
-      <div className="flex items-center gap-2 sm:col-span-2">
-        <Switch
-          id={ID.isPublic}
-          checked={values.isPublic}
-          onCheckedChange={(checked) => onChange({ isPublic: checked === true })}
-        />
-        <Label htmlFor={ID.isPublic} className="font-normal">
-          {t('records.type_editor.is_public', { defaultValue: 'Public' })}
-        </Label>
-      </div>
-      <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
-        {t('records.type_editor.is_public_help', {
-          defaultValue:
-            "Exposes a read-only public API for this type's published records (design §10).",
-        })}
-      </p>
-
-      {values.isPublic && (
-        <div className="-mt-2 grid gap-1.5 sm:col-span-2" data-testid="records-public-url">
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="w-fit rounded-md border bg-muted px-2 py-1 text-sm">{publicUrl}</code>
-            <Button type="button" variant="outline" size="sm" onClick={() => void copyPublicUrl()}>
-              {copied
-                ? t('records.type_editor.public_url_copied', { defaultValue: 'Copied' })
-                : t('records.type_editor.public_url_copy', { defaultValue: 'Copy' })}
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {t('records.type_editor.is_public_url_help', {
-              defaultValue:
-                'Published records only, filterable only on indexed fields, and never expanded.',
-            })}
-          </p>
-        </div>
-      )}
+      <PublicField
+        isPublic={values.isPublic}
+        typeKey={values.key}
+        publicRoutePrefix={publicRoutePrefix}
+        onChange={(isPublic) => onChange({ isPublic })}
+      />
 
       <div className="flex items-center gap-2 sm:col-span-2">
         <Switch

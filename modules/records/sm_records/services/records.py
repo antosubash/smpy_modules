@@ -10,10 +10,9 @@ having in front of you while reading it:
 * **Nothing here commits.** The framework's session commits the request if
   anything was written (``get_db`` plus ``CommitBeforeResponseMiddleware``), so
   a commit in this layer would take the caller's rollback away.
-* **A soft delete keeps its index rows** (§7.3). Queries join back to
-  ``records_record``, where the framework's filter hides the row, so the
-  trash keeps its slug and its ``unique`` claims and a restore finds them
-  intact.
+* **A soft delete keeps its index rows** (§7.3). Queries join back to the
+  document row, where the framework's filter hides it, so the trash keeps its
+  slug and its ``unique`` claims and a restore finds them intact.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ from sm_records.index.writer import write_index
 # Re-exported: which language a create writes in is locale policy, and lives
 # with the rest of it in :mod:`sm_records.locales`.
 from sm_records.locales import resolve_locale
-from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid
+from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _claims, _payload, _relations
 from sm_records.services._common import guarded_bump, reload, type_id_map, utcnow
@@ -48,8 +47,7 @@ from sm_records.services._lifecycle import (
 # document, and lives in ``_listing`` for that reason and for the file cap.
 from sm_records.services._listing import RecordListPage, list_records
 
-# Re-exported: ``read_view`` lives in ``_payload`` with the rest of the
-# payload reading, and is imported from here by the contracts layer.
+# Re-exported: ``read_view`` lives in ``_payload`` with the payload reading.
 from sm_records.services._payload import read_view
 
 # Re-exported: a translation is an ordinary record, so the two functions that
@@ -78,26 +76,27 @@ __all__ = [
 ]
 
 
-async def get_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
-    stmt = select(Record).where(Record.uuid == uuid, Record.type_id == rtype.id)
+async def _by_uuid(db: AsyncSession, rtype: RecordType, uuid: str, *, trashed: bool) -> Record:
+    """One record of ``rtype`` by uuid, out of whichever table set it lives in
+    (Phase 5 §6.3). ``trashed`` lifts the framework's soft-delete filter, which
+    is the only way to load a row it hides — restore and purge both need it."""
+    cls = tables_for(rtype).record
+    stmt = select(cls).where(cls.uuid == uuid, cls.type_id == rtype.id)
+    if trashed:
+        stmt = stmt.execution_options(include_deleted=True)
     record = (await db.execute(stmt)).scalars().first()
     if record is None:
         raise NotFound(f"no {rtype.key} record with uuid {uuid!r}")
     return record
+
+
+async def get_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
+    return await _by_uuid(db, rtype, uuid, trashed=False)
 
 
 async def get_deleted_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
-    """The trash view. ``include_deleted`` is the only way to load a row the
-    framework's filter hides, and restore and purge both need it."""
-    stmt = (
-        select(Record)
-        .where(Record.uuid == uuid, Record.type_id == rtype.id)
-        .execution_options(include_deleted=True)
-    )
-    record = (await db.execute(stmt)).scalars().first()
-    if record is None:
-        raise NotFound(f"no {rtype.key} record with uuid {uuid!r}")
-    return record
+    """The trash view."""
+    return await _by_uuid(db, rtype, uuid, trashed=True)
 
 
 class _Prepared(NamedTuple):
@@ -181,7 +180,7 @@ async def create_record(
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _claims.ensure_slug_free(db, rtype, resolved_slug, resolved_locale)
 
-    record = Record(
+    record = tables_for(rtype).record(
         uuid=uuid,
         type_id=rtype.id,
         data=stored,
@@ -269,10 +268,11 @@ async def update_record(
     # own and cannot be steered by a caller.
     await _claims.ensure_slug_free(db, rtype, resolved_slug, record.locale, exclude_id=record.id)
 
-    if not await guarded_bump(db, Record, record.id, expected_version):
+    record_cls = tables_for(rtype).record
+    if not await guarded_bump(db, record_cls, record.id, expected_version):
         raise Conflict(
             f"record {record.uuid} has changed since it was read",
-            current=await reload(db, Record, record.id),
+            current=await reload(db, record_cls, record.id),
         )
 
     new_status = status or record.status

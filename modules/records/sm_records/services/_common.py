@@ -25,7 +25,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeIndex
-from sm_records.models import Record, RecordType
+from sm_records.models import RecordType, tables_for
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
     from simple_module_db.listeners import SESSION_HAS_WRITES_KEY
@@ -145,9 +145,11 @@ async def record_count(
 
     Not a column: the previous draft denormalised it and §5 removed it,
     because a ``COUNT`` over an indexed column is cheap and cannot go stale.
-    ``func.count(Record.id)`` rather than a bare ``count()`` so the statement
+    ``func.count(record.id)`` rather than a bare ``count()`` so the statement
     names the mapper — that is what the framework's soft-delete filter attaches
-    to, and without it this would always count the trash.
+    to, and without it this would always count the trash. The class comes from
+    ``tables_for(rtype)``, so a collection type is counted in its own table
+    (Phase 5 §6.3).
 
     Which count a caller wants is not a detail. "Live" is what an operator is
     shown on a screen; but §16's ``fields`` lock and §8.9's delete
@@ -156,7 +158,8 @@ async def record_count(
     restore away from being read under them. Both of those pass
     ``include_deleted=True``.
     """
-    stmt = select(func.count(Record.id)).where(Record.type_id == rtype.id)
+    record = tables_for(rtype).record
+    stmt = select(func.count(record.id)).where(record.type_id == rtype.id)
     if include_deleted:
         stmt = stmt.execution_options(include_deleted=True)
     return int((await db.execute(stmt)).scalar_one())
