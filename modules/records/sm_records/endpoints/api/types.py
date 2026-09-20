@@ -31,6 +31,7 @@ from sm_records.deps import (
     caller_roles,
     check_type_roles,
     get_settings,
+    load_schema_type,
     load_type,
     request_db,
     require_manage_types,
@@ -140,8 +141,17 @@ async def create_type(
 
 @router.get("/types/{key}", response_model=TypeRead, dependencies=[require_view])
 async def read_type(
-    rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
+    rtype: RecordType = Depends(load_schema_type), db: AsyncSession = Depends(request_db)
 ) -> TypeRead:
+    """One type's definition, and how many records it holds.
+
+    ``load_schema_type`` and not ``load_type``: ``records.manage_types``
+    reads this whatever ``allowed_roles`` says — the README's one exception,
+    and the same one the type editor makes — and everybody else meets the
+    narrowing. The ``record_count``/``trashed_record_count`` on ``TypeRead``
+    are why it cannot simply be ``records.view``: they are a live count of a
+    type whose records, trash and referrers this caller is refused.
+    """
     return type_read(rtype, *await type_service.record_counts(db, rtype))
 
 
@@ -226,8 +236,11 @@ async def reindex_type(
     "/types/{key}/revisions", response_model=TypeRevisionListResponse, dependencies=[require_view]
 )
 async def list_type_revisions(
-    rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
+    rtype: RecordType = Depends(load_schema_type), db: AsyncSession = Depends(request_db)
 ) -> TypeRevisionListResponse:
+    """Every historical definition of this type — ``load_schema_type``, the
+    same gate :func:`read_type` applies: the history of a schema is the
+    schema, one version at a time."""
     revisions = await revision_service.list_type_revisions(db, rtype)
     return TypeRevisionListResponse(items=[type_revision_read(r) for r in revisions])
 

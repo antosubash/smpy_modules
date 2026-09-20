@@ -7,8 +7,13 @@ a record is.
 
 The two rules worth keeping in front of you:
 
-* **The size ceiling is checked before anything is read.** A limit applied
-  after ``json.loads`` has already allocated what it refuses.
+* **The size ceiling is applied while the body is read, not after.**
+  ``Content-Length`` is checked before anything is read at all, and a request
+  that declares none — a chunked upload, which is what an HTTP client sends
+  when it streams a file — is counted byte by byte and refused the moment the
+  running total passes the ceiling. A limit applied after ``json.loads`` (or
+  after ``await request.body()``) has already allocated what it refuses: the
+  413 arrived, and 64 MB had been read to produce it.
 * **The options come from the query string *and* the multipart form, the form
   winning.** Both, because both are how this is called: a browser posting a
   file dialog has a form and no query string, ``curl`` has a body that *is*
@@ -17,9 +22,11 @@ The two rules worth keeping in front of you:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Request
+from starlette.formparsers import MultiPartException
 
 from sm_records.contracts.io import ImportFormat
 from sm_records.services.errors import ImportParseFailed, PayloadTooLarge, ValidationFailed
@@ -62,6 +69,19 @@ def guess_format(explicit: str | None, filename: str | None, content_type: str) 
     )
 
 
+MAX_FORM_FIELDS = 32
+"""How many non-file parts a multipart import may carry. The options are six
+(``format``, ``mode``, ``dry_run``, ``on_error``, ``match_by``, ``force``) and
+every browser form here sends a subset; the headroom is for a client that
+repeats one. Starlette's own default is 1 000, each of which is a parsed and
+retained ``str``."""
+
+MAX_FORM_FILES = 4
+"""How many file parts it may carry. One is read (``file``); the rest are
+spooled to disk by the parser before anything here sees them, which is what
+this bounds."""
+
+
 def _check_size(raw_length: int | None, settings: RecordsSettings) -> None:
     if raw_length is not None and raw_length > settings.max_import_bytes:
         raise PayloadTooLarge(
@@ -70,24 +90,67 @@ def _check_size(raw_length: int | None, settings: RecordsSettings) -> None:
         )
 
 
+def _counting_receive(request: Request, limit: int) -> Callable[[], Any]:
+    """``request.receive``, refusing at the first byte past ``limit``.
+
+    The ASGI channel and not the parsed body, because that is the only layer
+    both paths share: the raw branch buffers with ``Request.body`` and the
+    multipart branch hands the same channel to Starlette's parser, which
+    spools each part to a ``SpooledTemporaryFile`` — a ceiling checked after
+    either has finished is a ceiling that has already paid for what it
+    refuses. A wrapped ``receive`` counts what actually arrived, which is the
+    one number a request without ``Content-Length`` cannot lie about.
+    """
+    seen = 0
+
+    async def receive() -> Any:
+        nonlocal seen
+        message = await request.receive()
+        if message.get("type") == "http.request":
+            seen += len(message.get("body", b"") or b"")
+            if seen > limit:
+                raise PayloadTooLarge(f"the uploaded file is over the {limit}-byte limit")
+        return message
+
+    return receive
+
+
 async def read_upload(request: Request, settings: RecordsSettings) -> tuple[bytes, str | None, Any]:
     """The bytes, the filename (if any) and the multipart form (if any).
 
-    ``Content-Length`` is checked before anything is read — a ceiling applied
-    after the body is in memory has already allocated what it refuses — and
-    again against what arrived, since a chunked request carries no header.
+    ``Content-Length`` is refused before a byte is read, and the body itself
+    is read through :func:`_counting_receive` so a request that declares no
+    length — every chunked upload — is refused at the first byte over the
+    ceiling rather than after the whole of it is in memory.
+
+    The multipart branch additionally bounds what the *parser* will build:
+    ``max_part_size`` is the same ceiling (a single part cannot exceed a body
+    that is already capped, so this can only ever agree with the count above),
+    and ``max_files``/``max_fields`` cap the number of parts, which
+    ``Content-Length`` does not — a small body can carry a thousand of them.
+    A refusal from the parser is this module's own 400, not the 500 an
+    unhandled ``MultiPartException`` would be.
     """
     declared = request.headers.get("content-length")
     _check_size(int(declared) if declared and declared.isdigit() else None, settings)
+    limit = settings.max_import_bytes
+    capped = Request(request.scope, _counting_receive(request, limit))
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
-        form = await request.form()
+        try:
+            form = await capped.form(
+                max_part_size=max(limit, 1),
+                max_files=MAX_FORM_FILES,
+                max_fields=MAX_FORM_FIELDS,
+            )
+        except MultiPartException as exc:
+            raise ImportParseFailed(f"the multipart upload could not be read: {exc}") from exc
         upload = form.get("file")
         if upload is None or isinstance(upload, str):
             raise ImportParseFailed("multipart upload is missing its 'file' part")
         raw = await upload.read()
         _check_size(len(raw), settings)
         return raw, upload.filename, form
-    raw = await request.body()
+    raw = await capped.body()
     _check_size(len(raw), settings)
     return raw, None, None
 

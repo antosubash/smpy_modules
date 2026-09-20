@@ -72,10 +72,25 @@ class ReferencedByOthers(Conflict):
     API and the relation payload speak (design §5), so the delete dialog can
     link straight to each blocker. Reused for a type delete, where the strings
     are type keys — the caller knows which it asked about.
+
+    ``hidden`` counts blockers whose *type* narrows ``allowed_roles`` past the
+    caller, and they are deliberately **not** in ``referrers``: the referrers
+    panel counts those and refuses to name them
+    (``contracts.relations.ReferrersResponse``), and a refusal that named them
+    anyway would hand back exactly the identifier the panel goes out of its
+    way to withhold. ``more`` is how many *visible* blockers were left off the
+    list, which is capped for the same reason ``ImportReport`` caps its errors
+    — a hundred thousand referrers is not a response anybody can read.
+    ``detail`` counts all three, so the number the caller is told stays the
+    number that blocked them.
     """
 
-    def __init__(self, detail: str, referrers: list[str]) -> None:
+    def __init__(
+        self, detail: str, referrers: list[str], *, hidden: int = 0, more: int = 0
+    ) -> None:
         self.referrers = referrers
+        self.hidden = hidden
+        self.more = more
         super().__init__(detail)
 
 

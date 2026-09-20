@@ -72,7 +72,13 @@ async def test_cascade_into_a_restricted_type_is_refused_for_a_caller_without_it
         f"{API}/types/f1open/records/{target['uuid']}", headers=roles(ROLE_EDITOR)
     )
     assert refused.status_code == 409
-    assert refused.json()["referrers"] == [secret["uuid"]]
+    # Counted, never named: the blocker lives in a type this caller may not
+    # read, and the referrers panel refuses to name it for the same reason
+    # (``contracts.relations``). The count is what has to stay honest.
+    body = refused.json()
+    assert body["referrers"] == []
+    assert body["hidden"] == 1
+    assert body["detail"].startswith("1 record(s) still reference")
 
     still_there = await client.get(
         f"{API}/types/f1secret/records/{secret['uuid']}", headers=roles(ROLE_EDITOR_TWO)

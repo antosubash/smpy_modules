@@ -23,6 +23,7 @@ from sm_records.contracts.schemas import (
     record_read,
 )
 from sm_records.deps import (
+    MAX_PAGE,
     PageCursor,
     actor,
     caller_roles,
@@ -69,7 +70,7 @@ async def list_records(
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_PAGE),
     page_size: int | None = Query(default=None, ge=1),
     cursor: PageCursor = Depends(parse_cursor),
     filters: list[Filter] = Depends(parse_filters),

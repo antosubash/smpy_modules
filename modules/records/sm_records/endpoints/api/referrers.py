@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.relations import ReferrersResponse, referrer_read
 from sm_records.deps import (
+    MAX_PAGE,
     caller_roles,
     get_settings,
     has_edit_permission,
@@ -48,7 +49,7 @@ async def list_referrers(
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_PAGE),
     page_size: int | None = Query(default=None, ge=1),
 ) -> ReferrersResponse:
     """Every record referencing this one, trash included, one page at a time.

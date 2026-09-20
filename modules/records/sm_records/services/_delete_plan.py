@@ -17,6 +17,8 @@ takes its tables from that.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Final
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +31,49 @@ from sm_records.services.errors import Conflict
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 
-__all__ = ["apply_set_null", "plan_delete"]
+__all__ = ["BLOCKER_CAP", "Blockers", "apply_set_null", "plan_delete"]
+
+BLOCKER_CAP: Final = 50
+"""How many blocker uuids a refusal lists. The same reasoning as
+``contracts.io.ERROR_CAP``: a type whose records were loaded in bulk can have
+a hundred thousand referrers, and a 409 body of a hundred thousand uuids is a
+response nobody reads and a payload larger than the record it is about. The
+count stays exact — ``Blockers.more`` says how many are not listed."""
+
+
+@dataclass(slots=True)
+class Blockers:
+    """Why a delete is refused, split by what the caller may be told.
+
+    ``listed`` names blockers the caller can read for themselves; ``hidden``
+    only *counts* the ones whose type narrows ``allowed_roles`` past them,
+    because naming those is the leak the referrers panel exists not to be
+    (``contracts.relations``: the count is honest, *which* records they are
+    does not travel). ``more`` is visible blockers past :data:`BLOCKER_CAP`.
+
+    ``total`` is all three, and it is the number the refusal's ``detail``
+    speaks — the panel's ``total`` and the delete dialog say the same one.
+    """
+
+    listed: list[str] = field(default_factory=list)
+    hidden: int = 0
+    more: int = 0
+
+    @property
+    def total(self) -> int:
+        return len(self.listed) + self.hidden + self.more
+
+    def __bool__(self) -> bool:
+        return self.total > 0
+
+    def add(self, uuid: str, *, blocked: bool) -> None:
+        if blocked:
+            self.hidden += 1
+        elif len(self.listed) < BLOCKER_CAP:
+            self.listed.append(uuid)
+        else:
+            self.more += 1
+
 
 _RESTRICT = "restrict"
 _SET_NULL = "set_null"
@@ -104,17 +148,18 @@ async def apply_set_null(
 
 async def plan_delete(
     db: AsyncSession, rtype: RecordType, record: Record, roles: Sequence[str] | None
-) -> tuple[list[tuple[Record, RecordType]], list[tuple[_relations.Referrer, str]], list[str]]:
+) -> tuple[list[tuple[Record, RecordType]], list[tuple[_relations.Referrer, str]], Blockers]:
     """Walk the whole referrer graph without touching a row.
 
-    Returns ``(records to trash, set_null rewrites, restrict blockers)``. The
+    Returns ``(records to trash, set_null rewrites, blockers)`` — see
+    :class:`Blockers` for why the last is not simply a list of uuids. The
     walk is breadth-first with a visited set, because a user-defined graph can
     hold a cycle — two types each relating to the other — and without the set
     the first such cycle is a ``RecursionError`` in a delete handler.
     """
     trash: list[tuple[Record, RecordType]] = [(record, rtype)]
     set_nulls: list[tuple[_relations.Referrer, str]] = []
-    blockers: list[str] = []
+    blockers = Blockers()
     seen_blockers: set[str] = set()
     # Keyed by ``(collection, id)`` and not by ``id`` alone: two records in two
     # collections can share a primary key, and a visited set that could not tell
@@ -130,12 +175,17 @@ async def plan_delete(
             # to reach a type the URL never names — a cascade or a set_null into
             # a *different* type would otherwise trash or rewrite records this
             # caller may not write at all. Same predicate as the read paths.
-            if behaviour != _RESTRICT and role_blocked(ref.rtype, roles):
+            blocked = role_blocked(ref.rtype, roles)
+            if behaviour != _RESTRICT and blocked:
                 behaviour = _RESTRICT
             if behaviour == _RESTRICT:
                 if ref.record.uuid not in seen_blockers:
                     seen_blockers.add(ref.record.uuid)
-                    blockers.append(ref.record.uuid)
+                    # ``blocked`` decides whether the uuid travels, not what
+                    # made this a blocker: a declared ``restrict`` in a type
+                    # the caller may not read is as unnameable as a cascade
+                    # that was downgraded into one.
+                    blockers.add(ref.record.uuid, blocked=blocked)
             elif behaviour == _SET_NULL:
                 set_nulls.append((ref, current.uuid))
             elif behaviour == _CASCADE and (ref.rtype.collection, ref.record.id) not in visited:

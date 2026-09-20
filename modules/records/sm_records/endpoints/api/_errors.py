@@ -104,8 +104,19 @@ async def _response_for(request: Request, exc: Exception) -> JSONResponse:
             {"detail": exc.detail, "errors": exc.errors}, status_code=exc.status_code
         )
     if isinstance(exc, ReferencedByOthers):
+        # ``hidden`` and ``more`` are always present, at zero when there is
+        # nothing to say: a client that has to tell "no hidden blockers" from
+        # "this server does not report them" would guess, and the number it
+        # would guess about is the difference between ``detail``'s count and
+        # the list it can show.
         return JSONResponse(
-            {"detail": exc.detail, "referrers": exc.referrers}, status_code=exc.status_code
+            {
+                "detail": exc.detail,
+                "referrers": exc.referrers,
+                "hidden": exc.hidden,
+                "more": exc.more,
+            },
+            status_code=exc.status_code,
         )
     if isinstance(exc, SchemaChangeRefused):
         # Checked ahead of the generic ``Conflict`` branch below: this is one,

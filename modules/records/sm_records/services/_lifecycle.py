@@ -86,8 +86,14 @@ async def soft_delete_record(
     """
     trash, set_nulls, blockers = await plan_delete(db, rtype, record, roles)
     if blockers:
+        # ``blockers.total`` and not ``len(listed)``: the count has to stay the
+        # one the referrers panel and the delete dialog speak, whether or not
+        # every blocker is one this caller may be told the uuid of.
         raise ReferencedByOthers(
-            f"{len(blockers)} record(s) still reference {record.uuid}", blockers
+            f"{blockers.total} record(s) still reference {record.uuid}",
+            blockers.listed,
+            hidden=blockers.hidden,
+            more=blockers.more,
         )
     for ref, target_uuid in set_nulls:
         await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)

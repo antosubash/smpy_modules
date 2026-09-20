@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records import constants
 from sm_records._grammar import (
     MALFORMED_FILTER,
+    MAX_PAGE,
     PageCursor,
     parse_cursor,
     parse_expand,
@@ -192,6 +193,15 @@ async def parse_trashed(
     return trashed
 
 
+async def _holds(request: Request, db: AsyncSession, permission: str) -> bool:
+    """Whether the caller holds ``permission``, without raising."""
+    try:
+        await _check_permission(request, db, permission)
+    except HTTPException:
+        return False
+    return True
+
+
 async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
     """Whether the caller holds ``records.edit``, without raising.
 
@@ -199,15 +209,40 @@ async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
     permission rather than always 403ing or always allowing — see
     ``endpoints/views.py::record_edit``.
     """
-    try:
-        await _check_permission(request, db, constants.PERM_EDIT)
-    except HTTPException:
-        return False
-    return True
+    return await _holds(request, db, constants.PERM_EDIT)
+
+
+async def load_schema_type(
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+) -> RecordType:
+    """:func:`load_type` for the three routes that serve a type's *definition*
+    — ``GET /types/{key}``, ``…/revisions`` and ``…/export``.
+
+    The rule is the README's, and it is ``views_types``': the type editor over
+    the same object is ``require_manage_types``, because a manager locked out
+    of the screen that edits ``allowed_roles`` would be a one-way door. That
+    is the whole exception, so a caller who does *not* hold
+    ``records.manage_types`` meets the ordinary narrowing here, exactly as
+    they do on every record surface of the type.
+
+    It was ``load_type``, which asked for neither: a ``records.view`` holder
+    the type excludes read its full ``fields``, its ``allowed_roles``, every
+    historical schema and — in ``TypeRead`` — a live count of the records
+    whose list, trash, referrers and revisions they are refused. The counts
+    are the half that is not "about the schema rather than the records" at
+    all, and the export is the same definition by another route.
+    """
+    if await _holds(request, db, constants.PERM_MANAGE_TYPES):
+        return rtype
+    check_type_roles(request, rtype)
+    return rtype
 
 
 __all__ = [
     "MALFORMED_FILTER",
+    "MAX_PAGE",
     "REQUEST_SESSION_KEY",
     "PageCursor",
     "actor",
@@ -216,6 +251,7 @@ __all__ = [
     "get_settings",
     "has_edit_permission",
     "load_allowed_type",
+    "load_schema_type",
     "load_type",
     "parse_cursor",
     "parse_expand",

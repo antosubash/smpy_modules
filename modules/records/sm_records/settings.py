@@ -12,8 +12,19 @@ writes it back.
 read routes it configures are mounted from ``on_startup`` — after hydration,
 which is the only point at which the prefix is known, and long after the
 router table would otherwise be built (see :mod:`sm_records.boot`). Changing
-it therefore takes a restart. Everything else here is read per request and
-takes effect on save.
+it therefore takes a restart.
+
+It is not the only one: ``content_locales`` and ``default_content_locale``
+carry the flag too, and those three are the whole ``requires_restart`` set
+below — the README's settings table lists the same three. Their values *are*
+read per request (:mod:`sm_records.locales` takes the settings object rather
+than caching one), so screens follow an edit immediately; the flag is there
+because an edit changes what the install *publishes* rather than how a page
+renders. Records already written in a locale that has just been dropped stay
+written, the public API stops serving them, and the count of them is taken at
+startup and only there (:mod:`sm_records.health`).
+
+Everything else here is read per request and takes effect on save.
 """
 
 from __future__ import annotations
@@ -141,20 +152,28 @@ class RecordsSettings(BaseSettings):
     of 1 keeps exactly the current one.
     """
 
+    max_filter_terms: int = Field(default=20, ge=1)
+    """Most ``?filter=`` terms one listing takes; over it is a ``400`` naming
+    ``filter``. Each term is another correlated ``EXISTS`` over an index."""
+
+    max_sort_terms: int = Field(default=5, ge=1)
+    """Most *distinct* ``?sort=`` fields (repeats deduplicate first); each is
+    another ``LEFT JOIN``, and a hundred was SQLite's join ceiling: a 500."""
+
+    max_in_values: int = Field(default=200, ge=1)
+    """Most values one ``filter=<field>:in:a,b`` term lists; two thousand
+    was ``Expression tree is too large`` — to an anonymous caller."""
+
     max_payload_bytes: int = 262144
     """Reject a record write whose ``data`` payload, serialized, exceeds this
     many bytes (default 256 KB)."""
 
     max_import_bytes: int = 52428800
     """Reject an import whose uploaded body exceeds this many bytes (default
-    50 MB), before it is parsed.
-
-    Checked against ``Content-Length`` first and then against what was
-    actually read, because a chunked request carries no length header and a
-    lying one is not a reason to buffer 4 GB of CSV into memory. The ceiling
-    is on the *file*, not on the records in it: a row that is individually too
-    big is still refused by :attr:`max_payload_bytes` on its own write.
-    """
+    50 MB), **before** it is parsed: ``Content-Length`` first, then byte by
+    byte while reading, since a chunked request carries no length header and
+    is exactly the body that must not be buffered whole to be refused. The
+    ceiling is on the file; one oversized row is :attr:`max_payload_bytes`."""
 
     max_fields_per_type: int = 100
     """Largest number of field definitions a single Record Type may declare."""

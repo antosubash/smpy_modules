@@ -22,6 +22,7 @@ from sm_records.contracts.schemas import (
     type_read,
 )
 from sm_records.deps import (
+    MAX_PAGE,
     caller_roles,
     get_settings,
     has_edit_permission,
@@ -174,7 +175,7 @@ async def record_list(
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_PAGE),
     parsed: tuple[list[Filter], str | None] = Depends(parse_view_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     trashed: bool = Depends(parse_trashed),

@@ -20,6 +20,8 @@ file and nowhere but the query string for an option.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +41,7 @@ from sm_records.deps import (
     check_type_roles,
     get_settings,
     load_allowed_type,
+    load_schema_type,
     load_type,
     parse_filters,
     parse_sorts,
@@ -58,7 +61,7 @@ from sm_records.endpoints.api._io_upload import (
     text_option,
 )
 from sm_records.endpoints.api.types import _check_roles_for_discard, _schedule_reindex_if_pending
-from sm_records.index.query import Filter, Sort
+from sm_records.index.query import Filter, Sort, build_query
 from sm_records.models import RecordType
 from sm_records.services import export as export_service
 from sm_records.services import import_ as import_service
@@ -88,8 +91,20 @@ async def export_records(
     is a read of exactly what that route would return, narrowed by the type's
     ``allowed_roles`` (§10). ``?trashed=true`` costs ``records.edit`` for the
     same reason it does there: enumerating the trash is an editor's question.
+
+    **The query plan is resolved here, before the response exists.** A refused
+    ``?filter=``/``?sort=`` — an unknown field, an unindexed one, one
+    mid-reindex — is a ``QueryError``, and raised from inside the streaming
+    body it arrives after ``http.response.start``: nothing can turn it into a
+    status any more, so the caller downloaded a ``200 OK`` named
+    ``post-2026-09-20.json`` holding a truncated JSON prefix and the server
+    logged an unhandled exception. Building the same statement in the handler
+    costs one throwaway ``Select`` and no database round trip, and puts the
+    refusal back where ``RecordsErrorRoute`` maps it to the list's own 400
+    (or 409, mid-reindex) with a JSON body and no headers sent.
     """
     chosen = check_format(fmt)
+    build_query(rtype, list(rtype.fields or []), filters, sorts)
     factory = request.app.state.sm.db.session_factory
     stream = export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
     filename = export_service.export_filename(rtype.key, chosen.value)
@@ -152,14 +167,52 @@ async def import_records(
 
 
 @router.get("/types/{key}/export", response_model=TypeExport, dependencies=[require_view])
-async def export_type(rtype: RecordType = Depends(load_type)) -> TypeExport:
+async def export_type(rtype: RecordType = Depends(load_schema_type)) -> TypeExport:
     """The type definition alone, in the shape ``POST /types/import`` takes.
 
-    ``load_type`` and not ``load_allowed_type``: ``allowed_roles`` narrows a
-    type's *records* (§10), and ``GET /types/{key}`` already serves the schema
-    to anyone holding ``records.view``.
+    ``load_schema_type``, which is what ``GET /types/{key}`` takes: this is
+    the same definition — ``allowed_roles`` included — by another route, so
+    it cannot be reachable where that one is not. A ``records.manage_types``
+    holder reads it whatever the narrowing says; a caller the type excludes
+    gets the 403 every other surface of that type gives them.
     """
     return type_export(rtype)
+
+
+def _update_changes(request: Request, rtype: RecordType, body: TypeImportRequest) -> dict[str, Any]:
+    """The columns a ``mode=update`` import writes — what the body actually sent.
+
+    ``exclude_unset``, exactly as ``PUT /types/{key}`` builds its change set
+    (``endpoints/api/types.py``), and for the same reason: a key the caller did
+    not send is not a key they asked to change. Passing every attribute of
+    ``TypeImportRequest`` instead wrote the *class defaults* over the stored
+    row, so a definition that simply did not mention ``allowed_roles``,
+    ``is_public`` or ``translatable`` cleared all three — a narrowed type
+    silently widened and a public one silently unpublished by a routine
+    "import this definition".
+
+    ``allowed_roles`` then carries one rule of its own, because an export
+    carries *every* field and a file from another install may name a list this
+    one never agreed to: sending a list that differs from the stored one costs
+    the same ``check_type_roles`` a record write does. Re-importing this
+    install's own export sends the list it already has and is unaffected;
+    widening a narrowing the caller is outside of stays where the README puts
+    it — on the schema editor and its ``PUT``, where it is what the caller
+    asked for rather than a side effect of a file.
+
+    ``key`` is dropped rather than refused: it is the path here — it is what
+    resolved ``rtype`` three lines up — so it cannot disagree with itself.
+    """
+    changes = body.model_dump(
+        exclude_unset=True,
+        exclude={"mode", "expected_version", "force", "orphaned", "key"},
+    )
+    sent_roles = changes.get("allowed_roles")
+    if sent_roles is not None and sorted(sent_roles) != sorted(rtype.allowed_roles or []):
+        check_type_roles(request, rtype)
+    if "fields" in changes:
+        changes["fields_raw"] = changes.pop("fields")
+    return changes
 
 
 @router.post("/types/import", response_model=TypeRead, dependencies=[require_manage_types])
@@ -213,16 +266,7 @@ async def import_type(
         actor=who,
         force=body.force,
         orphaned=body.orphaned,
-        label=body.label,
-        label_plural=body.label_plural,
-        description=body.description,
-        icon=body.icon,
-        fields_raw=body.fields,
-        display_field=body.display_field,
-        slug_field=body.slug_field,
-        is_public=body.is_public,
-        translatable=body.translatable,
-        allowed_roles=body.allowed_roles,
+        **_update_changes(request, rtype, body),
     )
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
