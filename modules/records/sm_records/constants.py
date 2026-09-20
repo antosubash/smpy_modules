@@ -103,6 +103,20 @@ PUBLIC_ROUTE_METHODS: Final = frozenset({"GET", "HEAD"})
 ``PublicRouteRegistry`` exemption covers — pinned so a future route under the
 same prefix cannot widen the exemption by accident (§10)."""
 
+MAX_LOCALE_LEN: Final = 16
+"""``records_record.locale`` width — a BCP 47 tag such as ``pt-BR``."""
+
+TRANSLATION_GROUP_LEN: Final = 32
+"""``records_record.translation_group`` width: the first record's uuid hex."""
+
+TRANSLATIONS_PARAM: Final = "translations"
+"""``?translations=true`` on a record read lists the siblings (one extra
+query); never honoured on the list endpoint, where it would be one per row."""
+
+LOCALE_PARAM: Final = "locale"
+"""``?locale=`` on the public list. Absent means the default content locale,
+never "all": an anonymous reader asks for one site (Phase 5 §4.4)."""
+
 RESERVED_TYPE_KEYS: Final = frozenset({"types", "new"})
 """Type keys that would shadow a view route: ``/admin/records/types/...`` is
 the schema editor and ``/admin/records/{key}/new`` the record editor, and a
