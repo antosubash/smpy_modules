@@ -26,10 +26,11 @@ refused would be a puzzle rather than a policy. What comes back is always the
 
 from __future__ import annotations
 
+from sm_records.models import RecordType
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
-__all__ = ["default", "is_supported", "require", "resolve", "supported"]
+__all__ = ["default", "is_supported", "require", "resolve", "resolve_locale", "supported"]
 
 
 def supported(settings: RecordsSettings) -> tuple[str, ...]:
@@ -79,5 +80,31 @@ def require(settings: RecordsSettings, value: str | None, *, field: str = "local
         raise ValidationFailed(
             f"{value!r} is not a content locale; configured: {', '.join(supported(settings))}",
             [{"field": field, "message": f"{value!r} is not a content locale"}],
+        )
+    return resolved
+
+
+def resolve_locale(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
+    """The language a new record is written in — the whole of §4.3's create rule.
+
+    Three answers and no fourth: nothing asked for gets the configured default;
+    something asked for that is not a content locale is a 422 naming it
+    (:func:`require`); and a type that is not ``translatable`` accepts only the
+    default, because every screen and every public read for such a type assumes
+    one language and a record written into another would be reachable by uuid
+    and by nothing else.
+
+    A separate function because the translation endpoint needs the same three
+    answers with one of them reversed — there, a request for the default locale
+    on a non-translatable type is the refusal. It lives here rather than beside
+    ``create_record`` because it is locale policy and nothing else — the write
+    path calls it and re-exports it, as it does every other rule it borrows.
+    """
+    resolved = require(settings, locale)
+    if not rtype.translatable and resolved != default(settings):
+        raise ValidationFailed(
+            f"type {rtype.key!r} is not translatable, so its records are all in "
+            f"{default(settings)!r}; enable 'translatable' on the type first",
+            [{"field": "locale", "message": f"{rtype.key!r} is not translatable"}],
         )
     return resolved

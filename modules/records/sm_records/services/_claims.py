@@ -141,6 +141,7 @@ async def ensure_unique(
     values: dict[str, Any],
     *,
     exclude_id: int | None = None,
+    exclude_group: str | None = None,
 ) -> None:
     """Design §7.8: ``unique`` is application-enforced, against the index.
 
@@ -168,6 +169,24 @@ async def ensure_unique(
     thing (the write cannot be checked, so it is refused), was unreachable.
     A ``QueryError`` for any other reason is re-raised untouched: a ``unique``
     field that is somehow not indexed is a broken definition, not a rebuild.
+
+    **``exclude_group`` is what makes a ``unique`` field survive translation.**
+    ``unique`` is type-level and locale-blind, so without it the sibling that
+    :func:`~sm_records.services._translations.create_translation` copies the
+    payload into collides with its own source — a German product cannot carry
+    the English product's SKU, which is exactly what a SKU is for. The rule is
+    therefore *uniqueness among records that are not siblings*: rows sharing a
+    ``translation_group`` are exempt from each other's claims, and everything
+    else collides as before — two records in the same language, or two records
+    in different languages that belong to different groups. It is the same
+    mechanism as ``exclude_id``, one level up: that one exempts the row being
+    rewritten, this one the group it belongs to. The group is known before the
+    write in all three callers (a create's is its own new uuid, an update's is
+    the row's, a translation's is the source's), so this costs no query.
+
+    A trashed sibling is still a sibling and still exempt; a trashed
+    *non*-sibling still blocks, because ``include_deleted`` keeps the trash's
+    claims and a restore must find them intact.
     """
     for field in defs:
         if not field.unique:
@@ -181,6 +200,8 @@ async def ensure_unique(
             )
             if exclude_id is not None:
                 stmt = stmt.where(Record.id != exclude_id)
+            if exclude_group is not None:
+                stmt = stmt.where(Record.translation_group != exclude_group)
             taken = (
                 (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
             )

@@ -184,6 +184,14 @@ async def create_translation(
     it are not a thing that exists), a locale that is not configured (422,
     naming it), a source already in the target locale (409), and a sibling that
     already holds that language (409, **trash included**).
+
+    There is no fifth about ``unique``, and no uniqueness check of its own
+    here: the sibling is written by :func:`create_record` with the source's
+    group, and a record's ``unique`` claims do not apply to the group it is in
+    (see :func:`sm_records.services._claims.ensure_unique`). Copying a payload
+    that carries a ``unique`` value is the ordinary case — a German product
+    carries the English product's SKU — and checking it here would only refuse
+    it one layer earlier.
     """
     if not rtype.translatable:
         raise Conflict(
