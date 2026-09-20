@@ -47,27 +47,33 @@ export function RecordEditorHeaderBadges({
 }) {
   const { t } = useT();
   if (!current) return null;
+  const localeHelp = t('records.editor.locale_badge_help', {
+    defaultValue: "This record's language is fixed for its lifetime.",
+  });
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {current.schema_stale && (
-        <Badge variant="outline" className="border-amber-500 text-amber-600">
-          {t('records.editor.schema_stale', {
-            defaultValue: 'Fields changed since this was saved',
-          })}
-        </Badge>
-      )}
-      {current.is_deleted && (
-        <Badge variant="destructive">
-          {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
-        </Badge>
-      )}
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {current.schema_stale && (
+          <Badge variant="outline" className="border-amber-500 text-amber-600">
+            {t('records.editor.schema_stale', {
+              defaultValue: 'Fields changed since this was saved',
+            })}
+          </Badge>
+        )}
+        {current.is_deleted && (
+          <Badge variant="destructive">
+            {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
+          </Badge>
+        )}
+        {translatable && <RecordLocaleBadge locale={current.locale} title={localeHelp} />}
+      </div>
+      {/* The badge's own `title` only reaches a mouse — this line answers
+       *  the same question ("why can't I change the language?") for touch
+       *  and keyboard users too (UX-8). */}
       {translatable && (
-        <RecordLocaleBadge
-          locale={current.locale}
-          title={t('records.editor.locale_badge_help', {
-            defaultValue: "This record's language is fixed for its lifetime.",
-          })}
-        />
+        <p className="text-xs text-muted-foreground" data-testid="records-locale-help">
+          {localeHelp}
+        </p>
       )}
     </div>
   );

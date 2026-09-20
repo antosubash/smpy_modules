@@ -59,7 +59,15 @@ export type RecordRead = {
   invalid: { field: string; message: string }[];
 };
 
-export type RecordPage = { items: RecordRead[]; total: number; page: number; page_size: number };
+/** `total` is capped at `max_count` (F4); `next_cursor` feeds `?after=` (F11). */
+export type RecordPage = {
+  items: RecordRead[];
+  total: number;
+  total_capped: boolean;
+  page: number;
+  page_size: number;
+  next_cursor: string | null;
+};
 
 /**
  * A type key that is unique per run and still satisfies the server's
@@ -167,9 +175,8 @@ export function fieldRow(page: Page, index: number): Locator {
 }
 
 /** One schema-driven input on the record form. Located by its generated id
- *  (`record-field-<key>`) rather than its label: `FieldShell` folds a
- *  screen-reader-only "Required" into the label of every required field, so
- *  an exact label match would miss exactly the fields a test cares about. */
+ *  (`record-field-<key>`) and not its label: `FieldShell` folds a
+ *  screen-reader-only "Required" into every required field's label. */
 export function recordField(page: Page, key: string): Locator {
   return page.locator(`#record-field-${key}`);
 }
@@ -248,10 +255,9 @@ export async function expectTypeSaved(page: Page): Promise<void> {
 }
 
 /** Confirm an action behind the module's own `ConfirmDialog` (an `alertdialog`
- *  whose confirm button repeats the trigger's label, so it has to be scoped
- *  to the dialog). Unlike `helpers.ts::clickAndConfirm` there is no typed
- *  phrase gate here — only `DeleteTypeSection` asks for one, and it asks for
- *  a record count rather than a phrase. */
+ *  whose confirm button repeats the trigger's label, so it has to be scoped to
+ *  the dialog). No typed-phrase gate, unlike `helpers.ts::clickAndConfirm`:
+ *  only `DeleteTypeSection` asks for one, and it asks for a record count. */
 export async function confirmDialog(
   page: Page,
   trigger: Locator,

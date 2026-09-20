@@ -63,6 +63,10 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
     } catch (err) {
       setBusyLocale(null);
       setError(err instanceof Error ? err.message : String(err));
+      // A 409 here usually means the locale was taken between page load and
+      // this click (another tab, another editor) — refetch so the row offers
+      // "Open" for what now exists instead of a stale "Add" (UX-9).
+      router.reload({ only: ['translations'] });
     }
   };
 

@@ -2,7 +2,7 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
 
-import { getPreviewJob, previewSchema } from '../../utils/api';
+import { ApiError, getPreviewJob, previewSchema } from '../../utils/api';
 import type { FieldDef, SchemaPreview } from '../../utils/types';
 import { DryRunReportView } from './DryRunReportView';
 import { SchemaChangeList } from './SchemaChangeList';
@@ -56,6 +56,7 @@ export function SchemaPreviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
   const fieldsRef = useRef<FieldDef[]>(fields);
   fieldsRef.current = fields;
@@ -68,6 +69,7 @@ export function SchemaPreviewPanel({
     setProgress(null);
     setJob(null);
     setFailed(false);
+    setExpired(false);
     try {
       const result = await previewSchema(typeKey, {
         fields,
@@ -109,7 +111,15 @@ export function SchemaPreviewPanel({
         if (cancelled) return;
         setJob(null);
         setPending(false);
-        setError(err instanceof Error ? err.message : String(err));
+        // The registry is in-process (`services/preview_jobs.py`): a 404
+        // means a worker restart, a multi-worker host, or the TTL pruned it
+        // — not a real failure, so this gets its own copy rather than the
+        // server's "no schema preview job '…' for '…'" sentence (UX-4).
+        if (err instanceof ApiError && err.status === 404) {
+          setExpired(true);
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     };
     void tick();
@@ -138,12 +148,28 @@ export function SchemaPreviewPanel({
               })
             : t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })}
       </Button>
-      {(error || failed) && (
+      {(error || failed) && !expired && (
         <p className="text-sm text-destructive" role="alert">
           {error ??
             t('records.type_editor.preview.failed', {
               defaultValue: 'The check could not be completed. Try previewing again.',
             })}
+        </p>
+      )}
+      {expired && (
+        <p className="text-sm text-destructive" role="alert" data-testid="records-preview-expired">
+          {t('records.type_editor.preview.expired', {
+            defaultValue: 'The preview expired; preview again.',
+          })}{' '}
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 text-sm"
+            data-testid="records-preview-expired-retry"
+            onClick={() => void runPreview()}
+          >
+            {t('records.type_editor.preview.retry', { defaultValue: 'Preview again' })}
+          </Button>
         </p>
       )}
       {preview && !stale && (

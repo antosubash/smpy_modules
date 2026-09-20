@@ -45,4 +45,18 @@ uv run python scripts/set_setting.py sm_records \
   content_locales '["en","de"]' \
   default_content_locale en
 
+# Two Phase 5 ceilings, lowered so a browser test can reach them at all. Both
+# default far above anything an e2e run can seed (10,000 records for the
+# capped total, 5,000 for a synchronous schema preview), and both are only
+# visible in the UI on the far side of the ceiling: the list footer renders a
+# capped total as "N+", and "Preview changes" becomes a polled job with a
+# progress label. The values sit *above* every other spec's fixtures —
+# `records-list.spec.ts` pages through 30 records and asserts an exact total,
+# `records-schema-change.spec.ts` previews a type holding two — and low enough
+# that `records-paging.spec.ts` / `records-preview.spec.ts` can seed past them
+# over the API in seconds.
+uv run python scripts/set_setting.py sm_records \
+  max_count 32 \
+  preview_sync_limit 3
+
 exec make dev

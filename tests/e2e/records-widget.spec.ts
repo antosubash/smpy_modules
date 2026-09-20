@@ -1,7 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { csrfHeader, login, uniqueSlug } from './helpers';
-import { apiCreateRecord, apiCreateType, uniqueTypeKey } from './records-helpers';
+import {
+  apiCreateRecord,
+  apiCreateTranslation,
+  apiCreateType,
+  apiGetRecord,
+  apiUpdateRecord,
+  uniqueTypeKey,
+} from './records-helpers';
 
 /**
  * The `RecordsList` Puck block (design doc §16's deferred "natural
@@ -136,6 +143,56 @@ test.describe('RecordsList widget on a public page', () => {
       // The "only public types render" hint is editor-only — a visitor on
       // the real public page must never see it.
       await expect(anonPage.getByText('Only public types render on the site.')).toHaveCount(0);
+    } finally {
+      await anonContext.close();
+    }
+  });
+
+  test("the block's `locale` prop decides which language a visitor sees", async ({
+    page,
+    browser,
+  }) => {
+    await login(page);
+    const key = uniqueTypeKey('wlocale');
+    await apiCreateType(page, {
+      key,
+      label: 'Localized widget thing',
+      label_plural: 'Localized widget things',
+      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
+      display_field: 'title',
+      is_public: true,
+      translatable: true,
+    });
+    const en = await apiCreateRecord(page, key, {
+      data: { title: 'English article' },
+      status: 'published',
+    });
+    // The sibling starts as a draft with the source's payload copied, so it
+    // is retitled and published before a visitor could see it.
+    const de = await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
+    const fetched = await apiGetRecord(page, key, de.uuid);
+    await apiUpdateRecord(page, key, de.uuid, fetched.version, {
+      data: { title: 'Deutscher Artikel' },
+      status: 'published',
+    });
+
+    const slug = uniqueSlug('records-widget-de');
+    await createPublishedPage(page, `Records widget ${slug}`, slug, {
+      typeKey: key,
+      typeIsPublic: true,
+      locale: 'de',
+      title: 'Auf Deutsch',
+      emptyText: 'Nothing published yet.',
+    });
+
+    const anonContext = await browser.newContext();
+    try {
+      const anonPage = await anonContext.newPage();
+      await anonPage.goto(`/p/${slug}`);
+      await expect(anonPage.getByText('Deutscher Artikel')).toBeVisible();
+      // `?locale=` is a filter, not a fallback: the English sibling is a
+      // different record and never stands in for the German one (§4.4).
+      await expect(anonPage.getByText('English article')).toHaveCount(0);
     } finally {
       await anonContext.close();
     }

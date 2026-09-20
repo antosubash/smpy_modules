@@ -134,6 +134,10 @@ function TypeEditor({
       // (`current`/`report`/`conflicts`), so it lands here instead of there.
       if (err instanceof ApiError && err.status === 409 && changedTranslatable) {
         setTranslatableError(err.body?.detail ?? err.message);
+        // The switch itself moved on click; the server refused, so it
+        // reverts to what is actually saved rather than sit disagreeing with
+        // the error text underneath it (UX-7).
+        if (current) setValues((prev) => ({ ...prev, translatable: current.translatable }));
       } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         setCreateErrors(err.body.errors);
       } else {

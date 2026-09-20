@@ -17,12 +17,18 @@ export function SortableHeader({
   sort,
   onSort,
   className,
+  ariaLabel,
 }: {
   field: string;
   label: string;
   sort: SortState;
   onSort: (field: string) => void;
   className?: string;
+  /** Overrides the button's accessible name — for the rare field whose own
+   *  label collides with another column's (e.g. a field named "Title" next
+   *  to the display-title column), so `getByRole('button', {name})` and a
+   *  screen reader can still tell the two apart (UX-12). */
+  ariaLabel?: string;
 }) {
   const dir = sort?.field === field ? sort.dir : null;
   const ariaSort = dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none';
@@ -32,6 +38,7 @@ export function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(field)}
+        aria-label={ariaLabel}
         className="inline-flex items-center gap-1 font-medium hover:underline"
       >
         {label}

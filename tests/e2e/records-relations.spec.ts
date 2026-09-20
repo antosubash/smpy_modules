@@ -193,4 +193,49 @@ test.describe('Records — relations', () => {
     const { items } = (await books.json()) as { items: { data: Json }[] };
     expect(items[0].data.written_by ?? null).toBeNull();
   });
+
+  test('the relation picker finds a record by prefix, and widens to contains', async ({ page }) => {
+    await login(page);
+    const { authorKey, bookKey } = await makeLibrary(page);
+    // Five sharing a prefix, plus one whose distinctive word is in the
+    // middle of its title — F9's two cases in one fixture.
+    for (let i = 1; i <= 5; i += 1) {
+      await apiCreateRecord(page, authorKey, { data: { name: `Common Author ${i}` } });
+    }
+    await apiCreateRecord(page, authorKey, { data: { name: 'Ursula Le Guin' } });
+
+    // Every relation query the picker makes, in order.
+    const filters: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (!url.pathname.endsWith(`/types/${authorKey}/records`)) return;
+      const filter = url.searchParams.get('filter');
+      if (filter) filters.push(filter);
+    });
+
+    await page.goto(`/admin/records/${bookKey}/new`);
+    const picker = page.getByTestId('records-relation-written_by');
+    const search = picker.getByRole('searchbox');
+
+    // A prefix that finds enough is answered from the title index alone —
+    // the `contains` scan is never asked for (F9's `WIDEN_BELOW`).
+    await search.fill('Common');
+    await expect(picker.getByRole('button', { name: 'Common Author 1' })).toBeVisible();
+    await expect.poll(() => filters.length).toBe(1);
+    expect(filters[0]).toBe('display_title:starts_with:Common');
+
+    // A term from the middle of a title finds nothing by prefix, and the
+    // picker falls back to `contains` rather than saying "No matching records".
+    await search.fill('Guin');
+    const hit = picker.getByRole('button', { name: 'Ursula Le Guin' });
+    await expect(hit).toBeVisible();
+    expect(filters.slice(1)).toEqual([
+      'display_title:starts_with:Guin',
+      'display_title:contains:Guin',
+    ]);
+
+    // And picking it is what the search was for.
+    await hit.click();
+    await expect(picker.getByText('Ursula Le Guin')).toBeVisible();
+  });
 });

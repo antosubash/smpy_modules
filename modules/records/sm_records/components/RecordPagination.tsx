@@ -35,6 +35,15 @@ function pageInfo(
   });
 }
 
+/** What "N+" means, as a `title` on the whole footer line (UX-2) — the count
+ *  stopped rather than the data, and nothing else on screen says so. */
+function cappedHelp(t: Translate, total: number): string {
+  return t('records.records.page_info_capped_help', {
+    count: total.toLocaleString(),
+    defaultValue: 'More than {count} records match; the count stops at {count}.',
+  });
+}
+
 /**
  * The record list's footer: "Showing 1–25 of N" and the two page buttons.
  *
@@ -53,21 +62,30 @@ export function RecordPagination({
   pageSize,
   total,
   capped,
+  itemCount,
   onGo,
 }: {
   page: number;
   pageSize: number;
   total: number;
   capped: boolean;
+  /** How many rows this page actually rendered (`records.items.length`) —
+   *  the range's end. On a capped listing `total` is the ceiling, not the
+   *  real count, so `min(page*pageSize, total)` under-reports the last
+   *  partial page by however far the real count ran past the cap (UX-2); the
+   *  rows on screen are the one number that is always right. */
+  itemCount: number;
   onGo: (page: number) => void;
 }) {
   const { t } = useT();
   if (total <= pageSize) return null;
-  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, total);
+  const rangeStart = itemCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = itemCount === 0 ? 0 : rangeStart + itemCount - 1;
   return (
     <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-      <span>{pageInfo(t, rangeStart, rangeEnd, total, capped)}</span>
+      <span title={capped ? cappedHelp(t, total) : undefined}>
+        {pageInfo(t, rangeStart, rangeEnd, total, capped)}
+      </span>
       <div className="space-x-2">
         <Button
           type="button"

@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Table,
@@ -60,6 +61,15 @@ function Types({ types }: Props) {
                   </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     {type.key}
+                    {type.collection && (
+                      <Badge
+                        variant="outline"
+                        className="ml-2 font-sans"
+                        data-testid="records-type-collection-badge"
+                      >
+                        {type.collection}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {t('records.types.record_count', {

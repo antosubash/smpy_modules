@@ -182,7 +182,13 @@ function RecordList({ type, records, content_locales }: Props) {
             {/* `search` and not `''`: "Export" means "export what this screen
                 is showing", so the current `filter`/`sort`/`trashed` travel
                 with it — `exportUrl` drops only `page`. */}
-            <RecordIoMenu typeKey={type.key} search={search.toString()} canEdit={canEdit} />
+            <RecordIoMenu
+              typeKey={type.key}
+              search={search.toString()}
+              canEdit={canEdit}
+              fields={type.fields}
+              trashed={trashed}
+            />
             {canEdit && (
               <Button
                 type="button"
@@ -249,6 +255,7 @@ function RecordList({ type, records, content_locales }: Props) {
           pageSize={records.page_size}
           total={known}
           capped={records.total_capped}
+          itemCount={records.items.length}
           onGo={(next) => goTo({ page: next })}
         />
       </PageShell>

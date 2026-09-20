@@ -49,6 +49,12 @@ export type ImportOptions = {
   dryRun?: boolean;
   mode?: 'upsert' | 'create' | 'update';
   onError?: 'abort' | 'skip';
+  /** `'uuid'` | `'slug'` | a unique field's key — mirrors the API's
+   *  `match_by` (`services/_import_match.py`). */
+  matchBy?: string;
+  /** Overwrite a record whose stored version the file does not carry
+   *  (`services/_import_rows.py`'s "no version" refusal). */
+  force?: boolean;
 };
 
 /** POST one file and return the report.
@@ -69,6 +75,8 @@ export async function importRecords(
   body.append('dry_run', String(options.dryRun ?? true));
   if (options.mode) body.append('mode', options.mode);
   if (options.onError) body.append('on_error', options.onError);
+  if (options.matchBy) body.append('match_by', options.matchBy);
+  if (options.force) body.append('force', 'true');
 
   const response = await fetch(`${BASE}/types/${encodeURIComponent(typeKey)}/records/import`, {
     method: 'POST',

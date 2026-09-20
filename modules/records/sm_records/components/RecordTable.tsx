@@ -52,6 +52,9 @@ export function RecordTable({
 }) {
   const { t } = useT();
   const columns = listColumns(type);
+  // A field named "Title" would otherwise share the display-title column's
+  // accessible name (UX-12) — disambiguate only that collision.
+  const titleLabel = t('records.records.display_title', { defaultValue: 'Title' });
 
   return (
     <Table>
@@ -84,6 +87,7 @@ export function RecordTable({
               label={field.label}
               sort={sort}
               onSort={onSort}
+              ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
             />
           ))}
           <SortableHeader
