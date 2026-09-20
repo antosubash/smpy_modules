@@ -76,20 +76,37 @@ def capture(engine: Any) -> Iterator[Capture]:
 
 
 async def explain(session: Any, sql: str, params: Any) -> list[str]:
-    """``EXPLAIN QUERY PLAN`` for a statement captured by :func:`capture`.
+    """The query plan for a statement captured by :func:`capture`.
 
     Runs the driver SQL verbatim with the parameters it was given, so the plan
     describes the query the module actually issued.
+
+    Backend-aware, because the two this module claims to run on spell it
+    differently and the *finding* is the same either way: SQLite answers
+    ``EXPLAIN QUERY PLAN`` with one line per loop, Postgres answers ``EXPLAIN``
+    with an indented tree. Nothing here runs ``ANALYZE`` — the plan is what is
+    being read, and executing the statement a second time to time it would
+    make the row it is recorded beside mean something else.
     """
     conn = await session.connection()
-    rows = (await conn.exec_driver_sql("EXPLAIN QUERY PLAN " + sql, params)).all()
+    prefix = "EXPLAIN QUERY PLAN " if conn.dialect.name == "sqlite" else "EXPLAIN "
+    rows = (await conn.exec_driver_sql(prefix + sql, params)).all()
     return [str(row[-1]) for row in rows]
 
 
 def plan_scans_records(plan: list[str]) -> bool:
     """True when the plan reads ``records_record`` without an index — the
-    full-scan shape design §7.2 exists to prevent."""
-    return any("SCAN records_record" in line and "USING" not in line for line in plan)
+    full-scan shape design §7.2 exists to prevent.
+
+    ``SCAN records_record`` is SQLite's spelling and ``Seq Scan on
+    records_record`` is Postgres's; both mean the query is proportional to the
+    table rather than to what matches.
+    """
+    return any(
+        ("SCAN records_record" in line and "USING" not in line)
+        or "Seq Scan on records_record" in line
+        for line in plan
+    )
 
 
 def plan_uses(plan: list[str], index_name: str) -> bool:
@@ -97,7 +114,11 @@ def plan_uses(plan: list[str], index_name: str) -> bool:
 
 
 def plan_temp_btree(plan: list[str]) -> bool:
-    return any("TEMP B-TREE" in line.upper() for line in plan)
+    """A sorter the query had to build, under either backend's name for it."""
+    upper = [line.upper() for line in plan]
+    return any(
+        "TEMP B-TREE" in line or "->  SORT" in line or line.startswith("SORT") for line in upper
+    )
 
 
 @dataclass

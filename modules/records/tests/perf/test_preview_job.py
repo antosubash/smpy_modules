@@ -104,3 +104,61 @@ async def test_preview_sync_against_deferred(perf_db, perf_session, tmp_path):
         "preview: the deferred total is the synchronous total plus the job registry; "
         "what changes is when the caller is answered, not what the scan costs"
     )
+
+
+def _fields_of(rtype) -> list[dict]:
+    return [dict(field) for field in (rtype.fields or [])]
+
+
+async def test_apply_reuses_a_completed_preview(perf_db_copy, tmp_path):
+    """Saving after a preview does not scan twice — F10's second half.
+
+    The pair is one apply that may take a finished job's report and one that
+    may not, on two copies of the same file and against the same change.
+    ``preview_job_ttl_seconds = 0`` is the module's own switch for "always
+    scan", so the second run needs no special path: it is what every install
+    that turns reuse off does on every save.
+    """
+    import time as _time
+
+    from sm_records.services import preview_jobs, schema_change
+
+    from tests.perf.conftest import load_type
+
+    async def apply_once(*, with_preview: bool, ttl: int) -> float:
+        preview_jobs._jobs.clear()
+        async with perf_db_copy.session_factory() as session:
+            rtype = await load_type(session, "order")
+            raw = _restrictive(rtype)
+            settings = RecordsSettings(preview_job_ttl_seconds=ttl)
+            if with_preview:
+                job = preview_jobs.start(
+                    type_key=rtype.key,
+                    type_id=rtype.id,
+                    type_version=rtype.version,
+                    signature=preview_jobs.fields_hash(raw, rtype.display_field, rtype.slug_field),
+                    total=0,
+                    ttl_seconds=ttl,
+                )
+                diff, report = await schema_change.preview(session, rtype, raw, settings)
+                preview_jobs.finish(job.id, diff, report)
+            began = _time.perf_counter()
+            await schema_change.apply(
+                session,
+                rtype,
+                fields_raw=raw,
+                expected_version=rtype.version,
+                settings=settings,
+                force=True,
+            )
+            await session.rollback()
+            return (_time.perf_counter() - began) * 1000.0
+
+    scanned = await apply_once(with_preview=False, ttl=0)
+    reused = await apply_once(with_preview=True, ttl=600)
+    Results.add("PUT /types/order, no preview to reuse (inline scan)", 0, Timing([scanned]))
+    Results.add("PUT /types/order, reusing a completed preview", 0, Timing([reused]))
+    Results.note(
+        f"apply with a reusable report: {reused:.0f} ms against {scanned:.0f} ms — "
+        "the saved pass is the whole dry run"
+    )

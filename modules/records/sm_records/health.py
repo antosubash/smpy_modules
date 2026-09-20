@@ -16,6 +16,17 @@ loud. It is in-process state (:mod:`sm_records.index._drift`), so it reflects
 verifies run by *this* process; a CLI verify runs in another one and reports on
 its own stdout instead, which the README says.
 
+The third is ``orphaned_locales``: records written in a language the install
+has since dropped from ``content_locales``. Dropping one is **not** refused at
+save — the records exist, and refusing the edit would make a typo unfixable —
+so the public API stops serving them (``services.public``) and this is what
+says how many there are and in which language. It is counted at
+:meth:`~sm_records.module.RecordsModule.on_startup` and **only there**: the
+framework's settings registry has no post-hydration hook to re-run it from
+(``settings.registration`` records a class and nothing else), so an operator
+who drops a locale sees the count at the next restart. The README says so, and
+says how to list them meanwhile.
+
 The check reads the database, which a ``register_health_checks`` hook cannot:
 it runs before the lifespan opens one. So it reads what
 :meth:`~sm_records.module.RecordsModule.on_startup` parked on the module
@@ -30,11 +41,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from simple_module_core.health import HealthCheck, HealthCheckResult, HealthStatus
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from sm_records import locales
 from sm_records.constants import REINDEX_ALL
 from sm_records.index._drift import drift_detail
-from sm_records.models import RecordType
+from sm_records.models import RecordType, table_sets
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
 
@@ -106,6 +118,37 @@ def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
     return out, blocked
 
 
+async def count_orphaned_locales(db_state, settings: RecordsSettings) -> dict[str, int]:
+    """``{locale: records}`` for every locale outside ``content_locales``.
+
+    One ``GROUP BY locale`` per table set (Phase 5 §6.3) — a collection's
+    records live in its own document table — over live rows only: a trashed
+    record is not reachable anywhere, so counting it would report work an
+    operator cannot see. Run once, at startup; see the module docstring.
+    """
+    known = {locale.lower() for locale in locales.supported(settings)}
+    out: dict[str, int] = {}
+    async with db_state.session_factory() as session:
+        for tables in table_sets():
+            cls = tables.record
+            rows = (
+                await session.execute(select(cls.locale, func.count(cls.id)).group_by(cls.locale))
+            ).all()
+            for locale, count in rows:
+                if str(locale).lower() not in known:
+                    out[str(locale)] = out.get(str(locale), 0) + int(count)
+    return dict(sorted(out.items()))
+
+
+def _orphaned_detail(counts: dict[str, int]) -> str:
+    listed = ", ".join(f"{locale}: {count}" for locale, count in counts.items())
+    return (
+        f"orphaned_locales: {{{listed}}} — records in a language this install no longer "
+        "publishes; they are hidden from the public API and still editable in the admin "
+        "(filter=locale:eq:<tag>)"
+    )
+
+
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
     async def check() -> HealthCheckResult:
         db_state = getattr(module, "db", None)
@@ -140,6 +183,11 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         drift = drift_detail()
         if drift is not None:
             details.append(drift)
+        # Counted at startup and parked on the instance: see the module
+        # docstring for why it is not recounted on a settings edit.
+        orphaned = getattr(module, "orphaned_locales", None)
+        if orphaned:
+            details.append(_orphaned_detail(orphaned))
         if not details:
             return HealthCheckResult(status=HealthStatus.HEALTHY)
         return HealthCheckResult(status=HealthStatus.DEGRADED, detail="; ".join(details))

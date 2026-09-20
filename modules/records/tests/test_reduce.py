@@ -34,6 +34,10 @@ def state_spec(with_value: bool = True) -> ReduceSpec:
         value=(lambda record, rtype: Decimal((record.data or {}).get("total") or 0))
         if with_value
         else None,
+        # What the fold is *of*, which is what a stored reading's ``metric``
+        # reports: ``sum:total``, the same string the live reading gives for
+        # ``metric=sum:total``. Without it the metric is the bare ``"sum"``.
+        value_label="total",
     )
 
 

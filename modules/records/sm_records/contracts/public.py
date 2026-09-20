@@ -41,11 +41,11 @@ class PublicRecordRead(SQLModel):
     """The record's **published, live** siblings, so a site can render a
     language switcher (Phase 5 §4.4).
 
-    Published only, and never the trash: advertising a draft or a trashed
-    sibling would point a reader — and a crawler — at a 404, since neither is
-    served here. Resolved in one batched query per page, keyed by
-    ``translation_group`` and never per row
-    (``services._translations.published_siblings``).
+    Published only, never the trash, and never a locale the install has since
+    dropped from ``content_locales``: advertising any of the three would point
+    a reader — and a crawler — at a 404, because none of them is served here.
+    Resolved in one batched query per page, keyed by ``translation_group`` and
+    never per row (``services._translations.published_siblings``).
 
     ``translation_group`` itself is *not* published: it is an internal
     grouping key, and a reader needs the addresses, not the join column."""

@@ -52,6 +52,9 @@ class RecordsModule(ModuleBase):
         # Set in ``on_startup``; the health check reads it and answers HEALTHY
         # while it is ``None`` (there is nothing to be stale during boot).
         self.db = None
+        # ``{locale: records}`` for languages this install no longer publishes,
+        # counted once at startup — see :mod:`sm_records.health`.
+        self.orphaned_locales: dict[str, int] = {}
 
     @property
     def reduce_drift(self) -> dict[int, dict[str, int]]:
@@ -194,6 +197,15 @@ class RecordsModule(ModuleBase):
         settings = self.settings or RecordsSettings()
         boot.mount_public_router(app, settings)
         boot.exempt_public_routes(app, settings)
+
+        # Dropping a content locale is not refused at save (``settings_checks``
+        # says why), so this is what makes the records left behind visible. Once
+        # per boot: the framework offers no hook to re-run it when an operator
+        # hydrates new settings, which the health check's docstring records.
+        if self.db is not None:
+            from sm_records.health import count_orphaned_locales
+
+            self.orphaned_locales = await count_orphaned_locales(self.db, settings)
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

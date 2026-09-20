@@ -21,11 +21,18 @@ from sm_records import locales
 from sm_records.contracts.io import ImportMode, ImportRowError, OnError
 from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
-from sm_records.services import _payload, _relations
+from sm_records.services import _import_checks as _checks
+from sm_records.services import _payload, _relations, _uuids
 from sm_records.services._common import type_id_map
 from sm_records.services._import_match import resolve_matches
 from sm_records.services._import_parse import ImportRow, refuses_orphaned
-from sm_records.services._import_rows import Envelope, envelope_for, mode_error, unchanged
+from sm_records.services._import_rows import (
+    Envelope,
+    envelope_for,
+    mode_error,
+    unchanged,
+    version_required,
+)
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
@@ -111,51 +118,6 @@ async def validate_rows(
     return out
 
 
-def _duplicates(pairs: Sequence[tuple[ImportRow, Envelope]]) -> dict[int, str]:
-    """Rows whose identity another row in the same file already claimed.
-    Caught here rather than at the unique index, where the second write is a
-    raw ``IntegrityError`` — a 500 about a constraint, on a file whose real
-    problem is that two exports were concatenated."""
-    seen: dict[str, int] = {}
-    out: dict[int, str] = {}
-    for row, _ in pairs:
-        if not row.uuid:
-            continue
-        first = seen.setdefault(row.uuid, row.number)
-        if first != row.number:
-            out[row.number] = f"uuid {row.uuid} appears twice in this file (first at row {first})"
-    return out
-
-
-def _immutable(record: Record, row: ImportRow, envelope: Envelope) -> str | None:
-    """What this row asks to change about an existing record that cannot change.
-
-    A record's language is fixed for its lifetime and its translation group is
-    the relationship it is *in*, so a file asking to move either is refused
-    rather than silently ignored — the same answer ``PUT /records/{uuid}``
-    gives a body carrying a ``locale`` (§4.3). Ignoring it would make an import
-    the one write path where a language change appears to succeed.
-
-    A round trip never trips this: the export writes each record's own values
-    back, so the comparison is between a value and itself.
-    """
-    if row.locale is not None and row.locale != record.locale:
-        return (
-            f"record {record.uuid} is in {record.locale!r} and a record's locale is fixed "
-            f"for its lifetime; create a translation instead of importing it as "
-            f"{row.locale!r}"
-        )
-    if (
-        envelope.translation_group is not None
-        and envelope.translation_group != record.translation_group
-    ):
-        return (
-            f"record {record.uuid} is already in translation group "
-            f"{record.translation_group}; an import cannot move a record between groups"
-        )
-    return None
-
-
 async def plan_rows(
     db: AsyncSession,
     rtype: RecordType,
@@ -165,10 +127,38 @@ async def plan_rows(
     defs: list[FieldDefinition],
     errors: list[ImportRowError],
 ) -> tuple[list[Plan], int]:
-    """Decide per row what would happen, and count the no-ops."""
-    duplicates = _duplicates(pairs)
+    """Decide per row what would happen, and count the no-ops.
+
+    **Everything a write can refuse for a reason this pass can see is refused
+    here.** The module's bargain is that a dry run is the real run with the
+    writing switched off (:mod:`sm_records.services.import_`), and a check that
+    lived in :func:`~sm_records.services._import_rows.write_row` broke it: the
+    preview reported "1 to update, 0 failed" and the apply then failed the row.
+    That is worse than either answer on its own, because the whole point of the
+    default dry run is that the caller acts on it. So the version requirement
+    (:func:`~sm_records.services._import_rows.version_required`) is asked here
+    and ``write_row`` keeps it only as a guard for a direct caller.
+    """
+    duplicates = _checks.duplicates(pairs)
+    claims = _checks.group_claims(pairs)
     matches = await resolve_matches(
         db, rtype, [row for row, _ in pairs], match_by=options.match_by, defs=defs
+    )
+    # One batched lookup for the whole file rather than one per row, and none
+    # at all on a host with no collections declared (Phase 5 §6.5).
+    elsewhere = await _uuids.uuids_claimed_elsewhere(
+        db, rtype, [row.uuid for row, _ in pairs if row.uuid and matches.get(row.number) is None]
+    )
+    taken = await _checks.groups_in_type(
+        db,
+        rtype,
+        {
+            envelope.translation_group
+            for row, envelope in pairs
+            if envelope.translation_group
+            and envelope.translation_group != row.uuid
+            and claims.get(envelope.translation_group, 0) <= 1
+        },
     )
     plans: list[Plan] = []
     skipped = 0
@@ -180,7 +170,15 @@ async def plan_rows(
         elif problem is None and record is not None and record.is_deleted:
             problem = f"record {record.uuid} is in the trash; restore or purge it first"
         elif problem is None and record is not None:
-            problem = _immutable(record, row, envelope)
+            problem = _checks.immutable(record, row, envelope)
+        elif problem is None and row.uuid in elsewhere:
+            # A uuid is unique across every table set (§6.4) and this row would
+            # *create* a record under one another set already holds — which the
+            # importer used to do happily, because it keeps a file's uuid
+            # verbatim. See :mod:`sm_records.services._uuids`.
+            problem = _uuids.uuid_claim_message(row.uuid, elsewhere[row.uuid])
+        elif problem is None:
+            problem = _checks.forged_group(rtype, row, envelope, claims, taken)
         problem = problem or mode_error(options.mode, record)
         if problem is not None:
             errors.append(ImportRowError(row=row.number, uuid=row.uuid, message=problem))
@@ -188,5 +186,12 @@ async def plan_rows(
         if record is not None and unchanged(rtype, record, row, envelope, defs):
             skipped += 1
             continue
+        if record is not None and not options.force:
+            missing = version_required(record, row)
+            if missing is not None:
+                errors.append(
+                    ImportRowError(row=row.number, uuid=row.uuid, field="version", message=missing)
+                )
+                continue
         plans.append(Plan(row, envelope, record))
     return plans, skipped

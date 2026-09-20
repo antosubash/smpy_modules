@@ -49,6 +49,24 @@ __all__ = ["ImportOptions", "import_records"]
 _SKIP = "skipped"
 
 
+class _RowWriteError(Exception):
+    """A row that failed *during the write pass*, carrying which row it was.
+
+    ``on_error=abort`` raises out of the loop, and the refusal used to be
+    reported as ``row: 0`` — a hard-coded placeholder, because the exception
+    reaching :func:`import_records` carried a message and nothing else. §2's
+    whole bargain is that the caller "fixes the rows it names and re-posts the
+    same file", and on a 40,000-row file "row 0" names nothing. The write loop
+    knows ``plan.row.number``; this is what carries it out.
+    """
+
+    def __init__(self, row: int, uuid: str | None, error: RecordsError) -> None:
+        super().__init__(error.detail)
+        self.row = row
+        self.uuid = uuid
+        self.error = error
+
+
 @dataclass(slots=True)
 class _Tally:
     """Running counts, so the three places a report is built (dry run,
@@ -81,7 +99,10 @@ async def _write(
             "force": options.force,
         }
         if options.on_error is OnError.ABORT:
-            result = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+            try:
+                result = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+            except RecordsError as exc:
+                raise _RowWriteError(plan.row.number, plan.row.uuid, exc) from exc
             counts[result] += 1
             continue
         try:
@@ -160,10 +181,12 @@ async def import_records(
         tally.created, tally.updated = await _write(
             db, rtype, plans, options=options, settings=settings, actor=actor, errors=errors
         )
-    except RecordsError as exc:
-        errors.append(ImportRowError(row=0, message=exc.detail))
+    except _RowWriteError as failure:
+        errors.append(
+            ImportRowError(row=failure.row, uuid=failure.uuid, message=failure.error.detail)
+        )
         raise ImportRefused(
             _report(options, _Tally(total=tally.total, skipped=tally.skipped), errors, started),
-            f"import refused: {exc.detail}",
-        ) from exc
+            f"import refused: {failure.error.detail}",
+        ) from failure.error
     return _report(options, tally, errors, started)

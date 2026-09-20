@@ -262,6 +262,6 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         ),
         group_locale_signatures=(
             group_locale_index,
-            f"{record_table}.translation_group, {record_table}.locale",
+            f"{record_table}.type_id, {record_table}.translation_group, {record_table}.locale",
         ),
     )

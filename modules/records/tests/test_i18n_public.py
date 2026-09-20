@@ -204,6 +204,13 @@ async def test_the_export_carries_locale_and_group_and_reimports_as_a_no_op(site
 
 
 async def test_an_import_creates_records_in_the_locale_and_group_the_file_names(site):
+    """The two groups a row may name: its own uuid, or one the file describes.
+
+    A ``translation_group`` is a uniqueness exemption, so a row naming a group
+    that exists in the database but not in the file is refused rather than
+    honoured — see ``_import_plan._forged_group`` and
+    ``test_import_groups.py`` for the exemption that closes.
+    """
     english, _ = await _published_pair(site)
     document = {
         "records": [
@@ -217,19 +224,46 @@ async def test_an_import_creates_records_in_the_locale_and_group_the_file_names(
             }
         ]
     }
-    # The group already holds a ``de`` record, so this must be refused by the
-    # unique index rather than land as a second German sibling.
-    clash = await _import(site, json.dumps(document), "json")
-    assert clash.status_code == 422, clash.text
-    assert "translation group" in clash.text
+    forged = await _import(site, json.dumps(document), "json")
+    assert forged.status_code == 422, forged.text
+    assert "names a group not in this file" in forged.text
 
-    document["records"][0]["translation_group"] = "a" * 32
+    # Its own uuid: a record alone in a group named after itself.
+    document["records"][0]["translation_group"] = "f" * 32
     ok = await _import(site, json.dumps(document), "json")
     assert ok.status_code == 200, ok.text
     assert ok.json()["created"] == 1
     written = await site.get(f"{API}/{TYPE_KEY}/records/{'f' * 32}", headers=roles(ADMIN))
     assert written.json()["locale"] == "de"
-    assert written.json()["translation_group"] == "a" * 32
+    assert written.json()["translation_group"] == "f" * 32
+
+
+async def test_two_rows_of_one_file_sharing_a_group_and_a_language_still_collide(site):
+    """The pair rule is not a way round ``(type, group, locale)``.
+
+    Two rows carrying one group travel together legitimately — that is what an
+    export of a translated pair is — but they must still be in *different*
+    languages, and the unique index is what says so.
+    """
+    document = {
+        "records": [
+            {
+                "uuid": "d" * 32,
+                "locale": "de",
+                "translation_group": "e" * 32,
+                "data": {"title": "Eins", "body": "…"},
+            },
+            {
+                "uuid": "e" * 32,
+                "locale": "de",
+                "translation_group": "e" * 32,
+                "data": {"title": "Zwei", "body": "…"},
+            },
+        ]
+    }
+    clash = await _import(site, json.dumps(document), "json")
+    assert clash.status_code == 422, clash.text
+    assert "translation group" in clash.text
 
 
 async def test_an_import_defaults_a_missing_locale_and_refuses_an_unknown_one(site):

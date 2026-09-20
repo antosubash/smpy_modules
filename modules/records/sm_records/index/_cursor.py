@@ -18,9 +18,20 @@ storing anything. It carries two things.
 *A signature of the sort it was produced under.* A cursor taken while sorting
 by ``placed_at`` and replayed while sorting by ``price`` would compare a
 timestamp against a decimal and skip an arbitrary part of the type; there is
-no correct answer to give, so it is refused. The signature covers the type
-key, the ordered ``(field, direction)`` list and whether the listing was the
-trash, because each of those changes what the tuple means.
+no correct answer to give, so it is refused. The signature covers everything
+that changes what the tuple means: the type key, the ordered ``(field,
+direction)`` list, whether the listing was the trash, **the sort fields'
+resolved index kinds** and **the locale the listing was taken under**.
+
+The last two were added after a QA pass found them missing. A field retyped
+from ``number`` to ``text`` between two pages of a walk leaves the same field
+name in the cursor while ``"1.00000"`` stops being a decimal and starts being
+a string, so the keyset comparison silently skips or repeats rows; the kinds
+are what notice. And the public listing's ``?locale=`` is a predicate on the
+statement rather than a caller filter (``services.public._narrow_for``), so a
+cursor minted under ``?locale=en`` and replayed under ``?locale=de`` was
+accepted — no leak, since the predicate still applies, but "resume after this
+row" means nothing across two different listings.
 
 Every decode failure is one :class:`CursorError` and one 400: a malformed
 cursor is a client bug, and distinguishing "not base64" from "wrong sort" for
@@ -50,8 +61,31 @@ class CursorError(ValueError):
     """A ``?after=`` value this listing cannot resume from."""
 
 
-def sort_signature(type_key: str, sorts: Sequence[Any], *, trashed: bool = False) -> str:
+def _term_kinds(terms: Sequence[SortTerm]) -> list[str]:
+    """How each resolved sort term's values are typed, as stable strings.
+
+    ``fixed:<column>`` for a fixed column and the :class:`IndexKind` value for
+    an indexed or virtual field — i.e. exactly what ``_decode_value`` picks its
+    decoder by. Part of the signature, so retyping a field invalidates the
+    cursors taken before it rather than comparing a decimal against a string.
+    """
+    return [f"fixed:{term.fixed}" if term.fixed is not None else term.kind.value for term in terms]
+
+
+def sort_signature(
+    type_key: str,
+    sorts: Sequence[Any],
+    *,
+    trashed: bool = False,
+    locale: str | None = None,
+    terms: Sequence[SortTerm] = (),
+) -> str:
     """A short, stable digest of "what order is this". See the module docstring.
+
+    ``terms`` is the resolved sort (:func:`sort_plan`), read only for each
+    term's value kind, and ``locale`` is the language a public listing was
+    narrowed to — ``None`` on the admin listing, where a locale is an ordinary
+    filter and filters are deliberately not part of a cursor.
 
     Truncated to 12 hex characters: it is a mismatch detector, not a MAC —
     nothing is authorised by it, and a forged one can only make the caller
@@ -62,6 +96,8 @@ def sort_signature(type_key: str, sorts: Sequence[Any], *, trashed: bool = False
             "t": type_key,
             "s": [[s.field, bool(s.desc)] for s in sorts],
             "x": bool(trashed),
+            "k": _term_kinds(terms),
+            "l": locale,
         },
         separators=(",", ":"),
         sort_keys=True,

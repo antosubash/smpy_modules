@@ -178,6 +178,16 @@ so, and says that a host wanting them aligned sets both.
 - No automatic translation, no fallback to the default locale on the public
   API (a missing `de` sibling is a 404 for `?locale=de`, not the `en` record
   in disguise).
+- **No guard on removing a content locale**, and no migration of the records
+  left in it. Added after QA: what this *does* do is stop serving them
+  publicly — by uuid and in the `translations` list — while leaving them fully
+  readable and editable in the admin, and report them as `orphaned_locales` on
+  the reindex health check. Moving them into a language the site still
+  publishes is a content decision (`POST …/translations` or a delete), not one
+  a settings save can make. See §6.6.
+- **No `translation_group` in `RecordCreate`, and none an import may invent.**
+  The group is a uniqueness exemption, so joining an existing one is
+  `POST …/translations` and nothing else. §6.6 has the import rule.
 
 ## 5. Reduce indexes (§7.5)
 
@@ -359,6 +369,54 @@ the global one, not subclasses, so an annotation naming `Record` documents the
 shape rather than the table. The one place that mattered was an
 `isinstance(current, Record)` in the 409 body builder, which now asks
 `table_sets()`.
+
+**`uuid` is globally unique, and enforced on import.** §6.4 says "`uuid`
+remains globally unique across collections" and then leaves it to uuid4
+("collisions are not a practical concern — say so"). The QA pass showed that
+reading is not survivable: the importer keeps a file's uuid verbatim so a round
+trip is idempotent (§2), so *exporting a global type and importing it into a
+collection type* — the §12 motivation for collections — plants a collision
+deterministically. And a collision was not harmless. `referrers()` predicated
+on `target_uuid` alone, ignoring the `target_type_id` §6.3 says the query
+"already resolves", so the collection's record inherited the global record's
+referrers: `restrict` refused a delete nothing pointed at, `cascade` trashed an
+unrelated record and `set_null` blanked its field. `check_targets` merged a
+uuid → type map across sets with `.update()`, so the *last* set asked won and
+a live record stopped being of its own type for every future relation write.
+
+So deviation 8 is amended in both directions. The rule is that a `uuid` is
+unique across every table set, and the importer enforces it: a row creating a
+record under a uuid any other set holds is a **row error** in the planning
+pass, named with the collection (or "the global set") holding it, so a dry run
+predicts it and `abort` refuses before writing. The practical consequence is
+that moving a type's records into a collection is purge-then-import in that
+order, which the README states. Independently of the data, every lookup keys
+on `(target_type_id, target_uuid)` and resolves the table set from the type —
+`referrers`, `referrer_count`, the delete plan's three behaviours,
+`check_targets` and `expand` — so a duplicate that reaches the database some
+other way still cannot make one record's delete act on another's.
+
+**A translation group is a capability, and an import may not forge one.**
+§4.3 makes `(translation_group, locale)` unique and §5 exempts siblings from
+each other's `unique` claims; §2 has the importer carry the group verbatim.
+Together those let a hand-written file put an unrelated record into an existing
+record's group and hold a `unique` value twice. A creating row may therefore
+name only a group it is entitled to: its own `uuid`, one another row of the
+same file also carries, or one this type does not hold yet. The unique index
+also gained `type_id` as its leading column (`fe3ea2dfe0fb`), because §4.3's
+rule is stated per type and every reader of a group scopes by type — without
+it, an import into one type was refused by a record of another, in a message
+naming a record that did not exist.
+
+**A decommissioned content locale.** §4.2 validates `content_locales` for
+non-emptiness and for containing the default, and nothing guards *removing* a
+tag that records are written in — unlike §4.1's `translatable` flip, which is
+refused. Removing it stays unguarded (the records are good records, and a
+refusal makes a typo unfixable), but the three surfaces now agree: the public
+API does not serve such a record by uuid and does not list it as a sibling, the
+admin API reads and edits it exactly as before, and the reindex health check
+carries an `orphaned_locales` count. That count is computed at `on_startup`
+only — the framework's settings registry exposes no post-hydration hook.
 
 **The seeder's sixth type.** `event` is declared with `collection="events"` and
 created only where that collection is declared. Its share of `--records N` is

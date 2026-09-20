@@ -136,7 +136,10 @@ export async function fetchPublicRecords(
 ): Promise<PublicRecordPage> {
   const url = buildPublicListUrl(options);
   const response = await fetch(url, {
-    credentials: 'same-origin',
+    // 'omit', not 'same-origin': this client is the anonymous one the header
+    // comment describes, and sending a session cookie to a surface that reads
+    // no user contradicts it — the widget renders for a visitor who has none.
+    credentials: 'omit',
     headers: { Accept: 'application/json' },
     signal,
   });

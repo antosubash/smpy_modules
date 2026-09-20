@@ -31,6 +31,21 @@ from sqlalchemy import func, select
 from tests.app_harness import build_app
 from tests.perf._bench import Results
 
+DATABASE_URL = os.environ.get("RECORDS_PERF_URL", "")
+"""Run the suite against this database instead of a SQLite file.
+
+The whole study has been SQLite until now, and every previous round said so in
+its own "On Postgres" section — the statement counts are a property of the code
+and travel, but two of F5's findings are SQLite planner choices and were
+explicitly left unverified. Point this at a Postgres URL
+(``postgresql+asyncpg://…``) and the same measurements run there, with
+:func:`tests.perf._bench.explain` switching to Postgres's ``EXPLAIN``.
+
+What does **not** work there is :func:`perf_db_copy`, which copies a file. The
+schema-operation and per-feature files that mutate their database therefore
+skip on a non-SQLite backend; the read path, the pagination and the aggregate
+— which is where the unverified findings are — run unchanged."""
+
 DATASET_SIZE = int(os.environ.get("RECORDS_PERF_N", "2000"))
 """Total records across the five demo types. Small by default so a developer
 can run the suite in a minute; the study runs at 100000."""
@@ -62,6 +77,12 @@ def _create_missing_indexes(conn: Any) -> None:
     covers — and creating an index that is already there is a no-op, so it is
     also safe on a fresh one.
     """
+    if conn.dialect.name != "sqlite":
+        # ``create_all`` on Postgres creates a table's indexes with it, and
+        # this recovery reads ``sqlite_master`` directly. A Postgres run is
+        # always against a database seeded by the same revision, so there is
+        # nothing to recover.
+        return
     have = {
         row[0]
         for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type = 'index'")
@@ -86,6 +107,8 @@ def _create_missing_columns(conn: Any) -> None:
     the class of change a reusable perf fixture can absorb: anything else means
     the cached database is the wrong dataset and should be deleted.
     """
+    if conn.dialect.name != "sqlite":
+        return
     for table in Base.metadata.tables.values():
         rows = conn.exec_driver_sql(f"PRAGMA table_info('{table.name}')").fetchall()
         if not rows:
@@ -113,15 +136,19 @@ async def perf_db() -> AsyncIterator[Any]:
     run on.
     """
     path = _db_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    state = init_db(f"sqlite+aiosqlite:///{path}")
+    if DATABASE_URL:
+        state = init_db(DATABASE_URL)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        state = init_db(f"sqlite+aiosqlite:///{path}")
     register_listeners(state)
     async with state.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_create_missing_columns)
         await conn.run_sync(_create_missing_indexes)
 
-    if str(path) not in _seeded:
+    marker = DATABASE_URL or str(path)
+    if marker not in _seeded:
         have = await _record_total(state)
         if have < DATASET_SIZE:
             from sm_records.seed import seed_database
@@ -129,7 +156,7 @@ async def perf_db() -> AsyncIterator[Any]:
             await seed_database(
                 state, RecordsSettings(), records=DATASET_SIZE - have, seed=42, reset=False
             )
-        _seeded.add(str(path))
+        _seeded.add(marker)
     try:
         yield state
     finally:
@@ -148,6 +175,8 @@ async def perf_db_copy(perf_db, tmp_path) -> AsyncIterator[Any]:
     """
     import shutil
 
+    if DATABASE_URL:
+        pytest.skip("perf_db_copy copies a SQLite file; RECORDS_PERF_URL has no equivalent")
     source = _db_path()
     target = tmp_path / "records_perf_copy.db"
     await perf_db.engine.dispose()

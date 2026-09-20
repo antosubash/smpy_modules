@@ -41,12 +41,21 @@ def plan_label(plan: list[str]) -> str:
     return label[:70]
 
 
-async def measure(client, label: str, url: str, n: int, engine, session):
+async def measure(client, label: str, url: str, n: int, engine, session, *, plan_of: str = ""):
     """Time ``url`` over ``REPS`` repetitions, then record one more call's
-    statement count and the query plan of its biggest statement."""
+    statement count and the query plan of its biggest statement.
+
+    ``plan_of`` names a substring of the statement whose plan is wanted
+    instead. The default — the biggest statement — is right for a list page,
+    where the filtered ``SELECT`` is also the longest text. It is wrong for an
+    aggregate: the ``GROUP BY`` is short and the type load, with its column
+    list, is long, so the plan cell would describe the wrong query and the
+    "does not scan ``records_record``" assertion would pass vacuously.
+    """
     timing = await repeat(lambda: get_ok(client, url), reps=REPS, warmup=3)
     with capture(engine) as box:
         await get_ok(client, url)
-    plan = await explain(session, *box.longest())
+    wanted = box.matching(plan_of) if plan_of else []
+    plan = await explain(session, *(wanted[0] if wanted else box.longest()))
     Results.add(label, n, timing, statements=box.count, plan=plan_label(plan), plan_lines=plan)
     return box, plan

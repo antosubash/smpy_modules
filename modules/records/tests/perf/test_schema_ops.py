@@ -22,8 +22,8 @@ from sm_records.services._schema import normalise
 from sm_records.services.reindex_runner import run_pending
 from sm_records.services.revisions import list_type_revisions
 
-from tests.perf._bench import Results, Timing, capture
-from tests.perf.conftest import load_type
+from tests.perf._bench import Results, Timing, capture, repeat
+from tests.perf.conftest import REPS, load_type
 
 pytestmark = pytest.mark.perf
 
@@ -105,17 +105,21 @@ async def test_apply_restrictive_with_force(perf_db_copy):
     assert diff.changes
 
 
-async def test_toggle_indexed_and_reindex_batches(perf_db_copy):
-    """Toggle ``indexed`` on one field, then run the rebuild at three batch
-    sizes. The number recorded is records rebuilt per second."""
-    settings = _settings()
-    for batch_size in (100, 500, 2000):
-        async with perf_db_copy.session_factory() as session:
-            rtype = await load_type(session, "store")
-            raw = _fields(rtype)
-            for field in raw:
-                if field["key"] == "street":
-                    field["indexed"] = not field.get("indexed", False)
+async def _set_indexed(db_state, settings, key: str, value: bool) -> int:
+    """Set ``store.<key>``'s ``indexed`` flag and return the type id.
+
+    A no-op when the flag already has that value — ``apply`` would refuse a
+    change that changes nothing, and the caller only wants the state.
+    """
+    async with db_state.session_factory() as session:
+        rtype = await load_type(session, "store")
+        raw = _fields(rtype)
+        changed = False
+        for field in raw:
+            if field["key"] == key and bool(field.get("indexed", False)) != value:
+                field["indexed"] = value
+                changed = True
+        if changed:
             await schema_change.apply(
                 session,
                 rtype,
@@ -124,8 +128,29 @@ async def test_toggle_indexed_and_reindex_batches(perf_db_copy):
                 settings=settings,
             )
             await session.commit()
-            type_id = rtype.id
+        return rtype.id
 
+
+async def test_toggle_indexed_and_reindex_batches(perf_db_copy):
+    """The same rebuild at three batch sizes — "bigger is better", measured.
+
+    **Each iteration restores the state it found, untimed.** The earlier
+    version of this measurement simply flipped ``indexed`` each time round the
+    loop, which made the three rows three *different* operations: batch=100
+    added a field's index rows, batch=500 removed them and batch=2000 added
+    them again. The batch size was confounded with the direction of the
+    toggle, so the three numbers could not be compared with each other — which
+    is the only thing the row is for. Restoring first costs one unmeasured
+    rebuild per iteration and makes them one operation at three sizes.
+    """
+    settings = _settings()
+    for batch_size in (100, 500, 2000):
+        # Untimed: take the field out of the index and let the rebuild that
+        # enqueues finish, so every measured pass starts from the same place.
+        type_id = await _set_indexed(perf_db_copy, settings, "street", False)
+        await run_pending(perf_db_copy, type_id, settings=settings)
+
+        type_id = await _set_indexed(perf_db_copy, settings, "street", True)
         settings.reindex_batch_size = batch_size
         started = time.perf_counter()
         count = await run_pending(perf_db_copy, type_id, settings=settings)
@@ -181,11 +206,20 @@ async def test_orphaned_discard_bulk_write(perf_db_copy):
         )
         await session.commit()
 
-        started = time.perf_counter()
-        conflicts = await _orphaned.count_conflicts(
-            session, rtype, ["hours"], batch_size=settings.reindex_batch_size
-        )
-        count_ms = (time.perf_counter() - started) * 1000.0
+        # ``count_conflicts`` is read-only, so it can be repeated — and it has
+        # to be. A single sample of a ~100 ms walk over a freshly copied SQLite
+        # file is dominated by the page cache: re-running the suite unchanged
+        # produced 50 ms and 208 ms for the same code, which is wider than any
+        # difference between two revisions it was being used to compare.
+        conflicts: dict[str, int] = {}
+
+        async def count():
+            nonlocal conflicts
+            conflicts = await _orphaned.count_conflicts(
+                session, rtype, ["hours"], batch_size=settings.reindex_batch_size
+            )
+
+        timing = await repeat(count, reps=max(REPS // 4, 3), warmup=1)
 
         started = time.perf_counter()
         touched = await _orphaned.discard(
@@ -194,7 +228,7 @@ async def test_orphaned_discard_bulk_write(perf_db_copy):
         await session.commit()
         discard_ms = (time.perf_counter() - started) * 1000.0
 
-    Results.add("_orphaned count_conflicts(store.hours)", sum(conflicts.values()), _one(count_ms))
+    Results.add("_orphaned count_conflicts(store.hours)", sum(conflicts.values()), timing)
     Results.add("_orphaned discard(store.hours)", touched, _one(discard_ms))
 
 

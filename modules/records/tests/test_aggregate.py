@@ -223,7 +223,9 @@ async def test_the_stored_reading_answers_in_the_same_shape(client, seeded):
     body = await agg(client, reduce=STATE)
     assert body["stored"] is True
     assert body["updated_at"] is not None
-    assert body["metric"] == f"sum:{STATE}"
+    # The spec's own description of its fold, and not ``sum:<spec key>``: on a
+    # live reading ``sum:<x>`` names a *field*, so the two now read alike.
+    assert body["metric"] == "sum:total"
     live = await agg(client, group_by="state", metric="sum:total")
     assert [(g["value"], g["count"], g["sum"]) for g in body["groups"]] == [
         (g["value"], g["count"], g["sum"]) for g in live["groups"]

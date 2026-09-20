@@ -82,11 +82,19 @@ class ReduceSpec:
     ``key`` is a virtual key: reserved, validated and owned exactly as an
     index provider's :class:`~sm_records.index.providers.VirtualField` key is,
     and refused as a declared field key on save.
+
+    ``value_label`` is what a reading of this spec calls the quantity it sums —
+    free text for a human, and the only thing the ``metric`` field of an
+    aggregate response can honestly say about a stored fold. A live aggregate's
+    ``metric`` is ``sum:<field>`` and names a **field**; a spec has no field,
+    it has a callable, so reporting ``sum:<spec key>`` there read as a field
+    that does not exist. Without a label the metric is the bare ``"sum"``.
     """
 
     key: str
     group_by: GroupBy
     value: ValueOf | None = None
+    value_label: str | None = None
 
 
 _specs: dict[str, ReduceSpec] = {}

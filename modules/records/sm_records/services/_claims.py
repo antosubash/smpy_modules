@@ -54,6 +54,11 @@ def _group_locale_taken(type_key: str, locale: str) -> Conflict:
     carrying the column, or a second ``POST /translations`` that lost the race
     with the first. The endpoint's own check answers the ordinary case; this is
     what keeps the race a 409 rather than a 500.
+
+    Naming the type is only honest because the index is scoped by ``type_id``
+    (migration ``fe3ea2dfe0fb``). While it was not, this sentence could be
+    raised by a collision with a record of some *other* type, and then named a
+    record of this one that does not exist.
     """
     return Conflict(f"a {type_key} record in {locale!r} already exists in that translation group")
 

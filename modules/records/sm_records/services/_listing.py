@@ -103,8 +103,12 @@ async def list_records(
     # contract downstream is still one-argument, so it is bound here.
     record = tables_for(rtype).record
     narrow = partial(only_trashed, record) if trashed else None
-    signature = sort_signature(rtype.key, sorts, trashed=trashed)
-    decoded = decode_cursor(after, signature, sort_plan(rtype, fields, sorts)) if after else None
+    # The plan is resolved whether or not there is a cursor: its terms' index
+    # kinds are part of the signature, so a field retyped between two pages of
+    # a walk invalidates the cursor instead of comparing a decimal to a string.
+    plan = sort_plan(rtype, fields, sorts)
+    signature = sort_signature(rtype.key, sorts, trashed=trashed, terms=plan)
+    decoded = decode_cursor(after, signature, plan) if after else None
 
     total: int | None = None
     capped = False

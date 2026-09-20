@@ -22,12 +22,14 @@ a convenience:
 
 The filter and sort grammar is the admin one **narrowed to the public shape**.
 Refusing a field the index cannot answer is ``index.query``'s job and this adds
-nothing to it; what this adds is an allow-list over the *fixed* columns, which
-are queryable on every type whatever it declares. ``status``, ``position``,
-``created_at`` and ``updated_at`` are removed from the response shape
-(``contracts.public``) and would otherwise still answer a filter — an
-anonymous caller can binary-search a timestamp it cannot read. They are
-refused by name instead, exactly as an unindexed field is.
+nothing to it; what this adds is an **allow-list** — the type's declared field
+keys plus ``slug``, ``display_title`` and ``published_at``, i.e. exactly what
+``contracts.public`` publishes (:func:`_check_columns`). Everything else is a
+400 naming the field: the fixed columns the public shape drops (``status``,
+``position``, ``created_at``, ``updated_at``), which would otherwise let an
+anonymous caller binary-search a timestamp it cannot read, and a **virtual
+field** an index provider projects, whose value is not in the payload at all
+and which ``?after=`` would hand back in clear inside the cursor.
 
 What the *endpoint* does with the refusal differs (§10: 400 naming the field,
 never the admin's 409), and that mapping lives in ``endpoints/api/public.py``.
@@ -41,7 +43,9 @@ from typing import Any, Final
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.index._fixed import FIXED_COLUMNS, PUBLIC_FIXED_COLUMNS
+from sm_records import locales
+from sm_records.index._fields import declared_keys
+from sm_records.index._fixed import PUBLIC_FIXED_COLUMNS
 from sm_records.index.query import (
     Filter,
     QueryError,
@@ -109,23 +113,36 @@ def _narrow_for(record: Any, locale: str):
     return narrow
 
 
-_HIDDEN_COLUMNS: Final[frozenset[str]] = FIXED_COLUMNS - PUBLIC_FIXED_COLUMNS
-"""Fixed columns this surface will not answer about — the projection every
-record has, minus the part the public shape publishes."""
-
-
 def _check_columns(rtype: RecordType, filters: Sequence[Filter], sorts: Sequence[Sort]) -> None:
-    """Refuse a filter or sort naming a column the public shape removes.
+    """Refuse a filter or sort naming anything outside the public shape.
 
-    ``QueryError`` with the same ``unknown`` reason ``index.query._resolve``
-    gives a key no type declares — the endpoint flattens every reason into one
-    400 naming the field (§10), and these columns have to be indistinguishable
-    from a field that simply is not there. A declared field can never be
-    keyed after one of them (``constants.RESERVED_FIELD_KEYS``), so this
-    refuses nothing a type could have meant.
+    **An allow-list, not a deny-list.** It used to subtract the hidden fixed
+    columns from the full set and let everything else through to
+    ``index._filters.resolve``, which resolves a **virtual field** — a key an
+    index provider projects (§7.6) — exactly as it resolves a declared one. A
+    declared field's value is in ``data`` and therefore already public; a
+    virtual field's is nowhere in ``PublicRecordRead``. So an anonymous caller
+    could filter on a host-computed score it cannot read, sort by it, and get
+    the value back **in clear** inside the ``?after=`` cursor, which carries
+    the resolved sort values. That is verbatim the argument
+    ``_fixed.PUBLIC_FIXED_COLUMNS`` gives for removing ``created_at`` and
+    ``position``, applied to a column the host rather than the module invented.
+
+    What is allowed is therefore exactly what the response shape carries: the
+    type's **declared** field keys, plus ``slug``, ``display_title`` and
+    ``published_at``. A declared-but-unindexed field still falls through to the
+    grammar's own ``not_indexed`` refusal, because "you cannot query that" is
+    the honest answer and the endpoint flattens both into one 400 anyway.
+    Reduce-spec keys are refused here for the same reason virtual fields are.
+
+    ``QueryError`` with the ``unknown`` reason ``index.query`` gives a key no
+    type declares — the endpoint flattens every reason into one 400 naming the
+    field (§10), so a hidden column, a virtual field and a typo are the same
+    sentence to a caller who cannot see the schema.
     """
+    allowed = declared_keys(list(rtype.fields or [])) | PUBLIC_FIXED_COLUMNS
     for name in [flt.field for flt in filters] + [sort.field for sort in sorts]:
-        if name in _HIDDEN_COLUMNS:
+        if name not in allowed:
             raise QueryError(name, "unknown", f"{name!r} is not a field of {rtype.key!r}")
 
 
@@ -137,16 +154,32 @@ async def get_public_type(db: AsyncSession, key: str) -> RecordType:
     return rtype
 
 
-async def get_public_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
+async def get_public_record(
+    db: AsyncSession, rtype: RecordType, uuid: str, *, settings: RecordsSettings
+) -> Record:
     """One published record of a public type, by uuid.
 
     The ``status`` predicate is in the statement rather than checked after the
     load: a draft and a nonexistent uuid have to be the same 404, and a check
     after the fact is one refactor away from leaking the difference in a log
     line or a timing.
+
+    **And in a language this site still publishes.** Dropping a locale from
+    ``content_locales`` is not guarded at save (there is no good answer: the
+    records exist, and refusing the edit would make a typo unfixable), so the
+    records written in it stay. What they must not do is stay *publicly
+    readable* — a language the listing refuses to name (``?locale=de`` is a
+    400 once ``de`` is gone) cannot go on being served by uuid, or the site
+    publishes in a language it says it does not. The admin API is deliberately
+    the other way: an operator has to be able to read, edit and re-home them.
     """
     cls = tables_for(rtype).record
-    stmt = select(cls).where(cls.uuid == uuid, cls.type_id == rtype.id, _published(cls))
+    stmt = select(cls).where(
+        cls.uuid == uuid,
+        cls.type_id == rtype.id,
+        _published(cls),
+        cls.locale.in_(locales.supported(settings)),
+    )
     record = (await db.execute(stmt)).scalars().first()
     if record is None:
         raise NotFound(NOT_FOUND)
@@ -194,8 +227,14 @@ async def list_public_records(
     narrow = _narrow_for(tables_for(rtype).record, locale)
     size = settings.clamp_page_size(page_size)
     fields = list(rtype.fields or [])
-    signature = sort_signature(rtype.key, sorts)
-    decoded = decode_cursor(after, signature, sort_plan(rtype, fields, sorts)) if after else None
+    # ``locale`` is in the signature because it is a predicate on the statement
+    # rather than one of the caller's filters (:func:`_narrow_for`): without it
+    # a cursor minted under ``?locale=en`` was accepted under ``?locale=de``,
+    # which is "resume after this row" spoken about a different listing. The
+    # terms' kinds are in it for the reason ``index._cursor`` gives.
+    plan = sort_plan(rtype, fields, sorts)
+    signature = sort_signature(rtype.key, sorts, locale=locale, terms=plan)
+    decoded = decode_cursor(after, signature, plan) if after else None
 
     total: int | None = None
     capped = False

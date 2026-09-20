@@ -163,7 +163,7 @@ async def list_public_records(
         raise _refused(exc) from exc
     except CursorError as exc:
         raise HTTPException(status_code=400, detail="cannot resume from that cursor") from exc
-    siblings = await public_service.published_siblings(db, rtype, result.items)
+    siblings = await public_service.published_siblings(db, rtype, result.items, settings=settings)
     return PublicRecordPage(
         items=public_records_read(rtype, result.items, siblings=siblings),
         total=result.total,
@@ -176,7 +176,10 @@ async def list_public_records(
 
 @_read_route("/{type_key}/{uuid}", response_model=PublicRecordRead)
 async def get_public_record(
-    type_key: str, uuid: str, db: AsyncSession = Depends(request_db)
+    type_key: str,
+    uuid: str,
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> PublicRecordRead:
     """One published record. A draft, a trashed row, an unknown uuid and a
     private type are one and the same 404 (``services.public.NOT_FOUND``).
@@ -186,10 +189,15 @@ async def get_public_record(
     "wrong" language would make the same address work or not depending on a
     query parameter the caller copied from the listing, and every link a
     language switcher renders points at a sibling in *its* language anyway.
+
+    It is not locale-*blind* about the site's own languages: a record whose
+    locale has since been dropped from ``content_locales`` is the shared 404
+    here too, because the listing already refuses to name that language (§4.4,
+    and the README's "Content languages").
     """
     rtype = await public_service.get_public_type(db, type_key)
-    record = await public_service.get_public_record(db, rtype, uuid)
-    siblings = await public_service.published_siblings(db, rtype, [record])
+    record = await public_service.get_public_record(db, rtype, uuid, settings=settings)
+    siblings = await public_service.published_siblings(db, rtype, [record], settings=settings)
     return public_record_read(rtype, record, siblings=siblings.get(record.translation_group))
 
 

@@ -15,12 +15,9 @@ row and its counterpart in the database:
   optimistic-concurrency token a client is holding. :func:`unchanged` is what
   makes the second run a no-op, and it is also where ``skipped`` in the report
   comes from.
-* **An update never last-write-wins.** The export carries no ``version``
-  (design §5 says what travels: ``uuid`` and content), so a file that wants to
-  *change* a record has to say which version it is changing — or say ``force``
-  and mean it. Silently overwriting whatever is there is precisely the failure
-  §5.1 added the column to prevent, and a bulk path is the worst place to make
-  an exception for it.
+* **An update never last-write-wins.** :func:`version_required` is the rule;
+  it lives here with the write it guards, and the **planning pass** asks it so
+  a dry run predicts the same refusal (``_import_plan.plan_rows``).
 """
 
 from __future__ import annotations
@@ -38,7 +35,7 @@ from sm_records.services.errors import ValidationFailed
 from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
 
-__all__ = ["Envelope", "envelope_for", "unchanged", "write_row"]
+__all__ = ["Envelope", "envelope_for", "unchanged", "version_required", "write_row"]
 
 
 class Envelope:
@@ -49,9 +46,10 @@ class Envelope:
     ``locale`` arrives raw and is replaced by the *resolved* content locale in
     ``import_._validate`` — where the settings are in reach and where a bad one
     becomes this row's error rather than the whole file's. ``translation_group``
-    is carried verbatim and never interpreted: it is an opaque grouping key,
-    and an importer that tried to be clever about it would rewrite the
-    relationships the file is describing.
+    is carried verbatim: the importer never rewrites it, because that would
+    rewrite the relationships the file is describing. It does **check** it —
+    a group is a uniqueness exemption, not data (``_import_plan._forged_group``)
+    — and a row naming a group this file does not describe is refused.
     """
 
     __slots__ = ("has_slug", "locale", "position", "slug", "status", "translation_group")
@@ -151,6 +149,29 @@ def unchanged(
     return slug_for(rtype, row.values or {}, envelope.slug) == record.slug
 
 
+def version_required(record: Record, row: ImportRow) -> str | None:
+    """Why this row may not update ``record``, if the file left the version out.
+
+    The export carries no ``version`` (design §5 says what travels: ``uuid``
+    and content), so a file that wants to *change* a record has to say which
+    version it is changing — or say ``force`` and mean it. Silently overwriting
+    whatever is there is what §5.1 added the column to prevent, and a bulk path
+    is the worst place to make an exception for it.
+
+    A function rather than a branch inside :func:`write_row` because the
+    **planning pass** has to be able to ask it: a dry run skips the write, so a
+    refusal that only existed there made the preview promise an update the
+    apply then failed (``_import_plan.plan_rows``). ``write_row`` keeps the
+    same call as a guard for anything that reaches it without planning.
+    """
+    if row.version is not None:
+        return None
+    return (
+        f"record {record.uuid} already exists and the file carries no 'version'; "
+        "re-export it, add a version column, or import with force=true"
+    )
+
+
 async def write_row(
     db: AsyncSession,
     rtype: RecordType,
@@ -201,10 +222,10 @@ async def write_row(
 
     expected = row.version
     if expected is None:
-        if not force:
+        missing = None if force else version_required(record, row)
+        if missing is not None:
             raise ValidationFailed(
-                f"record {record.uuid} already exists and the file carries no 'version'; "
-                "re-export it, add a version column, or import with force=true",
+                missing,
                 [{"field": "version", "message": "a version is required to update a record"}],
             )
         expected = record.version

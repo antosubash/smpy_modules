@@ -64,7 +64,11 @@ async def list_translations(db: AsyncSession, rtype: RecordType, group: str) -> 
 
 
 async def published_siblings(
-    db: AsyncSession, rtype: RecordType, records: list[Record]
+    db: AsyncSession,
+    rtype: RecordType,
+    records: list[Record],
+    *,
+    settings: RecordsSettings,
 ) -> dict[str, list[Record]]:
     """``{translation_group: [published, live records]}`` for a whole page.
 
@@ -76,7 +80,13 @@ async def published_siblings(
     :func:`sm_records.services.public.get_public_record` puts it there.
 
     A language switcher is built from this, so advertising a draft or a trashed
-    sibling would point a reader — and a crawler — at a 404.
+    sibling would point a reader — and a crawler — at a 404. **A sibling in a
+    locale the install has since dropped from ``content_locales`` is the same
+    kind of broken link**, and a worse one: the record is there, so the
+    switcher offered a language the listing refuses to name and the by-uuid
+    read now 404s. The predicate is the same one
+    :func:`~sm_records.services.public.get_public_record` applies, so the two
+    halves of the public surface agree about which languages exist.
     """
     groups = sorted({record.translation_group for record in records})
     if not groups:
@@ -88,6 +98,7 @@ async def published_siblings(
             cls.type_id == rtype.id,
             cls.translation_group.in_(groups),
             cls.status == RecordStatus.PUBLISHED,
+            cls.locale.in_(locales.supported(settings)),
         )
         .order_by(cls.locale)
     )

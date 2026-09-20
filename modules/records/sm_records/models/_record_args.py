@@ -84,5 +84,13 @@ def record_args(table: str, slug_index: str, group_locale_index: str) -> tuple:
         # every language switcher starts contradicting itself. Trashed rows are
         # included, deliberately: a sibling in the trash still claims its slug
         # in its locale, so the language is occupied until it is purged.
-        Index(group_locale_index, "translation_group", "locale", unique=True),
+        #
+        # ``type_id`` **leads the key**. §4.3 states the rule as "one record
+        # per ``(translation_group, locale)``" and every reader of a group
+        # (``list_translations``, ``_sibling``, ``published_siblings``) scopes
+        # by type, so an index without it was wider than the concept it
+        # enforces: an import into type B naming a group that exists in type A
+        # was refused with "a B record in 'en' already exists in that
+        # translation group" — a refusal naming a record that does not exist.
+        Index(group_locale_index, "type_id", "translation_group", "locale", unique=True),
     )

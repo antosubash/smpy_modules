@@ -105,11 +105,10 @@ class _Prepared(NamedTuple):
     ``types`` rides along rather than being looked up again: ``{key: id}`` is
     read once here for the relation check and is the same mapping the index
     writer's resolver needs (``index.providers.TypeResolver``), which used to
-    make ``SELECT key, id FROM records_type`` a twice-per-write statement.
-    Threaded through an argument and not cached on the module: types are
-    created and deleted at runtime, and a process-global map would hand a
-    stale id to the one thing that must not have one — the ``relation`` rows
-    ``on_delete`` is enforced from (§9).
+    make ``SELECT key, id FROM records_type`` a twice-per-write statement. It
+    is an argument and not a module-level cache because types are created and
+    deleted at runtime, and a stale id would reach the one thing that must not
+    have one — the ``relation`` rows ``on_delete`` is enforced from (§9).
     """
 
     defs: list[FieldDefinition]
@@ -168,12 +167,15 @@ async def create_record(
     makes a record with no siblings alone in a group named after itself; only
     :func:`sm_records.services._translations.create_translation` and the
     importer pass one, and the first only ever the source's.
+
+    The uuid is generated here; the importer is the one writer that keeps an
+    identifier from outside, and it claims it first (``services._uuids``).
     """
     resolved_locale = resolve_locale(rtype, settings, locale)
-    # Both identifiers generated here rather than by two ``default_factory``
-    # calls: they have to be the *same* string for a record with no siblings —
-    # and before the checks rather than after, because the group is what
-    # exempts a translation from its source's ``unique`` claims.
+    # Both identifiers decided here rather than by two ``default_factory``
+    # calls: they have to be the *same* string for a record with no siblings,
+    # and before the checks, because the group is what exempts a translation
+    # from its source's ``unique`` claims.
     uuid = new_uuid()
     own_group = translation_group or uuid
     _, values, stored, types = await _prepare(db, rtype, data, settings, None, own_group)
@@ -247,11 +249,10 @@ async def update_record(
     ``orphaned_extra`` is **internal only**: keys to file under ``_orphaned``
     on this row, merged server-side *after* validation. It is not the client's
     ``_orphaned`` rule being relaxed — ``_payload.validate`` still refuses an
-    inbound payload that carries the key, and no endpoint passes this. Its one
+    inbound payload carrying the key, and no endpoint passes this. Its one
     caller is ``services.revisions.restore``, which has to put the undeclared
-    half of an older payload somewhere rather than drop it on the floor
-    (``extra="forbid"`` would otherwise make every revision older than a field
-    deletion a permanent 422).
+    half of an older payload somewhere (``extra="forbid"`` would otherwise make
+    every revision older than a field deletion a permanent 422).
     """
     # Read before anything is assigned to the row: the reduce index is
     # maintained by *moving* this record from the group its old payload put
@@ -264,8 +265,7 @@ async def update_record(
     stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     # ``record.locale`` and never an argument: a record's language is fixed for
-    # its lifetime (§4.3), so the namespace this claim is made in is the row's
-    # own and cannot be steered by a caller.
+    # its lifetime (§4.3), so this claim's namespace is the row's own.
     await _claims.ensure_slug_free(db, rtype, resolved_slug, record.locale, exclude_id=record.id)
 
     record_cls = tables_for(rtype).record

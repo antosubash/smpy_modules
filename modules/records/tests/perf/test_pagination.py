@@ -163,3 +163,43 @@ async def test_relation_picker_prefix_against_contains(perf_client, perf_db, per
         )
         Results.note(f"picker {op}: plan = {plan_label(plan)}")
         assert box.count <= 8
+
+
+async def test_the_bound_at_the_cap(perf_db, perf_session):
+    """``bounded_count_query`` with the cap *at* the type's own size (F4).
+
+    The three interesting places for the bound are below the type, exactly at
+    it and above it, and only the middle one is the state a host actually
+    tunes ``max_count`` to: the ceiling is meant to sit where the count stops
+    being worth paying for. It is also the boundary the ``total_capped`` flag
+    flips on, so a row that is wrong here is a UI that says "9,000+" about
+    exactly 9,000 records.
+    """
+    counts = await type_counts(perf_session)
+    rtype = await load_type(perf_session, "order")
+    fields = list(rtype.fields or [])
+    n = counts.get("order", 0)
+    for label, cap in (("at the cap", n), ("one below the cap", max(n - 1, 1))):
+        stmt = bounded_count_query(rtype, fields, cap=cap)
+
+        async def run(stmt=stmt):
+            await perf_session.execute(stmt)
+
+        timing = await repeat(run, reps=REPS, warmup=3)
+        with capture(perf_db.engine) as box:
+            await run()
+        plan = await explain(perf_session, *box.last())
+        Results.add(
+            f"bounded_count_query(order, cap={cap} — {label})",
+            n,
+            timing,
+            statements=box.count,
+            plan=plan_label(plan),
+            plan_lines=plan,
+        )
+        got = int((await perf_session.execute(stmt)).scalar_one())
+        assert got == min(n, cap + 1), f"cap {cap}: counted {got} of {n}"
+    Results.note(
+        "the bound reads cap+1 rows: at the cap it is the whole type plus the "
+        "probe row that tells the caller there is more"
+    )

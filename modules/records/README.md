@@ -96,12 +96,17 @@ while url:
 ```
 
 The cursor is opaque (base64 of the row's sort values and its id) but not
-secret, and it carries a digest of the sort it was produced under. Three
-things are a `400`: a cursor that does not decode, a cursor replayed under a
-different `?sort=` or against the trash, and `?page=` and `?after=` sent
-together — they are two ways of asking for a page and the server will not
-guess which one you meant. `?page=` stays for the admin UI, which shows
-numbered pages.
+secret, and it carries a digest of the sort it was produced under. That digest
+covers everything that changes what the value tuple *means*: the type, the
+ordered `(field, direction)` list, whether the listing was the trash, **the
+index kind behind each sort field** (so a field retyped from `number` to `text`
+mid-walk invalidates the cursor instead of comparing a decimal against a
+string) and, on the public API, **the `?locale=` the listing was narrowed to**.
+Three things are a `400`: a cursor that does not decode, a cursor replayed
+under a different sort — in any of those senses — or against the trash, and
+`?page=` and `?after=` sent together, which are two ways of asking for a page
+and the server will not guess which one you meant. `?page=` stays for the admin
+UI, which shows numbered pages.
 
 A full final page still returns a `next_cursor`; the request after it comes
 back empty with `next_cursor: null`. That is one extra round trip at the end
@@ -558,14 +563,42 @@ Two consequences are worth knowing:
 
 ### `uuid` across collections
 
-A record's `uuid` is unique **within its own table**: each record table carries
-its own unique index, and nothing at the database level stops the same uuid
-existing in two collections. Nothing at the generator level makes it plausible
-either — every uuid is a `uuid4`, generated the same way by the writer, the
-seeder and the importer — so the cross-collection reads that resolve a target
-by uuid (referrers, `?expand=`, a relation write check) treat it as globally
-unique. Stated here rather than relied on silently: an importer that invents
-uuids some other way is the one thing that could break it.
+**A record's `uuid` is unique across every table set**, and both halves of that
+are enforced rather than assumed.
+
+The database enforces uniqueness only *within* a table — each record table
+carries its own unique index, and no constraint spans them — so the rule is
+held by the write path: `uuid4` for everything the writer and the seeder
+create, and an explicit check for the one writer that keeps an identifier from
+outside. **The importer preserves a file's `uuid` verbatim** (that is what
+makes a round trip idempotent), so importing a global type's export into a
+collection type used to plant a duplicate deterministically. It now refuses the
+row:
+
+```
+uuid 9d0c… already exists in collection 'events'; a record's uuid is unique
+across every table set, so a file cannot create a record under one that is
+already in use
+```
+
+It is a row error, so `on_error=abort` refuses the whole file before writing
+anything and `on_error=skip` reports the row and imports the rest, and the
+**dry run predicts it** like every other row error. A host that declares no
+collection pays nothing for the check: there is no other table set to ask.
+
+**Moving a type's records into a collection is therefore purge-then-import,
+in that order.** Export the global type, delete it (which purges its records),
+create the type again with `collection=`, then import. Importing first and
+deleting afterwards is the sequence the refusal is about.
+
+Independently of the data, everything that resolves a record by uuid keys on
+**`(target_type_id, target_uuid)`** and takes its table set from the declared
+type — the referrer query, `referrer_count`, the delete plan's `restrict`,
+`set_null` and `cascade` walks, the relation write check and `?expand=`. So a
+duplicate that somehow exists (a hand-written row, a restore from a backup
+taken before this rule) cannot make a delete cascade into an unrelated record
+or a relation write be refused against a record that is exactly what it claims
+to be.
 
 ### Inert when unused
 
@@ -676,15 +709,59 @@ one**, which keeps its claim until it is purged or restored.
   only a JSON API keyed by uuid and slug — so a rename strands no URL the way
   a page rename does.
 
+### Dropping a content language
+
+**Removing a tag from `content_locales` is not refused at save**, deliberately
+— the alternative makes a typo unfixable, and the records written in that
+language are still perfectly good records. Here is exactly what happens to
+them:
+
+- the public listing stops naming the language (`?locale=de` is a `400`
+  listing the languages the site does publish);
+- the public **by-uuid** read is a `404`, and the language switcher on a
+  sibling stops advertising it. A language the site says it does not publish
+  cannot go on being served;
+- the **admin** API is untouched: the records list, read, edit, export and
+  delete exactly as before. An operator has to be able to reach them, which is
+  the whole reason the save is not refused;
+- `/health/ready` degrades with an `orphaned_locales: {de: 12}` detail naming
+  each stranded language and how many records are in it.
+
+The count is taken **once, at startup** (the framework's settings registry
+offers no post-hydration hook to recompute it from), so it appears after the
+restart the setting needs anyway. To find them at any time:
+
+```
+GET /api/records/types/{key}/records?filter=locale:eq:de
+```
+
+Then translate them into a language you do publish, or delete them. Adding the
+tag back restores everything — nothing was rewritten.
+
 ### Export and import
 
 The export gains `locale` and `translation_group` columns and the import reads
 them back: a missing `locale` defaults to `default_content_locale` (a file
 written before the install spoke more than one language is a file of
-default-locale records), a locale that is not configured is that row's error,
-and `translation_group` is carried verbatim and never interpreted. A row that
-asks to change an existing record's locale or move it between groups is
-refused, exactly as `PUT` is.
+default-locale records), and a locale that is not configured is that row's
+error. A row that asks to change an existing record's locale or move it
+between groups is refused, exactly as `PUT` is.
+
+**`translation_group` is carried verbatim but not taken on trust.** A group is
+a uniqueness exemption (see above), so a row that *creates* a record may name
+only a group it is entitled to: its own `uuid`, a group another row of the
+same file also carries (a translated pair travelling together — an export of a
+group always contains the whole group), or a group this type does not have
+yet. Naming a group this type already holds and the file does not describe is
+a row error:
+
+```
+translation_group ab03… names a group not in this file; create translations
+through POST /api/records/types/art/records/{uuid}/translations
+```
+
+Another *type*'s group is not a collision and not a forgery: groups are scoped
+by type everywhere that reads one, index included.
 
 ## Changing a schema that already holds records
 
@@ -713,6 +790,16 @@ record (trash included) so you can see what would break before saving.
 - `slug_field` changes never regenerate existing slugs — a slug is an
   address, and regenerating could break links or collide with a slug handed
   out since. Only records written after the change use the new pointer.
+
+**A preview is `records.manage_types`, not `records.view` on the type.**
+`POST .../schema/preview` deliberately opens to anyone who can open the schema
+screen (§10), and its report lists up to ten failing records by `uuid` and
+`display_title`. So a caller holding `manage_types` but outside a type's
+`allowed_roles` sees those titles. That is pre-existing and intentional —
+somebody editing a type's schema has to be able to see what their change would
+break — but it is worth knowing before you use `allowed_roles` to hide titles
+from an administrator: it hides them from the record API, not from a schema
+preview of the type.
 
 **A preview of a big type runs as a job.** The dry run validates every record
 of the type, trash included, at roughly a thousand records a second — a few
@@ -800,6 +887,9 @@ endings per RFC 4180.
   Matching on a non-unique field is refused rather than resolved arbitrarily.
 - `force` — an update whose row carries no `version` is refused, because the
   export deliberately does not carry one; `force=true` accepts last-write-wins.
+  The refusal is decided in the planning pass, so **a dry run predicts it**:
+  the preview reports the row as failed rather than promising an update the
+  apply would then refuse.
 - `max_import_bytes` (a setting, 50 MB by default) refuses a larger body with
   `413` **before** parsing it.
 
@@ -811,8 +901,18 @@ already agrees with is not written at all, so versions do not move.
 
 A row is refused for carrying `_orphaned`, naming an unknown field, pointing
 at a relation target that does not exist, repeating a `uuid` already used
-earlier in the same file, naming a `uuid` that belongs to another type, or
-matching a record in the trash (restore or purge it first).
+earlier in the same file, naming a `uuid` that belongs to another type or to
+[another table set](#uuid-across-collections), matching a record in the trash
+(restore or purge it first), naming a
+[translation group it may not join](#export-and-import), or updating a record
+without a `version`. **Every one of them is decided before anything is
+written**, so a dry run and the apply that follows it report the same rows: a
+check the write path could see and the planning pass could not is the one bug
+this arrangement exists to prevent.
+
+The handful of refusals that genuinely cannot be predicted — a slug two rows of
+the same file both derive, which neither row can claim until the other is
+written — are reported with **the row that failed**, not as row `0`.
 
 **Type definitions.** `POST /api/records/types/import` with `mode=update` and
 an `expected_version` routes through the ordinary `update_type` path, so
@@ -948,6 +1048,7 @@ register_reduce_provider(
         key="orders_per_state",
         group_by=lambda record, rtype: (record.data or {}).get("ship_state"),
         value=lambda record, rtype: Decimal((record.data or {}).get("total") or 0),
+        value_label="total",
     )
 )
 ```
@@ -955,6 +1056,15 @@ register_reduce_provider(
 Read it back with `GET …/records/aggregate?reduce=orders_per_state`, which
 returns the same shape as a live aggregate plus `stored: true` and
 `updated_at` — so a caller can ask the same question both ways and compare.
+
+**What `metric` says.** A live aggregate's `metric` echoes what you asked for,
+and `sum:<x>` there names a **field**. A stored one has no field — it has your
+`value` callable — so it reports the spec's own description: `"count"` when
+the spec declares no `value`, `"sum:<value_label>"` when it declares one and
+labels it, and the bare `"sum"` when it does not. `value_label` is free text
+naming the quantity being folded; with `value_label="total"` above, both
+readings of the example answer `metric: "sum:total"`, which is what makes the
+two comparable at a glance.
 
 **Delta, rebuild, verify.** The three exist together and none of them is
 optional:

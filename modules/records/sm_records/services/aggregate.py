@@ -95,6 +95,13 @@ def _group(row: Any, metric: Metric) -> AggregateGroup:
     return AggregateGroup(value=value, count=count, **{metric.op: rendered})
 
 
+def _stored_metric(spec: Any) -> str:
+    """What a stored reading calls its own metric — see :func:`stored_aggregate`."""
+    if spec.value is None:
+        return "count"
+    return "sum" if not spec.value_label else f"sum:{spec.value_label}"
+
+
 async def stored_aggregate(
     db: AsyncSession, rtype: RecordType, *, settings: RecordsSettings, key: str
 ) -> AggregateResponse:
@@ -105,8 +112,12 @@ async def stored_aggregate(
     ran the registration, must not be told "no groups" — that is the answer
     for a spec with no records, and the two are not the same fact.
 
-    ``metric`` reports ``count`` or ``sum:<key>`` according to what the spec
-    declares, so the field is as meaningful here as on a live read.
+    ``metric`` reports what the **spec** declares, in the spec's own words:
+    ``"count"``, or ``"sum"`` — with ``":<value_label>"`` appended when the
+    spec names one. Not ``sum:<spec key>``, which is what it used to say: on a
+    live reading ``sum:<x>`` names a *field*, so ``sum:by_state`` read as a
+    field called ``by_state`` that no type declares. A stored fold has no
+    field to name; it has a callable, and a label for it if the host wrote one.
     """
     spec = spec_for(key)
     if spec is None:
@@ -130,7 +141,7 @@ async def stored_aggregate(
     ).scalar_one_or_none()
     return AggregateResponse(
         group_by=key,
-        metric="count" if spec.value is None else f"sum:{key}",
+        metric=_stored_metric(spec),
         groups=[
             AggregateGroup(
                 value=row.group_value,
