@@ -15,9 +15,6 @@ import type {
   ApiErrorBody,
   FieldDef,
   FilterOp,
-  RecordPage,
-  RecordRead,
-  RecordStatus,
   SchemaPreview,
   SchemaPreviewJob,
   SchemaPreviewStarted,
@@ -137,6 +134,10 @@ export type CreateTypePayload = {
    *  `null` — when the new type goes in the shared tables, so the server's
    *  own default is what decides. */
   collection?: string;
+  /** Opts the new type into its own admin sidebar entry (per-type sidebar
+   *  entries design contract). Omitted when off — the server default is the
+   *  same `false`. */
+  show_in_menu?: boolean;
 };
 
 export function createType(payload: CreateTypePayload): Promise<TypeRead> {
@@ -210,90 +211,7 @@ export function reindexType(key: string): Promise<{ scheduled: boolean }> {
 }
 
 // Type-schema revisions, record revisions and referrers live in
-// `utils/api-history.ts` — kept out of here for the 300-line cap.
-
-// ---- Records --------------------------------------------------------------
-
-export type ListRecordsParams = {
-  page?: number;
-  page_size?: number;
-  sort?: string;
-  filter?: string;
-  /** `?after=<cursor>` — keyset pagination (F11). Mutually exclusive with
-   *  `page`; sending both is a 400. */
-  after?: string;
-  /** `?total=false` drops the count statement, so `RecordPage.total` comes
-   *  back `null` (F4). For a caller that pages with `after` and never renders
-   *  the number, this is the cheaper request. */
-  total?: boolean;
-};
-
-export function listRecords(typeKey: string, params: ListRecordsParams = {}): Promise<RecordPage> {
-  const qs = new URLSearchParams();
-  if (params.page !== undefined) qs.set('page', String(params.page));
-  if (params.page_size !== undefined) qs.set('page_size', String(params.page_size));
-  if (params.sort) qs.set('sort', params.sort);
-  if (params.filter) qs.set('filter', params.filter);
-  if (params.after) qs.set('after', params.after);
-  if (params.total === false) qs.set('total', 'false');
-  const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  return request(`/types/${encodeURIComponent(typeKey)}/records${suffix}`);
-}
-
-export type RecordWritePayload = {
-  data: Record<string, unknown>;
-  status?: RecordStatus;
-  slug?: string | null;
-  position?: number;
-};
-
-/** `createRecord`'s body only — `locale` names the content locale to create
- *  the record in (defaults to the type's default content locale). There is
- *  no `locale` on an update: a record's language is fixed for its lifetime
- *  (design §4.3), and the API 422s an update that sends one. */
-export type RecordCreatePayload = RecordWritePayload & { locale?: string };
-
-export function createRecord(typeKey: string, payload: RecordCreatePayload): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function getRecord(typeKey: string, uuid: string): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`);
-}
-
-export function updateRecord(
-  typeKey: string,
-  uuid: string,
-  expectedVersion: number,
-  payload: RecordWritePayload,
-): Promise<RecordRead> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ expected_version: expectedVersion, ...payload }),
-  });
-}
-
-export function deleteRecord(typeKey: string, uuid: string): Promise<void> {
-  return request(`/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}`, {
-    method: 'DELETE',
-  });
-}
-
-export function restoreRecord(typeKey: string, uuid: string): Promise<RecordRead> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/restore`,
-    { method: 'POST' },
-  );
-}
-
-export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/purge`,
-    { method: 'DELETE' },
-  );
-}
-
-// Record revisions live in `utils/api-history.ts` alongside the type ones.
+// `utils/api-history.ts` — kept out of here for the 300-line cap. Record CRUD
+// (list/create/get/update/delete/restore/purge) lives in `utils/api-records.ts`
+// for the same reason — adding `show_in_menu` to `CreateTypePayload` above is
+// what tipped this file over the cap.

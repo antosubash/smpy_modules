@@ -4,7 +4,8 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ApiError, getRecord } from '../utils/api';
+import { ApiError } from '../utils/api';
+import { getRecord } from '../utils/api-records';
 import { searchByTitle } from '../utils/relation-search';
 import type { ExpandedRef, FieldDef, RecordRead } from '../utils/types';
 import {

@@ -1,7 +1,7 @@
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
-import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api';
+import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api-records';
 import type { RecordRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RecordDeleteDialog } from './RecordDeleteDialog';

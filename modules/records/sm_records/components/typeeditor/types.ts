@@ -112,6 +112,10 @@ export type TypeMetadataValues = {
   /** `''` means the shared tables. Editable only while the type is new —
    *  `TypeMetadataForm` renders it as text once it exists (Phase 5 §6.2). */
   collection: string;
+  /** Whether this type gets its own admin sidebar entry, next to the
+   *  "Records" hub (per-type sidebar entries design contract). Off by
+   *  default for a new type. */
+  showInMenu: boolean;
 };
 
 export const TOP_LEVEL_ERROR_FIELDS = new Set([
@@ -127,4 +131,5 @@ export const TOP_LEVEL_ERROR_FIELDS = new Set([
   'fields',
   'translatable',
   'collection',
+  'show_in_menu',
 ]);

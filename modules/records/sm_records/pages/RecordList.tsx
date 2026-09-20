@@ -11,7 +11,7 @@ import { RecordIoMenu } from '../components/RecordIoMenu';
 import { RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
-import { deleteRecord, restoreRecord } from '../utils/api';
+import { deleteRecord, restoreRecord } from '../utils/api-records';
 import { buildSortParam, filterErrorReasonKey, nextSort, parseSort } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 

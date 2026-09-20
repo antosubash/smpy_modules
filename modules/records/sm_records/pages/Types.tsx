@@ -58,6 +58,14 @@ function Types({ types }: Props) {
                     <Link href={`/admin/records/types/${type.key}`} className="hover:underline">
                       {type.label}
                     </Link>
+                    {type.show_in_menu && (
+                      <span
+                        className="ml-2 text-xs font-normal text-muted-foreground"
+                        data-testid="records-type-in-sidebar"
+                      >
+                        {t('records.types.in_sidebar', { defaultValue: 'In sidebar' })}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     {type.key}

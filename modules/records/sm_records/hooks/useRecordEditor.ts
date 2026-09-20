@@ -3,7 +3,8 @@ import { useT } from '@simple-module-py/i18n';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { ApiError, createRecord, updateRecord } from '../utils/api';
+import { ApiError } from '../utils/api';
+import { createRecord, updateRecord } from '../utils/api-records';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { useRecordForm } from './useRecordForm';
 

@@ -11,6 +11,7 @@ import { fieldMessage } from './errors';
 import { PublicField } from './PublicField';
 import { RolesMultiSelect } from './RolesMultiSelect';
 import { displayFieldAllowed, slugFieldAllowed } from './rules';
+import { SidebarField } from './SidebarField';
 import type { EditableField, TypeMetadataValues } from './types';
 
 const ID = {
@@ -157,7 +158,8 @@ export function TypeMetadataForm({
         />
         <p className="text-sm text-muted-foreground">
           {t('records.type_editor.icon_help', {
-            defaultValue: 'The name of a lucide-react icon, e.g. "database".',
+            defaultValue:
+              'The name of a lucide-react icon, e.g. "database". Also used for this type\'s sidebar entry when "Show in sidebar" is on.',
           })}
         </p>
         <FieldError message={fieldMessage(errors, 'icon')} />
@@ -218,6 +220,12 @@ export function TypeMetadataForm({
           {translatableError}
         </p>
       )}
+
+      <SidebarField
+        showInMenu={values.showInMenu}
+        labelPlural={values.labelPlural}
+        onChange={(showInMenu) => onChange({ showInMenu })}
+      />
 
       <div className="grid gap-1.5 sm:col-span-2">
         <Label>{t('records.type_editor.allowed_roles', { defaultValue: 'Allowed roles' })}</Label>

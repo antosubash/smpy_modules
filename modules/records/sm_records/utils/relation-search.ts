@@ -7,7 +7,8 @@
  * its own.
  */
 
-import { buildFilterParam, listRecords } from './api';
+import { buildFilterParam } from './api';
+import { listRecords } from './api-records';
 import type { RecordRead } from './types';
 
 /** How many rows the dropdown shows. */

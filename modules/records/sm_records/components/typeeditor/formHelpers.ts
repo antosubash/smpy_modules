@@ -21,6 +21,7 @@ export function metadataFrom(type: TypeRead | null): TypeMetadataValues {
     slugField: type?.slug_field ?? '',
     translatable: type?.translatable ?? false,
     collection: type?.collection ?? '',
+    showInMenu: type?.show_in_menu ?? false,
   };
 }
 
@@ -46,6 +47,7 @@ export function extraCreateFields(values: TypeMetadataValues): Partial<CreateTyp
   // spelling of "the shared tables", and the server's default is the same
   // thing said once (Phase 5 §6.2).
   if (values.collection) extra.collection = values.collection;
+  if (values.showInMenu) extra.show_in_menu = true;
   return extra;
 }
 
@@ -77,6 +79,7 @@ export function buildChanges(
     changes.slug_field = values.slugField || null;
   }
   if (values.translatable !== current.translatable) changes.translatable = values.translatable;
+  if (values.showInMenu !== current.show_in_menu) changes.show_in_menu = values.showInMenu;
   if (JSON.stringify(fields) !== JSON.stringify(current.fields)) {
     changes.fields = fields;
   }

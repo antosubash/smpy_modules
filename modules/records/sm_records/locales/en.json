@@ -20,7 +20,8 @@
     "edit": "Edit",
     "trashed_record_count": "({count} trashed)",
     "trashed_record_count_one": "({count} trashed)",
-    "trashed_record_count_other": "({count} trashed)"
+    "trashed_record_count_other": "({count} trashed)",
+    "in_sidebar": "In sidebar"
   },
   "records": {
     "title": "Records",
@@ -168,7 +169,7 @@
     "key_immutable": "The key can't be changed once the type is created.",
     "icon": "Icon",
     "icon_placeholder": "database",
-    "icon_help": "The name of a lucide-react icon, e.g. \"database\".",
+    "icon_help": "The name of a lucide-react icon, e.g. \"database\". Also used for this type's sidebar entry when \"Show in sidebar\" is on.",
     "is_public": "Public",
     "is_public_help": "Exposes a read-only public API for this type's published records.",
     "is_public_url_help": "Published records only, filterable only on indexed fields, and never expanded.",
@@ -176,6 +177,8 @@
     "public_url_copied": "Copied",
     "translatable": "Translatable",
     "translatable_help": "Records can exist in several languages ({locales}); each translation is its own record with its own slug.",
+    "show_in_menu": "Show in sidebar",
+    "show_in_menu_help": "Adds {label_plural} to the admin sidebar under Content, next to Records.",
     "collection": "Collection",
     "collection_shared": "Shared tables",
     "collection_help": "Gives this type its own document and index tables. Chosen once — a type can't be moved between collections later.",
