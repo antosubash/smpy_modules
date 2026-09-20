@@ -7,9 +7,10 @@ maintainer's copy, and it is the one that says what has since been **fixed**.
 
 **Measured on:** SQLite 3.45.1 (file-backed, `journal_mode=delete`, no
 `ANALYZE` unless stated), aiosqlite 0.22.1, SQLAlchemy 2.0.51, Python 3.12,
-single process, HTTP driven in-process through `tests/app_harness.py`. **No
-Postgres was available**, so every number is SQLite; §"On Postgres" says which
-findings should reproduce there.
+single process, HTTP driven in-process through `tests/app_harness.py`. Every
+number below is SQLite unless it says otherwise — and since the Phase 5 round
+some of them do: **PostgreSQL 16.13 was finally available**, and §"On Postgres"
+is measurements rather than expectations.
 
 **Datasets.** The original study ran at 100,000 records. The before/after
 tables below are the durable suite at its two reproducible sizes,
@@ -31,7 +32,10 @@ load-bearing: the results table is printed from a session fixture, so pytest
 captures it without it. `RECORDS_PERF_N` sets the dataset size (default 2000,
 about a minute), `RECORDS_PERF_REPS` the repetitions (default 20),
 `RECORDS_PERF_BUDGET` the seconds one measurement may spend, and
-`RECORDS_PERF_DB` points it at a database seeded elsewhere. A database seeded
+`RECORDS_PERF_DB` points it at a SQLite file seeded elsewhere and
+`RECORDS_PERF_URL` at a whole other backend (`postgresql+asyncpg://…`; the
+tests that mutate their database skip there, because `perf_db_copy` copies a
+file). A database seeded
 before a revision added an index picks it up on the next run — `create_all` is
 `checkfirst` per *table* and would otherwise keep measuring the old schema
 against the new code. It prints a results table and the
@@ -545,13 +549,535 @@ is the two costs named above: the bounded count on a type below the ceiling
 (+0.8 ms) and the default two-term ordering's new plan (+2.9 ms). A caller
 that sends `?total=false` is at **8.53 ms**, below where the page started.
 
+## Phase 5 — what the features cost, and what they cost when nobody uses them
+
+Phase 5 built five things the original design had deferred: import/export,
+content i18n, live aggregates with opt-in reduce indexes, collections, and the
+pagebuilder widget. [The design's §0](../../../docs/plans/2026-09-20-records-phase5-design.md)
+makes one promise about all of them — *"each is opt-in per type or per host,
+off by default, and **inert when unused**: a host that never sets `collection`
+on a type, never registers a reduce provider, and never enables a second
+content locale runs exactly the Phase 4 code paths"* — and this section is
+that promise as numbers, plus the price of each feature once it is switched on.
+
+**Three trees, one dataset.**
+
+| tree | what it is |
+|---|---|
+| `d5f4e0f` | the head after the *first* perf fixes (F1, F2, F3, F6, F7, F8) — before Phase 4 |
+| `cd82e9a` | Phase 5 §1, closing F4/F5/F9/F10/F11 — the last commit before any Phase 5 **feature** |
+| `da162c6` | Phase 5 complete (collections, the last wave) |
+
+`RECORDS_PERF_N=20000` — 1,000 companies, 5,000 contacts, 3,000 products,
+2,000 stores, 9,000 orders — **median of three whole-suite runs per tree**, each
+run starting from its own fresh copy of the seeded file. Three runs and not one
+because a single run of this suite is not repeatable to better than about a
+tenth: `GET company list, text eq (city)` measured on `cd82e9a` in three
+separate batches gave **8.87, 9.48 and 9.99 ms** — a 12.6 % spread for one
+commit against one file. That number is the instrument's own drift and every
+delta below has to be read against it.
+
+**The read path and the pagination rows run on byte-identical copies of one
+file**, seeded by the current tree: the Phase 5 columns are additive and the
+older code simply does not select them, so both baselines read the same bytes.
+Writing to it is a different matter — `records_record.locale` and
+`translation_group` are `NOT NULL`, so an insert from a pre-i18n tree fails the
+constraint, and the conftest's `_create_missing_columns` recovers only
+*nullable* columns by design. The **write-path** rows therefore run on a second
+file seeded by `d5f4e0f` itself. The two files are the same dataset from the
+same seed — identical record counts per type and identical total payload and
+slug bytes, verified column by column; they differ only in the uuids relations
+point at and in the wall-clock stamps, neither of which any measurement reads.
+The **schema-operation** rows are back on the one shared file, because those
+tests only read and update.
+
+`da162c6` is where Phase 5's code stops; the review and browser-QA commits
+that follow it are not in these numbers, and nothing in them touches the query
+layer. Re-running is one command per tree — see §"Run the suite yourself".
+
+> `cd82e9a` does not import. Its `endpoints/api/__init__.py` names
+> `from sm_records.endpoints.api import io`, and `io.py` arrives one commit
+> later in `4da519f` — the import/export router's mount leaked into the perf
+> commit. The baseline worktree needed a two-line patch (drop `io` from the
+> import and its `include_router`) before anything could run against it.
+> Nothing else in the study depends on it, but a bisect that lands there stops
+> dead, so it is worth knowing.
+
+### Inert when unused — the write path
+
+Nothing about a write changed. The statement counts are identical across all
+three trees, and so are the milliseconds:
+
+| write | `d5f4e0f` | `cd82e9a` | `da162c6` | statements |
+|---|---|---|---|---|
+| `create_record(company)` — no unique field | 14.05 ms | 14.89 ms | **14.75 ms** | **13**, all three |
+| `create_record(product)` — unique `sku` | 15.37 ms | 15.43 ms | **15.25 ms** | **14**, all three |
+| `update_record`, no indexed change | 18.59 ms | 19.61 ms | **19.45 ms** | **20**, all three |
+| `update_record(price)` | 19.79 ms | 19.71 ms | **19.41 ms** | **21**, all three |
+| trash → restore → trash → purge | 48.28 ms | 48.54 ms | **52.76 ms** | **46**, all three |
+
+13 and 14 are the numbers F2 + F6 + F7 left behind, and they are still the
+numbers. The purge cycle is the one row over 5 %, and it is the one row in this
+table measured on two different files; at 4.5 ms over a four-write cycle it is
+inside the drift quoted above either way.
+
+The suite asserts the parts of this that are properties of the code rather than
+of the machine: `test_create_statement_count_is_flat` (the count does not move
+between the 1st and the 51st write), `test_type_id_map_is_resolved_once_per_write`,
+and — new in this round —
+`test_a_write_costs_nothing_when_no_spec_is_registered`, which fails if a write
+touches `records_index_reduce` on a host that registered no reduce provider.
+
+### Inert when unused — the read path
+
+Every row of the read path and the pagination suite, `cd82e9a` → `da162c6`,
+median of three. **No row moved more than 12 %, in either direction, and not
+one statement count or query plan changed.**
+
+| operation | type size | `cd82e9a` | `da162c6` | | statements |
+|---|---|---|---|---|---|
+| `GET /order/records` page 1 | 9,000 | 19.06 ms | 19.54 ms | +2.5 % | 3 |
+| the same with `?total=false` | 9,000 | 11.18 ms | 11.99 ms | +7.2 % | 2 |
+| page 200 by `?page=` (`OFFSET 4975`) | 9,000 | 72.77 ms | 80.86 ms | +11.1 % | 3 |
+| page 200 by `?after=` | 9,000 | 22.11 ms | 23.57 ms | +6.6 % | 2 |
+| text `eq` (city) | 1,000 | 9.99 ms | 10.67 ms | +6.8 % | 3 |
+| text `contains` | 1,000 | 15.63 ms | 16.53 ms | +5.8 % | 3 |
+| select `eq` (ship_state) | 9,000 | 15.32 ms | 16.27 ms | +6.2 % | 3 |
+| ref `eq` (customer) | 9,000 | 10.42 ms | 10.79 ms | +3.6 % | 3 |
+| multiselect `eq` (tags) | 3,000 | 15.77 ms | 16.04 ms | +1.7 % | 3 |
+| number / bool / date / datetime range | 1,000–9,000 | 15.02–26.45 ms | 16.33–27.78 ms | +3.6…+8.7 % | 3 |
+| three ANDed filters | 9,000 | 49.45 ms | 51.00 ms | +3.1 % | 3 |
+| `in` with 50 values | 5,000 | 18.69 ms | 19.23 ms | +2.9 % | 3 |
+| sort by `placed_at` / `-placed_at` | 9,000 | 27.96 / 27.84 ms | 30.15 / 29.22 ms | +7.8 / +5.0 % | 3 |
+| sort by `customer` / `-customer` | 9,000 | 31.23 / 31.97 ms | 33.15 / 33.57 ms | +6.1 / +5.0 % | 3 |
+| sort by `tags` (the `MIN` aggregate) | 3,000 | 24.34 ms | 26.44 ms | +8.6 % | 3 |
+| sort by a fixed column (6 rows) | 9,000 | 18.38–20.02 ms | 19.81–20.38 ms | −1.0…+9.7 % | 3 |
+| single record by uuid | 9,000 | 5.07 ms | 5.51 ms | +8.7 % | 2 |
+| picker `starts_with` / `contains` | 5,000 | 6.35 / 8.72 ms | 7.09 / 8.73 ms | +11.7 / +0.1 % | 2 |
+| `count_query(order, ship_state=CA)` | 9,000 | 1.04 ms | 1.03 ms | −1.0 % | 1 |
+| `count_query(order)` unbounded | 9,000 | 4.14 ms | 4.29 ms | +3.6 % | 1 |
+| `bounded_count_query(cap=3000)` | 9,000 | 2.10 ms | 2.18 ms | +3.8 % | 1 |
+| `bounded_count_query(cap=18000)` — above the type | 9,000 | 5.20 ms | 5.53 ms | +6.3 % | 1 |
+| Inertia `/admin/records/order` | 9,000 | 41.16 ms | 44.41 ms | +7.9 % | 8 |
+
+The HTTP-driven rows carry a consistent few per cent that the pure-SQL rows do
+not (`count_query` alone is −1.0 %), which would be a per-request constant of
+under a millisecond if it were real. **It is not attributable to any commit.**
+Bisecting the five Phase 5 feature commits — `4da519f` (import/export),
+`7f55187` (i18n backend), `8f1963b` (unique among non-siblings), `f655822`
+(aggregates and reduce), `da162c6` (collections) — two runs each on the same
+file, finds no step at any of them:
+
+| operation | `cd82e9a` | `4da519f` | `7f55187` | `8f1963b` | `f655822` | `da162c6` |
+|---|---|---|---|---|---|---|
+| text `eq` (city), 1,000 | 8.87 | 8.73 | 8.72 | 10.43 | 9.75 | 9.16 |
+| ref `eq` (customer), 9,000 | 9.47 | 9.69 | 9.36 | 10.25 | 9.99 | 9.25 |
+| select `eq`, 9,000 | 13.91 | 14.04 | 15.58 | 15.24 | 14.92 | 15.81 |
+| list page 1, 9,000 | 18.00 | 18.68 | 19.38 | 18.51 | 18.88 | 20.83 |
+| one record by uuid | 4.94 | 4.92 | 5.50 | 5.23 | 6.00 | 5.13 |
+| Inertia list view | 43.08 | 41.14 | 41.04 | 44.10 | 46.40 | 44.08 |
+| `count_query` alone | 0.92 | 0.86 | 0.93 | 1.01 | 0.91 | 0.92 |
+
+Statement counts across that whole row of commits: 3 for a list page, 2 for
+`?total=false` and for a single record, 8 for the Inertia view, 1 for a count.
+Unchanged, every one.
+
+### Where the >15 % rows actually come from
+
+Against `d5f4e0f` — the instructed baseline, which predates Phase **4** as well
+as Phase 5 — eighteen rows move by more than 15 %. Every one of them was
+bisected to a commit by running the *same* `test_read_path.py` (byte-identical
+at every commit in the range) at each of `ce02637`, `7e2948b`, `5b6fb36`,
+`e8c1ff8` and `cd82e9a`:
+
+| operation | `d5f4e0f` | `5b6fb36` | `cd82e9a` | `da162c6` | verdict |
+|---|---|---|---|---|---|
+| Inertia `/admin/records/order` | 32.11 ms, **5 stmts** | 38.86 ms, **8 stmts** | 41.05 ms | 44.41 ms | **`5b6fb36`** — Phase 4 §9's batched relation expansion, one query per relation field. Already documented; the count is the finding. |
+| text `eq` (city) | 6.55 ms | 7.21 ms | **9.48 ms** | 10.67 ms | **`cd82e9a`** |
+| ref `eq` (customer) | 7.10 ms | 7.44 ms | **9.02 ms** | 10.79 ms | **`cd82e9a`** |
+| select `eq` (ship_state) | 11.78 ms | 13.44 ms | **14.72 ms** | 16.27 ms | **`cd82e9a`** |
+| list page 1 | 14.78 ms | 15.13 ms | **18.32 ms** | 19.54 ms | **`cd82e9a`** |
+| the other ten filter/list rows | | | | +18…+37 % | **`cd82e9a`**, same shape |
+
+`cd82e9a` is F4 + F11, and the §"What the list page costs now that it does all
+this" table above already prices them: the bounded count costs an extra
+aggregate on a type below the ceiling, and the page now selects its sort values
+and encodes a cursor for its last row. It is a **constant ~2–3 ms per API
+request** — the same 3.2 ms on a 1,000-record type as on a 9,000-record one,
+while `count_query` alone does not move at all — so it is the request, not the
+SQL. A caller that sends `?total=false` gets most of it back.
+
+Two rows move the other way, and both are F5 at `cd82e9a`: sorting 9,000 orders
+by `-updated_at` went **43.47 → 19.84 ms (−54 %)** and the single-valued index
+sorts (`placed_at`, `customer`) went 33–39 → 28–32 ms.
+
+**Nothing in the Phase 5 feature span is responsible for any row over 15 %.**
+
+### The cost of each feature, switched on one at a time
+
+Each feature is priced **against itself**, off and on in one process against
+copies of the same file, rather than against a baseline tree — which is the
+only way to separate "what this feature costs" from the drift above. These
+rows are one run each: they are dominated by statement counts and by
+throughput over thousands of records, not by the few-millisecond differences
+the tables above had to resolve.
+
+#### A reduce index (§5.2)
+
+`records_index_reduce` is maintained by delta inside the write. With no spec
+registered the writer iterates an empty tuple and issues nothing at all; with
+one registered the cost is exactly one `UPDATE`.
+
+| | statements | p50 |
+|---|---|---|
+| `create_record(company)`, **no spec registered** | **13** | 14.92 ms |
+| `create_record(company)`, one spec, steady state | **14** (+1) | 16.94 ms |
+| `create_record(company)`, one spec, a group's **first sight** | **17** (+4) | — |
+| `update_record`, one spec, the edit does not move the group | **20** (+0) | 17.88 ms |
+
+The +4 is `UPDATE` (matching no row) → `SAVEPOINT` → `INSERT` → `RELEASE`: the
+`UPDATE` matching nothing is the only signal that a group has never been
+counted, and the savepoint is what keeps a racing writer's `IntegrityError`
+from killing the transaction. A type pays it once per group, ever. The +0 row
+is the one worth keeping: a spec whose contribution is unchanged tells the
+database nothing, so an ordinary edit on a type carrying a reduce index costs
+what it always cost. All three are asserted, not just printed.
+
+Rebuilding the whole fold: `rebuild_type(order, orders_per_state)` over 9,000
+records into 50 groups took **398 ms — 22,612 rec/s**, one `INSERT … SELECT …
+GROUP BY` per spec.
+
+#### The live aggregate, and reading the maintained one (§5.1)
+
+`GET /types/{key}/records/aggregate` is **two statements on any type** — the
+type load and one `GROUP BY` — and the suite asserts that the count does not
+vary between the 9,000-record `order` and the 3,000-record `product`.
+
+| aggregate over 9,000 orders (3,000 products for `tags`) | p50 | statements |
+|---|---|---|
+| `group_by=ship_state` (select) | 27.81 ms | 2 |
+| `group_by=ship_state&metric=sum:total` | 36.00 ms | 2 |
+| `group_by=ship_state&metric=max:placed_at` | 39.76 ms | 2 |
+| `group_by=customer` (relation) | 41.50 ms | 2 |
+| `group_by=status` (fixed column, no join) | 10.88 ms | 2 |
+| `group_by=tags` (multiselect, 3,000 products) | 13.73 ms | 2 |
+| `group_by=ship_state` + one datetime filter | 18.73 ms | 2 |
+| **`?reduce=orders_per_state`** — the same fold, maintained | **6.81 ms** | 3 |
+
+The last row is the entire argument for a reduce index, and the endpoint serves
+both readings so a caller can take it: the live `GROUP BY` is **O(rows folded)**
+and reads `records_index_text` through its lookup index; the stored one is
+**O(groups)** and reads 50 rows out of `records_index_reduce`. 27.83 → 6.81 ms
+at 9,000 records, and the gap widens with the type. The measurement asserts the
+two return the same groups with the same counts, which is also how drift in a
+maintained aggregate is noticed by the thing that reads it.
+
+Without the request around it, the `GROUP BY` alone is **one statement**:
+22.21 ms for a count over 9,000, 30.84 ms with `sum:total`, and **2.34 ms** once
+a filter narrows it — the aggregate is proportional to what it folds, not to
+the type.
+
+#### A second content locale (§4)
+
+| | p50 | statements |
+|---|---|---|
+| `GET /company/records`, **one** content locale | 13.46 ms | 3 |
+| `GET /company/records`, two locales, all locales | 16.43 ms | 3 |
+| `GET /company/records?locale=en` | 13.24 ms | 3 |
+| `GET /company/records?locale=de` | 13.99 ms | 3 |
+| public list, **one** content locale | 14.11 ms | **4** |
+| public list, two locales, default locale | 17.15 ms | **4** |
+| public list `?locale=de` | 16.45 ms | **4** |
+| `ensure_slug_free(company, locale=en / de)` | 0.51 / 0.52 ms | 1 |
+| `published_siblings(company, 25 records)` | 1.37 ms | 1 |
+| `create_translation` ×500 over 1,000 companies | 6.52 s — **77 rec/s** | — |
+
+`?locale=` is free, and that is the design working: locale is a fixed column,
+so filtering on it is a predicate on `records_record` and not a join —
+`test_a_second_locale_on_the_list_and_the_public_page` asserts that the
+filtered list costs exactly what the unfiltered one costs. The per-locale slug
+claim is one indexed statement, unchanged from F2's shape with a locale column
+added to the predicate. The sibling lookup for a whole page is one query keyed
+by `translation_group`, never one per row, and costs 1.37 ms for 25 records.
+
+**The public list is four statements where the admin list is three, on a host
+that publishes in one language.** See "Still open" below.
+
+#### A type in a collection (§6)
+
+Measured in a subprocess (`tests/perf/_collection_worker.py`), because
+`declare_collection` is a process-global side effect that has to happen before
+any app is built — declaring one inside this suite would add eight tables to
+the file every other measurement runs against. Two types with identical fields,
+one global and one in a declared collection, 2,000 records each:
+
+| operation | global | collection | statements |
+|---|---|---|---|
+| `create_record` | 9.97 ms | 9.76 ms | 8 both |
+| list page of 25 | 1.20 ms | 1.17 ms | 1 both |
+| list, number `gte` filter | 2.25 ms | 2.22 ms | 1 both |
+| list, sort by an indexed text field | 3.56 ms | 3.39 ms | 1 both |
+| seeding 2,000 records | 13.2 s (151 rec/s) | 13.7 s (146 rec/s) | — |
+
+Boring, which is the result: the tables are built by the same factory, so
+`test_a_collection_type_costs_what_a_global_type_costs` asserts the statement
+counts are equal *and* the query plans are equal line for line once the
+`records_c_<name>_` prefix is stripped.
+
+The one thing a collection does cost is **the referrers walk, and it costs it
+to every host that declares one whether or not any type lives in it**:
+
+| declared collections | statements per `referrers()` |
+|---|---|
+| 1 | 2 |
+| 2 | 3 |
+
+One read per declared table set, by construction: a `UNION` would merge ids
+that mean different rows, because two collections number their records
+independently (§6.6), so the walk asks each set in turn and keeps each set's
+ids with that set's class. Every `restrict` delete and every referrers panel
+pays it. At 1.3–2.0 ms per extra set on this dataset it is not a problem yet;
+it is linear in declarations and worth knowing before a host declares ten.
+
+#### Import and export (§2)
+
+Whole-type, `order`, 9,000 records:
+
+| | wall | rate | peak memory | output |
+|---|---|---|---|---|
+| export as JSON (streamed) | 1.65 s | **5,448 rows/s** | 5.3 MB | 6.0 MB |
+| export as CSV (streamed) | 1.74 s | **5,161 rows/s** | 4.9 MB | 3.3 MB |
+| import the JSON back, `upsert` | 11.03 s | **816 rows/s** | — | 9,000/9,000 **skipped** |
+| import with a bad row at 9,000 of 9,000, `on_error=abort` | 11.46 s | — | — | refused, **nothing written** |
+
+The two peaks are within 10 % of each other while the two files differ by
+nearly 2×, which is the memory claim: `walk_records` is keyset by `id` and
+`expunge_all`s between batches, so what is live is a batch of records and one
+chunk of output, not the type and not the file. (The first attempt at this
+number said 974 rows/s and 12.6 MB — `tracemalloc` was running during the timed
+pass and the test's own `"".join` of every chunk was being counted as the
+exporter's memory. The measurement now makes two passes, one timed and one
+under `tracemalloc` that throws every chunk away.)
+
+The round trip is idempotent and the report says so: **every one of the 9,000
+rows was skipped**, because each matched an existing record by `uuid` and
+compared equal. `abort` with the failure in the last row is the worst case by
+construction — the whole file is parsed and validated before anything is
+written — and it costs the validation pass and then refuses with the record
+count untouched.
+
+#### The deferred preview, and saving after one (§1, F10)
+
+| `order.gift` becomes required, 9,000 records | |
+|---|---|
+| `POST /schema/preview` synchronous — time to the response | 1,624 ms |
+| `POST /schema/preview` deferred — time to the `202` | **6.36 ms** |
+| the job's whole run, scan included | 1,509 ms |
+| `PUT /types/order` with no reusable report (inline scan) | 1,417 ms |
+| `PUT /types/order` reusing a completed preview | **8.43 ms** |
+
+The last pair is the half of F10 that had never been measured: an apply that
+can take a finished job's report is **168× faster** than one that cannot,
+because the saved work is the entire dry run.
+`preview_job_ttl_seconds = 0` is what every install that wants the scan
+unconditionally sets, and that is exactly the row above it.
+
+#### The bounded count at the cap (§1, F4)
+
+| `bounded_count_query(order, …)` | 9,000 orders |
+|---|---|
+| `cap = 3000` (below the type) | 2.18 ms |
+| `cap = 8999` (one below) | 5.67 ms |
+| `cap = 9000` (**at** the cap) | 6.07 ms |
+| `cap = 18000` (above the type) | 5.53 ms |
+| unbounded | 4.29 ms |
+
+The bound reads `cap + 1` rows, so at the cap it is the whole type plus the
+probe row that tells the caller there is more — the most expensive place the
+ceiling can sit, and the place a host tuning `max_count` naturally puts it.
+Below the cap it is cheaper than the unbounded count; at or above it, it is the
+unbounded count plus a trivial outer aggregate. `test_the_bound_at_the_cap`
+asserts the returned number is `min(n, cap + 1)`, which is what the
+`total_capped` flag is computed from.
+
+### Three measurements in this suite were wrong, and are fixed
+
+Found while re-running, and worth writing down because each produced a
+plausible number that meant something else:
+
+* **`reindex store (batch=100 / 500 / 2000)` measured three different
+  operations.** The loop flipped `indexed` on `store.street` each time round,
+  so batch=100 *added* a field's index rows, batch=500 *removed* them and
+  batch=2000 added them again — the batch size was confounded with the
+  direction of the toggle, which is fatal for a row whose only purpose is
+  "bigger is better". Each iteration now restores the state it found in an
+  untimed pass first. With that fixed the three are monotone again and mean
+  what they say: **751 ms (2,660 rec/s) / 511 ms (3,914) / 482 ms (4,148)** for
+  2,000 records.
+* **The export's peak memory was the test's own buffer**, as described above.
+* **`measure()` explained the wrong statement for an aggregate.** It takes the
+  plan of the *longest* statement, which is right for a list page (the filtered
+  `SELECT` is also the longest text) and wrong for an aggregate, where the
+  `GROUP BY` is short and the type load's column list is long — so the plan
+  cell described the type load and `assert not plan_scans_records(plan)` passed
+  vacuously. `measure(..., plan_of="GROUP BY")` names the statement to explain.
+
+And one that is fixed only by repetition: **`_orphaned.count_conflicts` cannot
+be measured once.** The same commit, the same file, the same 2,000-record walk
+gave **50 ms** in one batch of runs and **208 ms** in another — a 4× spread with
+no code between them. It is read-only, so it now repeats;
+`_orphaned.discard` and `type revision rollback` write, so they remain single
+samples and should not be compared across runs. That is what made an earlier
+draft of this section report a 63 % "improvement" in `count_conflicts` that did
+not exist.
+
+### Schema operations, all three trees, the same file
+
+Median of three, with the corrected reindex measurement:
+
+| operation | `d5f4e0f` | `cd82e9a` | `da162c6` |
+|---|---|---|---|
+| `dry_run(order, gift required)`, 9,000 records | 9,215 ms | 9,309 ms | 9,333 ms |
+| `schema apply(force, restrictive)` | 1,626 ms | 1,607 ms | 1,584 ms |
+| `reindex store`, batch 100 / 500 / 2000 | 999 / 633 / 553 ms | 961 / 617 / 530 ms | 965 / 683 / 485 ms |
+| `display_field` change, whole-type rebuild | 1,158 ms | 1,017 ms | 1,193 ms |
+| `_orphaned.discard(store.hours)` | 218 ms | 191 ms | 211 ms |
+| type revision rollback | 13.5 ms | 13.9 ms | 24.1 ms |
+
+Every row of the rebuild and the dry run is within the single-sample spread
+those measurements have; the dry run, which is the one row here with a stable
+number, is **+1.3 % over the whole range**.
+
 ## Still open
 
-Nothing from the study. Two costs above are deliberate trades rather than
-open findings, and both are written down where the code makes them:
-`ix_records_record_type_position_id` slowing the default two-term list
-ordering on a type whose `position` is uniform (F5), and the bounded count
-costing an extra aggregate on a type below `max_count` (F4).
+Nothing from the original study. Five things from the Phase 5 round, each with
+a number and a fix.
+
+### S1 — the public list pays for content i18n on a monolingual install
+
+`endpoints/api/public.py` calls `public_service.published_siblings(...)` on
+**every** public list response and **every** public record read, with no test
+of how many languages the install publishes in. On a host whose
+`content_locales` is `("en",)` every record is alone in its own translation
+group, the query can only ever return the record itself, and the
+`translations` array it fills is always empty — but the statement is issued
+anyway.
+
+| | statements | p50, 1,000 companies |
+|---|---|---|
+| `GET /api/records/company/records` (admin) | 3 | 13.46 ms |
+| `GET {public_prefix}/company` — **one** content locale | **4** | 14.11 ms |
+| `published_siblings` for a 25-record page, on its own | 1 | 1.37 ms |
+
+That is the one place Phase 5's "inert when unused" promise is not kept: a
+Phase 4 host that upgrades and changes no setting pays an extra round trip on
+the one endpoint anonymous traffic hits hardest — and, unlike the admin list,
+the public list is the one a cache or a crawler will call thousands of times.
+
+**Fix:** return `{}` from `published_siblings` when
+`len(locales.supported(settings)) == 1`. A language switcher built from the
+result has nothing to switch to on such a host, so there is no behaviour to
+preserve, and the settings object is already threaded into the function.
+Two lines, and the assertion belongs beside
+`test_one_locale_is_the_phase_4_read_path`, which is where the number above
+comes from and which will need its `4` turned into a `3`.
+
+### S2 — on Postgres, a descending sort on a **nullable** fixed column cannot use its index
+
+F5 gave `position`, `published_at`, `updated_at`, `created_at`, `display_title`
+and `slug` a `(type_id, <column>, id)` index each, and drops `NULLS LAST` only
+where the mapper says the column is `NOT NULL` — which `published_at`,
+`updated_at` and `slug` are not. On SQLite that costs a temp B-tree. On
+Postgres it costs the index entirely, because a btree stores `ASC NULLS LAST`
+and a backward scan of it yields `DESC NULLS FIRST`: the requested order is
+neither.
+
+| sort, 9,000 orders, Postgres | p50 | what the index does |
+|---|---|---|
+| `-position` (`NOT NULL`) | **1.15 ms** | `Index Scan Backward`, stops after 25 |
+| `-published_at` (nullable) | 6.16 ms | ignored — full `Sort` of 9,000 rows |
+| `-updated_at` (nullable) | 7.07 ms | ignored — full `Sort` of 9,000 rows |
+
+`-updated_at` is the **second term of the admin list's default ordering**, and
+`-published_at` is what a content listing sorts by, so these are the two
+descending sorts the product actually issues. The cost is O(type): 5× at 9,000
+records and growing.
+
+**Fix:** declare the two nullable ones a second time with the ordering the
+query asks for — `Index("…_type_published_desc", type_id, published_at.desc().nullslast(), id)`
+— which SQLAlchemy emits as `DESC NULLS LAST`, understood by Postgres and by
+SQLite since 3.30. It is two more indexes on `records_record`, and §F5's own
+note on what six indexes cost applies: writes did not measurably move for the
+first six and should not for these. Verify with the plan, not the milliseconds:
+the row to watch is `Index Scan Backward … Limit` replacing `Sort`.
+
+### S3 — on Postgres, the keyset cursor filters after the join
+
+`?after=` beats `?page=` on Postgres (26.47 ms against 41.05 ms at page 200 of
+9,000) because it does not produce and discard 4,975 rows — but the keyset
+predicate ends up in the `Hash Right Join`'s `Filter`, so the join still reads
+every index row for the sort field before anything is narrowed. The walk is
+O(type) per page there, where on SQLite it is a range.
+
+**Fix, if it ever matters:** the predicate is written out as an `OR` of three
+comparisons (§F11 explains why it is not a row-value comparison), and an `OR`
+is what stops Postgres pushing it into the index scan. A `UNION ALL` of the
+three disjuncts, or a row-value comparison on the single-term single-direction
+non-nullable case only, would let it seek. Neither is worth doing before
+somebody pages deeply through a large type on Postgres; the row above is here
+so they can find it when they do.
+
+### S4 — import is 816 rows/s, and an `abort` pays it in full before refusing
+
+A no-op round trip — importing an export that changes nothing — costs **11.0 s
+for 9,000 rows**, against the 1.65 s the export took. Every row is parsed,
+coerced, validated against the compiled model and compared field by field in
+Python; the record lookup is already batched, so the time is CPU in
+`validate_rows` and `unchanged`, not round trips. At 100,000 records that is
+two minutes for an import that writes nothing.
+
+`on_error=abort` with a bad row costs the same regardless of where the bad row
+is, because the whole file is validated before anything is written — 11.46 s to
+refuse a 9,000-row file whose last row is bad. That is the correct behaviour
+and the price of "all or nothing"; it is recorded so nobody reports the wait as
+a hang.
+
+**Fix, if it matters:** the cheap half is `unchanged`, which re-renders each
+record's stored view to compare it. Comparing a hash of the incoming envelope
+against one stored per record would make a re-import of an unchanged export
+proportional to the file rather than to the schema. The expensive half is
+Pydantic validation and should stay.
+
+### S5 — `referrers()` costs one read per **declared** collection
+
+Not per *used* one. `referrers()` asks every table set in turn — a `UNION`
+would merge ids that mean different rows, because two collections number their
+records independently (§6.6) — so a host that declares two collections pays
+three reads on every `restrict` delete and every referrers panel even if both
+collections are empty.
+
+| declared collections | statements per `referrers()`, same record |
+|---|---|
+| 1 | 2 |
+| 2 | 3 |
+
+(The absolute count depends on what the walk finds — a record with referrers
+costs more than one with none — so the number to read is the **increment**:
+exactly one read per declared set.) 0.7 ms per extra set on this dataset, so it
+is a note rather than a problem — but it is linear in declarations, and declarations are a host's
+Alembic history, which only ever grows.
+
+**Fix:** ask only the sets that hold a type which declares a relation to this
+record's type. The `records_type` rows are already loaded by the same call, and
+their `collection` column is the whole answer; a host that declares ten
+collections and points relations at two would then pay for two.
+
+### Deliberate trades, unchanged
+
+Both from the F-round and both still true: `ix_records_record_type_position_id`
+slows the default two-term list ordering on a type whose `position` is uniform
+(F5), and the bounded count costs an extra aggregate on a type below
+`max_count` (F4).
 
 ## Reference numbers after the fixes
 
@@ -591,6 +1117,31 @@ per relation field).
 | `_orphaned.count_conflicts` / `.discard` | 2,000 | 45 ms / 140 ms |
 | type revision rollback | — | 10.7 ms |
 
+The rows above were taken at `cd82e9a`, and the Phase 5 section shows the
+whole read and write path is still inside the instrument's drift of them. What
+Phase 5 *added* has no earlier number to sit beside, so it is listed
+separately — same dataset, same run:
+
+| operation | type size | p50 |
+|---|---|---|
+| `GET …/records/aggregate?group_by=…`, live `GROUP BY` (**2 statements**) | 9,000 | 10.9–41.5 ms |
+| the same `?group_by=` with a filter | 9,000 | 18.7 ms |
+| `GET …/records/aggregate?reduce=…`, maintained (3 statements) | 9,000 | **6.8 ms** |
+| `aggregate_query` alone, count / `sum:` / filtered (**1 statement**) | 9,000 | 22.2 / 30.8 / 2.3 ms |
+| `rebuild_type` for one reduce spec | 9,000 | 398 ms — 22,600 rec/s |
+| `create_record` with one reduce spec (14 statements, 17 on a group's first sight) | 20,000 total | 16.9 ms |
+| public list, 1 / 2 content locales (**4 statements** either way) | 1,000 | 14.1 / 17.2 ms |
+| admin list with `?locale=` (3 statements, same as without) | 1,500 | 13.2–14.4 ms |
+| `ensure_slug_free(type, locale)` (1 statement) | 1,000 | 0.5 ms |
+| `published_siblings` for a 25-record page (1 statement) | 1,000 | 1.4 ms |
+| `create_translation` | — | 13 ms — 77 rec/s |
+| export whole type, JSON / CSV, streamed | 9,000 | 1.65 / 1.74 s — 5,448 / 5,161 rows/s, peak ~5 MB |
+| import an unchanged export, `upsert` (every row skipped) | 9,000 | 11.0 s — 816 rows/s |
+| import, `on_error=abort`, bad row last | 9,000 | 11.5 s to refuse, nothing written |
+| `PUT /types/{key}` reusing a completed preview / scanning inline | 9,000 | **8.4 ms** / 1,417 ms |
+| a collection type against the same type global (create / list / filter / sort) | 2,000 each | identical, modulo the table prefix |
+| `referrers()`, per **declared** collection | — | +1 statement, +0.7 ms |
+
 ## What is already fine
 
 * Statement counts are constant in rows returned and in table size.
@@ -606,35 +1157,167 @@ per relation field).
   `_orphaned._records` is correct and shows clean index use.
 * Pydantic validation (0.4% of a create) and the relation target check
   (0.006 ms) are not worth optimising.
+* **A reduce spec nobody registered costs nothing at all** — every function in
+  `index/reduce.py` returns after a `for` over an empty tuple, and the perf
+  suite fails if a create touches `records_index_reduce` on such a host.
+* **A collection nobody declared costs nothing either**: `tables_for` answers
+  with the global set and the metadata holds the Phase 4 eleven tables. A
+  collection that *is* declared reads the same: its plans are compared with
+  the global type's line for line, with the table prefix stripped and the
+  interchangeable `(type_id, <fixed column>, id)` index names normalised —
+  those are equivalent by construction and SQLite picks between them on
+  statistics it does not have.
+* `?locale=` is a fixed-column predicate, so filtering a list by language is
+  free: same statement count, same plan, same milliseconds as not filtering.
+* The export streams. Two formats whose files differ by nearly 2× peak within
+  10% of each other, because what is live is a batch of records and one chunk
+  of output.
 
-## On Postgres
+## On Postgres — measured, at last
 
-Untested here — no Postgres binary was available. Expectations:
+Every previous round of this study ended with "no Postgres binary was
+available" and a list of expectations. **PostgreSQL 16.13 was available this
+time** (a local cluster, `C.UTF-8`, default `shared_buffers` raised to 256 MB),
+and the suite grew a way to use it: `RECORDS_PERF_URL=postgresql+asyncpg://…`
+points `perf_db` at a database instead of a SQLite file, and
+`_bench.explain` issues `EXPLAIN` rather than `EXPLAIN QUERY PLAN` when the
+dialect is not SQLite. `plan_scans_records` learned Postgres's spelling of a
+full scan (`Seq Scan on records_record`) and `plan_temp_btree` its spelling of
+a sorter (`Sort`). `perf_db_copy` copies a *file*, so the tests that mutate
+their database skip there and say so; the read path, the pagination and the
+aggregate — which is where every unverified finding was — run unchanged.
 
-* The **statement counts** are a property of the code and identical on any
-  backend, so F2, F6, F7 and F8 land there too, and the round-trip ones
-  (F6's six deletes, F7's second `records_type` read, F8's per-record writes)
-  are worth *more* there than on an in-process SQLite file.
-* The **semi-join should still win**, because it is proportional to matches
-  rather than to the size of the type. The pathological ratios above are
-  SQLite-with-no-statistics and should not reproduce under autovacuum — except
-  immediately after a restore or a bulk load, which is exactly the state a
-  migration leaves.
-* `analyze_tables` is a **no-op on Postgres** by design (`dialect.name !=
-  "sqlite"`): autovacuum owns those statistics.
-* The **sort joins and the fixed-column indexes** are ordinary btree work and
-  should behave at least as well there, but the two planner choices F5
-  documents are SQLite's own: the `type_id`-in-the-`ON`-clause trap came from
-  SQLite scoring equality columns with no statistics, and the default
-  two-term ordering's regression from it preferring a partial index order.
-  Postgres with live statistics should make neither choice — verify rather
-  than assume, by reading `EXPLAIN` for a sort on an indexed field and for
-  `ORDER BY position, updated_at DESC`.
-* **`starts_with` is collation-sensitive on Postgres** in a way it is not on
-  SQLite: the range `term <= value < successor` means what the column's
-  collation says it means. A picker that must be case-insensitive there wants
-  a `lower(display_title)` expression index and an operator over it, which is
-  not what this one is.
-* **`lock_type` keeps `FOR UPDATE` there**, which is a real row lock, so the
-  F3 race should already be closed. Verify rather than assume: run
-  `tests/test_unique_concurrency.py` against Postgres and count the 201s.
+The same 20,000-record dataset was seeded into it and the read path was run
+twice: once immediately after the bulk load with **no statistics at all**, and
+once after `ANALYZE`. That pair is the one the earlier doc asked for, because
+"immediately after a restore or a bulk load" is exactly the state a migration
+leaves.
+
+**All 30 read-path and pagination measurements pass on Postgres, with and
+without statistics, and no plan anywhere reads `records_record` sequentially.**
+
+### F1, the semi-join — confirmed, and better than it is on SQLite
+
+```
+GET order list, datetime range gte (placed_at), 9,000 orders
+  Hash Semi Join  (cost=281.75..1196.50 rows=2051)
+    Hash Cond: (records_record.id = records_index_datetime.record_id)
+    ->  Index Scan using ix_records_record_type_id on records_record
+          Index Cond: (type_id = 5)   Filter: (is_deleted IS FALSE)
+    ->  Seq Scan on records_index_datetime
+          Filter: ((value >= '2024-01-01…') AND (type_id = 5) AND (field_key = 'placed_at'))
+
+GET order list, 3-filter AND
+  Nested Loop Semi Join
+    ->  Nested Loop Semi Join
+          ->  Nested Loop
+                ->  HashAggregate (Group Key: records_index_text.record_id)
+                      ->  Index Scan using ix_records_index_text_lookup on records_index_text
+                            Index Cond: ((type_id = 5) AND (field_key = 'ship_state') AND (value = 'CA'))
+                ->  Index Scan using pk_records_record on records_record
+                      Index Cond: (id = records_index_text.record_id)
+          ->  Index Scan using ix_records_index_number_record on records_index_number
+    ->  Index Scan using ix_records_index_datetime_record on records_index_datetime
+```
+
+`IN (SELECT record_id FROM idx WHERE …)` becomes a real `Hash Semi Join` or
+`Nested Loop Semi Join`: the subquery is evaluated once and the outer table is
+reached by primary key, which is exactly the shape F1 was rewritten to produce.
+The `Seq Scan` on `records_index_datetime` in the first plan is the planner
+being right — 4,557 of 9,000 rows match that range, so a scan beats an index —
+and it is a scan of the *index* table, proportional to matches, not of the
+type. **`ANALYZE` changed no plan**; the 24 filter and sort rows moved by −18 %
+to +14 % between the two runs with no structural difference, which is this
+machine's noise and not the planner changing its mind. The pathological ratios
+F1 found on statistics-free SQLite do not reproduce here in either state.
+
+### F5, the direct-join sort — the SQLite-specific traps do not reproduce
+
+```
+GET order list, sort placed_at (single-valued datetime), 9,000 orders   17.14 ms
+  Limit → Sort (Sort Key: records_index_datetime_1.value, records_record.id)
+    →  Hash Right Join (Hash Cond: records_index_datetime_1.record_id = records_record.id)
+         →  Seq Scan on records_index_datetime  Filter: (field_key = 'placed_at')
+         →  Index Scan using ix_records_record_type_id on records_record
+```
+
+Same shape for `customer` (18.91 ms, over `records_index_ref`). The `MIN`
+aggregate survives only for the multiselect, as designed:
+
+```
+GET product list, sort tags (multiselect), 3,000 products                7.87 ms
+  Limit → Sort → Hash Left Join → HashAggregate (Group Key: record_id)
+          →  Bitmap Index Scan on ix_records_index_text_lookup
+```
+
+And the two planner choices the SQLite study flagged as SQLite's own:
+
+* **The `type_id`-in-the-`ON`-clause trap does not exist here.** The join is on
+  `record_id` and `field_key` and Postgres hash-joins it; nothing re-scans a
+  `(type_id, field_key)` range per row.
+* **The admin list's default order does not prefer the position index.**
+  `ORDER BY position, updated_at DESC NULLS LAST, id` is answered by an index
+  scan on `ix_records_record_type_id` plus one `Sort`, at 6.33 ms — Postgres
+  makes neither of the two choices SQLite makes, which is what the earlier
+  section asked someone to verify rather than assume.
+
+The fixed-column indexes of F5 do serve Postgres, but **only in one
+direction**:
+
+| sort, 9,000 orders | p50 | plan |
+|---|---|---|
+| `position` (`NOT NULL`) | 1.09 ms | `Index Scan using ix_records_record_type_position_id`, stops after 25 |
+| `-position` | 1.15 ms | `Index Scan Backward using ix_records_record_type_position_id`, stops after 25 |
+| `created_at` (`NOT NULL`) | 1.52 ms | `Index Scan using ix_records_record_type_created_id`, stops after 25 |
+| `published_at` (nullable) | 4.84 ms | `Incremental Sort` over `ix_records_record_published_at` |
+| `-published_at` (nullable) | 6.16 ms | **full `Sort` of 9,000 rows** |
+| `-updated_at` (nullable) | 7.07 ms | **full `Sort` of 9,000 rows** |
+
+See "Still open" — the nullable descending case is a real finding and it has a
+fix.
+
+### F11, the keyset cursor — wins, but not by a seek
+
+```
+GET order list page 200 by ?after=, sort=-placed_at              26.47 ms, 2 statements
+  Limit → Sort (Sort Key: records_index_datetime_1.value DESC NULLS LAST, records_record.id)
+    →  Hash Right Join
+         Filter: ((value < '2023-09-18…') OR (value IS NULL)
+                  OR ((value = '2023-09-18…') AND (records_record.id > 19298)))
+         →  Seq Scan on records_index_datetime  Filter: (field_key = 'placed_at')
+         →  Index Scan using ix_records_record_type_id on records_record
+
+GET order list page 200 by ?page= (OFFSET 4975)                  41.05 ms, 3 statements
+```
+
+The cursor still beats `OFFSET` by 1.6×, and it beats it for the reason that
+matters — it does not produce and discard 4,975 rows — but the keyset predicate
+lands in the join's `Filter`, after the join, so it narrows nothing before the
+sort. The two return byte-identical pages, which the measurement asserts.
+
+### The rest of it
+
+* `starts_with` is a range on Postgres too: `Index Cond: ((type_id = 2) AND
+  (display_title >= 'Smith') AND (display_title < 'Smiti'))` on
+  `ix_records_record_type_title_id`, 7.44 ms against `contains`'s 14.26 ms
+  sequential filter. This cluster is `C.UTF-8`; under a linguistic collation
+  the index is built in that collation and the range still uses it, but what
+  the range *means* changes — the existing caveat about case sensitivity
+  stands unaltered.
+* The bounded count of F4 compiles to the same `Aggregate → Subquery Scan →
+  Limit` shape and the soft-delete filter appears **inside** the `Limit`
+  (`Filter: (anon_1.is_deleted IS FALSE)` on the subquery scan and the inner
+  scan alike), which is the property F4 goes to some length to keep. 1.50 ms
+  at `cap = 3000`.
+* `analyze_tables` remains a deliberate no-op here (`dialect.name != "sqlite"`),
+  and the two runs above are why that is right: autovacuum's statistics changed
+  nothing the module cares about, in either direction.
+* Absolute numbers are 1.3–1.8× SQLite's on this machine across the board — an
+  out-of-process database over a socket against an in-process file. That ratio
+  is the harness, not the module, and nothing should be read into it.
+
+**Still not verified on Postgres:** the write path, the schema operations and
+`tests/test_unique_concurrency.py`'s `FOR UPDATE` row lock, because
+`perf_db_copy` has no Postgres equivalent and those tests mutate. Giving it one
+(a template database and `CREATE DATABASE … TEMPLATE`) is the next thing this
+suite needs.
