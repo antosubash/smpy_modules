@@ -1,6 +1,6 @@
 """Health checks the module contributes. Design doc §8.9.
 
-Two things degrade ``/health/ready`` here, and they are different failures.
+Three things degrade ``/health/ready`` here, and they are different failures.
 
 A reindex orphaned by a worker restart is *recoverable* — the CLI finishes it —
 but recoverable is not visible. A field that refuses filters with a 409 forever

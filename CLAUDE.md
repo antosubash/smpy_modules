@@ -23,7 +23,7 @@ against them. A module's first revision carries
 (`alembic downgrade <module>@base`). **That does not roll back only that
 module.** Autogenerate chains every revision off the current head, so the
 labelled revision sits on one linear history and `<module>@base` walks
-everything beneath it — verified: `downgrade records@base` ran 13 downgrades
+everything beneath it — verified: `downgrade records@base` ran 20 downgrades
 and emptied the database. Removing one module's schema in isolation needs its
 tables on a real branch (`down_revision = None`), which nothing here produces
 yet. Upstream: antosubash/simple_module_python#333.

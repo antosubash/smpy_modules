@@ -22,7 +22,12 @@ Three things about the shape are deliberate and would look like omissions:
   group_value)`` is what makes the incremental ``UPDATE … SET count = count +
   :d`` address exactly one row, and what turns two writers racing to create
   the same group into an ``IntegrityError`` one of them retries rather than
-  into two rows that each hold half the count.
+  into two rows that each hold half the count. It is named
+  ``uq_records_index_reduce_group`` and not ``ix_…`` — the one ``uq_`` in the
+  records set — because the name is the model's
+  (:data:`sm_records.models.REDUCE_GROUP_INDEX_NAME`) and says what it is for.
+  It is still an ``Index(unique=True)`` and not a ``UniqueConstraint``, so a
+  reader grepping ``uq_`` for one will not find it declared as such.
 
 Downgrading is clean: the table is derivable from the records in full
 (``python -m sm_records.cli reindex`` rebuilds it), so dropping it loses

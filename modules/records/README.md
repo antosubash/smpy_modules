@@ -34,8 +34,9 @@ The module's first revision is labelled `records`. Note that
 `alembic downgrade records@base` does **not** remove only this module: the
 revision chains off your host's current head, so that command rolls back
 every revision beneath it as well. To drop this module's tables alone,
-downgrade to the revision *before* the records one, or drop the ten
-`records_*` tables directly.
+downgrade to the revision *before* the records one, or drop the eleven
+`records_*` tables directly (plus the eight `records_c_<name>_*` tables of
+each collection your host declares).
 
 ## Usage
 
@@ -72,6 +73,16 @@ public read API.
 
 A page reads back as
 `{items, total, total_capped, page, page_size, next_cursor}`.
+
+**The grammar is bounded too.** `?filter=` is capped at `max_filter_terms`
+(20) and an `in:` list at `max_in_values` (200); `?sort=` is deduplicated by
+field — a repeated term cannot change an order the first one fixed — and then
+capped at `max_sort_terms` (5) distinct fields. Over any of them is a `400`
+naming the parameter, on the admin listing, the export and the anonymous API
+alike: every term is another `EXISTS` or another `LEFT JOIN`, and unbounded
+they were a `500` rather than a slow page. `?page=` is bounded at 1,000,000 —
+an `OFFSET` past `max_count` has nothing left to find, and `?after=` is what
+walks a type that large.
 
 **The count is bounded.** A page can stop after `page_size` matches; the
 `COUNT` behind `total` never can, so a filter matching most of a large type
@@ -217,6 +228,9 @@ variables are read. Configure on the Settings screen or with
 | `revision_limit` | 50 per record | no |
 | `max_payload_bytes` | 262144 (256 KB) | no |
 | `max_count` | 10000 | no |
+| `max_filter_terms` | 20 | no |
+| `max_sort_terms` | 5 | no |
+| `max_in_values` | 200 | no |
 | `preview_sync_limit` | 5000 | no |
 | `preview_job_ttl_seconds` | 600 (10 min) | no |
 | `max_import_bytes` | 52428800 (50 MB) | no |
@@ -235,8 +249,9 @@ largest type a schema preview will dry-run inside the request, and
 reusable by the save that follows it — see
 [Changing a schema that already holds records](#changing-a-schema-that-already-holds-records).
 
-`public_route_prefix` is the one setting a change to needs a restart. The
-routes it configures are mounted — and exempted from authentication — while
+`public_route_prefix` is one of the three settings above a change to needs a
+restart, and the only one whose reason is about routes. The routes it
+configures are mounted — and exempted from authentication — while
 the app boots, because the prefix only exists as the operator set it once the
 host has hydrated these settings from the database.
 
@@ -298,7 +313,14 @@ Three numbers come back, and each means something different:
   narrows `allowed_roles` past them. Stated rather than left to subtraction —
   a panel showing two of four with no explanation reads as a bug.
 - `items` is the visible rows, **paginated over the visible set alone**, so
-  walking pages cannot locate the hidden ones.
+  walking pages cannot locate the hidden ones. All three are counted and
+  windowed in SQL, so a page costs the page rather than the graph.
+
+A `restrict` refusal (`409` on a delete) speaks the same three numbers:
+`detail` counts every blocker, `referrers` lists at most 50 uuids of the ones
+this caller may read, `more` says how many visible blockers are not listed,
+and `hidden` counts the blockers whose type narrows `allowed_roles` past them
+— counted, never named, exactly as the panel does.
 
 ## Public read API
 
@@ -387,10 +409,16 @@ caller the list excludes is refused every *record* surface of that type:
 - `GET /api/records/types` and the Record Types screen *omit* the type
   altogether, rather than listing a card that 403s when opened.
 
-Two things stay visible, and both are about the schema rather than the
-records: `GET /api/records/types/{key}` and the type editor at
-`/admin/records/types/{key}`, which need `records.manage_types`. A manager
-locked out of the screen that edits `allowed_roles` would be a one-way door.
+One thing stays visible, and it is about the schema rather than the records:
+a **`records.manage_types` holder** reads `GET /api/records/types/{key}` —
+with `…/revisions` and `…/export`, which are the same definition by other
+routes — and opens the type editor at `/admin/records/types/{key}`, whatever
+`allowed_roles` says. A manager locked out of the screen that edits
+`allowed_roles` would be a one-way door. That is the whole exception: a
+caller holding only `records.view` gets the same `403` on those three routes
+as on every record surface of the type, because the definition names every
+field and the `allowed_roles` themselves, and `TypeRead` carries a live
+`record_count` of records they may not list.
 
 A relation pointing *at* a narrowed type is a different question and is not a
 refusal: an `?expand=` of it comes back `restricted` (see Relations), because
@@ -491,7 +519,7 @@ for the module itself:
 
 ```
 alembic -c host/alembic.ini revision --autogenerate -m "records events collection tables"
-alembic -c host/alembic.ini upgrade head
+alembic -c host/alembic.ini upgrade heads
 ```
 
 The host's `alembic/env.py` has to import that declaration module, or
@@ -620,8 +648,8 @@ no screen offers another, and the public API behaves identically.
 ### Configure the host
 
 ```
-python scripts/set_setting.py records content_locales '["en","de"]'
-python scripts/set_setting.py records default_content_locale en
+python scripts/set_setting.py sm_records content_locales '["en","de"]'
+python scripts/set_setting.py sm_records default_content_locale en
 ```
 
 Both need a restart. Each tag must be a lowercase language tag (`en`, `de`,
@@ -637,7 +665,7 @@ configuration, not a mistake. A host that wants them aligned sets both:
 
 ```
 python scripts/set_setting.py pagebuilder content_locales '["en","de"]'
-python scripts/set_setting.py records     content_locales '["en","de"]'
+python scripts/set_setting.py sm_records  content_locales '["en","de"]'
 ```
 
 Both are distinct again from the host's `SM_I18N_SUPPORTED_LOCALES`, which
@@ -783,7 +811,8 @@ record (trash included) so you can see what would break before saving.
   `"discard"` (they are dropped — the one bulk write the module ever does,
   and it touches only that sub-key).
 - An **index-affecting** change (toggling `indexed`, changing an indexed
-  field's type, or changing `display_field`) applies immediately and
+  field's type, re-pointing a `relation` at another type or flipping its
+  `many`, or changing `display_field`) applies immediately and
   enqueues a rebuild: the field appears in the type's `reindex_pending` and
   refuses filters and sorts until the rebuild has moved its rows and cleared
   the entry. The rebuild runs as a background task after the request.
@@ -839,9 +868,9 @@ claims and the per-type lock all behave exactly as they do for a single save.
 
 | route | permission | notes |
 |---|---|---|
-| `GET /api/records/types/{key}/records/export?format=json\|csv` | `records.view` | streaming; takes the list screen's `filter`/`sort`, and `trashed=true` (which costs `records.edit`) |
+| `GET /api/records/types/{key}/records/export?format=json\|csv` | `records.view` | streaming; takes the list screen's `filter`/`sort` (a refused one is the list's `400`, before any download starts), and `trashed=true` (which costs `records.edit`) |
 | `POST /api/records/types/{key}/records/import` | `records.edit` | multipart `file=`, or a raw body with `Content-Type: application/json` / `text/csv` |
-| `GET /api/records/types/{key}/export` | `records.view` | the type definition alone, shaped for the route below |
+| `GET /api/records/types/{key}/export` | `records.view` | the type definition alone, shaped for the route below; narrowed by the type's `allowed_roles` unless the caller holds `records.manage_types`, exactly as `GET /types/{key}` is |
 | `POST /api/records/types/import` | `records.manage_types` | `mode=create` (default) or `mode=update` + `expected_version` |
 
 The record export **streams**. It walks the type keyset-paged by `id` in
@@ -851,17 +880,17 @@ export with an explicit `?sort=` cannot be keyset-paged — the sort key lives
 in an index table — and pages by `OFFSET` instead; it is meant for exporting a
 *selection*, and the unsorted default is what a round trip should use.)
 
-**What travels.** Each record carries `uuid`, `slug`, `status`, `position`,
-`published_at` and `data`; `data` is the lenient read, so defaults are filled
-in and a record stamped at an older schema version exports under the current
-one. Relations travel as stored (`{"type": …, "uuid": …}`), never expanded.
+**What travels.** Each record carries `uuid`, `slug`, `locale`,
+`translation_group`, `status`, `position`, `published_at` and `data`; `data`
+is the lenient read, so defaults are filled in and a record stamped at an
+older schema version exports under the current one. Relations travel as stored (`{"type": …, "uuid": …}`), never expanded.
 The reserved `_orphaned` key, the audit columns, `version` and `is_deleted` do
 not travel: they describe this install's copy of the row. `uuid` does, which
 is what makes a round trip independent of autoincrement.
 
-**CSV.** Columns are `uuid, slug, status, position, published_at` and then one
-per declared field in declaration order; import is header-driven, so order and
-missing columns are fine (a missing column means "leave it alone", an empty
+**CSV.** Columns are `uuid, slug, locale, translation_group, status,
+position, published_at` and then one per declared field in declaration order;
+import is header-driven, so order and missing columns are fine (a missing column means "leave it alone", an empty
 cell means null). Values use the module's own wire forms — a `number` is its
 decimal string, a boolean is `true`/`false`, a date is ISO. `multiselect`,
 `json` and `media` cells are JSON-encoded; a relation is `type:uuid`, and a
@@ -885,13 +914,22 @@ endings per RFC 4180.
   each under its own savepoint, and reports the rest.
 - `match_by` — `uuid` (default), `slug`, or the key of a **`unique`** field.
   Matching on a non-unique field is refused rather than resolved arbitrarily.
+  `slug` matches on the *canonical* slug — the cell is slugified first, the
+  same way a write would store it, so a hand-written `Hello World` matches
+  the record whose slug is `hello-world`. Matching on anything but `uuid`
+  also refuses a row whose `uuid` already exists but whose match key found
+  nothing: the record's slug or unique value has moved since the file was
+  written, and creating it would collide on `uuid`.
 - `force` — an update whose row carries no `version` is refused, because the
   export deliberately does not carry one; `force=true` accepts last-write-wins.
   The refusal is decided in the planning pass, so **a dry run predicts it**:
   the preview reports the row as failed rather than promising an update the
   apply would then refuse.
 - `max_import_bytes` (a setting, 50 MB by default) refuses a larger body with
-  `413` **before** parsing it.
+  `413` **before** parsing it — `Content-Length` first, and then while the
+  body is read, so a chunked upload that declares no length is stopped at the
+  first byte over the ceiling rather than buffered whole and refused
+  afterwards.
 
 The report is `{dry_run, mode, total, created, updated, skipped, failed,
 errors: [{row, uuid, field, message}], errors_truncated, duration_ms}`, with
@@ -919,6 +957,17 @@ an `expected_version` routes through the ordinary `update_type` path, so
 importing a definition onto a populated type is classified, dry-run and
 refused with the same report — and answered with the same `force` /
 `orphaned` — as the same change made in the schema editor.
+
+**It writes what the file contains and nothing else.** Like `PUT
+/types/{key}`, the update is built with `exclude_unset`: a definition that
+does not mention `allowed_roles`, `is_public` or `translatable` leaves all
+three as they are, rather than clearing them to the defaults. A file that
+*does* name `allowed_roles`, and names a different list from the stored one,
+costs the caller the type's own narrowing on top of `records.manage_types` —
+widening a list you are outside of is a thing to ask for in the schema
+editor, not a side effect of importing a file. An export re-imported onto the
+install it came from sends the list already stored, so a round trip is
+unaffected.
 
 **From the command line** (from the repo root, like every entry point here):
 
@@ -982,8 +1031,10 @@ register_index_provider(price_bucket, fields=[VirtualField("price_bucket", Index
 `?filter=price_bucket:gte:1` and `?sort=-price_bucket` then work like any
 declared indexed field: same operator matrix per kind, `many=True` for a key
 that projects several rows per record (`eq` matches any of them, `ne` none of
-them), and the same truncation re-check on text. Those six names are the whole
-public surface of `sm_records.index`; the writer, the query builder and the
+them), and the same truncation re-check on text. Those six names, plus
+`IndexProvider` (the callable's type, for annotating one) and `virtual_fields`
+(every provider-projected key, by key), are the whole public surface of
+`sm_records.index` — its `__all__`; the writer, the query builder and the
 rebuild are internals.
 
 Register at import time or from your module's `on_startup` — anywhere before

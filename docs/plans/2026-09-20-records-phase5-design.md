@@ -134,8 +134,12 @@ so, and says that a host wanting them aligned sets both.
   type, same `translation_group`, status `draft`, payload copied, slug
   regenerated **in the new locale** (so it never collides across locales,
   and never silently inherits the source's address), `position` copied.
-- **One record per `(translation_group, locale)`** — enforced by a unique
-  index; a second translation into the same language is a 409.
+- **One record per `(translation_group, locale)`, within a type** — enforced
+  by a unique index; a second translation into the same language is a 409. The
+  index shipped as `(type_id, translation_group, locale)`: the rule is stated
+  per type and every reader of a group scopes by type, so the narrower key
+  refused an import into one type because of a record in another. See §6.6 and
+  `fe3ea2dfe0fb`.
 - **Every slug lookup takes a locale.** `get_by_slug`, `ensure_slug_free`,
   the DB-level `IntegrityError` mapping, the public API, the widget's link
   template — all of them. The original doc's warning is the acceptance test:
@@ -231,9 +235,12 @@ register_reduce_provider(ReduceSpec(
   lose an increment; on SQLite the type-row lock already serialises writers,
   on Postgres the row-level `UPDATE` does.
 - **Rebuilt by reindex**: `reindex_type` truncates the type's reduce rows and
-  recomputes them from the map projection in one `INSERT … SELECT … GROUP
-  BY`. So the reduce table is always derivable from the map tables, which is
-  the property YesSql's bridge table exists to keep.
+  recomputes them from the records. So the reduce table is always derivable,
+  which is the property YesSql's bridge table exists to keep. *Shipped
+  differently:* this sketched one `INSERT … SELECT … GROUP BY`, which a
+  `group_by` that is an arbitrary Python callable cannot be expressed as. The
+  rebuild walks the records in batches and bulk-inserts the accumulated groups
+  instead — see §6.6 and `sm_records/index/reduce_rebuild.py`.
 - **Verified**: `python -m sm_records.cli reindex --verify` recomputes the
   aggregate from the map tables and reports every group that disagrees with
   the stored row; the health check gains a `reduce_drift` detail when a
@@ -417,6 +424,16 @@ API does not serve such a record by uuid and does not list it as a sibling, the
 admin API reads and edits it exactly as before, and the reindex health check
 carries an `orphaned_locales` count. That count is computed at `on_startup`
 only — the framework's settings registry exposes no post-hydration hook.
+
+**The reduce rebuild is a Python fold, not one `INSERT … SELECT … GROUP BY`.**
+§5.2 sketched the SQL form, and it is the right shape — for a group the
+database can see. A `ReduceSpec.group_by` is an arbitrary Python callable over
+the whole record, which is the point of the seam, so there is no expression to
+`GROUP BY`. `reduce_rebuild` reads the records in batches, accumulates
+`{group: (count, sum)}` and bulk-inserts the result: one statement per rebuild
+rather than per group, with the batch bounding the records held at once and the
+accumulator bounding the groups. The property §5.2 wanted — the reduce table is
+derivable from the records — is unchanged; only the statement is.
 
 **The seeder's sixth type.** `event` is declared with `collection="events"` and
 created only where that collection is declared. Its share of `--records N` is

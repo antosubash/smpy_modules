@@ -147,12 +147,22 @@ jobs:
     # billable runner time. Adjust upward only if the suite legitimately
     # grows beyond this.
     #
-    # Raised from 15 when the multilingual specs landed: a green run reached
+    # Raised from 15 when the multilingual specs landed (a green run reached
     # test 138 of 143 at 15m17s and was cancelled with the last file still to
-    # go. At ~7s a test the suite now needs a little under 16 minutes, so 25
-    # leaves room for a slow runner without going near the billable runaway
-    # this ceiling exists to stop.
-    timeout-minutes: 25
+    # go), and from 25 when the records specs took the suite from 149 tests to
+    # 223 — 16 `records-*.spec.ts` files, 74 tests. At the same measured ~7s a
+    # test that is ~26 minutes of tests alone, and `uv sync`, `npm ci`,
+    # `make sync-module-deps`, `make gen-pages`, the Playwright browser install
+    # and up to 180s of `webServer` boot all sit inside this ceiling too. 45
+    # covers that with room for a slow runner and the odd retry, without going
+    # near the billable runaway this ceiling exists to stop.
+    #
+    # Not sharded, and the number is sized on the assumption that it stays that
+    # way: `playwright.config.ts` sets `workers: 1` / `fullyParallel: false` on
+    # purpose, because every spec runs against the one host and the one SQLite
+    # database `start-test-server.sh` builds. A second worker is a second
+    # writer to that database, not a second suite.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 

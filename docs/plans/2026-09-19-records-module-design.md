@@ -536,8 +536,10 @@ The word covers two entirely separate mechanisms here, and conflating them is
 the fastest way to design this wrong.
 
 **Physical tables — Alembic, once, owned by the host.** This module ships
-eight static SQLModel tables: `records_type`, `records_type_revision`,
-`records_record`, `records_revision`, and the five index tables. They are
+ten static SQLModel tables: `records_type`, `records_type_revision`,
+`records_record`, `records_revision`, and the six index tables of §7.3.
+(Phase 5 adds an eleventh, `records_index_reduce`, and a host that declares a
+collection gets eight more per collection — see the phase-5 design §6.) They are
 ordinary tables and they change only when the *module* ships a new version. A
 consuming host runs `make migration msg="add records"`, gets one revision,
 adds `branch_labels = ("records",)`, and applies it — identical to `news` or
@@ -545,8 +547,8 @@ adds `branch_labels = ("records",)`, and applies it — identical to `news` or
 
 The label does **not** buy an isolated rollback, despite what the repo's docs
 said until now: autogenerate chains the revision off the current head, so
-`downgrade records@base` walks the whole linear history (verified — 13
-downgrades, every table gone). This follows the repo convention rather than
+`downgrade records@base` walks the whole linear history (verified — 20
+downgrades as the chain stands at the end of phase 5, every table gone). This follows the repo convention rather than
 making `records` the first true branch; the discrepancy is filed upstream as
 antosubash/simple_module_python#333.
 
@@ -915,7 +917,7 @@ hides the entry from an `admin` user.
 
 ### Package layout, sized for the 300-line cap
 
-Phase 1 alone is the schema compiler, five index tables with maintenance, the
+Phase 1 alone is the schema compiler, six index tables with maintenance, the
 reindex, two CRUD surfaces and concurrency. Written as `service.py` it is a
 thousand lines on day one. The split that keeps each file a single
 responsibility:
