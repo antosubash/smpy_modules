@@ -149,6 +149,51 @@ async def test_deep_page_by_offset_against_cursor(perf_client, perf_db, perf_ses
     assert [i["uuid"] for i in by_offset["items"]] == [i["uuid"] for i in by_cursor["items"]]
 
 
+async def test_deep_page_by_cursor_on_a_non_nullable_column(perf_client, perf_db, perf_session):
+    """Page 200 by ``?after=`` on a sort the keyset predicate can seek — S3.
+
+    ``created_at`` is ``NOT NULL``, so its sort drops ``NULLS LAST`` and the
+    cursor predicate becomes the row-value comparison ``(created_at, id) <
+    (:v, :id)`` instead of an ``OR`` of three. That is the form a planner can
+    push into ``(type_id, created_at, id)``: on Postgres the ``OR`` landed in
+    the join's ``Filter``, after the join, and on SQLite the plan gains the
+    index constraint ``((created_at,id)<(?,?))`` rather than a filter.
+
+    Measured beside ``-placed_at`` above, which is an *indexed* field reached
+    by ``LEFT OUTER JOIN`` and therefore nullable — that one keeps the ``OR``
+    form by design, and its plan is expected not to move.
+
+    The pages are compared against ``?page=`` as well, because a keyset
+    rewrite that is fast and wrong is the failure mode worth guarding.
+    """
+    counts = await type_counts(perf_session)
+    n = counts.get("order", 0)
+    if n < 200 * 25:
+        Results.note(f"row-value cursor comparison skipped: only {n} order record(s)")
+        return
+    for sort in ("created_at", "-created_at"):
+        previous = (await get_ok(perf_client, f"{API}/order/records?page=199&sort={sort}")).json()
+        cursor = previous["next_cursor"]
+        assert cursor, f"page 199 sorted by {sort} should carry a cursor"
+        box, plan = await measure(
+            perf_client,
+            f"GET order list page 200 by cursor, sort={sort} (row value)",
+            f"{API}/order/records?after={cursor}&sort={sort}&total=false",
+            n,
+            perf_db.engine,
+            perf_session,
+        )
+        assert box.count == 2, f"a cursor page costs {box.count} statements"
+        Results.note(f"row-value cursor, sort={sort}: plan = {plan_label(plan)}")
+        by_offset = (await get_ok(perf_client, f"{API}/order/records?page=200&sort={sort}")).json()
+        by_cursor = (
+            await get_ok(perf_client, f"{API}/order/records?after={cursor}&sort={sort}")
+        ).json()
+        assert [item["uuid"] for item in by_offset["items"]] == [
+            item["uuid"] for item in by_cursor["items"]
+        ], f"the row-value cursor disagrees with OFFSET on sort={sort}"
+
+
 async def test_relation_picker_prefix_against_contains(perf_client, perf_db, perf_session):
     """What the picker sends now, against what it sent before (F9)."""
     counts = await type_counts(perf_session)

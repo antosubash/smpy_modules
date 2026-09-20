@@ -13,9 +13,11 @@ any app is built: declaring one here would add eight tables to the seeded file
 every other measurement in this directory runs against, and would make
 ``referrers`` walk two table sets in rows meant to describe a host with none.
 
-The one row that is *not* boring is the last: ``referrers`` asks every declared
-table set, so declaring a collection costs one statement per set on every
-delete and every referrers panel, whether or not any type lives in it.
+The one row that used to be *not* boring is the last: ``referrers`` asked every
+declared table set, so declaring a collection cost one statement per set on
+every delete and every referrers panel, whether or not any type lived in it.
+S5 narrowed it to the sets that hold a type with a relation to the record's
+type, and the row is now boring too — which is what the assertion says.
 """
 
 from __future__ import annotations
@@ -135,13 +137,21 @@ async def test_a_collection_type_costs_what_a_global_type_costs(tmp_path):
     )
 
 
-async def test_referrers_costs_one_read_per_declared_table_set(tmp_path):
-    """What declaring a collection costs a host that never uses it.
+async def test_referrers_costs_nothing_per_declared_table_set(tmp_path):
+    """What declaring a collection costs a host that never uses it — S5.
 
-    ``referrers`` cannot union the sets — two collections number their records
-    independently, so a union would merge ids that mean different rows (§6.6) —
-    so it asks each in turn. The cost is therefore linear in *declared*
-    collections rather than in used ones, and it is paid by every delete.
+    ``referrers`` still cannot union the sets it *does* ask — two collections
+    number their records independently, so a union would merge ids that mean
+    different rows (§6.6) — but it no longer asks the ones that cannot hold a
+    referrer. The worker's two types (``gbench``, ``cbench``) declare no
+    relation field at all, so nothing in this process relates to either of
+    them and the walk is one statement: the schema read that says so.
+
+    **The increment is the assertion.** Declaring a second collection must
+    change nothing, because the cost is now a function of what relates to the
+    type rather than of what the host has ever declared — and declarations are
+    an Alembic history, which only ever grows. It was one statement per
+    declared set.
     """
     one = _run_worker(tmp_path, 1)
     two = _run_worker(tmp_path, 2)
@@ -150,10 +160,18 @@ async def test_referrers_costs_one_read_per_declared_table_set(tmp_path):
     counts_one = {r["statements"] for r in rows_one.values()}
     counts_two = {r["statements"] for r in rows_two.values()}
     assert len(counts_one) == 1 and len(counts_two) == 1, (counts_one, counts_two)
-    per_set = (counts_two.pop() - counts_one.pop()) / 1
+    with_one, with_two = counts_one.pop(), counts_two.pop()
+    assert with_two == with_one, (
+        f"referrers costs {with_one} statement(s) with one collection declared and "
+        f"{with_two} with two; declaring one a type never relates to must be free"
+    )
+    assert with_two == 1, (
+        f"referrers on a type nothing relates to costs {with_two} statements; "
+        "it should be the one schema read that establishes that"
+    )
     Results.note(
-        f"referrers costs {per_set:.0f} statement(s) per declared collection "
-        "(the walk asks every table set; a union would merge ids across sets)"
+        f"referrers costs {with_two} statement(s) whether one or two collections are "
+        "declared, when no type relates to the record's type (S5)"
     )
 
 

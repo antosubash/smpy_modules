@@ -117,6 +117,15 @@ async def record_edit(
     Languages panel on every load, and a second request to populate it is the
     round trip the prop exists to avoid. One query, for one record.
 
+    **Unconditionally, except on a host that publishes in one language** (S1).
+    The panel is rendered only when ``content_locales`` has more than one entry
+    (``pages/RecordEditor.tsx``), so on a monolingual install the query fills a
+    prop nothing reads — the same "inert when unused" rule
+    :func:`~sm_records.services._translations.published_siblings` applies to the
+    public read. The explicit routes (``?translations=true`` and
+    ``GET …/translations``) are untouched: a caller that asked for the group
+    gets it whatever the install publishes in.
+
     ``referrer_count`` is the "Referenced by" badge — ``_relations.referrer_count``,
     which is by construction the same number the panel behind it reports as
     ``total`` (both are distinct referring records). Deliberately not part of
@@ -141,7 +150,9 @@ async def record_edit(
         expand_service.relation_field_keys(rtype),
         roles=caller_roles(request),
     )
-    translations = await translations_of(db, rtype, record)
+    translations = (
+        [] if len(locales.supported(settings)) == 1 else await translations_of(db, rtype, record)
+    )
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
         {

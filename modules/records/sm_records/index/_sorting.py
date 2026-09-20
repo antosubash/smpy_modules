@@ -33,7 +33,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select, and_, false, func, nulls_last, or_, select
+from sqlalchemy import Select, and_, false, func, nulls_last, or_, select, tuple_
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import ColumnElement
 
@@ -209,23 +209,76 @@ def _same(term: SortTerm, value: Any) -> ColumnElement[bool]:
     return term.expr.is_(None) if value is None else term.expr == value
 
 
+def _row_value_clause(
+    record: Any, terms: list[SortTerm], values: list[Any]
+) -> ColumnElement[bool] | None:
+    """``(col, id) > (:v, :id)`` when that means the same thing, else ``None``.
+
+    A row-value comparison is a **single** comparison the planner can push into
+    an index scan, and that is the whole of S3: written as an ``OR`` of three
+    comparisons the same predicate lands in the join's ``Filter`` on Postgres,
+    after the join, so a deep ``?after=`` page walked every index row for the
+    sort field before anything was narrowed. As a row value it seeks —
+    ``(type_id, col, id)`` answers it directly, and SQLite reads it off the
+    same index (``SEARCH … USING COVERING INDEX … ((col,id)>(?,?))``).
+
+    It is only ever the same thing under four conditions, and each one of them
+    is a way the ``OR`` form stayed:
+
+    * **exactly one sort term**, so the tuple is ``(sort value, id)``. Two
+      terms could still be expressed, but only if both ran the same way; the
+      list's own default ordering (``position``, then ``-updated_at``) does
+      not, and an expansion that is right for some multi-term sorts and wrong
+      for others is worse than one rule.
+    * **the term is not nullable**, i.e. it does not wear ``NULLS LAST``. A row
+      value orders by SQL's own rules, where a comparison against ``NULL`` is
+      unknown rather than "after everything" — ``NULLS LAST`` is exactly the
+      ordering a row value cannot express, and every indexed sort is nullable
+      because it is reached by ``LEFT OUTER JOIN``. This is why the measured
+      deep-page case (``-placed_at``, an indexed field) keeps the explicit
+      form and keeps its plan.
+    * **the cursor value is not ``NULL``**, which follows from the above for a
+      well-formed cursor and is checked rather than assumed.
+    * **the term and the tiebreaker run the same way** (:func:`tiebreak_desc`).
+      A descending term that no index serves keeps an *ascending* ``id``, and
+      that mixed order is not a row value either.
+
+    Both backends this module claims to run on support row values — Postgres
+    always, SQLite since 3.15 (2016) — so there is no dialect to test for here;
+    what decides is the shape of the sort, and that is known without a bind.
+    """
+    if len(terms) != 1:
+        return None
+    term = terms[0]
+    if term.nullable or values[0] is None or tiebreak_desc(terms) != term.desc:
+        return None
+    left = tuple_(term.expr, record.id)
+    right = (values[0], values[-1])
+    return left < right if term.desc else left > right
+
+
 def keyset_clause(record: Any, terms: list[SortTerm], values: list[Any]) -> ColumnElement[bool]:
     """ "Everything the order puts after this row" — design §"F11".
 
     ``values`` is one per term plus the ``Record.id`` tiebreaker, exactly the
-    tuple :mod:`sm_records.index._cursor` decoded. The predicate is the
-    lexicographic comparison written out, innermost first::
+    tuple :mod:`sm_records.index._cursor` decoded.
+
+    A single non-nullable sort term becomes the row-value comparison
+    ``(col, id) > (:v, :id)`` — see :func:`_row_value_clause` for when, and why
+    that is not every case. Everything else is the lexicographic comparison
+    written out, innermost first::
 
         after(t1) OR (same(t1) AND (after(t2) OR (same(t2) AND id > vid)))
 
     The ``id`` comparison follows :func:`tiebreak_desc`, exactly as the
-    ordering does.
-
-    Written out rather than as a row-value comparison (``(a, b) > (?, ?)``)
-    because a row-value comparison cannot express per-term directions, cannot
-    express ``NULLS LAST``, and is not supported on every backend this module
-    claims to run on.
+    ordering does. The two forms select the same rows in the same order by
+    construction — ``tests/test_cursor_keyset.py`` walks a type both ways
+    and compares the pages — and the expansion stays for the sorts a row value
+    cannot express: several terms, mixed directions, and ``NULLS LAST``.
     """
+    row_value = _row_value_clause(record, terms, values)
+    if row_value is not None:
+        return row_value
     clause: ColumnElement[bool] = (
         record.id < values[-1] if tiebreak_desc(terms) else record.id > values[-1]
     )

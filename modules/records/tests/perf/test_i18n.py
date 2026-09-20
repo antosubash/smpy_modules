@@ -90,7 +90,15 @@ async def test_one_locale_is_the_phase_4_read_path(perf_db_copy, tmp_path):
     The statement counts are the assertion. A locale predicate the code adds
     unconditionally, or a sibling lookup that runs whether or not siblings can
     exist, shows up here as a number that is one too high — which is exactly
-    what ``published_siblings`` turns out to do, and the note below says so.
+    what ``published_siblings`` used to do (S1): the public list cost **4**
+    statements against the admin list's 3, and the public record read 3 against
+    a by-uuid read's 2.
+
+    It no longer does, and this is the test that says so. ``3`` and ``2`` are
+    the Phase 4 numbers — the extra round trip is gone, on the two endpoints
+    anonymous traffic hits hardest and on the install that never asked for
+    content i18n. An assertion rather than a note, because "inert when unused"
+    is a promise about code and not a measurement of a machine.
     """
     settings = RecordsSettings(content_locales=("en",), default_content_locale="en")
     async with perf_db_copy.session_factory() as session:
@@ -117,11 +125,28 @@ async def test_one_locale_is_the_phase_4_read_path(perf_db_copy, tmp_path):
                 perf_db_copy.engine,
                 session,
             )
+            items = (await get_ok(client, f"{PUBLIC}/{TYPE}")).json()["items"]
+            assert items, "the public list returned nothing to read by uuid"
+            read, _ = await measure(
+                client,
+                f"GET public {TYPE} by uuid, 1 content locale",
+                f"{PUBLIC}/{TYPE}/{items[0]['uuid']}",
+                n,
+                perf_db_copy.engine,
+                session,
+            )
     assert admin.count == 3, f"the admin list costs {admin.count} statements on one locale"
+    assert public.count == 3, (
+        f"the public list costs {public.count} statements on a monolingual host; "
+        "published_siblings must issue no query when there is one content locale"
+    )
+    assert read.count == 2, (
+        f"the public record read costs {read.count} statements on a monolingual host"
+    )
     Results.note(
-        f"public list on a monolingual host: {public.count} statements "
-        f"(admin list: {admin.count}) — the extra one is the unconditional "
-        "published_siblings batch"
+        f"monolingual host: public list {public.count} statements (admin list: "
+        f"{admin.count}), public record read {read.count} — the sibling batch is "
+        "not issued when there is one content locale (S1)"
     )
 
 

@@ -26,7 +26,7 @@ from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.models import Base, Record, RecordType
 from sm_records.settings import RecordsSettings
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 
 from tests.app_harness import build_app
 from tests.perf._bench import Results
@@ -76,21 +76,37 @@ def _create_missing_indexes(conn: Any) -> None:
     purpose (it is the slowest thing here), which is exactly the case this
     covers — and creating an index that is already there is a no-op, so it is
     also safe on a fresh one.
+
+    **Backend-independent since S2.** It used to read ``sqlite_master`` and
+    return early on anything else, on the grounds that a Postgres run is always
+    against a database seeded by the same revision. That was true until a
+    revision added an index and the before/after pair had to be taken on one
+    Postgres database — which is precisely what this function exists for.
+    ``inspect`` answers the same question on both backends.
+
+    **And it ``ANALYZE``s what it touched**, which is not tidiness. A new index
+    with no ``sqlite_stat1`` row is not "unknown" to SQLite's planner, it is
+    *assumed to be very selective* — so on a database whose other indexes were
+    analysed by the seeder it wins every lookup it is eligible for, and a list
+    page that took 1.1 ms takes 26.5 ms driving from the wrong one. That is a
+    property of a half-analysed database, not of the index, and a suite that
+    left the file in that state would be measuring a deployment nobody has:
+    the revision that creates these indexes runs ``ANALYZE`` too
+    (``c4a17b9de0f2``), for the same reason.
     """
-    if conn.dialect.name != "sqlite":
-        # ``create_all`` on Postgres creates a table's indexes with it, and
-        # this recovery reads ``sqlite_master`` directly. A Postgres run is
-        # always against a database seeded by the same revision, so there is
-        # nothing to recover.
-        return
-    have = {
-        row[0]
-        for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type = 'index'")
-    }
+    inspector = inspect(conn)
+    created: set[str] = set()
     for table in Base.metadata.tables.values():
+        if not inspector.has_table(table.name):
+            continue
+        have = {index["name"] for index in inspector.get_indexes(table.name)}
         for index in table.indexes:
             if index.name not in have:
                 index.create(conn)
+                created.add(table.name)
+    if created and conn.dialect.name == "sqlite":
+        for name in sorted(created):
+            conn.exec_driver_sql(f"ANALYZE {name}")
 
 
 def _create_missing_columns(conn: Any) -> None:

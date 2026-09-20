@@ -16,9 +16,127 @@ has to be spelled from its own prefix or the second ``CREATE INDEX`` fails.
 
 from __future__ import annotations
 
-from sqlalchemy import Index, text
+from typing import Any
 
-__all__ = ["record_args"]
+from sqlalchemy import Index, Table, text
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.elements import UnaryExpression
+
+__all__ = [
+    "DESCENDING_SORT_COLUMNS",
+    "add_descending_indexes",
+    "descending_index_names",
+    "record_args",
+]
+
+DESCENDING_SORT_COLUMNS: tuple[str, ...] = ("published_at", "slug", "updated_at")
+"""The sortable fixed columns a record may have **no value for**.
+
+Each gets a *second* index, ordered the way a descending page on it asks — see
+:func:`record_args`. Written out rather than derived because this module runs
+while ``__table_args__`` is being built, i.e. before the columns exist, so it
+cannot read nullability off the mapper the way
+:data:`sm_records.index._fixed.NOT_NULL_FIXED_COLUMNS` does.
+``tests/test_record_indexes.py`` is what keeps the two in step: it fails if a
+column becomes nullable, or stops being, without this list moving.
+"""
+
+
+def _short(name: str) -> str:
+    """``published_at`` -> ``published`` — the spelling the ascending indexes
+    already use, so the pair reads as a pair."""
+    return name.removesuffix("_at")
+
+
+def descending_index_names(table: str) -> tuple[str, ...]:
+    """The descending indexes one table set carries, in declaration order.
+
+    Exported because the revision that creates them asks for them by name
+    rather than spelling them a second time: index names are schema-global on
+    Postgres, so each table set's copies are named after *its* table, and a
+    migration that hard-coded the global spellings would create one index and
+    miss every collection's."""
+    return tuple(f"ix_{table}_type_{_short(name)}_desc" for name in DESCENDING_SORT_COLUMNS)
+
+
+class _DescNullsLast(UnaryExpression):
+    """``<column> DESC NULLS LAST`` inside an index definition, per dialect.
+
+    Postgres stores an ordering in the btree, and ``DESC NULLS LAST`` is
+    neither direction of the ascending ``(type_id, col, id)`` index: a btree
+    holding ``ASC NULLS LAST`` yields ``DESC NULLS FIRST`` read backwards, so
+    the planner ignored it and sorted the whole type instead (S2). Declared
+    this way the index *is* the order the page asks for.
+
+    SQLite has no ``NULLS`` clause in ``CREATE INDEX`` at all — the statement
+    is a hard ``unsupported use of NULLS LAST`` — and it needs none: SQLite
+    sorts ``NULL`` smallest, so a plain ``DESC`` already puts them last and the
+    two spellings describe the same index.
+
+    A compiled element rather than ``text()`` because ``text()`` is one string
+    on every backend and these two backends need two. A subclass of
+    :class:`~sqlalchemy.sql.elements.UnaryExpression`, and not of
+    ``ColumnElement``, for a reason that is entirely about **Alembic**: it
+    unwraps a ``UnaryExpression`` to decide whether an index is
+    "expression-based", and an index it calls expression-based gets an
+    *approximate* signature — the columns it could find, which for an opaque
+    element is none of them. Autogenerate then compares ``('type_id',)``
+    against the three columns the database reports and proposes to drop and
+    recreate these indexes on every run, for ever. Wrapping the real column in
+    a ``UnaryExpression`` makes the index an ordinary three-column one to
+    everything except the DDL compiler.
+    """
+
+    inherit_cache = True
+
+    def __init__(self, element: Any) -> None:
+        super().__init__(element, modifier=operators.desc_op, wraps_column_expression=False)
+
+
+@compiles(_DescNullsLast)
+def _render_desc_nulls_last(element: _DescNullsLast, compiler: Any, **kw: Any) -> str:
+    return f"{compiler.process(element.element, **kw)} DESC NULLS LAST"
+
+
+@compiles(_DescNullsLast, "sqlite")
+def _render_desc_sqlite(element: _DescNullsLast, compiler: Any, **kw: Any) -> str:
+    return f"{compiler.process(element.element, **kw)} DESC"
+
+
+def add_descending_indexes(table: Table) -> None:
+    """Declare one table set's descending indexes on its document table.
+
+    Called by :func:`sm_records.models._record.make_record_tables` once the
+    table exists, and **not** from :func:`record_args`, which runs while
+    ``__table_args__`` is being built and therefore has only column *names* to
+    work with. These indexes need the real :class:`~sqlalchemy.Column` objects:
+    see :class:`_DescNullsLast` for what an index Alembic cannot find the
+    columns of does to every future autogenerate run.
+
+    One index per nullable sortable column, shaped
+    ``(type_id, <column> DESC NULLS LAST, id DESC)`` — exactly the ``ORDER BY``
+    ``index/_sorting`` emits for a single descending sort on such a column.
+    ``nulls_last`` because the mapper says the column is nullable, and
+    ``id DESC`` because ``tiebreak_desc`` reverses the tiebreaker for an
+    index-served descending term.
+
+    The ascending indexes in :func:`record_args` cannot answer that ordering on
+    **Postgres**, and the reason is not the planner being coy: a btree stores
+    one ordering, and reading an ``ASC NULLS LAST`` index backwards yields
+    ``DESC NULLS FIRST``. The requested order is neither, so the index was
+    ignored and 9,000 rows were sorted to return 25 — on ``-updated_at``, what
+    the admin list sorts by when a reader clicks the column, and on
+    ``-published_at``, what a content listing sorts by (S2).
+
+    ``position``, ``created_at`` and ``display_title`` are ``NOT NULL``, so
+    their sorts drop ``NULLS LAST`` (``index._fixed``) and the ascending index
+    read backwards already *is* their order. They get no second index, which is
+    why :data:`DESCENDING_SORT_COLUMNS` is the nullable three and not all six.
+    """
+    names = descending_index_names(table.name)
+    for name, source in zip(names, DESCENDING_SORT_COLUMNS, strict=True):
+        Index(name, table.c.type_id, _DescNullsLast(table.c[source]), table.c.id.desc())
 
 
 def record_args(table: str, slug_index: str, group_locale_index: str) -> tuple:
@@ -45,7 +163,10 @@ def record_args(table: str, slug_index: str, group_locale_index: str) -> tuple:
         #
         # They are not free — six more btree inserts per record written. That
         # is the trade §7.3 already makes for every indexed field, made once
-        # more for the projection every record has.
+        # more for the projection every record has. Three of them are joined by
+        # a *descending* twin declared in :func:`add_descending_indexes`, which
+        # has to wait until the columns exist — see there for why the nullable
+        # ones need a second index at all.
         Index(f"ix_{table}_type_position_id", "type_id", "position", "id"),
         Index(f"ix_{table}_type_published_id", "type_id", "published_at", "id"),
         Index(f"ix_{table}_type_updated_id", "type_id", "updated_at", "id"),

@@ -30,7 +30,7 @@ from sm_records.constants import (
 )
 from sm_records.models._base import RECORD_SUFFIX, REVISION_SUFFIX, TYPE_TABLE, Base
 from sm_records.models._factory import table_class
-from sm_records.models._record_args import record_args
+from sm_records.models._record_args import add_descending_indexes, record_args
 
 
 def new_uuid() -> str:
@@ -239,14 +239,22 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
         created_by: str | None = Field(default=None, max_length=255)
 
+    document = table_class(
+        f"Record{class_suffix}",
+        (Base, _Record),
+        tablename=record_table,
+        table_args=record_args(record_table, slug_index, group_locale_index),
+        doc=_RECORD_DOC,
+    )
+    # After the class, not inside ``record_args``: these three indexes are
+    # declared over the real ``Column`` objects, which ``__table_args__`` does
+    # not have (it is evaluated while the table is being built and can only
+    # name columns as strings). ``_record_args._DescNullsLast`` says what
+    # Alembic does with an index whose columns it cannot find.
+    add_descending_indexes(document.__table__)
+
     return RecordTables(
-        record=table_class(
-            f"Record{class_suffix}",
-            (Base, _Record),
-            tablename=record_table,
-            table_args=record_args(record_table, slug_index, group_locale_index),
-            doc=_RECORD_DOC,
-        ),
+        record=document,
         revision=table_class(
             f"RecordRevision{class_suffix}",
             (Base, _Revision),

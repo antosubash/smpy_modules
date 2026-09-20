@@ -5,12 +5,14 @@ study that found these — raw output, query plans, every command — is
 [`perf-study-2026-09-19.md`](perf-study-2026-09-19.md); this is the
 maintainer's copy, and it is the one that says what has since been **fixed**.
 
-**Measured on:** SQLite 3.45.1 (file-backed, `journal_mode=delete`, no
-`ANALYZE` unless stated), aiosqlite 0.22.1, SQLAlchemy 2.0.51, Python 3.12,
-single process, HTTP driven in-process through `tests/app_harness.py`. Every
-number below is SQLite unless it says otherwise — and since the Phase 5 round
-some of them do: **PostgreSQL 16.13 was finally available**, and §"On Postgres"
-is measurements rather than expectations.
+**Measured on:** SQLite 3.45.1 (file-backed, `journal_mode=delete`, the
+seeder's own `ANALYZE` and no other unless stated), aiosqlite 0.22.1,
+SQLAlchemy 2.0.51, Python 3.12, single process, HTTP driven in-process through
+`tests/app_harness.py`. Every number below is SQLite unless it says otherwise —
+and since the Phase 5 round some of them do: **PostgreSQL 16.13 was available**
+(a local cluster, `C.UTF-8`, `shared_buffers` 256 MB), and §"On Postgres" is
+measurements rather than expectations. The S1–S5 round adds a Postgres
+before/after for S2 and S3, taken on one database back to back.
 
 **Datasets.** The original study ran at 100,000 records. The before/after
 tables below are the durable suite at its two reproducible sizes,
@@ -19,7 +21,10 @@ into the five demo types (`order` 45%, `contact` 25%, `product` 15%, `store`
 10%, `company` 5%). At 20,000 that is 9,000 orders, 5,000 contacts, 3,000
 products, 2,000 stores and 1,000 companies. The two runs of each pair start
 from **byte-identical copies of one seeded file**, so a row of a table below
-is one code change and nothing else.
+is one code change and nothing else. The S1–S5 pair is two whole-suite runs
+back to back on **one** file, the first against the same tree with
+`sm_records/` reverted — which is the closest a pair can get, and still leaves
+a drift of ±20 % that every table in §S1–S5 names a control row against.
 
 ## Run the suite yourself
 
@@ -38,7 +43,9 @@ tests that mutate their database skip there, because `perf_db_copy` copies a
 file). A database seeded
 before a revision added an index picks it up on the next run — `create_all` is
 `checkfirst` per *table* and would otherwise keep measuring the old schema
-against the new code. It prints a results table and the
+against the new code. That recovery runs on **either** backend and `ANALYZE`s
+what it created, because a SQLite index with no statistics row is not neutral
+(§S2). It prints a results table and the
 `EXPLAIN QUERY PLAN` of each operation's heaviest statement — which since F4
 is often the bounded count rather than the page, so a *page* plan is worth
 taking by hand — and asserts only shapes: "a filtered list does not full-scan
@@ -48,8 +55,9 @@ Never wall-clock thresholds.
 
 ## Fixed
 
-All eleven findings. Each row is p50 over 20 repetitions on the same seeded
-file, before → after.
+All sixteen findings — the original study's eleven (F1–F11) and the five the
+Phase 5 round left open (S1–S5). Each row is p50 over 20 repetitions on the
+same seeded file, before → after.
 
 The F4/F5/F9/F10/F11 pairs below were taken in two runs **back to back on one
 machine**, each from its own copy of the same seeded file, the "before" run
@@ -549,6 +557,320 @@ is the two costs named above: the bounded count on a type below the ceiling
 (+0.8 ms) and the default two-term ordering's new plan (+2.9 ms). A caller
 that sends `?total=false` is at **8.53 ms**, below where the page started.
 
+### S1 — the public read paid for content i18n on a monolingual install
+
+`endpoints/api/public.py` called `published_siblings(...)` on **every** public
+list response and **every** public record read, with no test of how many
+languages the install publishes in. On a host whose `content_locales` is
+`("en",)` every record is alone in its own translation group, so the statement
+could only ever return the records it was handed — one extra round trip on the
+two endpoints anonymous traffic hits hardest, on the install that never asked
+for the feature. It now returns `{}` without issuing anything when there is one
+content locale, and `endpoints/views.py`'s editor — which fills `translations`
+unconditionally for a Languages panel that is not rendered below two locales —
+skips its own read the same way.
+
+| operation, 1 content locale, ~1,150 companies | before | after |
+|---|---|---|
+| `GET {public_prefix}/company` — **statements** | **4** | **3** |
+| the same, p50 | 12.77 ms | **9.81 ms** |
+| `GET {public_prefix}/company/{uuid}` — **statements** | **3** | **2** |
+| the same, p50 | 5.09 ms | **3.83 ms** |
+| `GET /api/records/types/company/records` (admin, the control) | 11.27 ms, 3 | 10.91 ms, 3 |
+
+Both statement counts are now the Phase 4 ones, and
+`test_one_locale_is_the_phase_4_read_path` asserts them rather than noting them
+— "inert when unused" is a promise about code, not a measurement of a machine.
+The `translations` array a monolingual host serves is empty where it used to
+carry the record itself; nothing can be built from either, since there is no
+second language to switch to, and `test_a_decommissioned_locale_is_not_served_publicly`
+says so.
+
+### S2 — on Postgres, a descending sort on a nullable fixed column could not use its index
+
+F5 gave `position`, `published_at`, `updated_at`, `created_at`, `display_title`
+and `slug` a `(type_id, <column>, id)` index each, and `index/_sorting` drops
+`NULLS LAST` only where the mapper says the column is `NOT NULL`.
+`published_at`, `updated_at` and `slug` are not, so `ORDER BY col DESC NULLS
+LAST, id DESC` is **neither direction** of their ascending btree: read backwards
+it yields `DESC NULLS FIRST`. Postgres ignored the index and sorted the whole
+type to return 25 rows.
+
+`models/_record_args.add_descending_indexes` now declares a second index per
+nullable sortable column, in the order the page asks for —
+`(type_id, <column> DESC NULLS LAST, id DESC)`, once per table set, created by
+revision **`c4a17b9de0f2`**. On SQLite the same declaration compiles to
+`(type_id, <column> DESC, id DESC)`: SQLite has no `NULLS` clause in `CREATE
+INDEX` at all (`unsupported use of NULLS LAST`) and needs none, because it sorts
+`NULL` smallest and `DESC` already puts them last.
+
+**Postgres, 9,000 orders** (`GET /api/records/types/order/records?sort=…`):
+
+| sort | before | after | |
+|---|---|---|---|
+| `-updated_at` (nullable) | 30.82 ms | **19.24 ms** | −38 % |
+| `-published_at` (nullable) | 29.60 ms | **20.00 ms** | −32 % |
+| `updated_at` (control) | 20.76 ms | 19.23 ms | |
+| `published_at` (control) | 23.99 ms | 23.39 ms | |
+| `position` / `-position` (`NOT NULL`, control) | 19.75 / 18.97 ms | 19.15 / 19.37 ms | |
+
+The plan is the finding. Before:
+
+```
+-- page 1, sort -updated_at
+Limit
+  ->  Sort  (cost=1122.57..1145.07 rows=9000)
+        Sort Key: updated_at DESC NULLS LAST, id DESC
+        ->  Index Scan using ix_records_record_type_id on records_record
+              Index Cond: (type_id = 5)
+```
+
+After:
+
+```
+-- page 1, sort -updated_at
+Limit  (cost=0.29..9.40 rows=25)
+  ->  Index Scan using ix_records_record_type_updated_desc on records_record
+        Index Cond: (type_id = 5)
+```
+
+`-published_at` is the same pair, on `ix_records_record_type_published_desc`.
+The sort of 9,000 rows is gone; what remains is an index scan that stops after
+25. It is a *forward* scan of a descending index rather than the `Index Scan
+Backward` one might expect — the index is stored in the order the query asks
+for, so there is nothing to reverse.
+
+**On SQLite the index buys nothing, and creating it without `ANALYZE` costs a
+great deal.** SQLite sorts `NULL` smallest, so `DESC` already means `DESC NULLS
+LAST` there and the ascending index has served these sorts all along:
+
+```
+-- page 1, sort -updated_at
+before:  SEARCH records_record USING INDEX ix_records_record_type_updated_id (type_id=?)
+after:   SEARCH records_record USING INDEX ix_records_record_type_updated_desc (type_id=?)
+```
+
+No temp B-tree either way, and no sorter either way — the two indexes are the
+same walk read in two directions, and with statistics SQLite picks the new one
+because it is now there. What is new is a third index on
+`(type_id, …)` that **no `sqlite_stat1` row describes**, and to SQLite's planner
+that is not "unknown" but *assumed to be very selective*. On a database whose
+other indexes were analysed (the seeder runs `ANALYZE`, `seed/runner.py`) the
+new one therefore won every `type_id = ?` lookup it was eligible for — including
+the ones whose `ORDER BY` it cannot produce:
+
+| same file, same rows, A/B on the three indexes alone | analysed | created, not analysed |
+|---|---|---|
+| list page 1, no sort | 1.11 ms, `ix_records_record_type_id` | **26.52 ms**, `…_updated_desc` + `TEMP B-TREE` |
+| list page 200, no sort | 2.38 ms | **45.30 ms**, same |
+| list page 1, `sort=position` | 1.10 ms, `…_type_position_id` | **27.58 ms**, same |
+| list page 1, `sort=-updated_at` | 1.15 ms | 1.11 ms, `…_updated_desc` (correct) |
+
+One `ANALYZE` per document table puts every plan back, and that is what
+revision `c4a17b9de0f2` does after creating the indexes — the same claim
+`index/_analyze.py` already makes for the end of a reindex and the end of a
+seeding run, made once more for the moment that adds an index. The perf
+suite's `_create_missing_indexes` does it too, so a reused seeded file is in
+the state a migrated install is in rather than the state above.
+
+**It is the more general finding.** Any revision that adds an index to a table
+whose other indexes are analysed leaves SQLite planning against a statistic it
+does not have, and the symptom is not the new query being slow — it is every
+*old* query picking the new index.
+
+With statistics, the SQLite rows move inside the instrument's drift:
+
+| SQLite, 9,000 orders | before | after | |
+|---|---|---|---|
+| sort `-updated_at` | 17.87 ms | 15.53 ms | −13 % |
+| sort `-published_at` | 17.60 ms | 15.42 ms | −12 % |
+| sort `position` (nothing here touches it) | 17.49 ms | 15.53 ms | −11 % |
+| `create_record(company)` (13 statements) | 12.58 ms | 10.92 ms | −13 % |
+| `create_record(product)` (14 statements) | 14.34 ms | 11.50 ms | −20 % |
+| `update_record`, no indexed change (20 statements) | 17.81 ms | 14.70 ms | −17 % |
+| `GET /order/records` with total (the control) | 17.67 ms | 17.81 ms | +1 % |
+| export the type as JSON (the control) | 1,410 ms | 1,443 ms | +2 % |
+
+**Read the whole column, not a row of it.** `position` is in that table because
+no part of this change can touch it, and it moved by the same −11 % as the two
+sorts that are the subject: the two runs were back to back on one file and the
+second found it warm. What the pair says is that nothing moved *structurally* —
+same statement counts, same plans — and that three more btree inserts per record
+written did not show up in the write rows. §F5's own note applies unchanged: it
+did not measurably move for the first six and it does not for these.
+
+### S3 — on Postgres, the keyset cursor filtered after the join
+
+`?after=` beats `?page=` because it does not produce and discard 4,975 rows, but
+the keyset predicate was written out as an `OR` of three comparisons — and an
+`OR` is what stops a planner pushing a predicate into an index scan.
+`index/_sorting.keyset_clause` now emits the row-value comparison
+`(col, id) > (:v, :id)` for the one shape where it means exactly the same thing:
+a **single, non-nullable** sort term whose tiebreaker runs the same way. Both
+backends support row values (Postgres always, SQLite since 3.15), so nothing
+here tests for a dialect; what decides is the shape of the sort.
+
+The `OR` expansion stays for everything else, and that is not a leftover.
+`NULLS LAST` is an ordering a row value cannot express — SQL says a comparison
+against `NULL` is unknown, the ordering says nothing is after it — and every
+sort on an *indexed* field is nullable, because it is reached by `LEFT OUTER
+JOIN`. Several terms, and a descending term whose tiebreaker stays ascending,
+are the other two.
+
+**Postgres, page 200 of 9,000 orders by `?after=`:**
+
+| sort | before | after | |
+|---|---|---|---|
+| `created_at` (`NOT NULL`, row value) | 14.33 ms | **13.52 ms** | 2 statements |
+| `-created_at` (`NOT NULL`, row value) | 14.74 ms | **13.09 ms** | 2 statements |
+| `-placed_at` (indexed, nullable — the `OR` form, unchanged) | 29.62 ms | 29.74 ms | 2 statements |
+| the same page by `?page=` (`OFFSET 4975`) | 41.47 ms | 41.32 ms | 3 statements |
+
+Before:
+
+```
+Limit
+  ->  Index Scan using ix_records_record_type_created_id on records_record  (cost=0.29..3389.37)
+        Index Cond: (type_id = 5)
+        Filter: ((created_at > '…') OR ((created_at = '…') AND (id > 15975)))
+```
+
+After:
+
+```
+Limit
+  ->  Index Scan using ix_records_record_type_created_id on records_record  (cost=0.29..2125.94)
+        Index Cond: ((type_id = 5) AND (ROW(created_at, id) > ROW('…', 15975)))
+```
+
+The predicate moved from `Filter` to `Index Cond`: it is now part of what the
+scan seeks to rather than what it discards afterwards. `-placed_at`'s plan is
+unchanged, `Hash Left Join` and all — that is the case the row value cannot
+express, and it is recorded here so nobody looks for a regression that is a
+design decision.
+
+**SQLite** narrows the same scan:
+
+```
+-- page 200 by cursor, sort created_at
+before:  SEARCH records_record USING INDEX ix_records_record_type_created_id (type_id=?)
+after:   SEARCH records_record USING INDEX ix_records_record_type_created_id
+             (type_id=? AND created_at>?)
+```
+
+The predicate is an index constraint there too, and SQLite reports the leading
+column of the tuple rather than the tuple — the row value is what let it move
+out of the filter at all.
+
+| SQLite, page 200 by cursor, 9,000 orders | before | after |
+|---|---|---|
+| `sort=created_at` (row value) | 10.97 ms | 9.43 ms |
+| `sort=-created_at` (row value) | 10.81 ms | 9.57 ms |
+| `sort=-placed_at` (the `OR` form, unchanged) | 19.88 ms | 23.80 ms |
+
+`-placed_at` is the row that did not change and the row that moved most, which
+is worth saying out loud: its predicate is the same `OR` it always was, and its
+plan is the same join plus temp B-tree, but `records_record` is now reached
+through `ix_records_record_type_published_desc` instead of
+`…_type_published_id` — two interchangeable `(type_id, …)` indexes that SQLite
+chooses between on statistics, exactly the equivalence
+`tests/perf/test_collections.py::_shape` normalises away. 20 % is what that
+choice is worth on this row and it is not a property of the cursor.
+
+The pages are byte-identical either way, which is the point and which the
+measurement asserts: `test_deep_page_by_cursor_on_a_non_nullable_column`
+compares them against `?page=`, `tests/test_cursor_keyset.py` walks a whole type
+by cursor and compares that against one unpaged read, and the offset-vs-cursor
+equality test that predates this is untouched and still green.
+
+### S4 — import was 816 rows/s, and an `abort` paid it in full before refusing
+
+Two halves, both in the planning pass.
+
+**`unchanged()` compared through `read_view`.** Every row rendered its stored
+record to the current schema (a lenient per-field coercion) and walked the
+result back through `to_jsonable` to compare it field by field — on an import
+that writes nothing, which is what re-importing an export is. It now hashes two
+normalised payloads instead: `json.dumps(…, sort_keys=True)` over
+`record.data` and over `row.stored`, both of which are *already* in stored form.
+That is sound because of the line above it — a record whose `schema_version` is
+behind the type's is "changed" by rule (the restamp is the lazy migration), so
+by the time the payloads are compared the record has already been written under
+this exact schema and there is nothing for `read_view` to reconcile.
+
+**`abort` validated the whole file before refusing.** Nothing is going to be
+written, so the rest of the pass only decides how long the refusal takes. A real
+`on_error=abort` run now stops at the first row that fails, in the parse, the
+validation or the planning pass. The report names one row instead of up to
+`ERROR_CAP` of them — a dry run, which is what the caller asks for when it wants
+the whole list, is unchanged, and so is `on_error=skip`, which is going to write
+every row that is fine.
+
+Measured on its own, two runs of `tests/perf/test_io.py` back to back against
+copies of the same file, because the whole-suite pair has a drift of ±20 % and
+these are the only rows in it that are not a single query:
+
+| SQLite, 9,000 orders | before | after | |
+|---|---|---|---|
+| import an unchanged export, `upsert` (every row skipped) | 10,919 ms — **824 rows/s** | 9,810 ms — **917 rows/s** | −10.2 % |
+| `on_error=abort`, bad row **last** of 9,000 | 10,738 ms to refuse | 9,182 ms | −14.5 % |
+| export the same type as JSON (the control) | 1,393 ms | 1,381 ms | −0.8 % |
+| export as CSV (the control) | 1,517 ms | 1,515 ms | −0.2 % |
+
+The controls are what make the other two readable: the exporter is code neither
+run touched and it moved by under a percent, so the 10 % and the 14.5 % are the
+change and not the machine. The abort row is the worst case by construction —
+the bad row is the *last* one, so the short-circuit saves the planning pass and
+nothing of the validation pass; a file that fails early now refuses in
+proportion to where it fails rather than to its length.
+
+The round trip still parses, coerces and validates every row against the
+compiled model — that is the expensive half and it stays, because it is what
+makes an import safe. What is gone is the second schema pass per row.
+
+`test_import_the_export_back_in_upsert_mode` still asserts
+`skipped == total` and an unchanged record count, and the module's idempotence
+and round-trip tests are green: the digest answers the same question the deep
+comparison did.
+
+### S5 — `referrers()` cost one read per **declared** collection
+
+Not per *used* one. The walk asked every table set in turn — a `UNION` would
+merge ids that mean different rows, because two collections number their records
+independently (§6.6) — so a host that declared two collections paid three reads
+on every `restrict` delete and every referrers panel even when both collections
+were empty. That is linear in declarations, and a host's declarations are its
+Alembic history, which only ever grows.
+
+`services/_referrer_sets.referring_sets` now asks `records_type` once which sets
+hold a type declaring a relation to this record's type, and the loop runs over
+those. Three ways out return every set unchanged: a host with **no** collection
+declared (one set — the narrowing could only add a query, and the default host
+must not pay for a feature it does not use), a `type_id` no `records_type` row
+carries, and an install with a registered index **provider** that projects `REF`
+entries, since a provider may point at a type from a set whose schema says
+nothing about it (§7.6).
+
+| `referrers()` on a type nothing relates to | before | after |
+|---|---|---|
+| 1 declared collection | 2 statements, 1.36 ms | **1 statement**, 0.66 ms |
+| 2 declared collections | 3 statements, 2.17 ms | **1 statement**, 0.67 ms |
+| 0 declared collections (the default host) | 1 statement | 1 statement |
+
+The increment is what matters and it is now zero: declaring a collection a type
+never relates to is free. `test_referrers_costs_nothing_per_declared_table_set`
+asserts the count directly, and `test_collections_relations.py` asserts the
+other half — that the set which *can* hold a referrer is still asked, in both
+directions across the boundary, because reading too few tables is a `restrict`
+that lets a delete through.
+
+Deliberately **not** memoised per session, although `plan_delete` walks a cascade
+one record at a time: a memo would make the second call of a request free and
+the number a test can assert depend on how many calls came before it. The query
+it saves is up to one *per declared collection* on each of those records, so the
+walk is ahead everywhere except on a host where every declared collection holds
+a type pointing at this one — where it is behind by exactly one statement.
+
 ## Phase 5 — what the features cost, and what they cost when nobody uses them
 
 Phase 5 built five things the original design had deferred: import/export,
@@ -785,7 +1107,7 @@ the type.
 | `GET /company/records`, two locales, all locales | 16.43 ms | 3 |
 | `GET /company/records?locale=en` | 13.24 ms | 3 |
 | `GET /company/records?locale=de` | 13.99 ms | 3 |
-| public list, **one** content locale | 14.11 ms | **4** |
+| public list, **one** content locale | 14.11 ms | **4** → **3** (S1) |
 | public list, two locales, default locale | 17.15 ms | **4** |
 | public list `?locale=de` | 16.45 ms | **4** |
 | `ensure_slug_free(company, locale=en / de)` | 0.51 / 0.52 ms | 1 |
@@ -800,8 +1122,12 @@ claim is one indexed statement, unchanged from F2's shape with a locale column
 added to the predicate. The sibling lookup for a whole page is one query keyed
 by `translation_group`, never one per row, and costs 1.37 ms for 25 records.
 
-**The public list is four statements where the admin list is three, on a host
-that publishes in one language.** See "Still open" below.
+**The public list was four statements where the admin list is three, on a host
+that publishes in one language.** That was the one place Phase 5's
+"inert when unused" promise was not kept, and it is §S1 above: on one content
+locale the sibling batch is not issued at all, so the public list is three
+statements and the public record read is two. The rows in this table are the
+two-locale ones, where the batch is real work and costs what it says.
 
 #### A type in a collection (§6)
 
@@ -824,20 +1150,21 @@ Boring, which is the result: the tables are built by the same factory, so
 counts are equal *and* the query plans are equal line for line once the
 `records_c_<name>_` prefix is stripped.
 
-The one thing a collection does cost is **the referrers walk, and it costs it
-to every host that declares one whether or not any type lives in it**:
+The one thing a collection *did* cost is **the referrers walk, and it cost it
+to every host that declared one whether or not any type lived in it**:
 
-| declared collections | statements per `referrers()` |
-|---|---|
-| 1 | 2 |
-| 2 | 3 |
+| declared collections | statements per `referrers()` | after S5 |
+|---|---|---|
+| 1 | 2 | **1** |
+| 2 | 3 | **1** |
 
 One read per declared table set, by construction: a `UNION` would merge ids
 that mean different rows, because two collections number their records
 independently (§6.6), so the walk asks each set in turn and keeps each set's
-ids with that set's class. Every `restrict` delete and every referrers panel
-pays it. At 1.3–2.0 ms per extra set on this dataset it is not a problem yet;
-it is linear in declarations and worth knowing before a host declares ten.
+ids with that set's class. What it no longer does is ask a set that cannot hold
+a referrer — §S5 above. Every `restrict` delete and every referrers panel pays
+one read per set that holds a type with a relation to the record's type, plus
+the one schema query that says which those are.
 
 #### Import and export (§2)
 
@@ -847,8 +1174,8 @@ Whole-type, `order`, 9,000 records:
 |---|---|---|---|---|
 | export as JSON (streamed) | 1.65 s | **5,448 rows/s** | 5.3 MB | 6.0 MB |
 | export as CSV (streamed) | 1.74 s | **5,161 rows/s** | 4.9 MB | 3.3 MB |
-| import the JSON back, `upsert` | 11.03 s | **816 rows/s** | — | 9,000/9,000 **skipped** |
-| import with a bad row at 9,000 of 9,000, `on_error=abort` | 11.46 s | — | — | refused, **nothing written** |
+| import the JSON back, `upsert` | 11.03 s | **816 rows/s** | — | 9,000/9,000 **skipped** (now **917 rows/s**, §S4) |
+| import with a bad row at 9,000 of 9,000, `on_error=abort` | 11.46 s | — | — | refused, **nothing written** (now 9.2 s, §S4) |
 
 The two peaks are within 10 % of each other while the two files differ by
 nearly 2×, which is the memory claim: `walk_records` is keyset by `id` and
@@ -862,9 +1189,10 @@ under `tracemalloc` that throws every chunk away.)
 The round trip is idempotent and the report says so: **every one of the 9,000
 rows was skipped**, because each matched an existing record by `uuid` and
 compared equal. `abort` with the failure in the last row is the worst case by
-construction — the whole file is parsed and validated before anything is
-written — and it costs the validation pass and then refuses with the record
-count untouched.
+construction — a run that stops at its first bad row cannot stop earlier than
+the end when the bad row *is* the end — and it costs the validation pass and
+then refuses with the record count untouched. Both numbers are the ones S4
+brought down; the after figures are in that section.
 
 #### The deferred preview, and saving after one (§1, F10)
 
@@ -950,127 +1278,40 @@ number, is **+1.3 % over the whole range**.
 
 ## Still open
 
-Nothing from the original study. Five things from the Phase 5 round, each with
-a number and a fix.
+**Nothing with a number.** The original study's eleven findings and the Phase 5
+round's five are all in §Fixed above. What is left is work on the *instrument*
+and two facts about the module that are trades rather than bugs.
 
-### S1 — the public list pays for content i18n on a monolingual install
+**The write path, the schema operations and the `FOR UPDATE` row lock are still
+unverified on Postgres.** `perf_db_copy` copies a SQLite *file*, so every test
+that mutates its database skips on `RECORDS_PERF_URL` and says so. Giving it a
+Postgres equivalent — a template database and `CREATE DATABASE … TEMPLATE` — is
+the next thing this suite needs, and it is what would let the S2 write rows
+above (three more btree inserts per record) be measured on the backend whose
+planner the indexes were added for. `_create_missing_indexes` is already
+backend-independent, which is half of it: a database seeded before a revision
+added an index picks it up on the next run under either dialect.
 
-`endpoints/api/public.py` calls `public_service.published_siblings(...)` on
-**every** public list response and **every** public record read, with no test
-of how many languages the install publishes in. On a host whose
-`content_locales` is `("en",)` every record is alone in its own translation
-group, the query can only ever return the record itself, and the
-`translations` array it fills is always empty — but the statement is issued
-anyway.
+**Import is CPU in Pydantic, and stays there.** S4 removed the second schema
+pass; what a no-op import still pays is parsing every row and validating it
+against the compiled model, which is the half that makes an import safe. A
+faster answer would mean not validating, and that is not on offer.
 
-| | statements | p50, 1,000 companies |
-|---|---|---|
-| `GET /api/records/company/records` (admin) | 3 | 13.46 ms |
-| `GET {public_prefix}/company` — **one** content locale | **4** | 14.11 ms |
-| `published_siblings` for a 25-record page, on its own | 1 | 1.37 ms |
+**An index added by a revision needs `ANALYZE` on SQLite, and only this
+revision does it.** §S2 explains why — an index with no `sqlite_stat1` row is
+assumed to be very selective, so on a half-analysed database it wins lookups it
+should lose. `c4a17b9de0f2` runs `ANALYZE` after creating its indexes and the
+perf suite's index recovery does the same, but nothing *enforces* it: the next
+revision that adds an index to `records_record` has to remember. A `doctor`
+check for "an index on a records table with no statistics row" would be the way
+to stop remembering.
 
-That is the one place Phase 5's "inert when unused" promise is not kept: a
-Phase 4 host that upgrades and changes no setting pays an extra round trip on
-the one endpoint anonymous traffic hits hardest — and, unlike the admin list,
-the public list is the one a cache or a crawler will call thousands of times.
-
-**Fix:** return `{}` from `published_siblings` when
-`len(locales.supported(settings)) == 1`. A language switcher built from the
-result has nothing to switch to on such a host, so there is no behaviour to
-preserve, and the settings object is already threaded into the function.
-Two lines, and the assertion belongs beside
-`test_one_locale_is_the_phase_4_read_path`, which is where the number above
-comes from and which will need its `4` turned into a `3`.
-
-### S2 — on Postgres, a descending sort on a **nullable** fixed column cannot use its index
-
-F5 gave `position`, `published_at`, `updated_at`, `created_at`, `display_title`
-and `slug` a `(type_id, <column>, id)` index each, and drops `NULLS LAST` only
-where the mapper says the column is `NOT NULL` — which `published_at`,
-`updated_at` and `slug` are not. On SQLite that costs a temp B-tree. On
-Postgres it costs the index entirely, because a btree stores `ASC NULLS LAST`
-and a backward scan of it yields `DESC NULLS FIRST`: the requested order is
-neither.
-
-| sort, 9,000 orders, Postgres | p50 | what the index does |
-|---|---|---|
-| `-position` (`NOT NULL`) | **1.15 ms** | `Index Scan Backward`, stops after 25 |
-| `-published_at` (nullable) | 6.16 ms | ignored — full `Sort` of 9,000 rows |
-| `-updated_at` (nullable) | 7.07 ms | ignored — full `Sort` of 9,000 rows |
-
-`-updated_at` is the **second term of the admin list's default ordering**, and
-`-published_at` is what a content listing sorts by, so these are the two
-descending sorts the product actually issues. The cost is O(type): 5× at 9,000
-records and growing.
-
-**Fix:** declare the two nullable ones a second time with the ordering the
-query asks for — `Index("…_type_published_desc", type_id, published_at.desc().nullslast(), id)`
-— which SQLAlchemy emits as `DESC NULLS LAST`, understood by Postgres and by
-SQLite since 3.30. It is two more indexes on `records_record`, and §F5's own
-note on what six indexes cost applies: writes did not measurably move for the
-first six and should not for these. Verify with the plan, not the milliseconds:
-the row to watch is `Index Scan Backward … Limit` replacing `Sort`.
-
-### S3 — on Postgres, the keyset cursor filters after the join
-
-`?after=` beats `?page=` on Postgres (26.47 ms against 41.05 ms at page 200 of
-9,000) because it does not produce and discard 4,975 rows — but the keyset
-predicate ends up in the `Hash Right Join`'s `Filter`, so the join still reads
-every index row for the sort field before anything is narrowed. The walk is
-O(type) per page there, where on SQLite it is a range.
-
-**Fix, if it ever matters:** the predicate is written out as an `OR` of three
-comparisons (§F11 explains why it is not a row-value comparison), and an `OR`
-is what stops Postgres pushing it into the index scan. A `UNION ALL` of the
-three disjuncts, or a row-value comparison on the single-term single-direction
-non-nullable case only, would let it seek. Neither is worth doing before
-somebody pages deeply through a large type on Postgres; the row above is here
-so they can find it when they do.
-
-### S4 — import is 816 rows/s, and an `abort` pays it in full before refusing
-
-A no-op round trip — importing an export that changes nothing — costs **11.0 s
-for 9,000 rows**, against the 1.65 s the export took. Every row is parsed,
-coerced, validated against the compiled model and compared field by field in
-Python; the record lookup is already batched, so the time is CPU in
-`validate_rows` and `unchanged`, not round trips. At 100,000 records that is
-two minutes for an import that writes nothing.
-
-`on_error=abort` with a bad row costs the same regardless of where the bad row
-is, because the whole file is validated before anything is written — 11.46 s to
-refuse a 9,000-row file whose last row is bad. That is the correct behaviour
-and the price of "all or nothing"; it is recorded so nobody reports the wait as
-a hang.
-
-**Fix, if it matters:** the cheap half is `unchanged`, which re-renders each
-record's stored view to compare it. Comparing a hash of the incoming envelope
-against one stored per record would make a re-import of an unchanged export
-proportional to the file rather than to the schema. The expensive half is
-Pydantic validation and should stay.
-
-### S5 — `referrers()` costs one read per **declared** collection
-
-Not per *used* one. `referrers()` asks every table set in turn — a `UNION`
-would merge ids that mean different rows, because two collections number their
-records independently (§6.6) — so a host that declares two collections pays
-three reads on every `restrict` delete and every referrers panel even if both
-collections are empty.
-
-| declared collections | statements per `referrers()`, same record |
-|---|---|
-| 1 | 2 |
-| 2 | 3 |
-
-(The absolute count depends on what the walk finds — a record with referrers
-costs more than one with none — so the number to read is the **increment**:
-exactly one read per declared set.) 0.7 ms per extra set on this dataset, so it
-is a note rather than a problem — but it is linear in declarations, and declarations are a host's
-Alembic history, which only ever grows.
-
-**Fix:** ask only the sets that hold a type which declares a relation to this
-record's type. The `records_type` rows are already loaded by the same call, and
-their `collection` column is the whole answer; a host that declares ten
-collections and points relations at two would then pay for two.
+**A row-value cursor is only available to a non-nullable single-term sort.**
+`NULLS LAST` is not an order a row value can express, and every sort on an
+indexed field wears it because the field is reached by a `LEFT OUTER JOIN`. The
+deep-page case the product actually issues — `?sort=-placed_at&after=…` — is
+therefore still a post-join `Filter` on Postgres (§S3). Making it a seek would
+mean changing how a missing index row sorts, which is a contract, not a plan.
 
 ### Deliberate trades, unchanged
 
@@ -1130,17 +1371,17 @@ separately — same dataset, same run:
 | `aggregate_query` alone, count / `sum:` / filtered (**1 statement**) | 9,000 | 22.2 / 30.8 / 2.3 ms |
 | `rebuild_type` for one reduce spec | 9,000 | 398 ms — 22,600 rec/s |
 | `create_record` with one reduce spec (14 statements, 17 on a group's first sight) | 20,000 total | 16.9 ms |
-| public list, 1 / 2 content locales (**4 statements** either way) | 1,000 | 14.1 / 17.2 ms |
+| public list, 1 / 2 content locales (**3 / 4 statements**, S1) | 1,000 | 9.8 / 17.2 ms |
 | admin list with `?locale=` (3 statements, same as without) | 1,500 | 13.2–14.4 ms |
 | `ensure_slug_free(type, locale)` (1 statement) | 1,000 | 0.5 ms |
-| `published_siblings` for a 25-record page (1 statement) | 1,000 | 1.4 ms |
+| `published_siblings` for a 25-record page (1 statement, **0 on one locale**) | 1,000 | 1.4 ms |
 | `create_translation` | — | 13 ms — 77 rec/s |
 | export whole type, JSON / CSV, streamed | 9,000 | 1.65 / 1.74 s — 5,448 / 5,161 rows/s, peak ~5 MB |
-| import an unchanged export, `upsert` (every row skipped) | 9,000 | 11.0 s — 816 rows/s |
-| import, `on_error=abort`, bad row last | 9,000 | 11.5 s to refuse, nothing written |
+| import an unchanged export, `upsert` (every row skipped) | 9,000 | 9.8 s — **917 rows/s** (S4) |
+| import, `on_error=abort`, bad row last | 9,000 | 9.2 s to refuse, nothing written (S4) |
 | `PUT /types/{key}` reusing a completed preview / scanning inline | 9,000 | **8.4 ms** / 1,417 ms |
 | a collection type against the same type global (create / list / filter / sort) | 2,000 each | identical, modulo the table prefix |
-| `referrers()`, per **declared** collection | — | +1 statement, +0.7 ms |
+| `referrers()`, per **declared** collection (S5) | — | +0 statements |
 
 ## What is already fine
 
@@ -1273,8 +1514,8 @@ direction**:
 | `-published_at` (nullable) | 6.16 ms | **full `Sort` of 9,000 rows** |
 | `-updated_at` (nullable) | 7.07 ms | **full `Sort` of 9,000 rows** |
 
-See "Still open" — the nullable descending case is a real finding and it has a
-fix.
+The nullable descending case was a real finding; it is fixed, and §S2 has the
+plans it now produces.
 
 ### F11, the keyset cursor — wins, but not by a seek
 
@@ -1294,6 +1535,11 @@ The cursor still beats `OFFSET` by 1.6×, and it beats it for the reason that
 matters — it does not produce and discard 4,975 rows — but the keyset predicate
 lands in the join's `Filter`, after the join, so it narrows nothing before the
 sort. The two return byte-identical pages, which the measurement asserts.
+
+**This row is the one case S3 leaves alone, and deliberately**: `placed_at` is
+an indexed field reached by `LEFT OUTER JOIN`, so its sort wears `NULLS LAST`
+and a row-value comparison cannot express it. A sort on a *non-nullable* fixed
+column now does seek — see §S3 for the plan.
 
 ### The rest of it
 

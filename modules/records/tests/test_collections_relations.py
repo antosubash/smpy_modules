@@ -8,7 +8,8 @@ both directions at once:
   whichever set the target type lives in;
 * **referrers**, where a ref row lives in the *referrer's* collection table and
   names ``target_uuid`` + ``target_type_id``, so "who references X" has to ask
-  every declared set plus the global one;
+  every set that can hold one — which since S5 is the sets holding a type with
+  a relation to X's type, not every set the host has ever declared;
 * **``on_delete``**, which trashes, nulls or blocks records in another set;
 * **``?expand=``**, where the *target type* decides the table and the promise
   is still one batched query per field.
@@ -124,16 +125,8 @@ async def test_referrers_finds_a_global_referrer_of_a_collection_record(client):
     assert body["items"][0]["type_key"] == "deal"
 
 
-async def test_referrers_asks_every_declared_set_and_the_global_one(client):
-    """One statement per table set, counted — the design says "union or loop,
-    and say why", and this is the loop: the ids a ref table returns are ids in
-    *its own* record table, which a union would merge and lose."""
-    await _graph(client)
-    hall = await make_record(client, "hall", {"name": "Barbican"})
-    await make_record(
-        client, "gig", {"name": "Launch", "venue": {"type": "hall", "uuid": hall["uuid"]}}
-    )
-
+async def _ref_tables_asked(client, uuid: str, type_key: str) -> set[str]:
+    """Which ``*_index_ref`` tables one referrers call actually reads."""
     seen: list[str] = []
     engine = client.db_state.engine.sync_engine
 
@@ -143,13 +136,51 @@ async def test_referrers_asks_every_declared_set_and_the_global_one(client):
 
     event.listen(engine, "before_cursor_execute", record)
     try:
-        await client.get(_refs(hall["uuid"], "hall"), headers=roles(ADMIN))
+        await client.get(_refs(uuid, type_key), headers=roles(ADMIN))
     finally:
         event.remove(engine, "before_cursor_execute", record)
-
     tables = {"records_index_ref"} | {f"records_c_{n}_index_ref" for n in COLLECTION_NAMES}
-    hit = {name for name in tables if any(name in sql for sql in seen)}
-    assert hit == tables, (hit, seen)
+    return {name for name in tables if any(name in sql for sql in seen)}
+
+
+async def test_referrers_asks_the_sets_that_can_hold_one_and_no_others(client):
+    """One statement per table set **that can hold a referrer** — S5.
+
+    The design says "union or loop, and say why", and this is still the loop:
+    the ids a ref table returns are ids in *its own* record table, which a
+    union would merge and lose. What changed is which tables the loop runs
+    over. Only ``gig`` — in the ``events`` collection — declares a relation to
+    ``hall``, so that is the one ref table worth reading; ``archive`` holds no
+    type at all and the global set holds none that points at a ``hall``.
+
+    Both halves are the assertion. Reading too few tables is a ``restrict``
+    that lets a delete through and a ``cascade`` that misses a record, so the
+    set that *can* hold one has to be there; reading them all is the cost §S5
+    removed, and it grows with a host's Alembic history rather than with its
+    content.
+    """
+    await _graph(client)
+    hall = await make_record(client, "hall", {"name": "Barbican"})
+    gig = await make_record(
+        client, "gig", {"name": "Launch", "venue": {"type": "hall", "uuid": hall["uuid"]}}
+    )
+
+    assert await _ref_tables_asked(client, hall["uuid"], "hall") == {"records_c_events_index_ref"}
+    # ``gig`` is pointed at by the global ``deal`` and by nothing in either
+    # collection — the mirror image, so the narrowing is not just "always the
+    # collection".
+    assert await _ref_tables_asked(client, gig["uuid"], "gig") == {"records_index_ref"}
+
+
+async def test_a_type_nothing_relates_to_reads_no_ref_table_at_all(client):
+    """A host that declares two collections and a type nothing points at pays
+    for the schema read that establishes it, and for nothing else."""
+    await _graph(client)
+    await make_type(client, "memo", [field("name", "text")])
+    memo = await make_record(client, "memo", {"name": "nobody points here"})
+    assert await _ref_tables_asked(client, memo["uuid"], "memo") == set()
+    body = (await client.get(_refs(memo["uuid"], "memo"), headers=roles(ADMIN))).json()
+    assert body["total"] == 0 and body["items"] == []
 
 
 @pytest.mark.parametrize("behaviour", ["restrict", "set_null", "cascade"])

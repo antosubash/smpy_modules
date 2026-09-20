@@ -184,7 +184,13 @@ async def test_combined_three_filters(perf_client, perf_db, perf_session):
 async def test_sorted_by_each_kind(perf_client, perf_db, perf_session):
     """Every sortable kind, both directions. A sort on an index field adds an
     aggregate subquery and an outer join; the plan line to watch for is the
-    temp B-tree it forces."""
+    temp B-tree it forces.
+
+    The **descending** fixed-column rows are the ones S2 is about: a nullable
+    column's sort wears ``NULLS LAST``, which is neither direction of the
+    ascending ``(type_id, col, id)`` index, so on Postgres it was answered by
+    sorting the whole type.
+    """
     counts = await type_counts(perf_session)
     cases = [
         ("text", "company", "name"),
@@ -198,9 +204,10 @@ async def test_sorted_by_each_kind(perf_client, perf_db, perf_session):
         ("fixed column", "order", "position"),
         ("fixed column", "order", "published_at"),
     ]
+    plans: dict[str, list[str]] = {}
     for kind, key, field in cases:
         for direction in ("", "-"):
-            await measure(
+            _box, plan = await measure(
                 perf_client,
                 f"GET {key} list, sort {direction}{field} ({kind})",
                 f"{API}/{key}/records?sort={direction}{field}",
@@ -208,6 +215,10 @@ async def test_sorted_by_each_kind(perf_client, perf_db, perf_session):
                 perf_db.engine,
                 perf_session,
             )
+            if kind == "fixed column":
+                plans[f"{direction}{field}"] = plan
+    for field in ("published_at", "updated_at"):
+        Results.note(f"sort -{field} (nullable, S2): {plan_label(plans['-' + field])}")
 
 
 async def test_count_query_alone(perf_db, perf_session):

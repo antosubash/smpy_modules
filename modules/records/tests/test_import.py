@@ -91,6 +91,55 @@ async def test_abort_is_all_or_nothing(client):
     assert await data_by_uuid(client, PRODUCT) == {}
 
 
+async def test_abort_stops_at_the_first_bad_row(client):
+    """``on_error=abort`` refuses as soon as the answer is settled — S4.
+
+    Nothing is going to be written, so validating the remaining rows only
+    decides how long the refusal takes; on a 9,000-row file that was half the
+    11 seconds it took to say no. The report therefore names **one** row, the
+    first, and ``failed`` is 1 rather than 3.
+
+    The dry run below is the other half of the contract and the reason this is
+    an acceptable trade: a caller who wants the whole list of what is wrong
+    with the file asks for the preview that exists to produce it, and gets all
+    three rows.
+    """
+    await make_type(client, PRODUCT, [field("name", "text", required=True, indexed=True)])
+    rows = [
+        {"data": {"name": "Good"}},
+        {"data": {"name": None}},
+        {"data": {"name": None}},
+        {"data": {"name": None}},
+    ]
+
+    refused = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    assert refused.status_code == 422, refused.text
+    report = refused.json()["report"]
+    assert report["failed"] == 1, "abort should stop at the row that settles it"
+    assert [error["row"] for error in report["errors"]] == [2]
+    assert report["total"] == 4, "the file's size is still what it is"
+    assert await data_by_uuid(client, PRODUCT) == {}
+
+    preview = await post_import(client, PRODUCT, _document(rows))
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["failed"] == 3, "a dry run still reports every bad row"
+
+
+async def test_skip_still_reports_every_bad_row(client):
+    """``skip`` cannot short-circuit: every row that is fine is still going to
+    be written, so every row that is not still has to be reported."""
+    await make_type(client, PRODUCT, [field("name", "text", required=True, indexed=True)])
+    rows = [
+        {"data": {"name": None}},
+        {"data": {"name": "Good"}},
+        {"data": {"name": None}},
+    ]
+    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false", on_error="skip")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["failed"] == 2
+    assert resp.json()["created"] == 1
+
+
 async def test_skip_writes_the_valid_rows(client):
     await make_type(client, PRODUCT, [field("name", "text", required=True, indexed=True)])
     rows = [

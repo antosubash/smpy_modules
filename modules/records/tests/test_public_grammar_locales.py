@@ -123,12 +123,14 @@ async def test_a_decommissioned_locale_is_not_served_publicly(bilingual):
 
     assert (await client.get(f"{PREFIX}/{TYPE_KEY}?locale=de")).status_code == 400
     assert (await client.get(f"{PREFIX}/{TYPE_KEY}/{german['uuid']}")).status_code == 404
+    # Empty, and not ``["en"]``: a host down to one content locale issues no
+    # sibling query at all (S1), because the only record such a query could
+    # ever return is the one the caller is already reading. What the switcher
+    # must not do is offer ``de``, and it does not.
     switcher = await client.get(f"{PREFIX}/{TYPE_KEY}/{english['uuid']}")
-    assert [row["locale"] for row in switcher.json()["translations"]] == ["en"]
+    assert switcher.json()["translations"] == []
     page = await client.get(f"{PREFIX}/{TYPE_KEY}")
-    assert all(
-        [row["locale"] for row in item["translations"]] == ["en"] for item in page.json()["items"]
-    )
+    assert all(item["translations"] == [] for item in page.json()["items"])
 
 
 async def test_a_decommissioned_locale_stays_readable_and_editable_in_the_admin(bilingual):

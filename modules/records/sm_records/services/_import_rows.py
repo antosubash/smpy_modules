@@ -14,7 +14,9 @@ row and its counterpart in the database:
   appends a revision, rewrites six index tables and invalidates every
   optimistic-concurrency token a client is holding. :func:`unchanged` is what
   makes the second run a no-op, and it is also where ``skipped`` in the report
-  comes from.
+  comes from. It answers by hashing two normalised payloads rather than by
+  rendering the stored one through the schema, which is S4 and most of what a
+  no-op import used to cost.
 * **An update never last-write-wins.** :func:`version_required` is the rule;
   it lives here with the write it guards, and the **planning pass** asks it so
   a dry run predicts the same refusal (``_import_plan.plan_rows``).
@@ -22,20 +24,29 @@ row and its counterpart in the database:
 
 from __future__ import annotations
 
+import hashlib
+import json
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportMode
 from sm_records.models import Record, RecordStatus, RecordType
-from sm_records.schema.compile import to_jsonable
-from sm_records.schema.fields import FieldDefinition
 from sm_records.services._import_parse import ImportRow
-from sm_records.services._payload import read_view, slug_for
+from sm_records.services._payload import slug_for
 from sm_records.services.errors import ValidationFailed
 from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
 
-__all__ = ["Envelope", "envelope_for", "unchanged", "version_required", "write_row"]
+__all__ = [
+    "Envelope",
+    "envelope_for",
+    "payload_digest",
+    "unchanged",
+    "version_required",
+    "write_row",
+]
 
 
 class Envelope:
@@ -111,32 +122,61 @@ def envelope_for(row: ImportRow) -> Envelope:
     )
 
 
+def payload_digest(stored: Any) -> str:
+    """A stable fingerprint of one *stored* payload — S4.
+
+    ``json.dumps`` with ``sort_keys`` is the normalisation: a JSON object has
+    no order, so two equal payloads can differ as text, and the stored form
+    holds only what JSON holds (``to_jsonable`` has already turned every
+    ``Decimal`` into a string and every date into an ISO string). ``default=str``
+    is a backstop for a payload a host wrote by hand with ``psql`` — it must not
+    raise here, because the caller's answer to "did this change" is then simply
+    "yes" and the row is rewritten.
+
+    Hashed rather than compared as text because the text of a 9,000-row import
+    is the file twice over; a 16-byte digest per row is not.
+    """
+    raw = json.dumps(stored, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.blake2b(raw.encode("utf-8"), digest_size=16).hexdigest()
+
+
 def unchanged(
     rtype: RecordType,
     record: Record,
     row: ImportRow,
     envelope: Envelope,
-    defs: list[FieldDefinition],
 ) -> bool:
     """Would writing this row change anything at all?
 
-    Compared through ``read_view`` on both sides, never raw ``data`` against
-    raw ``data``: the file carries every declared key (the exporter fills
-    defaults, §8.3), a stored payload written before a field was added does
-    not, and comparing those two dictionaries directly would call every such
-    record "changed" and rewrite the type on every import.
+    **The envelope first, then one digest against another.** The stored payload
+    and the incoming one are both in *stored* form — ``record.data`` is what
+    ``_payload.validate`` produced the last time this row was written, and
+    ``row.stored`` is what it produced for this file's row a moment ago — so
+    the comparison is between two normalised dictionaries and needs no schema
+    pass at all. :func:`payload_digest` is what makes it one.
 
-    ``schema_version`` counts as a difference even when the payload matches,
-    because a write restamps the row at the type's current version (§8.3) —
-    that restamp is the lazy migration, and skipping it would mean an import
-    silently declines to do the one thing a re-import of a stale record is
-    good for.
+    This used to render the record through ``read_view`` on every row and
+    compare the result field by field, which is a lenient coercion of the whole
+    payload to the current schema plus a ``to_jsonable`` walk back: the bulk of
+    the 11 seconds a 9,000-row no-op import cost (S4), paid to learn that
+    nothing had changed.
+
+    Dropping it is sound *because of the first line*. ``schema_version``
+    counting as a difference is not an optimisation, it is the rule — a write
+    restamps the row at the type's current version (§8.3), and that restamp is
+    the lazy migration. So by the time the payloads are compared the record has
+    already been written under this exact schema, and the two questions
+    ``read_view`` answered for a stale row — a key the payload predates, a
+    deleted field's value still sitting at the top level — cannot arise. A
+    record behind the schema returns ``False`` above and is rewritten, which is
+    what it was always going to do.
+
+    ``_orphaned`` is dropped from the stored side and never present on the
+    incoming one (``_payload.validate`` refuses a payload carrying it), so an
+    undo buffer for a field deleted three schema versions ago does not make
+    every later import rewrite the type.
     """
     if record.schema_version != rtype.schema_version:
-        return False
-    current = to_jsonable(read_view(rtype, record, with_invalid=False, defs=defs)["data"])
-    current.pop(ORPHANED_KEY, None)
-    if current != (row.stored or {}):
         return False
     if envelope.status is not None and envelope.status is not record.status:
         return False
@@ -146,7 +186,11 @@ def unchanged(
     # written by an update (a record's language is fixed for its lifetime), and
     # ``import_._plan`` refuses a row that asks to change one rather than
     # letting it read as "changed" and rewrite the record every import.
-    return slug_for(rtype, row.values or {}, envelope.slug) == record.slug
+    if slug_for(rtype, row.values or {}, envelope.slug) != record.slug:
+        return False
+    stored = dict(record.data or {})
+    stored.pop(ORPHANED_KEY, None)
+    return payload_digest(stored) == payload_digest(row.stored or {})
 
 
 def version_required(record: Record, row: ImportRow) -> str | None:

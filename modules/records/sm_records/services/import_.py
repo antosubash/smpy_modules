@@ -10,6 +10,16 @@ different code path from the real one — so it would stop predicting it, which
 is the only thing a dry run is for. Here the two are one function with the
 writing step switched off, and both produce the same report.
 
+**Except when the answer is already no.** A real ``on_error=abort`` run stops
+at the first bad row (S4): nothing is going to be written, so validating the
+remaining 8,999 rows only decides *how long the refusal takes*. The report then
+names one row instead of up to ``ERROR_CAP`` of them, which is the trade — and
+it is the right one, because ``abort`` means the caller has to fix the file and
+re-post it, and a caller who wants the whole list of what is wrong asks for the
+dry run that exists to produce it. A dry run and ``on_error=skip`` are both
+unaffected: the first must report everything, and the second is going to write
+every row that is fine.
+
 **``abort`` is the request's transaction, not a loop counter.** Nothing here
 commits (``CLAUDE.md``: the framework's session does). A refused run raises
 :class:`~sm_records.services.errors.ImportRefused`, which ``RecordsErrorRoute``
@@ -25,6 +35,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from time import perf_counter
+from typing import NoReturn
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -140,6 +151,30 @@ def _report(
     )
 
 
+def _refuse(
+    options: ImportOptions,
+    tally: _Tally,
+    errors: Sequence[ImportRowError],
+    started: float,
+) -> NoReturn:
+    """Raise the "nothing was imported" refusal.
+
+    Nothing has been written when this fires, so the refusal costs no rollback
+    — but raising is still what gives the caller the report rather than a 200
+    that quietly wrote nothing, and what makes the endpoint discard whatever
+    the validation pass happened to touch.
+
+    A function because ``abort`` now has three places to reach it: a parse that
+    already failed, a validation pass that stopped at its first bad row, and
+    the full pass a non-short-circuiting run still does (S4). Three copies of
+    one ``raise`` are three chances for the report to disagree with itself.
+    """
+    raise ImportRefused(
+        _report(options, _Tally(total=tally.total, skipped=tally.skipped), errors, started),
+        f"{len({item.row for item in errors})} row(s) failed; nothing was imported",
+    )
+
+
 async def import_records(
     db: AsyncSession,
     rtype: RecordType,
@@ -159,9 +194,26 @@ async def import_records(
     errors: list[ImportRowError] = list(parsed.errors)
     tally = _Tally(total=len(parsed.rows) + len({item.row for item in parsed.errors}))
 
-    pairs = await validate_rows(db, rtype, parsed.rows, defs=defs, settings=settings, errors=errors)
+    # A real ``abort`` run may stop at the first bad row, and the parse pass has
+    # already found some if ``errors`` is non-empty — so the file is refused
+    # before it is validated at all. See the module docstring.
+    stop_early = not options.dry_run and options.on_error is OnError.ABORT
+    if stop_early and errors:
+        _refuse(options, tally, errors, started)
+
+    pairs = await validate_rows(
+        db,
+        rtype,
+        parsed.rows,
+        defs=defs,
+        settings=settings,
+        errors=errors,
+        stop_on_error=stop_early,
+    )
+    if stop_early and errors:
+        _refuse(options, tally, errors, started)
     plans, tally.skipped = await plan_rows(
-        db, rtype, pairs, options=options, defs=defs, errors=errors
+        db, rtype, pairs, options=options, defs=defs, errors=errors, stop_on_error=stop_early
     )
 
     if options.dry_run:
@@ -169,14 +221,7 @@ async def import_records(
         tally.updated = len(plans) - tally.created
         return _report(options, tally, errors, started)
     if errors and options.on_error is OnError.ABORT:
-        # Nothing has been written yet, so the refusal costs no rollback —
-        # but raising is still what gives the caller the report rather than a
-        # 200 that quietly wrote nothing, and what makes the endpoint discard
-        # whatever the validation pass happened to touch.
-        raise ImportRefused(
-            _report(options, _Tally(total=tally.total, skipped=tally.skipped), errors, started),
-            f"{len({item.row for item in errors})} row(s) failed; nothing was imported",
-        )
+        _refuse(options, tally, errors, started)
     try:
         tally.created, tally.updated = await _write(
             db, rtype, plans, options=options, settings=settings, actor=actor, errors=errors

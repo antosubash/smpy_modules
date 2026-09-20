@@ -5,12 +5,20 @@ the seam that module's docstring draws: it is the *write* check — does this
 target exist and is it what the payload claims — and this is the read that a
 delete, the referrers panel and the editor's badge all run.
 
-One indexed query per declared table set over ``records_index_ref``, keyed on
-``(target_type_id, target_uuid)``. Both columns, always: a uuid is unique
-inside each record table and nothing spans them, so predicating on the uuid
-alone made a record that borrowed another's uuid inherit its referrers — and
-with them a ``restrict`` that refused a delete nothing pointed at, a
-``cascade`` into an unrelated record and a ``set_null`` that blanked its field.
+One indexed query over ``records_index_ref`` per table set **that can hold a
+referrer**, keyed on ``(target_type_id, target_uuid)``. Both columns, always: a
+uuid is unique inside each record table and nothing spans them, so predicating
+on the uuid alone made a record that borrowed another's uuid inherit its
+referrers — and with them a ``restrict`` that refused a delete nothing pointed
+at, a ``cascade`` into an unrelated record and a ``set_null`` that blanked its
+field.
+
+"That can hold a referrer" is S5. It used to be *every declared* set, so a host
+that declared two collections paid three reads on every ``restrict`` delete and
+every referrers panel even when both collections were empty — linear in
+declarations, and declarations are a host's Alembic history, which only ever
+grows. Which sets can hold one is a fact about the schema
+(:mod:`sm_records.services._referrer_sets`), and the schema is one query.
 """
 
 from __future__ import annotations
@@ -22,10 +30,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import Record, RecordType, table_sets, tables_of
+from sm_records.models import Record, RecordType, tables_of
 from sm_records.schema.fields import ON_DELETE_DEFAULT
 from sm_records.schema.types import IndexKind
 from sm_records.services._common import role_blocked
+from sm_records.services._referrer_sets import referring_sets
 
 __all__ = ["Referrer", "field_label", "paged_referrers", "referrer_count", "referrers"]
 
@@ -56,7 +65,8 @@ async def referrers(
     otherwise make its own ``restrict`` field refuse its own delete, which is
     not a referential-integrity problem anybody has.
 
-    **Every declared table set is asked** — see the loop below.
+    **Every table set that can hold a referrer is asked** — see the loop below,
+    and :mod:`sm_records.services._referrer_sets` for which those are.
 
     **A target is ``(target_type_id, target_uuid)``, never a uuid on its own.**
     §6.3 says the ref row "stores ``target_uuid`` and ``target_type_id``"; this
@@ -82,17 +92,17 @@ async def referrers(
     """
     own = tables_of(record)
     out: list[Referrer] = []
-    # **One query per declared table set, not one query.** A ref row lives in
-    # the *referrer's* tables and names its target by ``(target_uuid,
-    # target_type_id)``, so the rows pointing at this record are scattered across
-    # every set that holds a type with a relation to it (Phase 5 §6.4). A UNION
-    # would collapse them into one result and lose the one thing the ids need to
-    # be read with — *which* record table each ``record_id`` belongs to — so the
-    # loop keeps each set's ids with that set's class. It is the global set plus
-    # one query per declared collection, in ``table_sets()`` order, which is why
+    # **One query per table set that can hold a referrer, not one query.** A ref
+    # row lives in the *referrer's* tables and names its target by
+    # ``(target_uuid, target_type_id)``, so the rows pointing at this record are
+    # scattered across every set that holds a type with a relation to it (Phase
+    # 5 §6.4). A UNION would collapse them into one result and lose the one
+    # thing the ids need to be read with — *which* record table each
+    # ``record_id`` belongs to — so the loop keeps each set's ids with that
+    # set's class. The sets come back in ``table_sets()`` order, which is why
     # that order is the global set first and then alphabetical: adding a
     # collection must not reorder an existing referrer list.
-    for tables in table_sets():
+    for tables in await referring_sets(db, record.type_id):
         ref = tables.index[IndexKind.REF]
         rows = (
             await db.execute(

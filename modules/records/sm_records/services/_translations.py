@@ -87,7 +87,22 @@ async def published_siblings(
     read now 404s. The predicate is the same one
     :func:`~sm_records.services.public.get_public_record` applies, so the two
     halves of the public surface agree about which languages exist.
+
+    **A monolingual install pays nothing for this** (S1). With one content
+    locale every record is alone in its own translation group — the statement
+    can only ever return the records it was handed — so there is no query to
+    issue and no switcher to build, and the endpoint costs what it cost before
+    content i18n existed. That is the one place Phase 5's "inert when unused"
+    promise was not kept, and it was the public list that paid it: the endpoint
+    anonymous traffic hits hardest.
+
+    ``{}`` and not "the records themselves" deliberately. A caller reads the
+    result per group (``siblings.get(group)``), the empty mapping answers
+    ``None`` for every one of them, and ``translations`` comes back empty —
+    which is what a language switcher with one language renders either way.
     """
+    if len(locales.supported(settings)) == 1:
+        return {}
     groups = sorted({record.translation_group for record in records})
     if not groups:
         return {}

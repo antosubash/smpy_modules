@@ -82,6 +82,7 @@ async def validate_rows(
     defs: list[FieldDefinition],
     settings: RecordsSettings,
     errors: list[ImportRowError],
+    stop_on_error: bool = False,
 ) -> list[tuple[ImportRow, Envelope]]:
     """Validate every row against the *current* schema, writing nothing.
 
@@ -89,6 +90,14 @@ async def validate_rows(
     the ``_orphaned`` refusal and the compiled model are one implementation
     rather than an import-shaped copy — plus ``create_record``'s relation
     target check, the rule a file breaks far more often than a form does.
+
+    ``stop_on_error`` returns at the first bad row instead of validating the
+    rest — S4. It is set only by a **real** ``on_error=abort`` run, where the
+    answer is already settled: nothing will be written, and the report names
+    the row that settled it. A *dry run* never sets it, because a dry run's
+    whole job is the complete list of what is wrong with the file, and
+    ``on_error=skip`` never sets it either, because there every other row is
+    still going to be written.
     """
     types = await type_id_map(db)
     out: list[tuple[ImportRow, Envelope]] = []
@@ -96,6 +105,8 @@ async def validate_rows(
         reserved = refuses_orphaned(row)
         if reserved is not None:
             errors.append(reserved)
+            if stop_on_error:
+                break
             continue
         try:
             values, stored = _payload.validate(
@@ -111,6 +122,8 @@ async def validate_rows(
             envelope.locale = locales.require(settings, envelope.locale)
         except ValidationFailed as exc:
             errors.extend(_errors_for(row, exc))
+            if stop_on_error:
+                break
             continue
         row.locale = envelope.locale
         row.values, row.stored = values, stored
@@ -126,6 +139,7 @@ async def plan_rows(
     options: ImportOptions,
     defs: list[FieldDefinition],
     errors: list[ImportRowError],
+    stop_on_error: bool = False,
 ) -> tuple[list[Plan], int]:
     """Decide per row what would happen, and count the no-ops.
 
@@ -138,6 +152,13 @@ async def plan_rows(
     default dry run is that the caller acts on it. So the version requirement
     (:func:`~sm_records.services._import_rows.version_required`) is asked here
     and ``write_row`` keeps it only as a guard for a direct caller.
+
+    ``stop_on_error`` is :func:`validate_rows`'s, and means the same thing: a
+    real ``abort`` run stops at the row that settles the answer instead of
+    planning the other 8,999 (S4). The batched lookups above it still run once
+    for the whole file — they are one statement each, and splitting them to
+    save the tail of a refused import would be the per-row shape §2 exists to
+    avoid.
     """
     duplicates = _checks.duplicates(pairs)
     claims = _checks.group_claims(pairs)
@@ -182,8 +203,10 @@ async def plan_rows(
         problem = problem or mode_error(options.mode, record)
         if problem is not None:
             errors.append(ImportRowError(row=row.number, uuid=row.uuid, message=problem))
+            if stop_on_error:
+                break
             continue
-        if record is not None and unchanged(rtype, record, row, envelope, defs):
+        if record is not None and unchanged(rtype, record, row, envelope):
             skipped += 1
             continue
         if record is not None and not options.force:
@@ -192,6 +215,8 @@ async def plan_rows(
                 errors.append(
                     ImportRowError(row=row.number, uuid=row.uuid, field="version", message=missing)
                 )
+                if stop_on_error:
+                    break
                 continue
         plans.append(Plan(row, envelope, record))
     return plans, skipped

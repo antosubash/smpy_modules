@@ -51,7 +51,15 @@ class Capture:
 
     def longest(self) -> tuple[str, Any]:
         """The biggest statement in the block — for a page read that is the
-        filtered ``SELECT``, which is the one worth a plan."""
+        filtered ``SELECT``, which is the one worth a plan.
+
+        ``("", ())`` for a block that issued nothing, which is a measurement
+        rather than a mistake: "this operation costs no round trip at all" is
+        exactly what several rows here exist to prove, and :func:`explain`
+        answers an empty statement with an empty plan.
+        """
+        if not self.statements:
+            return ("", ())
         return max(self.statements, key=lambda row: len(row[0]))
 
 
@@ -88,6 +96,8 @@ async def explain(session: Any, sql: str, params: Any) -> list[str]:
     being read, and executing the statement a second time to time it would
     make the row it is recorded beside mean something else.
     """
+    if not sql.strip():
+        return []
     conn = await session.connection()
     prefix = "EXPLAIN QUERY PLAN " if conn.dialect.name == "sqlite" else "EXPLAIN "
     rows = (await conn.exec_driver_sql(prefix + sql, params)).all()
