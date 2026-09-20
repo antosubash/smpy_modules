@@ -190,6 +190,13 @@ class VirtualField:
     The key is global — every type's records may carry it — so it is refused
     as a declared field key on any type (``schema.fields.validate_fields``),
     exactly as the document-table columns are.
+
+    **A virtual field is never refused as ``reindexing``.** The 409 of design
+    §8.5 belongs to a key sitting in a type's ``reindex_pending``, and a
+    provider has no entry there: changing what it projects is the host
+    redeploying, not a schema edit this module can see. The rows go stale
+    silently until someone runs ``python -m sm_records.cli reindex``, which is
+    the trade for an extension point the schema knows nothing about.
     """
 
     key: str
@@ -199,6 +206,12 @@ class VirtualField:
 
 _providers: list[IndexProvider] = [schema_provider]
 _virtual: dict[str, VirtualField] = {}
+_owners: dict[str, IndexProvider] = {}
+_shadowed: set[tuple[str, str]] = set()
+
+
+def _name(provider: IndexProvider) -> str:
+    return getattr(provider, "__qualname__", None) or repr(provider)
 
 
 def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) -> None:
@@ -207,16 +220,24 @@ def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) ->
     Idempotent on the callable — registering the same one twice would
     otherwise double every row it yields. A virtual key already registered by
     a *different* provider is a ``ValueError``: two projections under one key
-    would answer a filter with the union of both, silently.
+    would answer a filter with the union of both, silently. The ownership is
+    what is checked, not the declaration: two providers agreeing on kind and
+    ``many`` still write two sets of rows under one key.
+
+    Every key is checked before any is recorded, so a rejected call leaves the
+    registry exactly as it found it rather than half-registered.
 
     Call it at import time or from a module's ``on_startup``; the built-in
     ``schema_provider`` is always first and cannot be removed.
     """
-    for field in fields:
-        owner = _virtual.get(field.key)
-        if owner is not None and owner != field:
-            raise ValueError(f"virtual field {field.key!r} is already registered as {owner}")
+    claimed = list(fields)
+    for field in claimed:
+        owner = _owners.get(field.key)
+        if owner is not None and owner is not provider:
+            raise ValueError(f"virtual field {field.key!r} is already registered by {_name(owner)}")
+    for field in claimed:
         _virtual[field.key] = field
+        _owners[field.key] = provider
     if provider not in _providers:
         _providers.append(provider)
 
@@ -241,4 +262,23 @@ def clear() -> None:
     Virtual fields go with their providers.
     """
     _virtual.clear()
+    _owners.clear()
+    _shadowed.clear()
     _providers[:] = [schema_provider]
+
+
+def note_shadowed(type_key: str, field_key: str) -> bool:
+    """Record that ``type_key`` declares a field shadowing a virtual key, and
+    say whether this is the first time — so the query layer logs the collision
+    once per type rather than once per request.
+
+    Kept next to the registry because the registry is what creates the
+    collision and :func:`clear` is what ends it: a test that clears the
+    providers gets a clean slate here too, instead of a memo from an earlier
+    test silently swallowing the warning it asserts.
+    """
+    seen = (type_key, field_key)
+    if seen in _shadowed:
+        return False
+    _shadowed.add(seen)
+    return True

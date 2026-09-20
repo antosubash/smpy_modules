@@ -217,6 +217,61 @@ python -m sm_records.cli reindex --type KEY # one type
 It is idempotent and resumable — index rows are derived from the stored
 payloads, so running it twice converges.
 
+### Extending the index
+
+The built-in projection writes one index row per field marked `indexed: true`.
+An **index provider** is the seam for everything a schema cannot express — a
+computed bucket, a normalised sort key, a value denormalised from a related
+record. It is a callable `(record, record_type) -> Iterable[IndexEntry]`, and
+the keys it declares as `VirtualField`s become filterable and sortable on
+every type's records:
+
+```python
+from sm_records.index import IndexEntry, IndexKind, VirtualField, register_index_provider
+
+
+def price_bucket(record, rtype):
+    price = (record.data or {}).get("price")
+    if price is not None:
+        yield IndexEntry(IndexKind.NUMBER, "price_bucket", int(float(price)) // 100)
+
+
+register_index_provider(price_bucket, fields=[VirtualField("price_bucket", IndexKind.NUMBER)])
+```
+
+`?filter=price_bucket:gte:1` and `?sort=-price_bucket` then work like any
+declared indexed field: same operator matrix per kind, `many=True` for a key
+that projects several rows per record (`eq` matches any of them, `ne` none of
+them), and the same truncation re-check on text. Those six names are the whole
+public surface of `sm_records.index`; the writer, the query builder and the
+rebuild are internals.
+
+Register at import time or from your module's `on_startup` — anywhere before
+the first record is written. The registry is process-global, so every worker
+must run the same registrations, and the built-in provider is always first and
+cannot be removed.
+
+A few consequences worth knowing before you use it:
+
+- **A virtual key is global, so it is reserved.** Every type's records are
+  queryable by it, and a type declaring a field of the same key would shadow
+  it — so `validate_fields` refuses that key with a 422 naming it. The type
+  editor cannot grey the key out: what a host registered is not knowable to
+  the browser, and the key list it mirrors is static per process. A 422 on
+  save is the contract. (A key that collides with a record column or a fixed
+  filter column — `status`, `slug`, `created_at` … — is shadowed by that
+  column instead and never queryable; don't name one that.)
+- **Changing what a provider projects does not mark anything.** A provider is
+  code the host deploys, not a schema edit this module can see, so no
+  `reindex_pending` entry appears and no filter is refused while the rows are
+  stale. Run `python -m sm_records.cli reindex` after deploying a changed
+  provider — or after registering a first one against existing records.
+- **A provider that raises does not take the write down.** The failure is
+  logged with the provider's qualified name and the record's uuid, that
+  provider contributes no rows for that record, and the other providers and
+  the write itself carry on. A broken host extension must not make every
+  record unsaveable; its rows come back on the next reindex.
+
 ### Demo data
 
 `sm_records.seed` writes a small US-flavoured business dataset — five Record

@@ -81,6 +81,13 @@ def _clear_model_cache():
 def _clean_providers():
     """The index-provider registry is process-global (design doc §7.6), so a
     test that registers one changes what every later test's records index to.
+
+    ``clear()`` also drops the virtual fields those providers declared — and
+    with them the "already warned about this type" memo behind
+    ``providers.note_shadowed`` — so a test asserting the shadowing warning
+    sees it whatever ran before, and a test declaring a field keyed like some
+    other test's virtual field is not refused by a registration that outlived
+    it.
     """
     from sm_records.index import providers
 

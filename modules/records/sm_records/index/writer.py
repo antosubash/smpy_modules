@@ -13,6 +13,7 @@ would break the caller's ability to roll the whole write back.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -24,6 +25,7 @@ from sm_records.index.providers import (
     IndexEntry,
     TypeResolver,
     providers,
+    schema_provider,
     use_type_resolver,
 )
 from sm_records.models import (
@@ -38,6 +40,8 @@ from sm_records.models import (
     RecordType,
 )
 from sm_records.schema.types import IndexKind
+
+logger = logging.getLogger(__name__)
 
 
 def _text_values(value: str) -> dict:
@@ -93,11 +97,41 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
     the walk (:func:`~sm_records.index.providers.use_type_resolver`), and a
     generator would leave that binding's lifetime to whoever happens to stop
     iterating.
+
+    **Each registered provider is isolated.** One that raises is logged and
+    skipped, and the write carries on with the others: a host's broken
+    extension must not make every record of every type unsaveable. The
+    built-in ``schema_provider`` is deliberately not wrapped — it failing is a
+    bug in this module, and hiding it would turn a traceback into silently
+    missing index rows, which §7.7 is the argument against.
     """
     entries: list[IndexEntry] = []
     with use_type_resolver(resolve_type_id):
         for provider in providers():
-            entries.extend(provider(record, rtype))
+            if provider is schema_provider:
+                # Not guarded: the built-in projection raising is a bug in
+                # this module, and swallowing it would turn it into missing
+                # index rows — a wrong query result rather than a traceback.
+                entries.extend(provider(record, rtype))
+                continue
+            try:
+                produced = list(provider(record, rtype))
+            except Exception:
+                # A host's provider must not make every record of every type
+                # unsaveable. Its rows are simply missing until the bug is
+                # fixed and ``cli reindex`` has run, which is the same state
+                # a provider registered late leaves behind.
+                logger.exception(
+                    "records: index provider %s failed on record %s; its rows are missing",
+                    getattr(provider, "__qualname__", None) or repr(provider),
+                    record.uuid,
+                )
+                continue
+            # Materialised before it is appended: a generator that raises
+            # halfway would otherwise leave the entries it had already
+            # yielded in the set, which is half a projection written as if
+            # it were whole.
+            entries.extend(produced)
     return entries
 
 

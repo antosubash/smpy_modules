@@ -35,6 +35,7 @@ that already has one owner.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -42,7 +43,8 @@ from typing import Any
 from sqlalchemy import Select, func, nulls_last, select
 from sqlalchemy.sql import ColumnElement
 
-from sm_records.index._fields import IndexedField, declared_keys, indexed_map
+from sm_records.index import providers
+from sm_records.index._fields import IndexedField, declared_keys, indexed_map, virtual_field
 from sm_records.index._fixed import FIXED_COLUMNS, fixed_clause
 from sm_records.index._predicates import (
     INDEX_TABLE,
@@ -52,6 +54,8 @@ from sm_records.index._predicates import (
     value_clause,
 )
 from sm_records.models import Record, RecordType
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "FIXED_COLUMNS",
@@ -91,7 +95,33 @@ def _resolve(rtype: RecordType, indexed: dict[str, IndexedField], declared: set[
     ``reindex_pending`` is a mapping of key → enqueued-at, so membership is a
     key test. Its reserved ``"*"`` entry (a whole-type ``display_title``
     rebuild) is unreachable here: no field key can be ``*``.
+
+    A key the type does not declare may still be a **virtual field** — one an
+    index provider projects (design §7.6). Resolving it here, between
+    ``declared`` and the ``unknown`` refusal, is what makes a provider-only
+    key queryable at all: it behaves as an indexed declared field of its kind,
+    with the same operator matrix, the same ``many`` reading of ``eq``/``ne``
+    and the same §7.4 truncation re-check. It is never refused as
+    ``reindexing`` — see :class:`~sm_records.index.providers.VirtualField`.
+
+    **A declared field of the same key wins.** ``validate_fields`` refuses the
+    key, so the two can only collide on a type stored before the provider was
+    registered; that type has real rows written from its own definition, and
+    refusing its filter — or answering it from the provider's rows — would
+    break a type that works. The collision is logged once per type instead.
     """
+    virtual = providers.virtual_fields().get(name)
+    if name in declared:
+        if virtual is not None and providers.note_shadowed(rtype.key, name):
+            logger.warning(
+                "records: type %r declares field %r, which an index provider also projects as a "
+                "virtual field; the declared field wins, so that provider's rows under the key "
+                "are not queryable on this type",
+                rtype.key,
+                name,
+            )
+    elif virtual is not None:
+        return virtual_field(virtual.key, virtual.kind, virtual.many)
     if name in (rtype.reindex_pending or {}):
         raise QueryError(name, "reindexing", f"{name!r} is being reindexed")
     if name not in declared:

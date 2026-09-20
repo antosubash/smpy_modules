@@ -24,11 +24,12 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records.constants import MAX_KEY_LEN, MAX_LABEL_LEN, RESERVED_FIELD_KEYS, TYPE_KEY_PATTERN
+from sm_records.constants import MAX_LABEL_LEN, TYPE_KEY_PATTERN
+from sm_records.schema._keys import KEY_RE as _KEY_RE
+from sm_records.schema._keys import FieldSchemaError, validate_key
+from sm_records.schema._keys import require as _require
 from sm_records.schema.compile import PayloadValidationError, coerce_value
 from sm_records.schema.types import NOT_UNIQUE, FieldType, indexable
-
-_KEY_RE = re.compile(TYPE_KEY_PATTERN)
 
 _TEXT_CONSTRAINTS = frozenset({"min_length", "max_length", "pattern"})
 _NUMERIC_CONSTRAINTS = frozenset({"min", "max"})
@@ -54,18 +55,6 @@ ON_DELETE_DEFAULT = "restrict"
 graph deletes content nobody asked to delete. Design §9."""
 
 
-class FieldSchemaError(ValueError):
-    """A field definition that cannot mean anything. The message always names
-    the field key, because a type editor saves the whole list at once and
-    "invalid field" without a key is unactionable."""
-
-    def __init__(self, key: str | None, problem: str) -> None:
-        self.key = key
-        self.problem = problem
-        where = f"field {key!r}" if key else "fields"
-        super().__init__(f"{where}: {problem}")
-
-
 class FieldDefinition(SQLModel):
     """One entry of ``RecordType.fields``.
 
@@ -89,29 +78,6 @@ class FieldDefinition(SQLModel):
     help: str | None = None
     constraints: dict[str, Any] = SQLField(default_factory=dict)
     options: dict[str, Any] = SQLField(default_factory=dict)
-
-
-def _require(condition: Any, key: str | None, problem: str) -> None:
-    if not condition:
-        raise FieldSchemaError(key, problem)
-
-
-def _validate_key(raw: dict[str, Any], seen: set[str]) -> str:
-    raw_key = raw.get("key")
-    _require(isinstance(raw_key, str) and raw_key, None, "every field needs a 'key'")
-    key = str(raw_key)
-    # Reserved first: `_orphaned` also fails the pattern, and "reserved by the
-    # module" tells the author why far better than a regex does. The rest is
-    # every ``Record`` column plus the fixed filter/sort columns
-    # (``constants._reserved_field_keys``), which the query layer resolves
-    # ahead of the type's own fields — so such a field indexed correctly and
-    # was then filtered and sorted from the wrong data, with a 200.
-    reserved = "key is reserved: it names a column every record already has, "
-    _require(key not in RESERVED_FIELD_KEYS, key, reserved + "so a filter would shadow it")
-    _require(_KEY_RE.match(key), key, f"key must match {TYPE_KEY_PATTERN}")
-    _require(len(key) <= MAX_KEY_LEN, key, f"key must be at most {MAX_KEY_LEN} characters")
-    _require(key not in seen, key, "duplicate field key")
-    return key
 
 
 def _validate_choices(key: str, options: dict[str, Any]) -> None:
@@ -245,7 +211,7 @@ def validate_fields(raw: list[dict[str, Any]]) -> list[FieldDefinition]:
     seen: set[str] = set()
     for entry in raw:
         _require(isinstance(entry, dict), None, "each field definition must be an object")
-        key = _validate_key(entry, seen)
+        key = validate_key(entry, seen)
         seen.add(key)
 
         raw_type = entry.get("type")
