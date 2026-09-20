@@ -176,18 +176,59 @@ schema_provider: IndexProvider = make_schema_provider(lambda key: current_type_r
 """The default-registered instance. It defers to whatever resolver the current
 write bound, so one module-level provider serves every session."""
 
+
+@dataclass(frozen=True, slots=True)
+class VirtualField:
+    """A key a provider projects that no Record Type declares (design §7.6).
+
+    Declaring it is what makes the key *queryable*: the filter grammar resolves
+    a field key to an index table through the type's ``fields``, and a
+    provider-only key would otherwise be written and never readable. ``many``
+    says one record may hold several rows for the key (a multiselect-style
+    projection), which decides ``eq``'s any-of reading and ``ne``'s none-of.
+
+    The key is global — every type's records may carry it — so it is refused
+    as a declared field key on any type (``schema.fields.validate_fields``),
+    exactly as the document-table columns are.
+    """
+
+    key: str
+    kind: IndexKind
+    many: bool = False
+
+
 _providers: list[IndexProvider] = [schema_provider]
+_virtual: dict[str, VirtualField] = {}
 
 
-def register(provider: IndexProvider) -> None:
-    """Add a provider. Idempotent — registering the same callable twice would
-    otherwise double every row it yields."""
+def register(provider: IndexProvider, *, fields: Iterable[VirtualField] = ()) -> None:
+    """Add a provider and the virtual fields it projects.
+
+    Idempotent on the callable — registering the same one twice would
+    otherwise double every row it yields. A virtual key already registered by
+    a *different* provider is a ``ValueError``: two projections under one key
+    would answer a filter with the union of both, silently.
+
+    Call it at import time or from a module's ``on_startup``; the built-in
+    ``schema_provider`` is always first and cannot be removed.
+    """
+    for field in fields:
+        owner = _virtual.get(field.key)
+        if owner is not None and owner != field:
+            raise ValueError(f"virtual field {field.key!r} is already registered as {owner}")
+        _virtual[field.key] = field
     if provider not in _providers:
         _providers.append(provider)
 
 
 def providers() -> tuple[IndexProvider, ...]:
     return tuple(_providers)
+
+
+def virtual_fields() -> dict[str, VirtualField]:
+    """Every provider-projected key, by key. Read by the filter grammar and by
+    ``validate_fields`` — one registry, so the two cannot disagree."""
+    return dict(_virtual)
 
 
 def clear() -> None:
@@ -197,5 +238,7 @@ def clear() -> None:
     Emptying the list outright is what a test usually means, but a test that
     did so and forgot to restore would leave every later record in the process
     with an empty index — a wrong-answer failure a long way from its cause.
+    Virtual fields go with their providers.
     """
+    _virtual.clear()
     _providers[:] = [schema_provider]

@@ -92,6 +92,17 @@ from it (design doc §18 Q2). Safe as a sentinel because ``TYPE_KEY_PATTERN``
 requires a lowercase letter first, so no field key can be ``*`` and a
 whole-type rebuild therefore never refuses a filter."""
 
+EXPAND_PARAM: Final = "expand"
+"""Query parameter naming the relation fields to resolve on a read (design
+§9): comma-separated field keys, depth one, refused with a 400 for a key that
+is not a ``relation`` field of the type. Admin API only — the public read API
+never expands (§10)."""
+
+PUBLIC_ROUTE_METHODS: Final = frozenset({"GET", "HEAD"})
+"""The only verbs the anonymous read API answers, and the only ones its
+``PublicRouteRegistry`` exemption covers — pinned so a future route under the
+same prefix cannot widen the exemption by accident (§10)."""
+
 RESERVED_TYPE_KEYS: Final = frozenset({"types", "new"})
 """Type keys that would shadow a view route: ``/admin/records/types/...`` is
 the schema editor and ``/admin/records/{key}/new`` the record editor, and a

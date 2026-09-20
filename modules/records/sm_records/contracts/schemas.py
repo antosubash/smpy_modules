@@ -23,8 +23,17 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
+from sm_records.contracts.relations import ExpandedRef
+from sm_records.contracts.revisions import (
+    RecordRevisionDetailRead,
+    RecordRevisionRestoreRequest,
+    RevisionListResponse,
+    RevisionRead,
+    record_revision_detail_read,
+    revision_read,
+)
 from sm_records.index.reindex import pending_map
-from sm_records.models import Record, RecordRevision, RecordType
+from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._payload import field_defs
 from sm_records.services.records import read_view
@@ -147,6 +156,13 @@ class RecordRead(SQLModel):
     **Always empty on a list response** — filling it costs a validator pass
     per row (:func:`record_list_read`); the badge belongs to the editor, which
     reads one record."""
+    expanded: dict[str, list[ExpandedRef]] | None = None
+    """Relation targets resolved under an explicit ``?expand=a,b`` (design
+    §9): field key -> one :class:`ExpandedRef` per stored reference, in payload
+    order, so a to-many field's list lines up with ``data[key]``. ``None`` when
+    the caller did not ask; a stored reference whose target is trashed, purged
+    or not this caller's to see is still listed, flagged rather than dropped.
+    Depth is one — an expanded target's own relations stay bare."""
 
 
 class RecordPage(SQLModel):
@@ -169,31 +185,6 @@ class RecordUpdate(SQLModel):
     status: str | None = None
     slug: str | None = None
     position: int | None = None
-
-
-class RevisionRead(SQLModel):
-    id: int
-    version: int
-    schema_version: int
-    event: str
-    display_title: str
-    created_at: datetime
-    created_by: str | None
-
-
-class RevisionListResponse(SQLModel):
-    items: list[RevisionRead]
-
-
-class RecordRevisionDetailRead(RevisionRead):
-    """``GET .../revisions/{id}``'s response — the list entry plus the
-    payload it snapshotted, for the read-only preview before restoring it."""
-
-    data: dict[str, Any]
-
-
-class RecordRevisionRestoreRequest(SQLModel):
-    expected_version: int
 
 
 def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -> TypeRead:
@@ -226,6 +217,7 @@ def record_read(
     *,
     with_invalid: bool = True,
     defs: list[FieldDefinition] | None = None,
+    expanded: dict[str, list[ExpandedRef]] | None = None,
 ) -> RecordRead:
     """The one lenient read every caller gets: ``read_view`` fills a missing
     key from ``default`` and flags a row stamped at an old schema version
@@ -237,8 +229,10 @@ def record_read(
     ``data`` still carries the reserved ``_orphaned`` sub-key when the row has
     one: these screens are the admin's, and the raw editor shows a deleted
     field's content on purpose (§8.2 — that is what makes the deletion
-    undoable). **Phase 4's public read API must strip it** before serving a
-    record to anonymous callers.
+    undoable). The public read API strips it — see ``contracts/public.py``.
+
+    ``expanded`` is passed through untouched: resolving it is the service's
+    job (``services/expand.py``), this only carries it.
     """
     view = read_view(rtype, record, with_invalid=with_invalid, defs=defs)
     return RecordRead(
@@ -257,6 +251,7 @@ def record_read(
         updated_at=record.updated_at,
         is_deleted=record.is_deleted,
         invalid=view["invalid"],
+        expanded=expanded,
     )
 
 
@@ -273,28 +268,3 @@ def record_list_read(rtype: RecordType, records: Sequence[Record]) -> list[Recor
     """
     defs = field_defs(rtype)
     return [record_read(rtype, record, with_invalid=False, defs=defs) for record in records]
-
-
-def revision_read(revision: RecordRevision) -> RevisionRead:
-    return RevisionRead(
-        id=revision.id,
-        version=revision.version,
-        schema_version=revision.schema_version,
-        event=revision.event.value,
-        display_title=revision.display_title,
-        created_at=revision.created_at,
-        created_by=revision.created_by,
-    )
-
-
-def record_revision_detail_read(revision: RecordRevision) -> RecordRevisionDetailRead:
-    return RecordRevisionDetailRead(
-        id=revision.id,
-        version=revision.version,
-        schema_version=revision.schema_version,
-        event=revision.event.value,
-        display_title=revision.display_title,
-        created_at=revision.created_at,
-        created_by=revision.created_by,
-        data=dict(revision.data or {}),
-    )
