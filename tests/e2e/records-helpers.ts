@@ -42,6 +42,7 @@ export type TypeRead = {
   record_count: number;
   trashed_record_count: number;
   reindex_pending: Record<string, string>;
+  translatable: boolean;
 };
 
 export type RecordRead = {
@@ -51,6 +52,8 @@ export type RecordRead = {
   display_title: string;
   status: string;
   slug: string | null;
+  locale: string;
+  translation_group: string;
   position: number;
   is_deleted: boolean;
   invalid: { field: string; message: string }[];
@@ -139,6 +142,21 @@ export function apiUpdateRecord(
 
 export function apiListRecords(page: Page, key: string, query = ''): Promise<RecordPage> {
   return api(page, 'GET', `/types/${key}/records${query ? `?${query}` : ''}`);
+}
+
+// ---- Translations ---------------------------------------------------------
+
+export function apiListTranslations(page: Page, key: string, uuid: string): Promise<Json[]> {
+  return api(page, 'GET', `/types/${key}/records/${uuid}/translations`);
+}
+
+export function apiCreateTranslation(
+  page: Page,
+  key: string,
+  uuid: string,
+  body: Json,
+): Promise<RecordRead> {
+  return api(page, 'POST', `/types/${key}/records/${uuid}/translations`, body);
 }
 
 // ---- Page objects -------------------------------------------------------

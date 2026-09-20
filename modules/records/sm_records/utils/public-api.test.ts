@@ -154,4 +154,15 @@ describe('buildPublicListUrl', () => {
       `${DEFAULT_PUBLIC_PREFIX}/products?page_size=50`,
     );
   });
+
+  it('adds locale only when given', () => {
+    const url = buildPublicListUrl({ typeKey: 'products', limit: 10, locale: 'de' });
+    const parsed = new URL(url, 'http://example.test');
+    expect(parsed.searchParams.get('locale')).toBe('de');
+  });
+
+  it('omits locale when blank or whitespace-only', () => {
+    const url = buildPublicListUrl({ typeKey: 'products', limit: 10, locale: '  ' });
+    expect(url).toBe(`${DEFAULT_PUBLIC_PREFIX}/products?page_size=10`);
+  });
 });

@@ -44,6 +44,11 @@ export type TypeRead = {
    *  schema-affecting change enqueued a reindex that hasn't finished (design
    *  §8.5/§8.9). Non-empty while that field can't be filtered or sorted on. */
   reindex_pending: Record<string, string>;
+  /** Whether this type's records may be authored in more than one content
+   *  locale (Phase 5 §4.1). Off by default — a type that is not translatable
+   *  has every record in the default content locale and shows no language UI.
+   *  Turning it off while records in another locale exist is refused (409). */
+  translatable: boolean;
 };
 
 /** The classification a schema-`fields` diff falls into (design §8.2). */
@@ -117,6 +122,20 @@ export type TypeRevision = {
 
 export type RecordStatus = 'draft' | 'published';
 
+/** One sibling in a record's translation group, as `GET
+ *  .../records/{uuid}/translations` lists it and as `RecordRead.translations`
+ *  embeds it (design §4.4). Mirrors `contracts/i18n.py::TranslationRead`. */
+export type TranslationRead = {
+  locale: string;
+  uuid: string;
+  status: RecordStatus;
+  display_title: string;
+  /** A trashed sibling is still a sibling: it keeps its slug claim in its
+   *  locale, so the Languages panel shows it rather than offering to create
+   *  a second translation that would then collide. */
+  is_deleted: boolean;
+};
+
 /** One stored relation reference, resolved under `?expand=` (design §9).
  *  Mirrors `contracts/relations.py::ExpandedRef` — exactly one of the three
  *  states holds: resolved (`display_title` set), `dangling` (target trashed
@@ -173,6 +192,12 @@ export type RecordRead = {
   created_at: string;
   updated_at: string | null;
   is_deleted: boolean;
+  /** The record's language, fixed for its lifetime (design §4.3) — set at
+   *  create and never changed by an update. */
+  locale: string;
+  /** What this record and its translations share; a record with no siblings
+   *  is alone in its own group. */
+  translation_group: string;
   /** Empty when the record satisfies the current schema. Non-empty marks it
    *  "invalid under current schema" without hiding it (design §8.3) — set by
    *  a `force`d restrictive schema change or a schema rollback the record no
@@ -183,6 +208,10 @@ export type RecordRead = {
    *  `undefined`/`null` when the caller did not ask (a plain list row, or a
    *  record freshly returned by a create/update, which does not expand). */
   expanded?: Record<string, ExpandedRef[]> | null;
+  /** The record's siblings, one entry per other content locale it exists in
+   *  — present under `?translations=true` and on the editor view, `undefined`
+   *  everywhere else (never on the list, design §4.4). */
+  translations?: TranslationRead[] | null;
 };
 
 export type RecordPage = {

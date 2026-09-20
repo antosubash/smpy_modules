@@ -38,4 +38,11 @@ uv run python scripts/set_setting.py pagebuilder \
   content_locales '["en","de"]' \
   default_content_locale en
 
+# Same two locales for the records module's own content i18n (Phase 5 §4.2)
+# — deliberately its own setting, not pagebuilder's (records must not depend
+# on pagebuilder), registered under its package name (`constants.PACKAGE`).
+uv run python scripts/set_setting.py sm_records \
+  content_locales '["en","de"]' \
+  default_content_locale en
+
 exec make dev

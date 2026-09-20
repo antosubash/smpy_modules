@@ -1,7 +1,8 @@
 import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
-import type { RecordStatus } from '../utils/types';
+import { localeLabel } from '../utils/locale';
+import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 
 /** See `utils/api.ts`'s header comment / the module report for why `t()`
  *  takes a string literal here rather than `keys.records.…` — the installed
@@ -17,6 +18,59 @@ export function RecordStatusBadge({ status }: { status: RecordStatus }) {
     );
   }
   return <Badge variant="secondary">{t('records.records.draft', { defaultValue: 'Draft' })}</Badge>;
+}
+
+/** The record's language, as a small badge — the record list's locale
+ *  column and the editor header both use it, so it lives here next to the
+ *  other one-line record badges rather than in either caller. `title` is
+ *  the editor's own reminder that the language is fixed for a record's
+ *  lifetime; the list omits it (a table cell has no room for a tooltip that
+ *  matters on every row). */
+export function RecordLocaleBadge({ locale, title }: { locale: string; title?: string }) {
+  return (
+    <Badge variant="outline" data-testid="records-locale-badge" title={title}>
+      {localeLabel(locale)}
+    </Badge>
+  );
+}
+
+/** The editor header's badge row: outdated-schema, deleted and locale, in
+ *  that order — pulled out of `RecordEditor` itself to keep that page under
+ *  the 300-line cap. `current` is `null` on the new-record screen, where
+ *  none of the three apply yet. */
+export function RecordEditorHeaderBadges({
+  current,
+  translatable,
+}: {
+  current: RecordRead | null;
+  translatable: TypeRead['translatable'];
+}) {
+  const { t } = useT();
+  if (!current) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {current.schema_stale && (
+        <Badge variant="outline" className="border-amber-500 text-amber-600">
+          {t('records.editor.schema_stale', {
+            defaultValue: 'Fields changed since this was saved',
+          })}
+        </Badge>
+      )}
+      {current.is_deleted && (
+        <Badge variant="destructive">
+          {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
+        </Badge>
+      )}
+      {translatable && (
+        <RecordLocaleBadge
+          locale={current.locale}
+          title={t('records.editor.locale_badge_help', {
+            defaultValue: "This record's language is fixed for its lifetime.",
+          })}
+        />
+      )}
+    </div>
+  );
 }
 
 /** A record's `data` was last written against an older or newer version of

@@ -52,6 +52,8 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   'version',
   'status',
   'slug',
+  'locale',
+  'translation_group',
   'display_title',
   'position',
   'published_at',

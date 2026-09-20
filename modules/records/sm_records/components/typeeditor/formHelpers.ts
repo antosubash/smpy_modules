@@ -19,6 +19,7 @@ export function metadataFrom(type: TypeRead | null): TypeMetadataValues {
     allowedRoles: type?.allowed_roles ?? [],
     displayField: type?.display_field ?? '',
     slugField: type?.slug_field ?? '',
+    translatable: type?.translatable ?? false,
   };
 }
 
@@ -39,6 +40,7 @@ export function extraCreateFields(values: TypeMetadataValues): Partial<CreateTyp
   if (values.allowedRoles.length > 0) extra.allowed_roles = values.allowedRoles;
   if (values.displayField) extra.display_field = values.displayField;
   if (values.slugField) extra.slug_field = values.slugField;
+  if (values.translatable) extra.translatable = true;
   return extra;
 }
 
@@ -69,6 +71,7 @@ export function buildChanges(
   if (values.slugField !== (current.slug_field ?? '')) {
     changes.slug_field = values.slugField || null;
   }
+  if (values.translatable !== current.translatable) changes.translatable = values.translatable;
   if (JSON.stringify(fields) !== JSON.stringify(current.fields)) {
     changes.fields = fields;
   }

@@ -37,6 +37,10 @@ export type RecordsListProps = {
   typeIsPublic: boolean | null;
   filter: string;
   sort: string;
+  /** `?locale=` on the public request — blank means the site's default
+   *  content locale, never "every locale" (design §4.4, mirroring the public
+   *  API's own rule for an anonymous reader with no `?locale=` at all). */
+  locale: string;
   limit: number;
   layout: RecordsListLayout;
   title: string;

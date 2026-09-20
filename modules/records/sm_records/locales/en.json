@@ -42,6 +42,7 @@
     "filter_clear": "Clear",
     "position": "Position",
     "published_at": "Published",
+    "locale": "Language",
     "schema_stale": "Outdated schema",
     "delete_checking": "Checking what references this record…",
     "delete_blocked": "{count} record will block this delete",
@@ -76,6 +77,14 @@
     "view_live": "Back to live records",
     "empty": "No trashed records"
   },
+  "translations": {
+    "title": "Languages",
+    "editing": "Editing",
+    "open": "Open",
+    "add": "Add translation",
+    "creating": "Creating…",
+    "trashed": "Trashed"
+  },
   "list": {
     "filter_error": {
       "reindexing": "That field is being reindexed right now and cannot be filtered on yet. Try again shortly.",
@@ -107,6 +116,8 @@
     "data_help": "Raw JSON for this record's fields. Switching back re-fills the form from it.",
     "slug_label": "Slug",
     "position_label": "Position",
+    "locale_label": "Language",
+    "locale_badge_help": "This record's language is fixed for its lifetime.",
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
@@ -158,6 +169,8 @@
     "is_public_url_help": "Published records only, filterable only on indexed fields, and never expanded.",
     "public_url_copy": "Copy",
     "public_url_copied": "Copied",
+    "translatable": "Translatable",
+    "translatable_help": "Records can exist in several languages ({locales}); each translation is its own record with its own slug.",
     "allowed_roles": "Allowed roles",
     "allowed_roles_help": "Leave empty to allow anyone holding \"Manage record types\". Selecting one or more roles narrows access to those roles as well.",
     "display_field": "Display field",

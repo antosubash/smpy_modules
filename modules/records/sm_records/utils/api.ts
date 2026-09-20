@@ -132,6 +132,7 @@ export type CreateTypePayload = {
   allowed_roles?: string[];
   display_field?: string;
   slug_field?: string;
+  translatable?: boolean;
 };
 
 export function createType(payload: CreateTypePayload): Promise<TypeRead> {
@@ -242,7 +243,13 @@ export type RecordWritePayload = {
   position?: number;
 };
 
-export function createRecord(typeKey: string, payload: RecordWritePayload): Promise<RecordRead> {
+/** `createRecord`'s body only — `locale` names the content locale to create
+ *  the record in (defaults to the type's default content locale). There is
+ *  no `locale` on an update: a record's language is fixed for its lifetime
+ *  (design §4.3), and the API 422s an update that sends one. */
+export type RecordCreatePayload = RecordWritePayload & { locale?: string };
+
+export function createRecord(typeKey: string, payload: RecordCreatePayload): Promise<RecordRead> {
   return request(`/types/${encodeURIComponent(typeKey)}/records`, {
     method: 'POST',
     body: JSON.stringify(payload),

@@ -15,7 +15,13 @@ import { deleteRecord, restoreRecord } from '../utils/api';
 import { buildSortParam, filterErrorReasonKey, nextSort, parseSort } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
-type Props = { type: TypeRead; records: RecordPage };
+type Props = {
+  type: TypeRead;
+  records: RecordPage;
+  /** Every content locale the module runs (`views.py::record_list`); absent
+   *  degrades to "no language UI", same as the editor's own prop. */
+  content_locales?: string[];
+};
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
 
@@ -78,7 +84,7 @@ function parseFilterParam(raw: string | null): FilterValue {
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
  *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
  *  can be bookmarked or shared. */
-function RecordList({ type, records }: Props) {
+function RecordList({ type, records, content_locales }: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
@@ -88,6 +94,11 @@ function RecordList({ type, records }: Props) {
   const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
   const currentFilter = parseFilterParam(rawFilter);
   const currentSort = parseSort(search.toString());
+  // The admin list always defaults to every locale (design §4.4) — the
+  // column and filter only earn their place once the type actually uses more
+  // than one, so a monolingual type or install shows neither.
+  const contentLocales = content_locales ?? [];
+  const showLocaleUI = type.translatable && contentLocales.length > 1;
   // Inertia's own `errors` bag — `record_list` (views.py) attaches
   // `{filter: exc.reason}` whenever building the query raises `QueryError`,
   // regardless of whether the offending term came from `?filter=` or
@@ -201,6 +212,7 @@ function RecordList({ type, records }: Props) {
             current={currentFilter}
             onApply={applyFilter}
             onClear={clearFilter}
+            locales={showLocaleUI ? contentLocales : []}
           />
         </div>
 
@@ -225,6 +237,7 @@ function RecordList({ type, records }: Props) {
             records={records.items}
             sort={currentSort}
             trashed={trashed}
+            showLocale={showLocaleUI}
             onSort={handleSort}
             onDelete={handleDelete}
             onRestore={handleRestore}

@@ -101,6 +101,10 @@ export type BuildPublicListUrlOptions = {
   limit?: number;
   filter?: string;
   sort?: string;
+  /** Blank (the default) omits the param entirely — the public API then
+   *  answers with the default content locale, never "every locale" (design
+   *  §4.4). */
+  locale?: string;
 };
 
 /** `{prefix}/{typeKey}?page_size=&filter=&sort=` — the one anonymous list
@@ -118,6 +122,8 @@ export function buildPublicListUrl(options: BuildPublicListUrlOptions): string {
   if (filter) params.set('filter', filter);
   const sort = (options.sort ?? '').trim();
   if (sort) params.set('sort', sort);
+  const locale = (options.locale ?? '').trim();
+  if (locale) params.set('locale', locale);
   return `${prefix}/${typeKey}?${params.toString()}`;
 }
 

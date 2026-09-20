@@ -15,7 +15,18 @@ import { apiCreateRecord, apiCreateType, uniqueTypeKey } from './records-helpers
  * none at all.
  */
 
-const PUBLIC_SHAPE = ['data', 'display_title', 'published_at', 'slug', 'uuid'].sort();
+// `locale`/`translations` joined the public shape with content i18n (design
+// §4.4) — every record has a locale, and `translations` lists its published
+// siblings (empty for a record with none, as here).
+const PUBLIC_SHAPE = [
+  'data',
+  'display_title',
+  'locale',
+  'published_at',
+  'slug',
+  'translations',
+  'uuid',
+].sort();
 
 test.describe('Records — public read API', () => {
   test("serves a public type's list and one record, in the public shape, with no session", async ({
@@ -51,6 +62,13 @@ test.describe('Records — public read API', () => {
       expect(Object.keys(oneBody).sort()).toEqual(PUBLIC_SHAPE);
       expect(oneBody.display_title).toBe('Hello');
       expect(oneBody.data).toEqual({ title: 'Hello' });
+      expect(oneBody.locale).toBe('en');
+      // A published record's own group includes itself (Phase 5 §4.4's
+      // "the record itself is included" rule applies here too — there is no
+      // other member of this record's group).
+      expect(oneBody.translations).toEqual([
+        { locale: 'en', uuid: record.uuid, slug: record.slug },
+      ]);
       // Removed from the shape, not merely absent by accident — the audit
       // trail, `status`/`version`/`invalid` and `expanded` are all admin-only.
       for (const auditKey of [

@@ -1,7 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
@@ -16,17 +15,25 @@ import { RecordEnvelopeFields } from '../components/RecordEnvelopeFields';
 import { RecordForm } from '../components/RecordForm';
 import { RecordReferrers } from '../components/RecordReferrers';
 import { RecordRevisions } from '../components/RecordRevisions';
+import { RecordEditorHeaderBadges } from '../components/RecordStatusBadge';
 import { RecordsToaster } from '../components/RecordsToaster';
+import { RecordTranslations } from '../components/RecordTranslations';
 import { useRecordForm } from '../hooks/useRecordForm';
 import { ApiError, createRecord, updateRecord } from '../utils/api';
-import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
+import type { RecordRead, RecordStatus, TranslationRead, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
   record: RecordRead | null;
-  /** "Referenced by" badge count (`views.py::record_edit`) — absent on the
-   *  new-record screen, which has no uuid anything could reference yet. */
+  /** "Referenced by" badge count — absent on the new-record screen. */
   referrer_count?: number;
+  /** The record's translation group, current record included — `[]` on the
+   *  new-record screen, which has no group yet (`views.py::record_new`). */
+  translations?: TranslationRead[];
+  /** Every content locale the module is configured for (design §4.4); absent
+   *  degrades to "no language UI", as `news`' list screen treats it. */
+  content_locales?: string[];
+  default_locale?: string;
 };
 
 const DATA_ID = 'record-data';
@@ -41,13 +48,26 @@ const ENVELOPE_KEYS = ['status', 'slug', 'position'];
  * back re-populates the fields from what was typed. A trashed record loads
  * here too (for `records.edit`): the `Deleted` badge above and the
  * restore/purge buttons in `RecordActions` are how it's reached from the UI. */
-function RecordEditor({ type, record, referrer_count }: Props) {
+function RecordEditor({
+  type,
+  record,
+  referrer_count,
+  translations,
+  content_locales,
+  default_locale,
+}: Props) {
   const { t } = useT();
   const isNew = record === null;
+  const contentLocales = content_locales ?? [];
+  const defaultLocale = default_locale ?? contentLocales[0] ?? 'en';
+  // Only a new record on a translatable type with several locales gets to
+  // pick one — an existing record's language is fixed for its lifetime.
+  const showLocalePicker = isNew && type.translatable && contentLocales.length > 1;
   const [current, setCurrent] = useState<RecordRead | null>(record);
   const [status, setStatus] = useState<RecordStatus>(record?.status ?? 'draft');
   const [slug, setSlug] = useState(record?.slug ?? '');
   const [position, setPosition] = useState(String(record?.position ?? 0));
+  const [locale, setLocale] = useState(defaultLocale);
   const [conflict, setConflict] = useState<RecordRead | null>(null);
   const [pending, setPending] = useState(false);
   const form = useRecordForm(type, record);
@@ -57,7 +77,13 @@ function RecordEditor({ type, record, referrer_count }: Props) {
     const data = form.validateAndBuild();
     if (data === null) return;
 
-    const payload = { data, status, slug: slug || null, position: Number(position) || 0 };
+    const payload = {
+      data,
+      status,
+      slug: slug || null,
+      position: Number(position) || 0,
+      ...(showLocalePicker ? { locale } : {}),
+    };
     setPending(true);
     try {
       const saved = isNew
@@ -141,18 +167,7 @@ function RecordEditor({ type, record, referrer_count }: Props) {
         }
       >
         <div className="space-y-6">
-          {current?.schema_stale && (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
-              {t('records.editor.schema_stale', {
-                defaultValue: 'Fields changed since this was saved',
-              })}
-            </Badge>
-          )}
-          {current?.is_deleted && (
-            <Badge variant="destructive">
-              {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
-            </Badge>
-          )}
+          <RecordEditorHeaderBadges current={current} translatable={type.translatable} />
 
           {conflict && (
             <ConflictPanel
@@ -170,7 +185,19 @@ function RecordEditor({ type, record, referrer_count }: Props) {
             onStatusChange={setStatus}
             onSlugChange={setSlug}
             onPositionChange={setPosition}
+            {...(showLocalePicker
+              ? { locale, locales: contentLocales, onLocaleChange: setLocale }
+              : {})}
           />
+
+          {current && type.translatable && contentLocales.length > 1 && (
+            <RecordTranslations
+              typeKey={type.key}
+              record={current}
+              locales={contentLocales}
+              translations={translations ?? []}
+            />
+          )}
 
           {unplaceable.length > 0 && (
             <ul

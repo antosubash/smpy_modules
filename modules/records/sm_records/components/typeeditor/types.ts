@@ -22,6 +22,10 @@ export type TypeEditorProps = {
    *  is on, since the prefix is a DB-backed setting the browser has no other
    *  way to know (design §11). */
   public_route_prefix: string;
+  /** Every content locale the module runs (design §4.4) — the "Translatable"
+   *  toggle's help text names them, since that list is DB-backed configuration
+   *  the browser has no other way to know. */
+  content_locales: string[];
 };
 
 /** A field row's local editing state. Identical in shape to the wire
@@ -99,6 +103,7 @@ export type TypeMetadataValues = {
   allowedRoles: string[];
   displayField: string;
   slugField: string;
+  translatable: boolean;
 };
 
 export const TOP_LEVEL_ERROR_FIELDS = new Set([
@@ -112,4 +117,5 @@ export const TOP_LEVEL_ERROR_FIELDS = new Set([
   'is_public',
   'allowed_roles',
   'fields',
+  'translatable',
 ]);

@@ -6,6 +6,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { useState } from 'react';
 
 import { opsForFieldType } from '../utils/filters';
+import { localeLabel } from '../utils/locale';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 
 /** Labels for the filter grammar's operators. A plain `t()` call per op
@@ -40,15 +41,17 @@ export type FilterValue = { field: string; op: FilterOp; value: string } | null;
 
 type FilterableField = { key: string; label: string; ops: readonly FilterOp[] };
 
-/** The two fixed columns every type can filter on regardless of its schema
+/** The fixed columns every type can filter on regardless of its schema
  *  (`sm_records.index.query.FIXED_COLUMNS`), narrowed to the one operator
  *  each is actually useful with here: `status` is a two-value enum, so
  *  anything but "is" is unhelpful noise, and `display_title` is free text,
  *  where "starts with" and "contains" are the two ops the fixed-column query
  *  layer accepts for it (`fixed_clause`: both need a text column, `gt`/`lt`
- *  need an ordered one — `display_title` is text and not ordered). */
-function fixedFilterFields(t: Translate): FilterableField[] {
-  return [
+ *  need an ordered one — `display_title` is text and not ordered). `locale`
+ *  only joins the list when the caller passes more than one — a single-locale
+ *  install has nothing to filter between (design §4.4). */
+function fixedFilterFields(t: Translate, locales: string[]): FilterableField[] {
+  const fields: FilterableField[] = [
     {
       key: 'display_title',
       // `starts_with` first: it is the one an index on
@@ -64,6 +67,14 @@ function fixedFilterFields(t: Translate): FilterableField[] {
       ops: ['eq'],
     },
   ];
+  if (locales.length > 1) {
+    fields.push({
+      key: 'locale',
+      label: t('records.records.locale', { defaultValue: 'Language' }),
+      ops: ['eq'],
+    });
+  }
+  return fields;
 }
 
 /**
@@ -85,11 +96,15 @@ export function FilterBar({
   current,
   onApply,
   onClear,
+  locales = [],
 }: {
   fields: FieldDef[];
   current: FilterValue;
   onApply: (field: string, op: FilterOp, value: string) => void;
   onClear: () => void;
+  /** Every content locale the module runs — omit or pass a single-entry list
+   *  for a type that isn't translatable or an install that only runs one. */
+  locales?: string[];
 }) {
   const { t } = useT();
   const indexed: FilterableField[] = fields
@@ -112,7 +127,10 @@ export function FilterBar({
   // reserved field keys (`typeeditor/rules.ts::RESERVED_FIELD_KEYS`), but a
   // type saved before that still carries such a field.
   const declared = new Set(indexed.map((f) => f.key));
-  const filterable = [...indexed, ...fixedFilterFields(t).filter((f) => !declared.has(f.key))];
+  const filterable = [
+    ...indexed,
+    ...fixedFilterFields(t, locales).filter((f) => !declared.has(f.key)),
+  ];
   const fieldByKey = new Map(filterable.map((f) => [f.key, f]));
 
   const initialField = current?.field ?? filterable[0]?.key ?? '';
@@ -133,12 +151,14 @@ export function FilterBar({
   const allowedOps = fieldByKey.get(field)?.ops ?? FILTER_OPS;
   const needsValue = op !== 'is_null';
   const isStatus = field === 'status';
+  const isLocale = field === 'locale';
 
   const selectField = (nextField: string) => {
     setField(nextField);
     const nextOps = fieldByKey.get(nextField)?.ops ?? FILTER_OPS;
     if (!nextOps.includes(op)) setOp(nextOps[0] ?? 'eq');
     if (nextField === 'status' && value !== 'draft' && value !== 'published') setValue('draft');
+    if (nextField === 'locale' && !locales.includes(value)) setValue(locales[0] ?? '');
   };
 
   return (
@@ -194,7 +214,25 @@ export function FilterBar({
           </NativeSelect>
         </div>
       )}
-      {needsValue && !isStatus && (
+      {needsValue && isLocale && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="records-filter-value">
+            {t('records.records.filter_value', { defaultValue: 'Value' })}
+          </Label>
+          <NativeSelect
+            id="records-filter-value"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          >
+            {locales.map((tag) => (
+              <NativeSelectOption key={tag} value={tag}>
+                {localeLabel(tag)}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
+      {needsValue && !isStatus && !isLocale && (
         <div className="grid gap-1.5">
           <Label htmlFor="records-filter-value">
             {t('records.records.filter_value', { defaultValue: 'Value' })}

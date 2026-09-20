@@ -45,7 +45,13 @@ const TYPES_LIST_HREF = '/admin/records/';
  * "Preview changes" before saving and by the save itself, which the server
  * enforces with a dry-run (§8.2) rather than trusting the client to have run
  * one. */
-function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEditorProps) {
+function TypeEditor({
+  type,
+  target_types,
+  roles,
+  public_route_prefix,
+  content_locales,
+}: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
   const [current, setCurrent] = useState<TypeRead | null>(type);
@@ -54,6 +60,10 @@ function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEdit
   const [originalKeys] = useState<Set<string>>(new Set((type?.fields ?? []).map((f) => f.key)));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
+  // A 409 from turning "Translatable" off while foreign-locale records exist
+  // (design §4.1) — not one of `useSchemaApply`'s four known 409/422 shapes,
+  // so it is rethrown to here rather than handled there.
+  const [translatableError, setTranslatableError] = useState<string | null>(null);
 
   // `current` is seeded once from `type` (the initial `useState` argument is
   // only read on mount), so a background `router.reload({ only: ['type'] })'
@@ -93,6 +103,8 @@ function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEdit
 
   const save = async () => {
     setPending(true);
+    setTranslatableError(null);
+    let changedTranslatable = false;
     try {
       if (isNew) {
         setCreateErrors([]);
@@ -108,6 +120,7 @@ function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEdit
       }
       if (!current) return;
       const changes = buildChanges(current, values, fields);
+      changedTranslatable = 'translatable' in changes;
       if (Object.keys(changes).length === 0) {
         toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
         return;
@@ -115,7 +128,12 @@ function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEdit
       schemaApply.reset();
       await schemaApply.run(attemptUpdate, { expected_version: current.version, ...changes });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
+      // Turning "Translatable" off while records in another locale exist —
+      // a 409 that carries none of `useSchemaApply`'s four known shapes
+      // (`current`/`report`/`conflicts`), so it lands here instead of there.
+      if (err instanceof ApiError && err.status === 409 && changedTranslatable) {
+        setTranslatableError(err.body?.detail ?? err.message);
+      } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         setCreateErrors(err.body.errors);
       } else {
         toast.error(err instanceof Error ? err.message : String(err));
@@ -179,6 +197,8 @@ function TypeEditor({ type, target_types, roles, public_route_prefix }: TypeEdit
                 onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
                 errors={topLevelErrors}
                 publicRoutePrefix={public_route_prefix}
+                contentLocales={content_locales}
+                translatableError={translatableError}
               />
             </CardContent>
           </Card>

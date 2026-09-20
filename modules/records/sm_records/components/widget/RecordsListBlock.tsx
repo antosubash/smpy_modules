@@ -61,6 +61,10 @@ const BASE_FIELDS = {
     type: 'text',
     label: 'Sort (e.g. -published_at for newest first)',
   },
+  locale: {
+    type: 'text',
+    label: 'Locale (blank = default content locale)',
+  },
   limit: { type: 'number', label: 'How many', min: 1, max: 50 },
   layout: { type: 'select', label: 'Layout', options: LAYOUT_OPTIONS },
   title: { type: 'text', label: 'Heading' },
@@ -107,6 +111,7 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
     typeIsPublic: null,
     filter: '',
     sort: '',
+    locale: '',
     limit: 10,
     layout: 'list',
     title: '',

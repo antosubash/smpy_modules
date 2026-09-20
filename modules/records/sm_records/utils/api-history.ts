@@ -12,6 +12,7 @@ import type {
   RecordRevision,
   RecordRevisionDetail,
   ReferrersResponse,
+  TranslationRead,
   TypeRead,
   TypeRevision,
 } from './types';
@@ -82,5 +83,33 @@ export function listReferrers(
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return request(
     `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/referrers${suffix}`,
+  );
+}
+
+// ---- Translations -------------------------------------------------------
+
+/** `GET .../records/{uuid}/translations` — the record's siblings, for the
+ *  editor's Languages panel (design §4.4). */
+export function listTranslations(typeKey: string, uuid: string): Promise<TranslationRead[]> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/translations`,
+  );
+}
+
+export type CreateTranslationPayload = { locale: string; slug?: string };
+
+/** `POST .../records/{uuid}/translations` — creates a sibling in `locale`,
+ *  draft, with the source's payload and position copied and its slug
+ *  regenerated in the target locale (design §4.3). 409 if that locale's
+ *  sibling already exists or the type is not translatable; 422 for a locale
+ *  outside the module's configured content locales. */
+export function createTranslation(
+  typeKey: string,
+  uuid: string,
+  body: CreateTranslationPayload,
+): Promise<RecordRead> {
+  return request(
+    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/translations`,
+    { method: 'POST', body: JSON.stringify(body) },
   );
 }

@@ -20,6 +20,7 @@ const ID = {
   description: 'type-editor-description',
   icon: 'type-editor-icon',
   isPublic: 'type-editor-is-public',
+  translatable: 'type-editor-translatable',
   displayField: 'type-editor-display-field',
   slugField: 'type-editor-slug-field',
 };
@@ -44,6 +45,8 @@ export function TypeMetadataForm({
   onChange,
   errors,
   publicRoutePrefix,
+  contentLocales,
+  translatableError,
 }: {
   isNew: boolean;
   fields: EditableField[];
@@ -55,6 +58,13 @@ export function TypeMetadataForm({
    *  once it's switched on, since the prefix is DB-backed and the browser
    *  has no other way to know it (design §11). */
   publicRoutePrefix: string;
+  /** Every content locale the module runs — named in "Translatable"'s help
+   *  text, since that list is DB-backed configuration (design §4.4). */
+  contentLocales: string[];
+  /** A 409 from turning "Translatable" off while records in another locale
+   *  exist (design §4.1) — not a field-scoped `422`, so it doesn't arrive
+   *  through `errors` and is shown here instead. */
+  translatableError?: string | null;
 }) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
@@ -189,6 +199,34 @@ export function TypeMetadataForm({
             })}
           </p>
         </div>
+      )}
+
+      <div className="flex items-center gap-2 sm:col-span-2">
+        <Switch
+          id={ID.translatable}
+          data-testid="records-translatable-toggle"
+          checked={values.translatable}
+          onCheckedChange={(checked) => onChange({ translatable: checked === true })}
+        />
+        <Label htmlFor={ID.translatable} className="font-normal">
+          {t('records.type_editor.translatable', { defaultValue: 'Translatable' })}
+        </Label>
+      </div>
+      <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
+        {t('records.type_editor.translatable_help', {
+          locales: contentLocales.join(', '),
+          defaultValue:
+            'Records can exist in several languages ({locales}); each translation is its own record with its own slug.',
+        })}
+      </p>
+      {translatableError && (
+        <p
+          className="-mt-2 text-sm text-destructive sm:col-span-2"
+          role="alert"
+          data-testid="records-translatable-error"
+        >
+          {translatableError}
+        </p>
       )}
 
       <div className="grid gap-1.5 sm:col-span-2">

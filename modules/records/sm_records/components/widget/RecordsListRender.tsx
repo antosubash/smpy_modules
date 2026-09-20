@@ -197,6 +197,7 @@ export function RecordsListRender(props: RecordsListRenderProps) {
         limit: props.limit,
         filter: props.filter,
         sort: props.sort,
+        locale: props.locale,
       },
       controller.signal,
     )
@@ -206,7 +207,15 @@ export function RecordsListRender(props: RecordsListRenderProps) {
         setState({ status: 'error' });
       });
     return () => controller.abort();
-  }, [props.typeKey, props.apiPrefix, props.limit, props.filter, props.sort, skipFetch]);
+  }, [
+    props.typeKey,
+    props.apiPrefix,
+    props.limit,
+    props.filter,
+    props.sort,
+    props.locale,
+    skipFetch,
+  ]);
 
   const showHint = isEditing && props.typeIsPublic === false;
 

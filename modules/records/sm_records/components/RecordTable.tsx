@@ -15,7 +15,7 @@ import type { RecordRead, TypeRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RecordCell } from './RecordCell';
 import { RecordDeleteDialog } from './RecordDeleteDialog';
-import { RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
+import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
 
 /**
@@ -30,6 +30,7 @@ export function RecordTable({
   records,
   sort,
   trashed = false,
+  showLocale = false,
   onSort,
   onDelete,
   onRestore,
@@ -41,6 +42,10 @@ export function RecordTable({
    *  "Restore" rather than "Delete" — deleting an already-trashed row makes
    *  no sense, and restoring one that isn't does not either. */
   trashed?: boolean;
+  /** The type is translatable and the module runs more than one content
+   *  locale — an editor's question is "what exists", not "what exists in
+   *  English" (design §4.4), hence a column rather than a filtered default. */
+  showLocale?: boolean;
   onSort: (field: string) => void;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
@@ -64,6 +69,14 @@ export function RecordTable({
             sort={sort}
             onSort={onSort}
           />
+          {showLocale && (
+            <SortableHeader
+              field="locale"
+              label={t('records.records.locale', { defaultValue: 'Language' })}
+              sort={sort}
+              onSort={onSort}
+            />
+          )}
           {columns.map((field) => (
             <SortableHeader
               key={field.key}
@@ -114,6 +127,11 @@ export function RecordTable({
                 {record.schema_stale && <SchemaStaleBadge />}
               </div>
             </TableCell>
+            {showLocale && (
+              <TableCell>
+                <RecordLocaleBadge locale={record.locale} />
+              </TableCell>
+            )}
             {columns.map((field) => (
               <TableCell key={field.key} className="text-muted-foreground">
                 <RecordCell
