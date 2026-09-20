@@ -57,6 +57,57 @@ this is a deliberate hard rule, not a v1 limitation, and it is what keeps
 performance a property of the schema rather than a cliff discovered under
 load.
 
+### Paging a large type
+
+`GET /api/records/types/{key}/records` takes `?page=` and `?page_size=` as it
+always has, and three parameters that exist because none of the above scales
+past a type of a few thousand records. The same three are available on the
+public read API.
+
+| parameter | does |
+|---|---|
+| `?after=<cursor>` | returns the page *after* the row a previous page's `next_cursor` names, with no `OFFSET` |
+| `?total=false` | skips the count query entirely: `total` comes back `null` |
+| — | `total` is exact up to `max_count`; beyond it `total` is `max_count` and `total_capped` is `true` |
+
+A page reads back as
+`{items, total, total_capped, page, page_size, next_cursor}`.
+
+**The count is bounded.** A page can stop after `page_size` matches; the
+`COUNT` behind `total` never can, so a filter matching most of a large type
+paid for all of it on every page of it. `total` is now exact up to `max_count`
+(10,000 by default) and reported as that ceiling with `total_capped: true`
+beyond it — the admin list renders that as "10,000+". A caller that does not
+render the number should send `?total=false` and skip the statement.
+
+**`?after=` is keyset pagination.** Read `next_cursor` off a page and send it
+as `?after=` to get the next one; `null` means there are no more. The cost of
+page 200 is then the cost of page 1, which `?page=200` is not — `OFFSET`
+produces and discards everything before the page it wants. Walking a whole
+type looks like:
+
+```python
+url = "/api/records/types/order/records?page_size=200&sort=-placed_at&total=false"
+while url:
+    page = client.get(url).json()
+    handle(page["items"])
+    cursor = page["next_cursor"]
+    url = f"...&after={cursor}" if cursor else None
+```
+
+The cursor is opaque (base64 of the row's sort values and its id) but not
+secret, and it carries a digest of the sort it was produced under. Three
+things are a `400`: a cursor that does not decode, a cursor replayed under a
+different `?sort=` or against the trash, and `?page=` and `?after=` sent
+together — they are two ways of asking for a page and the server will not
+guess which one you meant. `?page=` stays for the admin UI, which shows
+numbered pages.
+
+A full final page still returns a `next_cursor`; the request after it comes
+back empty with `next_cursor: null`. That is one extra round trip at the end
+of a walk and is the ordinary contract of cursor pagination — "fewer rows than
+asked for" is the only end-of-data signal that survives a capped `total`.
+
 ### Showing records on a page
 
 When `simple_module_pagebuilder` is also installed, this module contributes a
@@ -110,10 +161,21 @@ variables are read. Configure on the Settings screen or with
 | `max_page_size` | 200 | no |
 | `revision_limit` | 50 per record | no |
 | `max_payload_bytes` | 262144 (256 KB) | no |
+| `max_count` | 10000 | no |
+| `preview_sync_limit` | 5000 | no |
+| `preview_job_ttl_seconds` | 600 (10 min) | no |
+| `max_import_bytes` | 52428800 (50 MB) | no |
 | `max_fields_per_type` | 100 | no |
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
+
+`max_count` is how far a list page's `total` is counted exactly — see
+[Paging a large type](#paging-a-large-type). `preview_sync_limit` is the
+largest type a schema preview will dry-run inside the request, and
+`preview_job_ttl_seconds` is how long a finished preview's report stays
+reusable by the save that follows it — see
+[Changing a schema that already holds records](#changing-a-schema-that-already-holds-records).
 
 `public_route_prefix` is the one setting a change to needs a restart. The
 routes it configures are mounted — and exempted from authentication — while
@@ -188,7 +250,7 @@ published records anonymously at two routes, under `public_route_prefix`
 
 | route | answers |
 |---|---|
-| `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, page, page_size}` |
+| `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, total_capped, page, page_size, next_cursor}` |
 | `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
 
 A record reads back as `uuid`, `slug`, `display_title`, `published_at` and
@@ -217,6 +279,10 @@ The rules worth knowing before you point a site at it:
   `expand` and `trashed` are simply not parameters here; unknown ones are
   ignored.
 - `page_size` is clamped to `max_page_size` rather than refused.
+- **`?after=`, `?total=false` and the `max_count` bound apply here too** — see
+  [Paging a large type](#paging-a-large-type). A client walking a large public
+  type is precisely the caller that should not be paying for an `OFFSET` and a
+  count it never reads.
 
 ## Permissions
 
@@ -344,6 +410,29 @@ record (trash included) so you can see what would break before saving.
 - `slug_field` changes never regenerate existing slugs — a slug is an
   address, and regenerating could break links or collide with a slug handed
   out since. Only records written after the change use the new pointer.
+
+**A preview of a big type runs as a job.** The dry run validates every record
+of the type, trash included, at roughly a thousand records a second — a few
+seconds on a small type and minutes on a large one, with whatever proxy
+timeout that implies. `POST .../schema/preview` therefore answers `200` with
+the report up to `preview_sync_limit` records (5,000 by default) and
+`202 {"job": "...", "status": "running"}` above it, running the scan after the
+response. Poll `GET /api/records/types/{key}/schema/preview/{job}` for
+`{status, checked, total, preview}`; the type editor does this once a second
+and shows "Checked N of M…". A `404` from the poll means this process no
+longer holds the job — the registry is in-memory and bounded, by design, since
+§8.9 refuses to persist a report about records that may have changed — and the
+answer to one is simply to preview again, which writes nothing.
+
+Saving straight after a preview does not scan twice. `PUT /types/{key}` reuses
+a completed job's report when it was taken against the same type, the same
+proposed fields **and the same `version`** — the value the caller already has
+to send as `expected_version` and which the save has already checked under the
+type's row lock, so the schema the report describes is provably the schema
+being changed. What that does not cover is records written in between, which
+is what `preview_job_ttl_seconds` bounds (10 minutes by default); set it to
+`0` to make every save run its own pass. A save with no matching preview, or
+one resolving orphaned keys with `discard`, always runs its own.
 
 Field keys are immutable: a "rename" is a remove plus an add, and is
 treated as one. Every schema change writes a type revision;

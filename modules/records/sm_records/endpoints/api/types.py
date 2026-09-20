@@ -14,11 +14,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schema_change import (
-    SchemaPreviewRead,
-    SchemaPreviewRequest,
     TypeRestoreRequest,
     TypeRevisionListResponse,
-    schema_preview_read,
     type_revision_read,
 )
 from sm_records.contracts.schemas import (
@@ -46,7 +43,6 @@ from sm_records.services import revisions as revision_service
 from sm_records.services import types as type_service
 from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
-from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute)
@@ -205,39 +201,6 @@ async def delete_type(
     """
     check_type_roles(request, rtype)
     await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
-
-
-@router.post(
-    "/types/{key}/schema/preview",
-    response_model=SchemaPreviewRead,
-    dependencies=[require_manage_types],
-)
-async def preview_schema(
-    body: SchemaPreviewRequest,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-) -> SchemaPreviewRead:
-    """Writes nothing (design §8.9) — see ``endpoints/api/_errors.py``'s
-    module docstring on why this handler still has no ``try``/``except`` of
-    its own: nothing here can leave writes for ``RecordsErrorRoute`` to
-    discard, because nothing here writes.
-
-    ``exclude_unset`` is what lets a caller that only ever sends ``fields``
-    (today's UI) reach :func:`schema_change.preview` without its
-    ``display_field``/``slug_field`` arguments at all, rather than as an
-    explicit ``None`` that would misread as "clear the pointer".
-    """
-    sent = body.model_dump(exclude_unset=True)
-    diff, report = await schema_change.preview(
-        db,
-        rtype,
-        body.fields,
-        settings,
-        display_field=sent.get("display_field", MISSING),
-        slug_field=sent.get("slug_field", MISSING),
-    )
-    return schema_preview_read(diff, report)
 
 
 @router.post("/types/{key}/reindex", status_code=202, dependencies=[require_manage_types])

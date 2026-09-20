@@ -2,22 +2,23 @@
 
 Three entry points, one pipeline: :func:`preview` classifies a proposed
 ``fields`` list and reports what it would do to the records that exist,
-writing nothing; :func:`apply` re-runs that classification *inline* and then
-writes — re-run rather than trusting a report id, because a report taken
-minutes ago is a report about a different database (§8.9); :func:`rollback`
+writing nothing; :func:`apply` re-runs that classification and then writes —
+re-run rather than trusting a report id, because a report taken minutes ago
+is a report about a different database (§8.9), with the one narrow exception
+``_preview.reused_report`` argues for; :func:`rollback`
 writes an earlier :class:`RecordTypeRevision` back through :func:`apply`, so
 an undo is classified, and refusable, like any other change (§8.6).
 
 **The payload never migrates here.** A restrictive change applied with
 ``force`` leaves the failing rows exactly as they were: *marked*, not mutated
 and not hidden (§8.3 — ``services.records.read_view`` reports them under
-``invalid``). The only rows this module ever rewrites are the reserved
+``invalid``). The only rows this module rewrites are the reserved
 ``_orphaned`` sub-key on an explicit ``discard``, and the index, which is
-derived and therefore rebuilt out of request (§8.5, :mod:`reindex_runner`).
-"""
+derived and rebuilt out of request (§8.5, :mod:`reindex_runner`)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import select
@@ -34,7 +35,7 @@ from sm_records.services._claims import lock_type
 from sm_records.services._common import guarded_bump, reload, utcnow
 from sm_records.services._dry_run import change_report
 from sm_records.services._payload import field_defs
-from sm_records.services._preview import MISSING, pointer_preview_changes
+from sm_records.services._preview import MISSING, pointer_preview_changes, reused_report
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
 from sm_records.services.errors import (
     Conflict,
@@ -61,6 +62,7 @@ async def preview(
     *,
     display_field: Any = MISSING,
     slug_field: Any = MISSING,
+    on_progress: Callable[[int], None] | None = None,
 ) -> tuple[SchemaDiff, DryRunReport]:
     """Classify a proposed ``fields`` list and dry-run it. Writes nothing.
 
@@ -68,6 +70,10 @@ async def preview(
     (re-exported here), not ``None`` — a caller that left a pointer out must
     not be read as clearing it. A ``display_field`` change is folded into the
     diff as an index-affecting entry, so a pointer-only edit still previews.
+
+    ``on_progress`` belongs to the deferred path (``services.preview_jobs``):
+    the scan reports its running ``checked`` count per batch so a polling
+    client can show it, and it is ``None`` when the caller is waiting.
     """
     new_defs, _ = normalise(fields_raw, settings)
     diff = diff_fields(field_defs(rtype), new_defs)
@@ -77,14 +83,17 @@ async def preview(
     conflicts = await _orphaned.count_conflicts(
         db, rtype, _added_keys(diff), batch_size=settings.reindex_batch_size
     )
-    return diff, await change_report(db, rtype, new_defs, settings, diff=diff, conflicts=conflicts)
+    report = await change_report(
+        db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, on_progress=on_progress
+    )
+    return diff, report
 
 
 def _refusal(rtype: RecordType, report: DryRunReport) -> str:
     return (
-        f"{report.failing} of {report.checked} {rtype.key} record(s) would not satisfy the "
-        "new schema; re-send with a default that makes them valid, or force=True to apply "
-        "the change and mark them"
+        f"{report.failing} of {report.checked} {rtype.key} record(s) would not satisfy the new "
+        "schema; re-send with a default that makes them valid, or force=True to apply the "
+        "change and mark them"
     )
 
 
@@ -121,35 +130,32 @@ async def apply(
     changes: dict[str, Any] | None = None,
 ) -> tuple[RecordType, SchemaDiff]:
     """Classify, refuse or write. Design §8.2, §8.5, §8.6, §8.8.
-
     ``fields_raw`` omitted keeps the current field list — the pointer-only
-    edit (``display_field``/``slug_field``, in ``changes`` with any other
-    plain column), which still belongs here because ``display_field`` alone
-    enqueues a whole-type rebuild.
+    edit (``display_field``/``slug_field``, in ``changes`` with any other plain
+    column), which belongs here because ``display_field`` alone enqueues a
+    whole-type rebuild.
 
     ``force=True`` applies a restrictive change **and leaves the failing rows
-    untouched** — not mutated, not hidden, not migrated: they read back with
-    an ``invalid`` list naming the fields (§8.2/§8.3), and the next ordinary
-    write of each is what brings it up to the new shape.
+    untouched** — not mutated, not hidden, not migrated: they read back with an
+    ``invalid`` list naming the fields (§8.2/§8.3), and the next ordinary write
+    of each brings it up to the new shape.
 
     ``orphaned`` is ``"restore"`` or ``"discard"``, required exactly when the
-    report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes
-    nothing — the read path already falls back to ``_orphaned`` for a
-    declared key — but it is still dry-run first and still refusable: §8.8
-    offers a restore where the values *validate*, and values written under a
-    definition that has since changed need not (see :func:`_needs_dry_run`).
-    ``"discard"`` is the one bulk payload write in §8.
+    report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes nothing
+    — the read path already falls back to ``_orphaned`` for a declared key —
+    but it is still dry-run first and still refusable: §8.8 offers a restore
+    where the values *validate*, and values written under a definition that
+    has since changed need not. ``"discard"`` is the one bulk payload write.
 
     A ``fields_raw`` equal to what is stored is not a change: the schema bump,
-    the revision snapshot and the rebuild are all skipped, and only ``version``
+    the revision snapshot and the rebuild are skipped, and only ``version``
     moves.
 
     The version bump is deliberately *not* the first statement, though §8.6
     describes it that way: the row lock and version check happen first, so a
     stale caller gets its 409 before the scan — but the guarded ``UPDATE``
-    itself happens after the dry run, so a refusal leaves nothing written,
-    as a property of this module rather than of callers remembering to
-    roll back.
+    itself happens after the dry run, so a refusal leaves nothing written, as
+    a property of this module rather than of callers remembering to roll back.
     """
     changes = dict(changes or {})
     new_defs, new_fields = (
@@ -193,7 +199,18 @@ async def apply(
     # must judge each record without them — otherwise a change is refused for
     # values the operator has already said to throw away.
     drop = frozenset(conflicts) if orphaned == _orphaned.DISCARD else frozenset()
-    report = await change_report(
+    # The scan is the expensive half of a schema change on a large type, so
+    # "Preview changes" then "Save" pays for one pass rather than two when the
+    # two describe the same thing — ``_preview.reused_report`` says when.
+    report = reused_report(
+        rtype,
+        current_version=current.version,
+        fields_raw=new_fields if new_fields is not None else list(rtype.fields or []),
+        display_field=changes.get("display_field", rtype.display_field),
+        slug_field=changes.get("slug_field", rtype.slug_field),
+        settings=settings,
+        drop_keys=drop,
+    ) or await change_report(
         db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, drop_keys=drop
     )
     if report.failing and not force:
@@ -226,9 +243,8 @@ async def apply(
     if orphaned == _orphaned.DISCARD and conflicts:
         await _orphaned.discard(db, rtype, list(conflicts), batch_size=settings.reindex_batch_size)
     # ``display_field`` feeds every record's denormalised ``display_title``
-    # (§18 Q2), so changing it is a whole-type rebuild; ``slug_field`` is not
-    # — a slug is an address, and regenerating one already handed out would
-    # break every link to it (only records written after take the new one).
+    # (§18 Q2), so changing it is a whole-type rebuild; ``slug_field`` is not —
+    # a slug is an address, and regenerating one handed out breaks every link.
     await _mark_pending(
         db, rtype, list(diff.keys(ChangeClass.INDEX_AFFECTING)), whole_type=display_moved
     )
@@ -251,8 +267,8 @@ async def rollback(
     Not a restore in the "put the row back" sense: the earlier ``fields`` go
     through :func:`apply` and are classified against what is stored *now*.
     Undoing a field deletion is therefore an addition, which meets §8.8's
-    orphaned-key refusal — the point: the values are still there, and
-    whether they come back is the operator's call, not the undo's.
+    orphaned-key refusal — the point: the values are still there, and whether
+    they come back is the operator's call, not the undo's.
     """
     revision = (
         (

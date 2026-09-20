@@ -7,6 +7,8 @@ import type { SharedProps } from '@simple-module-py/ui/types';
 import type React from 'react';
 
 import { FilterBar, type FilterValue } from '../components/FilterBar';
+import { RecordIoMenu } from '../components/RecordIoMenu';
+import { RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
 import { deleteRecord, restoreRecord } from '../utils/api';
@@ -146,10 +148,14 @@ function RecordList({ type, records }: Props) {
     router.reload({ only: ['records'] });
   };
 
-  const hasPrev = records.page > 1;
-  const hasNext = records.page * records.page_size < records.total;
-  const rangeStart = records.total === 0 ? 0 : (records.page - 1) * records.page_size + 1;
-  const rangeEnd = Math.min(records.page * records.page_size, records.total);
+  // `total` is exact only up to `RecordsSettings.max_count` (F4): beyond it
+  // the API reports the cap with `total_capped`, and the footer says
+  // "10,000+" rather than a number that is not the number. Everything that
+  // uses it for arithmetic — the range, and whether there is a next page —
+  // reads the same capped value, so a capped listing simply pages to the cap
+  // and the cursor contract (`next_cursor`) is what an API client walks past
+  // it with.
+  const known = records.total ?? 0;
 
   return (
     <>
@@ -162,6 +168,10 @@ function RecordList({ type, records }: Props) {
             <Button variant="outline" onClick={() => router.visit('/admin/records')}>
               {t('records.types.title', { defaultValue: 'Record Types' })}
             </Button>
+            {/* `search` and not `''`: "Export" means "export what this screen
+                is showing", so the current `filter`/`sort`/`trashed` travel
+                with it — `exportUrl` drops only `page`. */}
+            <RecordIoMenu typeKey={type.key} search={search.toString()} canEdit={canEdit} />
             {canEdit && (
               <Button
                 type="button"
@@ -221,38 +231,13 @@ function RecordList({ type, records }: Props) {
           />
         )}
 
-        {records.total > records.page_size && (
-          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-            <span>
-              {t('records.records.page_info', {
-                start: rangeStart,
-                end: rangeEnd,
-                total: records.total,
-                defaultValue: 'Showing {start}–{end} of {total}',
-              })}
-            </span>
-            <div className="space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!hasPrev}
-                onClick={() => goTo({ page: records.page - 1 })}
-              >
-                {t('records.records.previous', { defaultValue: 'Previous' })}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!hasNext}
-                onClick={() => goTo({ page: records.page + 1 })}
-              >
-                {t('records.records.next', { defaultValue: 'Next' })}
-              </Button>
-            </div>
-          </div>
-        )}
+        <RecordPagination
+          page={records.page}
+          pageSize={records.page_size}
+          total={known}
+          capped={records.total_capped}
+          onGo={(next) => goTo({ page: next })}
+        />
       </PageShell>
     </>
   );

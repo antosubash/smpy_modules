@@ -12,7 +12,7 @@ Re-exported from ``deps``, so every endpoint keeps importing one module.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Any, Final, NamedTuple
 
 from fastapi import HTTPException, Query
 
@@ -21,6 +21,8 @@ from sm_records.index.query import Filter, FilterOp, Sort
 
 __all__ = [
     "MALFORMED_FILTER",
+    "PageCursor",
+    "parse_cursor",
     "parse_expand",
     "parse_filters",
     "parse_sorts",
@@ -120,3 +122,41 @@ def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[
         Sort(field=item[1:], desc=True) if item.startswith("-") else Sort(field=item, desc=False)
         for item in raw_sorts
     ]
+
+
+class PageCursor(NamedTuple):
+    """``?after=`` and ``?total=``, parsed — the two knobs of F11 and F4.
+
+    Carried as one object rather than two parameters because the refusal
+    below is about their *combination* with ``?page=``, and a dependency that
+    sees only one of them cannot make it.
+    """
+
+    after: str | None
+    with_total: bool
+
+
+def parse_cursor(
+    page: int = Query(default=1, ge=1),
+    after: str | None = Query(default=None),
+    total: bool = Query(default=True),
+) -> PageCursor:
+    """``?after=<cursor>`` pages by keyset; ``?page=`` still pages by offset.
+
+    Sending both is a 400 rather than a precedence rule. They answer the same
+    question differently — "the 200th page of this order" against "whatever
+    follows this row" — and a caller that sent both has a bug the server
+    cannot resolve in its favour: silently honouring one would hand back a
+    page that is correct for a request nobody made.
+
+    ``?total=false`` drops the count statement entirely (``total: null``,
+    ``total_capped: false``), which is what a caller walking the type with
+    ``after`` should send — it is otherwise paying for a number it never
+    reads, on every page.
+    """
+    if after is not None and page != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="send either 'page' or 'after', not both: they are two ways to ask for a page",
+        )
+    return PageCursor(after=after, with_total=total)

@@ -1,11 +1,18 @@
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { previewSchema } from '../../utils/api';
+import { getPreviewJob, previewSchema } from '../../utils/api';
 import type { FieldDef, SchemaPreview } from '../../utils/types';
 import { DryRunReportView } from './DryRunReportView';
 import { SchemaChangeList } from './SchemaChangeList';
+
+/** How often a deferred preview is polled. One second: the scan reports its
+ *  progress per batch of `reindex_batch_size`, so anything faster polls for
+ *  a number that has not moved. */
+const POLL_MS = 1000;
+
+type Progress = { checked: number; total: number } | null;
 
 /**
  * "Preview changes": `POST .../schema/preview` writes nothing (design
@@ -17,6 +24,13 @@ import { SchemaChangeList } from './SchemaChangeList';
  * fetched for and comparing rather than clearing it from an effect — so a
  * fresh keystroke after "Preview changes" can't leave a report on screen
  * that no longer matches the draft.
+ *
+ * Above `preview_sync_limit` records the endpoint answers `202` with a job id
+ * instead of the report (F10): the same request, the same button, and the
+ * only visible difference is that "Checking…" becomes "Checked N of M…" while
+ * the scan runs. `job` is held in state and polled by the effect below rather
+ * than awaited in `runPreview`, so unmounting the panel stops the polling
+ * instead of leaving a promise writing to a component that is gone.
  */
 export function SchemaPreviewPanel({
   typeKey,
@@ -40,26 +54,71 @@ export function SchemaPreviewPanel({
   const [previewedFields, setPreviewedFields] = useState<FieldDef[] | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [job, setJob] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [progress, setProgress] = useState<Progress>(null);
+  const fieldsRef = useRef<FieldDef[]>(fields);
+  fieldsRef.current = fields;
 
   const stale = preview !== null && previewedFields !== fields;
 
   const runPreview = async () => {
     setPending(true);
     setError(null);
+    setProgress(null);
+    setJob(null);
+    setFailed(false);
     try {
       const result = await previewSchema(typeKey, {
         fields,
         display_field: displayField || null,
         slug_field: slugField || null,
       });
+      if ('job' in result) {
+        // Deferred: stay `pending` — the effect below owns the rest.
+        setJob(result.job);
+        return;
+      }
       setPreview(result);
       setPreviewedFields(fields);
+      setPending(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setPending(false);
     }
   };
+
+  useEffect(() => {
+    if (job === null) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const state = await getPreviewJob(typeKey, job);
+        if (cancelled) return;
+        setProgress({ checked: state.checked, total: state.total });
+        if (state.status === 'running') return;
+        setJob(null);
+        setPending(false);
+        if (state.preview) {
+          setPreview(state.preview);
+          setPreviewedFields(fieldsRef.current);
+        } else {
+          setFailed(true);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setJob(null);
+        setPending(false);
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [job, typeKey]);
 
   return (
     <div className="space-y-4">
@@ -69,13 +128,22 @@ export function SchemaPreviewPanel({
         disabled={!dirty || pending}
         onClick={() => void runPreview()}
       >
-        {pending
-          ? t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })
-          : t('records.type_editor.preview.button', { defaultValue: 'Preview changes' })}
+        {!pending
+          ? t('records.type_editor.preview.button', { defaultValue: 'Preview changes' })
+          : progress
+            ? t('records.type_editor.preview.progress', {
+                checked: progress.checked,
+                total: progress.total,
+                defaultValue: 'Checked {checked} of {total}…',
+              })
+            : t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })}
       </Button>
-      {error && (
+      {(error || failed) && (
         <p className="text-sm text-destructive" role="alert">
-          {error}
+          {error ??
+            t('records.type_editor.preview.failed', {
+              defaultValue: 'The check could not be completed. Try previewing again.',
+            })}
         </p>
       )}
       {preview && !stale && (

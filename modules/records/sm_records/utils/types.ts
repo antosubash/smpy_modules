@@ -87,6 +87,22 @@ export type SchemaPreview = {
   report: DryRunReport;
 };
 
+/** `POST .../schema/preview`'s 202 body: the dry run was too big to run
+ *  inside the request (F10), so it runs deferred and this is its handle. */
+export type SchemaPreviewStarted = { job: string; status: string };
+
+/** `GET .../schema/preview/{job}` — the deferred dry run's state. `preview`
+ *  is the same shape the synchronous path returns, present once `status` is
+ *  `"done"`. */
+export type SchemaPreviewJob = {
+  job: string;
+  status: 'running' | 'done' | 'failed';
+  checked: number;
+  total: number;
+  preview: SchemaPreview | null;
+  error: string | null;
+};
+
 /** One snapshot of a type's schema, from `GET /types/{key}/revisions`. */
 export type TypeRevision = {
   id: number;
@@ -171,9 +187,17 @@ export type RecordRead = {
 
 export type RecordPage = {
   items: RecordRead[];
-  total: number;
+  /** Exact up to `RecordsSettings.max_count`, `null` when the caller sent
+   *  `?total=false` (F4). */
+  total: number | null;
+  /** The real number is larger than `total` — the list shows "10,000+". */
+  total_capped: boolean;
   page: number;
   page_size: number;
+  /** The opaque `?after=` value for the page after this one, `null` on the
+   *  last page (F11). The admin UI pages by number and ignores it; an API
+   *  client walking the type should use it instead of `?page=`. */
+  next_cursor: string | null;
 };
 
 export type RecordRevision = {
@@ -192,12 +216,23 @@ export type RecordRevisionDetail = RecordRevision & { data: Record<string, unkno
 
 /** The filter grammar's operators (`?filter=field:op:value`). Mirrors
  *  `sm_records.index._predicates.FilterOp`. */
-export type FilterOp = 'eq' | 'ne' | 'in' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte' | 'is_null';
+export type FilterOp =
+  | 'eq'
+  | 'ne'
+  | 'in'
+  | 'contains'
+  | 'starts_with'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'is_null';
 
 export const FILTER_OPS: FilterOp[] = [
   'eq',
   'ne',
   'contains',
+  'starts_with',
   'gt',
   'gte',
   'lt',

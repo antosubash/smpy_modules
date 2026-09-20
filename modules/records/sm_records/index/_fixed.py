@@ -28,10 +28,17 @@ from sm_records.index._predicates import (
     FilterOp,
     QueryError,
     like_contains_pattern,
+    starts_with_clause,
 )
 from sm_records.models import Record, RecordStatus
 
-__all__ = ["FIXED_COLUMNS", "PUBLIC_FIXED_COLUMNS", "fixed_clause"]
+__all__ = [
+    "FIXED_COLUMNS",
+    "NOT_NULL_FIXED_COLUMNS",
+    "PUBLIC_FIXED_COLUMNS",
+    "SORT_INDEXED_FIXED_COLUMNS",
+    "fixed_clause",
+]
 
 FIXED_COLUMNS: frozenset[str] = frozenset(
     {"status", "display_title", "slug", "position", "published_at", "created_at", "updated_at"}
@@ -55,6 +62,39 @@ caller binary-search an audit timestamp to arbitrary precision and read the
 internal ``position`` ordering of content it is only supposed to be able to
 list. They are refused by name, the same 400 an unindexed field gets, rather
 than answered.
+"""
+
+NOT_NULL_FIXED_COLUMNS: frozenset[str] = frozenset(
+    name for name in FIXED_COLUMNS if not getattr(Record, name).property.columns[0].nullable
+)
+"""The fixed columns the database guarantees a value for.
+
+Read off the mapped columns rather than listed by hand, because the list is
+only ever used to *drop* a ``NULLS LAST`` wrapper (``index._sorting``) and
+getting it wrong in that direction reorders a page. ``status``, ``position``,
+``display_title`` and ``created_at`` are non-nullable today; ``slug``,
+``published_at`` and ``updated_at`` are not, and keep the wrapper.
+
+Dropping it matters because ``ORDER BY col NULLS LAST`` is not the order any
+btree on ``col`` stores, so SQLite answers it with a temp B-tree over the
+whole type even when the composite index of ``Record.__table_args__`` covers
+the column exactly — 25 rows paid for with a sort of 9,000.
+"""
+
+SORT_INDEXED_FIXED_COLUMNS: frozenset[str] = frozenset(
+    index.columns.keys()[1]
+    for index in Record.__table__.indexes
+    if len(index.columns) == 3 and index.columns.keys()[0::2] == ["type_id", "id"]
+)
+"""The fixed columns a ``(type_id, <column>, id)`` index can order directly.
+
+Read off the model rather than listed, so adding such an index is the only
+thing needed to make a sort on that column index-served — and dropping one
+cannot leave this claiming otherwise. It is used for exactly one decision, in
+:func:`sm_records.index._sorting.tiebreak_desc`: whether a *descending* sort
+can be answered by reading that index backwards, end to end, with no sorter
+at all. Everything else pays a sorter regardless, and there the tiebreaker
+must stay ascending — see that function for what it costs when it does not.
 """
 
 _FIXED_TEXT = frozenset({"display_title", "slug"})
@@ -98,6 +138,13 @@ def fixed_clause(field: str, op: FilterOp, value: Any) -> ColumnElement[bool]:
             raise QueryError(field, "unsupported_op", "contains needs a text column")
         pattern = like_contains_pattern(_fixed_value(field, value))
         return column.ilike(pattern, escape=LIKE_ESCAPE_CHAR)
+    if op is FilterOp.STARTS_WITH:
+        if field not in _FIXED_TEXT:
+            raise QueryError(field, "unsupported_op", "starts_with needs a text column")
+        # A half-open range and not ``LIKE 'term%'`` — see
+        # ``_predicates.prefix_range`` for why the range is the only spelling
+        # an index can answer, and what it costs in case sensitivity.
+        return starts_with_clause(column, _fixed_value(field, value))
     if op in _ORDER_OPS and field not in _FIXED_ORDERED:
         raise QueryError(field, "unsupported_op", f"{op.value} needs an ordered column")
     if op is FilterOp.IN:

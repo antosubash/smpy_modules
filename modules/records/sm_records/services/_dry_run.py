@@ -20,6 +20,7 @@ needed" sits with the scan it guards.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import select
@@ -98,6 +99,7 @@ async def dry_run(
     batch_size: int,
     orphaned_conflicts: dict[str, int] | None = None,
     drop_keys: frozenset[str] = frozenset(),
+    on_progress: Callable[[int], None] | None = None,
 ) -> DryRunReport:
     """Validate every record against ``new_defs`` without writing anything.
 
@@ -110,6 +112,12 @@ async def dry_run(
     first — the same lenient read an API caller gets — so a row is judged on
     what it *reads as* under the new schema, defaults filled and values coerced
     (§8.4), not on the raw payload it happens to hold.
+
+    ``on_progress`` is called with the running ``checked`` count once per
+    batch — per batch and not per record, because it is what a polling client
+    renders as "checked N of M" and a call per record would be a write to the
+    job registry per record for a number nobody reads at that resolution. It
+    is ``None`` on the synchronous path, where there is nobody to tell.
 
     ``drop_keys`` are removed from the payload before that read: they are the
     orphaned values an ``orphaned="discard"`` apply is about to throw away
@@ -134,6 +142,8 @@ async def dry_run(
                         errors=tuple(errors),
                     )
                 )
+        if on_progress is not None:
+            on_progress(checked)
     return DryRunReport(
         checked=checked,
         failing=failing,
@@ -173,6 +183,7 @@ async def change_report(
     diff: SchemaDiff,
     conflicts: dict[str, int],
     drop_keys: frozenset[str] = frozenset(),
+    on_progress: Callable[[int], None] | None = None,
 ) -> DryRunReport:
     if not needs_dry_run(diff, conflicts):
         # Skipped, but ``checked`` still has to be an honest count of what
@@ -187,4 +198,5 @@ async def change_report(
         batch_size=settings.reindex_batch_size,
         orphaned_conflicts=conflicts,
         drop_keys=drop_keys,
+        on_progress=on_progress,
     )

@@ -19,6 +19,8 @@ import type {
   RecordRead,
   RecordStatus,
   SchemaPreview,
+  SchemaPreviewJob,
+  SchemaPreviewStarted,
   TypeRead,
 } from './types';
 
@@ -173,12 +175,28 @@ export type SchemaPreviewBody = {
 };
 
 /** `POST /types/{key}/schema/preview` — writes nothing; classifies the
- *  proposed schema and dry-runs it (design §8.9). */
-export function previewSchema(key: string, body: SchemaPreviewBody): Promise<SchemaPreview> {
+ *  proposed schema and dry-runs it (design §8.9).
+ *
+ * Resolves to the report on a type small enough to scan inside the request,
+ * and to a `{job, status}` handle above `preview_sync_limit` (F10). The two
+ * are told apart by the presence of `job`, not by the status code, because
+ * `request` does not surface one. */
+export function previewSchema(
+  key: string,
+  body: SchemaPreviewBody,
+): Promise<SchemaPreview | SchemaPreviewStarted> {
   return request(`/types/${encodeURIComponent(key)}/schema/preview`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/** One poll of a deferred preview (F10). A 404 means this process no longer
+ *  holds the job — the registry is in-process by design — and the caller's
+ *  answer is to preview again, which is free because a preview writes
+ *  nothing. */
+export function getPreviewJob(key: string, job: string): Promise<SchemaPreviewJob> {
+  return request(`/types/${encodeURIComponent(key)}/schema/preview/${encodeURIComponent(job)}`);
 }
 
 /** Manually kick a stuck reindex (§8.9's health check names it). */
@@ -196,6 +214,13 @@ export type ListRecordsParams = {
   page_size?: number;
   sort?: string;
   filter?: string;
+  /** `?after=<cursor>` — keyset pagination (F11). Mutually exclusive with
+   *  `page`; sending both is a 400. */
+  after?: string;
+  /** `?total=false` drops the count statement, so `RecordPage.total` comes
+   *  back `null` (F4). For a caller that pages with `after` and never renders
+   *  the number, this is the cheaper request. */
+  total?: boolean;
 };
 
 export function listRecords(typeKey: string, params: ListRecordsParams = {}): Promise<RecordPage> {
@@ -204,6 +229,8 @@ export function listRecords(typeKey: string, params: ListRecordsParams = {}): Pr
   if (params.page_size !== undefined) qs.set('page_size', String(params.page_size));
   if (params.sort) qs.set('sort', params.sort);
   if (params.filter) qs.set('filter', params.filter);
+  if (params.after) qs.set('after', params.after);
+  if (params.total === false) qs.set('total', 'false');
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return request(`/types/${encodeURIComponent(typeKey)}/records${suffix}`);
 }

@@ -18,14 +18,12 @@ having in front of you while reading it:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeIndex
-from sm_records.index.query import Filter, Sort, build_query, count_query, only_trashed
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
 from sm_records.schema.fields import FieldDefinition
@@ -41,6 +39,10 @@ from sm_records.services._lifecycle import (
     soft_delete_record,
 )
 
+# Re-exported: listing a page is a different job from the lifecycle of one
+# document, and lives in ``_listing`` for that reason and for the file cap.
+from sm_records.services._listing import RecordListPage, list_records
+
 # Re-exported: ``read_view`` lives in ``_payload`` with the rest of the
 # payload reading, and is imported from here by the contracts layer.
 from sm_records.services._payload import read_view
@@ -49,6 +51,7 @@ from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 
 __all__ = [
+    "RecordListPage",
     "create_record",
     "get_deleted_record",
     "get_record",
@@ -60,40 +63,6 @@ __all__ = [
     "soft_delete_record",
     "update_record",
 ]
-
-
-async def list_records(
-    db: AsyncSession,
-    rtype: RecordType,
-    *,
-    settings: RecordsSettings,
-    filters: Sequence[Filter] = (),
-    sorts: Sequence[Sort] = (),
-    page: int = 1,
-    page_size: int | None = None,
-    trashed: bool = False,
-) -> tuple[list[Record], int]:
-    """One page of records, and the unpaged total.
-
-    ``QueryError`` from the builder is allowed to propagate: only the endpoint
-    layer knows the difference it has to express — 409 while a field is being
-    reindexed, 400 for a field that is simply not queryable (§8.5).
-
-    ``trashed=True`` lists the trash and *only* the trash (see
-    ``index.query.only_trashed``). Filters and sorts apply unchanged — index
-    rows survive a soft delete (§7.3), so the trash is as queryable as
-    anything else.
-    """
-    size = min(page_size or settings.default_page_size, settings.max_page_size)
-    size = max(size, 1)
-    offset = max(page - 1, 0) * size
-    fields = list(rtype.fields or [])
-    count_stmt = count_query(rtype, fields, filters)
-    stmt = build_query(rtype, fields, filters, sorts).offset(offset).limit(size)
-    if trashed:
-        count_stmt, stmt = only_trashed(count_stmt), only_trashed(stmt)
-    total = int((await db.execute(count_stmt)).scalar_one())
-    return list((await db.execute(stmt)).scalars().all()), total
 
 
 async def get_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:

@@ -67,11 +67,14 @@ test.describe('Records — list, filter, sort, page', () => {
 
     // Per-kind operator sets, minus `in` (the wire format joins on a bare
     // comma) and plus `is_null`, which the index layer answers uniformly.
+    // `starts with` is the index-backed prefix match of F9 — a range, not a
+    // `LIKE`, and therefore case-sensitive where `contains` is not.
     await fieldSelect.selectOption('name');
     await expect(page.locator('#records-filter-op').locator('option')).toHaveText([
       'is',
       'is not',
       'contains',
+      'starts with',
       'is empty',
     ]);
     await fieldSelect.selectOption('qty');

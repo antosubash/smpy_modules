@@ -14,10 +14,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from sm_records.endpoints.api import records, referrers, revisions, types
+from sm_records.endpoints.api import io, preview, records, referrers, revisions, types
 
 router = APIRouter()
+# Before ``types``: ``/types/{key}/schema/preview/{job}`` is a GET the types
+# router has no route for, but keeping the pair adjacent is what makes the
+# split between them visible at the mount point.
+router.include_router(preview.router)
 router.include_router(types.router)
+# Before ``records``: Starlette matches in registration order, and
+# ``/types/{key}/records/{uuid}`` would otherwise swallow
+# ``/types/{key}/records/export`` as a record whose uuid is "export".
+router.include_router(io.router)
 router.include_router(records.router)
 router.include_router(referrers.router)
 router.include_router(revisions.router)

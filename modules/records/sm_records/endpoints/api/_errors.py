@@ -45,6 +45,7 @@ from sm_records.models import Record, RecordType
 from sm_records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.services.errors import (
     Conflict,
+    ImportRefused,
     NotFound,
     OrphanedKeyConflict,
     RecordsError,
@@ -100,6 +101,16 @@ async def _response_for(request: Request, exc: Exception) -> JSONResponse:
         # (design §8.2), not a ``current`` row to reload.
         report = dry_run_report_read(exc.report).model_dump(mode="json")
         return JSONResponse({"detail": exc.detail, "report": report}, status_code=exc.status_code)
+    if isinstance(exc, ImportRefused):
+        # An ``on_error=abort`` import that found a bad row. Like
+        # ``SchemaChangeRefused`` above, the useful part of the refusal is the
+        # report riding with it — the caller fixes the rows it names and
+        # re-posts the same file — and, like that one, the rollback below is
+        # what makes "nothing was imported" true rather than aspirational.
+        return JSONResponse(
+            {"detail": exc.detail, "report": exc.report.model_dump(mode="json")},
+            status_code=exc.status_code,
+        )
     if isinstance(exc, OrphanedKeyConflict):
         # Same reasoning as above: a ``Conflict`` subclass whose payload is
         # its own (design §8.8), not the generic ``current`` row.

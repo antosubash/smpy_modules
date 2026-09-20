@@ -150,6 +150,17 @@ class RecordsSettings(BaseSettings):
     """Reject a record write whose ``data`` payload, serialized, exceeds this
     many bytes (default 256 KB)."""
 
+    max_import_bytes: int = 52428800
+    """Reject an import whose uploaded body exceeds this many bytes (default
+    50 MB), before it is parsed.
+
+    Checked against ``Content-Length`` first and then against what was
+    actually read, because a chunked request carries no length header and a
+    lying one is not a reason to buffer 4 GB of CSV into memory. The ceiling
+    is on the *file*, not on the records in it: a row that is individually too
+    big is still refused by :attr:`max_payload_bytes` on its own write.
+    """
+
     max_fields_per_type: int = 100
     """Largest number of field definitions a single Record Type may declare."""
 
@@ -161,6 +172,49 @@ class RecordsSettings(BaseSettings):
     written per record per save, so a type with 80 indexed fields turns one
     save into 81 inserts. A visible ceiling makes that a design conversation
     at schema-editing time instead of an incident.
+    """
+
+    max_count: int = Field(default=10000, ge=1)
+    """How far a list page's ``total`` is counted exactly before it is capped.
+
+    A page can stop after ``page_size`` matches; the ``COUNT`` behind ``total``
+    never can, so an unbounded one is O(matches) on a request whose page is
+    O(25) — the cost of a filter that matches most of a large type, paid on
+    every page of it. The count is bounded to ``max_count + 1`` rows instead:
+    at or below the ceiling ``total`` is the exact number and ``total_capped``
+    is ``false``, above it ``total`` is ``max_count`` and ``total_capped`` is
+    ``true``, which the list screen renders as "10,000+".
+
+    A caller that pages with ``?after=`` and does not need the number at all
+    should send ``?total=false`` and skip the statement entirely.
+    """
+
+    preview_sync_limit: int = Field(default=5000, ge=0)
+    """Largest type ``POST /types/{key}/schema/preview`` will dry-run inside
+    the request (design §8.9).
+
+    A dry run validates every record of the type, trash included, at roughly a
+    thousand records a second — fine for a small type and a multi-minute HTTP
+    request for a large one, with whatever proxy timeout that implies. Above
+    this many records the endpoint answers ``202`` with a job id and runs the
+    scan through the module's deferred-job mechanism; the caller polls
+    ``GET /types/{key}/schema/preview/{job}``.
+
+    ``0`` sends every preview through the job, which is the setting to reach
+    for behind a proxy with a short timeout.
+    """
+
+    preview_job_ttl_seconds: int = Field(default=600, ge=0)
+    """How long a finished preview job's report stays reusable.
+
+    Two things read it: the job registry prunes anything older, and ``PUT
+    /types/{key}`` reuses a completed job's report instead of re-running the
+    scan inline when the job was taken against the same type, the same
+    proposed fields and the same ``RecordType.version`` — see
+    :func:`sm_records.services.schema_change.apply`.
+
+    ``0`` disables the reuse and prunes every job immediately, which is the
+    setting for an install that would rather pay the second pass.
     """
 
     reindex_batch_size: int = 500

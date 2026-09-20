@@ -1,5 +1,6 @@
-"""``python -m sm_records.cli reindex [--type KEY]`` / ``seed [...]`` — design
-doc §7.7, §8.9, and the demo-data seeder in ``sm_records/seed/``.
+"""``python -m sm_records.cli reindex [--type KEY]`` / ``seed`` / ``export`` /
+``import`` — design doc §7.7, §8.9, the demo-data seeder in
+``sm_records/seed/``, and §16's file import-export.
 
 The recovery path for an index that is wrong, and the other half of "deferred"
 in a repo with no queue: a background task that died with its worker leaves
@@ -24,6 +25,7 @@ from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sqlalchemy import select
 
+from sm_records import cli_io
 from sm_records.constants import PACKAGE
 from sm_records.models import RecordType
 from sm_records.seed.runner import SeedSummary
@@ -172,6 +174,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Records module maintenance commands.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    # ``export``/``import`` live in ``cli_io`` — the same 300-line cap that
+    # split ``seed`` into its own package, and the same division: this file
+    # parses and dispatches, the other owns the work.
+    cli_io.add_parsers(sub)
     reindex_parser = sub.add_parser(
         "reindex", help="rebuild index rows from documents (design doc §7.7)"
     )
@@ -211,6 +217,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     from simple_module_hosting.settings import Settings
+
+    if args.command in ("export", "import"):
+        return cli_io.run(args, args.database_url or Settings().database_url)
 
     if args.command == "seed":
         database_url = args.database_url or Settings().database_url

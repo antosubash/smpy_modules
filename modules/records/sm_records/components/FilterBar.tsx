@@ -25,6 +25,7 @@ function opLabel(t: Translate, op: FilterOp): string {
     eq: 'is',
     ne: 'is not',
     contains: 'contains',
+    starts_with: 'starts with',
     gt: '>',
     gte: '>=',
     lt: '<',
@@ -43,15 +44,19 @@ type FilterableField = { key: string; label: string; ops: readonly FilterOp[] };
  *  (`sm_records.index.query.FIXED_COLUMNS`), narrowed to the one operator
  *  each is actually useful with here: `status` is a two-value enum, so
  *  anything but "is" is unhelpful noise, and `display_title` is free text,
- *  where "contains" is the only op the fixed-column query layer accepts for
- *  it (`_fixed_clause`: `contains` needs a text column, `gt`/`lt` need an
- *  ordered one — `display_title` is neither). */
+ *  where "starts with" and "contains" are the two ops the fixed-column query
+ *  layer accepts for it (`fixed_clause`: both need a text column, `gt`/`lt`
+ *  need an ordered one — `display_title` is text and not ordered). */
 function fixedFilterFields(t: Translate): FilterableField[] {
   return [
     {
       key: 'display_title',
+      // `starts_with` first: it is the one an index on
+      // `(type_id, display_title, id)` can answer (F9), and `contains`
+      // — `ILIKE '%term%'` — is a read of every row of the type by
+      // construction.
       label: t('records.records.display_title', { defaultValue: 'Title' }),
-      ops: ['contains'],
+      ops: ['starts_with', 'contains'],
     },
     {
       key: 'status',

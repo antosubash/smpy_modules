@@ -35,10 +35,16 @@ class PublicRecordRead(SQLModel):
 
 
 class PublicRecordPage(SQLModel):
+    """The anonymous listing's page shape — :class:`RecordPage`'s public twin,
+    with the same ``total``/``total_capped``/``next_cursor`` contract (F4, F11)
+    and the same defaults, so an existing reader is unaffected."""
+
     items: list[PublicRecordRead]
-    total: int
+    total: int | None
     page: int
     page_size: int
+    total_capped: bool = False
+    next_cursor: str | None = None
 
 
 def public_record_read(

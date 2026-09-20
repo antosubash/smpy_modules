@@ -10,7 +10,7 @@ can see at route-registration time.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schemas import (
@@ -22,12 +22,14 @@ from sm_records.contracts.schemas import (
     record_read,
 )
 from sm_records.deps import (
+    PageCursor,
     actor,
     caller_roles,
     check_type_roles,
     get_settings,
     load_allowed_type,
     load_type,
+    parse_cursor,
     parse_expand,
     parse_filters,
     parse_sorts,
@@ -37,7 +39,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
-from sm_records.index.query import Filter, Sort
+from sm_records.index.query import CursorError, Filter, Sort
 from sm_records.models import RecordStatus, RecordType
 from sm_records.services import expand as expand_service
 from sm_records.services import records as record_service
@@ -67,6 +69,7 @@ async def list_records(
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
     page_size: int | None = Query(default=None, ge=1),
+    cursor: PageCursor = Depends(parse_cursor),
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     trashed: bool = Depends(parse_trashed),
@@ -84,21 +87,32 @@ async def list_records(
     query each (design §9) — never per row, which is the difference between a
     list screen and fifty round trips.
 
+    ``?after=<cursor>`` pages by keyset instead of ``OFFSET`` and
+    ``?total=false`` drops the count; both are ``deps.parse_cursor``, which
+    also refuses ``page`` and ``after`` together. A malformed cursor, or one
+    replayed under a different sort, is a 400 — it cannot be honoured and
+    guessing would silently skip rows.
+
     ``load_allowed_type`` and not ``load_type``: the type's ``allowed_roles``
     narrow this read exactly as they narrow the writes below it (§10).
     """
-    items, total = await record_service.list_records(
-        db,
-        rtype,
-        settings=settings,
-        filters=filters,
-        sorts=sorts,
-        page=page,
-        page_size=page_size,
-        trashed=trashed,
-    )
+    try:
+        result = await record_service.list_records(
+            db,
+            rtype,
+            settings=settings,
+            filters=filters,
+            sorts=sorts,
+            page=page,
+            page_size=page_size,
+            trashed=trashed,
+            after=cursor.after,
+            with_total=cursor.with_total,
+        )
+    except CursorError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     expanded = (
-        await expand_service.expand(db, rtype, items, expand, roles=caller_roles(request))
+        await expand_service.expand(db, rtype, result.items, expand, roles=caller_roles(request))
         if expand
         else None
     )
@@ -107,8 +121,10 @@ async def list_records(
         # list reads each row leniently but does not validate it, so a page of
         # fifty costs one compiled-model pass rather than fifty (``invalid`` is
         # the record editor's badge — see the contracts module).
-        items=record_list_read(rtype, items, expanded=expanded),
-        total=total,
+        items=record_list_read(rtype, result.items, expanded=expanded),
+        total=result.total,
+        total_capped=result.total_capped,
+        next_cursor=result.next_cursor,
         page=page,
         page_size=settings.clamp_page_size(page_size),
     )

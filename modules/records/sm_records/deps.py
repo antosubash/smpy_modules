@@ -23,6 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records import constants
 from sm_records._grammar import (
     MALFORMED_FILTER,
+    PageCursor,
+    parse_cursor,
     parse_expand,
     parse_filters,
     parse_sorts,
@@ -207,6 +209,7 @@ async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
 __all__ = [
     "MALFORMED_FILTER",
     "REQUEST_SESSION_KEY",
+    "PageCursor",
     "actor",
     "caller_roles",
     "check_type_roles",
@@ -214,6 +217,7 @@ __all__ = [
     "has_edit_permission",
     "load_allowed_type",
     "load_type",
+    "parse_cursor",
     "parse_expand",
     "parse_filters",
     "parse_sorts",

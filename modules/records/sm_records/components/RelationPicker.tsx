@@ -4,7 +4,8 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ApiError, buildFilterParam, getRecord, listRecords } from '../utils/api';
+import { ApiError, getRecord } from '../utils/api';
+import { searchByTitle } from '../utils/relation-search';
 import type { ExpandedRef, FieldDef, RecordRead } from '../utils/types';
 import {
   isRelationValue,
@@ -16,7 +17,6 @@ import {
 /** Long enough that typing a word is one request, short enough that the list
  *  feels attached to the keyboard. */
 const DEBOUNCE_MS = 250;
-const RESULT_LIMIT = 10;
 
 /** `title: null` means "looked up and not there" — a dangling reference,
  *  which a soft-deleted target legitimately produces (design §9). `restricted`
@@ -44,10 +44,6 @@ function valuesOf(value: unknown, many: boolean): RelationValue[] {
 /**
  * Picks the target of a `relation` field: `{type, uuid}`, or a list of them
  * when `options.many`.
- *
- * Search runs against `display_title:contains:<q>`, the one filter the index
- * layer supports on that column — `§7.2`'s rule means a free-text search over
- * the payload does not exist, and asking for one returns a 400, not results.
  */
 export function RelationPicker({
   field,
@@ -141,13 +137,10 @@ export function RelationPicker({
     let cancelled = false;
     setSearching(true);
     const timer = setTimeout(() => {
-      listRecords(target, {
-        page_size: RESULT_LIMIT,
-        filter: buildFilterParam('display_title', 'contains', term),
-      })
-        .then((page) => {
+      searchByTitle(target, term)
+        .then((items) => {
           if (cancelled) return;
-          setResults(page.items);
+          setResults(items);
           setSearchError(null);
         })
         .catch((err: unknown) => {

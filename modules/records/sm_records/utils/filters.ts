@@ -6,7 +6,8 @@
  * declared `type`, and re-deriving `IndexKind` from `schema/types.py` just to
  * look it up again would be indirection for its own sake):
  *
- * - TEXT  (text, select, multiselect, email, url): eq, ne, in, contains
+ * - TEXT  (text, select, multiselect, email, url): eq, ne, in, contains,
+ *   starts_with
  * - BOOL  (boolean):                                eq, ne
  * - NUMBER (number, integer), DATE, DATETIME:        eq, ne, in, gt, gte, lt, lte
  * - REF   (relation):                                eq, ne, in
@@ -24,7 +25,7 @@
 
 import type { FilterOp } from './types';
 
-const TEXT_OPS: readonly FilterOp[] = ['eq', 'ne', 'in', 'contains'];
+const TEXT_OPS: readonly FilterOp[] = ['eq', 'ne', 'in', 'contains', 'starts_with'];
 const BOOL_OPS: readonly FilterOp[] = ['eq', 'ne'];
 const ORDERED_OPS: readonly FilterOp[] = ['eq', 'ne', 'in', 'gt', 'gte', 'lt', 'lte'];
 const REF_OPS: readonly FilterOp[] = ['eq', 'ne', 'in'];

@@ -260,7 +260,14 @@ async def test_trashed_applies_filters_and_sorts_as_usual(client):
         "/api/records/types/product/records?trashed=true&filter=price:eq:2",
         headers=roles(ADMIN),
     )
-    assert miss.json() == {"items": [], "total": 0, "page": 1, "page_size": 25}
+    assert miss.json() == {
+        "items": [],
+        "total": 0,
+        "total_capped": False,
+        "next_cursor": None,
+        "page": 1,
+        "page_size": 25,
+    }
 
 
 async def test_trashed_costs_edit_not_merely_view(client):

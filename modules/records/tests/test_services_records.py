@@ -217,13 +217,14 @@ async def test_list_records_filters_sorts_and_pages(db, settings, article):
     for title in ("Alpha", "Beta", "Gamma"):
         await service.create_record(db, article, data={"title": title}, settings=settings)
 
-    rows, total = await service.list_records(
+    rows, total, capped, cursor = await service.list_records(
         db, article, settings=settings, sorts=[Sort("title", desc=True)], page=1, page_size=2
     )
+    assert (capped, cursor is None) == (False, False)
     assert total == 3
     assert [r.display_title for r in rows] == ["Gamma", "Beta"]
 
-    rows, total = await service.list_records(
+    rows, total, _capped, _cursor = await service.list_records(
         db, article, settings=settings, filters=[Filter("title", FilterOp.EQ, "Beta")]
     )
     assert (total, [r.display_title for r in rows]) == (1, ["Beta"])
@@ -233,7 +234,9 @@ async def test_list_records_clamps_the_page_size(db, settings, article):
     small = RecordsSettings(default_page_size=1, max_page_size=2)
     for title in ("A", "B", "C"):
         await service.create_record(db, article, data={"title": title}, settings=small)
-    rows, total = await service.list_records(db, article, settings=small, page_size=100)
+    rows, total, _capped, _cursor = await service.list_records(
+        db, article, settings=small, page_size=100
+    )
     assert (len(rows), total) == (2, 3)
 
 

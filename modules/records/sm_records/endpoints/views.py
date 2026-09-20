@@ -224,7 +224,9 @@ async def record_list(
     filters, malformed = parsed
     errors: dict[str, str] = {}
     items: list = []
-    total = 0
+    total: int | None = 0
+    capped = False
+    next_cursor: str | None = None
     if malformed is not None:
         # A ``?filter=`` term that does not parse at all, which the API answers
         # with a 400 raised from the dependency. Here it joins the same
@@ -235,7 +237,7 @@ async def record_list(
         errors["filter"] = malformed
     else:
         try:
-            items, total = await record_service.list_records(
+            items, total, capped, next_cursor = await record_service.list_records(
                 db,
                 rtype,
                 settings=settings,
@@ -251,7 +253,7 @@ async def record_list(
             # unknown or unindexed cannot be a status code here. The screen
             # renders empty with the reason in Inertia's own ``errors`` bag —
             # the same channel form validation uses — and shows it inline.
-            items, total = [], 0
+            items, total, capped, next_cursor = [], 0, False, None
             errors["filter"] = exc.reason
     # Always, for every relation column the screen renders (§9: the generic
     # list is the one caller that always expands). One batched query per
@@ -265,6 +267,8 @@ async def record_list(
         # ``contracts.schemas.record_list_read``.
         items=record_list_read(rtype, items, expanded=expanded),
         total=total,
+        total_capped=capped,
+        next_cursor=next_cursor,
         page=page,
         page_size=page_size,
     )

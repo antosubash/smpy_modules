@@ -51,6 +51,27 @@ def _db_path() -> Path:
 _seeded: set[str] = set()
 
 
+def _create_missing_indexes(conn: Any) -> None:
+    """Add any index the model declares that the database does not have yet.
+
+    ``create_all`` is ``checkfirst`` per *table*: a database seeded before a
+    revision added an index to an existing table is skipped whole, so the
+    suite would keep measuring the old schema against the new code and report
+    the new indexes as doing nothing. The seeded file is reused across runs on
+    purpose (it is the slowest thing here), which is exactly the case this
+    covers — and creating an index that is already there is a no-op, so it is
+    also safe on a fresh one.
+    """
+    have = {
+        row[0]
+        for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type = 'index'")
+    }
+    for table in Base.metadata.tables.values():
+        for index in table.indexes:
+            if index.name not in have:
+                index.create(conn)
+
+
 async def _record_total(db_state: Any) -> int:
     async with db_state.session_factory() as session:
         return int((await session.execute(select(func.count(Record.id)))).scalar_one())
@@ -71,6 +92,7 @@ async def perf_db() -> AsyncIterator[Any]:
     register_listeners(state)
     async with state.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_missing_indexes)
 
     if str(path) not in _seeded:
         have = await _record_total(state)
@@ -164,6 +186,26 @@ async def type_counts(session: Any) -> dict[str, int]:
         )
     ).all()
     return {key: int(count) for key, count in rows}
+
+
+@pytest.fixture(autouse=True)
+def _empty_preview_jobs():
+    """No preview job survives into the next measurement.
+
+    ``services.preview_jobs`` is a process-global registry keyed by type key,
+    type version and proposed fields — which is exactly right for a host
+    serving one database and exactly wrong for a suite that runs several
+    measurements against *copies* of one. Without this, the preview measured
+    in ``test_preview_job`` is still "completed" when
+    ``test_apply_restrictive_with_force`` applies the same change to a fresh
+    copy of the same database, the apply reuses its report (as it is designed
+    to) and the number recorded is not the one the row claims.
+    """
+    from sm_records.services import preview_jobs
+
+    preview_jobs._jobs.clear()
+    yield
+    preview_jobs._jobs.clear()
 
 
 @pytest.fixture(scope="session", autouse=True)

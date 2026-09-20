@@ -37,8 +37,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._fixed import FIXED_COLUMNS, PUBLIC_FIXED_COLUMNS
-from sm_records.index.query import Filter, QueryError, Sort, build_query, count_query
+from sm_records.index.query import (
+    Filter,
+    QueryError,
+    Sort,
+    bounded_count_query,
+    decode_cursor,
+    encode_cursor,
+    page_query,
+    sort_plan,
+    sort_signature,
+)
 from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.services._listing import RecordListPage
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
@@ -54,6 +65,14 @@ content by its absence (§10).
 """
 
 _PUBLISHED = Record.status == RecordStatus.PUBLISHED
+
+
+def _published_only(stmt):
+    """The one predicate this whole surface is defined by, as a callable —
+    which is the shape ``bounded_count_query``'s ``narrow`` takes, so the page
+    and both halves of its count cannot disagree about what "public" means."""
+    return stmt.where(_PUBLISHED)
+
 
 _HIDDEN_COLUMNS: Final[frozenset[str]] = FIXED_COLUMNS - PUBLIC_FIXED_COLUMNS
 """Fixed columns this surface will not answer about — the projection every
@@ -107,20 +126,53 @@ async def list_public_records(
     sorts: Sequence[Sort] = (),
     page: int = 1,
     page_size: int | None = None,
-) -> tuple[list[Record], int]:
+    after: str | None = None,
+    with_total: bool = True,
+) -> RecordListPage:
     """One page of a public type's published records, and the matching total.
 
     ``QueryError`` from the builder — or from :func:`_check_columns`, which
     runs first — propagates: the endpoint turns every reason into the same 400
     naming the field, because "not indexed", "being reindexed" and "not part
     of the public shape" are the same answer to someone who cannot see the
-    schema (§10).
+    schema (§10). ``CursorError`` is flattened to a 400 there too.
+
+    The bound on ``total`` (F4), the ``?after=`` cursor (F11) and
+    ``total=false`` are the admin listing's, unchanged — an anonymous caller
+    walking a large public type is exactly who wants them. ``_PUBLISHED``
+    narrows **both** halves of the bounded count, for the reason
+    ``bounded_count_query`` gives: a bound whose inner ``LIMIT`` fills with
+    rows the outer then discards under-counts near the cap.
     """
     _check_columns(rtype, filters, sorts)
     size = settings.clamp_page_size(page_size)
-    offset = max(page - 1, 0) * size
     fields = list(rtype.fields or [])
-    count_stmt = count_query(rtype, fields, filters).where(_PUBLISHED)
-    stmt = build_query(rtype, fields, filters, sorts).where(_PUBLISHED).offset(offset).limit(size)
-    total = int((await db.execute(count_stmt)).scalar_one())
-    return list((await db.execute(stmt)).scalars().all()), total
+    signature = sort_signature(rtype.key, sorts)
+    decoded = decode_cursor(after, signature, sort_plan(rtype, fields, sorts)) if after else None
+
+    total: int | None = None
+    capped = False
+    if with_total:
+        cap = settings.max_count
+        counted = int(
+            (
+                await db.execute(
+                    bounded_count_query(rtype, fields, filters, cap=cap, narrow=_published_only)
+                )
+            ).scalar_one()
+        )
+        capped = counted > cap
+        total = cap if capped else counted
+
+    stmt, terms = page_query(rtype, fields, filters, sorts, after=decoded)
+    stmt = _published_only(stmt)
+    if decoded is None:
+        stmt = stmt.offset(max(page - 1, 0) * size)
+    rows = (await db.execute(stmt.limit(size))).all()
+    items = [row[0] for row in rows]
+    next_cursor = (
+        encode_cursor(signature, [*rows[-1][1 : len(terms) + 1], items[-1].id])
+        if len(rows) == size
+        else None
+    )
+    return RecordListPage(items, total, capped, next_cursor)

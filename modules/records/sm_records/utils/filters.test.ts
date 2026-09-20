@@ -7,9 +7,9 @@ import { opsForFieldType } from './filters';
  * server-side truth this is checked against (F1).
  */
 describe('opsForFieldType', () => {
-  it('gives every text-like kind eq/ne/in/contains', () => {
+  it('gives every text-like kind eq/ne/in/contains/starts_with', () => {
     for (const type of ['text', 'select', 'multiselect', 'email', 'url']) {
-      expect(opsForFieldType(type)).toEqual(['eq', 'ne', 'in', 'contains']);
+      expect(opsForFieldType(type)).toEqual(['eq', 'ne', 'in', 'contains', 'starts_with']);
     }
   });
 

@@ -166,10 +166,20 @@ class RecordRead(SQLModel):
 
 
 class RecordPage(SQLModel):
+    """One page of records, with an honest account of what it does not know.
+
+    ``total`` is exact up to ``RecordsSettings.max_count`` and ``None`` when
+    the caller sent ``?total=false``; ``total_capped`` says the real number is
+    larger than the ``total`` reported (F4). ``next_cursor`` is the opaque
+    ``?after=`` value for the page after this one, ``None`` on the last (F11).
+    """
+
     items: list[RecordRead]
-    total: int
+    total: int | None
     page: int
     page_size: int
+    total_capped: bool = False
+    next_cursor: str | None = None
 
 
 class RecordCreate(SQLModel):

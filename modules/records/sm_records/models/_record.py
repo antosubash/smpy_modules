@@ -71,6 +71,33 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
     __tablename__ = RECORD_TABLE
     __table_args__ = (
         Index("ix_records_record_type_status_position", "type_id", "status", "position"),
+        # One composite per sortable fixed column, all shaped
+        # ``(type_id, <column>, id)``. A list page is always narrowed to one
+        # type and always ends its ``ORDER BY`` with ``Record.id`` (the
+        # tiebreaker that makes a page boundary deterministic and a cursor
+        # unambiguous), so this is the exact key the order needs: SQLite and
+        # Postgres can both walk it and stop after ``page_size`` rows instead
+        # of sorting the whole type into a temp B-tree.
+        #
+        # Two things have to stay true for them to be used, and both are in
+        # ``index/_sorting.py``: the ordering must not wear ``NULLS LAST`` on
+        # a column the database knows is ``NOT NULL`` (it is not the order a
+        # btree stores), and the tiebreaker must be ``id`` and nothing else.
+        #
+        # ``display_title`` earns its own for a second reason: it is what the
+        # relation picker searches, and a prefix match over a covering index
+        # is the difference between reading three columns of an index and
+        # reading every row of the type.
+        #
+        # They are not free — six more btree inserts per record written. That
+        # is the trade §7.3 already makes for every indexed field, made once
+        # more for the projection every record has.
+        Index("ix_records_record_type_position_id", "type_id", "position", "id"),
+        Index("ix_records_record_type_published_id", "type_id", "published_at", "id"),
+        Index("ix_records_record_type_updated_id", "type_id", "updated_at", "id"),
+        Index("ix_records_record_type_created_id", "type_id", "created_at", "id"),
+        Index("ix_records_record_type_title_id", "type_id", "display_title", "id"),
+        Index("ix_records_record_type_slug_id", "type_id", "slug", "id"),
         # Partial unique: a slug is unique within its type, among rows that
         # have one. The index is on the row, not on live rows — a soft-deleted
         # record keeps its slug claimed, as pagebuilder does for trashed pages,

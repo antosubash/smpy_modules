@@ -90,6 +90,47 @@ class SchemaChangeRefused(Conflict):
         self.report = report
 
 
+class PayloadTooLarge(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """An uploaded import file over ``max_import_bytes``.
+
+    413 and **before parsing**, which is the whole point: a limit checked
+    after ``json.loads`` is a limit that has already allocated the thing it
+    was meant to refuse.
+    """
+
+    status_code = 413
+
+
+class ImportParseFailed(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """A file that is not the format it claims to be.
+
+    400 rather than 422: nothing here is a judgement about the *content*
+    against a schema — the bytes did not parse, or the header names a column
+    no field has. ``detail`` names the line or row, because "invalid JSON" on
+    a 40 MB file is not an actionable message.
+    """
+
+    status_code = 400
+
+
+class ImportRefused(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """``on_error=abort`` found a bad row, so the whole import is off.
+
+    Carries the same :class:`~sm_records.contracts.io.ImportReport` a
+    successful run returns — a refusal the caller can read row by row and fix,
+    rather than a message about the first thing that went wrong. Raised rather
+    than returned so ``RecordsErrorRoute`` rolls the request's session back:
+    that rollback is what makes ``abort`` mean *all or nothing* instead of
+    "everything up to the bad row".
+    """
+
+    status_code = 422
+
+    def __init__(self, report: object, detail: str) -> None:
+        super().__init__(detail)
+        self.report = report
+
+
 class OrphanedKeyConflict(Conflict):
     """A field is being added whose key still holds orphaned values on some
     records (§8.8). Neither restoring nor discarding may happen silently;
@@ -104,8 +145,11 @@ class OrphanedKeyConflict(Conflict):
 __all__ = [
     "Conflict",
     "Forbidden",
+    "ImportParseFailed",
+    "ImportRefused",
     "NotFound",
     "OrphanedKeyConflict",
+    "PayloadTooLarge",
     "RecordsError",
     "ReferencedByOthers",
     "SchemaChangeRefused",

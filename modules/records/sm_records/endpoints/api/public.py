@@ -44,9 +44,16 @@ from sm_records.contracts.public import (
     public_record_read,
     public_records_read,
 )
-from sm_records.deps import get_settings, parse_filters, parse_sorts, request_db
+from sm_records.deps import (
+    PageCursor,
+    get_settings,
+    parse_cursor,
+    parse_filters,
+    parse_sorts,
+    request_db,
+)
 from sm_records.endpoints.api._errors import RecordsErrorRoute
-from sm_records.index.query import Filter, QueryError, Sort
+from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.services import public as public_service
 from sm_records.settings import RecordsSettings
 
@@ -102,19 +109,27 @@ async def list_public_records(
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1),
     page_size: int | None = Query(default=None, ge=1),
+    cursor: PageCursor = Depends(parse_cursor),
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
 ) -> PublicRecordPage:
     """Published records of a public type, with the admin filter/sort grammar.
 
     ``page_size`` is clamped to ``max_page_size`` rather than refused, and no
-    other parameter is declared: ``expand`` and ``trashed`` are not options
-    here, so they arrive as unknown query parameters and are ignored, which is
-    what a query string a caller copied from the admin UI should do.
+    other parameter is declared beyond the pagination ones: ``expand`` and
+    ``trashed`` are not options here, so they arrive as unknown query
+    parameters and are ignored, which is what a query string a caller copied
+    from the admin UI should do.
+
+    ``?after=`` and ``?total=false`` are the same contract the admin listing
+    has (F11, F4) — an anonymous client walking a large public type is
+    precisely the caller that should not be paying for an ``OFFSET`` and a
+    count it never reads. A cursor this listing cannot resume from is the same
+    flat 400 a refused filter is.
     """
     rtype = await public_service.get_public_type(db, type_key)
     try:
-        items, total = await public_service.list_public_records(
+        result = await public_service.list_public_records(
             db,
             rtype,
             settings=settings,
@@ -122,12 +137,18 @@ async def list_public_records(
             sorts=sorts,
             page=page,
             page_size=page_size,
+            after=cursor.after,
+            with_total=cursor.with_total,
         )
     except QueryError as exc:
         raise _refused(exc) from exc
+    except CursorError as exc:
+        raise HTTPException(status_code=400, detail="cannot resume from that cursor") from exc
     return PublicRecordPage(
-        items=public_records_read(rtype, items),
-        total=total,
+        items=public_records_read(rtype, result.items),
+        total=result.total,
+        total_capped=result.total_capped,
+        next_cursor=result.next_cursor,
         page=page,
         page_size=settings.clamp_page_size(page_size),
     )

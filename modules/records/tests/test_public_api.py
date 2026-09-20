@@ -102,7 +102,14 @@ async def test_the_shape_carries_no_audit_or_status_columns(public_client):
     assert set(one.json()) == {"uuid", "slug", "display_title", "published_at", "data"}
 
     listed = await public_client.get(f"{_PREFIX}/article")
-    assert set(listed.json()) == {"items", "total", "page", "page_size"}
+    assert set(listed.json()) == {
+        "items",
+        "total",
+        "total_capped",
+        "next_cursor",
+        "page",
+        "page_size",
+    }
     assert set(listed.json()["items"][0]) == {
         "uuid",
         "slug",

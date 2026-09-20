@@ -193,7 +193,10 @@ async def test_sorted_by_each_kind(perf_client, perf_db, perf_session):
         ("date", "company", "founded"),
         ("datetime", "order", "placed_at"),
         ("ref", "order", "customer"),
+        ("multiselect", "product", "tags"),
         ("fixed column", "order", "updated_at"),
+        ("fixed column", "order", "position"),
+        ("fixed column", "order", "published_at"),
     ]
     for kind, key, field in cases:
         for direction in ("", "-"):

@@ -21,12 +21,14 @@ __all__ = [
     "DryRunReportRead",
     "FailingRecordRead",
     "SchemaChangeRead",
+    "SchemaPreviewJobRead",
     "SchemaPreviewRead",
     "SchemaPreviewRequest",
     "TypeRestoreRequest",
     "TypeRevisionListResponse",
     "TypeRevisionRead",
     "dry_run_report_read",
+    "schema_preview_job_read",
     "schema_preview_read",
     "type_revision_read",
 ]
@@ -76,6 +78,24 @@ class SchemaPreviewRead(SQLModel):
     kind: ChangeClass
     changes: list[SchemaChangeRead]
     report: DryRunReportRead
+
+
+class SchemaPreviewJobRead(SQLModel):
+    """``GET /types/{key}/schema/preview/{job}`` — a deferred preview's state.
+
+    ``status`` is ``running``, ``done`` or ``failed``. ``checked``/``total``
+    are the progress the scan reports per batch, for the "checked N of M" the
+    editor shows. ``preview`` is the ordinary :class:`SchemaPreviewRead` and
+    is present exactly when ``status`` is ``done`` — the same body the
+    synchronous path returns, so a client renders one shape either way.
+    """
+
+    job: str
+    status: str
+    checked: int
+    total: int
+    preview: SchemaPreviewRead | None = None
+    error: str | None = None
 
 
 class TypeRevisionRead(SQLModel):
@@ -151,4 +171,27 @@ def schema_preview_read(diff: SchemaDiff, report: DryRunReport) -> SchemaPreview
         kind=diff.kind,
         changes=[_schema_change_read(c) for c in diff.changes],
         report=dry_run_report_read(report),
+    )
+
+
+def schema_preview_job_read(job: Any) -> SchemaPreviewJobRead:
+    """A :class:`~sm_records.services.preview_jobs.PreviewJob` on the wire.
+
+    ``Any`` rather than the dataclass: the contracts layer is the module's
+    public surface and an in-process registry entry is not part of it —
+    importing the type here would make a request-shape module depend on a
+    services one for nothing but an annotation.
+    """
+    preview = (
+        schema_preview_read(job.diff, job.report)
+        if job.diff is not None and job.report is not None
+        else None
+    )
+    return SchemaPreviewJobRead(
+        job=job.id,
+        status=job.status,
+        checked=job.checked,
+        total=job.total,
+        preview=preview,
+        error=job.error,
     )

@@ -54,8 +54,45 @@ def like_contains_pattern(term: str) -> str:
     demands a literal backslash no real content has and the search silently
     returns nothing — strictly worse than the over-matching it prevents.
     """
-    escaped = term.translate(str.maketrans({"%": r"\%", "_": r"\_", "\\": "\\\\"}))
-    return f"%{escaped}%"
+    return f"%{like_escape(term)}%"
+
+
+def prefix_range(term: str) -> tuple[str, str | None]:
+    r"""``(low, high)`` such that ``low <= value < high`` is exactly "starts
+    with ``term``" — the half-open range a btree can answer by seeking.
+
+    ``LIKE 'term%'`` expresses the same set and **cannot be answered from an
+    index on SQLite**: the LIKE optimisation needs a ``NOCASE``-collated index
+    when ``case_sensitive_like`` is off (the default), and every index here is
+    ``BINARY``. Postgres is the same story under any non-C collation. A range
+    is the portable spelling of a prefix search, and it is what makes
+    ``ix_records_record_type_title_id`` able to serve the relation picker.
+
+    The upper bound is the term with its last code point incremented, which is
+    the *tight* bound: a value strictly between ``term`` and that successor
+    must have ``term`` as a prefix, and every value that does is below it.
+    Surrogates are stepped over because a lone one is not encodable, and a
+    term made entirely of the maximum code point has no successor at all —
+    ``high`` is ``None`` there and the caller drops the upper bound, which
+    over-matches by nothing a real title contains.
+
+    The cost is that this is **case- and collation-sensitive**, where
+    ``contains`` is neither. That is the operator's contract, stated in the
+    README: ``starts_with`` is the cheap, exact one and ``contains`` is the
+    forgiving, expensive one, and the picker asks in that order.
+    """
+    for position in range(len(term) - 1, -1, -1):
+        point = ord(term[position]) + 1
+        if point == 0xD800:
+            point = 0xE000
+        if point <= 0x10FFFF:
+            return term, term[:position] + chr(point)
+    return term, None
+
+
+def like_escape(term: str) -> str:
+    """The literal-match escaping both patterns above share."""
+    return term.translate(str.maketrans({"%": r"\%", "_": r"\_", "\\": "\\\\"}))
 
 
 class FilterOp(str, enum.Enum):  # noqa: UP042
@@ -63,6 +100,7 @@ class FilterOp(str, enum.Enum):  # noqa: UP042
     NE = "ne"
     IN = "in"
     CONTAINS = "contains"
+    STARTS_WITH = "starts_with"
     GT = "gt"
     GTE = "gte"
     LT = "lt"
@@ -95,6 +133,22 @@ INDEX_TABLE: dict[IndexKind, Any] = {
     IndexKind.REF: IndexRef,
 }
 
+SORT_ATTR: dict[IndexKind, str] = {
+    IndexKind.TEXT: "value",
+    IndexKind.NUMBER: "value",
+    IndexKind.BOOL: "value",
+    IndexKind.DATE: "value",
+    IndexKind.DATETIME: "value",
+    IndexKind.REF: "target_uuid",
+}
+"""Which *attribute name* carries the sortable value, per kind.
+
+The name and not the bound column, because a sort joins an ``aliased()`` copy
+of the table (:mod:`sm_records.index._sorting`) and the column on the alias is
+a different object from the one on the class. :data:`SORT_COLUMN` below is the
+same mapping already resolved against the class, for the predicate builders,
+which never alias."""
+
 SORT_COLUMN: dict[IndexKind, Any] = {
     IndexKind.TEXT: IndexText.value,
     IndexKind.NUMBER: IndexNumber.value,
@@ -108,7 +162,9 @@ _ORDERED = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
 _ALLOWED: dict[IndexKind, frozenset[FilterOp]] = {
     # Text is not ordered-comparable on purpose: ``value`` holds only the
     # first 512 characters, so ``>`` over it would answer with a prefix.
-    IndexKind.TEXT: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, FilterOp.CONTAINS}),
+    IndexKind.TEXT: frozenset(
+        {FilterOp.EQ, FilterOp.NE, FilterOp.IN, FilterOp.CONTAINS, FilterOp.STARTS_WITH}
+    ),
     IndexKind.NUMBER: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *_ORDERED}),
     IndexKind.BOOL: frozenset({FilterOp.EQ, FilterOp.NE}),
     IndexKind.DATE: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *_ORDERED}),
@@ -153,6 +209,32 @@ def _text_eq(value: str) -> ColumnElement[bool]:
     return and_(IndexText.value == head, IndexText.value_full == value)
 
 
+def starts_with_clause(column: Any, value: str) -> ColumnElement[bool]:
+    """``value <= column < successor`` — see :func:`prefix_range`."""
+    low, high = prefix_range(value)
+    return and_(column >= low, column < high) if high is not None else column >= low
+
+
+def _text_starts_with(value: str) -> ColumnElement[bool]:
+    """Design doc §7.4 again, and the easy half of it.
+
+    ``value`` holds the first :data:`~sm_records.constants.TEXT_INDEX_LEN`
+    characters, so for a needle no longer than that the prefix is *entirely*
+    inside the indexed column and no ``value_full`` re-check is possible or
+    needed — unlike ``eq``, a prefix match cannot be a false positive because
+    of what was cut off. A longer needle is the reverse: ``value`` can only
+    confirm its first 512 characters, so the rest is checked against
+    ``value_full``, which by construction is non-NULL whenever the stored
+    value was long enough to match at all.
+    """
+    if len(value) <= TEXT_INDEX_LEN:
+        return starts_with_clause(IndexText.value, value)
+    return and_(
+        IndexText.value == value[:TEXT_INDEX_LEN],
+        starts_with_clause(IndexText.value_full, value),
+    )
+
+
 def _text_clause(op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
     if op is FilterOp.CONTAINS:
         pattern = like_contains_pattern(_coerce(IndexKind.TEXT, value, field))
@@ -161,6 +243,8 @@ def _text_clause(op: FilterOp, value: Any, field: str) -> ColumnElement[bool]:
             IndexText.value.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
             IndexText.value_full.ilike(pattern, escape=LIKE_ESCAPE_CHAR),
         )
+    if op is FilterOp.STARTS_WITH:
+        return _text_starts_with(_coerce(IndexKind.TEXT, value, field))
     return _text_eq(_coerce(IndexKind.TEXT, value, field))
 
 
