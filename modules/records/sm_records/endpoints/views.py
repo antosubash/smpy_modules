@@ -22,6 +22,7 @@ from sm_records.contracts.schemas import (
     type_read,
 )
 from sm_records.deps import (
+    caller_roles,
     get_settings,
     has_edit_permission,
     load_type,
@@ -35,6 +36,8 @@ from sm_records.deps import (
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.index.query import Filter, QueryError, Sort
 from sm_records.models import RecordType
+from sm_records.services import _relations
+from sm_records.services import expand as expand_service
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
 from sm_records.services.errors import NotFound
@@ -128,6 +131,18 @@ async def record_edit(
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
 ) -> InertiaResponse:
+    """The editor, with its relation fields already resolved.
+
+    Expansion is not optional here for the same reason it is not on the list
+    (§9): a relation picker showing stored UUIDs is not an editor, and a
+    second request per field to turn them into titles is the round-trip
+    ``?expand=`` exists to avoid.
+
+    ``referrer_count`` is the "Referenced by" badge — one ``COUNT`` over
+    ``records_index_ref`` (``_relations.referrer_count``) and deliberately not
+    part of ``RecordRead``: the list screen would pay it per row for a number
+    only this screen shows, and the panel behind it is its own endpoint.
+    """
     counts = await type_service.record_counts(db, rtype)
     try:
         record = await record_service.get_record(db, rtype, uuid)
@@ -139,17 +154,28 @@ async def record_edit(
         if not await has_edit_permission(request, db):
             raise
         record = await record_service.get_deleted_record(db, rtype, uuid)
+    expanded = await expand_service.expand(
+        db,
+        rtype,
+        [record],
+        expand_service.relation_field_keys(rtype),
+        roles=caller_roles(request),
+    )
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
         {
             "type": type_read(rtype, *counts).model_dump(mode="json"),
-            "record": record_read(rtype, record).model_dump(mode="json"),
+            "record": record_read(rtype, record, expanded=expanded[record.uuid]).model_dump(
+                mode="json"
+            ),
+            "referrer_count": await _relations.referrer_count(db, record),
         },
     )
 
 
 @router.get("/{key}", response_model=None)
 async def record_list(
+    request: Request,
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
@@ -167,7 +193,7 @@ async def record_list(
     enumerates soft-deleted rows to restore one (FAIL-3)."""
     counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
-    page_size = max(min(settings.default_page_size, settings.max_page_size), 1)
+    page_size = settings.clamp_page_size(None)
     filters, malformed = parsed
     errors: dict[str, str] = {}
     items: list = []
@@ -200,10 +226,17 @@ async def record_list(
             # the same channel form validation uses — and shows it inline.
             items, total = [], 0
             errors["filter"] = exc.reason
+    # Always, for every relation column the screen renders (§9: the generic
+    # list is the one caller that always expands). One batched query per
+    # relation field for the whole page — never one per row, which is what
+    # ``record_list_read`` takes the finished map rather than a session for.
+    expanded = await expand_service.expand(
+        db, rtype, items, expand_service.relation_field_keys(rtype), roles=caller_roles(request)
+    )
     records_page = RecordPage(
         # One lenient read per row and no per-row validation — see
         # ``contracts.schemas.record_list_read``.
-        items=record_list_read(rtype, items),
+        items=record_list_read(rtype, items, expanded=expanded),
         total=total,
         page=page,
         page_size=page_size,

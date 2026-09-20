@@ -11,21 +11,15 @@ can see at route-registration time.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schemas import (
     RecordCreate,
     RecordPage,
     RecordRead,
-    RecordRevisionDetailRead,
-    RecordRevisionRestoreRequest,
     RecordUpdate,
-    RevisionListResponse,
     record_list_read,
     record_read,
-    record_revision_detail_read,
-    revision_read,
 )
 from sm_records.deps import (
     actor,
@@ -33,6 +27,7 @@ from sm_records.deps import (
     check_type_roles,
     get_settings,
     load_type,
+    parse_expand,
     parse_filters,
     parse_sorts,
     parse_trashed,
@@ -42,10 +37,10 @@ from sm_records.deps import (
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.index.query import Filter, Sort
-from sm_records.models import RecordRevision, RecordStatus, RecordType
+from sm_records.models import RecordStatus, RecordType
+from sm_records.services import expand as expand_service
 from sm_records.services import records as record_service
-from sm_records.services import revisions as revision_service
-from sm_records.services.errors import NotFound, ValidationFailed
+from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
@@ -63,12 +58,9 @@ def _status(raw: str | None) -> RecordStatus | None:
         ) from exc
 
 
-def _page_size(settings: RecordsSettings, page_size: int | None) -> int:
-    return max(min(page_size or settings.default_page_size, settings.max_page_size), 1)
-
-
 @router.get("/records", response_model=RecordPage, dependencies=[require_view])
 async def list_records(
+    request: Request,
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
@@ -77,6 +69,7 @@ async def list_records(
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     trashed: bool = Depends(parse_trashed),
+    expand: list[str] = Depends(parse_expand),
 ) -> RecordPage:
     """The type's records, or — with ``?trashed=true`` — only its trash.
 
@@ -85,6 +78,10 @@ async def list_records(
     makes "trash and restore" a feature you can use once. ``trashed`` costs
     ``records.edit`` (``deps.parse_trashed``); every item comes back with
     ``is_deleted: true``, so the shape needs nothing new.
+
+    ``?expand=a,b`` resolves those relation fields for the whole page in one
+    query each (design §9) — never per row, which is the difference between a
+    list screen and fifty round trips.
     """
     items, total = await record_service.list_records(
         db,
@@ -96,15 +93,20 @@ async def list_records(
         page_size=page_size,
         trashed=trashed,
     )
+    expanded = (
+        await expand_service.expand(db, rtype, items, expand, roles=caller_roles(request))
+        if expand
+        else None
+    )
     return RecordPage(
         # ``record_list_read``, not a comprehension over ``record_read``: a
         # list reads each row leniently but does not validate it, so a page of
         # fifty costs one compiled-model pass rather than fifty (``invalid`` is
         # the record editor's badge — see the contracts module).
-        items=record_list_read(rtype, items),
+        items=record_list_read(rtype, items, expanded=expanded),
         total=total,
         page=page,
-        page_size=_page_size(settings, page_size),
+        page_size=settings.clamp_page_size(page_size),
     )
 
 
@@ -133,10 +135,23 @@ async def create_record(
 
 @router.get("/records/{uuid}", response_model=RecordRead, dependencies=[require_view])
 async def get_record(
-    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
+    uuid: str,
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+    expand: list[str] = Depends(parse_expand),
 ) -> RecordRead:
+    """One record, with ``?expand=`` resolving the relation fields it names
+    to depth one (design §9). A key that is not a relation field of the type
+    is a 400 naming it — ``services.expand`` refuses it with the same
+    ``QueryError`` the filter grammar uses for an unknown field."""
     record = await record_service.get_record(db, rtype, uuid)
-    return record_read(rtype, record)
+    expanded = (
+        await expand_service.expand(db, rtype, [record], expand, roles=caller_roles(request))
+        if expand
+        else None
+    )
+    return record_read(rtype, record, expanded=None if expanded is None else expanded[record.uuid])
 
 
 @router.put("/records/{uuid}", response_model=RecordRead, dependencies=[require_edit])
@@ -210,75 +225,3 @@ async def purge_record(
     check_type_roles(request, rtype)
     record = await record_service.get_deleted_record(db, rtype, uuid)
     await record_service.hard_delete_record(db, rtype, record)
-
-
-@router.get(
-    "/records/{uuid}/revisions", response_model=RevisionListResponse, dependencies=[require_view]
-)
-async def list_revisions(
-    uuid: str, rtype: RecordType = Depends(load_type), db: AsyncSession = Depends(request_db)
-) -> RevisionListResponse:
-    record = await record_service.get_record(db, rtype, uuid)
-    revisions = await revision_service.list_revisions(db, record)
-    return RevisionListResponse(items=[revision_read(revision) for revision in revisions])
-
-
-@router.get(
-    "/records/{uuid}/revisions/{revision_id}",
-    response_model=RecordRevisionDetailRead,
-    dependencies=[require_view],
-)
-async def get_record_revision(
-    uuid: str,
-    revision_id: int,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-) -> RecordRevisionDetailRead:
-    """The read-only preview before restoring: the list entry plus the
-    payload it snapshotted. A revision id from another record is a 404 — see
-    ``services.revisions.restore``'s own docstring for why that is a 404
-    rather than a 403: nothing else in the API takes a revision id, so there
-    is no resource here the caller is being refused access to."""
-    record = await record_service.get_record(db, rtype, uuid)
-    stmt = select(RecordRevision).where(
-        RecordRevision.id == revision_id, RecordRevision.record_id == record.id
-    )
-    revision = (await db.execute(stmt)).scalars().first()
-    if revision is None:
-        raise NotFound(f"record {uuid} has no revision {revision_id!r}")
-    return record_revision_detail_read(revision)
-
-
-@router.post(
-    "/records/{uuid}/revisions/{revision_id}/restore",
-    response_model=RecordRead,
-    dependencies=[require_edit],
-)
-async def restore_record_revision(
-    uuid: str,
-    revision_id: int,
-    body: RecordRevisionRestoreRequest,
-    request: Request,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-    who: str | None = Depends(actor),
-) -> RecordRead:
-    """Write a past revision's payload back as a new version of the record —
-    ``records.edit`` plus the same ``allowed_roles`` narrowing as every other
-    record write (design §10), since a restore is a write like any other. A
-    payload that no longer fits the *current* schema is the usual ``422``
-    (``services.revisions.restore``'s own docstring explains why validating
-    against "now" rather than "then" is the correct answer, not a gap)."""
-    check_type_roles(request, rtype)
-    record = await record_service.get_record(db, rtype, uuid)
-    restored = await revision_service.restore(
-        db,
-        rtype,
-        record,
-        revision_id=revision_id,
-        expected_version=body.expected_version,
-        settings=settings,
-        actor=who,
-    )
-    return record_read(rtype, restored)

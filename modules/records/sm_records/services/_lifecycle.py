@@ -24,6 +24,7 @@ from sm_records.services._common import (
     guarded_bump,
     mark_written,
     reload,
+    role_blocked,
     type_resolver,
     utcnow,
 )
@@ -90,21 +91,6 @@ async def _apply_set_null(
     await write_index(db, ref.record, ref.rtype, resolve_type_id=await type_resolver(db))
 
 
-def _role_blocked(rtype: RecordType, roles: Sequence[str] | None) -> bool:
-    """Design §10's ``allowed_roles`` narrowing, for a type the caller never named.
-
-    ``deps.check_type_roles`` only ever sees the type in the URL, so a cascade
-    or a set_null into a *different* type used to trash or rewrite records the
-    caller is not allowed to write at all — the narrowing was one relation
-    field away from being decorative. ``roles is None`` means "no caller":
-    the CLI and any system path keep the unrestricted behaviour.
-    """
-    if roles is None:
-        return False
-    allowed = rtype.allowed_roles or []
-    return bool(allowed) and not set(roles).intersection(allowed)
-
-
 async def _plan_delete(
     db: AsyncSession, rtype: RecordType, record: Record, roles: Sequence[str] | None
 ) -> tuple[list[tuple[Record, RecordType]], list[tuple[_relations.Referrer, str]], list[str]]:
@@ -126,7 +112,11 @@ async def _plan_delete(
         current = queue.pop(0)
         for ref in await _relations.referrers(db, current):
             behaviour = ref.on_delete
-            if behaviour != _RESTRICT and _role_blocked(ref.rtype, roles):
+            # ``role_blocked`` and not a local copy: design §10's narrowing has
+            # to reach a type the URL never names — a cascade or a set_null into
+            # a *different* type would otherwise trash or rewrite records this
+            # caller may not write at all. Same predicate as the read paths.
+            if behaviour != _RESTRICT and role_blocked(ref.rtype, roles):
                 behaviour = _RESTRICT
             if behaviour == _RESTRICT:
                 if ref.record.uuid not in seen_blockers:
@@ -177,7 +167,7 @@ async def soft_delete_record(
     the CLI, a background task, any path with no user behind it. Given a list,
     a referrer whose *type* narrows writes to roles the caller does not hold
     is treated as ``restrict`` however its field is declared: see
-    :func:`_role_blocked`.
+    :func:`~sm_records.services._common.role_blocked`.
     """
     trash, set_nulls, blockers = await _plan_delete(db, rtype, record, roles)
     if blockers:

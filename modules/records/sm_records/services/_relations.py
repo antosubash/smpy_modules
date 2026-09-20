@@ -9,16 +9,17 @@ is one indexed query rather than a scan of every payload in the install.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import IndexRef, Record, RecordType
 from sm_records.schema.fields import ON_DELETE_DEFAULT, FieldDefinition
 from sm_records.schema.types import FieldType
+from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
 
 
@@ -116,7 +117,9 @@ def _on_delete(rtype: RecordType, field_key: str) -> str:
     return ON_DELETE_DEFAULT
 
 
-async def referrers(db: AsyncSession, record: Record) -> list[Referrer]:
+async def referrers(
+    db: AsyncSession, record: Record, *, include_deleted: bool = False
+) -> list[Referrer]:
     """Who points at ``record``, and with what delete behaviour.
 
     Self-references are dropped: a record holding a relation to itself would
@@ -129,6 +132,13 @@ async def referrers(db: AsyncSession, record: Record) -> list[Referrer]:
     ``restrict`` delete nor is followed by a ``cascade`` — it is not content
     anyone can currently reach, and cascading into the trash would rewrite
     rows a restore is supposed to bring back whole.
+
+    ``include_deleted=True`` lifts that filter, and **only the read API passes
+    it** (:func:`paged_referrers`): "what references this record" is a question
+    about the whole graph, and ``ReferrerRead.is_deleted`` is in the contract
+    precisely so the panel can show a trashed referrer greyed out rather than
+    pretend it is not there. The delete path keeps the default, because
+    including the trash there would change delete semantics — see above.
     """
     rows = (
         await db.execute(
@@ -141,7 +151,7 @@ async def referrers(db: AsyncSession, record: Record) -> list[Referrer]:
     if not pairs:
         return []
 
-    records = await _by_id(db, Record, {rid for rid, _ in pairs})
+    records = await _by_id(db, Record, {rid for rid, _ in pairs}, include_deleted=include_deleted)
     types = await _by_id(db, RecordType, {r.type_id for r in records.values()})
     out: list[Referrer] = []
     for record_id, field_key in sorted(pairs):
@@ -153,9 +163,79 @@ async def referrers(db: AsyncSession, record: Record) -> list[Referrer]:
     return out
 
 
-async def _by_id(db: AsyncSession, model: Any, ids: Iterable[int]) -> dict[int, Any]:
+async def _by_id(
+    db: AsyncSession, model: Any, ids: Iterable[int], *, include_deleted: bool = False
+) -> dict[int, Any]:
     ids = list(ids)
     if not ids:
         return {}
-    rows = (await db.execute(select(model).where(model.id.in_(ids)))).scalars().all()
+    stmt = select(model).where(model.id.in_(ids))
+    if include_deleted:
+        stmt = stmt.execution_options(include_deleted=True)
+    rows = (await db.execute(stmt)).scalars().all()
     return {row.id: row for row in rows}
+
+
+def field_label(rtype: RecordType, field_key: str) -> str:
+    """The referring field's label, from the *referring* type's definition.
+
+    Falls back to the key: a definition written before labels were required,
+    or a field deleted since (its index rows survive until the record is
+    rewritten), still has to render as something in the panel.
+    """
+    for raw in rtype.fields or []:
+        if raw.get("key") == field_key:
+            return str(raw.get("label") or field_key)
+    return field_key
+
+
+async def paged_referrers(
+    db: AsyncSession,
+    record: Record,
+    *,
+    roles: Sequence[str] | None = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[Referrer], int]:
+    """One page of "what references this record", and the honest total.
+
+    Two rules, and the order they are applied in is the point:
+
+    * ``total`` counts **every** referrer — live, trashed, and the ones this
+      caller may not see. A count that shrank per caller would tell the
+      restricted caller exactly how many rows they are missing only by
+      comparing with somebody else, and would make the delete dialog's "3
+      records reference this" disagree with what the delete actually refuses.
+    * the page window is taken *before* the role filter, so every caller sees
+      the same rows at the same offsets; a referrer whose type narrows
+      ``allowed_roles`` past this caller simply is not in the page it falls
+      in (design §10 — nothing about it leaks, not even its type).
+
+    The window is applied in Python rather than in SQL because the underlying
+    query is already one indexed lookup over ``records_index_ref`` plus two
+    id-keyed loads: the row count here is "how many records reference one
+    record", which is bounded by the graph an editor built by hand.
+    """
+    rows = await referrers(db, record, include_deleted=True)
+    offset = max(page - 1, 0) * page_size
+    window = rows[offset : offset + page_size]
+    return [ref for ref in window if not role_blocked(ref.rtype, roles)], len(rows)
+
+
+async def referrer_count(db: AsyncSession, record: Record) -> int:
+    """How many distinct records point at this one — one ``COUNT`` and no joins.
+
+    The editor shows a number next to its "Referenced by" panel on every
+    record it opens, and :func:`paged_referrers` is too much work for that:
+    it loads the referring records and their types to decide what each one
+    would cost on delete. This counts index rows instead, which is the
+    question the badge asks.
+
+    Deliberately *not* filtered by the caller's roles or by the trash. Both
+    would cost the loads this exists to avoid, and the number is a prompt to
+    open the panel — where both rules do apply — rather than an answer.
+    """
+    stmt = select(func.count(func.distinct(IndexRef.record_id))).where(
+        IndexRef.target_uuid == record.uuid, IndexRef.record_id != record.id
+    )
+    return int((await db.execute(stmt)).scalar_one())

@@ -16,7 +16,7 @@ map does not go stale behind the caller's back.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,6 +30,31 @@ try:  # pragma: no cover - the constant is the framework's, the fallback is ours
     from simple_module_db.listeners import SESSION_HAS_WRITES_KEY
 except ImportError:  # pragma: no cover
     SESSION_HAS_WRITES_KEY = "has_writes"
+
+
+def role_blocked(rtype: RecordType, roles: Sequence[str] | None) -> bool:
+    """Design §10's ``allowed_roles`` narrowing, as a predicate with one owner.
+
+    Three places apply it and they must not drift: ``deps.check_type_roles``
+    (the type named in the URL), ``services._lifecycle`` (a type a cascade or
+    a ``set_null`` reaches that the URL never names) and the two Phase 4 reads
+    — ``services.expand`` and the referrers listing — where a target the
+    caller may not see is reported as ``restricted`` rather than resolved.
+    A second copy of "does this caller hold one of these roles" is how the
+    read path ends up more permissive than the write path.
+
+    ``roles is None`` means "no caller": the CLI, a background task, any path
+    with no user behind it, which keeps the unrestricted behaviour. An empty
+    list is a caller holding no roles, and a narrowed type blocks them.
+
+    Note what this deliberately does not do: an ``admin`` wildcard is not an
+    exception. Narrowing is a list of role names, and a role not on it is
+    refused however powerful it is elsewhere (see the README).
+    """
+    if roles is None:
+        return False
+    allowed = rtype.allowed_roles or []
+    return bool(allowed) and not set(roles).intersection(allowed)
 
 
 def utcnow() -> datetime:

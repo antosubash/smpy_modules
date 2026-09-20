@@ -251,9 +251,17 @@ async def test_inertia_list_view(perf_client, perf_db, perf_session):
     """``GET /admin/records/{key}`` with ``X-Inertia``.
 
     The view does more than the API list: two ``record_count`` queries for the
-    type header on top of the page and its total. The Phase 3 review found a
-    per-row validation here; ``record_list_read`` is the fix, and a statement
-    count that does not scale with the page size is what proves it is in place.
+    type header on top of the page and its total, and — since Phase 4 — the
+    expansion every relation column it renders always asks for (§9): one
+    lookup for the target types plus **one per relation field**, which for
+    ``order`` (a contact and a to-many product list) is three.
+
+    The budget is a ceiling on a sum that scales with the *schema*, never with
+    the page: the Phase 3 review found a per-row validation here
+    (``record_list_read`` is the fix) and a per-row expansion would be the
+    same mistake with a different name. Ten statements is 200 records read in
+    a fixed number of round trips; the assertion fails the moment either of
+    those turns into "once per row".
     """
     counts = await type_counts(perf_session)
     headers = {**HEADERS, "X-Inertia": "true", "X-Inertia-Version": "1.0"}

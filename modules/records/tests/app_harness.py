@@ -183,6 +183,10 @@ async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
     # endpoints work under an ordering production does not have.
     module.register_middleware(app)
     app.add_middleware(_HeaderAuthMiddleware)
+    # Parked so a test can run the lifespan hook the host would run — the
+    # anonymous read API is mounted from ``on_startup`` (its prefix is a
+    # settings value), so a test of it has to reach the module instance.
+    app.state.records_module = module
     return app, db_state
 
 

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records import constants
 from sm_records.index.query import Filter, FilterOp, Sort
 from sm_records.models import RecordType
+from sm_records.services._common import role_blocked
 from sm_records.services.errors import Forbidden
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
@@ -108,16 +109,16 @@ def check_type_roles(request: Request, rtype: RecordType) -> None:
 
     Applied on every *record* write, never on type management — narrowing is a
     property of a type's own records, not of the schema that defines it.
+
+    The predicate itself is ``services._common.role_blocked`` and is not
+    re-implemented here: the read paths that report a target as ``restricted``
+    rather than refusing (``services.expand``, the referrers listing) have to
+    answer the *same* question this raises on, admin wildcard included.
     """
-    allowed = rtype.allowed_roles or []
-    if not allowed:
-        return
-    user = getattr(request.state, "user", None)
-    roles = set(getattr(user, "roles", None) or [])
-    if not roles.intersection(allowed):
+    if role_blocked(rtype, caller_roles(request)):
+        allowed = sorted(rtype.allowed_roles or [])
         raise Forbidden(
-            f"type {rtype.key!r} is restricted to roles {sorted(allowed)}; "
-            f"caller holds none of them"
+            f"type {rtype.key!r} is restricted to roles {allowed}; caller holds none of them"
         )
 
 
@@ -238,6 +239,32 @@ async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
     return True
 
 
+def parse_expand(
+    raw_expand: list[str] = Query(default=[], alias=constants.EXPAND_PARAM),
+) -> list[str]:
+    """``?expand=a,b`` (and ``?expand=a&expand=b``) — the relation fields to
+    resolve on this read, design §9.
+
+    Both spellings, because both are what a client reaches for and neither is
+    ambiguous: the grammar is a list of field keys, and a field key cannot
+    contain a comma (``TYPE_KEY_PATTERN``). Order is preserved and duplicates
+    are dropped here rather than in the service, so ``expand=a,a`` cannot cost
+    two queries.
+
+    No validation of the keys themselves: whether a key names a relation field
+    is a question about the *type*, which this dependency cannot see — it is
+    ``services.expand``'s, and it answers with the same ``QueryError`` the
+    filter grammar refuses an unknown field with.
+    """
+    keys: list[str] = []
+    for raw in raw_expand:
+        for item in raw.split(","):
+            key = item.strip()
+            if key and key not in keys:
+                keys.append(key)
+    return keys
+
+
 def parse_sorts(raw_sorts: list[str] = Query(default=[], alias="sort")) -> list[Sort]:
     """``?sort=`` repeats; a leading ``-`` means descending."""
     return [
@@ -255,6 +282,7 @@ __all__ = [
     "get_settings",
     "has_edit_permission",
     "load_type",
+    "parse_expand",
     "parse_filters",
     "parse_sorts",
     "parse_trashed",

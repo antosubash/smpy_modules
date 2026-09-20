@@ -9,9 +9,11 @@ the host hydrates it from the DB at lifespan start, and the Settings screen
 writes it back.
 
 ``public_route_prefix`` carries ``requires_restart`` because the anonymous
-read routes it configures would be mounted at boot — but that API is Phase 4
-of the design doc (§16) and has not shipped, so today nothing reads the field
-at all. Everything else here is read per request and takes effect on save.
+read routes it configures are mounted from ``on_startup`` — after hydration,
+which is the only point at which the prefix is known, and long after the
+router table would otherwise be built (see :mod:`sm_records.boot`). Changing
+it therefore takes a restart. Everything else here is read per request and
+takes effect on save.
 """
 
 from __future__ import annotations
@@ -56,13 +58,18 @@ class RecordsSettings(BaseSettings):
     public_route_prefix: str = Field(default="/api/records/public", json_schema_extra=_RESTART)
     """URL prefix for the anonymous read API of public record types.
 
-    **Inert today.** The public read API is Phase 4 (design doc §16, "Phase 4
-    — reach"): nothing reads this field, and ``RecordType.is_public`` grants
-    no anonymous access. It is kept, and kept marked ``requires_restart``,
-    because when the routes land they are mounted via
-    ``register_public_routes`` from ``on_startup`` — the set of public types
-    is only known after settings hydration — and changing the prefix will
-    then need a restart.
+    ``GET {prefix}/{type_key}`` and ``GET {prefix}/{type_key}/{uuid}`` serve
+    the published records of a type whose ``is_public`` is set, to callers
+    with no session at all (design §10). A type that is not public is a 404
+    on both, indistinguishable from one that does not exist.
+
+    Read once, while booting: :mod:`sm_records.boot` mounts the router and
+    exempts the prefix from ``AuthMiddleware`` from ``on_startup``, so a new
+    value needs a restart — which is what ``requires_restart`` tells the
+    operator on the Settings screen. The exemption is registered as a prefix
+    rule terminating in ``/``; a value sharing its first characters with the
+    admin API (``/api/records``) is therefore still safe, but a value that is
+    a *parent* of it would not be.
     """
 
     default_page_size: int = 25
@@ -114,6 +121,18 @@ class RecordsSettings(BaseSettings):
     Turns an orphaned reindex — one whose background task died with the
     worker that owned it — from a support ticket into an alert.
     """
+
+    def clamp_page_size(self, requested: int | None) -> int:
+        """The page size a list endpoint actually uses.
+
+        One owner for the rule, because four call sites want it and they must
+        agree: the admin list, the referrers panel, the anonymous read API and
+        the record-list view. ``None`` means "the caller did not ask" and gets
+        :attr:`default_page_size`; anything above :attr:`max_page_size` is
+        clamped rather than refused, so an anonymous caller probing the
+        ceiling learns nothing and gets a usable page either way.
+        """
+        return max(min(requested or self.default_page_size, self.max_page_size), 1)
 
     @model_validator(mode="after")
     def _check_limits(self) -> RecordsSettings:

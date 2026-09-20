@@ -17,6 +17,7 @@ from simple_module_core.health import HealthRegistry
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.public_routes import PublicRouteRegistry
 
 from sm_records import constants
 
@@ -111,6 +112,19 @@ class RecordsModule(ModuleBase):
 
         registry.add(stale_reindex_check(self))
 
+    def register_public_routes(self, registry: PublicRouteRegistry) -> None:
+        """Nothing here — the exemption is added at startup instead.
+
+        Which path is public depends on ``public_route_prefix``, and this hook
+        runs during app construction, before the host hydrates that from the
+        database. Exempting the pydantic default here would open a prefix the
+        operator may have moved, and leave the one they chose gated.
+
+        ``AuthMiddleware`` reads the registry live, so
+        :func:`sm_records.boot.exempt_public_routes` can fill it from
+        ``on_startup`` — after hydration, before the first request. Design §10.
+        """
+
     def register_middleware(self, app: FastAPI) -> None:
         """Install the deferred-job drain — see :mod:`sm_records.deferred`.
 
@@ -142,6 +156,16 @@ class RecordsModule(ModuleBase):
         services = getattr(app.state, constants.PACKAGE, None)
         if services is not None and getattr(services, "settings", None) is not None:
             self.settings = services.settings
+
+        # The anonymous read API (design §10), mounted and exempted here for
+        # the reason in ``boot``'s docstring: its prefix is a DB-backed setting
+        # that only exists as the operator set it from this point on.
+        from sm_records import boot
+        from sm_records.settings import RecordsSettings
+
+        settings = self.settings or RecordsSettings()
+        boot.mount_public_router(app, settings)
+        boot.exempt_public_routes(app, settings)
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

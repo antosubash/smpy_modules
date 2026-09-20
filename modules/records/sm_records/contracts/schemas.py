@@ -255,7 +255,12 @@ def record_read(
     )
 
 
-def record_list_read(rtype: RecordType, records: Sequence[Record]) -> list[RecordRead]:
+def record_list_read(
+    rtype: RecordType,
+    records: Sequence[Record],
+    *,
+    expanded: dict[str, dict[str, list[ExpandedRef]]] | None = None,
+) -> list[RecordRead]:
     """A page of records, read once per *type* rather than once per row.
 
     Two things the per-record path does that a list must not: it re-validates
@@ -265,6 +270,21 @@ def record_list_read(rtype: RecordType, records: Sequence[Record]) -> list[Recor
     shows — so ``invalid`` is ``[]`` here by construction, and a caller that
     needs it opens the record (design §8.3's "marked, not hidden" is about the
     editor). ``defs`` is computed once and shared.
+
+    ``expanded`` is the whole page's expansion keyed by record uuid — what
+    ``services.expand.expand`` returns — and is *looked up* here rather than
+    resolved: one batched query per relation field for the page is the rule
+    (§9), so a per-row query hiding behind this signature would be exactly the
+    regression it exists to prevent.
     """
     defs = field_defs(rtype)
-    return [record_read(rtype, record, with_invalid=False, defs=defs) for record in records]
+    return [
+        record_read(
+            rtype,
+            record,
+            with_invalid=False,
+            defs=defs,
+            expanded=None if expanded is None else expanded.get(record.uuid, {}),
+        )
+        for record in records
+    ]

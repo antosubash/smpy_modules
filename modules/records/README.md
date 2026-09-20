@@ -45,18 +45,10 @@ form at `/admin/records/{key}` and `/admin/records/{key}/{uuid}` — one pair of
 screens serves every type; nothing is generated per type.
 
 The same operations are available as a JSON API under `/api/records`. Every
-route on it requires a session and one of the three permissions below — there
-is no anonymous surface yet.
-
-**`is_public` and `public_route_prefix` are stored but inert.** The public
-read API they configure is **Phase 4** of the design doc (§16, "Phase 4 —
-reach") and has not shipped: a type marked `is_public` is readable by exactly
-the callers a private one is, and nothing reads `public_route_prefix`. The
-flag is persisted and editable so the schema does not have to change when the
-API lands. Two more §9/§10 features are Phase 4 with it: `?expand=` on a read
-(depth-1 resolution of a relation, ignored today) and the `dangling: true`
-marker on a reference whose target has been trashed or purged (a reference
-like that reads back as the raw stored object).
+route on it requires a session and one of the three permissions below. A type
+marked **`is_public`** additionally serves its *published* records to callers
+with no session at all, under `public_route_prefix` — see
+[Public read API](#public-read-api).
 
 **If a field is not indexed, it is not queryable.** `data` is opaque storage;
 no endpoint filters, sorts, or searches by extracting from it. A field must
@@ -73,7 +65,7 @@ variables are read. Configure on the Settings screen or with
 
 | setting | default | restart? |
 |---|---|---|
-| `public_route_prefix` | `/api/records/public` | yes — but see below |
+| `public_route_prefix` | `/api/records/public` | yes |
 | `default_page_size` | 25 | no |
 | `max_page_size` | 200 | no |
 | `revision_limit` | 50 per record | no |
@@ -83,9 +75,77 @@ variables are read. Configure on the Settings screen or with
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
 
-`public_route_prefix` is read by nothing: it configures the Phase 4 public
-read API described under Usage, which has not shipped. Setting it changes no
-behaviour.
+`public_route_prefix` is the one setting a change to needs a restart. The
+routes it configures are mounted — and exempted from authentication — while
+the app boots, because the prefix only exists as the operator set it once the
+host has hydrated these settings from the database.
+
+## Relations
+
+A `relation` field stores `{"type": "<type_key>", "uuid": "<record uuid>"}` —
+and a row in the reference index, which is what makes both directions cheap.
+
+**Forward: `?expand=`.** `GET /api/records/types/{key}/records` and
+`…/records/{uuid}` take `?expand=field_a,field_b` and resolve those relation
+fields to **depth one**, one batched query per named field for the whole page.
+Each reference comes back under `expanded[field_key]`, in payload order, in
+exactly one of three states:
+
+- **resolved** — `display_title`, `slug` and `status` are filled;
+- **dangling** — the target is in the trash or gone; `display_title` is
+  `null`. A restorable delete must not break what references it, so this is a
+  flag rather than an error or a dropped entry;
+- **restricted** — the target's type narrows `allowed_roles` past the caller.
+  Nothing but the uuid the caller already holds in `data` comes back.
+
+A key that is not a relation field of the type is a `400` naming it. Depth
+greater than one is not supported; the admin list and record editor always
+expand every relation column they render, so "opt-in" describes the API rather
+than the UI.
+
+**Reverse: referrers.**
+`GET /api/records/types/{key}/records/{uuid}/referrers?page=&page_size=`
+answers "what points at this record", from the reference index rather than a
+scan, and each entry carries the referring field's label and its `on_delete`
+so a delete dialog can say *why* a delete would be blocked. Trashed referrers
+are listed and flagged `is_deleted` (the delete path itself still ignores
+them). A referrer whose type the caller may not view is **counted in `total`
+and omitted from `items`** — the count stays honest, because it is the count a
+`restrict` refusal will produce, and the row itself does not leak.
+
+## Public read API
+
+Off by default and per type. Setting `is_public` on a Record Type serves its
+published records anonymously at two routes, under `public_route_prefix`
+(default `/api/records/public`):
+
+| route | answers |
+|---|---|
+| `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, page, page_size}` |
+| `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
+
+A record reads back as `uuid`, `slug`, `display_title`, `published_at` and
+`data` — nothing else. The audit columns, `version`, `status`, `invalid` and
+the reserved `_orphaned` sub-key (a deleted field's retained values, which are
+the admin's undo buffer) are removed from the *shape*, not filtered out of the
+query.
+
+The rules worth knowing before you point a site at it:
+
+- **A type that is not public is a `404`, identical to one that does not
+  exist**, by key and by uuid alike. A draft, a trashed record and an unknown
+  uuid answer with that same body, so nothing here can be used to enumerate
+  what an install holds.
+- **The filter and sort grammar is the admin one, over indexed fields only.**
+  A filter or sort naming a field that is unindexed, non-existent, or
+  mid-reindex is a `400` naming the field — never the admin API's `409`:
+  "cannot" and "cannot right now" are the same answer to a caller who has no
+  business seeing operational state.
+- **No `?expand=`** — an anonymous caller must not be able to turn one request
+  into a batch of joins against other types, some of which may not be public.
+  `expand` and `trashed` are simply not parameters here; unknown ones are
+  ignored.
+- `page_size` is clamped to `max_page_size` rather than refused.
 
 ## Permissions
 
@@ -138,6 +198,12 @@ screen, that a given type is further restricted to specific roles.
   asking the reference index who points at a record, so an unindexed relation
   would accept `restrict`/`set_null`/`cascade` and enforce none of them.
   Indexed relations count against `max_indexed_fields_per_type`.
+- **`allowed_roles` narrows reads as well as writes, but it narrows them
+  differently.** A caller the list excludes is *refused* a write and is
+  *redacted* on a read: an expanded reference to such a type comes back
+  `restricted`, and a referrer of one is counted without being listed. Neither
+  is an error, because in both cases the caller is reading a record they are
+  entitled to see that happens to point somewhere they are not.
 - **`display_field` must point at a `text`, `select`, `email`, `url`,
   `integer`, `number`, `date` or `datetime` field, and `slug_field` at a
   `text`, `select`, `email` or `url` one.** The rest do not stringify into
