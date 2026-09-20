@@ -17,12 +17,15 @@ from sm_records.models._index import (
     IndexText,
 )
 from sm_records.models._record import (
+    GROUP_LOCALE_CONFLICT_SIGNATURES,
+    GROUP_LOCALE_INDEX_NAME,
     SLUG_CONFLICT_SIGNATURES,
     SLUG_INDEX_NAME,
     Record,
     RecordRevision,
     RecordStatus,
     RevisionEvent,
+    new_uuid,
 )
 from sm_records.models._type import RecordType, RecordTypeRevision
 
@@ -38,6 +41,8 @@ INDEX_TABLES: tuple[type, ...] = (
 cascade on delete, the tests)."""
 
 __all__ = [
+    "GROUP_LOCALE_CONFLICT_SIGNATURES",
+    "GROUP_LOCALE_INDEX_NAME",
     "INDEX_TABLES",
     "SLUG_CONFLICT_SIGNATURES",
     "SLUG_INDEX_NAME",
@@ -54,4 +59,5 @@ __all__ = [
     "RecordType",
     "RecordTypeRevision",
     "RevisionEvent",
+    "new_uuid",
 ]

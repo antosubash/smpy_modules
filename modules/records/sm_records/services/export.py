@@ -59,8 +59,22 @@ __all__ = [
     "walk_records",
 ]
 
-ENVELOPE_COLUMNS = ("uuid", "slug", "status", "position", "published_at")
+ENVELOPE_COLUMNS = (
+    "uuid",
+    "slug",
+    "locale",
+    "translation_group",
+    "status",
+    "position",
+    "published_at",
+)
 """The fixed columns of §5 that travel with every record, whatever its type.
+
+``locale`` and ``translation_group`` travel because a file that lost them
+could not be imported back into a multilingual install without silently
+collapsing every record into the default language and breaking every
+translation group apart (Phase 5 §4.3). ``translation_group`` is opaque to the
+importer — it is carried, never interpreted.
 
 First rather than last in the CSV: ``uuid`` is the column an operator edits a
 file *against* (it is what ``match_by`` defaults to), and a spreadsheet whose
@@ -146,6 +160,8 @@ def record_row(rtype: RecordType, record: Record, defs: list[FieldDefinition]) -
     return {
         "uuid": record.uuid,
         "slug": record.slug,
+        "locale": record.locale,
+        "translation_group": record.translation_group,
         "status": record.status.value,
         "position": record.position,
         "published_at": record.published_at.isoformat() if record.published_at else None,

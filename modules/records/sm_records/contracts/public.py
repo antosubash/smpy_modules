@@ -16,9 +16,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
 from sm_records.constants import ORPHANED_KEY
+from sm_records.contracts.i18n import PublicTranslationRead, public_translation_read
 from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._payload import field_defs, read_view
@@ -29,9 +31,24 @@ __all__ = ["PublicRecordPage", "PublicRecordRead", "public_record_read", "public
 class PublicRecordRead(SQLModel):
     uuid: str
     slug: str | None
+    locale: str
+    """Which language this record is written in — the one thing a site needs
+    besides the payload to render it under the right ``lang`` attribute."""
     display_title: str
     published_at: datetime | None
     data: dict[str, Any]
+    translations: list[PublicTranslationRead] = SQLField(default_factory=list)
+    """The record's **published, live** siblings, so a site can render a
+    language switcher (Phase 5 §4.4).
+
+    Published only, and never the trash: advertising a draft or a trashed
+    sibling would point a reader — and a crawler — at a 404, since neither is
+    served here. Resolved in one batched query per page, keyed by
+    ``translation_group`` and never per row
+    (``services._translations.published_siblings``).
+
+    ``translation_group`` itself is *not* published: it is an internal
+    grouping key, and a reader needs the addresses, not the join column."""
 
 
 class PublicRecordPage(SQLModel):
@@ -48,7 +65,11 @@ class PublicRecordPage(SQLModel):
 
 
 def public_record_read(
-    rtype: RecordType, record: Record, *, defs: list[FieldDefinition] | None = None
+    rtype: RecordType,
+    record: Record,
+    *,
+    defs: list[FieldDefinition] | None = None,
+    siblings: list[Record] | None = None,
 ) -> PublicRecordRead:
     """One published record for an anonymous reader.
 
@@ -61,13 +82,35 @@ def public_record_read(
     return PublicRecordRead(
         uuid=record.uuid,
         slug=record.slug,
+        locale=record.locale,
         display_title=record.display_title,
         published_at=record.published_at,
         data=data,
+        translations=[public_translation_read(sibling) for sibling in siblings or []],
     )
 
 
-def public_records_read(rtype: RecordType, records: list[Record]) -> list[PublicRecordRead]:
-    """A page, with the type's field definitions validated once, not per row."""
+def public_records_read(
+    rtype: RecordType,
+    records: list[Record],
+    *,
+    siblings: dict[str, list[Record]] | None = None,
+) -> list[PublicRecordRead]:
+    """A page, with the type's field definitions validated once, not per row.
+
+    ``siblings`` is the whole page's translation groups, already resolved —
+    what ``services._translations.published_siblings`` returns. *Looked up*
+    here rather than queried, for the reason §9 gives about expansion: one
+    batched query per page is the rule, and a per-row query hiding behind this
+    signature would be exactly the regression it exists to prevent.
+    """
     defs = field_defs(rtype)
-    return [public_record_read(rtype, record, defs=defs) for record in records]
+    return [
+        public_record_read(
+            rtype,
+            record,
+            defs=defs,
+            siblings=None if siblings is None else siblings.get(record.translation_group),
+        )
+        for record in records
+    ]

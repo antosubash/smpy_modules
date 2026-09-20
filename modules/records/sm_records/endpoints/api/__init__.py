@@ -14,7 +14,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from sm_records.endpoints.api import io, preview, records, referrers, revisions, types
+from sm_records.endpoints.api import (
+    io,
+    preview,
+    records,
+    referrers,
+    revisions,
+    translations,
+    types,
+)
 
 router = APIRouter()
 # Before ``types``: ``/types/{key}/schema/preview/{job}`` is a GET the types
@@ -26,6 +34,10 @@ router.include_router(types.router)
 # ``/types/{key}/records/{uuid}`` would otherwise swallow
 # ``/types/{key}/records/export`` as a record whose uuid is "export".
 router.include_router(io.router)
+# Before ``records`` for the same reason ``io`` is: both add paths under
+# ``/types/{key}/records/{uuid}/…``, and registration order is what Starlette
+# matches in.
+router.include_router(translations.router)
 router.include_router(records.router)
 router.include_router(referrers.router)
 router.include_router(revisions.router)

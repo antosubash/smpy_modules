@@ -37,7 +37,7 @@ from typing import Any, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants
+from sm_records import constants, locales
 from sm_records.contracts.public import (
     PublicRecordPage,
     PublicRecordRead,
@@ -112,6 +112,7 @@ async def list_public_records(
     cursor: PageCursor = Depends(parse_cursor),
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
+    locale: str | None = Query(default=None, alias=constants.LOCALE_PARAM),
 ) -> PublicRecordPage:
     """Published records of a public type, with the admin filter/sort grammar.
 
@@ -121,6 +122,14 @@ async def list_public_records(
     parameters and are ignored, which is what a query string a caller copied
     from the admin UI should do.
 
+    ``?locale=`` names the language this listing is of. **Its absence is the
+    default content locale, never "all"** (§4.4): an anonymous reader asks for
+    one site, and a merged list is how a German record ends up rendered on an
+    English page. A locale that is not configured is a 400 naming it — not the
+    flat "cannot filter or sort by" of a refused field, because this one *is*
+    a parameter of this route and telling a caller which languages exist is
+    not an oracle over private content; it is the site's own front door.
+
     ``?after=`` and ``?total=false`` are the same contract the admin listing
     has (F11, F4) — an anonymous client walking a large public type is
     precisely the caller that should not be paying for an ``OFFSET`` and a
@@ -128,11 +137,21 @@ async def list_public_records(
     flat 400 a refused filter is.
     """
     rtype = await public_service.get_public_type(db, type_key)
+    chosen = locales.default(settings) if locale is None else locales.resolve(settings, locale)
+    if chosen is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"unknown locale {locale!r}; this site publishes in "
+                f"{', '.join(locales.supported(settings))}"
+            ),
+        )
     try:
         result = await public_service.list_public_records(
             db,
             rtype,
             settings=settings,
+            locale=chosen,
             filters=filters,
             sorts=sorts,
             page=page,
@@ -144,8 +163,9 @@ async def list_public_records(
         raise _refused(exc) from exc
     except CursorError as exc:
         raise HTTPException(status_code=400, detail="cannot resume from that cursor") from exc
+    siblings = await public_service.published_siblings(db, rtype, result.items)
     return PublicRecordPage(
-        items=public_records_read(rtype, result.items),
+        items=public_records_read(rtype, result.items, siblings=siblings),
         total=result.total,
         total_capped=result.total_capped,
         next_cursor=result.next_cursor,
@@ -159,10 +179,18 @@ async def get_public_record(
     type_key: str, uuid: str, db: AsyncSession = Depends(request_db)
 ) -> PublicRecordRead:
     """One published record. A draft, a trashed row, an unknown uuid and a
-    private type are one and the same 404 (``services.public.NOT_FOUND``)."""
+    private type are one and the same 404 (``services.public.NOT_FOUND``).
+
+    **Locale-blind**, and ``?locale=`` is not a parameter here — a uuid names
+    exactly one record, in exactly one language (§4.4). Answering a 404 for the
+    "wrong" language would make the same address work or not depending on a
+    query parameter the caller copied from the listing, and every link a
+    language switcher renders points at a sibling in *its* language anyway.
+    """
     rtype = await public_service.get_public_type(db, type_key)
     record = await public_service.get_public_record(db, rtype, uuid)
-    return public_record_read(rtype, record)
+    siblings = await public_service.published_siblings(db, rtype, [record])
+    return public_record_read(rtype, record, siblings=siblings.get(record.translation_group))
 
 
 __all__ = ["router"]

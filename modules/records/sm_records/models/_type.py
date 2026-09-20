@@ -55,6 +55,21 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     is_public: bool = Field(default=False)
     """Gates the anonymous read API. Off by default."""
 
+    translatable: bool = Field(default=False)
+    """Whether this type's records may be authored in more than one content
+    locale (Phase 5 §4.1).
+
+    Off by default, which is what keeps content i18n inert on a host that never
+    asks for it: a type that is not translatable has every record in the
+    default content locale, shows no language UI, and refuses a create naming
+    any other locale.
+
+    Flipping it **on** is additive — existing records already carry the default
+    locale. Flipping it **off** while records in another locale exist is
+    refused with a 409 (``services._type_update``), because those records would
+    otherwise become unreachable through a UI that no longer offers their
+    language."""
+
     allowed_roles: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False, default=list),

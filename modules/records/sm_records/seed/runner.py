@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 import random
-import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,6 +18,8 @@ from typing import Any
 from sm_records.index._analyze import OWNED_TABLE_NAMES, analyze_tables
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.seed import generate
+from sm_records.seed._i18n import seed_translations
+from sm_records.seed.log import log
 from sm_records.seed.types import TYPE_DEFS
 from sm_records.services.errors import NotFound
 from sm_records.services.records import create_record
@@ -92,10 +93,6 @@ def _distribute(total: int, weights: dict[str, float]) -> dict[str, int]:
     return counts
 
 
-def _log(message: str) -> None:
-    print(f"records seed: {message}", file=sys.stderr)
-
-
 async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordType]:
     """Create the five demo types that don't already exist, in dependency
     order (``TYPE_DEFS``) — a relation's target must exist before the type
@@ -116,7 +113,7 @@ async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordT
                 slug_field=type_def.slug_field,
                 actor="records-seed-cli",
             )
-            _log(f"created type {type_def.key!r}")
+            log(f"created type {type_def.key!r}")
         types[type_def.key] = rtype
     await db.commit()
     return types
@@ -139,7 +136,7 @@ async def _reset(db: Any) -> None:
             continue
         held = await record_count(db, rtype, include_deleted=True)
         await delete_type(db, rtype, confirm_record_count=held)
-        _log(f"reset: deleted type {type_def.key!r} ({held} record(s))")
+        log(f"reset: deleted type {type_def.key!r} ({held} record(s))")
     await db.commit()
 
 
@@ -161,7 +158,7 @@ class _BatchCommitter:
         self._count += 1
         if self._count % _BATCH_SIZE == 0:
             await self._db.commit()
-            _log(f"{self._count}/{self._total_planned} records written")
+            log(f"{self._count}/{self._total_planned} records written")
 
     async def finish(self) -> None:
         await self._db.commit()
@@ -227,6 +224,9 @@ async def run(
                 )
             )
         summary.created["company"] = len(companies)
+        summary.created["company"] += await seed_translations(
+            db, committer, types["company"], companies, settings=settings
+        )
 
         contacts: list[Record] = []
         for i in range(counts["contact"]):
@@ -281,7 +281,7 @@ async def run(
         await db.commit()
 
     summary.elapsed_seconds = time.monotonic() - started
-    _log(
+    log(
         f"done: {summary.total} record(s) in {summary.elapsed_seconds:.1f}s "
         f"({summary.records_per_second:.0f}/s) — {summary.created}"
     )

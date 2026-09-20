@@ -98,7 +98,9 @@ async def test_export_csv_then_import_is_a_no_op(catalogue_db, tmp_path):
     # ``read_bytes`` and not ``read_text``: universal-newline translation
     # would rewrite the RFC 4180 ``\r\n`` this test is checking for.
     table = out.read_bytes().decode("utf-8")
-    assert table.split("\r\n")[0] == "uuid,slug,status,position,published_at,name,price"
+    assert table.split("\r\n")[0] == (
+        "uuid,slug,locale,translation_group,status,position,published_at,name,price"
+    )
 
     report = await import_command(
         catalogue_db,

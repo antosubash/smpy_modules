@@ -20,8 +20,6 @@ file and nowhere but the query string for an option.
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,29 +49,27 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._io_upload import (
+    check_format,
+    enum_option,
+    flag_option,
+    guess_format,
+    read_upload,
+    text_option,
+)
 from sm_records.endpoints.api.types import _check_roles_for_discard, _schedule_reindex_if_pending
 from sm_records.index.query import Filter, Sort
 from sm_records.models import RecordType
 from sm_records.services import export as export_service
 from sm_records.services import import_ as import_service
 from sm_records.services import types as type_service
-from sm_records.services.errors import ImportParseFailed, PayloadTooLarge, ValidationFailed
+from sm_records.services.errors import ImportParseFailed, ValidationFailed
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute)
 
 _MEDIA = {ImportFormat.JSON: "application/json", ImportFormat.CSV: "text/csv; charset=utf-8"}
 _UPDATE = "update"
-
-
-def _format(raw: str) -> ImportFormat:
-    try:
-        return ImportFormat(raw)
-    except ValueError as exc:
-        raise ValidationFailed(
-            f"format must be 'json' or 'csv', not {raw!r}",
-            [{"field": "format", "message": f"unknown format {raw!r}"}],
-        ) from exc
 
 
 @router.get("/types/{key}/records/export", dependencies=[require_view])
@@ -93,7 +89,7 @@ async def export_records(
     ``allowed_roles`` (§10). ``?trashed=true`` costs ``records.edit`` for the
     same reason it does there: enumerating the trash is an editor's question.
     """
-    chosen = _format(fmt)
+    chosen = check_format(fmt)
     factory = request.app.state.sm.db.session_factory
     stream = export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
     filename = export_service.export_filename(rtype.key, chosen.value)
@@ -109,75 +105,6 @@ async def export_records(
         media_type=_MEDIA[chosen],
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
-
-def _guess_format(explicit: str | None, filename: str | None, content_type: str) -> ImportFormat:
-    if explicit:
-        return _format(explicit)
-    if filename and filename.lower().endswith(".csv"):
-        return ImportFormat.CSV
-    if filename and filename.lower().endswith(".json"):
-        return ImportFormat.JSON
-    if content_type.startswith(("text/csv", "application/csv")):
-        return ImportFormat.CSV
-    if content_type.startswith("application/json"):
-        return ImportFormat.JSON
-    raise ImportParseFailed(
-        "cannot tell whether this is JSON or CSV: send ?format=, a .json/.csv filename, "
-        "or Content-Type: application/json / text/csv"
-    )
-
-
-def _check_size(raw_length: int | None, settings: RecordsSettings) -> None:
-    if raw_length is not None and raw_length > settings.max_import_bytes:
-        raise PayloadTooLarge(
-            f"the uploaded file is {raw_length} bytes, over the "
-            f"{settings.max_import_bytes}-byte limit"
-        )
-
-
-async def _read_upload(
-    request: Request, settings: RecordsSettings
-) -> tuple[bytes, str | None, Any]:
-    """The bytes, the filename (if any) and the multipart form (if any).
-
-    ``Content-Length`` is checked before anything is read — a ceiling applied
-    after the body is in memory has already allocated what it refuses — and
-    again against what arrived, since a chunked request carries no header.
-    """
-    declared = request.headers.get("content-length")
-    _check_size(int(declared) if declared and declared.isdigit() else None, settings)
-    if request.headers.get("content-type", "").startswith("multipart/form-data"):
-        form = await request.form()
-        upload = form.get("file")
-        if upload is None or isinstance(upload, str):
-            raise ImportParseFailed("multipart upload is missing its 'file' part")
-        raw = await upload.read()
-        _check_size(len(raw), settings)
-        return raw, upload.filename, form
-    raw = await request.body()
-    _check_size(len(raw), settings)
-    return raw, None, None
-
-
-def _option(form: Any, name: str, fallback: str) -> str:
-    value = None if form is None else form.get(name)
-    return fallback if value is None or isinstance(value, bytes) else str(value)
-
-
-def _flag(form: Any, name: str, fallback: bool) -> bool:
-    value = None if form is None else form.get(name)
-    return fallback if value is None else str(value).strip().lower() in ("true", "1", "yes", "on")
-
-
-def _enum(factory: Any, raw: str, field: str) -> Any:
-    try:
-        return factory(raw)
-    except ValueError as exc:
-        raise ValidationFailed(
-            f"{field} does not accept {raw!r}",
-            [{"field": field, "message": f"unknown {field} {raw!r}"}],
-        ) from exc
 
 
 @router.post(
@@ -202,9 +129,9 @@ async def import_records(
     costs — an import is one, many times over.
     """
     check_type_roles(request, rtype)
-    raw, filename, form = await _read_upload(request, settings)
-    chosen = _guess_format(
-        _option(form, "format", fmt or "") or None,
+    raw, filename, form = await read_upload(request, settings)
+    chosen = guess_format(
+        text_option(form, "format", fmt or "") or None,
         filename,
         request.headers.get("content-type", ""),
     )
@@ -213,11 +140,11 @@ async def import_records(
     except UnicodeDecodeError as exc:
         raise ImportParseFailed(f"the file is not valid UTF-8 (byte {exc.start})") from exc
     options = import_service.ImportOptions(
-        mode=_enum(ImportMode, _option(form, "mode", mode), "mode"),
-        dry_run=_flag(form, "dry_run", dry_run),
-        on_error=_enum(OnError, _option(form, "on_error", on_error), "on_error"),
-        match_by=_option(form, "match_by", match_by),
-        force=_flag(form, "force", force),
+        mode=enum_option(ImportMode, text_option(form, "mode", mode), "mode"),
+        dry_run=flag_option(form, "dry_run", dry_run),
+        on_error=enum_option(OnError, text_option(form, "on_error", on_error), "on_error"),
+        match_by=text_option(form, "match_by", match_by),
+        force=flag_option(form, "force", force),
     )
     return await import_service.import_records(
         db, rtype, text, fmt=chosen, options=options, settings=settings, actor=who
@@ -265,6 +192,7 @@ async def import_type(
             display_field=body.display_field,
             slug_field=body.slug_field,
             is_public=body.is_public,
+            translatable=body.translatable,
             allowed_roles=body.allowed_roles,
             actor=who,
         )
@@ -293,6 +221,7 @@ async def import_type(
         display_field=body.display_field,
         slug_field=body.slug_field,
         is_public=body.is_public,
+        translatable=body.translatable,
         allowed_roles=body.allowed_roles,
     )
     _schedule_reindex_if_pending(request, updated, settings)

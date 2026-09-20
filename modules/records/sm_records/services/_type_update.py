@@ -11,9 +11,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import RecordType
+from sm_records import locales
+from sm_records.models import Record, RecordType
 from sm_records.services._common import guarded_bump, record_count, reload
 from sm_records.services._payload import field_defs
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
@@ -36,6 +38,7 @@ _EDITABLE = frozenset(
         "display_field",
         "slug_field",
         "is_public",
+        "translatable",
         "allowed_roles",
     }
 )
@@ -44,6 +47,43 @@ _EDITABLE = frozenset(
 #: rest are labels: they cannot damage a record, and a revision per typo would
 #: bury the schema edits the table exists to make reversible.
 _SNAPSHOT_TRIGGERS = ("fields_raw", "display_field", "slug_field")
+
+
+async def _check_translatable(
+    db: AsyncSession,
+    rtype: RecordType,
+    settings: RecordsSettings,
+    translatable: bool | None,
+) -> None:
+    """Turning ``translatable`` **off** is refused while foreign-locale records
+    exist (Phase 5 §4.1).
+
+    Turning it on is additive — every existing record already carries the
+    default locale, and nothing about them changes. Turning it off is not: the
+    type's screens stop offering any language but the default, so a German
+    record would stay in the database, keep its slug claim in German, keep
+    answering ``?locale=de`` on the public API, and be unreachable from the
+    admin UI. Refusing names the count, so the operator knows what has to be
+    translated away or deleted first.
+
+    The count includes the trash: a trashed record still owns its language in
+    its group, and restoring it after the flag went off would recreate exactly
+    the unreachable row this refuses.
+    """
+    if translatable is not False or not rtype.translatable:
+        return
+    stmt = (
+        select(func.count(Record.id))
+        .where(Record.type_id == rtype.id, Record.locale != locales.default(settings))
+        .execution_options(include_deleted=True)
+    )
+    held = int((await db.execute(stmt)).scalar_one())
+    if held:
+        raise Conflict(
+            f"type {rtype.key!r} holds {held} record(s) in a locale other than "
+            f"{locales.default(settings)!r}; translating them away or deleting them "
+            "is what makes 'translatable' safe to turn off"
+        )
 
 
 async def update_type(
@@ -73,6 +113,7 @@ async def update_type(
     and §8.8) and are ignored on every other edit; they are named here rather
     than folded into ``**changes`` because they are not columns.
     """
+    await _check_translatable(db, rtype, settings, changes.get("translatable"))
     unknown = sorted(set(changes) - _EDITABLE)
     if unknown:
         problem = (

@@ -41,11 +41,28 @@ __all__ = [
 ]
 
 FIXED_COLUMNS: frozenset[str] = frozenset(
-    {"status", "display_title", "slug", "position", "published_at", "created_at", "updated_at"}
+    {
+        "status",
+        "display_title",
+        "slug",
+        "locale",
+        "position",
+        "published_at",
+        "created_at",
+        "updated_at",
+    }
 )
 """The projection every record has regardless of its type — the module's
 ``ContentItemIndex``. Filterable and sortable directly, with no index table
-and no ``indexed: true`` anywhere."""
+and no ``indexed: true`` anywhere.
+
+``locale`` is here rather than in an index table because a record's language is
+a property of the *document*, like its status: the ``records_index_*`` tables
+are untouched by content i18n, and ``filter=locale:eq:de`` is an ordinary
+column predicate (Phase 5 §4.1). Membership here is also what reserves the key
+— ``constants.RESERVED_FIELD_KEYS`` derives from this set plus the ``Record``
+columns — so no type can declare a field called ``locale`` and have it answered
+from the wrong place."""
 
 PUBLIC_FIXED_COLUMNS: frozenset[str] = FIXED_COLUMNS & frozenset(
     {"slug", "display_title", "published_at"}
@@ -98,6 +115,10 @@ must stay ascending — see that function for what it costs when it does not.
 """
 
 _FIXED_TEXT = frozenset({"display_title", "slug"})
+"""Fixed columns ``contains``/``starts_with`` are meaningful on. ``locale`` is
+deliberately not one: a language tag is matched whole (``eq``, ``ne``, ``in``),
+and a prefix match over it would make ``de`` select ``de-AT`` on one install
+and nothing on the next."""
 _FIXED_ORDERED = frozenset({"position", "published_at", "created_at", "updated_at"})
 _ORDER_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
 

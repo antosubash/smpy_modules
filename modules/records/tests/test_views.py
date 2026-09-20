@@ -55,7 +55,18 @@ async def test_record_list_view(client, records_app):
     assert resp.status_code == 200
     body = resp.json()
     assert body["component"] == "Records/RecordList"
-    assert set(body["props"]) == {"type", "records", "errors", "trashed"}
+    # ``content_locales``/``default_locale`` are configuration the browser
+    # cannot see (Phase 5 §4.2), and the list's locale selector needs both.
+    # Note what is *not* here: any default locale filter. The admin list shows
+    # every language, because an editor's question is "what exists" (§4.4).
+    assert set(body["props"]) == {
+        "type",
+        "records",
+        "errors",
+        "trashed",
+        "content_locales",
+        "default_locale",
+    }
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
     # Always present, so a partial reload after a bad filter clears the notice.
@@ -72,7 +83,17 @@ async def test_record_new_view(client, records_app):
     assert resp.status_code == 200
     body = resp.json()
     assert body["component"] == "Records/RecordEditor"
-    assert set(body["props"]) == {"type", "record"}
+    assert set(body["props"]) == {
+        "type",
+        "record",
+        "translations",
+        "content_locales",
+        "default_locale",
+    }
+    # Empty rather than absent: the record does not exist yet, so it has no
+    # group — but the Languages panel reads one prop shape on both editor
+    # screens, and an absent key would leave the previous page's on screen.
+    assert body["props"]["translations"] == []
     assert body["props"]["record"] is None
     assert body["props"]["type"]["key"] == "product"
 
@@ -167,7 +188,16 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
     body = resp.json()
     assert body["component"] == "Records/TypeEditor"
     assert body["props"]["type"]["key"] == "person"
-    assert set(body["props"]) == {"type", "target_types", "roles", "public_route_prefix"}
+    assert set(body["props"]) == {
+        "type",
+        "target_types",
+        "roles",
+        "public_route_prefix",
+        # The "Translatable" toggle has to be able to say which languages it
+        # would be turning on, and that list is configuration (§4.2).
+        "content_locales",
+        "default_locale",
+    }
 
 
 async def test_reserved_type_keys_are_refused(client, records_app):

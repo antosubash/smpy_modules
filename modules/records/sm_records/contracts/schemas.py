@@ -23,6 +23,14 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
+from sm_records.contracts._types import (
+    TypeCreate,
+    TypeListResponse,
+    TypeRead,
+    TypeUpdate,
+    type_read,
+)
+from sm_records.contracts.i18n import TranslationRead
 from sm_records.contracts.relations import ExpandedRef
 from sm_records.contracts.revisions import (
     RecordRevisionDetailRead,
@@ -32,7 +40,6 @@ from sm_records.contracts.revisions import (
     record_revision_detail_read,
     revision_read,
 )
-from sm_records.index.reindex import pending_map
 from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._payload import field_defs
@@ -59,79 +66,6 @@ __all__ = [
 ]
 
 
-class TypeRead(SQLModel):
-    key: str
-    label: str
-    label_plural: str
-    description: str | None
-    icon: str | None
-    fields: list[dict[str, Any]]
-    schema_version: int
-    version: int
-    display_field: str | None
-    slug_field: str | None
-    is_public: bool
-    allowed_roles: list[str]
-    record_count: int
-    """Live records only — the number a list screen shows."""
-    trashed_record_count: int
-    """Records in the trash. Separate from ``record_count`` because the two
-    answer different questions: what the type shows, and what deleting it
-    would destroy. ``DELETE /types/{key}`` confirms against the *sum*."""
-    reindex_pending: dict[str, str]
-    """Field key (or ``"*"`` for the whole type) -> ISO enqueue time — a
-    schema-affecting change that hasn't finished its out-of-request rebuild
-    yet (design §8.5/§8.9). Mirrors ``RecordType.reindex_pending`` exactly;
-    the UI reads it to grey out a field as a filter/sort target and to offer
-    the manual "Reindex" button."""
-    created_at: datetime
-    updated_at: datetime | None
-
-
-class TypeListResponse(SQLModel):
-    items: list[TypeRead]
-
-
-class TypeCreate(SQLModel):
-    key: str
-    label: str
-    label_plural: str | None = None
-    description: str | None = None
-    icon: str | None = None
-    fields: list[dict[str, Any]] = SQLField(default_factory=list)
-    display_field: str | None = None
-    slug_field: str | None = None
-    is_public: bool = False
-    allowed_roles: list[str] = SQLField(default_factory=list)
-
-
-class TypeUpdate(SQLModel):
-    """Every field but ``expected_version`` is optional; only the ones the
-    caller actually sent should reach ``update_type`` — see
-    ``endpoints/api/types.py``'s ``model_dump(exclude_unset=True)``.
-
-    ``force``/``orphaned`` are not columns and never reach ``**changes`` — they
-    are the two retries a 409 from :mod:`sm_records.services.schema_change`
-    asks for (§8.2, §8.8), read separately by the endpoint and passed to
-    ``update_type`` as their own keyword arguments.
-    """
-
-    expected_version: int
-    #: Declared only so a body carrying one is refused, not dropped — see
-    key: str | None = None  # ``endpoints/api/types.py``'s ``update_type``.
-    label: str | None = None
-    label_plural: str | None = None
-    description: str | None = None
-    icon: str | None = None
-    fields: list[dict[str, Any]] | None = None
-    display_field: str | None = None
-    slug_field: str | None = None
-    is_public: bool | None = None
-    allowed_roles: list[str] | None = None
-    force: bool = False
-    orphaned: str | None = None
-
-
 class RecordRead(SQLModel):
     uuid: str
     type_key: str
@@ -141,6 +75,11 @@ class RecordRead(SQLModel):
     schema_version: int
     status: str
     slug: str | None
+    locale: str
+    """The language this record is written in, fixed for its lifetime."""
+    translation_group: str
+    """What this record and its translations share. A record with no siblings
+    is alone in a group named after its own uuid."""
     display_title: str
     position: int
     published_at: datetime | None
@@ -156,6 +95,16 @@ class RecordRead(SQLModel):
     **Always empty on a list response** — filling it costs a validator pass
     per row (:func:`record_list_read`); the badge belongs to the editor, which
     reads one record."""
+    translations: list[TranslationRead] | None = None
+    """Every record in this one's translation group, itself included, **only**
+    under ``?translations=true`` on the single-record read and on the record
+    editor view (Phase 5 §4.4).
+
+    ``None`` when the caller did not ask, and never filled on a list: it is one
+    extra query per *record*, which on a page of fifty is fifty. Trashed
+    siblings are listed and flagged — they keep their claim on their language,
+    so a panel that hid them would offer an "Add translation" the API can only
+    refuse."""
     expanded: dict[str, list[ExpandedRef]] | None = None
     """Relation targets resolved under an explicit ``?expand=a,b`` (design
     §9): field key -> one :class:`ExpandedRef` per stored reference, in payload
@@ -186,39 +135,33 @@ class RecordCreate(SQLModel):
     data: dict[str, Any] = SQLField(default_factory=dict)
     status: str | None = None
     slug: str | None = None
+    locale: str | None = None
+    """The language to write this record in (Phase 5 §4.3).
+
+    ``None`` means the configured ``default_content_locale``. A value that is
+    not one of ``content_locales`` is a 422 naming it, and a type that is not
+    ``translatable`` accepts only the default — a record written into a
+    language its type does not offer would be reachable by uuid and by nothing
+    else. Set here and nowhere else: a record's language is fixed for its
+    lifetime, so there is no ``locale`` on :class:`RecordUpdate`."""
     position: int = 0
 
 
 class RecordUpdate(SQLModel):
+    """No ``locale`` is honoured here — a record's language is fixed for its
+    lifetime (Phase 5 §4.3). ``locale`` is nonetheless *declared*, for the same
+    reason :attr:`TypeUpdate.key` is: a client sends back the record it just
+    read, and SQLModel's default would drop the key silently and answer 200 to
+    a request that asked for a language change. ``endpoints/api/records.py``
+    refuses a body that carries it, so the answer is a 422 saying why."""
+
     expected_version: int
     data: dict[str, Any]
     status: str | None = None
     slug: str | None = None
+    #: Declared only so a body carrying one is refused, not dropped.
+    locale: str | None = None
     position: int | None = None
-
-
-def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -> TypeRead:
-    """Both counts are required rather than defaulted: a caller that forgot
-    the trashed one would silently report a populated type as editable."""
-    return TypeRead(
-        key=rtype.key,
-        label=rtype.label,
-        label_plural=rtype.label_plural,
-        description=rtype.description,
-        icon=rtype.icon,
-        fields=list(rtype.fields or []),
-        schema_version=rtype.schema_version,
-        version=rtype.version,
-        display_field=rtype.display_field,
-        slug_field=rtype.slug_field,
-        is_public=rtype.is_public,
-        allowed_roles=list(rtype.allowed_roles or []),
-        record_count=record_count,
-        trashed_record_count=trashed_record_count,
-        reindex_pending=pending_map(rtype),
-        created_at=rtype.created_at,
-        updated_at=rtype.updated_at,
-    )
 
 
 def record_read(
@@ -228,6 +171,7 @@ def record_read(
     with_invalid: bool = True,
     defs: list[FieldDefinition] | None = None,
     expanded: dict[str, list[ExpandedRef]] | None = None,
+    translations: list[TranslationRead] | None = None,
 ) -> RecordRead:
     """The one lenient read every caller gets: ``read_view`` fills a missing
     key from ``default`` and flags a row stamped at an old schema version
@@ -241,8 +185,9 @@ def record_read(
     field's content on purpose (§8.2 — that is what makes the deletion
     undoable). The public read API strips it — see ``contracts/public.py``.
 
-    ``expanded`` is passed through untouched: resolving it is the service's
-    job (``services/expand.py``), this only carries it.
+    ``expanded`` and ``translations`` are passed through untouched: resolving
+    either is the service's job (``services/expand.py``,
+    ``services/_translations.py``), this only carries them.
     """
     view = read_view(rtype, record, with_invalid=with_invalid, defs=defs)
     return RecordRead(
@@ -254,6 +199,8 @@ def record_read(
         schema_version=record.schema_version,
         status=record.status.value,
         slug=record.slug,
+        locale=record.locale,
+        translation_group=record.translation_group,
         display_title=record.display_title,
         position=record.position,
         published_at=record.published_at,
@@ -261,6 +208,7 @@ def record_read(
         updated_at=record.updated_at,
         is_deleted=record.is_deleted,
         invalid=view["invalid"],
+        translations=translations,
         expanded=expanded,
     )
 

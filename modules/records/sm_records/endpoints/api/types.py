@@ -128,6 +128,7 @@ async def create_type(
         display_field=body.display_field,
         slug_field=body.slug_field,
         is_public=body.is_public,
+        translatable=body.translatable,
         allowed_roles=body.allowed_roles,
         actor=who,
     )

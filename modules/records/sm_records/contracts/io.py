@@ -125,6 +125,9 @@ class TypeExport(SQLModel):
     display_field: str | None = None
     slug_field: str | None = None
     is_public: bool = False
+    translatable: bool = False
+    """Carried so a definition exported from a multilingual install arrives at
+    the next one still able to hold translations (Phase 5 §4.1)."""
     allowed_roles: list[str] = SQLField(default_factory=list)
 
 
@@ -155,5 +158,6 @@ def type_export(rtype: RecordType) -> TypeExport:
         display_field=rtype.display_field,
         slug_field=rtype.slug_field,
         is_public=rtype.is_public,
+        translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),
     )

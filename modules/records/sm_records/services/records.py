@@ -23,9 +23,10 @@ from typing import Any, NamedTuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import locales
 from sm_records.index.providers import TypeIndex
 from sm_records.index.writer import write_index
-from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent
+from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _claims, _payload, _relations
 from sm_records.services._common import guarded_bump, reload, type_id_map, utcnow
@@ -46,19 +47,27 @@ from sm_records.services._listing import RecordListPage, list_records
 # Re-exported: ``read_view`` lives in ``_payload`` with the rest of the
 # payload reading, and is imported from here by the contracts layer.
 from sm_records.services._payload import read_view
-from sm_records.services.errors import Conflict, NotFound
+
+# Re-exported: a translation is an ordinary record, so the two functions that
+# make one and list one live beside the lifecycle they are part of — in
+# ``_translations`` only for the file cap.
+from sm_records.services._translations import create_translation, list_translations
+from sm_records.services.errors import Conflict, NotFound, ValidationFailed
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 
 __all__ = [
     "RecordListPage",
     "create_record",
+    "create_translation",
     "get_deleted_record",
     "get_record",
     "hard_delete_record",
     "list_records",
+    "list_translations",
     "purge_type_records",
     "read_view",
+    "resolve_locale",
     "restore_record",
     "soft_delete_record",
     "update_record",
@@ -131,6 +140,30 @@ async def _prepare(
     return _Prepared(defs, values, stored, types)
 
 
+def resolve_locale(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
+    """The language a new record is written in — the whole of §4.3's create rule.
+
+    Three answers and no fourth: nothing asked for gets the configured default;
+    something asked for that is not a content locale is a 422 naming it
+    (:func:`sm_records.locales.require`); and a type that is not
+    ``translatable`` accepts only the default, because every screen and every
+    public read for such a type assumes one language and a record written into
+    another would be reachable by uuid and by nothing else.
+
+    A separate function because the translation endpoint needs the same three
+    answers with one of them reversed — there, a request for the default locale
+    on a non-translatable type is the refusal.
+    """
+    resolved = locales.require(settings, locale)
+    if not rtype.translatable and resolved != locales.default(settings):
+        raise ValidationFailed(
+            f"type {rtype.key!r} is not translatable, so its records are all in "
+            f"{locales.default(settings)!r}; enable 'translatable' on the type first",
+            [{"field": "locale", "message": f"{rtype.key!r} is not translatable"}],
+        )
+    return resolved
+
+
 async def create_record(
     db: AsyncSession,
     rtype: RecordType,
@@ -141,25 +174,43 @@ async def create_record(
     slug: str | None = None,
     position: int = 0,
     actor: str | None = None,
+    locale: str | None = None,
+    translation_group: str | None = None,
 ) -> Record:
+    """Write a new record, in one language, in its own translation group.
+
+    ``locale`` defaults to the configured default content locale and is fixed
+    from here on — there is no ``locale`` on the update path (§4.3).
+    ``translation_group`` defaults to the record's **own uuid**, which is what
+    makes a record with no siblings alone in a group named after itself; only
+    :func:`sm_records.services._translations.create_translation` passes one,
+    and only ever the source's.
+    """
+    resolved_locale = resolve_locale(rtype, settings, locale)
     _, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=None)
     resolved_slug = _payload.slug_for(rtype, values, slug)
-    await _claims.ensure_slug_free(db, rtype, resolved_slug)
+    await _claims.ensure_slug_free(db, rtype, resolved_slug, resolved_locale)
 
+    # Both identifiers generated here rather than by two ``default_factory``
+    # calls: they have to be the *same* string for a record with no siblings.
+    uuid = new_uuid()
     record = Record(
+        uuid=uuid,
         type_id=rtype.id,
         data=stored,
         schema_version=rtype.schema_version,
         version=1,
         status=status,
         slug=resolved_slug,
+        locale=resolved_locale,
+        translation_group=translation_group or uuid,
         display_title=_payload.display_title(rtype, values),
         position=position,
         published_at=utcnow() if status is RecordStatus.PUBLISHED else None,
         created_by=actor,
     )
     db.add(record)
-    await _claims.flush_write(db, rtype, resolved_slug)
+    await _claims.flush_write(db, rtype, resolved_slug, resolved_locale)
 
     await write_revision(
         db, record, RevisionEvent.CREATE, limit=settings.revision_limit, actor=actor
@@ -219,7 +270,10 @@ async def update_record(
     defs, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=record.id)
     stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
-    await _claims.ensure_slug_free(db, rtype, resolved_slug, exclude_id=record.id)
+    # ``record.locale`` and never an argument: a record's language is fixed for
+    # its lifetime (§4.3), so the namespace this claim is made in is the row's
+    # own and cannot be steered by a caller.
+    await _claims.ensure_slug_free(db, rtype, resolved_slug, record.locale, exclude_id=record.id)
 
     if not await guarded_bump(db, Record, record.id, expected_version):
         raise Conflict(
@@ -239,7 +293,7 @@ async def update_record(
     record.updated_by = actor
     record.version = expected_version + 1
     db.add(record)
-    await _claims.flush_write(db, rtype, resolved_slug)
+    await _claims.flush_write(db, rtype, resolved_slug, record.locale)
 
     await write_revision(db, record, event, limit=settings.revision_limit, actor=actor)
     await write_index(db, record, rtype, resolve_type_id=TypeIndex(types))

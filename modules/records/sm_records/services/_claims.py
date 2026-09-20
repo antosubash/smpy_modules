@@ -24,47 +24,83 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.query import Filter, FilterOp, QueryError, exists_query
-from sm_records.models import SLUG_CONFLICT_SIGNATURES, Record, RecordType
+from sm_records.models import (
+    GROUP_LOCALE_CONFLICT_SIGNATURES,
+    SLUG_CONFLICT_SIGNATURES,
+    Record,
+    RecordType,
+)
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services.errors import Conflict
 
 __all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type"]
 
 
-def _slug_taken(type_key: str, slug: str) -> Conflict:
+def _slug_taken(type_key: str, slug: str, locale: str) -> Conflict:
     """One wording for the two places a slug collision is discovered.
 
     It takes the key as a string rather than the ``RecordType`` because one of
     those places is *after a failed flush*, where every instance in the session
     is expired and reading ``rtype.key`` would emit a refresh ``SELECT`` on a
     transaction that can only be rolled back — turning the 409 into a
-    ``PendingRollbackError``.
+    ``PendingRollbackError``. ``locale`` travels for the same reason and says
+    *which* namespace is occupied: the same word is a legal address in every
+    other language (Phase 5 §4.3), so a message that did not name one would
+    read as a refusal the caller cannot work around.
     """
-    return Conflict(f"slug {slug!r} is already used by another {type_key} record")
+    return Conflict(f"slug {slug!r} is already used by another {type_key} record in {locale!r}")
+
+
+def _group_locale_taken(type_key: str, locale: str) -> Conflict:
+    """The database's own refusal of a second record in one language of one
+    translation group — :data:`~sm_records.models.GROUP_LOCALE_CONFLICT_SIGNATURES`.
+
+    Reached by a writer that sets ``translation_group`` itself: an import
+    carrying the column, or a second ``POST /translations`` that lost the race
+    with the first. The endpoint's own check answers the ordinary case; this is
+    what keeps the race a 409 rather than a 500.
+    """
+    return Conflict(f"a {type_key} record in {locale!r} already exists in that translation group")
 
 
 async def ensure_slug_free(
-    db: AsyncSession, rtype: RecordType, slug: str | None, *, exclude_id: int | None = None
+    db: AsyncSession,
+    rtype: RecordType,
+    slug: str | None,
+    locale: str,
+    *,
+    exclude_id: int | None = None,
 ) -> None:
-    """A slug is unique within its type, **including the trash** (design §5).
+    """A slug is unique within its type **and its locale**, including the trash
+    (design §5, Phase 5 §4.3).
 
-    ``include_deleted`` is the whole point: a slug that frees on delete is a
-    slug that can be taken while the original sits restorable, and the restore
-    then fails or silently renames. The partial unique index would catch this
-    at the DB anyway — checking here turns an ``IntegrityError`` at flush into
-    a 409 that names the field.
+    ``locale`` is a positional argument and not a keyword with a default, on
+    purpose: every slug lookup and every slug claim in this module takes one,
+    and a default would let exactly the call that forgot it fall back to the
+    English namespace — which is how ``?locale=de`` starts serving the English
+    record. The predicate has to match the partial unique index's key column
+    for column, or the check and the constraint disagree about what a
+    collision is.
+
+    ``include_deleted`` is the rest of the point: a slug that frees on delete
+    is a slug that can be taken while the original sits restorable, and the
+    restore then fails or silently renames. The partial unique index would
+    catch this at the DB anyway — checking here turns an ``IntegrityError`` at
+    flush into a 409 that names the field.
     """
     if slug is None:
         return
-    stmt = select(Record.id).where(Record.type_id == rtype.id, Record.slug == slug)
+    stmt = select(Record.id).where(
+        Record.type_id == rtype.id, Record.locale == locale, Record.slug == slug
+    )
     if exclude_id is not None:
         stmt = stmt.where(Record.id != exclude_id)
     taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
     if taken is not None:
-        raise _slug_taken(rtype.key, slug)
+        raise _slug_taken(rtype.key, slug, locale)
 
 
-async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None) -> None:
+async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None, locale: str) -> None:
     """Flush a record write, turning the slug index's own refusal into the 409
     :func:`ensure_slug_free` would have raised.
 
@@ -77,8 +113,9 @@ async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None) -> 
     database-level failure and the application-level check produce the same
     error, and neither is the authority on the wording.
 
-    Recognised by :data:`~sm_records.models.SLUG_CONFLICT_SIGNATURES`, which is
-    where the per-dialect wording lives; anything else is re-raised, because an
+    Recognised by :data:`~sm_records.models.SLUG_CONFLICT_SIGNATURES` and
+    :data:`~sm_records.models.GROUP_LOCALE_CONFLICT_SIGNATURES`, which is where
+    the per-dialect wording lives; anything else is re-raised, because an
     ``IntegrityError`` this module cannot explain is a bug rather than a 409.
 
     ``rtype.key`` is read **before** the flush. A flush that raises expires
@@ -90,9 +127,11 @@ async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None) -> 
         await db.flush()
     except IntegrityError as exc:
         message = str(exc.orig or exc)
+        if any(sig in message for sig in GROUP_LOCALE_CONFLICT_SIGNATURES):
+            raise _group_locale_taken(type_key, locale) from exc
         if slug is None or not any(sig in message for sig in SLUG_CONFLICT_SIGNATURES):
             raise
-        raise _slug_taken(type_key, slug) from exc
+        raise _slug_taken(type_key, slug, locale) from exc
 
 
 async def ensure_unique(

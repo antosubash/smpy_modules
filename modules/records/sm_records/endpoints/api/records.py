@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import constants
 from sm_records.contracts.schemas import (
     RecordCreate,
     RecordPage,
@@ -39,6 +40,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import CursorError, Filter, Sort
 from sm_records.models import RecordStatus, RecordType
 from sm_records.services import expand as expand_service
@@ -149,6 +151,7 @@ async def create_record(
         slug=body.slug,
         position=body.position,
         actor=who,
+        locale=body.locale,
     )
     return record_read(rtype, record)
 
@@ -160,18 +163,30 @@ async def get_record(
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
     expand: list[str] = Depends(parse_expand),
+    with_translations: bool = Query(default=False, alias=constants.TRANSLATIONS_PARAM),
 ) -> RecordRead:
     """One record, with ``?expand=`` resolving the relation fields it names
     to depth one (design §9). A key that is not a relation field of the type
     is a 400 naming it — ``services.expand`` refuses it with the same
-    ``QueryError`` the filter grammar uses for an unknown field."""
+    ``QueryError`` the filter grammar uses for an unknown field.
+
+    ``?translations=true`` adds the record's translation group — itself and
+    every sibling, trash included (Phase 5 §4.4). One extra query, and opt-in
+    rather than always, because the *list* must never pay it: there it would be
+    one query per row for a panel only the editor shows.
+    """
     record = await record_service.get_record(db, rtype, uuid)
     expanded = (
         await expand_service.expand(db, rtype, [record], expand, roles=caller_roles(request))
         if expand
         else None
     )
-    return record_read(rtype, record, expanded=None if expanded is None else expanded[record.uuid])
+    return record_read(
+        rtype,
+        record,
+        expanded=None if expanded is None else expanded[record.uuid],
+        translations=await translations_of(db, rtype, record) if with_translations else None,
+    )
 
 
 @router.put("/records/{uuid}", response_model=RecordRead, dependencies=[require_edit])
@@ -185,6 +200,17 @@ async def update_record(
     who: str | None = Depends(actor),
 ) -> RecordRead:
     check_type_roles(request, rtype)
+    # Declared on ``RecordUpdate`` so it is *refused* rather than dropped: a
+    # client sending back the record it just read would otherwise get a 200 for
+    # a language change that never happened. A record's language is fixed for
+    # its lifetime — ``POST /records/{uuid}/translations`` is the only way to
+    # have the same content in another one (Phase 5 §4.3).
+    if constants.LOCALE_PARAM in body.model_fields_set:
+        problem = (
+            "locale is fixed for a record's lifetime — create a translation "
+            "instead (POST /records/{uuid}/translations)"
+        )
+        raise ValidationFailed(problem, [{"field": constants.LOCALE_PARAM, "message": problem}])
     record = await record_service.get_record(db, rtype, uuid)
     updated = await record_service.update_record(
         db,

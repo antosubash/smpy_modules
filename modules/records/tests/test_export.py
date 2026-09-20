@@ -39,7 +39,19 @@ async def test_json_export_shape(client):
     assert [f["key"] for f in document["type"]["fields"]] == [f["key"] for f in product_fields()]
     assert len(document["records"]) == 2
     row = document["records"][0]
-    assert set(row) == {"uuid", "slug", "status", "position", "published_at", "data"}
+    assert set(row) == {
+        "uuid",
+        "slug",
+        # Phase 5 §4.3: a file that lost these could not be imported back into
+        # a multilingual install without collapsing every record into the
+        # default language and breaking every translation group apart.
+        "locale",
+        "translation_group",
+        "status",
+        "position",
+        "published_at",
+        "data",
+    }
     # Relations travel exactly as they are stored (§9), not expanded.
     assert set(row["data"]["brand"]) == {"type", "uuid"}
     assert row["data"]["price"] == "0.25"
@@ -74,8 +86,16 @@ async def test_csv_round_trip_keeps_uuid_data_and_relations(client):
     assert table.endswith("\r\n")
     assert not table.startswith("﻿")
     header = table.split("\r\n")[0].split(",")
-    assert header[:5] == ["uuid", "slug", "status", "position", "published_at"]
-    assert header[5:] == [f["key"] for f in product_fields()]
+    assert header[:7] == [
+        "uuid",
+        "slug",
+        "locale",
+        "translation_group",
+        "status",
+        "position",
+        "published_at",
+    ]
+    assert header[7:] == [f["key"] for f in product_fields()]
 
     await drop_type(client, PRODUCT, len(rows))
     await make_type(client, PRODUCT, product_fields(), display_field="name", slug_field="name")

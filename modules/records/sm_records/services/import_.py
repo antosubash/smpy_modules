@@ -25,37 +25,23 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.io import (
     ERROR_CAP,
     ImportFormat,
-    ImportMode,
     ImportReport,
     ImportRowError,
     OnError,
 )
-from sm_records.models import Record, RecordType
-from sm_records.services import _payload, _relations
-from sm_records.services._common import type_id_map
-from sm_records.services._import_parse import (
-    ImportRow,
-    parse_csv,
-    parse_json,
-    refuses_orphaned,
-)
-from sm_records.services._import_rows import (
-    Envelope,
-    envelope_for,
-    match_field,
-    mode_error,
-    resolve_matches,
-    unchanged,
-    write_row,
-)
-from sm_records.services.errors import ImportRefused, RecordsError, ValidationFailed
+from sm_records.models import RecordType
+from sm_records.services import _payload
+from sm_records.services._import_match import match_field
+from sm_records.services._import_parse import parse_csv, parse_json
+from sm_records.services._import_plan import ImportOptions, Plan, plan_rows, validate_rows
+from sm_records.services._import_rows import write_row
+from sm_records.services.errors import ImportRefused, RecordsError
 from sm_records.settings import RecordsSettings
 
 __all__ = ["ImportOptions", "import_records"]
@@ -63,129 +49,22 @@ __all__ = ["ImportOptions", "import_records"]
 _SKIP = "skipped"
 
 
-@dataclass(frozen=True, slots=True)
-class ImportOptions:
-    """Everything the caller chose, in one object.
-
-    ``dry_run`` defaults to ``True``: this is the one operation in the module
-    that can touch every record of a type at once, so a caller that means it
-    says so and a caller that forgot gets a report.
-    """
-
-    mode: ImportMode = ImportMode.UPSERT
-    dry_run: bool = True
-    on_error: OnError = OnError.ABORT
-    match_by: str = "uuid"
-    force: bool = False
-
-
 @dataclass(slots=True)
-class _Plan:
-    row: ImportRow
-    envelope: Envelope
-    record: Record | None
+class _Tally:
+    """Running counts, so the three places a report is built (dry run,
+    refusal, success) share one call rather than three argument lists that
+    can disagree about what ``skipped`` meant."""
 
-
-def _errors_for(row: ImportRow, exc: ValidationFailed) -> list[ImportRowError]:
-    return [
-        ImportRowError(
-            row=row.number, uuid=row.uuid, field=item.get("field"), message=item["message"]
-        )
-        for item in exc.errors
-    ]
-
-
-async def _validate(
-    db: AsyncSession,
-    rtype: RecordType,
-    rows: Sequence[ImportRow],
-    *,
-    defs: list[Any],
-    settings: RecordsSettings,
-    errors: list[ImportRowError],
-) -> list[tuple[ImportRow, Envelope]]:
-    """Validate every row against the *current* schema, writing nothing.
-
-    The same ``_payload.validate`` a single write uses — so the size ceiling,
-    the ``_orphaned`` refusal and the compiled model are one implementation
-    rather than an import-shaped copy — plus ``create_record``'s relation
-    target check, the rule a file breaks far more often than a form does.
-    """
-    types = await type_id_map(db)
-    out: list[tuple[ImportRow, Envelope]] = []
-    for row in rows:
-        reserved = refuses_orphaned(row)
-        if reserved is not None:
-            errors.append(reserved)
-            continue
-        try:
-            values, stored = _payload.validate(
-                rtype, defs, row.data, max_payload_bytes=settings.max_payload_bytes
-            )
-            await _relations.check_targets(db, defs, values, types)
-            envelope = envelope_for(row)
-        except ValidationFailed as exc:
-            errors.extend(_errors_for(row, exc))
-            continue
-        row.values, row.stored = values, stored
-        out.append((row, envelope))
-    return out
-
-
-def _duplicates(pairs: Sequence[tuple[ImportRow, Envelope]]) -> dict[int, str]:
-    """Rows whose identity another row in the same file already claimed.
-    Caught here rather than at the unique index, where the second write is a
-    raw ``IntegrityError`` — a 500 about a constraint, on a file whose real
-    problem is that two exports were concatenated."""
-    seen: dict[str, int] = {}
-    out: dict[int, str] = {}
-    for row, _ in pairs:
-        if not row.uuid:
-            continue
-        first = seen.setdefault(row.uuid, row.number)
-        if first != row.number:
-            out[row.number] = f"uuid {row.uuid} appears twice in this file (first at row {first})"
-    return out
-
-
-async def _plan(
-    db: AsyncSession,
-    rtype: RecordType,
-    pairs: Sequence[tuple[ImportRow, Envelope]],
-    *,
-    options: ImportOptions,
-    defs: list[Any],
-    errors: list[ImportRowError],
-) -> tuple[list[_Plan], int]:
-    """Decide per row what would happen, and count the no-ops."""
-    duplicates = _duplicates(pairs)
-    matches = await resolve_matches(
-        db, rtype, [row for row, _ in pairs], match_by=options.match_by, defs=defs
-    )
-    plans: list[_Plan] = []
-    skipped = 0
-    for row, envelope in pairs:
-        problem = duplicates.get(row.number)
-        record = matches.get(row.number)
-        if problem is None and record is not None and record.type_id != rtype.id:
-            problem = f"uuid {row.uuid} belongs to a different record type"
-        elif problem is None and record is not None and record.is_deleted:
-            problem = f"record {record.uuid} is in the trash; restore or purge it first"
-        problem = problem or mode_error(options.mode, record)
-        if problem is not None:
-            errors.append(ImportRowError(row=row.number, uuid=row.uuid, message=problem))
-            continue
-        if record is not None and unchanged(rtype, record, row, envelope, defs):
-            skipped += 1
-            continue
-        plans.append(_Plan(row, envelope, record))
-    return plans, skipped
+    total: int = 0
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
 
 
 async def _write(
     db: AsyncSession,
     rtype: RecordType,
-    plans: Sequence[_Plan],
+    plans: Sequence[Plan],
     *,
     options: ImportOptions,
     settings: RecordsSettings,
@@ -218,18 +97,6 @@ async def _write(
                 ImportRowError(row=plan.row.number, uuid=plan.row.uuid, message=exc.detail)
             )
     return counts["created"], counts["updated"]
-
-
-@dataclass(slots=True)
-class _Tally:
-    """Running counts, so the three places a report is built (dry run,
-    refusal, success) share one call rather than three argument lists that
-    can disagree about what ``skipped`` meant."""
-
-    total: int = 0
-    created: int = 0
-    updated: int = 0
-    skipped: int = 0
 
 
 def _report(
@@ -271,8 +138,10 @@ async def import_records(
     errors: list[ImportRowError] = list(parsed.errors)
     tally = _Tally(total=len(parsed.rows) + len({item.row for item in parsed.errors}))
 
-    pairs = await _validate(db, rtype, parsed.rows, defs=defs, settings=settings, errors=errors)
-    plans, tally.skipped = await _plan(db, rtype, pairs, options=options, defs=defs, errors=errors)
+    pairs = await validate_rows(db, rtype, parsed.rows, defs=defs, settings=settings, errors=errors)
+    plans, tally.skipped = await plan_rows(
+        db, rtype, pairs, options=options, defs=defs, errors=errors
+    )
 
     if options.dry_run:
         tally.created = sum(1 for plan in plans if plan.record is None)

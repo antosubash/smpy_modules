@@ -87,6 +87,7 @@ async def create_type(
     display_field: str | None = None,
     slug_field: str | None = None,
     is_public: bool = False,
+    translatable: bool = False,
     allowed_roles: list[str] | None = None,
     actor: str | None = None,
 ) -> RecordType:
@@ -119,6 +120,7 @@ async def create_type(
         display_field=display_field,
         slug_field=slug_field,
         is_public=is_public,
+        translatable=translatable,
         allowed_roles=list(allowed_roles or []),
         created_by=actor,
     )

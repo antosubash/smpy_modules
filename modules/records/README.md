@@ -157,6 +157,8 @@ variables are read. Configure on the Settings screen or with
 | setting | default | restart? |
 |---|---|---|
 | `public_route_prefix` | `/api/records/public` | yes |
+| `content_locales` | `["en"]` | yes |
+| `default_content_locale` | `en` | yes |
 | `default_page_size` | 25 | no |
 | `max_page_size` | 200 | no |
 | `revision_limit` | 50 per record | no |
@@ -169,6 +171,9 @@ variables are read. Configure on the Settings screen or with
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
+
+`content_locales` and `default_content_locale` are the languages records may
+be authored in — see [Content languages](#content-languages).
 
 `max_count` is how far a list page's `total` is counted exactly — see
 [Paging a large type](#paging-a-large-type). `preview_sync_limit` is the
@@ -253,8 +258,8 @@ published records anonymously at two routes, under `public_route_prefix`
 | `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, total_capped, page, page_size, next_cursor}` |
 | `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
 
-A record reads back as `uuid`, `slug`, `display_title`, `published_at` and
-`data` — nothing else. The audit columns, `version`, `status`, `invalid` and
+A record reads back as `uuid`, `slug`, `locale`, `translations`,
+`display_title`, `published_at` and `data` — nothing else. The audit columns, `version`, `status`, `invalid` and
 the reserved `_orphaned` sub-key (a deleted field's retained values, which are
 the admin's undo buffer) are removed from the *shape*, not filtered out of the
 query.
@@ -274,6 +279,17 @@ The rules worth knowing before you point a site at it:
   unindexed, non-existent or mid-reindex, is the same `400` naming the field —
   never the admin API's `409`: "cannot" and "cannot right now" are the same
   answer to a caller who has no business seeing operational state.
+- **`?locale=` names the language the listing is of, and its absence means
+  `default_content_locale` — never "all".** An anonymous reader is asking for
+  one site, and merging languages into one list is how a German record ends up
+  rendered on an English page. A locale that is not configured is a `400`
+  naming it and listing the ones that are; that is the site's own front door,
+  not an oracle over private content. The by-uuid route is **locale-blind** and
+  ignores `?locale=`: a uuid names exactly one record, in exactly one language.
+  `translations` lists that record's **published, live** siblings — `locale`,
+  `uuid` and `slug` each — so a site can render a language switcher without
+  advertising an address that answers `404`. It is resolved in one batched
+  query per page, never one per row.
 - **No `?expand=`** — an anonymous caller must not be able to turn one request
   into a batch of joins against other types, some of which may not be public.
   `expand` and `trashed` are simply not parameters here; unknown ones are
@@ -344,7 +360,8 @@ screen, that a given type is further restricted to specific roles.
   `text` or `json` field instead.
 - **Some field keys are reserved.** A field may not be keyed `_orphaned`, nor
   after any column a record already has — `id`, `uuid`, `type_id`, `data`,
-  `schema_version`, `version`, `status`, `slug`, `display_title`, `position`,
+  `schema_version`, `version`, `status`, `slug`, `locale`,
+  `translation_group`, `display_title`, `position`,
   `published_at`, `created_at`, `updated_at`, `created_by`, `updated_by`,
   `is_deleted`, `deleted_at`, `deleted_by`. The query layer resolves those
   names against the record row before the type's own fields, so such a field
@@ -382,6 +399,107 @@ screen, that a given type is further restricted to specific roles.
   SQLite, where `FOR UPDATE` locks nothing. This is "unique enforced at the
   cost of serializing writes on that type," not a database-level uniqueness
   guarantee.
+
+## Content languages
+
+Off by default, per host **and** per type. An install that leaves
+`content_locales` at `["en"]` and never sets `translatable` on a type runs
+exactly the code it ran before this existed: every record is in one language,
+no screen offers another, and the public API behaves identically.
+
+### Configure the host
+
+```
+python scripts/set_setting.py records content_locales '["en","de"]'
+python scripts/set_setting.py records default_content_locale en
+```
+
+Both need a restart. Each tag must be a lowercase language tag (`en`, `de`,
+`pt-br`), and the default must be one of them. Resolution from a query string
+is case-insensitive — `?locale=DE` finds `de` — but the configured list is not,
+so two spellings of one language can never address two different sets.
+
+**These are this module's own settings, not `pagebuilder`'s.** `records` is
+published on its own and a host may install either without the other, and the
+two may legitimately publish in different language sets — an English-only
+product catalogue beside a four-language marketing site is a real
+configuration, not a mistake. A host that wants them aligned sets both:
+
+```
+python scripts/set_setting.py pagebuilder content_locales '["en","de"]'
+python scripts/set_setting.py records     content_locales '["en","de"]'
+```
+
+Both are distinct again from the host's `SM_I18N_SUPPORTED_LOCALES`, which
+decides what language the *admin console* speaks rather than what the content
+is published in.
+
+### Turn it on for a type
+
+`translatable` on a Record Type. Turning it **on** is additive — every
+existing record already carries the default locale. Turning it **off** while
+records in another locale exist is a `409` naming the count: those records
+would otherwise stay in the database, keep their slug claims, keep answering
+`?locale=`, and be unreachable from a UI that no longer offers their language.
+
+### A record's language is fixed for its lifetime
+
+There is no `locale` on `PUT /records/{uuid}` — a body carrying one is a `422`,
+refused rather than quietly dropped. `POST /records` takes one (defaulting to
+`default_content_locale`; a type that is not `translatable` accepts only that).
+Everything after that is a **translation**: a whole sibling record, never a
+per-field overlay.
+
+| route | does |
+|---|---|
+| `POST /api/records/types/{key}/records/{uuid}/translations` | creates the sibling — `records.edit` plus the type's `allowed_roles` |
+| `GET /api/records/types/{key}/records/{uuid}/translations` | lists the group, the record itself and trashed siblings included |
+| `GET /api/records/types/{key}/records/{uuid}?translations=true` | the same list, on the record — never on the list endpoint, where it would be one query per row |
+
+The new record joins the source's `translation_group`, copies its payload and
+`position`, starts as a **draft** whatever the source's status, and gets a slug
+regenerated *in the target locale* — suffixed `-2`, `-3`… if something there
+already holds it. An explicit `slug` is used as given and refused with a `409`
+if it is taken in that locale.
+
+Refusals: a type that is not `translatable` (`409`), a locale that is not
+configured (`422`, naming it), a source already in the target locale (`409`),
+and a sibling that already holds that language (`409`) — **including a trashed
+one**, which keeps its claim until it is purged or restored.
+
+### What this buys, and what it costs
+
+- **Slugs are unique per `(type, locale)`**, not per type. The same word is the
+  address in both languages, because they are two documents at two addresses.
+  Trash keeps its claim per locale, as it always did per type.
+- **One record per `(translation_group, locale)`**, enforced by a unique index,
+  so a double submit cannot produce two German siblings.
+- **Deleting a record never touches its siblings.** A translation group is a
+  grouping, not a cascade.
+- **`locale` is a filterable, sortable fixed column** — `?filter=locale:eq:de`,
+  `?sort=locale` — and is therefore a reserved field key. The admin list
+  defaults to **all** locales, because an editor's question is "what exists",
+  not "what exists in English".
+- **`allowed_roles`, `is_public` and `on_delete` are type-level and
+  locale-blind**, and so is `unique`: a `unique` field is unique across the
+  whole type, so a translation that copies one will be refused. Give a type a
+  `unique` field only where that is what you mean across every language.
+- **There is no per-field translation**, no automatic translation, and no
+  fallback on the public API: a missing `de` sibling is a `404` for
+  `?locale=de`, not the `en` record in disguise.
+- **There are no locale-scoped redirects.** Records have no public *pages* —
+  only a JSON API keyed by uuid and slug — so a rename strands no URL the way
+  a page rename does.
+
+### Export and import
+
+The export gains `locale` and `translation_group` columns and the import reads
+them back: a missing `locale` defaults to `default_content_locale` (a file
+written before the install spoke more than one language is a file of
+default-locale records), a locale that is not configured is that row's error,
+and `translation_group` is carried verbatim and never interpreted. A row that
+asks to change an existing record's locale or move it between groups is
+refused, exactly as `PUT` is.
 
 ## Changing a schema that already holds records
 
@@ -649,6 +767,12 @@ dataset with more records, and unique fields (`contact.email`, `product.sku`,
 `order.order_no`) stay collision-free because their values are keyed off each
 type's current record count, not the seed alone. `--reset` hard-deletes the
 five types and everything in them (including the trash) before reseeding.
+
+On an install with more than one `content_locale`, the seeder also marks the
+`company` type `translatable` and gives roughly a tenth of the companies a
+sibling in the second locale, so a multilingual host has something for the
+Languages panel and for `?locale=` to show. On a single-locale install it does
+none of that and writes exactly the dataset it always did.
 
 Every record goes through `services.records.create_record`, so this is the
 slow path, not a bulk insert — 10,000 records took **1 minute 46 seconds

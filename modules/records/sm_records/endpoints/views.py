@@ -14,7 +14,7 @@ from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants
+from sm_records import constants, locales
 from sm_records.contracts.schemas import (
     RecordPage,
     record_list_read,
@@ -26,111 +26,48 @@ from sm_records.deps import (
     get_settings,
     has_edit_permission,
     load_allowed_type,
-    load_type,
     parse_sorts,
     parse_trashed,
     parse_view_filters,
     request_db,
-    require_manage_types,
     require_view,
 )
+from sm_records.endpoints import views_types
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import Filter, QueryError, Sort
 from sm_records.models import RecordType
 from sm_records.services import _relations
 from sm_records.services import expand as expand_service
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
-from sm_records.services._common import role_blocked
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute, dependencies=[require_view])
+# First, and that is not cosmetic: ``/types/new`` and ``/types/{key}`` must be
+# matched before the generic ``/{key}`` record list below, and Starlette
+# matches in registration order.
+router.include_router(views_types.router)
 
 _DEFAULT_SORTS: tuple[Sort, ...] = (Sort(field="position"), Sort(field="updated_at", desc=True))
 """Design plan's default for the record list: hand-ordered types read by
 ``position`` first, everything else falls back to most-recently-touched."""
 
 
-@router.get("/", response_model=None)
-async def type_list(
-    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
-) -> InertiaResponse:
-    """The same omission ``GET /api/records/types`` makes: a type whose
-    ``allowed_roles`` exclude the caller is not a card they can open, so it is
-    not a card (§10)."""
-    rtypes = [
-        rtype
-        for rtype in await type_service.list_types(db)
-        if not role_blocked(rtype, caller_roles(request))
-    ]
-    types = [
-        type_read(rtype, *await type_service.record_counts(db, rtype)).model_dump(mode="json")
-        for rtype in rtypes
-    ]
-    return await inertia.render(constants._PAGE_TYPES, {"types": types})
+def _locale_props(settings: RecordsSettings) -> dict[str, object]:
+    """What the editor's Languages panel needs besides the record.
 
-
-def _editor_context(
-    request: Request, rtypes: list[RecordType], settings: RecordsSettings
-) -> dict[str, object]:
-    """What the schema editor needs besides the type: the relation-target
-    choices and the role names ``allowed_roles`` can be drawn from. Roles come
-    from the framework's registry rather than a module list, so a role added
-    by another module is offered here without this one knowing it.
-
-    ``public_route_prefix`` rides along too: it is a DB-backed setting (design
-    §11), so the browser has no other way to build the URL the "Public"
-    toggle's help text shows once it is switched on.
+    Configuration, not data: ``content_locales`` and ``default_content_locale``
+    are DB-backed settings (§4.2), so the browser has no other way to know
+    which languages the panel should offer a row for. The type's own
+    ``translatable`` arrives inside ``type`` and decides whether the panel is
+    rendered at all.
     """
-    registry = getattr(getattr(request.app.state, "sm", None), "permissions", None)
-    role_map = getattr(registry, "role_map", None) or {}
     return {
-        "target_types": [{"key": t.key, "label": t.label} for t in rtypes],
-        "roles": sorted(role_map),
-        "public_route_prefix": settings.public_route_prefix,
+        "content_locales": list(locales.supported(settings)),
+        "default_locale": locales.default(settings),
     }
-
-
-# Declared before the ``/{key}`` family: ``types`` is a reserved type key
-# (constants.RESERVED_TYPE_KEYS) precisely so these two never lose to it.
-#
-# Both carry ``require_manage_types`` on top of the router's ``require_view``:
-# the screen renders the whole type definition, its ``allowed_roles`` and the
-# install's role list, and every button on it calls an API that already
-# requires ``records.manage_types``. A ``records.view`` holder reaching it saw
-# all of that and could press none of it.
-@router.get("/types/new", response_model=None, dependencies=[require_manage_types])
-async def type_new(
-    request: Request,
-    inertia: InertiaDep,
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-) -> InertiaResponse:
-    rtypes = await type_service.list_types(db)
-    return await inertia.render(
-        constants._PAGE_TYPE_EDITOR,
-        {"type": None, **_editor_context(request, rtypes, settings)},
-    )
-
-
-@router.get("/types/{key}", response_model=None, dependencies=[require_manage_types])
-async def type_edit(
-    request: Request,
-    inertia: InertiaDep,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-) -> InertiaResponse:
-    rtypes = await type_service.list_types(db)
-    live, trashed = await type_service.record_counts(db, rtype)
-    return await inertia.render(
-        constants._PAGE_TYPE_EDITOR,
-        {
-            "type": type_read(rtype, live, trashed).model_dump(mode="json"),
-            **_editor_context(request, rtypes, settings),
-        },
-    )
 
 
 @router.get("/{key}/new", response_model=None)
@@ -138,14 +75,24 @@ async def record_new(
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     """``load_allowed_type`` here and on the two screens below: design §10's
     ``allowed_roles`` narrow the record surface, views included, or the same
-    caller reads on one screen what the JSON API refuses them on the next."""
+    caller reads on one screen what the JSON API refuses them on the next.
+
+    ``translations`` is an empty list rather than absent: the record does not
+    exist yet, so it has no group — but the panel reads one prop shape on both
+    screens, and an absent key would leave it rendering the previous page's."""
     counts = await type_service.record_counts(db, rtype)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
-        {"type": type_read(rtype, *counts).model_dump(mode="json"), "record": None},
+        {
+            "type": type_read(rtype, *counts).model_dump(mode="json"),
+            "record": None,
+            "translations": [],
+            **_locale_props(settings),
+        },
     )
 
 
@@ -156,6 +103,7 @@ async def record_edit(
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     """The editor, with its relation fields already resolved.
 
@@ -163,6 +111,11 @@ async def record_edit(
     (§9): a relation picker showing stored UUIDs is not an editor, and a
     second request per field to turn them into titles is the round-trip
     ``?expand=`` exists to avoid.
+
+    ``translations`` is filled unconditionally here, unlike on the JSON API
+    where it costs ``?translations=true`` (§4.4): this screen renders the
+    Languages panel on every load, and a second request to populate it is the
+    round trip the prop exists to avoid. One query, for one record.
 
     ``referrer_count`` is the "Referenced by" badge — ``_relations.referrer_count``,
     which is by construction the same number the panel behind it reports as
@@ -188,14 +141,17 @@ async def record_edit(
         expand_service.relation_field_keys(rtype),
         roles=caller_roles(request),
     )
+    translations = await translations_of(db, rtype, record)
     return await inertia.render(
         constants._PAGE_RECORD_EDITOR,
         {
             "type": type_read(rtype, *counts).model_dump(mode="json"),
-            "record": record_read(rtype, record, expanded=expanded[record.uuid]).model_dump(
-                mode="json"
-            ),
+            "record": record_read(
+                rtype, record, expanded=expanded[record.uuid], translations=translations
+            ).model_dump(mode="json"),
+            "translations": [item.model_dump(mode="json") for item in translations],
             "referrer_count": await _relations.referrer_count(db, record),
+            **_locale_props(settings),
         },
     )
 
@@ -281,6 +237,11 @@ async def record_list(
         "records": records_page.model_dump(mode="json"),
         "errors": errors,
         "trashed": trashed,
+        # No default locale filter anywhere above: the admin list defaults to
+        # **all** locales (§4.4), because an editor's question is "what
+        # exists", not "what exists in English". The selector narrows it with
+        # an ordinary ``?filter=locale:eq:de``.
+        **_locale_props(settings),
     }
     return await inertia.render(constants._PAGE_RECORD_LIST, props)
 

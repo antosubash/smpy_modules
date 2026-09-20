@@ -62,6 +62,11 @@ class ImportRow:
     envelope: dict[str, Any] = dc_field(default_factory=dict)
     stored: dict[str, Any] | None = None
     values: dict[str, Any] | None = None
+    locale: str | None = None
+    """The row's content locale, **resolved** — filled by ``import_._validate``
+    once the configured list is in reach, so everything downstream (the slug
+    match, the write) reads a real content locale rather than whatever the file
+    spelled. ``None`` until then."""
 
     @property
     def uuid(self) -> str | None:

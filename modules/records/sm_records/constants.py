@@ -106,6 +106,20 @@ same prefix cannot widen the exemption by accident (§10)."""
 MAX_LOCALE_LEN: Final = 16
 """``records_record.locale`` width — a BCP 47 tag such as ``pt-BR``."""
 
+LOCALE_PATTERN: Final = r"^[a-z]{2,3}(-[a-z0-9]{2,8})*$"
+"""A content locale, lowercased. Deliberately narrower than BCP 47's full
+grammar, for the reason :mod:`pagebuilder.locales` gives about its own: the tag
+is a column value and a query-string value, so accepting two spellings of one
+language would let ``?locale=DE`` and ``?locale=de`` address different sets.
+Matching is done case-insensitively by :func:`sm_records.locales.resolve`; the
+*configured* list is required to be in this form."""
+
+DEFAULT_CONTENT_LOCALE: Final = "en"
+"""The locale a record is in when nobody says otherwise, and the value the
+migration backfills onto every row written before this module had a language.
+Also :attr:`~sm_records.settings.RecordsSettings.default_content_locale`'s
+default, and the ``server_default`` of ``records_record.locale``."""
+
 TRANSLATION_GROUP_LEN: Final = 32
 """``records_record.translation_group`` width: the first record's uuid hex."""
 

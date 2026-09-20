@@ -12,7 +12,13 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, text
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN
+from sm_records.constants import (
+    DEFAULT_CONTENT_LOCALE,
+    MAX_DISPLAY_TITLE_LEN,
+    MAX_LOCALE_LEN,
+    MAX_SLUG_LEN,
+    TRANSLATION_GROUP_LEN,
+)
 from sm_records.models._base import RECORD_TABLE, REVISION_TABLE, TYPE_TABLE, Base
 
 SLUG_INDEX_NAME = "ix_records_record_type_slug"
@@ -22,24 +28,54 @@ which recognises the database's own refusal and raises the 409 the application
 check raises. A rename that reached only one of them would turn every lost slug
 race back into a 500, so the name has one owner."""
 
+GROUP_LOCALE_INDEX_NAME = "ix_records_record_group_locale"
+"""One record per language per translation group (Phase 5 §4.3), named for the
+same reason :data:`SLUG_INDEX_NAME` is: :func:`sm_records.services._claims.flush_write`
+recognises the database's own refusal and raises the 409 the application check
+raises."""
+
 SLUG_CONFLICT_SIGNATURES: tuple[str, ...] = (
     SLUG_INDEX_NAME,
-    f"{RECORD_TABLE}.type_id, {RECORD_TABLE}.slug",
+    f"{RECORD_TABLE}.type_id, {RECORD_TABLE}.locale, {RECORD_TABLE}.slug",
 )
 """How each backend says "that slug is taken" in an ``IntegrityError``.
 
 Two spellings because the two dialects report a different thing. Postgres
 names the constraint (``duplicate key value violates unique constraint
 "ix_records_record_type_slug"``); SQLite names the *columns*
-(``UNIQUE constraint failed: records_record.type_id, records_record.slug``)
-and never mentions the index at all. Matching the driver's whole message shape
+(``UNIQUE constraint failed: records_record.type_id, records_record.locale,
+records_record.slug``) and never mentions the index at all. The column list is
+therefore part of this contract: adding ``locale`` to the index — which is what
+makes the same word an address in two languages (Phase 5 §4.1) — changes what
+SQLite prints, and a signature left at the old pair would turn every lost slug
+race on SQLite back into a 500. Matching the driver's whole message shape
 would be worse than either — this matches the one substring each backend does
 put in it, and anything matching neither is re-raised, because an
 ``IntegrityError`` this module cannot explain is a bug rather than a 409."""
 
+GROUP_LOCALE_CONFLICT_SIGNATURES: tuple[str, ...] = (
+    GROUP_LOCALE_INDEX_NAME,
+    f"{RECORD_TABLE}.translation_group, {RECORD_TABLE}.locale",
+)
+"""The same two spellings for "that language is already taken in this group".
 
-def _new_uuid() -> str:
+Reached only by a writer that sets ``translation_group`` itself — an import
+carrying the column, or a second ``POST /translations`` that lost the race with
+the first. :func:`sm_records.services._translations.create_translation` checks
+for the sibling first; this is what closes the window behind it, and it costs
+the ordinary write path nothing because the string comparison happens only
+after a flush has already failed."""
+
+
+def new_uuid() -> str:
+    """A record's public identifier, and — for a record with no siblings — its
+    own translation group. Exported because :func:`create_record` needs both
+    values to be *the same* string (Phase 5 §4.1), which it cannot arrange by
+    letting two ``default_factory`` calls fire independently."""
     return uuid4().hex
+
+
+_new_uuid = new_uuid
 
 
 class RecordStatus(str, enum.Enum):  # noqa: UP042
@@ -98,8 +134,12 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
         Index("ix_records_record_type_created_id", "type_id", "created_at", "id"),
         Index("ix_records_record_type_title_id", "type_id", "display_title", "id"),
         Index("ix_records_record_type_slug_id", "type_id", "slug", "id"),
-        # Partial unique: a slug is unique within its type, among rows that
-        # have one. The index is on the row, not on live rows — a soft-deleted
+        # Partial unique: a slug is unique within its type **and its locale**,
+        # among rows that have one. ``locale`` is in the key rather than beside
+        # it because the alternative — a locale column whose slugs are still
+        # globally unique per type — is precisely the half-version the original
+        # design warned about, the one where ``?locale=de`` starts serving the
+        # English record (Phase 5 §4.1). The index is on the row, not on live rows — a soft-deleted
         # record keeps its slug claimed, as pagebuilder does for trashed pages,
         # so a restore can never find its address taken.
         #
@@ -114,11 +154,19 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
         Index(
             SLUG_INDEX_NAME,
             "type_id",
+            "locale",
             "slug",
             unique=True,
             postgresql_where=text("slug IS NOT NULL"),
             sqlite_where=text("slug IS NOT NULL"),
         ),
+        # One record per language per translation group (Phase 5 §4.3). A
+        # second "add German" — a double submit, a stale tab, two rows of an
+        # import sharing a group — otherwise produces two German siblings and
+        # every language switcher starts contradicting itself. Trashed rows are
+        # included, deliberately: a sibling in the trash still claims its slug
+        # in its locale, so the language is occupied until it is purged.
+        Index(GROUP_LOCALE_INDEX_NAME, "translation_group", "locale", unique=True),
     )
 
     id: int | None = Field(default=None, primary_key=True)
@@ -156,6 +204,37 @@ class Record(Base, AuditMixin, SoftDeleteMixin, table=True):  # ty: ignore[unsup
         ),
     )
     slug: str | None = Field(default=None, max_length=MAX_SLUG_LEN)
+    locale: str = Field(default=DEFAULT_CONTENT_LOCALE, max_length=MAX_LOCALE_LEN)
+    """The language this record is written in, **fixed for its lifetime**.
+
+    Every record has one, including on a monolingual install: a nullable column
+    would mean every slug lookup had to spell "this locale or nothing", and the
+    row that predates the feature would be the one that behaves differently.
+    There is no ``locale`` on ``RecordUpdate`` — moving a record between
+    languages would strand its slug in the old one, so the only way to have the
+    same content in two languages is ``POST /records/{uuid}/translations``,
+    which creates a sibling (Phase 5 §4.3).
+
+    The default is the literal ``"en"`` and not the configured
+    ``default_content_locale``: this is a column default the ORM applies with
+    no request and no ``app.state`` in reach, and the write path
+    (``services.records.create_record``) resolves the configured value itself.
+    """
+
+    translation_group: str = Field(
+        default_factory=new_uuid, max_length=TRANSLATION_GROUP_LEN, index=True
+    )
+    """What a record and its translations share.
+
+    A generated key rather than a pointer at "the original", because there is
+    no original: translations are siblings, and pointing each at a source would
+    make deleting the English record orphan the German one — or quietly
+    re-parent it. ``create_record`` sets it to the record's **own uuid**, so a
+    record with no siblings is alone in a group named after itself; a record
+    created through ``POST /translations`` joins the source's group instead.
+    Deleting a record never touches its siblings: a group is a grouping, not a
+    cascade.
+    """
     display_title: str = Field(default="", max_length=MAX_DISPLAY_TITLE_LEN)
     """Denormalised from ``RecordType.display_field`` on write, recomputed by
     the reindex, so the list screen never parses JSON to render a row."""

@@ -8,6 +8,11 @@ a convenience:
   uuid. A 403 on a private type would turn the endpoint into an oracle for
   "which type keys exist on this install", which is exactly the enumeration
   an anonymous surface must not offer.
+* **One language at a time.** ``?locale=`` names it and its *absence* means
+  the default content locale, never "all" — an anonymous reader is asking for
+  one site, and merging languages into one list is how a German record gets
+  served to an English reader (Phase 5 §4.4). The by-uuid read is the
+  exception and is locale-blind: a uuid is one record.
 * **Published only, and never the trash.** ``status`` is a predicate on the
   query, not a filter the caller could drop; the soft-delete filter is the
   framework's and applies as everywhere else.
@@ -50,10 +55,17 @@ from sm_records.index.query import (
 )
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.services._listing import RecordListPage
+from sm_records.services._translations import published_siblings
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
-__all__ = ["NOT_FOUND", "get_public_record", "get_public_type", "list_public_records"]
+__all__ = [
+    "NOT_FOUND",
+    "get_public_record",
+    "get_public_type",
+    "list_public_records",
+    "published_siblings",
+]
 
 NOT_FOUND: Final = "not found"
 """The one 404 body this whole surface ever produces.
@@ -72,6 +84,20 @@ def _published_only(stmt):
     which is the shape ``bounded_count_query``'s ``narrow`` takes, so the page
     and both halves of its count cannot disagree about what "public" means."""
     return stmt.where(_PUBLISHED)
+
+
+def _narrow_for(locale: str):
+    """``_published_only`` plus "and in this language".
+
+    One callable so the page and both halves of its bounded count cannot
+    disagree about what this listing contains — the same reason
+    :func:`_published_only` exists on its own.
+    """
+
+    def narrow(stmt):
+        return _published_only(stmt).where(Record.locale == locale)
+
+    return narrow
 
 
 _HIDDEN_COLUMNS: Final[frozenset[str]] = FIXED_COLUMNS - PUBLIC_FIXED_COLUMNS
@@ -122,6 +148,7 @@ async def list_public_records(
     rtype: RecordType,
     *,
     settings: RecordsSettings,
+    locale: str,
     filters: Sequence[Filter] = (),
     sorts: Sequence[Sort] = (),
     page: int = 1,
@@ -137,6 +164,15 @@ async def list_public_records(
     of the public shape" are the same answer to someone who cannot see the
     schema (§10). ``CursorError`` is flattened to a 400 there too.
 
+    ``locale`` is **required and single-valued**, and the endpoint defaults it
+    to ``default_content_locale`` rather than leaving it off (§4.4): an
+    anonymous reader asks for one site, so "no locale" cannot mean "every
+    language merged into one list". It is applied as a predicate on the
+    statement and not as a caller ``Filter``, for two reasons — ``locale`` is
+    not in :data:`PUBLIC_FIXED_COLUMNS`, so :func:`_check_columns` refuses it
+    from a caller; and narrowing both halves of the bounded count is what a
+    ``narrow`` callable is for, exactly as with ``_PUBLISHED``.
+
     The bound on ``total`` (F4), the ``?after=`` cursor (F11) and
     ``total=false`` are the admin listing's, unchanged — an anonymous caller
     walking a large public type is exactly who wants them. ``_PUBLISHED``
@@ -145,6 +181,7 @@ async def list_public_records(
     rows the outer then discards under-counts near the cap.
     """
     _check_columns(rtype, filters, sorts)
+    narrow = _narrow_for(locale)
     size = settings.clamp_page_size(page_size)
     fields = list(rtype.fields or [])
     signature = sort_signature(rtype.key, sorts)
@@ -157,7 +194,7 @@ async def list_public_records(
         counted = int(
             (
                 await db.execute(
-                    bounded_count_query(rtype, fields, filters, cap=cap, narrow=_published_only)
+                    bounded_count_query(rtype, fields, filters, cap=cap, narrow=narrow)
                 )
             ).scalar_one()
         )
@@ -165,7 +202,7 @@ async def list_public_records(
         total = cap if capped else counted
 
     stmt, terms = page_query(rtype, fields, filters, sorts, after=decoded)
-    stmt = _published_only(stmt)
+    stmt = narrow(stmt)
     if decoded is None:
         stmt = stmt.offset(max(page - 1, 0) * size)
     rows = (await db.execute(stmt.limit(size))).all()

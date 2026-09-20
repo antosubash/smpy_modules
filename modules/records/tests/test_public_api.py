@@ -22,6 +22,15 @@ import pytest_asyncio
 from tests.app_harness import ADMIN, roles
 
 _PREFIX = "/api/records/public"
+_PUBLIC_SHAPE = {
+    "uuid",
+    "slug",
+    "locale",
+    "translations",
+    "display_title",
+    "published_at",
+    "data",
+}
 _UNKNOWN_UUID = "0" * 32
 
 
@@ -99,7 +108,11 @@ async def test_the_shape_carries_no_audit_or_status_columns(public_client):
     this asserts the exact key set, not the absence of one column."""
     record = await _article(public_client)
     one = await public_client.get(f"{_PREFIX}/article/{record['uuid']}")
-    assert set(one.json()) == {"uuid", "slug", "display_title", "published_at", "data"}
+    # ``locale``/``translations`` are Phase 5 §4.4: which language this is and
+    # where its published siblings are. Still no ``status``, ``version``,
+    # ``position`` or audit column — and no ``translation_group``, which is an
+    # internal join key rather than an address.
+    assert set(one.json()) == _PUBLIC_SHAPE
 
     listed = await public_client.get(f"{_PREFIX}/article")
     assert set(listed.json()) == {
@@ -110,13 +123,7 @@ async def test_the_shape_carries_no_audit_or_status_columns(public_client):
         "page",
         "page_size",
     }
-    assert set(listed.json()["items"][0]) == {
-        "uuid",
-        "slug",
-        "display_title",
-        "published_at",
-        "data",
-    }
+    assert set(listed.json()["items"][0]) == _PUBLIC_SHAPE
     for absent in ("version", "created_by", "updated_at", "status", "invalid", "expanded"):
         assert absent not in listed.json()["items"][0]
 
