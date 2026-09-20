@@ -184,6 +184,22 @@ class RecordsSettings(BaseSettings):
     should send ``?total=false`` and skip the statement entirely.
     """
 
+    max_aggregate_groups: int = Field(default=1000, ge=1)
+    """How many groups ``GET /types/{key}/records/aggregate`` returns before it
+    stops (Phase 5 §5.1).
+
+    A ``GROUP BY`` over an unbounded number of groups is as expensive as an
+    unbounded ``COUNT`` and for the same reason — the database has to produce
+    every group before it can order them — so the statement is bounded to
+    ``max_aggregate_groups + 1`` rows and the response says ``truncated: true``
+    when it hit the ceiling. Groups come back by count descending, so what is
+    dropped is always the long tail, which is what a dashboard wants.
+
+    It bounds the **stored** reading (``?reduce=``) identically: a maintained
+    aggregate with a hundred thousand groups is a table as big as the type,
+    and a caller asking for all of it should page a list instead.
+    """
+
     preview_sync_limit: int = Field(default=5000, ge=0)
     """Largest type ``POST /types/{key}/schema/preview`` will dry-run inside
     the request (design §8.9).

@@ -22,6 +22,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import TEXT_INDEX_LEN
+from sm_records.index._reduce_write import apply_delta
 from sm_records.index.providers import (
     IndexEntry,
     TypeResolver,
@@ -43,6 +44,7 @@ from sm_records.models import (
     RecordType,
 )
 from sm_records.schema.types import IndexKind
+from sm_records.services._common import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +228,7 @@ async def write_index(
     *,
     resolve_type_id: TypeResolver,
     fresh: bool = False,
+    previous: Record | None = None,
 ) -> None:
     """Rebuild every index row for ``record`` from its payload.
 
@@ -242,7 +245,18 @@ async def write_index(
     assert it. :func:`sm_records.services.records.create_record` is that
     caller and the only one; the six ``DELETE``s it saves were 27-50% of a
     create, all of them guaranteed to match nothing.
+
+    ``previous`` is the record **as it was before this write**, and it exists
+    only for the reduce index: a fold cannot be rewritten from the new payload
+    alone, it has to be moved off the group the old payload was in. Pass
+    :func:`sm_records.index.reduce.snapshot` with the ``data`` read before the
+    write. ``None`` means "this record was not counted until now" — which is
+    true of a create and of a restore, and *false* of an edit. Getting it
+    wrong on an edit double-counts the record, which is why ``fresh`` and
+    ``previous`` together are refused outright rather than silently reconciled.
     """
+    if fresh and previous is not None:
+        raise ValueError("write_index: 'fresh' is a create, which has no previous state")
     if record.id is None:
         # A freshly-created record has no id until it hits the DB, and index
         # rows are keyed on it. Flushing here rather than making the caller
@@ -256,3 +270,11 @@ async def write_index(
     if rows:
         db.add_all(rows)
     await db.flush()
+
+    # Last, and in the same transaction: the map rows above are a projection
+    # of this record and can be rewritten wholesale, while a reduce row is a
+    # fold over many records and can only be *moved* — from what this record
+    # contributed before the write to what it contributes now (Phase 5 §5.2).
+    # With no spec registered this is a ``for`` over an empty tuple and issues
+    # nothing, which is what keeps the Phase 4 statement count intact.
+    await apply_delta(db, rtype, before=previous, after=record, now=utcnow())

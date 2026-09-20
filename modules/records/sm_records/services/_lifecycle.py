@@ -16,6 +16,8 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.index._reduce_write import apply_delta, drop_type_rows
+from sm_records.index.reduce import snapshot
 from sm_records.index.reindex import reindex_record
 from sm_records.index.writer import delete_index, write_index
 from sm_records.models import Record, RecordRevision, RecordType, RevisionEvent
@@ -62,7 +64,8 @@ async def _apply_set_null(
     ``display_title`` a type whose ``display_field`` *is* the relation keeps a
     list-screen title naming a record that is now in the trash.
     """
-    data = dict(ref.record.data or {})
+    previous_data = dict(ref.record.data or {})
+    data = dict(previous_data)
     value = data.get(ref.field_key)
     if isinstance(value, list):
         kept = [item for item in value if not (isinstance(item, dict) and item.get("uuid") == uuid)]
@@ -88,7 +91,15 @@ async def _apply_set_null(
     await write_revision(
         db, ref.record, RevisionEvent.UPDATE, limit=settings.revision_limit, actor=actor
     )
-    await write_index(db, ref.record, ref.rtype, resolve_type_id=await type_resolver(db))
+    # ``previous``: an ordinary edit of somebody else's record, so a reduce
+    # index moves it off the group its old payload put it in (Phase 5 §5.2).
+    await write_index(
+        db,
+        ref.record,
+        ref.rtype,
+        resolve_type_id=await type_resolver(db),
+        previous=snapshot(ref.record, previous_data),
+    )
 
 
 async def _plan_delete(
@@ -132,16 +143,31 @@ async def _plan_delete(
 
 
 async def _trash(
-    db: AsyncSession, record: Record, *, actor: str | None, settings: RecordsSettings
+    db: AsyncSession,
+    record: Record,
+    rtype: RecordType,
+    *,
+    actor: str | None,
+    settings: RecordsSettings,
 ) -> None:
+    """Trash one record and take it out of every maintained aggregate.
+
+    The map index rows stay (§7.3: every query joins back to the record row,
+    where the framework's filter hides it). A reduce row has no record to join
+    back to, so a trashed record left counted would be counted forever — hence
+    the decrement, and the matching increment in :func:`restore_record`.
+    ``rtype`` is threaded in for that: a cascade trashes records of types the
+    URL never named, each folding under its own type's specs."""
+    now = utcnow()
     record.is_deleted = True
-    record.deleted_at = utcnow()
+    record.deleted_at = now
     record.deleted_by = actor
     db.add(record)
     await db.flush()
     await write_revision(
         db, record, RevisionEvent.DELETE, limit=settings.revision_limit, actor=actor
     )
+    await apply_delta(db, rtype, before=record, after=None, now=now)
 
 
 async def soft_delete_record(
@@ -176,8 +202,8 @@ async def soft_delete_record(
         )
     for ref, target_uuid in set_nulls:
         await _apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
-    for doomed, _ in trash:
-        await _trash(db, doomed, actor=actor, settings=settings)
+    for doomed, doomed_type in trash:
+        await _trash(db, doomed, doomed_type, actor=actor, settings=settings)
 
 
 async def restore_record(
@@ -205,6 +231,8 @@ async def restore_record(
     await write_revision(
         db, record, RevisionEvent.RESTORE, limit=settings.revision_limit, actor=actor
     )
+    # No ``previous``: a trashed record is not counted, so to a reduce index a
+    # restore is an *arrival* — +1, the mirror of ``_trash``'s decrement.
     await reindex_record(db, record, rtype, resolve_type_id=await type_resolver(db))
     return record
 
@@ -246,6 +274,9 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     """
     if not record.is_deleted:
         raise Conflict(f"record {record.uuid} must be in the trash before it can be purged")
+    # **No reduce delta**: the record was decremented when it was trashed, and
+    # the refusal above guarantees only a trashed record reaches here, so a
+    # second decrement would take the group below the truth (Phase 5 §5.2).
     await delete_index(db, record.id)
     await _purge(db, [record])
 
@@ -261,5 +292,9 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> int:
     records = list((await db.execute(stmt)).scalars().all())
     for record in records:
         await delete_index(db, record.id)
+    # One statement rather than a delta per live record: the type is going
+    # away, so every group of every spec on it goes with it. A reduce row has
+    # no foreign key to cascade through, so this is what removes them.
+    await drop_type_rows(db, rtype.id)
     await _purge(db, records)
     return len(records)

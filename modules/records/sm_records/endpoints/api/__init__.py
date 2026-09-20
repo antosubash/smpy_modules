@@ -15,6 +15,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from sm_records.endpoints.api import (
+    aggregate,
     io,
     preview,
     records,
@@ -34,6 +35,10 @@ router.include_router(types.router)
 # ``/types/{key}/records/{uuid}`` would otherwise swallow
 # ``/types/{key}/records/export`` as a record whose uuid is "export".
 router.include_router(io.router)
+# Before ``records`` for the reason ``io`` is: ``/types/{key}/records/{uuid}``
+# would otherwise match ``/types/{key}/records/aggregate`` as a record whose
+# uuid is "aggregate".
+router.include_router(aggregate.router)
 # Before ``records`` for the same reason ``io`` is: both add paths under
 # ``/types/{key}/records/{uuid}/…``, and registration order is what Starlette
 # matches in.

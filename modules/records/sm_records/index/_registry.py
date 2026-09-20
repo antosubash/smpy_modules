@@ -59,6 +59,14 @@ class VirtualField:
 
 _virtual: dict[str, VirtualField] = {}
 _owners: dict[str, _Provider] = {}
+_reduce: dict[str, _Provider] = {}
+"""Reduce-spec keys, by key, to the spec that owns each (Phase 5 §5.2).
+
+Here rather than beside the specs themselves because this module is the
+registry of *names*: a reduce key is a virtual key in every respect that
+matters to a schema author — reserved on save, refused as a declared field,
+one owner — and keeping the two sets apart in two files is how one of them
+ends up claimable twice."""
 _shadowed: set[tuple[str, str]] = set()
 _dropped: set[tuple[str, str]] = set()
 
@@ -67,7 +75,7 @@ def _name(provider: _Provider) -> str:
     return getattr(provider, "__qualname__", None) or repr(provider)
 
 
-def _check_key(key: str) -> None:
+def _check_key(key: str, *, virtual: bool = True) -> None:
     """A virtual key must be a key, and must not be one nothing can read.
 
     The same rules a *declared* field key obeys (``schema._keys.validate_key``),
@@ -83,22 +91,27 @@ def _check_key(key: str) -> None:
     a host's own code at import or ``on_startup`` — there is a person reading
     a traceback, and the alternative is rows nobody can query.
     """
+    kind = "virtual field" if virtual else "reduce spec"
+    taken = _reduce if virtual else _virtual
+    if key in taken:
+        raise ValueError(
+            f"{kind} {key!r} is already registered as a "
+            f"{'reduce spec' if virtual else 'virtual field'}: one key, one owner, whichever "
+            "kind of provider claimed it first"
+        )
     reserved = frozenset(constants.RESERVED_FIELD_KEYS) | FIXED_COLUMNS
     if key in reserved:
         raise ValueError(
-            f"virtual field {key!r} is a reserved key: it names a column every record "
+            f"{kind} {key!r} is a reserved key: it names a column every record "
             "already has, which the query grammar resolves first — the rows would be "
             "written and never readable"
         )
     if not _KEY_RE.match(key):
         raise ValueError(
-            f"virtual field {key!r} must match {constants.TYPE_KEY_PATTERN}, "
-            "like any other field key"
+            f"{kind} {key!r} must match {constants.TYPE_KEY_PATTERN}, like any other field key"
         )
     if len(key) > constants.MAX_KEY_LEN:
-        raise ValueError(
-            f"virtual field {key!r} must be at most {constants.MAX_KEY_LEN} characters"
-        )
+        raise ValueError(f"{kind} {key!r} must be at most {constants.MAX_KEY_LEN} characters")
 
 
 def claim(provider: _Provider, fields: Iterable[VirtualField]) -> None:
@@ -117,6 +130,36 @@ def claim(provider: _Provider, fields: Iterable[VirtualField]) -> None:
     for field in claimed:
         _virtual[field.key] = field
         _owners[field.key] = provider
+
+
+def claim_reduce(key: str, spec: _Provider) -> None:
+    """Record ``spec`` as the owner of a reduce key — see
+    :func:`sm_records.index.reduce.register_reduce_provider`, the one caller.
+
+    The same rules a virtual key obeys, checked by the same function: a reduce
+    key is queried through the aggregate endpoint rather than the filter
+    grammar, but it is just as global (every type may carry it) and just as
+    unreadable if it collides, so it is refused as a declared field key in the
+    same place and with the same kind of message.
+    """
+    _check_key(key, virtual=False)
+    owner = _reduce.get(key)
+    if owner is not None and owner is not spec:
+        raise ValueError(f"reduce spec {key!r} is already registered by {_name(owner)}")
+    _reduce[key] = spec
+
+
+def reduce_keys() -> frozenset[str]:
+    """Every registered reduce key. Read by ``schema._keys.validate_key``, so
+    a declared field cannot shadow one, and by the aggregate endpoint, so an
+    unknown ``?reduce=`` is a 400 naming it rather than an empty result."""
+    return frozenset(_reduce)
+
+
+def clear_reduce() -> None:
+    """Drop every claimed reduce key — the registry half of
+    :func:`sm_records.index.reduce.clear_reduce_providers`."""
+    _reduce.clear()
 
 
 def virtual_fields() -> dict[str, VirtualField]:

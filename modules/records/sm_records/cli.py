@@ -8,6 +8,11 @@ in a repo with no queue: a background task that died with its worker leaves
 safe to run twice — the rebuild deletes and rewrites each record's rows from
 ``data``, which is the source of truth (§7.7).
 
+``reindex --verify`` is the odd one out: it writes nothing and exits ``1`` if a
+maintained aggregate disagrees with the records (Phase 5 §5.2). It lives in
+:mod:`sm_records.cli_verify`, for the same reason ``export``/``import`` live in
+:mod:`sm_records.cli_io` — this file parses and dispatches.
+
 ``argparse`` rather than typer: this ships in a published module, and a CLI
 that is two flags wide does not justify a dependency a host would have to
 carry. Run it from the repo root, like every other entry point here, so the
@@ -139,6 +144,19 @@ def _force_pending(database_url: str, type_key: str) -> None:
     asyncio.run(run())
 
 
+async def run_verify(database_url: str, type_key: str | None) -> int:
+    """``reindex --verify``: the connection, and :mod:`sm_records.cli_verify`
+    for the work — the same division of labour :func:`reindex` has."""
+    from sm_records import cli_verify
+
+    db_state = init_db(database_url)
+    register_listeners(db_state)
+    try:
+        return await cli_verify.verify(db_state, type_key, settings=await _load_settings(db_state))
+    finally:
+        await db_state.engine.dispose()
+
+
 async def seed(database_url: str, *, records: int, seed_value: int, reset: bool) -> SeedSummary:
     """Create the demo types (if missing) and write ``records`` records.
 
@@ -187,6 +205,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="one record type's key; omit to finish every pending rebuild",
     )
+    reindex_parser.add_argument(
+        "--verify",
+        action="store_true",
+        help=(
+            "check the reduce indexes against the records instead of rebuilding; "
+            "exit 1 if any stored group disagrees (Phase 5 §5.2)"
+        ),
+    )
     seed_parser = sub.add_parser(
         "seed", help="write demo data (company/contact/product/order/store records)"
     )
@@ -229,6 +255,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     database_url = Settings().database_url
+    if args.verify:
+        # Read-only, and never combined with the rebuild: "check it" and "fix
+        # it" are different intentions, and a command that silently did both
+        # would make the drift it repaired impossible to report.
+        return 1 if asyncio.run(run_verify(database_url, args.type_key)) else 0
     if args.type_key is not None:
         _force_pending(database_url, args.type_key)
     asyncio.run(reindex(database_url, args.type_key))

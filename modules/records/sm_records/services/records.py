@@ -23,9 +23,13 @@ from typing import Any, NamedTuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import locales
 from sm_records.index.providers import TypeIndex
+from sm_records.index.reduce import snapshot
 from sm_records.index.writer import write_index
+
+# Re-exported: which language a create writes in is locale policy, and lives
+# with the rest of it in :mod:`sm_records.locales`.
+from sm_records.locales import resolve_locale
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _claims, _payload, _relations
@@ -52,7 +56,7 @@ from sm_records.services._payload import read_view
 # make one and list one live beside the lifecycle they are part of — in
 # ``_translations`` only for the file cap.
 from sm_records.services._translations import create_translation, list_translations
-from sm_records.services.errors import Conflict, NotFound, ValidationFailed
+from sm_records.services.errors import Conflict, NotFound
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 
@@ -120,14 +124,18 @@ async def _prepare(
     rtype: RecordType,
     data: dict[str, Any],
     settings: RecordsSettings,
-    *,
     exclude_id: int | None,
+    group: str,
 ) -> _Prepared:
     """Validate, then the two checks no database constraint can make.
 
     The type row is locked before them and not before validation: the lock
     exists to close the check-then-act window of §7.8, and holding it across
     pydantic's work would serialise writes on a type for no benefit.
+
+    ``group`` is the write's translation group, known by both write paths
+    before they call: siblings are exempt from each other's ``unique`` claims
+    (:func:`sm_records.services._claims.ensure_unique`).
     """
     defs = _payload.field_defs(rtype)
     values, stored = _payload.validate(
@@ -136,32 +144,8 @@ async def _prepare(
     await _claims.lock_type(db, rtype)
     types = await type_id_map(db)
     await _relations.check_targets(db, defs, values, types)
-    await _claims.ensure_unique(db, rtype, defs, values, exclude_id=exclude_id)
+    await _claims.ensure_unique(db, rtype, defs, values, exclude_id=exclude_id, exclude_group=group)
     return _Prepared(defs, values, stored, types)
-
-
-def resolve_locale(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
-    """The language a new record is written in — the whole of §4.3's create rule.
-
-    Three answers and no fourth: nothing asked for gets the configured default;
-    something asked for that is not a content locale is a 422 naming it
-    (:func:`sm_records.locales.require`); and a type that is not
-    ``translatable`` accepts only the default, because every screen and every
-    public read for such a type assumes one language and a record written into
-    another would be reachable by uuid and by nothing else.
-
-    A separate function because the translation endpoint needs the same three
-    answers with one of them reversed — there, a request for the default locale
-    on a non-translatable type is the refusal.
-    """
-    resolved = locales.require(settings, locale)
-    if not rtype.translatable and resolved != locales.default(settings):
-        raise ValidationFailed(
-            f"type {rtype.key!r} is not translatable, so its records are all in "
-            f"{locales.default(settings)!r}; enable 'translatable' on the type first",
-            [{"field": "locale", "message": f"{rtype.key!r} is not translatable"}],
-        )
-    return resolved
 
 
 async def create_record(
@@ -183,17 +167,20 @@ async def create_record(
     from here on — there is no ``locale`` on the update path (§4.3).
     ``translation_group`` defaults to the record's **own uuid**, which is what
     makes a record with no siblings alone in a group named after itself; only
-    :func:`sm_records.services._translations.create_translation` passes one,
-    and only ever the source's.
+    :func:`sm_records.services._translations.create_translation` and the
+    importer pass one, and the first only ever the source's.
     """
     resolved_locale = resolve_locale(rtype, settings, locale)
-    _, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=None)
+    # Both identifiers generated here rather than by two ``default_factory``
+    # calls: they have to be the *same* string for a record with no siblings —
+    # and before the checks rather than after, because the group is what
+    # exempts a translation from its source's ``unique`` claims.
+    uuid = new_uuid()
+    own_group = translation_group or uuid
+    _, values, stored, types = await _prepare(db, rtype, data, settings, None, own_group)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _claims.ensure_slug_free(db, rtype, resolved_slug, resolved_locale)
 
-    # Both identifiers generated here rather than by two ``default_factory``
-    # calls: they have to be the *same* string for a record with no siblings.
-    uuid = new_uuid()
     record = Record(
         uuid=uuid,
         type_id=rtype.id,
@@ -203,7 +190,7 @@ async def create_record(
         status=status,
         slug=resolved_slug,
         locale=resolved_locale,
-        translation_group=translation_group or uuid,
+        translation_group=own_group,
         display_title=_payload.display_title(rtype, values),
         position=position,
         published_at=utcnow() if status is RecordStatus.PUBLISHED else None,
@@ -267,7 +254,14 @@ async def update_record(
     (``extra="forbid"`` would otherwise make every revision older than a field
     deletion a permanent 422).
     """
-    defs, values, stored, types = await _prepare(db, rtype, data, settings, exclude_id=record.id)
+    # Read before anything is assigned to the row: the reduce index is
+    # maintained by *moving* this record from the group its old payload put
+    # it in to the group its new one does (Phase 5 §5.2), and by the time
+    # ``write_index`` runs ``record.data`` is already the new value. This is
+    # the one place the old payload still exists.
+    previous_data = dict(record.data or {})
+    own_group = record.translation_group
+    defs, values, stored, types = await _prepare(db, rtype, data, settings, record.id, own_group)
     stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     # ``record.locale`` and never an argument: a record's language is fixed for
@@ -296,5 +290,11 @@ async def update_record(
     await _claims.flush_write(db, rtype, resolved_slug, record.locale)
 
     await write_revision(db, record, event, limit=settings.revision_limit, actor=actor)
-    await write_index(db, record, rtype, resolve_type_id=TypeIndex(types))
+    await write_index(
+        db,
+        record,
+        rtype,
+        resolve_type_id=TypeIndex(types),
+        previous=snapshot(record, previous_data),
+    )
     return record

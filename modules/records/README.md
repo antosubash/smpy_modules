@@ -108,6 +108,54 @@ back empty with `next_cursor: null`. That is one extra round trip at the end
 of a walk and is the ordinary contract of cursor pagination — "fewer rows than
 asked for" is the only end-of-data signal that survives a capped `total`.
 
+### Counting records by group
+
+`GET /api/records/types/{key}/records/aggregate` answers "how many records per
+X" without pulling the records. It is a `GROUP BY` over the same index tables
+the list reads, through the same filter grammar, so the numbers it returns are
+the numbers the list would show.
+
+| parameter | does |
+|---|---|
+| `?group_by=` | an indexed field, a virtual field an index provider projects, or a fixed column (`status`, `locale`, `slug`, `position`, `published_at`, `created_at`, `updated_at`, `display_title`) |
+| `?metric=` | `count` (the default), `sum:<number field>`, or `min:<field>` / `max:<field>` over a number, date, datetime or text field |
+| `?filter=` | repeats, and means exactly what it means on the list |
+| `?locale=` | shorthand for `filter=locale:eq:<tag>` |
+| `?reduce=` | read a maintained aggregate instead — see **Maintained aggregates** below |
+
+```
+GET /api/records/types/order/records/aggregate?group_by=state&metric=sum:total&filter=status:eq:published
+
+{"group_by": "state", "metric": "sum:total", "stored": false, "updated_at": null,
+ "total_groups": 2, "truncated": false,
+ "groups": [{"value": "CA", "count": 2, "sum": "15.00000", "min": null, "max": null},
+            {"value": "NY", "count": 1, "sum": "7.00000", "min": null, "max": null}]}
+```
+
+Worth knowing:
+
+- Every value comes back as a **string**, `count` excepted. A group read from
+  a maintained aggregate is text by construction, and the two readings have to
+  be comparable without per-field coercion.
+- Groups are ordered by count descending, then by value, and capped at
+  `max_aggregate_groups` (1,000 by default) with `truncated: true` when the
+  cap was hit. What is dropped is always the long tail.
+- **A multi-valued `group_by` counts a record once per value it holds**, so
+  the counts sum to more than the number of records. That is the same reading
+  `filter=tags:eq:red` has, and the only honest one for "records per tag".
+- The trash is never counted, and a record with no value for the field is in
+  no group at all (it has no index row). A *fixed column* that is `NULL` does
+  produce a group whose `value` is `null` — the column exists.
+- Refusals are the filter grammar's: an unknown field is a `400`, a declared
+  but unindexed one is a `400`, and one that is mid-rebuild is a `409` — the
+  same three you get for filtering on it.
+- **It is not on the anonymous read API, and will not be.** An anonymous
+  aggregate is an oracle over rows the caller cannot read: `group_by=status`
+  reports how many unpublished drafts a type holds, and a `min`/`max` asked
+  repeatedly under different filters reconstructs individual values a row at a
+  time. `records.view` plus the type's `allowed_roles` gate it exactly as they
+  gate the record list.
+
 ### Showing records on a page
 
 When `simple_module_pagebuilder` is also installed, this module contributes a
@@ -392,13 +440,14 @@ screen, that a given type is further restricted to specific roles.
 - **`unique` is enforced by the application, not by a database constraint.**
   The index tables are shared across every field of a kind, so a partial
   unique index naming a runtime-chosen field key isn't possible. A `unique`
-  field is checked with a `SELECT ... LIMIT 1` inside the write's transaction,
-  and writes to the type are serialized to close the check-then-act race
-  between two concurrent creates: a row lock on the type on Postgres, and a
-  write against the type row — which takes SQLite's `RESERVED` lock — on
-  SQLite, where `FOR UPDATE` locks nothing. This is "unique enforced at the
-  cost of serializing writes on that type," not a database-level uniqueness
-  guarantee.
+  field is checked with a `SELECT ... LIMIT 1` inside the write's transaction —
+  among the records that are not translations of the one being written, see
+  [Content languages](#what-this-buys-and-what-it-costs) — and writes to the
+  type are serialized to close the check-then-act race between two concurrent
+  creates: a row lock on the type on Postgres, and a write against the type row
+  — which takes SQLite's `RESERVED` lock — on SQLite, where `FOR UPDATE` locks
+  nothing. This is "unique enforced at the cost of serializing writes on that
+  type," not a database-level uniqueness guarantee.
 
 ## Content languages
 
@@ -481,9 +530,17 @@ one**, which keeps its claim until it is purged or restored.
   defaults to **all** locales, because an editor's question is "what exists",
   not "what exists in English".
 - **`allowed_roles`, `is_public` and `on_delete` are type-level and
-  locale-blind**, and so is `unique`: a `unique` field is unique across the
-  whole type, so a translation that copies one will be refused. Give a type a
-  `unique` field only where that is what you mean across every language.
+  locale-blind.**
+- **`unique` is enforced among records that are not siblings.** A `unique`
+  field is still unique across the whole type and across every language — two
+  records in the same locale, or in two locales but in different translation
+  groups, collide exactly as they did before. What is exempt is the group
+  itself: records sharing a `translation_group` do not claim against each
+  other, because a German product legitimately carries the English product's
+  SKU. So a translation may copy a `unique` value (it copies the whole
+  payload), editing the source afterwards leaves the sibling's now-stale copy
+  alone, and a trashed sibling keeps its exemption while a trashed unrelated
+  record still blocks.
 - **There is no per-field translation**, no automatic translation, and no
   fallback on the public API: a missing `de` sibling is a `404` for
   `?locale=de`, not the `en` record in disguise.
@@ -744,6 +801,104 @@ A few consequences worth knowing before you use it:
   provider contributes no rows for that record, and the other providers and
   the write itself carry on. A broken host extension must not make every
   record unsaveable; its rows come back on the next reindex.
+
+### Maintained aggregates
+
+An index provider makes a record *queryable*; a **reduce provider** keeps a
+running aggregate of the whole type, updated on every write. It is the answer
+to one problem only — a `GROUP BY` over a type so large that the live
+`/aggregate` above has become too slow — and it is opt-in per provider,
+because it buys that speed with a second source of truth.
+
+```python
+from decimal import Decimal
+
+from sm_records.index import ReduceSpec, register_reduce_provider
+
+register_reduce_provider(
+    ReduceSpec(
+        key="orders_per_state",
+        group_by=lambda record, rtype: (record.data or {}).get("ship_state"),
+        value=lambda record, rtype: Decimal((record.data or {}).get("total") or 0),
+    )
+)
+```
+
+Read it back with `GET …/records/aggregate?reduce=orders_per_state`, which
+returns the same shape as a live aggregate plus `stored: true` and
+`updated_at` — so a caller can ask the same question both ways and compare.
+
+**Delta, rebuild, verify.** The three exist together and none of them is
+optional:
+
+- **Delta.** `write_index` computes what the record contributed *before* the
+  write and what it contributes after, and applies the difference with
+  `UPDATE … SET count = count + :d` inside the same transaction. The database
+  does the arithmetic, so two writers cannot both read `7` and both store `8`.
+  On SQLite the per-type write lock already serialises them; on Postgres the
+  row `UPDATE` does. An edit that does not move the record costs no statement
+  at all, and an install with no spec registered costs exactly what it did
+  before this existed.
+- **Rebuild.** `python -m sm_records.cli reindex --type KEY` (and the reindex
+  button, and any schema-triggered rebuild) throws the type's stored groups
+  away and recomputes them from the records. The table is therefore never more
+  than a cache of something the documents already say.
+- **Verify.** `python -m sm_records.cli reindex --verify [--type KEY]`
+  recomputes every spec and reports each `(type, key, group)` whose stored row
+  disagrees. Exit code `1` on drift, `0` clean, so it works as a deploy gate
+  or a cron check. Design §7.5's objection to a maintained aggregate was that
+  it can drift; the answer is not that it cannot, it is that **drift is
+  detectable**. A verify run *in this process* also degrades `/health/ready`
+  with a `reduce_drift` detail until the next clean verify or rebuild; a CLI
+  verify is a different process and reports on its own stdout instead.
+
+The transitions, each of which has a test:
+
+| event | what moves |
+|---|---|
+| create | `+1`, `+value` into the new group (insert on the group's first sight) |
+| update, same group | `+new − old` on `sum` only; no count change |
+| update, new group | `−1 −old` on the old group, `+1 +new` on the new one |
+| soft delete (trash) | `−1 −value`; a trashed record is **not** counted |
+| restore | `+1 +value` |
+| purge of a trashed record | nothing — it was decremented when it was trashed |
+| delete the type | every group of every spec on it is removed |
+
+A group whose count reaches zero is deleted rather than left at zero, so the
+table is exactly the set of non-empty groups — which is what makes it
+comparable to a fresh recompute row for row.
+
+Other things to know before you register one:
+
+- **A reduce key is a virtual key.** Same rules as a `VirtualField`: it must
+  match `^[a-z][a-z0-9_]*$`, may not name a record column or fixed filter
+  column, has one owner, and is refused as a declared field key on save.
+- **Registering a spec marks nothing.** A provider is code you deploy, not a
+  schema edit this module can see, so no `reindex_pending` entry appears and
+  the table simply has no rows for the new key. Run
+  `python -m sm_records.cli reindex --type KEY` after deploying one, or after
+  changing what an existing one folds on. Until then the live `/aggregate` is
+  unaffected either way.
+- **Every worker must run the same registrations.** The registry is
+  process-global; a worker that skipped the registration writes no deltas, and
+  what it writes goes missing from the stored aggregate until a rebuild.
+- **`group_by` returning `None` means "no group"**, not an "unknown" bucket.
+  `value` returning `None` means zero contribution — the record still counts.
+- **Groups are stored as text, truncated at 512 characters**, which is the
+  same cut `text` index values take. A spec grouping on free prose will merge
+  groups that differ only after the cut; group on something bounded.
+- **One row per group is the cost.** A spec whose group is effectively unique
+  per record gives you a stored table as large as the type, maintained on
+  every write, for no benefit. That is a design mistake no implementation here
+  can fix.
+- **A destructive schema change rebuilds them.** Discarding a deleted field's
+  orphaned values rewrites every payload of the type, which is the one thing
+  other than a record write that can move what a spec folds on — so that pass
+  rebuilds the type's maintained aggregates before it returns.
+- **A spec that raises contributes nothing and is logged.** The write itself
+  is never taken down by a host's extension — but a failure on the *old* side
+  of a delta leaves a group over-counted until the next rebuild, which is
+  exactly what `--verify` is for.
 
 ### Demo data
 

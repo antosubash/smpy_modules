@@ -1,10 +1,20 @@
 """Health checks the module contributes. Design doc §8.9.
 
+Two things degrade ``/health/ready`` here, and they are different failures.
+
 A reindex orphaned by a worker restart is *recoverable* — the CLI finishes it —
 but recoverable is not visible. A field that refuses filters with a 409 forever
 because nothing ever ran the rebuild is noticed by whoever next tries that
 filter, which turns a deploy detail into a support ticket. This degrades
 ``/health/ready`` instead, naming the type and the fields.
+
+The second is ``reduce_drift``: a maintained aggregate (Phase 5 §5.2) that the
+last verify found disagreeing with the records. Design §7.5's objection to a
+maintained aggregate was exactly that it can drift, and the answer was that
+drift would be *detectable* — which means nothing unless something says so out
+loud. It is in-process state (:mod:`sm_records.index._drift`), so it reflects
+verifies run by *this* process; a CLI verify runs in another one and reports on
+its own stdout instead, which the README says.
 
 The check reads the database, which a ``register_health_checks`` hook cannot:
 it runs before the lifespan opens one. So it reads what
@@ -23,6 +33,7 @@ from simple_module_core.health import HealthCheck, HealthCheckResult, HealthStat
 from sqlalchemy import select
 
 from sm_records.constants import REINDEX_ALL
+from sm_records.index._drift import drift_detail
 from sm_records.models import RecordType
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
@@ -110,17 +121,27 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
                 )
             ).all()
         stale, blocked = _stale(rows, limit, now)
-        if not stale:
-            return HealthCheckResult(status=HealthStatus.HEALTHY)
-        detail = (
-            f"reindex pending for longer than {limit}s: {'; '.join(stale)} — "
-            "run `python -m sm_records.cli reindex`"
-        )
-        if blocked:
-            detail += (
-                "; a unique field is among them, so writes to this type are refused "
-                "until the rebuild completes"
+        details: list[str] = []
+        if stale:
+            detail = (
+                f"reindex pending for longer than {limit}s: {'; '.join(stale)} — "
+                "run `python -m sm_records.cli reindex`"
             )
-        return HealthCheckResult(status=HealthStatus.DEGRADED, detail=detail)
+            if blocked:
+                detail += (
+                    "; a unique field is among them, so writes to this type are refused "
+                    "until the rebuild completes"
+                )
+            details.append(detail)
+        # Reported alongside rather than instead: a stale rebuild and a drifted
+        # aggregate are different faults with different fixes, and a check that
+        # showed only the first would hide the second for as long as any type
+        # had a marker set.
+        drift = drift_detail()
+        if drift is not None:
+            details.append(drift)
+        if not details:
+            return HealthCheckResult(status=HealthStatus.HEALTHY)
+        return HealthCheckResult(status=HealthStatus.DEGRADED, detail="; ".join(details))
 
     return HealthCheck(name=CHECK_NAME, check=check)

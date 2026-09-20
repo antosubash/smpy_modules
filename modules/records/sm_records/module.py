@@ -53,6 +53,22 @@ class RecordsModule(ModuleBase):
         # while it is ``None`` (there is nothing to be stale during boot).
         self.db = None
 
+    @property
+    def reduce_drift(self) -> dict[int, dict[str, int]]:
+        """What the last in-process verify found, by type id (Phase 5 §5.2).
+
+        Exposed on the module instance because that is where a host looks for
+        this module's runtime state, and because the health check already
+        closes over ``self`` — the state itself lives in
+        :mod:`sm_records.index._drift`, which is process-global for the same
+        reason the provider registry is: the writer has no module instance to
+        report to. Empty means the last verify was clean, or that none has run
+        in this process.
+        """
+        from sm_records.index._drift import current_drift
+
+        return current_drift()
+
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
 

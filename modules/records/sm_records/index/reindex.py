@@ -23,6 +23,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeResolver
+from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.writer import project, row_values, write_index
 from sm_records.models import INDEX_TABLES, Record, RecordType
 
@@ -152,13 +153,21 @@ async def reindex_type(
             .all()
         )
         if not batch:
-            return total
+            break
         await reindex_batch(db, batch, rtype, resolve_type_id=resolve_type_id, touched=touched)
         for record in batch:
             last_id = record.id or last_id
             total += 1
         if after_batch is not None:
             await after_batch()
+    # After the map rows, never interleaved with them: a reduce row is a fold
+    # over *many* records, so it cannot be rebuilt batch by batch alongside
+    # the projection of one. It is deleted and recomputed in its own pass per
+    # spec, which is also why it is safe to run here — the walk above has
+    # finished and nothing in this transaction is half-written. With no spec
+    # registered this issues no statements at all (Phase 5 §5.2).
+    await rebuild_type(db, rtype, batch_size=batch_size)
+    return total
 
 
 def pending_map(rtype: RecordType) -> dict[str, str]:

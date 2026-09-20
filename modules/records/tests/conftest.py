@@ -88,12 +88,19 @@ def _clean_providers():
     sees it whatever ran before, and a test declaring a field keyed like some
     other test's virtual field is not refused by a registration that outlived
     it.
+
+    ``reduce_providers`` go with them, and for the same reason twice over: a
+    reduce spec left registered writes a delta on every later test's record
+    write, and its key stays reserved against a declared field of that name.
     """
     from sm_records.index import providers
+    from sm_records.index.reduce import clear_reduce_providers
 
     providers.clear()
+    clear_reduce_providers()
     yield
     providers.clear()
+    clear_reduce_providers()
 
 
 async def create_type(db: AsyncSession, key: str, fields: list[dict], **cols) -> RecordType:

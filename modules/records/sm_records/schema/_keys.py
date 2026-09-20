@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from sm_records.constants import MAX_KEY_LEN, RESERVED_FIELD_KEYS, TYPE_KEY_PATTERN
+from sm_records.index._registry import reduce_keys
 from sm_records.index.providers import virtual_fields
 
 KEY_RE = re.compile(TYPE_KEY_PATTERN)
@@ -82,6 +83,18 @@ def validate_key(raw: dict[str, Any], seen: set[str], *, on_save: bool = False) 
             key,
             "key is reserved by an index provider: it is a virtual field, queryable on every "
             "type's records, so a declared field of the same key would shadow it",
+        )
+        # The same rule for the other kind of provider key (Phase 5 §5.2). A
+        # reduce key is not read by the filter grammar, so it shadows nothing
+        # there — but ``?reduce=`` and ``?group_by=`` share one namespace with
+        # declared fields on the aggregate endpoint, and one key answering two
+        # different questions depending on which parameter named it is the
+        # ambiguity the single-owner rule exists to prevent.
+        require(
+            key not in reduce_keys(),
+            key,
+            "key is reserved by a reduce provider: it names a maintained aggregate, which "
+            "the aggregate endpoint resolves alongside this type's fields",
         )
     require(KEY_RE.match(key), key, f"key must match {TYPE_KEY_PATTERN}")
     require(len(key) <= MAX_KEY_LEN, key, f"key must be at most {MAX_KEY_LEN} characters")

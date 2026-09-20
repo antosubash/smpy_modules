@@ -27,6 +27,7 @@ from sm_records.models._record import (
     RevisionEvent,
     new_uuid,
 )
+from sm_records.models._reduce import REDUCE_GROUP_INDEX_NAME, IndexReduce
 from sm_records.models._type import RecordType, RecordTypeRevision
 
 INDEX_TABLES: tuple[type, ...] = (
@@ -44,6 +45,7 @@ __all__ = [
     "GROUP_LOCALE_CONFLICT_SIGNATURES",
     "GROUP_LOCALE_INDEX_NAME",
     "INDEX_TABLES",
+    "REDUCE_GROUP_INDEX_NAME",
     "SLUG_CONFLICT_SIGNATURES",
     "SLUG_INDEX_NAME",
     "Base",
@@ -51,6 +53,7 @@ __all__ = [
     "IndexDate",
     "IndexDatetime",
     "IndexNumber",
+    "IndexReduce",
     "IndexRef",
     "IndexText",
     "Record",

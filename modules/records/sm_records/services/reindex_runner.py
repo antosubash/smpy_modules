@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import REINDEX_ALL
 from sm_records.index._analyze import INDEX_TABLE_NAMES, analyze_tables
+from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.reindex import (
     clear_pending,
     delete_field_rows,
@@ -224,6 +225,15 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
             return 0
         pending = pending_map(rtype)
         if not pending:
+            # Nothing is pending for the *map* indexes — but a reduce index
+            # carries no marker and never will: registering or changing a spec
+            # is the host deploying code, not a schema edit this module can
+            # see (Phase 5 §5.2). So the operator who pressed "reindex", or
+            # ran the CLI against this type, still has work here, and it is
+            # this. With no spec registered it issues no statements at all.
+            if await rebuild_type(session, rtype, batch_size=settings.reindex_batch_size):
+                mark_written(session)
+                await session.commit()
             return 0
         started_at_schema = rtype.schema_version
 

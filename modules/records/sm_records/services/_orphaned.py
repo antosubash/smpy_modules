@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
+from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.models import Record, RecordType
 from sm_records.services._common import mark_written
 
@@ -132,4 +133,11 @@ async def discard(db: AsyncSession, rtype: RecordType, keys: list[str], *, batch
         await db.flush()
     if touched:
         mark_written(db)
+        # Every record of the type just had keys removed from its payload, and
+        # a reduce spec folds on that payload — so a spec grouping on (or
+        # valuing) a discarded key is stale from here on. It carries no
+        # ``reindex_pending`` marker and never will (a spec is a deployment,
+        # not a schema edit), so nothing else would rebuild it. Inert with no
+        # spec registered: this issues no statements at all.
+        await rebuild_type(db, rtype, batch_size=batch_size)
     return touched

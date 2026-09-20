@@ -57,6 +57,14 @@ TEXT_INDEX_LEN: Final = 512
 2048 bytes at four-byte UTF-8, under Postgres's 2704-byte btree ceiling —
 redo that arithmetic before raising it. See the design doc §7.4."""
 
+REDUCE_GROUP_LEN: Final = 512
+"""Characters of a reduce group value that land in ``records_index_reduce``.
+
+The same ceiling as :data:`TEXT_INDEX_LEN` and for the same reason — the
+column is part of a unique index, so it is bound by Postgres's btree limit —
+and deliberately the same number, so a reduce spec grouping on a text field
+buckets exactly as a filter on that field matches (Phase 5 §5.2)."""
+
 NUMBER_PRECISION: Final = 19
 NUMBER_SCALE: Final = 5
 """``Numeric(19, 5)`` — five decimal places is the ``number`` type's contract,
