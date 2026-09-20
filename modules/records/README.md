@@ -58,6 +58,33 @@ this is a deliberate hard rule, not a v1 limitation, and it is what keeps
 performance a property of the schema rather than a cliff discovered under
 load.
 
+### Sidebar entries
+
+Every type is reachable through the **Record Types** entry above. A type can
+also ask for an entry of its own, next to it: turn on **Show in sidebar** in
+the type editor (`show_in_menu` on the API) and the admin sidebar gains an
+item under *Content*, labelled with the type's plural, using the type's icon
+and linking to its record list. Off by default — a sidebar with an item per
+type is unusable on an install with thirty of them — and the hub entry stays
+whatever you do.
+
+It is **not a schema change**: no classification, no dry run, no revision and
+no `schema_version` bump, exactly like `is_public`. It round-trips through
+export and import with the rest of the definition.
+
+A type's `allowed_roles` narrow who sees the entry, deliberately: role
+filtering in the menu is a plain intersection with no admin bypass, and so is
+the check on the record list behind the link, so a caller the type excludes
+would get a 403 from a link only they could see. An empty `allowed_roles` —
+the default — means everyone with `records.view` sees it.
+
+**The entry can lag by `menu_refresh_seconds` in a multi-worker host.** The
+framework's menu registry is built once per process, at boot, and types are
+created long after that; the worker that served your save re-reads the types
+on its next page request, and the others within the window (5 seconds by
+default, `0` to re-read on every page request). Nothing about the record data
+is affected — only which links the sidebar is showing.
+
 ### Paging a large type
 
 `GET /api/records/types/{key}/records` takes `?page=` and `?page_size=` as it
@@ -238,9 +265,13 @@ variables are read. Configure on the Settings screen or with
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
+| `menu_refresh_seconds` | 5 | no |
 
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
+
+`menu_refresh_seconds` is the sidebar's refresh window — see
+[Sidebar entries](#sidebar-entries).
 
 `max_count` is how far a list page's `total` is counted exactly — see
 [Paging a large type](#paging-a-large-type). `preview_sync_limit` is the

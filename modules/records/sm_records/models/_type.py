@@ -75,6 +75,20 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     is_public: bool = Field(default=False)
     """Gates the anonymous read API. Off by default."""
 
+    show_in_menu: bool = Field(default=False)
+    """Whether this type gets its own entry in the admin sidebar.
+
+    Off by default: the module's "Records" hub entry is what every type is
+    reachable through, and a sidebar that grew an item per type would be
+    unusable on an install with thirty of them. Turning it on adds one item
+    labelled :attr:`label_plural`, pointing at this type's record list, next
+    to the hub — see :mod:`sm_records.menu`.
+
+    Not a schema field: it changes no record, bumps no ``schema_version`` and
+    writes no revision, which is why ``services._type_update`` treats it like
+    ``is_public`` rather than like anything in ``fields``.
+    """
+
     translatable: bool = Field(default=False)
     """Whether this type's records may be authored in more than one content
     locale (Phase 5 §4.1).

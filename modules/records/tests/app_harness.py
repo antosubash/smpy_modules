@@ -26,9 +26,11 @@ from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from inertia import InertiaConfig, inertia_dependency_factory
 from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
+from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
 from simple_module_hosting.permissions import resolve_permissions
 from sm_records.models import Base, Record, RecordType
 from sm_records.module import RecordsModule
@@ -120,7 +122,9 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
+async def build_app(
+    tmp_path: Any, db_state: Any = None, *, menus: bool = False
+) -> tuple[FastAPI, Any]:
     """Every router mounted at its real prefix, exactly as
     ``wire_module_routes`` does in production.
 
@@ -129,6 +133,13 @@ async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
     SQLite database and needs the endpoints wired to *that* one, not to a
     fresh empty one. Its schema is assumed to exist; the default path still
     creates it.
+
+    ``menus`` adds the two pieces of the host that the sidebar needs: a
+    ``MenuRegistry`` filled through ``register_menu_items``, and
+    ``InertiaLayoutDataMiddleware``, which is what turns it into the ``menus``
+    shared prop of a view response. Off by default because that middleware
+    adds ``auth``/``menus``/``i18n`` to *every* Inertia payload, and the view
+    tests assert the exact set of props their pages produce.
     """
     module = RecordsModule()
     # Pre-seeded so ``register_settings`` hands the services container this
@@ -176,6 +187,21 @@ async def build_app(tmp_path: Any, db_state: Any = None) -> tuple[FastAPI, Any]:
         root_directory=".",
     )
     app.state.inertia_dependency = inertia_dependency_factory(inertia_config)
+
+    if menus:
+        # Added before the module's own middleware so it ends up *outside* it:
+        # ``add_middleware`` is LIFO, which is exactly the order
+        # ``_phase_helpers.install_middleware`` produces in the real host, and
+        # it is what lets a sync done by ``MenuSyncMiddleware`` be visible to
+        # the shared props of the same request.
+        menu_registry = MenuRegistry()
+        module.register_menu_items(menu_registry)
+        app.add_middleware(
+            InertiaLayoutDataMiddleware,
+            menu_registry=menu_registry,
+            permission_registry=registry,
+        )
+        app.state.menu_registry = menu_registry
 
     # Wired through the hook the host calls, not by hand: the deferred-job
     # drain is what makes the reindex run *after* the request's session has

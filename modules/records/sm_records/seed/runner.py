@@ -69,6 +69,7 @@ async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordT
                 display_field=type_def.display_field,
                 slug_field=type_def.slug_field,
                 collection=type_def.collection,
+                show_in_menu=type_def.show_in_menu,
                 actor="records-seed-cli",
             )
             log(f"created type {type_def.key!r}")

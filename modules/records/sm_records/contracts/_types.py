@@ -38,6 +38,10 @@ class TypeRead(SQLModel):
     ``null`` for the shared ones. Read-only after creation — the editor shows
     it and offers no control."""
     is_public: bool
+    show_in_menu: bool
+    """Whether this type has its own entry in the admin sidebar
+    (:mod:`sm_records.menu`). The type editor renders it as a switch; nothing
+    else reads it, and it is not part of the schema."""
     translatable: bool
     """Whether this type's records may be authored in more than one content
     locale (Phase 5 §4.1). ``false`` is what keeps the language UI off and the
@@ -73,6 +77,7 @@ class TypeCreate(SQLModel):
     display_field: str | None = None
     slug_field: str | None = None
     is_public: bool = False
+    show_in_menu: bool = False
     translatable: bool = False
     allowed_roles: list[str] = SQLField(default_factory=list)
     collection: str | None = None
@@ -103,6 +108,7 @@ class TypeUpdate(SQLModel):
     display_field: str | None = None
     slug_field: str | None = None
     is_public: bool | None = None
+    show_in_menu: bool | None = None
     translatable: bool | None = None
     allowed_roles: list[str] | None = None
     collection: str | None = None
@@ -131,6 +137,7 @@ def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -
         slug_field=rtype.slug_field,
         collection=rtype.collection,
         is_public=rtype.is_public,
+        show_in_menu=rtype.show_in_menu,
         translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),
         record_count=record_count,

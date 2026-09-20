@@ -38,6 +38,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.menu import affects_menu, mark_dirty
 from sm_records.models import RecordType
 from sm_records.services import _orphaned, reindex_runner, schema_change
 from sm_records.services import revisions as revision_service
@@ -113,6 +114,7 @@ async def list_types(request: Request, db: AsyncSession = Depends(request_db)) -
 )
 async def create_type(
     body: TypeCreate,
+    request: Request,
     db: AsyncSession = Depends(request_db),
     settings=Depends(get_settings),
     who: str | None = Depends(actor),
@@ -129,11 +131,14 @@ async def create_type(
         display_field=body.display_field,
         slug_field=body.slug_field,
         is_public=body.is_public,
+        show_in_menu=body.show_in_menu,
         translatable=body.translatable,
         allowed_roles=body.allowed_roles,
         collection=body.collection,
         actor=who,
     )
+    if body.show_in_menu:
+        mark_dirty(request.app)
     # A freshly created type holds no records, trashed or otherwise — skip
     # the queries rather than count a table it cannot yet appear in.
     return type_read(rtype, 0, 0)
@@ -191,6 +196,11 @@ async def update_type(
         orphaned=body.orphaned,
         **changes,
     )
+    # Only for a change that can move the sidebar — the marking is cheap, but
+    # the read it schedules is a query, and ``fields`` edits are the common
+    # case on this route and never touch navigation.
+    if affects_menu(changes):
+        mark_dirty(request.app)
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
 
@@ -212,7 +222,12 @@ async def delete_type(
     exception. Same check, same admin semantics, as every record write.
     """
     check_type_roles(request, rtype)
+    shown = rtype.show_in_menu
     await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
+    # Read before the delete: afterwards the row is gone and the attribute is
+    # a question about an expired instance.
+    if shown:
+        mark_dirty(request.app)
 
 
 @router.post("/types/{key}/reindex", status_code=202, dependencies=[require_manage_types])

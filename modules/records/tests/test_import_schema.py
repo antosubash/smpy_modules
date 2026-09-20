@@ -33,6 +33,9 @@ async def test_type_export_is_importable_shaped(client):
         "display_field",
         "slug_field",
         "is_public",
+        # Carried so a type that had its own sidebar entry where it was
+        # exported still has one where it is imported.
+        "show_in_menu",
         # Carried so a definition exported from a multilingual install arrives
         # at the next one still able to hold translations (Phase 5 §4.1).
         "translatable",

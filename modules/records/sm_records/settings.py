@@ -10,19 +10,16 @@ writes it back.
 
 ``public_route_prefix`` carries ``requires_restart`` because the anonymous
 read routes it configures are mounted from ``on_startup`` — after hydration,
-which is the only point at which the prefix is known, and long after the
-router table would otherwise be built (see :mod:`sm_records.boot`). Changing
-it therefore takes a restart.
+the first point at which the prefix is known, and long after the router table
+would otherwise be built (see :mod:`sm_records.boot`).
 
-It is not the only one: ``content_locales`` and ``default_content_locale``
-carry the flag too, and those three are the whole ``requires_restart`` set
-below — the README's settings table lists the same three. Their values *are*
-read per request (:mod:`sm_records.locales` takes the settings object rather
-than caching one), so screens follow an edit immediately; the flag is there
-because an edit changes what the install *publishes* rather than how a page
-renders. Records already written in a locale that has just been dropped stay
-written, the public API stops serving them, and the count of them is taken at
-startup and only there (:mod:`sm_records.health`).
+``content_locales`` and ``default_content_locale`` carry it too, and those
+three are the whole ``requires_restart`` set below — the README's settings
+table lists the same three. Both locale values *are* read per request, so
+screens follow an edit immediately; the flag is there because an edit changes
+what the install *publishes* rather than how a page renders. Records already
+written in a dropped locale stay written, the public API stops serving them,
+and they are counted at startup and only there (:mod:`sm_records.health`).
 
 Everything else here is read per request and takes effect on save.
 """
@@ -38,6 +35,7 @@ from sm_records import constants
 from sm_records.settings_checks import (
     DEFAULT_PUBLIC_ROUTE_PREFIX,
     check_content_locales,
+    check_limits,
     check_public_route_prefix,
 )
 
@@ -63,13 +61,12 @@ class RecordsSettings(BaseSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Init kwargs only — no env, no ``.env``, no secrets directory.
 
-        The hydrator passes stored overrides as keyword arguments, so this
-        leaves exactly two answers for any field: what the database says, or
-        the default declared here. Dropping the env sources rather than
-        merely not documenting them is deliberate — a stray
-        ``SM_RECORDS_*`` left in a shell or a deploy manifest would
-        otherwise quietly outrank the value an operator can see and edit on
-        the Settings screen.
+        The hydrator passes stored overrides as keyword arguments, so any
+        field has exactly two answers: what the database says, or the default
+        declared here. Dropping the env sources rather than merely not
+        documenting them is deliberate — a stray ``SM_RECORDS_*`` in a shell
+        or a deploy manifest would otherwise quietly outrank the value an
+        operator can see and edit on the Settings screen.
         """
         return (init_settings,)
 
@@ -132,12 +129,10 @@ class RecordsSettings(BaseSettings):
     """
 
     default_page_size: int = 25
-    """Default page size for a list endpoint that receives no explicit
-    ``limit``."""
+    """Page size for a list endpoint that receives no explicit ``limit``."""
 
     max_page_size: int = 200
-    """Largest ``limit`` a caller may request on a list endpoint. Must be at
-    least :attr:`default_page_size`."""
+    """Largest ``limit`` a caller may request. At least :attr:`default_page_size`."""
 
     revision_limit: int = Field(default=50, ge=1)
     """How many ``records_revision`` rows are kept per record.
@@ -148,8 +143,8 @@ class RecordsSettings(BaseSettings):
 
     At least 1: there is no "unlimited" setting, and ``0`` — which an operator
     would read as "keep no history" — is not representable rather than
-    silently meaning the opposite. Every write appends a revision, so a limit
-    of 1 keeps exactly the current one.
+    silently meaning the opposite. Every write appends one, so a limit of 1
+    keeps exactly the current revision.
     """
 
     max_filter_terms: int = Field(default=20, ge=1)
@@ -251,6 +246,18 @@ class RecordsSettings(BaseSettings):
     """Number of records processed per batch by the reindex command and by a
     schema-triggered index-table migration (design doc §8.5)."""
 
+    menu_refresh_seconds: int = Field(default=5, ge=0)
+    """How stale a per-type admin sidebar entry may get, in seconds.
+
+    A type with ``show_in_menu`` has its own sidebar item
+    (:mod:`sm_records.menu`) and the framework's menu registry is filled once
+    at boot, so a worker that did not serve the write re-reads the types at
+    most this often, on a request that renders a sidebar. The worker that
+    *did* serve it re-reads on its next one regardless — so this is the window
+    another process can lag by, not a delay the editor sees. ``0`` re-reads on
+    every page request. No restart: it is read at the moment of the check.
+    """
+
     reindex_stale_after_seconds: int = 900
     """A ``reindex_pending`` entry (design doc §8.5) older than this degrades
     ``/health/ready`` and names the type and field (default 15 minutes).
@@ -262,9 +269,9 @@ class RecordsSettings(BaseSettings):
     def clamp_page_size(self, requested: int | None) -> int:
         """The page size a list endpoint actually uses.
 
-        One owner for the rule, because four call sites want it and they must
-        agree: the admin list, the referrers panel, the anonymous read API and
-        the record-list view. ``None`` means "the caller did not ask" and gets
+        One owner for the rule, because four call sites must agree on it: the
+        admin list, the referrers panel, the anonymous read API and the
+        record-list view. ``None`` means "the caller did not ask" and gets
         :attr:`default_page_size`; anything above :attr:`max_page_size` is
         clamped rather than refused, so an anonymous caller probing the
         ceiling learns nothing and gets a usable page either way.
@@ -287,14 +294,7 @@ class RecordsSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_limits(self) -> RecordsSettings:
-        if self.default_page_size > self.max_page_size:
-            raise ValueError(
-                f"default_page_size ({self.default_page_size}) must not exceed "
-                f"max_page_size ({self.max_page_size})"
-            )
-        if self.max_indexed_fields_per_type > self.max_fields_per_type:
-            raise ValueError(
-                f"max_indexed_fields_per_type ({self.max_indexed_fields_per_type}) "
-                f"must not exceed max_fields_per_type ({self.max_fields_per_type})"
-            )
+        """The two cross-field ceilings — see
+        :func:`~sm_records.settings_checks.check_limits`."""
+        check_limits(self)
         return self

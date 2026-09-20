@@ -86,6 +86,14 @@ class TypeDef:
     collection: str | None = None
     """Which table set the type is created in (Phase 5 §6.2). ``None`` — the
     global tables — for every type but ``event``."""
+    show_in_menu: bool = True
+    """Whether the seeded type gets its own admin-sidebar entry.
+
+    ``True`` for every demo type, which is the opposite of the column's own
+    default — the demo host exists to show the feature, and a seeded install
+    where the switch is off everywhere shows nothing of it. A real install
+    starts with no types at all, so nothing here changes what an operator
+    gets by default."""
 
 
 COMPANY = TypeDef(

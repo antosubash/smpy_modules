@@ -26,10 +26,11 @@ from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.models import Base, Record, RecordType
 from sm_records.settings import RecordsSettings
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, select
 
 from tests.app_harness import build_app
 from tests.perf._bench import Results
+from tests.perf._schema import create_missing_columns, create_missing_indexes
 
 DATABASE_URL = os.environ.get("RECORDS_PERF_URL", "")
 """Run the suite against this database instead of a SQLite file.
@@ -66,77 +67,6 @@ def _db_path() -> Path:
 _seeded: set[str] = set()
 
 
-def _create_missing_indexes(conn: Any) -> None:
-    """Add any index the model declares that the database does not have yet.
-
-    ``create_all`` is ``checkfirst`` per *table*: a database seeded before a
-    revision added an index to an existing table is skipped whole, so the
-    suite would keep measuring the old schema against the new code and report
-    the new indexes as doing nothing. The seeded file is reused across runs on
-    purpose (it is the slowest thing here), which is exactly the case this
-    covers — and creating an index that is already there is a no-op, so it is
-    also safe on a fresh one.
-
-    **Backend-independent since S2.** It used to read ``sqlite_master`` and
-    return early on anything else, on the grounds that a Postgres run is always
-    against a database seeded by the same revision. That was true until a
-    revision added an index and the before/after pair had to be taken on one
-    Postgres database — which is precisely what this function exists for.
-    ``inspect`` answers the same question on both backends.
-
-    **And it ``ANALYZE``s what it touched**, which is not tidiness. A new index
-    with no ``sqlite_stat1`` row is not "unknown" to SQLite's planner, it is
-    *assumed to be very selective* — so on a database whose other indexes were
-    analysed by the seeder it wins every lookup it is eligible for, and a list
-    page that took 1.1 ms takes 26.5 ms driving from the wrong one. That is a
-    property of a half-analysed database, not of the index, and a suite that
-    left the file in that state would be measuring a deployment nobody has:
-    the revision that creates these indexes runs ``ANALYZE`` too
-    (``c4a17b9de0f2``), for the same reason.
-    """
-    inspector = inspect(conn)
-    created: set[str] = set()
-    for table in Base.metadata.tables.values():
-        if not inspector.has_table(table.name):
-            continue
-        have = {index["name"] for index in inspector.get_indexes(table.name)}
-        for index in table.indexes:
-            if index.name not in have:
-                index.create(conn)
-                created.add(table.name)
-    if created and conn.dialect.name == "sqlite":
-        for name in sorted(created):
-            conn.exec_driver_sql(f"ANALYZE {name}")
-
-
-def _create_missing_columns(conn: Any) -> None:
-    """Add any **column** the model declares that a reused database lacks.
-
-    The sibling of :func:`_create_missing_indexes`, and for the same reason:
-    ``create_all`` is ``checkfirst`` per *table*, so a file seeded before an
-    additive migration is skipped whole and every later query selects a column
-    the file does not have — which is a ``no such column`` on the first read,
-    not a wrong measurement. Phase 5 §6.2's nullable ``records_type.collection``
-    is what made this concrete.
-
-    Only additive, nullable columns can be recovered this way, which is exactly
-    the class of change a reusable perf fixture can absorb: anything else means
-    the cached database is the wrong dataset and should be deleted.
-    """
-    if conn.dialect.name != "sqlite":
-        return
-    for table in Base.metadata.tables.values():
-        rows = conn.exec_driver_sql(f"PRAGMA table_info('{table.name}')").fetchall()
-        if not rows:
-            continue
-        have = {row[1] for row in rows}
-        for column in table.columns:
-            if column.name in have or not column.nullable:
-                continue
-            ddl = column.type.compile(dialect=conn.dialect)
-            conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {ddl}')
-
-
 async def _record_total(db_state: Any) -> int:
     async with db_state.session_factory() as session:
         return int((await session.execute(select(func.count(Record.id)))).scalar_one())
@@ -160,8 +90,8 @@ async def perf_db() -> AsyncIterator[Any]:
     register_listeners(state)
     async with state.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(_create_missing_columns)
-        await conn.run_sync(_create_missing_indexes)
+        await conn.run_sync(create_missing_columns)
+        await conn.run_sync(create_missing_indexes)
 
     marker = DATABASE_URL or str(path)
     if marker not in _seeded:

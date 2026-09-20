@@ -14,11 +14,16 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Final
+from typing import Any, Final
 
 from sm_records import constants
 
-__all__ = ["DEFAULT_PUBLIC_ROUTE_PREFIX", "check_content_locales", "check_public_route_prefix"]
+__all__ = [
+    "DEFAULT_PUBLIC_ROUTE_PREFIX",
+    "check_content_locales",
+    "check_limits",
+    "check_public_route_prefix",
+]
 
 DEFAULT_PUBLIC_ROUTE_PREFIX: Final = "/api/records/public"
 """Where the anonymous read API lives unless an operator moves it. Named
@@ -107,4 +112,28 @@ def check_content_locales(locales: Sequence[str], default_locale: str) -> None:
     if default_locale not in locales:
         raise ValueError(
             f"default_content_locale {default_locale!r} is not in content_locales {list(locales)}"
+        )
+
+
+def check_limits(settings: Any) -> None:
+    """The two cross-field ceilings ``RecordsSettings`` has to hold together.
+
+    A default page size above the maximum would be clamped away on every
+    request by :meth:`~sm_records.settings.RecordsSettings.clamp_page_size`,
+    which is a setting that silently does not mean what it says; an indexed
+    field ceiling above the field ceiling is a limit that can never bind.
+    Both are refused where the operator can see the field they just typed.
+    Takes the settings object rather than four integers: it is called from a
+    model validator that has one, and the names below are then the names the
+    error messages use.
+    """
+    if settings.default_page_size > settings.max_page_size:
+        raise ValueError(
+            f"default_page_size ({settings.default_page_size}) must not exceed "
+            f"max_page_size ({settings.max_page_size})"
+        )
+    if settings.max_indexed_fields_per_type > settings.max_fields_per_type:
+        raise ValueError(
+            f"max_indexed_fields_per_type ({settings.max_indexed_fields_per_type}) "
+            f"must not exceed max_fields_per_type ({settings.max_fields_per_type})"
         )

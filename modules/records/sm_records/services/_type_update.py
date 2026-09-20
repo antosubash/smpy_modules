@@ -38,6 +38,12 @@ _EDITABLE = frozenset(
         "display_field",
         "slug_field",
         "is_public",
+        # A navigation flag, not a schema field: no classification, no dry
+        # run, no revision and no ``schema_version`` bump — exactly the class
+        # of change ``is_public`` is. What it *does* change is the admin
+        # sidebar, which the endpoint layer notices (``sm_records.menu``);
+        # this layer stays free of app and registry knowledge.
+        "show_in_menu",
         "translatable",
         "allowed_roles",
     }

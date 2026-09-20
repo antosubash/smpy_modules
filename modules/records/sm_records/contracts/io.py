@@ -125,6 +125,11 @@ class TypeExport(SQLModel):
     display_field: str | None = None
     slug_field: str | None = None
     is_public: bool = False
+    show_in_menu: bool = False
+    """Carried so a type that had its own sidebar entry where it was exported
+    still has one where it is imported — the same round-trip rule ``is_public``
+    obeys, and the reason an export is a definition rather than a snapshot of
+    half of one."""
     translatable: bool = False
     """Carried so a definition exported from a multilingual install arrives at
     the next one still able to hold translations (Phase 5 §4.1)."""
@@ -158,6 +163,7 @@ def type_export(rtype: RecordType) -> TypeExport:
         display_field=rtype.display_field,
         slug_field=rtype.slug_field,
         is_public=rtype.is_public,
+        show_in_menu=rtype.show_in_menu,
         translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),
     )

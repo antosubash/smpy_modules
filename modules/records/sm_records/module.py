@@ -55,6 +55,15 @@ class RecordsModule(ModuleBase):
         # ``{locale: records}`` for languages this install no longer publishes,
         # counted once at startup — see :mod:`sm_records.health`.
         self.orphaned_locales: dict[str, int] = {}
+        # The sidebar state of :mod:`sm_records.menu`: the registry handed to
+        # ``register_menu_items``, the per-type items this module last put in
+        # it, and when. Kept here because the registry is built once at boot
+        # and the types it describes are created at runtime — the module
+        # instance is the only thing that outlives both.
+        self.menu_registry: MenuRegistry | None = None
+        self._type_menu_items: list[MenuItem] = []
+        self._menu_dirty = False
+        self._menu_synced_at = 0.0
 
     @property
     def reduce_drift(self) -> dict[int, dict[str, int]]:
@@ -133,6 +142,21 @@ class RecordsModule(ModuleBase):
                 group=constants.MENU_GROUP,
             )
         )
+        # Kept, because a type opting into its own entry (``show_in_menu``) is
+        # a runtime fact and this hook runs once, at boot, before there is a
+        # database to ask. :mod:`sm_records.menu` fills the rest in later and
+        # keeps it current; the hub item above is never one of its items.
+        self.menu_registry = registry
+
+    def mark_menu_dirty(self) -> None:
+        """Re-read the sidebar types on the next request that renders one.
+
+        Called through :func:`sm_records.menu.mark_dirty` by the endpoints
+        that write a type. It is a flag and not a refresh: the write has not
+        committed yet when they call it (the framework commits after the
+        response starts), so reading now would read the row as it was.
+        """
+        self._menu_dirty = True
 
     def register_health_checks(self, registry: HealthRegistry) -> None:
         """A reindex orphaned by a worker restart is recoverable but silent —
@@ -157,17 +181,33 @@ class RecordsModule(ModuleBase):
         """
 
     def register_middleware(self, app: FastAPI) -> None:
-        """Install the deferred-job drain — see :mod:`sm_records.deferred`.
+        """Install the deferred-job drain and the sidebar sync.
 
-        The reindex of §8.9 must not start until the request that scheduled it
-        has committed and released its session, and middleware is the first
-        hook that runs after a route's dependency teardown. A ``BackgroundTasks``
-        entry runs *inside* it, which on SQLite deadlocks the schema write
-        against its own rebuild.
+        The drain is :mod:`sm_records.deferred`: the reindex of §8.9 must not
+        start until the request that scheduled it has committed and released
+        its session, and middleware is the first hook that runs after a
+        route's dependency teardown. A ``BackgroundTasks`` entry runs *inside*
+        it, which on SQLite deadlocks the schema write against its own
+        rebuild.
+
+        The sync is :mod:`sm_records.menu`, and middleware for a different
+        reason — see below.
         """
+        from sm_records._menu_middleware import MenuSyncMiddleware
         from sm_records.deferred import DeferredJobsMiddleware
 
         app.add_middleware(DeferredJobsMiddleware)
+        # Parked before the middleware that reads it so a handler can reach
+        # this instance through ``request.app`` — today only to mark the
+        # sidebar stale after a type write (:func:`sm_records.menu.mark_dirty`).
+        setattr(app.state, constants.MODULE_ATTR, self)
+        # Keeps the per-type sidebar entries current in *this* worker, which
+        # is the half of :mod:`sm_records.menu` that a multi-process host
+        # needs: the registry is per process, and only one process served the
+        # write. Added here rather than wrapped around a route because it has
+        # to run before ``InertiaLayoutDataMiddleware`` reads the registry —
+        # see :mod:`sm_records._menu_middleware`.
+        app.add_middleware(MenuSyncMiddleware, module=self)
 
     async def on_startup(self, app: FastAPI) -> None:
         """Hand the health check what it cannot reach on its own.
@@ -206,6 +246,15 @@ class RecordsModule(ModuleBase):
             from sm_records.health import count_orphaned_locales
 
             self.orphaned_locales = await count_orphaned_locales(self.db, settings)
+
+        # The first sidebar read: ``register_menu_items`` ran before there was
+        # a database, so until now the registry holds the hub entry and none
+        # of the per-type ones. Forced past the refresh window because there
+        # is nothing to be stale yet — and deliberately last, so a database
+        # this cannot read costs a log line rather than a boot.
+        from sm_records import menu
+
+        await menu.refresh(self, force=True)
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

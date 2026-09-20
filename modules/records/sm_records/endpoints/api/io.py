@@ -62,6 +62,7 @@ from sm_records.endpoints.api._io_upload import (
 )
 from sm_records.endpoints.api.types import _check_roles_for_discard, _schedule_reindex_if_pending
 from sm_records.index.query import Filter, Sort, build_query
+from sm_records.menu import affects_menu, mark_dirty
 from sm_records.models import RecordType
 from sm_records.services import export as export_service
 from sm_records.services import import_ as import_service
@@ -246,9 +247,12 @@ async def import_type(
             slug_field=body.slug_field,
             is_public=body.is_public,
             translatable=body.translatable,
+            show_in_menu=body.show_in_menu,
             allowed_roles=body.allowed_roles,
             actor=who,
         )
+        if body.show_in_menu:
+            mark_dirty(request.app)
         return type_read(rtype, 0, 0)
 
     if body.expected_version is None:
@@ -258,6 +262,7 @@ async def import_type(
         )
     rtype = await type_service.get_type(db, body.key)
     _check_roles_for_discard(request, rtype, body.orphaned)
+    changes = _update_changes(request, rtype, body)
     updated = await type_service.update_type(
         db,
         rtype,
@@ -266,7 +271,12 @@ async def import_type(
         actor=who,
         force=body.force,
         orphaned=body.orphaned,
-        **_update_changes(request, rtype, body),
+        **changes,
     )
+    # Same rule as ``PUT /types/{key}``: an imported definition that renames a
+    # type, re-icons it, narrows its roles or flips ``show_in_menu`` has moved
+    # the sidebar, and nothing else here has.
+    if affects_menu(changes):
+        mark_dirty(request.app)
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))

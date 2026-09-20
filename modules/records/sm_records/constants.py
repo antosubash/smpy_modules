@@ -30,6 +30,23 @@ MENU_GROUP: Final = "Content"
 MENU_ICON: Final = "database"
 MENU_ORDER: Final = 300
 
+MENU_ORDER_TYPE: Final = MENU_ORDER + 1
+"""Order of a per-type sidebar entry — one past the hub, so every type a host
+opts in sits directly under "Records". The registry sorts by ``order`` alone
+and stably, which is what makes :mod:`sm_records.menu`'s alphabetical
+insertion the tiebreak between them."""
+
+MENU_SKIP_PREFIXES: Final = ("/api/", "/static", "/health")
+"""Request paths :class:`sm_records._menu_middleware.MenuSyncMiddleware` never
+re-reads the menu for: none of them renders a sidebar, and the JSON API is the
+one surface where a per-request read would show up in a statement count."""
+
+MODULE_ATTR: Final = "records_module"
+"""``app.state`` attribute holding the :class:`~sm_records.module.RecordsModule`
+instance. Parked there by ``register_middleware`` so a request handler can reach
+the module's own runtime state — today only to mark the sidebar stale after a
+type write (:func:`sm_records.menu.mark_dirty`)."""
+
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it
 #: guarantees ``app.state.settings.module_registry`` exists by the time
 #: ``register_settings`` runs — the host topo-sorts modules on this field.

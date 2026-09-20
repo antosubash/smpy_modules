@@ -435,6 +435,33 @@ rather than per group, with the batch bounding the records held at once and the
 accumulator bounding the groups. The property §5.2 wanted — the reduce table is
 derivable from the records — is unchanged; only the statement is.
 
+**Per-type sidebar entries, and the registry that cannot hold them.** Not in
+this design at all: a type may now set `show_in_menu` and get its own entry in
+the admin sidebar next to the "Records" hub. The column, the contract field and
+the editor switch are unremarkable — it is a label, not a schema change, so it
+joins `is_public` in `_EDITABLE` and bumps nothing. The mechanism behind it is
+the deviation worth recording. The framework's `MenuRegistry` is filled once,
+during app construction, by each module's `register_menu_items` hook: it has
+`add`/`add_many`, no remove, no provider hook, and `InertiaLayoutDataMiddleware`
+reads that one instance for every request. Types are created at runtime, so
+nothing this module can do at boot describes them. So `sm_records.menu` keeps
+the registry honest itself — it holds the items it inserted last, splices them
+out of `_items` by identity (never by URL, so a host's own
+`/admin/records/...` entry survives) and re-adds the current set. That splice
+is one function, documented, and reaches into framework internals in exactly
+one place; upstream is
+[antosubash/simple_module_python#340](https://github.com/antosubash/simple_module_python/issues/340)
+(MenuRegistry: no way to remove items or contribute them dynamically), and the
+function is what changes when it lands. When the re-read happens is the other
+half: `on_startup` once, then per request through a module middleware — which
+runs before the Inertia layer, so a sync is visible to the request that
+triggered it — at most every `menu_refresh_seconds`, and immediately after a
+type write in this process marks it dirty. The marking is done by the
+endpoints, never the services, which know about a session and nothing else;
+paths under `/api/`, `/static` and `/health` are skipped, because they render
+no sidebar and because the write path's statement count is a tested property
+of this module.
+
 **The seeder's sixth type.** `event` is declared with `collection="events"` and
 created only where that collection is declared. Its share of `--records N` is
 taken *proportionally* from the five rather than added on top, so `N` still
