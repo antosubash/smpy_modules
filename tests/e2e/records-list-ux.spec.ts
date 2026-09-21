@@ -268,4 +268,30 @@ test.describe('Records — list UX', () => {
       PHONE.width,
     );
   });
+
+  // `1`, not `true`: the server's own `bool` coercion (`parse_trashed`) reads
+  // both as true, so a page that only checks `=== 'true'` used to disagree
+  // with what it had just been sent — "No records yet" over an empty trash,
+  // live rows shown with the trashed row's own actions once one existed.
+  test('?trashed=1 renders the trash, not the live empty state (rough edge)', async ({ page }) => {
+    await login(page);
+    const key = await seedUxType(page, 1);
+
+    await page.goto(`/admin/records/${key}?trashed=1`);
+    const empty = page.getByTestId('records-empty-state');
+    await expect(empty).toContainText('No trashed records');
+    await expect(empty.getByRole('link', { name: 'New record' })).toHaveCount(0);
+    await expect(page.getByTestId('records-trash-toggle')).toHaveText('Back to live records');
+
+    await page.goto(`/admin/records/${key}`);
+    const row = page.getByTestId('records-record-row').first();
+    await row.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByTestId('records-record-row')).toHaveCount(0);
+
+    await page.goto(`/admin/records/${key}?trashed=1`);
+    const trashedRow = page.getByTestId('records-record-row');
+    await expect(trashedRow).toHaveCount(1);
+    await expect(trashedRow.getByRole('button', { name: 'Restore' })).toBeVisible();
+  });
 });

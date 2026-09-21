@@ -18,6 +18,7 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 
 import { RecordsToaster } from '../components/RecordsToaster';
+import { navIconName } from '../components/typeeditor/navIcons';
 import type { TypeRead } from '../utils/types';
 
 type Props = { types: TypeRead[] };
@@ -112,8 +113,17 @@ function Types({ types }: Props) {
                     <TableCell className="font-medium">
                       <div className="flex items-start gap-2">
                         {type.icon && (
-                          <span className="mt-0.5 text-muted-foreground">
-                            <NavIcon name={type.icon} />
+                          <span
+                            className="mt-0.5 shrink-0 text-muted-foreground"
+                            data-testid="records-type-icon"
+                            data-icon={navIconName(type.icon)}
+                          >
+                            {/* `NavIcon` draws from an allowlist, not from
+                                all of lucide-react, and answers a name
+                                outside it with an empty span — so an icon
+                                this row can't draw falls back to the
+                                module's own rather than to a hole. */}
+                            <NavIcon name={navIconName(type.icon)} />
                           </span>
                         )}
                         <div className="min-w-0">

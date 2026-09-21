@@ -178,6 +178,26 @@ export function listStatus(
   });
 }
 
+// ---- Trashed toggle -----------------------------------------------------
+
+/** The values pydantic's `bool` query coercion (`deps.py::parse_trashed`'s
+ *  `Query(default=False)`) accepts as true, case-insensitively. Anything
+ *  else — including an empty string, which pydantic itself rejects with a
+ *  422 — reads as false here, the same "not trashed" the server falls back
+ *  to for a param it never received at all. */
+const TRUE_TRASHED_VALUES = new Set(['1', 'true', 'yes', 'on', 'y', 't']);
+
+/**
+ * Whether `?trashed=` should show the trash, matching the server's own
+ * `bool` coercion instead of a literal `=== 'true'` (rough edge: `?trashed=1`
+ * used to desync the page from what the server actually returned — the
+ * server read it as true and served the trash while the page's own
+ * `=== 'true'` check read false and rendered the live empty state).
+ */
+export function parseTrashedParam(raw: string | null): boolean {
+  return raw !== null && TRUE_TRASHED_VALUES.has(raw.toLowerCase());
+}
+
 /** One filter term as the URL carries it (`?filter=field:op:value`), or
  *  `null` for a list with no filter in force. */
 export type FilterValue = { field: string; op: FilterOp; value: string } | null;

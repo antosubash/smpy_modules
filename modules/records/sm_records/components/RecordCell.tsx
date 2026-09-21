@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 
 const DASH = '—';
 
@@ -140,18 +141,12 @@ export function RecordCell({
       );
     }
 
-    case 'datetime': {
-      // ISO datetime (design doc §7.3), rendered in the viewer's own zone.
-      const parsed = typeof value === 'string' ? new Date(value) : null;
-      if (!parsed || Number.isNaN(parsed.getTime())) return <span>{String(value)}</span>;
-      return (
-        <span>
-          {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-            parsed,
-          )}
-        </span>
-      );
-    }
+    case 'datetime':
+      // ISO datetime (design doc §7.3), rendered in the viewer's own zone —
+      // `formatDateTime` (utils/values.ts) is the one place that formatting
+      // lives, shared with the envelope's own `published_at`/`updated_at`
+      // timestamps in `RecordTable`/`RecordCardList`.
+      return <span>{typeof value === 'string' ? formatDateTime(value) : String(value)}</span>;
 
     case 'select':
       return <span>{choiceLabel(field, value)}</span>;

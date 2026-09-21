@@ -61,14 +61,41 @@ export function keyFromLabel(label: string): string {
     .replace(/_+$/, '');
 }
 
-/** A plural label guessed from the singular, English-style. Only ever an
- *  opening offer: it stops the moment the operator types in the field
- *  themselves (R19). */
+/** Singulars no suffix rule reaches. The guess is *withheld* for these
+ *  rather than invented: "Persons" and "Childs" both read as a bug the
+ *  operator then has to notice, while an untouched label is visibly still
+ *  theirs to write. Matched on the last word, so "Contact Person" counts. */
+const IRREGULAR_SINGULARS = new Set([
+  'person',
+  'child',
+  'man',
+  'woman',
+  'foot',
+  'tooth',
+  'mouse',
+  'goose',
+]);
+
+/**
+ * A plural label guessed from the singular, English-style. Only ever an
+ * opening offer: it stops the moment the operator types in the field
+ * themselves (R19).
+ *
+ * A label that already ends in `s` is left exactly as typed — the old rule
+ * suffixed everything ending in `s`/`x`/`z`/`ch`/`sh` with `es`, so the very
+ * common case of naming a type by its plural ("Blog Posts") auto-filled
+ * "Blog Postses" (UX verification, rough edge 4). Pluralising an already
+ * plural word is the one mistake this function can make that looks like
+ * gibberish rather than like a near miss.
+ */
 export function pluralFromLabel(label: string): string {
   const trimmed = label.trim();
   if (!trimmed) return '';
-  if (/(s|x|z|ch|sh)$/i.test(trimmed)) return `${trimmed}es`;
-  if (/[^aeiou]y$/i.test(trimmed)) return `${trimmed.slice(0, -1)}ies`;
+  const lower = trimmed.toLowerCase();
+  if (lower.endsWith('s')) return trimmed;
+  if (IRREGULAR_SINGULARS.has(lower.split(/\s+/).pop() ?? '')) return trimmed;
+  if (/(x|z|ch|sh)$/.test(lower)) return `${trimmed}es`;
+  if (/[^aeiou]y$/.test(lower)) return `${trimmed.slice(0, -1)}ies`;
   return `${trimmed}s`;
 }
 

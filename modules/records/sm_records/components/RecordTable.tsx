@@ -12,6 +12,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 import { listColumns, type SortState } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 import { RecordCardList } from './RecordCardList';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
@@ -200,9 +201,11 @@ export function RecordTable({
             {showPosition && (
               <TableCell className="text-muted-foreground">{record.position}</TableCell>
             )}
-            <TableCell className="text-muted-foreground">{record.published_at ?? '—'}</TableCell>
             <TableCell className="text-muted-foreground">
-              {record.updated_at ?? record.created_at}
+              {record.published_at ? formatDateTime(record.published_at) : '—'}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {formatDateTime(record.updated_at ?? record.created_at)}
             </TableCell>
             <TableCell className="text-right">
               <RecordRowAction

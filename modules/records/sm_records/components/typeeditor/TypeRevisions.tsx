@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useSchemaApply } from '../../hooks/useSchemaApply';
 import { listTypeRevisions, restoreTypeRevision } from '../../utils/api-history';
 import type { TypeRead, TypeRevision } from '../../utils/types';
+import { formatDateTime } from '../../utils/values';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { SchemaConflictPanel } from './SchemaConflictPanel';
 import { TypeConflictNotice } from './TypeConflictNotice';
@@ -129,7 +130,7 @@ export function TypeRevisions({
                       })}
                     </p>
                     <p className="text-muted-foreground">
-                      {rev.created_at}
+                      {formatDateTime(rev.created_at)}
                       {rev.created_by ? ` · ${rev.created_by}` : ''}
                     </p>
                   </div>

@@ -164,6 +164,26 @@ describe('keyFromLabel / pluralFromLabel — R19', () => {
     expect(pluralFromLabel('Widget')).toBe('Widgets');
     expect(pluralFromLabel('Box')).toBe('Boxes');
     expect(pluralFromLabel('Category')).toBe('Categories');
+    expect(pluralFromLabel('City')).toBe('Cities');
+    expect(pluralFromLabel('Branch')).toBe('Branches');
+    expect(pluralFromLabel('Dish')).toBe('Dishes');
+    expect(pluralFromLabel('Day')).toBe('Days');
+    expect(pluralFromLabel('  Order  ')).toBe('Orders');
     expect(pluralFromLabel('')).toBe('');
+  });
+
+  it('leaves a label that is already plural alone', () => {
+    // The rough edge this fixes: every `s`/`es` ending used to take another
+    // `es`, so naming the type by its plural produced "Blog Postses".
+    expect(pluralFromLabel('Blog Posts')).toBe('Blog Posts');
+    expect(pluralFromLabel('Categories')).toBe('Categories');
+    expect(pluralFromLabel('Addresses')).toBe('Addresses');
+    expect(pluralFromLabel('Status')).toBe('Status');
+  });
+
+  it('withholds the guess for a singular no suffix rule reaches', () => {
+    expect(pluralFromLabel('Person')).toBe('Person');
+    expect(pluralFromLabel('Contact Person')).toBe('Contact Person');
+    expect(pluralFromLabel('Child')).toBe('Child');
   });
 });

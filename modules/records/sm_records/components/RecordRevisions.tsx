@@ -12,6 +12,7 @@ import type {
   RecordRevisionDetail,
   ValidationError,
 } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /**
@@ -161,7 +162,7 @@ export function RecordRevisions({
                       {rev.display_title}
                     </p>
                     <p className="text-muted-foreground">
-                      {rev.created_at}
+                      {formatDateTime(rev.created_at)}
                       {rev.created_by ? ` · ${rev.created_by}` : ''}
                     </p>
                   </button>

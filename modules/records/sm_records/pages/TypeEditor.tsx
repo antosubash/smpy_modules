@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { RecordsToaster } from '../components/RecordsToaster';
+import { groupErrors } from '../components/typeeditor/errors';
 import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
   buildChanges,
@@ -21,14 +22,11 @@ import {
 } from '../components/typeeditor/formHelpers';
 import { PointerFields } from '../components/typeeditor/PointerFields';
 import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
+import { SaveBar } from '../components/typeeditor/SaveBar';
 import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
 import { TypeEditorFooter } from '../components/typeeditor/TypeEditorFooter';
 import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
-import {
-  type EditableField,
-  TOP_LEVEL_ERROR_FIELDS,
-  type TypeEditorProps,
-} from '../components/typeeditor/types';
+import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
@@ -106,8 +104,12 @@ function TypeEditor({
   );
 
   const activeErrors = isNew ? createErrors : schemaApply.errors;
-  const topLevelErrors = activeErrors.filter((e) => TOP_LEVEL_ERROR_FIELDS.has(e.field));
-  const fieldErrors = activeErrors.filter((e) => !TOP_LEVEL_ERROR_FIELDS.has(e.field));
+  // Three-way, not two: an error naming neither an input nor a row (a
+  // `__root__` one) used to be handed to the field list and dropped there,
+  // which is how a refused save came to change nothing at all (R6). `SaveBar`
+  // renders what nothing else owns.
+  const fieldKeys = fields.map((field) => field.key);
+  const errorGroups = groupErrors(activeErrors, fieldKeys);
   const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
   const dirty = typeIsDirty(current, values, fields);
   const guard = useUnsavedGuard(dirty);
@@ -225,7 +227,7 @@ function TypeEditor({
                 roles={roles}
                 values={values}
                 onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
-                errors={topLevelErrors}
+                errors={errorGroups.topLevel}
                 publicRoutePrefix={public_route_prefix}
                 contentLocales={content_locales}
                 collections={collections}
@@ -244,7 +246,7 @@ function TypeEditor({
             slugField={values.slugField}
             disabled={pending}
             dirty={schemaDirty}
-            errors={fieldErrors}
+            errors={errorGroups.rows}
             lastApplied={lastApplied}
             onChange={setFields}
           />
@@ -252,22 +254,17 @@ function TypeEditor({
           <PointerFields
             fields={fields}
             values={values}
-            errors={topLevelErrors}
+            errors={errorGroups.topLevel}
             onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
           />
 
-          <div className="flex items-center gap-3">
-            <Button type="button" disabled={pending || !dirty} onClick={() => void save()}>
-              {pending
-                ? t('records.editor.saving', { defaultValue: 'Saving…' })
-                : t('records.editor.save', { defaultValue: 'Save' })}
-            </Button>
-            {!dirty && !pending && (
-              <span className="text-sm text-muted-foreground" data-testid="records-no-changes">
-                {t('records.type_editor.no_changes', { defaultValue: 'No changes to save' })}
-              </span>
-            )}
-          </div>
+          <SaveBar
+            errors={activeErrors}
+            fieldKeys={fieldKeys}
+            pending={pending}
+            dirty={dirty}
+            onSave={() => void save()}
+          />
 
           <TypeEditorFooter
             current={isNew ? null : current}

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { FieldDef } from './types';
 import {
   buildPayload,
+  formatDateTime,
   isoToLocalInput,
   localInputToIso,
   toApiValue,
@@ -93,6 +94,23 @@ describe('datetime never leaves naive', () => {
 
   it('hands unparseable text back rather than inventing a timestamp', () => {
     expect(localInputToIso('not a date')).toBe('not a date');
+  });
+});
+
+describe('formatDateTime', () => {
+  // The rough edge this exists to close: `published_at`/`updated_at` used to
+  // print the raw ISO envelope timestamp (`2026-09-21T06:16:27.404600`) right
+  // next to a schema `datetime` field formatted with `Intl.DateTimeFormat` —
+  // this is the one function both now go through.
+  it('formats an ISO datetime with a locale date and short time, not the raw string', () => {
+    const out = formatDateTime('2026-09-21T06:16:27.404600+00:00');
+    expect(out).not.toBe('2026-09-21T06:16:27.404600+00:00');
+    expect(out).not.toContain('T');
+    expect(out).toMatch(/2026/);
+  });
+
+  it('hands unparseable text back rather than inventing a display value', () => {
+    expect(formatDateTime('not a date')).toBe('not a date');
   });
 });
 

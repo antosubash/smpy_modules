@@ -51,7 +51,14 @@ export function FieldRowSummary({
     <div className="flex items-center gap-2">
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-muted/60"
+        // `flex-wrap` is what keeps a phone from scrolling sideways: the
+        // badges and the type name are `shrink-0`, so the summary's
+        // min-content width was the whole line (~450 px on a five-badge
+        // row), and a CSS grid sizes its track to that — the row, the list
+        // and the document all ended up 473 px wide at a 390 px viewport
+        // (UX verification, rough edge 3). Wrapped, the min-content is one
+        // badge and the row fits any width.
+        className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 text-left hover:bg-muted/60"
         aria-expanded={expanded}
         aria-controls={`field-row-${index}-body`}
         data-testid="records-field-toggle"

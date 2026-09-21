@@ -8,6 +8,7 @@ import type { ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
 import { keyFromLabel, pluralFromLabel } from './formHelpers';
+import { IconField } from './IconField';
 import { PublicField } from './PublicField';
 import { RolesMultiSelect } from './RolesMultiSelect';
 import { type KeyError as KeyErrorCode, keyValid } from './rules';
@@ -25,7 +26,6 @@ const ID = {
   label: 'type-editor-label',
   labelPlural: 'type-editor-label-plural',
   description: 'type-editor-description',
-  icon: 'type-editor-icon',
   translatable: 'type-editor-translatable',
 };
 
@@ -165,23 +165,11 @@ export function TypeMetadataForm({
         <FieldError message={fieldMessage(errors, 'label_plural')} />
       </div>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor={ID.icon}>{t('records.type_editor.icon', { defaultValue: 'Icon' })}</Label>
-        <Input
-          id={ID.icon}
-          value={values.icon}
-          onChange={(e) => onChange({ icon: e.target.value })}
-          placeholder={t('records.type_editor.icon_placeholder', { defaultValue: 'database' })}
-          aria-invalid={!!fieldMessage(errors, 'icon')}
-        />
-        <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.icon_help', {
-            defaultValue:
-              'The name of a lucide-react icon, e.g. "database". Also used for this type\'s sidebar entry when "Show in sidebar" is on.',
-          })}
-        </p>
-        <FieldError message={fieldMessage(errors, 'icon')} />
-      </div>
+      <IconField
+        value={values.icon}
+        error={fieldMessage(errors, 'icon')}
+        onChange={(icon) => onChange({ icon })}
+      />
 
       <CollectionField
         isNew={isNew}

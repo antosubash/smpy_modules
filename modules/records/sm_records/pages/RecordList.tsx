@@ -22,6 +22,7 @@ import {
   nextSort,
   parseFilterParam,
   parseSort,
+  parseTrashedParam,
 } from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
@@ -44,7 +45,7 @@ function RecordList({ type, records, content_locales }: Props) {
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
   const rawSort = search.get('sort');
-  const trashed = search.get('trashed') === 'true';
+  const trashed = parseTrashedParam(search.get('trashed'));
   const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
   const rawPageSize = Number(search.get('page_size')) || records.page_size;
   const listTop = useRef<HTMLDivElement>(null);

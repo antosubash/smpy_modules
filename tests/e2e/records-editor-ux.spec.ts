@@ -235,4 +235,32 @@ test.describe('Records — editor UX', () => {
     await expect(picker.getByRole('listbox')).toHaveCount(0);
     await expect(input).toHaveValue('Kombu');
   });
+
+  test('a unique-value collision marks the field once, not also as a toast', async ({ page }) => {
+    await login(page);
+    const key = uniqueTypeKey('uxcollide');
+    await apiCreateType(page, {
+      key,
+      label: 'UX Collide',
+      label_plural: 'UX Collides',
+      fields: [
+        { key: 'title', type: 'text', label: 'Title', required: true, indexed: true },
+        { key: 'email', type: 'email', label: 'Email', unique: true, indexed: true },
+      ],
+      display_field: 'title',
+    });
+    await apiCreateRecord(page, key, { data: { title: 'First', email: 'dup@example.com' } });
+    await page.goto(`/admin/records/${key}/new`);
+
+    await recordField(page, 'title').fill('Second');
+    await recordField(page, 'email').fill('dup@example.com');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    // R8b's inline mark is still there, sentence and all…
+    await expect(recordFieldError(page, 'email')).toContainText('may be in the Trash');
+    // …but a field that owns the collision no longer *also* gets a toast
+    // saying the same thing a beat later (the double announcement UX-R26
+    // was fixed to stop doing, that this collision picked back up).
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+  });
 });

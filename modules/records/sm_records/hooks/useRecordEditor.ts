@@ -136,6 +136,13 @@ export function useRecordEditor(
    * sitting in the Trash, where a trashed record keeps its claims until it is
    * purged. Both halves matter: the mark says *where*, the sentence says
    * *why nothing on screen shows the conflict*.
+   *
+   * Announced once, not twice (UX review rough edge): when a field owns the
+   * collision, the inline error under that input *is* the announcement — a
+   * toast saying the same thing a beat later is the double-up the imports
+   * flow (R26) was fixed to stop doing. The toast is for the one case an
+   * inline error can't cover: a collision `conflictField` couldn't attribute
+   * to any of this type's fields.
    */
   const markCollision = (err: ApiError) => {
     const detail = typeof err.body?.detail === 'string' ? err.body.detail : err.message;
@@ -147,14 +154,12 @@ export function useRecordEditor(
       detail,
       type.fields.map((one) => one.key),
     );
-    const message = `${detail} ${inTrash}`;
     if (field === null) {
       toast.error(detail);
       return;
     }
-    form.setServerErrors([{ field, message }]);
+    form.setServerErrors([{ field, message: `${detail} ${inTrash}` }]);
     focusInvalidInput(field);
-    toast.error(message);
   };
 
   /** `overwriteVersion` is set only when this save follows "Overwrite

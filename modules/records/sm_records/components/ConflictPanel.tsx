@@ -3,6 +3,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 
 import type { RecordRead } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 
 /**
  * A 409 on save, as a real screen state — not a toast.
@@ -55,7 +56,7 @@ export function ConflictPanel({
             <p className="mt-1 font-medium">{current.display_title}</p>
             <p className="text-sm text-muted-foreground">
               {t('records.records.updated_at', { defaultValue: 'Updated' })}:{' '}
-              {current.updated_at ?? current.created_at}
+              {formatDateTime(current.updated_at ?? current.created_at)}
             </p>
           </div>
           <div>

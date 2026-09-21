@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 
 import { listColumns } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
@@ -101,13 +102,13 @@ export function RecordCardList({
                 <dt className="font-medium">
                   {t('records.records.published_at', { defaultValue: 'Published on' })}
                 </dt>
-                <dd>{record.published_at}</dd>
+                <dd>{formatDateTime(record.published_at)}</dd>
               </>
             )}
             <dt className="font-medium">
               {t('records.records.updated_at', { defaultValue: 'Updated' })}
             </dt>
-            <dd>{record.updated_at ?? record.created_at}</dd>
+            <dd>{formatDateTime(record.updated_at ?? record.created_at)}</dd>
           </dl>
         </li>
       ))}

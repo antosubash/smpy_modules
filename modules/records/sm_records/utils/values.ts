@@ -103,6 +103,28 @@ export function localInputToIso(local: string): string {
   return `${date}T${time}${offset}`;
 }
 
+/**
+ * ISO datetime (with offset) → the viewer's own locale, date + short time.
+ *
+ * Shared between a schema `datetime` field's cell (`RecordCell`) and the
+ * envelope's own fixed timestamps (`published_at`/`updated_at`/`created_at`,
+ * design §9) — both are ISO-with-offset on the wire, so the same
+ * presentation belongs on both. Rendering the envelope's raw ISO string next
+ * to a `datetime` field formatted this way is what actually reads as two
+ * different clocks on one row.
+ *
+ * Unparseable input is handed back unchanged, same as a `datetime` field's
+ * own fallback — the point is never to substitute a value for one the
+ * browser's `Date` rejects.
+ */
+export function formatDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    parsed,
+  );
+}
+
 function asText(raw: unknown): string {
   if (typeof raw === 'string') return raw;
   return raw === null || raw === undefined ? '' : String(raw);

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSortParam, filterErrorReasonKey, listColumns, nextSort, parseSort } from './listing';
+import {
+  buildSortParam,
+  filterErrorReasonKey,
+  listColumns,
+  nextSort,
+  parseSort,
+  parseTrashedParam,
+} from './listing';
 import type { FieldDef } from './types';
 
 function field(overrides: Partial<FieldDef>): FieldDef {
@@ -137,5 +144,23 @@ describe('listColumns and the display field', () => {
   it('keeps every column for a type with no display field', () => {
     const fields = [field({ key: 'a', indexed: true })];
     expect(listColumns({ fields, display_field: null }).map((f) => f.key)).toEqual(['a']);
+  });
+});
+
+describe('parseTrashedParam', () => {
+  // Matches pydantic's own `bool` query coercion (`deps.py::parse_trashed`'s
+  // `Query(default=False)`) — the rough edge this closes is `?trashed=1`
+  // reading as true on the server and false here, so the page rendered the
+  // live empty state over rows the server had already sent it as the trash.
+  it('reads every truthy spelling the server accepts, case-insensitively', () => {
+    for (const raw of ['1', 'true', 'True', 'TRUE', 'yes', 'YES', 'on', 'y', 't']) {
+      expect(parseTrashedParam(raw)).toBe(true);
+    }
+  });
+
+  it('reads a falsy spelling, an absent param, and garbage as false', () => {
+    for (const raw of ['0', 'false', 'no', 'off', 'n', 'f', null, '', 'garbage']) {
+      expect(parseTrashedParam(raw)).toBe(false);
+    }
   });
 });
