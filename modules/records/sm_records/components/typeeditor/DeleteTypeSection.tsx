@@ -49,7 +49,7 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
   return (
     <Card className="border-destructive/50">
       <CardHeader>
-        <CardTitle className="text-destructive">
+        <CardTitle role="heading" aria-level={2} className="text-destructive">
           {t('records.type_editor.danger_zone', { defaultValue: 'Danger zone' })}
         </CardTitle>
       </CardHeader>

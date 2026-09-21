@@ -162,8 +162,9 @@ test.describe('Records — types', () => {
     await expect(row).toContainText(`Counted ${key}`);
     await expect(row).toContainText(key);
 
-    // Both links on the row go where the list promises.
-    await row.getByRole('link', { name: 'View records' }).click();
+    // The row's primary link is the records, not the schema (UX review
+    // R13.1) — browsing content is the frequent action.
+    await row.getByTestId('records-type-link').click();
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));
     await expect(page.getByRole('heading', { name: `Counted ${key} items` })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Keeper' })).toBeVisible();
@@ -209,6 +210,9 @@ test.describe('Records — types', () => {
     }
 
     await page.goto('/admin/records/');
+    // The page is titled after the sidebar item that opens it; "Record
+    // Types" stays as the table's own heading (R13.2).
+    await expect(page.getByRole('heading', { name: 'Records', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Record Types' })).toBeVisible();
     await expect(page.getByText('No record types yet')).toBeVisible();
     await expect(page.getByTestId('records-type-row')).toHaveCount(0);

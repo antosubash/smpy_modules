@@ -9,20 +9,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { RecordsToaster } from '../components/RecordsToaster';
-import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
-import { FieldList } from '../components/typeeditor/FieldList';
+import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
   buildChanges,
   extraCreateFields,
   metadataFrom,
   schemaIsDirty,
+  stripUids,
+  typeIsDirty,
+  withUids,
 } from '../components/typeeditor/formHelpers';
+import { PointerFields } from '../components/typeeditor/PointerFields';
 import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
-import { SchemaConflictPanel } from '../components/typeeditor/SchemaConflictPanel';
-import { SchemaPreviewPanel } from '../components/typeeditor/SchemaPreviewPanel';
 import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
+import { TypeEditorFooter } from '../components/typeeditor/TypeEditorFooter';
 import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
-import { TypeRevisions } from '../components/typeeditor/TypeRevisions';
 import {
   type EditableField,
   TOP_LEVEL_ERROR_FIELDS,
@@ -30,8 +31,9 @@ import {
 } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
+import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { ApiError, createType, updateType } from '../utils/api';
-import type { TypeRead, ValidationError } from '../utils/types';
+import type { DryRunReport, TypeRead, ValidationError } from '../utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
 
@@ -39,8 +41,10 @@ const TYPES_LIST_HREF = '/admin/records/';
  *
  * The schema editor from design §6.1/§7.2/§16: type metadata, the field
  * list (with `indexed` — "the single most consequential choice on the
- * screen", §7.2 — front and center), and, on an existing type, the danger
- * zone. Phase 3 lifts the Phase 1 lock: a populated type's `fields`,
+ * screen", §7.2 — named once in the Fields card header), the two field
+ * pointers *below* it (UX review R19: on a new type they have nothing to
+ * point at until a field exists), and, on an existing type, the danger zone.
+ * Phase 3 lifts the Phase 1 lock: a populated type's `fields`,
  * `display_field` and `slug_field` are editable here too, checked by
  * "Preview changes" before saving and by the save itself, which the server
  * enforces with a dry-run (§8.2) rather than trusting the client to have run
@@ -57,10 +61,14 @@ function TypeEditor({
   const isNew = type === null;
   const [current, setCurrent] = useState<TypeRead | null>(type);
   const [values, setValues] = useState(metadataFrom(type));
-  const [fields, setFields] = useState<EditableField[]>(type?.fields ?? []);
+  const [fields, setFields] = useState<EditableField[]>(() => withUids(type?.fields ?? []));
   const [originalKeys] = useState<Set<string>>(new Set((type?.fields ?? []).map((f) => f.key)));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
+  // The dry-run report of the change that was last forced through (R7a) —
+  // `useSchemaApply` clears its own on success, and that report is the only
+  // inventory of the records the force just marked invalid.
+  const [lastApplied, setLastApplied] = useState<DryRunReport | null>(null);
   // A 409 from turning "Translatable" off while foreign-locale records exist
   // (design §4.1) — not one of `useSchemaApply`'s four known 409/422 shapes,
   // so it is rethrown to here rather than handled there.
@@ -80,7 +88,7 @@ function TypeEditor({
   const applySaved = (saved: TypeRead) => {
     setCurrent(saved);
     setValues(metadataFrom(saved));
-    setFields(saved.fields);
+    setFields(withUids(saved.fields));
   };
 
   const schemaApply = useSchemaApply((result) => {
@@ -100,7 +108,19 @@ function TypeEditor({
   const activeErrors = isNew ? createErrors : schemaApply.errors;
   const topLevelErrors = activeErrors.filter((e) => TOP_LEVEL_ERROR_FIELDS.has(e.field));
   const fieldErrors = activeErrors.filter((e) => !TOP_LEVEL_ERROR_FIELDS.has(e.field));
-  const dirty = !isNew && schemaIsDirty(current, values, fields);
+  const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
+  const dirty = typeIsDirty(current, values, fields);
+  const guard = useUnsavedGuard(dirty);
+
+  /** Force a refused change through, keeping its report on screen
+   *  afterwards — `retryWith` answers `null` when the retry was itself
+   *  refused, and there is nothing applied to report in that case. */
+  const forceApply = async () => {
+    const report = schemaApply.report;
+    const result = await schemaApply.retryWith({ force: true });
+    if (result) setLastApplied(report);
+    return result;
+  };
 
   const save = async () => {
     setPending(true);
@@ -113,9 +133,12 @@ function TypeEditor({
           key: values.key,
           label: values.label,
           label_plural: values.labelPlural,
-          fields,
+          fields: stripUids(fields),
           ...extraCreateFields(values),
         });
+        // The draft has just been written; the guard must not then ask about
+        // it on the way to the editor for the type it became.
+        guard.allow();
         router.visit(`/admin/records/types/${created.key}`);
         return;
       }
@@ -123,7 +146,10 @@ function TypeEditor({
       const changes = buildChanges(current, values, fields);
       changedTranslatable = 'translatable' in changes;
       if (Object.keys(changes).length === 0) {
-        toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
+        // Unreachable while Save is disabled on a clean draft (R22b), kept
+        // as the honest answer rather than a green "Saved" for a write that
+        // never happened.
+        toast(t('records.type_editor.no_changes', { defaultValue: 'No changes to save' }));
         return;
       }
       schemaApply.reset();
@@ -153,12 +179,16 @@ function TypeEditor({
     schemaApply.reset();
   };
 
+  const title = isNew
+    ? t('records.type_editor.title_new', { defaultValue: 'New type' })
+    : (current?.label ?? '');
+
   return (
     <>
       <Head
         title={
           isNew
-            ? t('records.type_editor.title_new', { defaultValue: 'New type' })
+            ? title
             : t('records.type_editor.title_edit', {
                 defaultValue: 'Edit {label}',
                 label: current?.label ?? '',
@@ -166,11 +196,7 @@ function TypeEditor({
         }
       />
       <PageShell
-        title={
-          isNew
-            ? t('records.type_editor.title_new', { defaultValue: 'New type' })
-            : (current?.label ?? '')
-        }
+        title={title}
         actions={
           <Button variant="outline" onClick={() => router.visit(TYPES_LIST_HREF)}>
             {t('records.editor.cancel', { defaultValue: 'Cancel' })}
@@ -196,7 +222,6 @@ function TypeEditor({
             <CardContent>
               <TypeMetadataForm
                 isNew={isNew}
-                fields={fields}
                 roles={roles}
                 values={values}
                 onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
@@ -209,64 +234,54 @@ function TypeEditor({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {t('records.type_editor.section_fields', { defaultValue: 'Fields' })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!isNew && current && (
-                <p className="text-sm text-muted-foreground">
-                  {t('records.type_editor.live_notice', {
-                    count: current.record_count,
-                    trashed: current.trashed_record_count,
-                    defaultValue:
-                      '{count} live, {trashed} trashed records — changes are checked against them before they apply.',
-                  })}
-                </p>
-              )}
-              <FieldList
-                fields={fields}
-                originalKeys={originalKeys}
-                targetTypes={target_types}
-                disabled={pending}
-                errors={fieldErrors}
-                onChange={setFields}
-              />
-              {!isNew && current && (
-                <SchemaPreviewPanel
-                  typeKey={current.key}
-                  fields={fields}
-                  displayField={values.displayField}
-                  slugField={values.slugField}
-                  dirty={dirty}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <FieldsCard
+            current={current}
+            isNew={isNew}
+            fields={fields}
+            originalKeys={originalKeys}
+            targetTypes={target_types}
+            displayField={values.displayField}
+            slugField={values.slugField}
+            disabled={pending}
+            dirty={schemaDirty}
+            errors={fieldErrors}
+            lastApplied={lastApplied}
+            onChange={setFields}
+          />
 
-          <div>
-            <Button type="button" disabled={pending} onClick={() => void save()}>
+          <PointerFields
+            fields={fields}
+            values={values}
+            errors={topLevelErrors}
+            onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
+          />
+
+          <div className="flex items-center gap-3">
+            <Button type="button" disabled={pending || !dirty} onClick={() => void save()}>
               {pending
                 ? t('records.editor.saving', { defaultValue: 'Saving…' })
                 : t('records.editor.save', { defaultValue: 'Save' })}
             </Button>
+            {!dirty && !pending && (
+              <span className="text-sm text-muted-foreground" data-testid="records-no-changes">
+                {t('records.type_editor.no_changes', { defaultValue: 'No changes to save' })}
+              </span>
+            )}
           </div>
 
-          <SchemaConflictPanel
+          <TypeEditorFooter
+            current={isNew ? null : current}
             report={schemaApply.report}
             conflicts={schemaApply.conflicts}
             pending={schemaApply.pending || pending}
-            onForce={() => schemaApply.retryWith({ force: true })}
+            onForce={forceApply}
             onOrphaned={(choice) => schemaApply.retryWith({ orphaned: choice })}
+            onRestored={applySaved}
+            onDeleted={() => {
+              guard.allow();
+              router.visit(TYPES_LIST_HREF);
+            }}
           />
-
-          {!isNew && current && <TypeRevisions type={current} onRestored={applySaved} />}
-
-          {!isNew && current && (
-            <DeleteTypeSection type={current} onDeleted={() => router.visit(TYPES_LIST_HREF)} />
-          )}
         </div>
       </PageShell>
     </>

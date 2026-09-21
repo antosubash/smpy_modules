@@ -33,10 +33,12 @@ export type TypeEditorProps = {
   collections: string[];
 };
 
-/** A field row's local editing state. Identical in shape to the wire
- *  `FieldDef` — kept as its own alias so a future divergence (e.g. a
- *  UI-only draft flag) doesn't have to touch every import site. */
-export type EditableField = FieldDef;
+/** A field row's local editing state: the wire `FieldDef` plus `uid`, a
+ *  client-only identity minted by `formHelpers.ts::newFieldUid` when the
+ *  field is loaded or added. React keys the rows by it (UX review R10) and
+ *  `stripUids` takes it back off before anything is sent, so the wire shape
+ *  is unchanged. */
+export type EditableField = FieldDef & { uid: string };
 
 /** One choice of a `select`/`multiselect` field's `options.choices`. */
 export type Choice = { value: string; label: string };

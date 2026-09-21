@@ -1,18 +1,24 @@
 import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
-import { useEffect } from 'react';
+import { useRef } from 'react';
 import type { ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
+import { keyFromLabel, pluralFromLabel } from './formHelpers';
 import { PublicField } from './PublicField';
 import { RolesMultiSelect } from './RolesMultiSelect';
-import { displayFieldAllowed, slugFieldAllowed } from './rules';
+import { type KeyError as KeyErrorCode, keyValid } from './rules';
 import { SidebarField } from './SidebarField';
-import type { EditableField, TypeMetadataValues } from './types';
+import type { TypeMetadataValues } from './types';
+
+// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
+// against `useT()`'s real, key-union-overloaded signature either blows up
+// TS with an "excessively deep" instantiation or fails to unify when called.
+// biome-ignore lint/suspicious/noExplicitAny: see comment above
+type Translate = (...args: any[]) => string;
 
 const ID = {
   key: 'type-editor-key',
@@ -21,8 +27,6 @@ const ID = {
   description: 'type-editor-description',
   icon: 'type-editor-icon',
   translatable: 'type-editor-translatable',
-  displayField: 'type-editor-display-field',
-  slugField: 'type-editor-slug-field',
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -39,7 +43,6 @@ function FieldError({ message }: { message?: string }) {
  */
 export function TypeMetadataForm({
   isNew,
-  fields,
   roles,
   values,
   onChange,
@@ -50,7 +53,6 @@ export function TypeMetadataForm({
   translatableError,
 }: {
   isNew: boolean;
-  fields: EditableField[];
   roles: string[];
   values: TypeMetadataValues;
   onChange: (patch: Partial<TypeMetadataValues>) => void;
@@ -72,44 +74,57 @@ export function TypeMetadataForm({
   translatableError?: string | null;
 }) {
   const { t } = useT();
-  const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
-  // Only the field types the API accepts for each pointer
-  // (`services/_schema.py::DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`). Offering
-  // a `json` display field or a `boolean` slug field meant a 422 on save at
-  // best, and — before the server checked — every record titled `{'a': 1}`
-  // or slugged `true`.
-  const displayChoices = fields.filter((f) => displayFieldAllowed(f.type));
-  const slugChoices = fields.filter((f) => slugFieldAllowed(f.type));
+  // Which of the two derived fields the operator has taken over. Refs, not
+  // state: nothing renders off them, and a re-render caused by the label
+  // they are derived from must not reset them (R19).
+  const keyTouched = useRef(!isNew);
+  const pluralTouched = useRef(!isNew);
+  // The type key answers to exactly the rule a *field* key does
+  // (`constants.TYPE_KEY_PATTERN`), which `rules.ts` already mirrors — so
+  // "Blog Posts" is refused here, in place, instead of coming back as a 422
+  // from Save on the one value that can never be corrected afterwards.
+  const localKeyError = isNew && values.key ? keyValid(values.key, []) : null;
 
-  // A pointer's target can stop being allowed out from under it — its type
-  // changed (e.g. `text` to `longtext`) after it was picked (L7). Left
-  // alone, the `<select>` drops the option and falls back to showing "None"
-  // while `values.displayField`/`slugField` still hold the old key, so the
-  // save that follows sends a pointer the control no longer shows and the
-  // server refuses it (`DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`,
-  // `services/_schema.py`) with an error that contradicts the screen.
-  // Clearing it here keeps the visible "None" and the actual form state in
-  // agreement.
-  useEffect(() => {
-    if (values.displayField && !displayChoices.some((f) => f.key === values.displayField)) {
-      onChange({ displayField: '' });
-    }
-    if (values.slugField && !slugChoices.some((f) => f.key === values.slugField)) {
-      onChange({ slugField: '' });
-    }
-  }, [displayChoices, slugChoices, values.displayField, values.slugField, onChange]);
+  /** Typing a Label fills in the Key and the Plural label until either is
+   *  edited directly — the new-type form's only two answers that can be
+   *  guessed, and the Key is the one that is permanent. */
+  const onLabelChange = (label: string) => {
+    const patch: Partial<TypeMetadataValues> = { label };
+    if (isNew && !keyTouched.current) patch.key = keyFromLabel(label);
+    if (!pluralTouched.current) patch.labelPlural = pluralFromLabel(label);
+    onChange(patch);
+  };
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="grid gap-1.5">
         <Label htmlFor={ID.key}>{t('records.types.key', { defaultValue: 'Key' })}</Label>
         {isNew ? (
-          <Input
-            id={ID.key}
-            value={values.key}
-            onChange={(e) => onChange({ key: e.target.value })}
-            aria-invalid={!!fieldMessage(errors, 'key')}
-          />
+          <>
+            <Input
+              id={ID.key}
+              value={values.key}
+              placeholder={t('records.type_editor.key_placeholder', {
+                defaultValue: 'blog_post',
+              })}
+              onChange={(e) => {
+                keyTouched.current = true;
+                onChange({ key: e.target.value });
+              }}
+              aria-invalid={!!localKeyError || !!fieldMessage(errors, 'key')}
+            />
+            <p className="text-sm text-muted-foreground">
+              {t('records.type_editor.key_new_help', {
+                defaultValue:
+                  "Lowercase letters, numbers and underscores, starting with a letter. Chosen once — this can't be changed later.",
+              })}
+            </p>
+            {localKeyError && (
+              <p className="text-sm text-destructive" data-testid="records-type-key-error">
+                {typeKeyError(t, localKeyError, values.key)}
+              </p>
+            )}
+          </>
         ) : (
           <>
             <Input id={ID.key} value={values.key} disabled readOnly />
@@ -128,7 +143,7 @@ export function TypeMetadataForm({
         <Input
           id={ID.label}
           value={values.label}
-          onChange={(e) => onChange({ label: e.target.value })}
+          onChange={(e) => onLabelChange(e.target.value)}
           aria-invalid={!!fieldMessage(errors, 'label')}
         />
         <FieldError message={fieldMessage(errors, 'label')} />
@@ -141,7 +156,10 @@ export function TypeMetadataForm({
         <Input
           id={ID.labelPlural}
           value={values.labelPlural}
-          onChange={(e) => onChange({ labelPlural: e.target.value })}
+          onChange={(e) => {
+            pluralTouched.current = true;
+            onChange({ labelPlural: e.target.value });
+          }}
           aria-invalid={!!fieldMessage(errors, 'label_plural')}
         />
         <FieldError message={fieldMessage(errors, 'label_plural')} />
@@ -243,44 +261,19 @@ export function TypeMetadataForm({
         </p>
         <FieldError message={fieldMessage(errors, 'allowed_roles')} />
       </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor={ID.displayField}>
-          {t('records.type_editor.display_field', { defaultValue: 'Display field' })}
-        </Label>
-        <NativeSelect
-          id={ID.displayField}
-          value={values.displayField}
-          onChange={(e) => onChange({ displayField: e.target.value })}
-        >
-          <NativeSelectOption value="">{none}</NativeSelectOption>
-          {displayChoices.map((f) => (
-            <NativeSelectOption key={f.key} value={f.key}>
-              {f.label} ({f.key})
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <FieldError message={fieldMessage(errors, 'display_field')} />
-      </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor={ID.slugField}>
-          {t('records.type_editor.slug_field', { defaultValue: 'Slug field' })}
-        </Label>
-        <NativeSelect
-          id={ID.slugField}
-          value={values.slugField}
-          onChange={(e) => onChange({ slugField: e.target.value })}
-        >
-          <NativeSelectOption value="">{none}</NativeSelectOption>
-          {slugChoices.map((f) => (
-            <NativeSelectOption key={f.key} value={f.key}>
-              {f.label} ({f.key})
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <FieldError message={fieldMessage(errors, 'slug_field')} />
-      </div>
     </div>
   );
+}
+
+/** The type key's inline refusals — the same four `rules.ts::keyValid`
+ *  returns for a field key, worded for a type (R19). */
+function typeKeyError(t: Translate, code: KeyErrorCode, key: string): string {
+  const defaults = {
+    required: 'A key is required.',
+    reserved: '"{key}" is reserved by the module.',
+    pattern:
+      'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
+    duplicate: 'Another type already uses this key.',
+  };
+  return t(`records.type_editor.type_key_error.${code}`, { key, defaultValue: defaults[code] });
 }

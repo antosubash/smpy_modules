@@ -3,9 +3,11 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
 
 import { ApiError, getPreviewJob, previewSchema } from '../../utils/api';
-import type { FieldDef, SchemaPreview } from '../../utils/types';
+import type { SchemaPreview, TypeRead } from '../../utils/types';
 import { DryRunReportView } from './DryRunReportView';
+import { stripUids } from './formHelpers';
 import { SchemaChangeList } from './SchemaChangeList';
+import type { EditableField } from './types';
 
 /** How often a deferred preview is polled. One second: the scan reports its
  *  progress per batch of `reindex_batch_size`, so anything faster polls for
@@ -13,6 +15,10 @@ import { SchemaChangeList } from './SchemaChangeList';
 const POLL_MS = 1000;
 
 type Progress = { checked: number; total: number } | null;
+
+/** Which schema the report on screen was produced for: the draft being
+ *  edited ("Preview changes") or the one already saved ("Check records"). */
+type Mode = 'draft' | 'saved';
 
 /**
  * "Preview changes": `POST .../schema/preview` writes nothing (design
@@ -34,13 +40,23 @@ type Progress = { checked: number; total: number } | null;
  */
 export function SchemaPreviewPanel({
   typeKey,
+  saved,
   fields,
   displayField,
   slugField,
   dirty,
 }: {
   typeKey: string;
-  fields: FieldDef[];
+  /** The type as the server last returned it. "Check records" (UX review
+   *  R7b) previews *this* rather than the draft: the same endpoint, the
+   *  schema exactly as saved. Note what the server then does — a no-change
+   *  preview is not restrictive, so `_dry_run.py::needs_dry_run` skips the
+   *  scan and answers `failing: 0` without reading a record. The panel says
+   *  so rather than dressing that up as a clean bill of health; re-deriving
+   *  the worklist of a forced apply needs a rescan the API does not offer
+   *  yet (or R7c's stored flag). */
+  saved: TypeRead;
+  fields: EditableField[];
   /** The editor's current `display_field`/`slug_field` form values (empty
    *  string = cleared) — sent alongside `fields` on every preview so a
    *  pointer-only edit (no field added/removed/changed) doesn't preview as
@@ -51,7 +67,7 @@ export function SchemaPreviewPanel({
 }) {
   const { t } = useT();
   const [preview, setPreview] = useState<SchemaPreview | null>(null);
-  const [previewedFields, setPreviewedFields] = useState<FieldDef[] | null>(null);
+  const [previewedFields, setPreviewedFields] = useState<EditableField[] | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<string | null>(null);
@@ -64,12 +80,16 @@ export function SchemaPreviewPanel({
   // admin has typed by the time a long-running preview job lands (M1): both
   // the sync and deferred paths then mark `previewedFields` against the
   // draft that was actually sent, not the latest one.
-  const requestedFieldsRef = useRef<FieldDef[]>(fields);
+  const requestedFieldsRef = useRef<EditableField[]>(fields);
+  const [mode, setMode] = useState<Mode>('draft');
 
-  const stale = preview !== null && previewedFields !== fields;
+  // A saved-schema check is never stale: the draft moving underneath it
+  // doesn't change which records fail the schema that is actually applied.
+  const stale = preview !== null && mode === 'draft' && previewedFields !== fields;
 
-  const runPreview = async () => {
+  const runPreview = async (which: Mode = 'draft') => {
     requestedFieldsRef.current = fields;
+    setMode(which);
     setPending(true);
     setError(null);
     setProgress(null);
@@ -77,11 +97,20 @@ export function SchemaPreviewPanel({
     setFailed(false);
     setExpired(false);
     try {
-      const result = await previewSchema(typeKey, {
-        fields,
-        display_field: displayField || null,
-        slug_field: slugField || null,
-      });
+      const result = await previewSchema(
+        typeKey,
+        which === 'draft'
+          ? {
+              fields: stripUids(fields),
+              display_field: displayField || null,
+              slug_field: slugField || null,
+            }
+          : {
+              fields: saved.fields,
+              display_field: saved.display_field,
+              slug_field: saved.slug_field,
+            },
+      );
       if ('job' in result) {
         // Deferred: stay `pending` — the effect below owns the rest.
         setJob(result.job);
@@ -138,22 +167,39 @@ export function SchemaPreviewPanel({
 
   return (
     <div className="space-y-4">
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!dirty || pending}
-        onClick={() => void runPreview()}
-      >
-        {!pending
-          ? t('records.type_editor.preview.button', { defaultValue: 'Preview changes' })
-          : progress
-            ? t('records.type_editor.preview.progress', {
-                checked: progress.checked,
-                total: progress.total,
-                defaultValue: 'Checked {checked} of {total}…',
-              })
-            : t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!dirty || pending}
+          onClick={() => void runPreview('draft')}
+        >
+          {!pending
+            ? t('records.type_editor.preview.button', { defaultValue: 'Preview changes' })
+            : progress
+              ? t('records.type_editor.preview.progress', {
+                  checked: progress.checked,
+                  total: progress.total,
+                  defaultValue: 'Checked {checked} of {total}…',
+                })
+              : t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          data-testid="records-check-records"
+          onClick={() => void runPreview('saved')}
+        >
+          {t('records.type_editor.preview.check_button', { defaultValue: 'Check records' })}
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('records.type_editor.preview.check_help', {
+          defaultValue:
+            '"Check records" runs the same dry run against the schema exactly as it is saved. Neither button writes anything.',
+        })}
+      </p>
       {(error || failed) && !expired && (
         <p className="text-sm text-destructive" role="alert">
           {error ??
@@ -172,7 +218,7 @@ export function SchemaPreviewPanel({
             variant="link"
             className="h-auto p-0 text-sm"
             data-testid="records-preview-expired-retry"
-            onClick={() => void runPreview()}
+            onClick={() => void runPreview(mode)}
           >
             {t('records.type_editor.preview.retry', { defaultValue: 'Preview again' })}
           </Button>
@@ -180,8 +226,34 @@ export function SchemaPreviewPanel({
       )}
       {preview && !stale && (
         <div className="space-y-3 rounded-md border p-4" data-testid="records-schema-preview">
-          <SchemaChangeList preview={preview} />
-          <DryRunReportView report={preview.report} />
+          {mode === 'draft' ? (
+            <SchemaChangeList preview={preview} />
+          ) : (
+            <p className="text-sm font-medium" data-testid="records-check-records-title">
+              {t('records.type_editor.preview.check_title', {
+                defaultValue: 'Records checked against the saved schema',
+              })}
+            </p>
+          )}
+          {/* A preview of the saved schema is, by construction, a preview of
+              no change — and `services/_dry_run.py::needs_dry_run` skips the
+              scan for one, answering `checked: N, failing: 0` without having
+              looked at a record. Rendering that as a dry-run result would say
+              "0 would fail" about records that are marked invalid, which is
+              the opposite of what R7b is for; so the no-change answer gets
+              its own sentence instead. Re-deriving the worklist needs the
+              server to accept a rescan (or R7c's stored flag). */}
+          {mode === 'saved' && preview.changes.length === 0 ? (
+            <p className="text-sm text-muted-foreground" data-testid="records-check-not-rescanned">
+              {t('records.type_editor.preview.check_skipped', {
+                count: preview.report.checked,
+                defaultValue:
+                  'Nothing has changed since this schema was saved, so the server did not re-scan these {count} records — it runs the check only for a change that could break something.',
+              })}
+            </p>
+          ) : (
+            <DryRunReportView report={preview.report} />
+          )}
         </div>
       )}
     </div>

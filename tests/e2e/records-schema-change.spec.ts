@@ -22,6 +22,16 @@ import {
  * (§8.8), and the reindex window an `indexed` toggle opens (§8.5).
  */
 
+/** Open one field row's editing body. Rows collapse to a one-line summary
+ *  (UX review R9), so anything inside the body has to be expanded first;
+ *  a row added through `addFieldInEditor` opens by itself. */
+async function expandField(page: Page, index: number): Promise<void> {
+  const row = fieldRow(page, index);
+  if ((await row.getAttribute('data-field-expanded')) === 'true') return;
+  await row.getByTestId('records-field-toggle').click();
+  await expect(row).toHaveAttribute('data-field-expanded', 'true');
+}
+
 async function seedPopulatedType(page: Page, prefix: string): Promise<string> {
   const key = uniqueTypeKey(prefix);
   await apiCreateType(page, {
@@ -184,6 +194,7 @@ test.describe('Records — schema change', () => {
 
     // `note` holds values and is not indexed — turning indexing on is the
     // index-affecting change of §8.5, which opens the reindex window.
+    await expandField(page, 1);
     await fieldRow(page, 1).getByRole('checkbox', { name: 'Indexed' }).click();
     await saveType(page);
     await expectTypeSaved(page);

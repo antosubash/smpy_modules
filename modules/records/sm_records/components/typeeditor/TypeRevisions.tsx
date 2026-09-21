@@ -74,7 +74,7 @@ export function TypeRevisions({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>
+        <CardTitle role="heading" aria-level={2}>
           {t('records.type_editor.revisions.title', { defaultValue: 'Schema history' })}
         </CardTitle>
         <Button type="button" variant="ghost" size="sm" onClick={toggle}>

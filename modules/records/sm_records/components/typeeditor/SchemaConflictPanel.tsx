@@ -44,11 +44,11 @@ export function SchemaConflictPanel({
           className="space-y-3 rounded-md border border-destructive/50 p-4"
           data-testid="records-schema-report"
         >
-          <p className="font-medium text-destructive">
+          <h2 className="font-medium text-destructive">
             {t('records.type_editor.preview.report_title', {
               defaultValue: 'This change would leave records invalid',
             })}
-          </p>
+          </h2>
           <DryRunReportView report={report} />
           <ConfirmDialog
             trigger={
@@ -83,11 +83,11 @@ export function SchemaConflictPanel({
           className="space-y-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-4"
           data-testid="records-orphaned-conflicts"
         >
-          <p className="font-medium">
+          <h2 className="font-medium">
             {t('records.type_editor.preview.conflicts_title', {
               defaultValue: 'These fields still hold values from a previous delete',
             })}
-          </p>
+          </h2>
           <OrphanedConflictsList conflicts={conflicts} />
           <p className="text-sm text-muted-foreground">
             {t('records.type_editor.preview.conflicts_help', {

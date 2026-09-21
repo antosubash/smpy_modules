@@ -60,8 +60,19 @@ async function seedType(page: Page): Promise<string> {
   return key;
 }
 
+/** Open one field row's editing body. Rows collapse to a one-line summary
+ *  (UX review R9), so anything inside the body has to be expanded first;
+ *  a row added through `addFieldInEditor` opens by itself. */
+async function expandField(page: Page, index: number): Promise<void> {
+  const row = fieldRow(page, index);
+  if ((await row.getAttribute('data-field-expanded')) === 'true') return;
+  await row.getByTestId('records-field-toggle').click();
+  await expect(row).toHaveAttribute('data-field-expanded', 'true');
+}
+
 /** Make `note` required — the restrictive change every test here previews. */
 async function makeNoteRequired(page: Page): Promise<void> {
+  await expandField(page, 1);
   await fieldRow(page, 1).getByRole('checkbox', { name: 'Required' }).click();
 }
 
