@@ -24,16 +24,16 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sm_records.models import Base, Record, RecordType
+from sm_records.models import Record, RecordType
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.pool import StaticPool
 
-# HTTP test harness — app + client fixtures, header-driven roles, and DB
-# seeding helpers for API/view tests. Split into its own module for the
-# 300-line cap; importing the names here is what makes pytest see them as
-# fixtures in this directory. See ``tests/app_harness.py``.
+# ``app_harness`` is the HTTP test harness — app + client fixtures,
+# header-driven roles, and DB seeding helpers for API/view tests. Split into
+# its own module for the 300-line cap; importing the names here is what makes
+# pytest see them as fixtures in this directory.
+#
+# ``pg_support`` owns the one decision both database fixtures make: in-memory
+# SQLite, or the Postgres database ``RECORDS_TEST_URL`` names.
 from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     ADMIN,
     ROLE_EDITOR,
@@ -47,14 +47,37 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     seed_record,
     seed_type,
 )
+from tests.pg_support import arm_reset, make_db_state
+
+
+@pytest.fixture(autouse=True)
+def _arm_database_reset():
+    """Every test starts from an empty database.
+
+    A no-op on SQLite, where each test builds its own ``:memory:`` one and
+    there is nothing to empty. On Postgres it is what makes the *first*
+    database a test asks for a clean one — see
+    :func:`tests.pg_support.arm_reset` for why the emptying is armed here
+    rather than done on every ``make_db_state``.
+
+    Autouse and synchronous, so it is set up before any of the async database
+    fixtures that read the flag it sets.
+    """
+    arm_reset()
+    yield
 
 
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
-    state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """In-memory SQLite by default; Postgres when ``RECORDS_TEST_URL`` says so.
+
+    The construction moved to :func:`tests.pg_support.make_db_state` so that
+    this fixture and ``app_harness.build_app`` — the suite's two entry points
+    into a database — cannot drift apart about which backend is in use. On
+    SQLite it is exactly what it was: ``StaticPool`` over ``:memory:``, with
+    the soft-delete listeners registered.
+    """
+    state = await make_db_state()
     yield state
     await state.engine.dispose()
 

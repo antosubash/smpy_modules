@@ -11,14 +11,50 @@ if [[ -z "${SM_DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
-# Extract the SQLite file path from a URL like
-# sqlite+aiosqlite:////abs/path/to/test.db so we can `rm` it.
-db_path="${SM_DATABASE_URL#sqlite+aiosqlite:///}"
-if [[ "${db_path}" != /* ]]; then
-  db_path="$(pwd)/${db_path}"
-fi
+# Start from an empty database. How that is done depends on the backend, and
+# the parameter expansion below is only meaningful for one of them: on a
+# Postgres URL `${SM_DATABASE_URL#sqlite+aiosqlite:///}` matches nothing, so
+# the prefix is left in place and what used to be `rm -f`-ed was the *whole
+# URL* read as a relative path — a file that never existed, removed
+# successfully, leaving last run's tables in place. The `case` makes the
+# distinction explicit rather than leaving it to a no-op substitution.
+case "${SM_DATABASE_URL}" in
+  sqlite*)
+    # Extract the SQLite file path from a URL like
+    # sqlite+aiosqlite:////abs/path/to/test.db so we can `rm` it.
+    db_path="${SM_DATABASE_URL#sqlite+aiosqlite:///}"
+    if [[ "${db_path}" != /* ]]; then
+      db_path="$(pwd)/${db_path}"
+    fi
+    rm -f "${db_path}" "${db_path}-wal" "${db_path}-shm"
+    ;;
+  *)
+    # Anything else is a server the suite does not own the file of. Drop the
+    # schema and let the migrations rebuild it, which is the closest
+    # equivalent of deleting the file and is what keeps a rerun independent of
+    # the last one.
+    #
+    # `DROP SCHEMA` rather than `alembic downgrade base`: a downgrade replays
+    # every revision's `downgrade()` and so depends on all of them being
+    # correct in a database the run is about to throw away regardless, and it
+    # leaves behind anything a revision forgot to drop — Postgres enum types,
+    # most of the time. Dropping the schema cannot leave anything.
+    uv run python - <<'PY'
+import asyncio, os
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 
-rm -f "${db_path}" "${db_path}-wal" "${db_path}-shm"
+async def main() -> None:
+    engine = create_async_engine(os.environ["SM_DATABASE_URL"])
+    async with engine.begin() as conn:
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+    await engine.dispose()
+
+asyncio.run(main())
+PY
+    ;;
+esac
 
 # Migrations run from the repo root (alembic.ini resolves its script_location
 # relative to itself), and `heads` rather than `head` because pagebuilder's

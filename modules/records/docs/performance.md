@@ -1562,8 +1562,83 @@ column now does seek — see §S3 for the plan.
   out-of-process database over a socket against an in-process file. That ratio
   is the harness, not the module, and nothing should be read into it.
 
-**Still not verified on Postgres:** the write path, the schema operations and
+~~**Still not verified on Postgres:** the write path, the schema operations and
 `tests/test_unique_concurrency.py`'s `FOR UPDATE` row lock, because
 `perf_db_copy` has no Postgres equivalent and those tests mutate. Giving it one
 (a template database and `CREATE DATABASE … TEMPLATE`) is the next thing this
-suite needs.
+suite needs.~~ — done, 2026-09-21; see below.
+
+### Postgres — the write path, concurrency and the rest of the suite
+
+**The whole suite now runs on Postgres**, and so do the 927 unit tests and the
+109 Playwright specs. Full evidence, including three migration bugs that made
+a Postgres install impossible from an empty database, is in
+[`postgres-2026-09-21.md`](postgres-2026-09-21.md). `perf_db_copy` got its
+template database, so the 19 measurements that used to skip — schema
+operations, import and export, the reindex, content i18n, the reduce index —
+have numbers here for the first time.
+
+`RECORDS_PERF_N=20000`, `REPS=20`, PostgreSQL 16.13 against SQLite 3.45 on the
+same machine in the same session. **Ratio is Postgres ÷ SQLite; under 1.00 is
+faster.**
+
+| operation | SQLite | Postgres | ratio |
+|---|---|---|---|
+| `create_record` / with a `unique` field | 11.91 / 14.02 ms | **8.60 / 10.04 ms** | 0.72× |
+| `update_record`, no indexed change / `price` | 18.06 / 20.01 ms | **13.22 / 13.18 ms** | 0.73× / 0.66× |
+| trash → restore → trash → purge | 46.18 ms | **30.62 ms** | 0.66× |
+| list page 1, unfiltered | 20.21 ms | 17.37 ms | 0.86× |
+| **page 200 by `?page=` (`OFFSET`)** | 78.40 ms | **39.21 ms** | **0.50×** |
+| page 200 by `?after=` | 24.95 ms | 26.54 ms | 1.06× |
+| **three ANDed filters** | 49.24 ms | **16.88 ms** | **0.34×** |
+| single filters (text / select / number / ref) | — | — | 0.88–1.12× |
+| sorts (text, number, datetime, ref, fixed column) | — | — | 0.77–1.17× |
+| `count_query` unbounded | 5.09 ms | **2.08 ms** | 0.41× |
+| live `GROUP BY` aggregate | 26.44 ms | **15.87 ms** | 0.60× |
+| import, `upsert`, unchanged export | 10.58 s (847 rows/s) | **8.56 s (1,047 rows/s)** | 0.81× |
+| export JSON / CSV, streamed | 1.53 / 1.65 s | 1.50 / 1.65 s | 1.00× |
+| `create_translation` | 71 rec/s | **103 rec/s** | 0.68× |
+| `reindex`, batch = 500 | 433.74 ms | **672.09 ms** | **1.55×** |
+| `display_field` change, whole-type rebuild | 932.40 ms | **1309.39 ms** | **1.40×** |
+| `_orphaned.count_conflicts` / `.discard` | 44 / 258 ms | 69 / 333 ms | 1.56× / 1.29× |
+
+Three things are worth carrying away.
+
+**The write path costs fewer statements on Postgres, and "statement counts
+travel" is wrong for it.** A create is **10 statements on Postgres and 13 on
+SQLite**, and the gap widens with the number of indexed fields: `write_index`
+batches its index rows into one `INSERT` per *kind table* on Postgres and one
+per *row* on SQLite. Measured directly, on a type with eight indexed `text`
+fields, a create is 14 statements on SQLite and still 7 on Postgres. **The
+"13 statements per create" figure published above is SQLite's, for the demo
+`company` type.** Every other statement count in this document is identical on
+both backends.
+
+**The per-type lock holds.** `tests/test_postgres_lock.py` fires twenty
+concurrent `create_record` calls carrying one `unique` value from twenty
+separate sessions: one succeeds, nineteen get the 409, one row is stored, no
+`IntegrityError` escapes and nothing deadlocks. Same for concurrent slug
+claims, and a `update_type` racing twenty creates leaves every record stamped
+with a `schema_version` the type has actually had. This is the first execution
+of `lock_type`'s `SELECT … FOR UPDATE` branch —
+`tests/test_unique_concurrency.py` races on a SQLite file and reaches the
+other one.
+
+**Bulk index rewrites are the one place Postgres is slower** (1.3–1.55×). At
+batch = 100 the two are level, so it is not per-statement latency; it is the
+`DELETE` + re-`INSERT` of index rows costing more against real MVCC than
+against a file. 2,965 rec/s at batch 500 is still far inside
+`reindex_stale_after_seconds`, and the rebuild is a background job.
+
+Two corrections to the section above, both from measuring rather than
+predicting:
+
+* "Absolute numbers are 1.3–1.8× SQLite's across the board" does not hold on
+  this machine. Across 122 measurements Postgres is at parity or faster for
+  everything except the bulk rewrites — the earlier ratio was a property of
+  that run's harness, as that bullet itself suspected.
+* "No plan anywhere reads `records_record` sequentially" was said of the read
+  path. The **bounded count** does, when `cap` is well below the type size:
+  Postgres takes a `Seq Scan` stopped early by the `LIMIT` and is *faster* for
+  it (1.49 ms vs 2.57 ms). The property F4 actually cares about — the
+  soft-delete filter staying inside the `Limit` — holds.

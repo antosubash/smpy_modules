@@ -13,6 +13,7 @@ without waiting half an hour inside pytest.
 
 from __future__ import annotations
 
+import itertools
 import os
 import tempfile
 from collections.abc import AsyncIterator
@@ -26,7 +27,8 @@ from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.models import Base, Record, RecordType
 from sm_records.settings import RecordsSettings
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.app_harness import build_app
 from tests.perf._bench import Results
@@ -109,23 +111,82 @@ async def perf_db() -> AsyncIterator[Any]:
         await state.engine.dispose()
 
 
+_copies = itertools.count()
+
+
+async def _postgres_copy(source_url: str) -> tuple[str, str]:
+    """``CREATE DATABASE … TEMPLATE`` — Postgres's answer to ``cp``.
+
+    The server copies the template's files itself, so this is the same
+    operation as the SQLite branch's ``shutil.copyfile`` and costs about as
+    much. It is the reason the schema-operation, import/export, reindex and
+    i18n measurements can run on Postgres at all: until this existed they
+    skipped, and the previous Postgres round could say nothing about the
+    write-heavy half of the suite.
+
+    Two constraints shape it. ``CREATE DATABASE`` cannot run inside a
+    transaction, hence ``AUTOCOMMIT``; and it refuses while **any** session is
+    connected to the template, which is why the caller disposes ``perf_db``'s
+    engine first. The name carries the process id as well as a counter because
+    a second pytest process against the same cluster would otherwise collide
+    on ``…_copy_0``.
+    """
+    admin_url = source_url.rsplit("/", 1)[0] + "/postgres"
+    source_name = source_url.rsplit("/", 1)[1].split("?")[0]
+    # Postgres truncates identifiers at 63 bytes; the prefix keeps it short
+    # enough that the suffix is never what gets cut.
+    target_name = f"{source_name[:40]}_c{os.getpid()}_{next(_copies)}"
+    engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text(f'DROP DATABASE IF EXISTS "{target_name}" WITH (FORCE)'))
+            await conn.execute(text(f'CREATE DATABASE "{target_name}" TEMPLATE "{source_name}"'))
+    finally:
+        await engine.dispose()
+    return admin_url, f"{source_url.rsplit('/', 1)[0]}/{target_name}"
+
+
+async def _drop_postgres_copy(admin_url: str, target_url: str) -> None:
+    name = target_url.rsplit("/", 1)[1]
+    engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+    finally:
+        await engine.dispose()
+
+
 @pytest_asyncio.fixture
 async def perf_db_copy(perf_db, tmp_path) -> AsyncIterator[Any]:
     """A throwaway copy of the seeded database.
 
     The schema-operation measurements mutate the type they run against —
     applying a change, toggling ``indexed``, discarding orphaned values — and
-    a suite that leaves the seeded file in a different shape than it found it
-    is not repeatable. Copying the file is seconds even at 100k records, and
-    far cheaper than reseeding.
+    a suite that leaves the seeded database in a different shape than it found
+    it is not repeatable. Copying is seconds even at 100k records, and far
+    cheaper than reseeding.
+
+    Both backends copy, by their own means: a file on SQLite, ``CREATE
+    DATABASE … TEMPLATE`` on Postgres. Either way ``perf_db``'s engine is
+    disposed first — SQLite so the file is not copied mid-write, Postgres
+    because the server refuses to use a template that has a connection open.
     """
     import shutil
 
+    await perf_db.engine.dispose()
     if DATABASE_URL:
-        pytest.skip("perf_db_copy copies a SQLite file; RECORDS_PERF_URL has no equivalent")
+        admin_url, target_url = await _postgres_copy(DATABASE_URL)
+        state = init_db(target_url)
+        register_listeners(state)
+        try:
+            yield state
+        finally:
+            await state.engine.dispose()
+            await _drop_postgres_copy(admin_url, target_url)
+        return
+
     source = _db_path()
     target = tmp_path / "records_perf_copy.db"
-    await perf_db.engine.dispose()
     shutil.copyfile(source, target)
     state = init_db(f"sqlite+aiosqlite:///{target}")
     register_listeners(state)

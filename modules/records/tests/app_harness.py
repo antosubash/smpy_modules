@@ -28,15 +28,14 @@ from inertia import InertiaConfig, inertia_dependency_factory
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
 from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
 from simple_module_hosting.permissions import resolve_permissions
-from sm_records.models import Base, Record, RecordType
+from sm_records.models import Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
-from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from tests.pg_support import make_db_state
 
 try:
     # Only present when the host also installs ``permissions`` — see
@@ -49,12 +48,12 @@ try:
     # the role map when ``request.state.resolved_permissions`` is unset — so
     # both have to be provided here for the harness to behave like the real
     # request pipeline (``AuthMiddleware`` sets ``resolved_permissions``;
-    # real user ids are UUIDs).
-    from permissions.models import Base as _PermissionsBase
+    # real user ids are UUIDs). Its table is created by
+    # ``tests.pg_support.make_db_state``.
+    import permissions.models  # noqa: F401
 
     _PERMISSIONS_INSTALLED = True
 except ImportError:  # pragma: no cover - exercised only without `permissions`
-    _PermissionsBase = None
     _PERMISSIONS_INSTALLED = False
 
 #: Holds ``records.view`` + ``records.edit`` — the caller a ``allowed_roles``
@@ -158,16 +157,11 @@ async def build_app(
     app.include_router(view_router)
 
     if db_state is None:
-        db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-        register_listeners(db_state)
-        async with db_state.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            if _PERMISSIONS_INSTALLED:
-                # ``permissions.deps.RequiresPermission`` queries this table
-                # directly (see the middleware above) rather than falling
-                # back to the role map — it has to exist even though this
-                # module's own ``Base`` never declares it.
-                await conn.run_sync(_PermissionsBase.metadata.create_all)
+        # ``make_db_state`` is the suite's one place that decides which backend
+        # a test runs on — in-memory SQLite by default, Postgres when
+        # ``RECORDS_TEST_URL`` is set — and the one place that creates the
+        # ``permissions`` table the middleware above needs.
+        db_state = await make_db_state()
 
     registry = PermissionRegistry()
     module.register_permissions(registry)

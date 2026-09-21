@@ -7,6 +7,8 @@ the test module owns which URLs are worth measuring.
 
 from __future__ import annotations
 
+import re
+
 from tests.app_harness import ADMIN, roles
 from tests.perf._bench import (
     Results,
@@ -28,14 +30,35 @@ async def get_ok(client, url: str):
     return response
 
 
+#: Postgres's spellings of "this node read an index". ``Index Scan using X on
+#: t`` and ``Index Only Scan using X on t`` name the index after ``using``;
+#: ``Bitmap Index Scan on X`` names it after ``on``, because the *heap* access
+#: is a separate node. Case-sensitive on purpose — SQLite shouts ``USING`` and
+#: is handled by the branch above, and keeping the two patterns disjoint is
+#: what lets one function serve both without either changing the other's output.
+_PG_INDEX = re.compile(r"(?:Index(?: Only)? Scan using|Bitmap Index Scan on)\s+(\S+)")
+
+
 def plan_label(plan: list[str]) -> str:
     """One cell of the results table: which index the plan used, or the
-    full-scan shape design §7.2 exists to prevent."""
+    full-scan shape design §7.2 exists to prevent.
+
+    **Both dialects, since the Postgres study of 2026-09-21.** The SQLite
+    branch splits on ``USING`` because that is how ``EXPLAIN QUERY PLAN``
+    writes it (``SEARCH t USING INDEX ix_… (type_id=?)``). Postgres writes
+    ``Index Scan using ix_… on t``, in lower case, which that split does not
+    see — so every row of the first Postgres run of this suite reported its
+    plan as ``?`` and the column, which is most of why the table exists, said
+    nothing. The SQLite label is deliberately left byte-for-byte as it was,
+    ``INDEX `` prefix and all, so the numbers already recorded in
+    ``docs/performance.md`` stay comparable with new ones.
+    """
     if plan_scans_records(plan):
         return "SCAN records_record"
     used = [line.split("USING")[1].strip() for line in plan if "USING" in line]
-    names = sorted({item.replace("COVERING ", "").split(" (")[0] for item in used})
-    label = ",".join(names) or "?"
+    names = {item.replace("COVERING ", "").split(" (")[0] for item in used}
+    names |= {match.group(1) for line in plan for match in _PG_INDEX.finditer(line)}
+    label = ",".join(sorted(names)) or "?"
     if plan_temp_btree(plan):
         label += " +TEMP B-TREE"
     return label[:70]
