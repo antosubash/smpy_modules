@@ -176,6 +176,7 @@ async def record_list(
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1, le=MAX_PAGE),
+    page_size: int | None = Query(default=None, ge=1),
     parsed: tuple[list[Filter], str | None] = Depends(parse_view_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     trashed: bool = Depends(parse_trashed),
@@ -188,7 +189,11 @@ async def record_list(
     enumerates soft-deleted rows to restore one (FAIL-3)."""
     counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
-    page_size = settings.clamp_page_size(None)
+    # ``?page_size=`` the same way the JSON API takes it, clamped to
+    # ``max_page_size`` rather than refused: the list footer offers 25/50/100
+    # (UX-R18) and writes the choice into the URL, which is where every other
+    # piece of this screen's state already lives.
+    size = settings.clamp_page_size(page_size)
     filters, malformed = parsed
     errors: dict[str, str] = {}
     items: list = []
@@ -212,6 +217,7 @@ async def record_list(
                 filters=filters,
                 sorts=effective_sorts,
                 page=page,
+                page_size=size,
                 trashed=trashed,
             )
         except QueryError as exc:
@@ -238,7 +244,7 @@ async def record_list(
         total_capped=capped,
         next_cursor=next_cursor,
         page=page,
-        page_size=page_size,
+        page_size=size,
     )
     # ``errors`` is sent on every render, empty or not: the list refetches
     # with ``only: ["records", "errors"]`` and Inertia merges partial props

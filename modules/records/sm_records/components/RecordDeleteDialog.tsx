@@ -54,7 +54,15 @@ export function DialogDescription({
   if (loadError) {
     return <span className="text-destructive">{loadError}</span>;
   }
-  return t('records.records.confirm_delete', { defaultValue: 'Delete this record?' });
+  // Names the Trash and says the delete is reversible (UX-R8): this is a
+  // soft delete the record can be restored from until it is purged, and a
+  // dialog that said "Delete this record?" presented a safe, reversible
+  // action as a one-way door — the module's safety net was invisible on the
+  // one screen that should mention it.
+  return t('records.records.confirm_delete', {
+    defaultValue:
+      'Move this record to the Trash? You can restore it until it is deleted permanently.',
+  });
 }
 
 /** The consequences of deleting, when there are any worth naming — `null`
@@ -141,8 +149,8 @@ export function DialogDetails({
  * §9): before asking, it fetches the referrers and says what deleting would
  * actually do — block (`restrict`, confirm disabled), clear a reference
  * (`set_null`) or take other records with it (`cascade`, listed). Zero
- * referrers falls through to the same plain "Delete this record?" the
- * dialog always asked.
+ * referrers falls through to the plain "Move this record to the Trash?"
+ * every delete asks.
  *
  * The fetch is a snapshot, not a lock: a `restrict` referrer created between
  * the fetch and the confirm click still comes back as the API's own `409`

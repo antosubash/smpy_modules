@@ -90,7 +90,10 @@ test.describe('Records — record CRUD', () => {
     await expect(page.getByRole('heading', { name: 'Things' })).toBeVisible();
     await expect(page.getByText('No records yet')).toBeVisible();
 
-    await page.getByRole('link', { name: 'New record' }).click();
+    // The empty state carries its own "New record" call to action now
+    // (UX-R1), so this has to say which of the two it means — and the one
+    // inside the box is the one an empty type's reader actually reaches for.
+    await page.getByTestId('records-empty-state').getByRole('link', { name: 'New record' }).click();
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}/new$`));
 
     await recordField(page, 'title').fill('First thing');
@@ -110,8 +113,8 @@ test.describe('Records — record CRUD', () => {
     // The relation is picked through `RelationPicker`, which searches the
     // target type on `display_title:contains:` and stores `{type, uuid}`.
     const picker = page.getByTestId('records-relation-owner');
-    await picker.getByRole('searchbox').fill('Ada');
-    await picker.getByRole('button', { name: 'Ada Lovelace' }).click();
+    await picker.getByRole('combobox').fill('Ada');
+    await picker.getByRole('option', { name: 'Ada Lovelace' }).click();
     await expect(picker.getByText('Ada Lovelace')).toBeVisible();
 
     await page.locator('#record-status').selectOption('published');

@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
@@ -5,6 +6,7 @@ import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api-records';
 import type { RecordRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RecordDeleteDialog } from './RecordDeleteDialog';
+import { restoredToast, trashToast } from './trashToast';
 
 /** Delete / restore / purge for `RecordEditor` — split out so the editor's
  *  main body stays readable and under the 300-line cap. Exactly one of the
@@ -37,6 +39,18 @@ export function RecordActions({
         }
         onConfirm={async () => {
           await deleteRecord(typeKey, record.uuid);
+          // Before `onGone()` navigates: the toast names the Trash the
+          // record went to and offers to put it back (UX-R8). `RecordsToaster`
+          // is mounted by the layout both screens share, so the toast
+          // survives the visit to the list that follows.
+          trashToast(t, {
+            typeKey,
+            onUndo: async () => {
+              await restoreRecord(typeKey, record.uuid);
+              restoredToast(t);
+              router.reload({ only: ['records'] });
+            },
+          });
           onGone();
         }}
       />
@@ -60,7 +74,10 @@ export function RecordActions({
         confirmLabel={restoreLabel}
         cancelLabel={cancelLabel}
         pendingLabel={pendingLabel}
-        onConfirm={async () => onRestored(await restoreRecord(typeKey, record.uuid))}
+        onConfirm={async () => {
+          onRestored(await restoreRecord(typeKey, record.uuid));
+          restoredToast(t);
+        }}
       />
       <ConfirmDialog
         trigger={

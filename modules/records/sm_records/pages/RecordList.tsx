@@ -5,14 +5,24 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
 import type React from 'react';
+import { useRef } from 'react';
 
-import { FilterBar, type FilterValue } from '../components/FilterBar';
+import { FilterBar } from '../components/FilterBar';
 import { RecordIoMenu } from '../components/RecordIoMenu';
-import { RecordPagination } from '../components/RecordPagination';
+import { RecordListEmpty } from '../components/RecordListEmpty';
+import { PAGE_SIZES, RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
+import { restoredToast, trashToast } from '../components/trashToast';
 import { deleteRecord, restoreRecord } from '../utils/api-records';
-import { buildSortParam, filterErrorReasonKey, nextSort, parseSort } from '../utils/listing';
+import {
+  buildSortParam,
+  filterErrorMessage,
+  listStatus,
+  nextSort,
+  parseFilterParam,
+  parseSort,
+} from '../utils/listing';
 import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
 
 type Props = {
@@ -25,62 +35,6 @@ type Props = {
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
 
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up TS
-// with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
-
-/** One term of the filter/sort grammar failed to build into a query —
- *  `filterErrorReasonKey` narrows `reason` to the closed set this maps.
- *  Every branch keeps its own literal `t()` call (rather than a
- *  `Record<FilterErrorReason, string>` built once) for the same reason
- *  `FilterBar`'s `opLabel` does: `make ci-check-untranslated` can't see
- *  through a config object, only a call it can find. */
-function filterErrorMessage(t: Translate, reason: string | undefined): string {
-  switch (filterErrorReasonKey(reason)) {
-    case 'reindexing':
-      return t('records.list.filter_error.reindexing', {
-        defaultValue:
-          'That field is being reindexed right now and cannot be filtered on yet. Try again shortly.',
-      });
-    case 'unsupported_op':
-      return t('records.list.filter_error.unsupported_op', {
-        defaultValue: "That condition isn't supported for this field.",
-      });
-    case 'not_indexed':
-      return t('records.list.filter_error.not_indexed', {
-        defaultValue: "That field isn't indexed, so it can't be filtered or sorted on.",
-      });
-    case 'unknown':
-      return t('records.list.filter_error.unknown', {
-        defaultValue: "That field doesn't exist on this record type.",
-      });
-    case 'bad_value':
-      return t('records.list.filter_error.bad_value', {
-        defaultValue: "That value isn't valid for this field.",
-      });
-    default:
-      return t('records.list.filter_error.generic', {
-        defaultValue: "That filter couldn't be applied.",
-      });
-  }
-}
-
-/** Split on the first two colons — the value half of `field:op:value` may
- *  itself contain one (an ISO datetime), and the field/op halves never do. */
-function parseFilterParam(raw: string | null): FilterValue {
-  if (!raw) return null;
-  const first = raw.indexOf(':');
-  const second = raw.indexOf(':', first + 1);
-  if (first < 0 || second < 0) return null;
-  return {
-    field: raw.slice(0, first),
-    op: raw.slice(first + 1, second) as FilterOp,
-    value: raw.slice(second + 1),
-  };
-}
-
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
  *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
  *  can be bookmarked or shared. */
@@ -92,6 +46,8 @@ function RecordList({ type, records, content_locales }: Props) {
   const rawSort = search.get('sort');
   const trashed = search.get('trashed') === 'true';
   const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
+  const rawPageSize = Number(search.get('page_size')) || records.page_size;
+  const listTop = useRef<HTMLDivElement>(null);
   const currentFilter = parseFilterParam(rawFilter);
   const currentSort = parseSort(search.toString());
   // The admin list always defaults to every locale (design §4.4) — the
@@ -120,6 +76,7 @@ function RecordList({ type, records, content_locales }: Props) {
     filter?: string | null;
     sort?: string | null;
     trashed?: boolean;
+    pageSize?: number;
   }) => {
     const params: Record<string, string> = {};
     const targetPage = next.page ?? records.page;
@@ -130,16 +87,34 @@ function RecordList({ type, records, content_locales }: Props) {
     if (targetSort) params.sort = targetSort;
     const targetTrashed = next.trashed ?? trashed;
     if (targetTrashed) params.trashed = 'true';
+    const targetSize = next.pageSize ?? rawPageSize;
+    // The default is the absence of the param, not `?page_size=25`: a URL
+    // that carries only what differs from the default is the one worth
+    // sharing, and the server clamps whatever does arrive.
+    if (targetSize && targetSize !== PAGE_SIZES[0]) params.page_size = String(targetSize);
     // Toggling `trashed` swaps every prop (`records`, `errors` and, via
     // `parse_trashed`, what the server even lets through) — a partial reload
     // only makes sense for staying inside the same trashed/live view.
     const full = next.trashed !== undefined;
+    const paged = next.page !== undefined || next.pageSize !== undefined;
     router.get(`/admin/records/${type.key}`, params, {
       only: full ? undefined : ['records', 'errors'],
       preserveState: true,
       preserveScroll: true,
-      replace: true,
+      // No `replace: true` (UX-R3). Every one of these is a change the user
+      // asked for, and collapsing them all into a single history entry meant
+      // Back left the list entirely instead of undoing the last filter, sort
+      // or page — the universal undo, and the one path `FilterBar`'s
+      // remount-on-`key` was written for.
+      onSuccess: paged ? scrollListIntoView : undefined,
     });
+  };
+
+  /** After a page change the rows above the fold are replaced silently —
+   *  `preserveScroll` keeps the reader pinned to the footer they clicked in
+   *  (UX-R18). Put the top of the list back on screen instead. */
+  const scrollListIntoView = () => {
+    listTop.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
   const applyFilter = (field: string, op: FilterOp, value: string) =>
@@ -152,11 +127,16 @@ function RecordList({ type, records, content_locales }: Props) {
   const handleDelete = async (record: RecordRead) => {
     await deleteRecord(type.key, record.uuid);
     router.reload({ only: ['records'] });
+    // A soft delete that said nothing at all was a reversible action wearing
+    // an irreversible one's face (UX-R8): the toast names the Trash, undoes
+    // the delete, and links the trashed view for anyone who reads it late.
+    trashToast(t, { typeKey: type.key, onUndo: () => handleRestore(record) });
   };
 
   const handleRestore = async (record: RecordRead) => {
     await restoreRecord(type.key, record.uuid);
     router.reload({ only: ['records'] });
+    restoredToast(t);
   };
 
   // `total` is exact only up to `RecordsSettings.max_count` (F4): beyond it
@@ -175,7 +155,14 @@ function RecordList({ type, records, content_locales }: Props) {
         title={type.label_plural}
         description={type.description ?? undefined}
         actions={
-          <>
+          // `PageShell` lays its own `actions` row out `flex-shrink-0` with
+          // no wrapping (it lives in the framework's `@simple-module-py/ui`
+          // package, which this module cannot change), so four buttons ran
+          // straight off a 390px document and took the whole page's
+          // horizontal scroll with them (UX-R4). Below `sm` that row is a
+          // full-width column item, so a wrapping flex row inside it is the
+          // fix from this side of the boundary.
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => router.visit('/admin/records')}>
               {t('records.types.title', { defaultValue: 'Record Types' })}
             </Button>
@@ -208,56 +195,77 @@ function RecordList({ type, records, content_locales }: Props) {
                 </Link>
               </Button>
             )}
-          </>
+          </div>
         }
       >
-        <div className="mb-4">
-          <FilterBar
-            key={rawFilter ?? '__none__'}
-            fields={type.fields}
-            current={currentFilter}
-            onApply={applyFilter}
-            onClear={clearFilter}
-            locales={showLocaleUI ? contentLocales : []}
+        {/* Contains the list's own overflow (UX-R4): the table already
+            scrolls inside its own box, and nothing else here may push the
+            document sideways on a phone. */}
+        <div className="min-w-0 overflow-x-clip">
+          <div className="mb-4">
+            <FilterBar
+              key={rawFilter ?? '__none__'}
+              fields={type.fields}
+              current={currentFilter}
+              onApply={applyFilter}
+              onClear={clearFilter}
+              locales={showLocaleUI ? contentLocales : []}
+            />
+          </div>
+
+          {filterErrorReason && (
+            <div
+              data-testid="records-filter-error"
+              className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm"
+            >
+              {filterErrorMessage(t, filterErrorReason)}
+            </div>
+          )}
+
+          <div ref={listTop} className="scroll-mt-4">
+            {records.items.length === 0 ? (
+              <RecordListEmpty
+                typeKey={type.key}
+                trashed={trashed}
+                filtered={Boolean(currentFilter) || Boolean(filterErrorReason)}
+                onClear={clearFilter}
+              />
+            ) : (
+              <RecordTable
+                type={type}
+                records={records.items}
+                sort={currentSort}
+                trashed={trashed}
+                showLocale={showLocaleUI}
+                onSort={handleSort}
+                onDelete={handleDelete}
+                onRestore={handleRestore}
+              />
+            )}
+          </div>
+
+          {/* A filter, a sort or a page swaps the rows through a partial
+            reload with no focus move, so a screen reader was never told the
+            page had become a different page (UX-R15). */}
+          <p className="sr-only" role="status" aria-live="polite" data-testid="records-list-status">
+            {listStatus(t, {
+              count: records.items.length,
+              page: records.page,
+              pages: Math.max(1, Math.ceil(known / records.page_size)),
+              capped: records.total_capped,
+            })}
+          </p>
+
+          <RecordPagination
+            page={records.page}
+            pageSize={records.page_size}
+            total={known}
+            capped={records.total_capped}
+            itemCount={records.items.length}
+            onGo={(next) => goTo({ page: next })}
+            onPageSize={(size) => goTo({ page: 1, pageSize: size })}
           />
         </div>
-
-        {filterErrorReason && (
-          <div
-            data-testid="records-filter-error"
-            className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm"
-          >
-            {filterErrorMessage(t, filterErrorReason)}
-          </div>
-        )}
-
-        {records.items.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-            {trashed
-              ? t('records.trash.empty', { defaultValue: 'No trashed records' })
-              : t('records.records.empty', { defaultValue: 'No records yet' })}
-          </div>
-        ) : (
-          <RecordTable
-            type={type}
-            records={records.items}
-            sort={currentSort}
-            trashed={trashed}
-            showLocale={showLocaleUI}
-            onSort={handleSort}
-            onDelete={handleDelete}
-            onRestore={handleRestore}
-          />
-        )}
-
-        <RecordPagination
-          page={records.page}
-          pageSize={records.page_size}
-          total={known}
-          capped={records.total_capped}
-          itemCount={records.items.length}
-          onGo={(next) => goTo({ page: next })}
-        />
       </PageShell>
     </>
   );

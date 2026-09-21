@@ -59,3 +59,21 @@ const OPS_BY_FIELD_TYPE: Record<string, readonly FilterOp[]> = {
 export function opsForFieldType(type: string): readonly FilterOp[] {
   return OPS_BY_FIELD_TYPE[type] ?? [];
 }
+
+/**
+ * Disambiguates filter-field labels that collide (UX-R5).
+ *
+ * A type's own `order_status` field labelled "Status" and the fixed record
+ * `status` column are two different filters with one name, and the dropdown
+ * gave the user no way to tell them apart — picking one was a coin flip.
+ * Any label that occurs more than once gains its key in parentheses, the
+ * same disambiguation `RecordTable` already applies to a column header's
+ * accessible name; a label that occurs once is left exactly as authored.
+ */
+export function disambiguateLabels<T extends { key: string; label: string }>(fields: T[]): T[] {
+  const seen = new Map<string, number>();
+  for (const field of fields) seen.set(field.label, (seen.get(field.label) ?? 0) + 1);
+  return fields.map((field) =>
+    (seen.get(field.label) ?? 0) > 1 ? { ...field, label: `${field.label} (${field.key})` } : field,
+  );
+}

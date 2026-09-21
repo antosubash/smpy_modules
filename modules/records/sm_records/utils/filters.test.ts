@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { opsForFieldType } from './filters';
+import { disambiguateLabels, opsForFieldType } from './filters';
 
 /**
  * Mirrors `sm_records.index._predicates._ALLOWED` — see that dict for the
@@ -35,5 +35,37 @@ describe('opsForFieldType', () => {
 
   it('returns nothing for an unknown type rather than throwing', () => {
     expect(opsForFieldType('nope')).toEqual([]);
+  });
+});
+
+describe('disambiguateLabels', () => {
+  it('leaves unique labels untouched', () => {
+    const fields = [
+      { key: 'name', label: 'Name' },
+      { key: 'status', label: 'Status' },
+    ];
+    expect(disambiguateLabels(fields)).toEqual(fields);
+  });
+
+  it('appends the key to every member of a colliding label', () => {
+    expect(
+      disambiguateLabels([
+        { key: 'order_status', label: 'Status' },
+        { key: 'status', label: 'Status' },
+        { key: 'name', label: 'Name' },
+      ]),
+    ).toEqual([
+      { key: 'order_status', label: 'Status (order_status)' },
+      { key: 'status', label: 'Status (status)' },
+      { key: 'name', label: 'Name' },
+    ]);
+  });
+
+  it('keeps the other properties of a disambiguated field', () => {
+    const [first] = disambiguateLabels([
+      { key: 'a', label: 'Dup', ops: ['eq'] },
+      { key: 'b', label: 'Dup', ops: ['ne'] },
+    ]);
+    expect(first).toEqual({ key: 'a', label: 'Dup (a)', ops: ['eq'] });
   });
 });

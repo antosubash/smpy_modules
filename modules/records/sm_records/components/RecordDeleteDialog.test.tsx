@@ -56,13 +56,16 @@ describe('RecordDeleteDialog / DialogDescription + DialogDetails', () => {
 
   it('falls back to the plain confirmation when there are no referrers', () => {
     const out = html([]);
-    expect(out).toContain('Delete this record?');
+    expect(out).toContain('Move this record to the Trash?');
+    // The Trash is the module's safety net and this is the one screen that
+    // has to mention it (UX-R8).
+    expect(out).toContain('restore it until it is deleted permanently');
     expect(out).not.toContain('block this delete');
   });
 
   it('falls back to the plain confirmation when every referrer is trashed', () => {
     const out = html([referrer({ is_deleted: true })]);
-    expect(out).toContain('Delete this record?');
+    expect(out).toContain('Move this record to the Trash?');
   });
 
   it('names a restrict referrer, links it, and explains the delete is blocked', () => {

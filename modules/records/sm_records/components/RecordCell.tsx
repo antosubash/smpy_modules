@@ -172,22 +172,25 @@ export function RecordCell({
       // Matched by position: `expanded[field.key]` carries one `ExpandedRef`
       // per stored reference, in payload order (design §9) — the same order
       // `refs` is already in.
+      //
+      // The separator rides *inside* each chip's wrapper and trails it
+      // (UX-R17). As its own child of the `gap-x-1` flex row it was a flex
+      // item in its own right, so the gap applied on both sides of it and
+      // every relation column printed "A , B ,".
       return (
         <span className="flex flex-wrap items-center gap-x-1">
           {refs.map((r, index) => {
             const exp = expanded[index];
             const key = isRef(r) ? r.uuid : String(index);
-            if (!exp) {
-              return (
-                <span key={key} className="font-mono text-xs">
-                  {isRef(r) ? r.uuid.slice(0, 8) : DASH}
-                </span>
-              );
-            }
+            const last = index === refs.length - 1;
             return (
-              <span key={exp.uuid} className="contents">
-                {index > 0 && <span className="text-muted-foreground">,</span>}
-                <ExpandedRefChip ref={exp} />
+              <span key={exp ? exp.uuid : key} className="inline-flex items-center">
+                {exp ? (
+                  <ExpandedRefChip ref={exp} />
+                ) : (
+                  <span className="font-mono text-xs">{isRef(r) ? r.uuid.slice(0, 8) : DASH}</span>
+                )}
+                {!last && <span className="text-muted-foreground">,</span>}
               </span>
             );
           })}

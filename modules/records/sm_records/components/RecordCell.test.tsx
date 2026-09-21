@@ -162,6 +162,33 @@ describe('RecordCell', () => {
     expect(out).not.toContain('01234567');
   });
 
+  it('separates several expanded relations with a comma that hugs the chip', () => {
+    const f = field({ type: 'relation', options: { target_type: 'author' } });
+    const refs = [
+      { type: 'author', uuid: 'aaaaaaaaaaaa' },
+      { type: 'author', uuid: 'bbbbbbbbbbbb' },
+    ];
+    const out = renderToStaticMarkup(
+      <RecordCell
+        field={f}
+        value={refs}
+        expanded={refs.map((ref, index) => ({
+          type_key: 'author',
+          uuid: ref.uuid,
+          display_title: index === 0 ? 'Herbert' : 'Le Guin',
+          slug: null,
+          status: 'published',
+          dangling: false,
+          restricted: false,
+        }))}
+      />,
+    );
+    // The separator trails its own chip's wrapper rather than being a flex
+    // item of its own, which is what printed "Herbert , Le Guin" (UX-R17).
+    const text = out.replace(/<[^>]+>/g, '');
+    expect(text).toBe('Herbert,Le Guin');
+  });
+
   it('truncates long text and keeps the full value in a title attribute', () => {
     const long = 'x'.repeat(80);
     const out = html(field({ type: 'text' }), long);

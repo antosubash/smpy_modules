@@ -117,3 +117,25 @@ describe('filterErrorReasonKey', () => {
     expect(filterErrorReasonKey(undefined)).toBe('generic');
   });
 });
+
+describe('listColumns and the display field', () => {
+  it('drops the column the Title column already prints', () => {
+    const fields = [field({ key: 'name', indexed: true }), field({ key: 'city', indexed: true })];
+    expect(listColumns({ fields, display_field: 'name' }).map((f) => f.key)).toEqual(['city']);
+  });
+
+  it('frees the dropped column for a field the cap would have cut', () => {
+    const fields = Array.from({ length: 6 }, (_, i) => field({ key: `f${i}`, indexed: true }));
+    expect(listColumns({ fields, display_field: 'f0' }).map((f) => f.key)).toEqual([
+      'f1',
+      'f2',
+      'f3',
+      'f4',
+    ]);
+  });
+
+  it('keeps every column for a type with no display field', () => {
+    const fields = [field({ key: 'a', indexed: true })];
+    expect(listColumns({ fields, display_field: null }).map((f) => f.key)).toEqual(['a']);
+  });
+});

@@ -3,9 +3,11 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import type React from 'react';
 import { useState } from 'react';
 
-import { opsForFieldType } from '../utils/filters';
+import { disambiguateLabels, opsForFieldType } from '../utils/filters';
+import type { FilterValue } from '../utils/listing';
 import { localeLabel } from '../utils/locale';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 
@@ -37,7 +39,10 @@ function opLabel(t: Translate, op: FilterOp): string {
   return t(`records.filters.op.${op}`, { defaultValue: defaults[op] });
 }
 
-export type FilterValue = { field: string; op: FilterOp; value: string } | null;
+// The shape lives in `utils/listing.ts` beside the parser that produces it
+// from the URL; re-exported here because every consumer of this component
+// already imports it from this module.
+export type { FilterValue };
 
 type FilterableField = { key: string; label: string; ops: readonly FilterOp[] };
 
@@ -127,10 +132,15 @@ export function FilterBar({
   // reserved field keys (`typeeditor/rules.ts::RESERVED_FIELD_KEYS`), but a
   // type saved before that still carries such a field.
   const declared = new Set(indexed.map((f) => f.key));
-  const filterable = [
+  // `disambiguateLabels` last, over the merged list: a type's own
+  // `order_status` field labelled "Status" and the fixed `status` column are
+  // two filters under one name, and the dropdown offered no way to tell them
+  // apart (UX-R5). Colliding labels — from either half of this list — gain
+  // their key in parentheses.
+  const filterable = disambiguateLabels([
     ...indexed,
     ...fixedFilterFields(t, locales).filter((f) => !declared.has(f.key)),
-  ];
+  ]);
   const fieldByKey = new Map(filterable.map((f) => [f.key, f]));
 
   const initialField = current?.field ?? filterable[0]?.key ?? '';
@@ -161,8 +171,22 @@ export function FilterBar({
     if (nextField === 'locale' && !locales.includes(value)) setValue(locales[0] ?? '');
   };
 
+  // A `<form>` and not a `<div>` (UX-R2): the value input is the most-typed
+  // control on the busiest screen in the module, and without implicit
+  // submission Enter did nothing at all — no request, no URL change, no
+  // feedback. `onApply` navigates, so the submit is always prevented first.
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!field) return;
+    onApply(field, op, needsValue ? value : 'true');
+  };
+
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
+    <form
+      className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
+      data-testid="records-filter-bar"
+      onSubmit={submit}
+    >
       <div className="grid gap-1.5">
         <Label htmlFor="records-filter-field">
           {t('records.records.filter_field', { defaultValue: 'Field' })}
@@ -245,12 +269,7 @@ export function FilterBar({
         </div>
       )}
       <div className="flex gap-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={!field}
-          onClick={() => onApply(field, op, needsValue ? value : 'true')}
-        >
+        <Button type="submit" size="sm" disabled={!field}>
           {t('records.records.filter_apply', { defaultValue: 'Apply' })}
         </Button>
         {current && (
@@ -259,6 +278,6 @@ export function FilterBar({
           </Button>
         )}
       </div>
-    </div>
+    </form>
   );
 }

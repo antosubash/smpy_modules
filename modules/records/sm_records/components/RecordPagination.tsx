@@ -1,5 +1,14 @@
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { Label } from '@simple-module-py/ui/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+
+/** The page sizes the footer offers. The first is the module's own default
+ *  (`RecordsSettings.default_page_size`), which is also what the footer
+ *  treats as "unset": a type small enough to fit on one page renders no
+ *  footer at all unless the URL asked for another size, and would otherwise
+ *  strand a reader who picked 100 with no control to go back to 25. */
+export const PAGE_SIZES = [25, 50, 100] as const;
 
 // See `pages/RecordList.tsx` for why `t` is typed this loosely.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
@@ -44,8 +53,23 @@ function cappedHelp(t: Translate, total: number): string {
   });
 }
 
+/** "Page 2 of 8" — or just "Page 2" when the total is the cap and not the
+ *  count (F4), where a last page number would be a number that isn't one.
+ *  Two `t()` calls for the reason `pageInfo` gives. */
+function pagePosition(t: Translate, page: number, pages: number, capped: boolean): string {
+  if (capped) {
+    return t('records.records.page_position_capped', { page, defaultValue: 'Page {page}' });
+  }
+  return t('records.records.page_position', {
+    page,
+    pages,
+    defaultValue: 'Page {page} of {pages}',
+  });
+}
+
 /**
- * The record list's footer: "Showing 1–25 of N" and the two page buttons.
+ * The record list's footer: "Showing 1–25 of N", where in the run of pages
+ * this one falls, the four page buttons and the page-size select.
  *
  * Extracted from `pages/RecordList.tsx` for the 300-line cap when the total
  * stopped being a plain number (F4). `total` is what the API reported — the
@@ -54,8 +78,15 @@ function cappedHelp(t: Translate, total: number): string {
  * cap and no further. Walking past it is what `RecordPage.next_cursor` and
  * `?after=` are for (F11); the admin UI shows numbered pages and does not.
  *
- * Renders nothing when there is only one page, which is what the list did
- * before and keeps a small type's screen free of chrome.
+ * "First"/"Last" and the size select are UX-R18: 180 records at 25 a page
+ * put the last page seven clicks away, with no page number to say where you
+ * were and no way to ask for a longer page. Both write the URL through the
+ * caller, like every other list control (the URL is the state).
+ *
+ * Renders nothing when a single page holds everything *and* nobody asked for
+ * a different page size — which is what the list did before, and keeps a
+ * small type's screen free of chrome without stranding a reader who picked
+ * 100 on a screen with no control to pick 25 again.
  */
 export function RecordPagination({
   page,
@@ -64,6 +95,7 @@ export function RecordPagination({
   capped,
   itemCount,
   onGo,
+  onPageSize,
 }: {
   page: number;
   pageSize: number;
@@ -76,35 +108,83 @@ export function RecordPagination({
    *  rows on screen are the one number that is always right. */
   itemCount: number;
   onGo: (page: number) => void;
+  /** Writes `?page_size=` and returns to page 1 — the row the reader was
+   *  looking at is on a different page under a different size anyway. */
+  onPageSize: (size: number) => void;
 }) {
   const { t } = useT();
-  if (total <= pageSize) return null;
+  if (total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
   const rangeStart = itemCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = itemCount === 0 ? 0 : rangeStart + itemCount - 1;
+  // The last page the numbered pager reaches. On a capped listing that is
+  // the last page *of the cap* — the same bound `Next` has always used.
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+  const onFirst = page <= 1;
+  const onLast = page >= lastPage;
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-      <span title={capped ? cappedHelp(t, total) : undefined}>
-        {pageInfo(t, rangeStart, rangeEnd, total, capped)}
-      </span>
-      <div className="space-x-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => onGo(page - 1)}
-        >
-          {t('records.records.previous', { defaultValue: 'Previous' })}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={page * pageSize >= total}
-          onClick={() => onGo(page + 1)}
-        >
-          {t('records.records.next', { defaultValue: 'Next' })}
-        </Button>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span title={capped ? cappedHelp(t, total) : undefined}>
+          {pageInfo(t, rangeStart, rangeEnd, total, capped)}
+        </span>
+        <span data-testid="records-page-position">{pagePosition(t, page, lastPage, capped)}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="records-page-size" className="font-normal">
+            {t('records.records.page_size', { defaultValue: 'Per page' })}
+          </Label>
+          <NativeSelect
+            id="records-page-size"
+            className="w-auto"
+            value={String(pageSize)}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+          >
+            {PAGE_SIZES.map((size) => (
+              <NativeSelectOption key={size} value={String(size)}>
+                {size}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="space-x-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={onFirst}
+            onClick={() => onGo(1)}
+          >
+            {t('records.records.first', { defaultValue: 'First' })}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={onFirst}
+            onClick={() => onGo(page - 1)}
+          >
+            {t('records.records.previous', { defaultValue: 'Previous' })}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={onLast}
+            onClick={() => onGo(page + 1)}
+          >
+            {t('records.records.next', { defaultValue: 'Next' })}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={onLast}
+            onClick={() => onGo(lastPage)}
+          >
+            {t('records.records.last', { defaultValue: 'Last' })}
+          </Button>
+        </div>
       </div>
     </div>
   );

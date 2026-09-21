@@ -1,6 +1,5 @@
 import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Table,
   TableBody,
@@ -9,14 +8,36 @@ import {
   TableHeader,
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { listColumns, type SortState } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
-import { ConfirmDialog } from './ConfirmDialog';
+import { RecordCardList } from './RecordCardList';
 import { RecordCell } from './RecordCell';
-import { RecordDeleteDialog } from './RecordDeleteDialog';
+import { RecordRowAction } from './RecordRowAction';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
+
+/** Tailwind's `sm` breakpoint, as a query — the width at which the table
+ *  stops fitting. Subscribed to rather than read once, so a rotation or a
+ *  resized window swaps layouts without a reload. */
+const NARROW = '(max-width: 639.98px)';
+
+function matchesNarrow(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(NARROW).matches;
+}
+
+function useIsNarrow(): boolean {
+  const subscribe = useCallback((onChange: () => void) => {
+    if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+    const query = window.matchMedia(NARROW);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  // The server snapshot is the table: nothing renders this on a server
+  // today, and a wide layout is the safer thing to hydrate into.
+  return useSyncExternalStore(subscribe, matchesNarrow, () => false);
+}
 
 /**
  * The record list's table: `display_title`, the type's first four indexed
@@ -24,6 +45,16 @@ import { SortableHeader } from './SortableHeader';
  * column, since only an indexed field can be sorted or filtered on),
  * `position`/`published_at`/`updated_at` and actions. Split out of
  * `RecordList` to keep that page under the 300-line cap.
+ *
+ * Below `sm` the same records render as stacked cards instead (UX-R4): a
+ * table of eight `whitespace-nowrap` columns cannot be reduced to the two or
+ * three a phone holds, and what fell off the right edge of the document
+ * there was the action column.
+ *
+ * One tree or the other, chosen by a media query rather than both rendered
+ * with one hidden by a breakpoint class: a hidden copy is still in the DOM,
+ * and a second row per record would double every `getByText(title)` in the
+ * suite (and mount every row's delete dialog twice).
  */
 export function RecordTable({
   type,
@@ -51,10 +82,29 @@ export function RecordTable({
   onRestore: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
+  const narrow = useIsNarrow();
   const columns = listColumns(type);
+  // `position` is 0 on every record of every type that never set it, which
+  // is most of them — a column of zeroes on a table that is already too wide
+  // (UX-R25). Sorting by it stays reachable through the URL.
+  const showPosition = records.some((record) => record.position !== 0);
   // A field named "Title" would otherwise share the display-title column's
   // accessible name (UX-12) — disambiguate only that collision.
   const titleLabel = t('records.records.display_title', { defaultValue: 'Title' });
+
+  if (narrow) {
+    return (
+      <RecordCardList
+        type={type}
+        records={records}
+        trashed={trashed}
+        showLocale={showLocale}
+        showPosition={showPosition}
+        onDelete={onDelete}
+        onRestore={onRestore}
+      />
+    );
+  }
 
   return (
     <Table>
@@ -90,15 +140,17 @@ export function RecordTable({
               ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
             />
           ))}
-          <SortableHeader
-            field="position"
-            label={t('records.records.position', { defaultValue: 'Position' })}
-            sort={sort}
-            onSort={onSort}
-          />
+          {showPosition && (
+            <SortableHeader
+              field="position"
+              label={t('records.records.position', { defaultValue: 'Position' })}
+              sort={sort}
+              onSort={onSort}
+            />
+          )}
           <SortableHeader
             field="published_at"
-            label={t('records.records.published_at', { defaultValue: 'Published' })}
+            label={t('records.records.published_at', { defaultValue: 'Published on' })}
             sort={sort}
             onSort={onSort}
           />
@@ -145,40 +197,21 @@ export function RecordTable({
                 />
               </TableCell>
             ))}
-            <TableCell className="text-muted-foreground">{record.position}</TableCell>
+            {showPosition && (
+              <TableCell className="text-muted-foreground">{record.position}</TableCell>
+            )}
             <TableCell className="text-muted-foreground">{record.published_at ?? '—'}</TableCell>
             <TableCell className="text-muted-foreground">
               {record.updated_at ?? record.created_at}
             </TableCell>
             <TableCell className="text-right">
-              {trashed ? (
-                <ConfirmDialog
-                  trigger={
-                    <Button type="button" variant="ghost" size="sm">
-                      {t('records.editor.restore', { defaultValue: 'Restore' })}
-                    </Button>
-                  }
-                  title={t('records.editor.restore', { defaultValue: 'Restore' })}
-                  description={t('records.editor.confirm_restore', {
-                    defaultValue: 'Restore this record?',
-                  })}
-                  confirmLabel={t('records.editor.restore', { defaultValue: 'Restore' })}
-                  cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                  pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
-                  onConfirm={() => onRestore(record)}
-                />
-              ) : (
-                <RecordDeleteDialog
-                  typeKey={type.key}
-                  uuid={record.uuid}
-                  trigger={
-                    <Button type="button" variant="ghost" size="sm">
-                      {t('records.records.delete', { defaultValue: 'Delete' })}
-                    </Button>
-                  }
-                  onConfirm={() => onDelete(record)}
-                />
-              )}
+              <RecordRowAction
+                typeKey={type.key}
+                record={record}
+                trashed={trashed}
+                onDelete={onDelete}
+                onRestore={onRestore}
+              />
             </TableCell>
           </TableRow>
         ))}
