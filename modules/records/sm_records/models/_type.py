@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, false
 from sqlmodel import Field
 
 from sm_records.constants import MAX_COLLECTION_NAME_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
@@ -75,7 +75,10 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     is_public: bool = Field(default=False)
     """Gates the anonymous read API. Off by default."""
 
-    show_in_menu: bool = Field(default=False)
+    show_in_menu: bool = Field(
+        default=False,
+        sa_column_kwargs={"server_default": false()},
+    )
     """Whether this type gets its own entry in the admin sidebar.
 
     Off by default: the module's "Records" hub entry is what every type is
@@ -87,6 +90,15 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     Not a schema field: it changes no record, bumps no ``schema_version`` and
     writes no revision, which is why ``services._type_update`` treats it like
     ``is_public`` rather than like anything in ``fields``.
+
+    ``server_default`` is declared here as well as in revision
+    ``b81c5f3a27d6``, which needed it to add the column to a populated table.
+    Alembic's ``compare_server_default`` is off in ``host/migrations/env.py``,
+    so the two disagreeing was invisible to ``alembic check`` — a comparison
+    run with it on reports ``modify_default`` for this one column, and a
+    ``create_all``-built database (every test suite) had no default where a
+    migrated one does. Declaring it is what the rest of the schema does:
+    ``users_user.is_external`` carries the same ``sa_column_kwargs``.
     """
 
     translatable: bool = Field(default=False)
