@@ -250,10 +250,10 @@ async def test_the_trash_listing_is_capped_too(client):
 
 
 def test_prefix_range_is_tight_and_total():
-    """``_predicates.prefix_range`` is the whole of ``starts_with``: the
+    """``_prefix.prefix_range`` is the whole of ``starts_with``: the
     range must contain every string beginning with the term and nothing
     else, including at the ends of the code-point space."""
-    from sm_records.index._predicates import prefix_range
+    from sm_records.index._prefix import prefix_range
 
     low, high = prefix_range("ab")
     assert (low, high) == ("ab", "ac")

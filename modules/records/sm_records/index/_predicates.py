@@ -27,6 +27,7 @@ from sm_records.index._coerce import (
     coerce_ref,
     coerce_text,
 )
+from sm_records.index._prefix import starts_with_clause
 from sm_records.schema.types import IndexKind
 
 LIKE_ESCAPE_CHAR = "\\"
@@ -47,39 +48,6 @@ def like_contains_pattern(term: str) -> str:
     returns nothing — strictly worse than the over-matching it prevents.
     """
     return f"%{like_escape(term)}%"
-
-
-def prefix_range(term: str) -> tuple[str, str | None]:
-    r"""``(low, high)`` such that ``low <= value < high`` is exactly "starts
-    with ``term``" — the half-open range a btree can answer by seeking.
-
-    ``LIKE 'term%'`` expresses the same set and **cannot be answered from an
-    index on SQLite**: the LIKE optimisation needs a ``NOCASE``-collated index
-    when ``case_sensitive_like`` is off (the default), and every index here is
-    ``BINARY``. Postgres is the same story under any non-C collation. A range
-    is the portable spelling of a prefix search, and it is what makes
-    ``ix_records_record_type_title_id`` able to serve the relation picker.
-
-    The upper bound is the term with its last code point incremented, which is
-    the *tight* bound: a value strictly between ``term`` and that successor
-    must have ``term`` as a prefix, and every value that does is below it.
-    Surrogates are stepped over because a lone one is not encodable, and a
-    term made entirely of the maximum code point has no successor at all —
-    ``high`` is ``None`` there and the caller drops the upper bound, which
-    over-matches by nothing a real title contains.
-
-    The cost is that this is **case- and collation-sensitive**, where
-    ``contains`` is neither. That is the operator's contract, stated in the
-    README: ``starts_with`` is the cheap, exact one and ``contains`` is the
-    forgiving, expensive one, and the picker asks in that order.
-    """
-    for position in range(len(term) - 1, -1, -1):
-        point = ord(term[position]) + 1
-        if point == 0xD800:
-            point = 0xE000
-        if point <= 0x10FFFF:
-            return term, term[:position] + chr(point)
-    return term, None
 
 
 def like_escape(term: str) -> str:
@@ -188,12 +156,6 @@ def _text_eq(table: Any, value: str) -> ColumnElement[bool]:
     if len(value) <= TEXT_INDEX_LEN:
         return and_(table.value == head, table.value_full.is_(None))
     return and_(table.value == head, table.value_full == value)
-
-
-def starts_with_clause(column: Any, value: str) -> ColumnElement[bool]:
-    """``value <= column < successor`` — see :func:`prefix_range`."""
-    low, high = prefix_range(value)
-    return and_(column >= low, column < high) if high is not None else column >= low
 
 
 def _text_starts_with(table: Any, value: str) -> ColumnElement[bool]:

@@ -468,11 +468,16 @@ other with what matches.
 set and cannot be answered from these indexes: SQLite's LIKE optimisation
 needs a `NOCASE`-collated index while `case_sensitive_like` is off (the
 default), and Postgres needs `text_pattern_ops` under any non-C collation.
-`_predicates.prefix_range` produces `term <= value < successor(term)` instead,
+`_prefix.prefix_range` produces `term <= value < successor(term)` instead,
 stepping over the surrogate block and returning no upper bound for a term of
-maximum code points. The cost is that `starts_with` is case- and
-collation-sensitive where `contains` is neither — which is why the picker asks
-in that order and why both operators exist.
+maximum code points. The comparison is pinned to code-point order
+(`_prefix.ByteOrdered`: `COLLATE "C"` on Postgres, the bare column elsewhere),
+because under a linguistic collation such as the `postgres` image's
+`en_US.utf8` the plain range also answered the other case (`'item' <= 'ITEM' <
+'iten'`). On such a cluster the range no longer seeks the `value` btree past
+its `(type_id, field_key)` prefix; it reads that field's rows and filters. The
+cost is that `starts_with` is case-sensitive where `contains` is not — which
+is why the picker asks in that order and why both operators exist.
 
 ### F10 — `POST /schema/preview` was synchronous
 

@@ -89,7 +89,7 @@ refused; so is an unknown one.
 | `ne` | Does not equal. On a multi-valued field: holds no such value. Also matches a NULL fixed column |
 | `in` | `in:a,b,c` — equals any of them |
 | `contains` | Case-insensitive substring. Scans |
-| `starts_with` | Prefix. Case- and collation-sensitive; answered from the index by seeking |
+| `starts_with` | Prefix. Case-sensitive in code-point order on every database; seeks the index on SQLite and `C`-collated Postgres, filters one field's rows under a linguistic collation |
 | `gt` `gte` `lt` `lte` | Ordered comparison |
 | `is_null` | `is_null:true` — the record has no value for the field; `is_null:false` — it has one |
 
