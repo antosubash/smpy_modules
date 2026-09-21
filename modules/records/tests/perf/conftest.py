@@ -44,10 +44,11 @@ explicitly left unverified. Point this at a Postgres URL
 (``postgresql+asyncpg://…``) and the same measurements run there, with
 :func:`tests.perf._bench.explain` switching to Postgres's ``EXPLAIN``.
 
-What does **not** work there is :func:`perf_db_copy`, which copies a file. The
-schema-operation and per-feature files that mutate their database therefore
-skip on a non-SQLite backend; the read path, the pagination and the aggregate
-— which is where the unverified findings are — run unchanged."""
+All 49 measurements run on both backends. :func:`perf_db_copy`, which the
+schema-operation and per-feature files need because they mutate the database
+they measure, used to copy a SQLite file and so skipped 19 of them on
+Postgres; it uses ``CREATE DATABASE … TEMPLATE`` there now (see the fixture),
+which is the same operation by the server's own means."""
 
 DATASET_SIZE = int(os.environ.get("RECORDS_PERF_N", "2000"))
 """Total records across the five demo types. Small by default so a developer

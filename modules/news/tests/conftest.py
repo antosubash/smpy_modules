@@ -1,11 +1,13 @@
 """Shared fixtures for the news integration tests.
 
 News is a sidecar over pagebuilder, so every meaningful query is a join and the
-harness has to create *both* modules' tables against one in-memory database.
-That is the only real difference from pagebuilder's own conftest; the rest
-mirrors it — ``StaticPool`` so every session sees the same ``:memory:``
-instance, ``register_listeners`` so ``get_db`` actually commits, and a stub auth
-middleware standing in for ``simple_module_auth``.
+harness has to create *both* modules' tables against one database. That is the
+only real difference from pagebuilder's own conftest; the rest mirrors it — the
+database comes from ``pg_support.make_db_state`` (in-memory SQLite on a
+``StaticPool`` by default, the Postgres database ``SM_TEST_DATABASE_URL`` names
+when it is set, with ``register_listeners`` attached either way so ``get_db``
+actually commits), and a stub auth middleware stands in for
+``simple_module_auth``.
 
 Pages are created directly through the ``Page`` model rather than through
 pagebuilder's API. These are news tests: what matters is the row the join finds,
@@ -23,18 +25,33 @@ import pytest_asyncio
 from fastapi import APIRouter, FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 from news.constants import PERM_EDIT, PERM_VIEW
-from news.models import Base as NewsBase
 from news.module import NewsModule
-from pagebuilder.models import Base as PagebuilderBase
 from pagebuilder.models import Page, PageStatus
 from pagebuilder.permissions import PERM_EDIT as PAGE_EDIT
 from pagebuilder.permissions import PERM_PUBLISH as PAGE_PUBLISH
+
+# ``pg_support`` owns the one decision both database fixtures make: in-memory
+# SQLite, or the Postgres database ``SM_TEST_DATABASE_URL`` names. It is also
+# where "both modules' tables" is spelled out.
+from pg_support import arm_reset, make_db_state
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.pool import StaticPool
 from starlette.middleware.base import BaseHTTPMiddleware
+
+
+@pytest.fixture(autouse=True)
+def _arm_database_reset():
+    """Every test starts from an empty database.
+
+    A no-op on SQLite, where each test builds its own ``:memory:`` one and
+    there is nothing to empty. On Postgres it is what makes the *first*
+    database a test asks for a clean one — a test taking both ``db`` and a
+    client fixture has two independent databases on SQLite and two windows
+    onto one database on Postgres. See ``tests/pg_support.py`` at the repo
+    root.
+    """
+    arm_reset()
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -129,12 +146,8 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
     app.include_router(api_router)
     app.include_router(view_router)
 
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        # Both metadatas: an article is only ever read through a join to a page.
-        await conn.run_sync(PagebuilderBase.metadata.create_all)
-        await conn.run_sync(NewsBase.metadata.create_all)
+    # Both metadatas: an article is only ever read through a join to a page.
+    db_state = await make_db_state()
 
     registry = PermissionRegistry()
     registry.add_group("News", [PERM_VIEW, PERM_EDIT])
@@ -159,11 +172,7 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
     """A bare database with both modules' tables, for direct service tests."""
-    state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(PagebuilderBase.metadata.create_all)
-        await conn.run_sync(NewsBase.metadata.create_all)
+    state = await make_db_state()
     yield state
     await state.engine.dispose()
 
