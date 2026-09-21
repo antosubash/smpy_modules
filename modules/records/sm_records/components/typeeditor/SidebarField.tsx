@@ -44,7 +44,8 @@ export function SidebarField({
       <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
         {t('records.type_editor.show_in_menu_help', {
           label_plural: labelPlural,
-          defaultValue: 'Adds {label_plural} to the admin sidebar under Content, next to Records.',
+          defaultValue:
+            'Adds {label_plural} to the admin sidebar, in its own Records group right after Content.',
         })}
       </p>
     </>

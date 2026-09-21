@@ -244,7 +244,7 @@ export function TypeMetadataForm({
         <p className="text-sm text-muted-foreground">
           {t('records.type_editor.allowed_roles_help', {
             defaultValue:
-              'Leave empty to allow anyone holding "Manage record types". Selecting one or more roles narrows access to those roles as well.',
+              "Leave empty so anyone who can view or edit records can work with this type's records. Selecting roles narrows viewing and editing of its records to those roles; managing the type itself is never narrowed.",
           })}
         </p>
         <FieldError message={fieldMessage(errors, 'allowed_roles')} />

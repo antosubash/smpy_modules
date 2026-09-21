@@ -13,6 +13,22 @@ declared field is projected into a separate, typed, real SQL index table so
 it stays genuinely queryable. See `docs/plans/2026-09-19-records-module-design.md`
 in the source repo for the full design.
 
+## Documentation
+
+The rest of this file is the long-form reference. Start with
+[`docs/index.md`](docs/index.md), which says who should read what.
+
+- [`docs/user-guide.md`](docs/user-guide.md) — for administrators: every admin
+  screen in the order you meet it, with the exact UI labels.
+- [`docs/api-reference.md`](docs/api-reference.md) — every endpoint, the query
+  grammar, the wire shapes, the error table and the file formats.
+- [`docs/operations.md`](docs/operations.md) — install, migrations, settings,
+  the CLI, health checks and the deployment constraints.
+- [`docs/architecture.md`](docs/architecture.md) — for contributors: the
+  document/index split, the schema-change pipeline and the extension points.
+- [`docs/performance.md`](docs/performance.md) — what it costs at scale, and
+  how to measure it yourself.
+
 ## Install
 
 ```bash
@@ -40,8 +56,8 @@ each collection your host declares).
 
 ## Usage
 
-Go to **Record Types** in the admin sidebar (`/admin/records`) to define a
-type and its fields. Each type gets a generic, schema-driven list screen and
+Go to **Records** in the admin sidebar (`/admin/records`) to define a
+type and its fields; a type that opts in gets its own entry there too. Each type gets a generic, schema-driven list screen and
 form at `/admin/records/{key}` and `/admin/records/{key}/{uuid}` — one pair of
 screens serves every type; nothing is generated per type.
 
@@ -515,7 +531,18 @@ screen, that a given type is further restricted to specific roles.
   creates: a row lock on the type on Postgres, and a write against the type row
   — which takes SQLite's `RESERVED` lock — on SQLite, where `FOR UPDATE` locks
   nothing. This is "unique enforced at the cost of serializing writes on that
-  type," not a database-level uniqueness guarantee.
+  type," not a database-level uniqueness guarantee. **Both halves are
+  measured**: twenty concurrent creates of one value on Postgres and eight on
+  SQLite each store exactly one row and refuse the rest with a `409` — see
+  [`docs/postgres-2026-09-21.md`](docs/postgres-2026-09-21.md) § 4.
+- **A write costs fewer SQL statements on Postgres than on SQLite, and the
+  difference grows with the number of indexed fields.** `write_index` batches
+  its index rows into one `INSERT` per *kind table* on Postgres and one per
+  *row* on SQLite, so a create is 10 statements against 13 on the demo
+  `company` type and 7 against 14 on a type with eight indexed `text` fields.
+  Nothing else in the module differs: every other statement count, and every
+  plan shape, is the same on both. Any "N statements per write" figure quoted
+  elsewhere is SQLite's.
 
 ## Collections
 
@@ -1023,6 +1050,50 @@ python -m sm_records.cli import --type order order.json --apply
 uv sync --extra dev
 uv run pytest
 ```
+
+### Running the suites against Postgres
+
+Both suites default to SQLite — in-memory for the unit tests, a reused file
+for the perf measurements — and both take an opt-in URL instead. CI is
+unchanged by either; nothing is selected unless the variable is set.
+
+```bash
+# unit suite: a real database, emptied (TRUNCATE ... RESTART IDENTITY) per test
+cd modules/records
+RECORDS_TEST_URL=postgresql+asyncpg://postgres@localhost:5432/records_unit \
+  uv run pytest -q
+
+# perf suite: a seeded database, measured instead of the SQLite file
+RECORDS_PERF_N=20000 RECORDS_PERF_URL=postgresql+asyncpg://postgres@localhost:5432/records_perf \
+  uv run pytest -q -s -m perf tests/perf
+```
+
+Create the databases first; neither variable creates one. The perf suite needs
+permission to `CREATE DATABASE`, because the measurements that mutate their
+database run against a `CREATE DATABASE ... TEMPLATE` copy and drop it
+afterwards — the Postgres equivalent of the SQLite branch copying the file.
+
+`tests/test_postgres_lock.py` runs **only** when `RECORDS_TEST_URL` names a
+Postgres database: it is the concurrency proof for the `SELECT ... FOR UPDATE`
+branch of the per-type lock, which cannot be reached on SQLite.
+`tests/test_unique_concurrency.py` and `tests/test_reindex_runner_locking.py`
+are its counterparts and stay on a SQLite file whatever the variable says,
+because what they pin is the other branch.
+
+The e2e suite picks its database from `SM_DATABASE_URL`, which
+`playwright.config.ts` passes through when it is set:
+
+```bash
+SM_DATABASE_URL=postgresql+asyncpg://postgres@localhost:5432/records_e2e \
+  npx playwright test tests/e2e/records-*.spec.ts
+```
+
+`tests/e2e/start-test-server.sh` empties whichever database that names —
+deleting the file for SQLite, dropping and recreating the schema otherwise —
+before running the migrations.
+
+Results of the last full Postgres run are in
+[`docs/postgres-2026-09-21.md`](docs/postgres-2026-09-21.md).
 
 
 ### Rebuilding the index by hand

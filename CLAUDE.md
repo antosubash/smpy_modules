@@ -98,8 +98,9 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n.** No module here is translated — pagebuilder, news and
-  canopy_atlas all have hardcoded English TSX and no `locales/en.json`. The
+- **UI i18n.** Only `records` is translated (every string through `t()` and a
+  `locales/en.json`); pagebuilder, news and canopy_atlas still have hardcoded
+  English TSX and no `locales/en.json`. The
   framework's own modules do have one, and the convention depends on
   `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
   *does* now wire it (`host/client_app/app.tsx` configures the catalog from
