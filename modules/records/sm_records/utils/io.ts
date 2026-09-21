@@ -13,6 +13,13 @@
  * the one property the endpoint was written for.
  */
 
+import type { FieldDef } from './types';
+
+// The rest of this module types `t` loosely for the same reason
+// `pages/RecordList.tsx` does — see that file's comment.
+// biome-ignore lint/suspicious/noExplicitAny: see comment above
+type Translate = (...args: any[]) => string;
+
 export type ImportRowError = {
   row: number;
   uuid?: string | null;
@@ -56,6 +63,58 @@ export type ImportOptions = {
    *  (`services/_import_rows.py`'s "no version" refusal). */
   force?: boolean;
 };
+
+/** The subset of `RecordImportOptions`' `ImportOptionsValue` this file reads
+ *  — named structurally instead of imported from `components/`, so the API
+ *  layer doesn't reach up into a component for a type. */
+export type ImportOptionsSummaryInput = {
+  mode: string;
+  matchBy: string;
+  force: boolean;
+};
+
+/** `match_by`'s wire value, as a label a person picked it from — mirrors the
+ *  three options `RecordImportOptions` renders (R23: the select itself no
+ *  longer shows `uuid`/`slug` raw). */
+function matchByLabel(t: Translate, matchBy: string, fields: FieldDef[]): string {
+  if (matchBy === 'uuid') {
+    return t('records.io.match_by_uuid', { defaultValue: 'Record ID (uuid)' });
+  }
+  if (matchBy === 'slug') {
+    return t('records.io.match_by_slug', { defaultValue: 'Slug' });
+  }
+  const field = fields.find((candidate) => candidate.key === matchBy);
+  return field ? `${field.label} (${field.key})` : matchBy;
+}
+
+/** The compact "what will happen" line `RecordIoMenu`'s dialog shows next to
+ *  the picked file (R21) — the options popover used to close before Apply
+ *  and take this context with it, leaving the confirm step restating
+ *  nothing. Kept here rather than in the component so `io.test.ts` can cover
+ *  every branch without mounting anything. */
+export function importOptionsSummary(
+  t: Translate,
+  options: ImportOptionsSummaryInput,
+  fields: FieldDef[],
+): string {
+  const modeText =
+    options.mode === 'create'
+      ? t('records.io.mode_create', { defaultValue: 'Create only' })
+      : options.mode === 'update'
+        ? t('records.io.mode_update', { defaultValue: 'Update only' })
+        : t('records.io.mode_upsert', { defaultValue: 'Create or update (upsert)' });
+  const forceText = options.force
+    ? t('records.io.summary_force_on', { defaultValue: 'overwrite unversioned rows: on' })
+    : t('records.io.summary_force_off', { defaultValue: 'overwrite unversioned rows: off' });
+  return [
+    modeText,
+    t('records.io.summary_match_by', {
+      label: matchByLabel(t, options.matchBy, fields),
+      defaultValue: 'match by {label}',
+    }),
+    forceText,
+  ].join(' · ');
+}
 
 /** POST one file and return the report.
  *

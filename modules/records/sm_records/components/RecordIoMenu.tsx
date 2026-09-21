@@ -16,9 +16,10 @@ import {
   DropdownMenuTrigger,
 } from '@simple-module-py/ui/components/ui/dropdown-menu';
 import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
+import { ChevronDownIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { exportUrl, type ImportReport, importRecords } from '../utils/io';
+import { exportUrl, type ImportReport, importOptionsSummary, importRecords } from '../utils/io';
 import type { FieldDef } from '../utils/types';
 import { ImportReportSummary } from './ImportReportSummary';
 import {
@@ -87,20 +88,25 @@ export function RecordIoMenu({
   const [options, setOptions] = useState<ImportOptionsValue>(DEFAULT_IMPORT_OPTIONS);
   const busy = phase !== 'idle';
 
-  const run = async (chosen: File, dryRun: boolean) => {
+  // `overrideOptions` lets a change made *while the dialog is already open*
+  // (the options trigger now lives inside it, above Apply — R21) re-run the
+  // dry run against the new choice immediately, instead of the closed-over
+  // `options` state from before the click that changed it.
+  const run = async (chosen: File, dryRun: boolean, overrideOptions?: ImportOptionsValue) => {
+    const opts = overrideOptions ?? options;
     setPhase(dryRun ? 'checking' : 'applying');
     try {
       const result = await importRecords(typeKey, chosen, {
         dryRun,
-        mode: options.mode,
-        onError: options.onError,
-        matchBy: options.matchBy,
-        force: options.force,
+        mode: opts.mode,
+        onError: opts.onError,
+        matchBy: opts.matchBy,
+        force: opts.force,
       });
       setReport(result);
-      if (!dryRun && result.failed === 0) {
-        toast.success(t('records.io.applied', { defaultValue: 'Import applied' }));
-      }
+      // R26: the dialog switches to "Import result" for this same outcome —
+      // announcing it a second time with a toast was the duplicate the
+      // review filed. The dialog stays open and names the reload below.
       // Reload whenever the apply actually wrote a row, not only on a
       // clean run (M3): `on_error: 'skip'` can write every good row and
       // still report `failed > 0`, and gating on `failed === 0` alone left
@@ -127,7 +133,22 @@ export function RecordIoMenu({
     await run(chosen, true);
   };
 
+  // Changing an option while the preview is on screen re-runs the dry run
+  // against the same file right away (R21) — the alternative, closing the
+  // dialog to reopen a toolbar popover and re-picking the file to see the
+  // effect, is the flow the review filed this against.
+  const onOptionsChange = (patch: Partial<ImportOptionsValue>) => {
+    setOptions((prev) => {
+      const next = { ...prev, ...patch };
+      if (file) void run(file, true, next);
+      return next;
+    });
+  };
+
   const dryRunNow = report ? report.dry_run : phase === 'checking';
+  // Options only matter before a write happens — once `report` is a real
+  // result (`dry_run: false`), the run they described already happened.
+  const canAdjustOptions = canEdit && file !== null && dryRunNow;
 
   return (
     <>
@@ -135,6 +156,7 @@ export function RecordIoMenu({
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="outline" data-testid="records-export-menu">
             {t('records.io.export', { defaultValue: 'Export' })}
+            <ChevronDownIcon className="size-4 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -175,11 +197,6 @@ export function RecordIoMenu({
             data-testid="records-import-input"
             onChange={onPick}
           />
-          <RecordImportOptions
-            fields={fields}
-            value={options}
-            onChange={(patch) => setOptions((prev) => ({ ...prev, ...patch }))}
-          />
           <Button
             type="button"
             variant="outline"
@@ -208,6 +225,17 @@ export function RecordIoMenu({
                 : t('records.io.result_title', { defaultValue: 'Import result' })}
             </DialogTitle>
           </DialogHeader>
+          {file && (
+            // R21: names the file and restates the rules it was just
+            // checked against — both used to be invisible by this point,
+            // the file because nothing echoed it and the options because
+            // the popover that set them had already closed.
+            <p className="text-sm text-muted-foreground" data-testid="records-import-file-summary">
+              {file.name}
+              {' — '}
+              {importOptionsSummary(t, options, fields)}
+            </p>
+          )}
           {busy && (
             <div
               className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -220,6 +248,16 @@ export function RecordIoMenu({
             </div>
           )}
           {report && <ImportReportSummary report={report} />}
+          {canAdjustOptions && (
+            <div>
+              <RecordImportOptions
+                fields={fields}
+                value={options}
+                onChange={onOptionsChange}
+                disabled={busy}
+              />
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" disabled={busy} onClick={() => setReport(null)}>
               {t('records.io.close', { defaultValue: 'Close' })}

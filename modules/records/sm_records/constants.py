@@ -30,11 +30,26 @@ MENU_GROUP: Final = "Content"
 MENU_ICON: Final = "database"
 MENU_ORDER: Final = 300
 
+MENU_GROUP_TYPES: Final = "Records"
+"""Sidebar group for a per-type entry (:func:`sm_records.menu.type_menu_items`).
+
+Deliberately its own group and not :data:`MENU_GROUP`: a type called "Pages"
+sitting as a peer of pagebuilder's "Pages" or news' "Articles" under the
+shared "Content" heading gives no sign it is a record type rather than
+another module's screen. The hub entry stays in :data:`MENU_GROUP` — it is
+how every *other* type is reached, not itself a type."""
+
 MENU_ORDER_TYPE: Final = MENU_ORDER + 1
 """Order of a per-type sidebar entry — one past the hub, so every type a host
 opts in sits directly under "Records". The registry sorts by ``order`` alone
 and stably, which is what makes :mod:`sm_records.menu`'s alphabetical
-insertion the tiebreak between them."""
+insertion the tiebreak between them.
+
+It also decides where the "Records" group itself renders: a group's position
+is set by the lowest ``order`` among its items (see ``MenuRegistry`` in
+``simple_module_core.menu``), and nothing else currently sits between the hub's
+``MENU_ORDER`` and this value, so keeping it one past the hub is what puts the
+"Records" group directly after "Content" in the admin sidebar."""
 
 MENU_SKIP_PREFIXES: Final = ("/api/", "/static", "/health")
 """Request paths :class:`sm_records._menu_middleware.MenuSyncMiddleware` never

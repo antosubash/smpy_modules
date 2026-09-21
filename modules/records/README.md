@@ -63,10 +63,14 @@ load.
 Every type is reachable through the **Record Types** entry above. A type can
 also ask for an entry of its own, next to it: turn on **Show in sidebar** in
 the type editor (`show_in_menu` on the API) and the admin sidebar gains an
-item under *Content*, labelled with the type's plural, using the type's icon
-and linking to its record list. Off by default — a sidebar with an item per
-type is unusable on an install with thirty of them — and the hub entry stays
-whatever you do.
+item in its own *Records* group — right after *Content*, where the hub entry
+itself lives — labelled with the type's plural, using the type's icon and
+linking to its record list. The type gets its own group rather than joining
+*Content* as a peer of pagebuilder's "Pages" or news' "Articles": nothing
+would otherwise say the entry is a record type, and a type named "Pages"
+would be ambiguous with pagebuilder's own. Off by default — a sidebar with an
+item per type is unusable on an install with thirty of them — and the hub
+entry stays whatever you do.
 
 It is **not a schema change**: no classification, no dry run, no revision and
 no `schema_version` bump, exactly like `is_public`. It round-trips through

@@ -82,22 +82,29 @@ test.describe('Records — import options and trash export', () => {
     await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
     const before = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
     expect((await before.json()).data.title).toBe('Original');
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
 
-    // Turn on "force" and re-run the same file.
-    await page.getByTestId('records-import-options-trigger').click();
+    // R21: the options trigger now lives inside this same dialog, above
+    // Apply, instead of a toolbar popover that had already closed by the
+    // time the preview needed it. Turning "force" on from here re-checks
+    // the same file automatically — no need to close the dialog and pick it
+    // again to see the effect.
+    await dialog.getByTestId('records-import-options-trigger').click();
     await page.getByTestId('records-import-force').click();
     await page.keyboard.press('Escape');
-    await page.getByTestId('records-import-input').setInputFiles(editedFile);
 
-    await expect(page.getByTestId('records-import-report')).toBeVisible();
     await expect(page.getByTestId('records-import-counts')).toHaveText(
       '1 row(s): 0 to create, 1 to update, 0 unchanged, 0 failed',
+    );
+    await expect(page.getByTestId('records-import-file-summary')).toContainText(
+      'overwrite unversioned rows: on',
     );
     await page.getByTestId('records-import-apply').click();
     await expect(page.getByTestId('records-import-counts')).toHaveText(
       '1 row(s): 0 created, 1 updated, 0 unchanged, 0 failed',
     );
+    // The options trigger is only offered before a write — the run it
+    // configured has now happened.
+    await expect(page.getByTestId('records-import-options-trigger')).toHaveCount(0);
 
     const after = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
     expect((await after.json()).data.title).toBe('Edited');

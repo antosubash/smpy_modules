@@ -160,7 +160,7 @@ async def test_a_type_that_asked_for_it_is_in_the_shared_props(worker_client):
     entry = items[1]
     assert entry["url"] == "/admin/records/company"
     assert entry["icon"] == "building"
-    assert entry["group"] == "Content"
+    assert entry["group"] == "Records"
     assert "Quiets" not in labels
 
 

@@ -36,10 +36,15 @@ export function RecordImportOptions({
   fields,
   value,
   onChange,
+  disabled = false,
 }: {
   fields: FieldDef[];
   value: ImportOptionsValue;
   onChange: (patch: Partial<ImportOptionsValue>) => void;
+  /** True while a check/apply is in flight — `RecordIoMenu` disables the
+   *  trigger rather than hiding it, so the settings that produced the
+   *  report on screen stay visible while it loads. */
+  disabled?: boolean;
 }) {
   const { t } = useT();
   const uniqueFields = fields.filter((field) => field.unique);
@@ -49,8 +54,9 @@ export function RecordImportOptions({
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
+          disabled={disabled}
           data-testid="records-import-options-trigger"
         >
           {t('records.io.options', { defaultValue: 'Import options' })}
@@ -109,10 +115,10 @@ export function RecordImportOptions({
             onChange={(e) => onChange({ matchBy: e.target.value })}
           >
             <NativeSelectOption value="uuid">
-              {t('records.io.match_by_uuid', { defaultValue: 'uuid' })}
+              {t('records.io.match_by_uuid', { defaultValue: 'Record ID (uuid)' })}
             </NativeSelectOption>
             <NativeSelectOption value="slug">
-              {t('records.io.match_by_slug', { defaultValue: 'slug' })}
+              {t('records.io.match_by_slug', { defaultValue: 'Slug' })}
             </NativeSelectOption>
             {uniqueFields.map((field) => (
               <NativeSelectOption key={field.key} value={field.key}>

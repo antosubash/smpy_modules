@@ -49,7 +49,8 @@ def test_item_carries_the_types_label_url_icon_and_roles():
     assert item.icon == "building"
     assert item.roles == ["ops"]
     assert item.section is MenuSection.ADMIN_SIDEBAR
-    assert item.group == constants.MENU_GROUP
+    # Its own group, not the hub's — see MENU_GROUP_TYPES's docstring.
+    assert item.group == constants.MENU_GROUP_TYPES
     # One past the hub, so the types cluster directly under it.
     assert item.order == constants.MENU_ORDER + 1
 

@@ -72,6 +72,9 @@ test.describe('Records — import / export from the list toolbar', () => {
     await apiCreateRecord(page, key, { data: { title: 'Second export', note: 'two' } });
 
     await page.goto(`/admin/records/${key}`);
+    // R24: the trigger carries a chevron so it reads as a menu, not a button
+    // that exports on click.
+    await expect(page.getByTestId('records-export-menu').locator('svg')).toBeVisible();
     await page.getByTestId('records-export-menu').click();
     const jsonLink = page.getByTestId('records-export-json');
     await expect(jsonLink).toBeVisible();
@@ -157,6 +160,11 @@ test.describe('Records — import / export from the list toolbar', () => {
     await expect(page.getByTestId('records-import-counts')).toHaveText(
       '2 row(s): 2 to create, 0 to update, 0 unchanged, 0 failed',
     );
+    // R21: the dialog names the file and restates the rules it was checked
+    // against, instead of asking the operator to trust the counts alone.
+    await expect(page.getByTestId('records-import-file-summary')).toHaveText(
+      'records.json — Create or update (upsert) · match by Record ID (uuid) · overwrite unversioned rows: off',
+    );
     // A dry run writes nothing — asserted against the API rather than the
     // screen, since the list behind the dialog was rendered before the
     // import and would look the same either way.
@@ -171,6 +179,9 @@ test.describe('Records — import / export from the list toolbar', () => {
       '2 row(s): 2 created, 0 updated, 0 unchanged, 0 failed',
     );
     await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
+    // R26: the dialog is the one announcement of the outcome — no success
+    // toast fires behind it.
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 
     // The list refreshes itself once the apply lands (UX-1) — no manual
     // reload needed to see the rows just imported, same as a delete/restore.

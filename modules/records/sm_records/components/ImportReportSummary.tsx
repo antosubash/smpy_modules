@@ -54,6 +54,19 @@ export function ImportReportSummary({ report }: { report: ImportReport }) {
   return (
     <div className="space-y-3 text-sm">
       <p data-testid="records-import-counts">{summaryText(t, report)}</p>
+      {report.total > 0 && (
+        // R21: the report has no per-record titles to show for any bucket —
+        // `ImportReport` (`contracts/io.py`) carries counts plus, for a
+        // failed row only, its row number and message, never a uuid the
+        // list resolved to a display title. Said here rather than left
+        // silent, since "first 5 affected titles" is what was asked for.
+        <p className="text-muted-foreground" data-testid="records-import-titles-note">
+          {t('records.io.titles_unavailable', {
+            defaultValue:
+              'This report lists row numbers, not record titles — showing titles here would need the import endpoint to return them.',
+          })}
+        </p>
+      )}
       {report.errors.length > 0 && (
         <ul className="max-h-60 space-y-1 overflow-y-auto rounded-lg border p-2">
           {report.errors.map((error) => (

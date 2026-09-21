@@ -20,8 +20,9 @@ type TypeReadWithSidebar = TypeRead & { show_in_menu: boolean };
 /**
  * Per-type sidebar entries (design contract: "per-type sidebar entries"):
  * a Record Type with `show_in_menu` gets its own admin sidebar link, next to
- * the "Records" hub, under the "Content" group — and the TypeEditor's own
- * "Show in sidebar" switch that drives it.
+ * the "Records" hub, under its own "Records" group (the hub itself stays in
+ * "Content") — and the TypeEditor's own "Show in sidebar" switch that drives
+ * it.
  *
  * The sidebar itself (`AdminLayout` -> `SidebarLayout`, `menuKey:
  * "adminSidebar"`) renders inside an `<aside>`, so every locator here is
@@ -47,7 +48,11 @@ test.describe('Records — sidebar entries', () => {
 
     await page.goto('/admin/records/');
     const sidebar = page.locator('aside');
+    // The hub stays under "Content"; the type's own entry gets its own
+    // "Records" group header (SidebarLayout.tsx renders one per distinct
+    // `group`, in the order its lowest-`order` item appears).
     await expect(sidebar.getByText('Content')).toBeVisible();
+    await expect(sidebar.locator('div.uppercase', { hasText: 'Records' })).toBeVisible();
     const link = sidebar.getByRole('link', { name: labelPlural, exact: true });
     await expect(link).toBeVisible();
 
