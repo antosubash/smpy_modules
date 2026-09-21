@@ -1060,7 +1060,7 @@ unchanged by either; nothing is selected unless the variable is set.
 ```bash
 # unit suite: a real database, emptied (TRUNCATE ... RESTART IDENTITY) per test
 cd modules/records
-RECORDS_TEST_URL=postgresql+asyncpg://postgres@localhost:5432/records_unit \
+SM_TEST_DATABASE_URL=postgresql+asyncpg://postgres@localhost:5432/records_unit \
   uv run pytest -q
 
 # perf suite: a seeded database, measured instead of the SQLite file
@@ -1068,13 +1068,19 @@ RECORDS_PERF_N=20000 RECORDS_PERF_URL=postgresql+asyncpg://postgres@localhost:54
   uv run pytest -q -s -m perf tests/perf
 ```
 
+`SM_TEST_DATABASE_URL` is the repo-wide name — `pagebuilder` and `news` read
+the same variable, through the same `tests/pg_support.py` at the repo root, so
+one export runs all three suites on one database. **`RECORDS_TEST_URL` still
+works** and is read as an alias when `SM_TEST_DATABASE_URL` is unset; the
+Postgres CI job and the 2026-09-21 study both name it.
+
 Create the databases first; neither variable creates one. The perf suite needs
 permission to `CREATE DATABASE`, because the measurements that mutate their
 database run against a `CREATE DATABASE ... TEMPLATE` copy and drop it
 afterwards — the Postgres equivalent of the SQLite branch copying the file.
 
-`tests/test_postgres_lock.py` runs **only** when `RECORDS_TEST_URL` names a
-Postgres database: it is the concurrency proof for the `SELECT ... FOR UPDATE`
+`tests/test_postgres_lock.py` runs **only** when `SM_TEST_DATABASE_URL` (or
+its `RECORDS_TEST_URL` alias) names a Postgres database: it is the concurrency proof for the `SELECT ... FOR UPDATE`
 branch of the per-type lock, which cannot be reached on SQLite.
 `tests/test_unique_concurrency.py` and `tests/test_reindex_runner_locking.py`
 are its counterparts and stay on a SQLite file whatever the variable says,

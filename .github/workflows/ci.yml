@@ -82,6 +82,115 @@ jobs:
       - name: Run pytest (host)
         run: uv run pytest host/tests
 
+  postgres:
+    name: Postgres (migrations + records)
+    runs-on: ubuntu-latest
+    # The records unit suite alone is ~3 min on SQLite (~4 min measured
+    # against Postgres — postgres-2026-09-21.md § 3); the migration round
+    # trip and perf smoke add a few minutes more. 20 gives comfortable room
+    # without chasing a hung step to the billable ceiling.
+    timeout-minutes: 20
+    services:
+      # `postgres:16` is what postgres-2026-09-21.md verified against
+      # (16.13). POSTGRES_DB pre-creates the database the migration round
+      # trip runs against; the records unit and perf databases are created
+      # by a later step because pg_support.py and the perf suite each want
+      # their own (TRUNCATE-per-test and CREATE DATABASE … TEMPLATE would
+      # otherwise collide with the migrated schema).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Sync workspace (all packages)
+        run: uv sync --all-packages
+
+      # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
+      # needs no extra install. Two databases: one for the records unit
+      # suite (pg_support.py's TRUNCATE … RESTART IDENTITY reset) and one
+      # for the perf smoke (which also does CREATE DATABASE … TEMPLATE
+      # copies of its own) — kept apart from `ci`, and from each other, so
+      # none of the three resets the others' schema mid-job.
+      - name: Create records test databases
+        run: |
+          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records
+          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records_perf
+
+      # Migration round trip against a real Postgres database — this is what
+      # caught the four Postgres-only migration bugs in
+      # postgres-2026-09-21.md § 2 (a boolean server_default of `0`, an enum
+      # server_default naming a value where SQLAlchemy stores the name, and
+      # two revisions whose downgrade left enum types behind). None of them
+      # was visible on SQLite, and `alembic check` alone (no downgrade) missed
+      # the enum-leftover bug too.
+      - name: Migrate up (heads)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini upgrade heads
+
+      - name: Alembic check (after upgrade)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini check
+
+      - name: Migrate down (base)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini downgrade base
+
+      - name: Migrate up again (heads)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini upgrade heads
+
+      - name: Alembic check (after round trip)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini check
+
+      # Both RECORDS_TEST_URL (tests/pg_support.py, today) and
+      # SM_TEST_DATABASE_URL (the name it and pagebuilder/news are being
+      # generalised to — RECORDS_TEST_URL stays as an alias) point at the
+      # same database, so this step works before and after that rename lands.
+      - name: Run pytest (records, Postgres)
+        env:
+          RECORDS_TEST_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
+        run: cd modules/records && uv run pytest -q -p no:cacheprovider
+
+      # A short smoke, not the full study (which runs at N=20000): enough to
+      # exercise the write, read, aggregate and i18n statement-count
+      # assertions against a real Postgres database on every PR.
+      # tests/perf/conftest.py and the perf test files assert either bounded
+      # ceilings (`< 40`) or self-consistency across two runs on the same
+      # backend, never a hard-coded SQLite statement count, so the suite
+      # needs no `-k` filter here.
+      - name: Run pytest (records perf smoke, Postgres)
+        env:
+          RECORDS_PERF_N: 500
+          RECORDS_PERF_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records_perf
+        run: cd modules/records && uv run pytest -q -m perf tests/perf
+
   frontend-build:
     name: Frontend build (tsc + vite)
     runs-on: ubuntu-latest
