@@ -9,7 +9,7 @@ import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
-import { RecordEnvelopeFields } from '../components/RecordEnvelopeFields';
+import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
 import { RecordForm } from '../components/RecordForm';
 import { RecordReferrers } from '../components/RecordReferrers';
 import { RecordRevisions } from '../components/RecordRevisions';
@@ -44,7 +44,12 @@ const ENVELOPE_KEYS = ['status', 'slug', 'position'];
  * toggle for a payload the form can't express — it round-trips, so switching
  * back re-populates the fields from what was typed. A trashed record loads
  * here too (for `records.edit`): the `Deleted` badge above and the
- * restore/purge buttons in `RecordActions` are how it's reached from the UI. */
+ * restore/purge buttons in `RecordActions` are how it's reached from the UI.
+ *
+ * Layout follows UX review R16: the record's own fields first, Status (and,
+ * on a new translatable record, Language) in the header row beside Cancel,
+ * and Slug/Position behind an "Advanced" disclosure under the form.
+ */
 function RecordEditor({
   type,
   record,
@@ -86,6 +91,9 @@ function RecordEditor({
   const unplaceable = (form.raw ? form.serverErrors : envelope).filter(
     (entry) => !ENVELOPE_KEYS.includes(entry.field),
   );
+  const slugSource = type.slug_field
+    ? type.fields.find((field) => field.key === type.slug_field)?.label
+    : undefined;
 
   return (
     <>
@@ -104,9 +112,22 @@ function RecordEditor({
         }
         description={type.label}
         actions={
-          <Button variant="outline" onClick={() => router.visit(backHref)}>
-            {t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          </Button>
+          <>
+            <RecordHeaderFields
+              status={status}
+              envelope={envelope}
+              onStatusChange={setStatus}
+              {...(showLocalePicker
+                ? { locale, locales: contentLocales, onLocaleChange: setLocale }
+                : {})}
+            />
+            {/* The guard in `useRecordEditor` is what asks about unsaved work
+                here: this is an ordinary Inertia visit, and `router.on(
+                'before')` sees it (R12c). */}
+            <Button variant="outline" onClick={() => router.visit(backHref)}>
+              {t('records.editor.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+          </>
         }
       >
         <div className="space-y-6">
@@ -120,19 +141,6 @@ function RecordEditor({
               onOverwrite={() => void save(conflict.version)}
             />
           )}
-
-          <RecordEnvelopeFields
-            status={status}
-            slug={slug}
-            position={position}
-            envelope={envelope}
-            onStatusChange={setStatus}
-            onSlugChange={setSlug}
-            onPositionChange={setPosition}
-            {...(showLocalePicker
-              ? { locale, locales: contentLocales, onLocaleChange: setLocale }
-              : {})}
-          />
 
           {current && type.translatable && contentLocales.length > 1 && (
             <RecordTranslations
@@ -193,6 +201,15 @@ function RecordEditor({
             />
           )}
 
+          <RecordAdvancedFields
+            slug={slug}
+            position={position}
+            envelope={envelope}
+            onSlugChange={setSlug}
+            onPositionChange={setPosition}
+            slugSourceLabel={slugSource}
+          />
+
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" disabled={pending} onClick={() => void save()}>
               {pending
@@ -207,6 +224,24 @@ function RecordEditor({
                 onRestored={applyRestored}
                 onGone={() => router.visit(backHref)}
               />
+            )}
+
+            {/* A save refused by the client validator used to change nothing
+                the person could see from here — the offending field could be
+                a screen above (R6). This says how many, beside the button
+                that appeared to do nothing. */}
+            {form.clientErrorCount > 0 && (
+              <p
+                className="text-sm text-destructive"
+                role="alert"
+                data-testid="records-save-summary"
+              >
+                {t('records.editor.fields_need_attention', {
+                  count: form.clientErrorCount,
+                  defaultValue: '{count} field needs attention',
+                  defaultValue_other: '{count} fields need attention',
+                })}
+              </p>
             )}
           </div>
 

@@ -215,19 +215,21 @@ test.describe('Records — relations', () => {
 
     await page.goto(`/admin/records/${bookKey}/new`);
     const picker = page.getByTestId('records-relation-written_by');
-    const search = picker.getByRole('searchbox');
+    // The picker's input is a `combobox` since UX review R20, not a bare
+    // searchbox, and its results are `option`s in a listbox.
+    const search = picker.getByRole('combobox');
 
     // A prefix that finds enough is answered from the title index alone —
     // the `contains` scan is never asked for (F9's `WIDEN_BELOW`).
     await search.fill('Common');
-    await expect(picker.getByRole('button', { name: 'Common Author 1' })).toBeVisible();
+    await expect(picker.getByRole('option', { name: 'Common Author 1' })).toBeVisible();
     await expect.poll(() => filters.length).toBe(1);
     expect(filters[0]).toBe('display_title:starts_with:Common');
 
     // A term from the middle of a title finds nothing by prefix, and the
     // picker falls back to `contains` rather than saying "No matching records".
     await search.fill('Guin');
-    const hit = picker.getByRole('button', { name: 'Ursula Le Guin' });
+    const hit = picker.getByRole('option', { name: 'Ursula Le Guin' });
     await expect(hit).toBeVisible();
     expect(filters.slice(1)).toEqual([
       'display_title:starts_with:Guin',

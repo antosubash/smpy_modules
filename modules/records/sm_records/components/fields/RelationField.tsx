@@ -13,14 +13,20 @@ export function RelationField({
   expanded,
 }: FieldComponentProps) {
   return (
+    // The render-prop form: the picker is a group of controls, not one
+    // input, so it takes the shell's label id as an `aria-labelledby`
+    // rather than an `htmlFor` (UX review R11).
     <FieldShell field={field} error={error}>
-      <RelationPicker
-        field={field}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        expanded={expanded}
-      />
+      {(labelId) => (
+        <RelationPicker
+          field={field}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          expanded={expanded}
+          labelId={labelId}
+        />
+      )}
     </FieldShell>
   );
 }

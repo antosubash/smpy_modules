@@ -121,24 +121,33 @@ export function RecordReferrers({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>
+        {/* `CardTitle` is a plain `<div>` that spreads its props, so this is
+            how the panel becomes reachable by heading navigation — the
+            editor exposed exactly two headings before (UX review R15). */}
+        <CardTitle role="heading" aria-level={2}>
           {t('records.referrers.title', {
             count: referrerCount,
             defaultValue: 'Referenced by {count} record',
             defaultValue_other: 'Referenced by {count} records',
           })}
         </CardTitle>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={toggle}
-          data-testid="records-referrers-toggle"
-        >
-          {open
-            ? t('records.referrers.hide', { defaultValue: 'Collapse' })
-            : t('records.referrers.show', { defaultValue: 'Expand' })}
-        </Button>
+        {/* Nothing to expand at zero: the header has already said "Referenced
+            by 0 records", and the request behind the toggle could only
+            repeat it (R14). Show/Hide, the one vocabulary this editor uses,
+            replaces Expand/Collapse. */}
+        {referrerCount > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={toggle}
+            data-testid="records-referrers-toggle"
+          >
+            {open
+              ? t('records.referrers.hide', { defaultValue: 'Hide' })
+              : t('records.referrers.show', { defaultValue: 'Show' })}
+          </Button>
+        )}
       </CardHeader>
       {open && (
         <CardContent className="space-y-3">

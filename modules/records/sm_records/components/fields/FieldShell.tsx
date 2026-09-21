@@ -32,8 +32,22 @@ export type FieldComponent = (props: FieldComponentProps) => ReactElement;
  *  carried next to it for a screen reader. */
 const REQUIRED_MARK = '*';
 
+/** The id of a schema field's input, from its key alone — what the editor
+ *  needs to take the person to a field it only knows by name (UX review R6,
+ *  and the 409 that names a `unique` field, R8b). */
+export function fieldIdForKey(key: string): string {
+  return `record-field-${key}`;
+}
+
 export function fieldInputId(field: FieldDef): string {
-  return `record-field-${field.key}`;
+  return fieldIdForKey(field.key);
+}
+
+/** The id of a field's `<Label>`, for the group controls (a checkbox list, a
+ *  relation picker) that have no single input to point `htmlFor` at and take
+ *  an `aria-labelledby` instead (R11). */
+export function fieldLabelId(field: FieldDef): string {
+  return `${fieldInputId(field)}-label`;
 }
 
 export function FieldShell({
@@ -47,10 +61,15 @@ export function FieldShell({
   /** Omitted when the control is a group (checkbox list, chips) rather than
    *  one focusable input — the group gets an `aria-labelledby` instead. */
   htmlFor?: string;
-  children: ReactNode;
+  /** A render prop for the children that need that `aria-labelledby`: the
+   *  shell computes the label's id, so it is the shell that has to hand it
+   *  over. `RelationField` was the one child that needed it and could not
+   *  get it, which is why a relation field had no accessible name at all
+   *  (R11). */
+  children: ReactNode | ((labelId: string) => ReactNode);
 }) {
   const { t } = useT();
-  const labelId = `${fieldInputId(field)}-label`;
+  const labelId = fieldLabelId(field);
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={htmlFor} id={labelId}>
@@ -67,7 +86,7 @@ export function FieldShell({
         )}
       </Label>
       {field.help && <p className="text-sm text-muted-foreground">{field.help}</p>}
-      {children}
+      {typeof children === 'function' ? children(labelId) : children}
       {error && (
         <p
           className="text-sm text-destructive"

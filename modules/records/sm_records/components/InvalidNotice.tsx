@@ -19,11 +19,14 @@ export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
       className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm"
       role="alert"
     >
-      <p className="font-medium text-destructive">
+      {/* A real `h2`, not a styled paragraph: the editor exposed exactly two
+          headings before this pass, so a screen-reader user navigating by
+          heading found nothing below the form (UX review R15). */}
+      <h2 className="font-medium text-destructive">
         {t('records.editor.invalid.title', {
           defaultValue: 'This record does not satisfy the current schema',
         })}
-      </p>
+      </h2>
       <ul className="mt-1 list-inside list-disc text-destructive">
         {errors.map((entry) => (
           <li key={`${entry.field}:${entry.message}`}>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, buildFilterParam, getType, previewSchema } from './api';
+import { ApiError, buildFilterParam, getType, OFFLINE_STATUS, previewSchema } from './api';
 import type { ApiErrorBody } from './types';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -65,6 +65,31 @@ describe('request() error shaping', () => {
       status: 422,
       message: 'label: is required',
     });
+  });
+
+  /** UX review R12a: `fetch` rejects rather than resolving when the server
+   *  isn't there, and the raw rejection ("Failed to fetch") used to land in a
+   *  toast over a form full of unsaved work. */
+  it('rethrows a dropped connection as an offline ApiError', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    const err = await getType('faq').catch((caught: unknown) => caught);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: OFFLINE_STATUS, body: null });
+    expect((err as ApiError).message).toContain("Couldn't reach the server");
+  });
+
+  /** R12b: a session that expired while the page was open is not a failed
+   *  request, and `Request failed (401 Unauthorized)` tells nobody that. */
+  it('replaces a 401 with a sign-in message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' })),
+    );
+
+    const err = await getType('faq').catch((caught: unknown) => caught);
+    expect(err).toMatchObject({ status: 401 });
+    expect((err as ApiError).message).toContain('session has expired');
   });
 
   it('falls back to the status line when the body is not JSON', async () => {

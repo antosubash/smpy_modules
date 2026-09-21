@@ -104,7 +104,8 @@ test.describe('Records — revisions', () => {
     });
 
     await page.goto(`/admin/records/types/${key}`);
-    await expect(page.getByRole('heading', { name: 'Schema history' })).toBeVisible();
+    // The page h1 is the type's own label; the panel title is the level-2 heading.
+    await expect(page.getByRole('heading', { level: 1, name: 'Schema history' })).toBeVisible();
     expect((await apiGetType(page, key)).fields.map((f) => f.key)).toEqual(['title', 'extra']);
 
     await page.getByRole('button', { name: 'Show' }).filter({ hasNotText: 'Hide' }).first().click();

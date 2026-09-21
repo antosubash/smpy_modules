@@ -32,7 +32,9 @@ export function ConflictPanel({
   return (
     <Card className="border-destructive/50" data-testid="records-conflict-panel">
       <CardHeader>
-        <CardTitle className="text-destructive">
+        {/* A heading, so a screen reader navigating by heading finds the
+            one panel on this page that must not be missed (R15). */}
+        <CardTitle className="text-destructive" role="heading" aria-level={2}>
           {t('records.editor.conflict_title', {
             defaultValue: 'This record changed while you were editing',
           })}

@@ -1,11 +1,9 @@
 import { useT } from '@simple-module-py/i18n';
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ApiError } from '../utils/api';
-import { getRecord } from '../utils/api-records';
+import { useRelationLabels } from '../hooks/useRelationLabels';
 import { searchByTitle } from '../utils/relation-search';
 import type { ExpandedRef, FieldDef, RecordRead } from '../utils/types';
 import {
@@ -14,28 +12,11 @@ import {
   relationIsMany,
   relationTarget,
 } from '../utils/values';
+import { RelationChips } from './RelationChips';
 
 /** Long enough that typing a word is one request, short enough that the list
  *  feels attached to the keyboard. */
 const DEBOUNCE_MS = 250;
-
-/** `title: null` means "looked up and not there" — a dangling reference,
- *  which a soft-deleted target legitimately produces (design §9). `restricted`
- *  marks a target this caller may not view: `title` is `null` there too, but
- *  it renders as a different, non-alarming chip — nothing here failed, the
- *  caller just isn't allowed to see it. */
-type LabelEntry = { title: string | null; restricted: boolean };
-type LabelMap = Record<string, LabelEntry>;
-
-/** `expanded` keyed by `uuid` rather than trusted to line up positionally
- *  with `selected`: the caller may have picked a new value since the page's
- *  own `?expand=` was resolved, and a uuid the map does not know is exactly
- *  the signal to fall back to this component's own lookup below. */
-function expandedByUuid(expanded: ExpandedRef[] | undefined): Record<string, ExpandedRef> {
-  const map: Record<string, ExpandedRef> = {};
-  for (const ref of expanded ?? []) map[ref.uuid] = ref;
-  return map;
-}
 
 function valuesOf(value: unknown, many: boolean): RelationValue[] {
   if (many) return Array.isArray(value) ? value.filter(isRelationValue) : [];
@@ -45,6 +26,16 @@ function valuesOf(value: unknown, many: boolean): RelationValue[] {
 /**
  * Picks the target of a `relation` field: `{type, uuid}`, or a list of them
  * when `options.many`.
+ *
+ * A WAI-ARIA combobox (UX review R20), not a text box with buttons under it:
+ * the input owns `aria-expanded`/`aria-activedescendant`, the results are a
+ * `listbox` of `option`s, Up/Down move the active option without moving
+ * focus, Enter takes it and Escape dismisses the list. `aria-live` announces
+ * how many results arrived, which nothing said before.
+ *
+ * The whole control is a `group` labelled by the field's own label (R11) —
+ * `FieldShell` hands that id down, because a filled single-value relation has
+ * no focusable input left for the label to point at.
  */
 export function RelationPicker({
   field,
@@ -52,6 +43,7 @@ export function RelationPicker({
   onChange,
   disabled,
   expanded,
+  labelId,
 }: {
   field: FieldDef;
   value: unknown;
@@ -59,74 +51,28 @@ export function RelationPicker({
   disabled?: boolean;
   /** This field's slice of the record's `expanded` (design §9), when the
    *  page already resolved it — the editor's own load always does. Consulted
-   *  before falling back to this component's per-uuid lookup, so a value the
-   *  page expanded is never fetched twice. */
+   *  before falling back to the per-uuid lookup, so a value the page
+   *  expanded is never fetched twice. */
   expanded?: ExpandedRef[];
+  /** `FieldShell`'s label id — the group's accessible name. */
+  labelId?: string;
 }) {
   const { t } = useT();
   const target = relationTarget(field);
   const many = relationIsMany(field);
   const selected = useMemo(() => valuesOf(value, many), [value, many]);
-  const expandedMap = useMemo(() => expandedByUuid(expanded), [expanded]);
+  const { labels, remember } = useRelationLabels(target, selected, expanded);
 
-  const [labels, setLabels] = useState<LabelMap>({});
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RecordRead[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const labelsRef = useRef<LabelMap>({});
-  labelsRef.current = labels;
+  const [active, setActive] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
 
-  // Resolve the display title of whatever is already selected: from the
-  // page's own `expanded` first (no request at all), and only fetched here
-  // for a uuid it does not cover — a value picked this session, or a record
-  // whose page never expanded it. A 404 is an expected answer either way,
-  // not a failure: it marks the chip and moves on.
-  useEffect(() => {
-    if (!target) return;
-    let cancelled = false;
-    const seeded: [string, LabelEntry][] = [];
-    const missing: string[] = [];
-    for (const ref of selected) {
-      if (ref.uuid in labelsRef.current) continue;
-      const exp = expandedMap[ref.uuid];
-      if (!exp) {
-        missing.push(ref.uuid);
-      } else if (exp.restricted) {
-        seeded.push([ref.uuid, { title: null, restricted: true }]);
-      } else {
-        seeded.push([
-          ref.uuid,
-          { title: exp.dangling ? null : exp.display_title, restricted: false },
-        ]);
-      }
-    }
-    if (seeded.length > 0) setLabels((prev) => ({ ...prev, ...Object.fromEntries(seeded) }));
-    if (missing.length === 0) return;
-    void Promise.all(
-      missing.map(async (uuid): Promise<readonly [string, LabelEntry] | null> => {
-        try {
-          const record = await getRecord(target, uuid);
-          return [uuid, { title: record.display_title, restricted: false }] as const;
-        } catch (err) {
-          // A 404 is a *fact* about the reference and is cached as one. Any
-          // other failure is about the network, so nothing is cached and the
-          // chip keeps showing the raw uuid until a later render retries.
-          if (err instanceof ApiError && err.status === 404) {
-            return [uuid, { title: null, restricted: false }] as const;
-          }
-          return null;
-        }
-      }),
-    ).then((pairs) => {
-      if (cancelled) return;
-      const resolved = pairs.filter((pair): pair is readonly [string, LabelEntry] => pair !== null);
-      if (resolved.length > 0) setLabels((prev) => ({ ...prev, ...Object.fromEntries(resolved) }));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [target, selected, expandedMap]);
+  const listboxId = `records-relation-listbox-${field.key}`;
+  const optionId = (uuid: string) => `records-relation-option-${field.key}-${uuid}`;
+  const open = query.trim() !== '' && !dismissed;
 
   useEffect(() => {
     const term = query.trim();
@@ -147,6 +93,7 @@ export function RelationPicker({
         .then((items) => {
           if (cancelled) return;
           setResults(items);
+          setActive(0);
           setSearchError(null);
         })
         .catch((err: unknown) => {
@@ -166,10 +113,7 @@ export function RelationPicker({
 
   const pick = useCallback(
     (record: RecordRead) => {
-      setLabels((prev) => ({
-        ...prev,
-        [record.uuid]: { title: record.display_title, restricted: false },
-      }));
+      remember(record);
       const ref: RelationValue = { type: target, uuid: record.uuid };
       if (!many) {
         onChange(ref);
@@ -178,8 +122,9 @@ export function RelationPicker({
       }
       setQuery('');
       setResults([]);
+      setActive(0);
     },
-    [many, onChange, selected, target],
+    [many, onChange, selected, target, remember],
   );
 
   const remove = useCallback(
@@ -189,56 +134,73 @@ export function RelationPicker({
     [many, onChange, selected],
   );
 
-  const missingLabel = t('records.relation.missing', { defaultValue: 'Missing record' });
-  const restrictedLabel = t('records.relation.restricted', { defaultValue: 'Restricted' });
-  const removeLabel = t('records.relation.remove', { defaultValue: 'Remove' });
+  /** Up/Down move the active option, Enter takes it, Escape closes the list
+   *  and leaves the text alone — the keyboard contract the pattern owes. */
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      // `preventDefault` because this is a `type="search"` input, and the
+      // browser's own Escape *clears* it. The pattern says the first Escape
+      // dismisses the list and leaves the text alone; losing what you typed
+      // is exactly the surprise the key is supposed to undo.
+      event.preventDefault();
+      setDismissed(true);
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (results.length === 0) return;
+      event.preventDefault();
+      setDismissed(false);
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setActive((prev) => (prev + step + results.length) % results.length);
+      return;
+    }
+    if (event.key === 'Enter') {
+      // Always swallowed while the list is open, so Enter never submits
+      // whatever form the editor grows around this.
+      if (!open || results.length === 0) return;
+      event.preventDefault();
+      const chosen = results[Math.min(active, results.length - 1)];
+      if (chosen) pick(chosen);
+    }
+  };
+
+  const activeIndex = Math.min(active, Math.max(results.length - 1, 0));
+  const activeUuid = open && results.length > 0 ? results[activeIndex]?.uuid : undefined;
 
   return (
-    <div className="grid gap-2" data-testid={`records-relation-${field.key}`}>
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {selected.map((ref) => {
-            const entry = labels[ref.uuid];
-            const restricted = entry?.restricted ?? false;
-            const gone = entry !== undefined && !restricted && entry.title === null;
-            const chipText = restricted
-              ? restrictedLabel
-              : gone
-                ? missingLabel
-                : (entry?.title ?? ref.uuid);
-            return (
-              <Badge
-                key={ref.uuid}
-                variant={gone ? 'destructive' : restricted ? 'outline' : 'secondary'}
-                className={`gap-1 py-1 ${restricted ? 'text-muted-foreground' : ''}`}
-                data-testid={restricted ? 'records-relation-chip-restricted' : undefined}
-              >
-                <span>{chipText}</span>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  aria-label={removeLabel}
-                  className="ml-1 opacity-70 hover:opacity-100 disabled:opacity-40"
-                  onClick={() => remove(ref.uuid)}
-                >
-                  {REMOVE_GLYPH}
-                </button>
-              </Badge>
-            );
-          })}
-        </div>
-      )}
+    // A `fieldset`, not a `div role="group"`: same role, and the element
+    // the platform already has for "these controls belong together" (R11).
+    <fieldset
+      className="grid gap-2"
+      aria-labelledby={labelId}
+      data-testid={`records-relation-${field.key}`}
+    >
+      <RelationChips selected={selected} labels={labels} disabled={disabled} onRemove={remove} />
 
       {(many || selected.length === 0) && (
         <Input
           type="search"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeUuid ? optionId(activeUuid) : undefined}
           value={query}
           disabled={disabled || !target}
           placeholder={t('records.relation.search_placeholder', {
             defaultValue: 'Search by title…',
           })}
-          aria-label={t('records.relation.search_label', { defaultValue: 'Search for a record' })}
-          onChange={(event) => setQuery(event.target.value)}
+          // Two relation fields on one form gave two identically named search
+          // boxes; the field's own label is what tells them apart (R11).
+          aria-label={t('records.relation.search_field_label', {
+            label: field.label,
+            defaultValue: 'Search {label}',
+          })}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setDismissed(false);
+          }}
+          onKeyDown={onKeyDown}
         />
       )}
 
@@ -250,7 +212,21 @@ export function RelationPicker({
         </p>
       )}
       {searchError && <p className="text-sm text-destructive">{searchError}</p>}
-      {query.trim() !== '' && (
+
+      {/* Outside the `open` gate on purpose: a live region has to be in the
+          document *before* it is filled, or the first announcement is the
+          region appearing rather than what it says. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {open && !searching
+          ? t('records.relation.result_count', {
+              count: results.length,
+              defaultValue: '{count} record found',
+              defaultValue_other: '{count} records found',
+            })
+          : ''}
+      </p>
+
+      {open && (
         <div className="rounded-md border">
           {searching && results.length === 0 && (
             <p className="p-2 text-sm text-muted-foreground">
@@ -262,23 +238,42 @@ export function RelationPicker({
               {t('records.relation.no_results', { defaultValue: 'No matching records' })}
             </p>
           )}
-          {results.map((record) => (
-            <Button
-              key={record.uuid}
-              type="button"
-              variant="ghost"
-              disabled={disabled}
-              className="w-full justify-start rounded-none font-normal"
-              onClick={() => pick(record)}
-            >
-              {record.display_title}
-            </Button>
-          ))}
+          {/* A listbox of options is the ARIA pattern this control
+              implements; no HTML element carries those roles. */}
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={labelId}
+            className="max-h-60 overflow-auto"
+          >
+            {results.map((record, index) => (
+              <div
+                key={record.uuid}
+                id={optionId(record.uuid)}
+                role="option"
+                // Never in the tab order: focus stays on the input and
+                // `aria-activedescendant` is what moves, which is the whole
+                // point of the pattern. `-1` is here so the option can still
+                // be reached programmatically.
+                tabIndex={-1}
+                aria-selected={index === activeIndex}
+                // `onMouseDown`, not `onClick`: the input must not lose focus
+                // before the pick lands, or the list closes under the pointer.
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  if (!disabled) pick(record);
+                }}
+                onMouseEnter={() => setActive(index)}
+                className={`cursor-pointer px-3 py-2 text-sm ${
+                  index === activeIndex ? 'bg-accent' : ''
+                }`}
+              >
+                {record.display_title}
+              </div>
+            ))}
+          </div>
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
-
-/** A glyph, not copy — the accessible name is the translated `aria-label`. */
-const REMOVE_GLYPH = '×';

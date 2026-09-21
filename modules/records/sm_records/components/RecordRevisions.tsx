@@ -107,11 +107,17 @@ export function RecordRevisions({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>{t('records.editor.revisions.title', { defaultValue: 'History' })}</CardTitle>
+        {/* See `RecordReferrers` for why the role is spelled out (R15). */}
+        <CardTitle role="heading" aria-level={2}>
+          {t('records.editor.revisions.title', { defaultValue: 'History' })}
+        </CardTitle>
+        {/* This panel's own keys, not the type editor's: the two screens are
+            free to word their toggles differently, and sharing a key made
+            "one vocabulary per screen" (R14) a cross-screen argument. */}
         <Button type="button" variant="ghost" size="sm" onClick={toggle}>
           {open
-            ? t('records.type_editor.revisions.hide', { defaultValue: 'Hide' })
-            : t('records.type_editor.revisions.show', { defaultValue: 'Show' })}
+            ? t('records.editor.revisions.hide', { defaultValue: 'Hide' })
+            : t('records.editor.revisions.show', { defaultValue: 'Show' })}
         </Button>
       </CardHeader>
       {open && (
