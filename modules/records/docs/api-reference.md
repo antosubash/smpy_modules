@@ -1132,7 +1132,17 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |
 | `preview_sync_limit` | 5,000 | Records a preview dry-runs inside the request, then `202` |
 | `revision_limit` | 50 | Revisions kept per record |
+| — | 32 | Nesting depth of one `json` field value — `422` over it |
+| — | 10,000 | Values (scalars and containers) in one `json` field value — `422` over it |
 | — | 1,000,000 | `?page=` — not a setting; an `OFFSET` that deep has nothing to find |
 | — | 200 | `ImportReport.errors` entries |
 | — | 50 | uuids listed in a `restrict` refusal |
 | — | 10 | Failing records in a dry-run `sample` |
+
+The two `json` bounds are not settings because there is no install they are a
+policy decision for. `max_payload_bytes` bounds a payload's *size*, not its
+*shape*, and the shape is what breaks: a few kilobytes nested three hundred
+levels deep is a value the serializer refuses to render, so accepting it once
+made every later read of that type a `500`. Both are checked on create, on
+update and per import row (there, one `ImportRowError` naming the field, so
+`on_error=skip` writes the rest of the file).

@@ -121,3 +121,60 @@ def to_datetime(value: Any) -> Any:
     if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
         raise ValueError("must carry a timezone offset; a naive datetime is never guessed")
     return parsed
+
+
+MAX_JSON_DEPTH = 32
+"""How deeply a ``json`` field's value may nest.
+
+Not a setting, because there is no install this is a policy decision for: a
+hand-written configuration blob, a rich-text document tree and a nested
+address book all live inside a dozen levels, and past thirty-two the value has
+stopped being content and started being a shape. What it stops is a *write
+that poisons every later read*: pydantic's Rust serializer gives up at roughly
+250 levels with ``Circular reference detected (depth exceeded)``, which is a
+500 — and on the import path the row is written and committed before any read
+of the type runs into it, so one accepted payload turned every listing of that
+type, the anonymous one included, into a permanent 500.
+
+Refused here rather than caught there, because "this value cannot be
+serialised" is a fact about the payload and belongs where every other one is:
+in the validator, as the module's own 422, naming the field.
+"""
+
+MAX_JSON_NODES = 10_000
+"""How many values (scalars, objects and arrays, counted together) one
+``json`` field's value may hold.
+
+Depth alone is not the whole shape: a flat array of a million numbers nests
+one level and is still a payload nothing downstream should be asked to walk.
+``max_payload_bytes`` bounds it eventually, but only *after* the value has
+been validated and serialised — this is the cheap bound, taken during the
+walk the depth check is already making."""
+
+
+def check_json_shape(value: Any) -> Any:
+    """Refuse a ``json`` value that nests too deeply or holds too many nodes.
+
+    Iterative, with an explicit stack, and not recursive: a recursive walk of a
+    value deep enough to be refused is itself a ``RecursionError`` — the 500
+    this function exists to replace, arriving from one frame further out.
+
+    The traversal is the same one for both bounds, so a value is walked once.
+    Counting every node (not only the containers) is what makes the second
+    bound meaningful for the flat-and-huge shape the first one cannot see.
+    """
+    if value is None:
+        return value
+    nodes = 0
+    stack: list[tuple[Any, int]] = [(value, 1)]
+    while stack:
+        node, depth = stack.pop()
+        nodes += 1
+        if nodes > MAX_JSON_NODES:
+            raise ValueError(f"holds more than {MAX_JSON_NODES} values")
+        if isinstance(node, dict | list):
+            if depth > MAX_JSON_DEPTH:
+                raise ValueError(f"is nested more than {MAX_JSON_DEPTH} levels deep")
+            children = node.values() if isinstance(node, dict) else node
+            stack.extend((child, depth + 1) for child in children)
+    return value

@@ -29,6 +29,7 @@ from pydantic import AfterValidator, BeforeValidator
 from sm_records.constants import TYPE_KEY_PATTERN
 from sm_records.schema._scalars import (
     check_decimal,
+    check_json_shape,
     to_bool,
     to_date,
     to_datetime,
@@ -135,9 +136,21 @@ def _select_check(options: dict[str, Any], *, many: bool):
 
 
 def _check_json(value: Any) -> Any:
-    if value is None or isinstance(value, dict | list):
+    """A ``json`` value has to be a container, and a *bounded* one.
+
+    The shape bounds (:data:`~sm_records.schema._scalars.MAX_JSON_DEPTH`,
+    :data:`~sm_records.schema._scalars.MAX_JSON_NODES`) are applied here and
+    not only on the size of the serialised payload, because size is not what
+    breaks: a 3 KB array nested three hundred deep is comfortably inside
+    ``max_payload_bytes`` and is still a value pydantic's serializer refuses to
+    render — which, once it is stored, is a 500 on every read of the type
+    rather than a 422 on the one write that asked for it.
+    """
+    if value is None:
         return value
-    raise ValueError("must be a JSON object or array, not a scalar")
+    if not isinstance(value, dict | list):
+        raise ValueError("must be a JSON object or array, not a scalar")
+    return check_json_shape(value)
 
 
 def _check_ref(value: Any) -> Any:
