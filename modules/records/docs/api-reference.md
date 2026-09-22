@@ -516,8 +516,18 @@ is always `409`. The report is what a caller retries from: deselect what it
 names, send the rest.
 
 A run that refuses nothing answers `200 BulkResult`: `action`, `requested`
-(distinct uuids), `changed`, and `cascaded` — records a `trash` reached
-through an `on_delete: cascade` relation and which the request never named.
+(distinct uuids), `changed`, `unchanged`, and `cascaded` — records a `trash`
+reached through an `on_delete: cascade` relation and which the request never
+named.
+
+`unchanged` counts records already in the state the action asks for: a
+`publish` of a published record, an `unpublish` of a draft. **Nothing is
+written for them** — no version bump, no `update` revision, no
+`RecordUpdated` — so "select all, Publish" no longer churns the history of
+every record that was already published. `requested` is always
+`changed + unchanged`. `trash`, `restore` and `purge` have no such case: a
+record already in the trash is a *refusal* there, because those change a
+record's existence and a caller acting on a stale list has to be told.
 
 ```bash
 curl -s -b cookies.txt -X POST \
@@ -527,7 +537,7 @@ curl -s -b cookies.txt -X POST \
 ```
 
 ```json
-{"action": "publish", "requested": 1, "changed": 1, "cascaded": 0}
+{"action": "publish", "requested": 1, "changed": 1, "unchanged": 0, "cascaded": 0}
 ```
 
 One event per record, the same ones the single-record paths publish:

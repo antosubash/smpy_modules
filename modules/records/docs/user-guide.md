@@ -445,6 +445,13 @@ Trashing a record still cascades: a record trashed this way takes its
 `on_delete: cascade` referrers with it, and the confirmation afterwards says
 how many went along.
 
+**Publish and Unpublish skip what is already there.** Selecting a page and
+pressing Publish publishes the drafts and leaves the published records exactly
+as they are — same version, no new entry in their history — and the message
+afterwards says how many were already in that state. It is worth knowing
+because select-all is the usual gesture: the alternative would put an "update"
+in the history of every record on the page, on a day nobody edited them.
+
 ### Export
 
 The **Export** button is a menu (it carries a chevron) with **Download JSON**

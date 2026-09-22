@@ -109,6 +109,10 @@ export type BulkResult = {
   action: BulkAction;
   requested: number;
   changed: number;
+  /** Records already in the state the action asks for — a `publish` of a
+   *  published record. Nothing was written for them: no version bump, no
+   *  revision, no event. Always `requested === changed + unchanged`. */
+  unchanged: number;
   /** Records a `trash` reached through an `on_delete: cascade` relation and
    *  which the request never named. */
   cascaded: number;

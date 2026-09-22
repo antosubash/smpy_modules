@@ -28,7 +28,13 @@ async def test_bulk_trash_moves_every_named_record(client, product):
     resp = await bulk(client, "trash", uuids)
 
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"action": "trash", "requested": 3, "changed": 3, "cascaded": 0}
+    assert resp.json() == {
+        "action": "trash",
+        "requested": 3,
+        "changed": 3,
+        "unchanged": 0,
+        "cascaded": 0,
+    }
     for uuid in uuids:
         assert (await read(client, uuid)).status_code == 404
     assert (await trash_listing(client))["total"] == 3
@@ -79,6 +85,9 @@ async def test_bulk_publish_and_unpublish_bump_the_version(client, product):
         "action": "publish",
         "requested": 2,
         "changed": 2,
+        # Both were drafts, so both moved — the no-op case is
+        # ``test_bulk_no_op_publish``.
+        "unchanged": 0,
         "cascaded": 0,
     }
 

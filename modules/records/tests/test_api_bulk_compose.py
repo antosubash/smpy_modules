@@ -88,7 +88,13 @@ async def test_a_cascade_reaches_records_the_batch_never_named(client):
     assert resp.status_code == 200, resp.text
     # Two named, three trashed: ``cascaded`` is the number the caller could
     # not have worked out for itself.
-    assert resp.json() == {"action": "trash", "requested": 2, "changed": 2, "cascaded": 1}
+    assert resp.json() == {
+        "action": "trash",
+        "requested": 2,
+        "changed": 2,
+        "unchanged": 0,
+        "cascaded": 1,
+    }
     assert (await read(client, child)).status_code == 404
 
 

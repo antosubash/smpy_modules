@@ -107,7 +107,13 @@ async def test_both_ends_of_a_cascade_in_one_batch_are_accepted(client, order):
     assert resp.status_code == 200, (resp.status_code, resp.text)
     # ``cascaded`` counts what the caller could not have worked out for
     # itself, so a record it named is not in it however it was reached.
-    assert resp.json() == {"action": "trash", "requested": 2, "changed": 2, "cascaded": 0}
+    assert resp.json() == {
+        "action": "trash",
+        "requested": 2,
+        "changed": 2,
+        "unchanged": 0,
+        "cascaded": 0,
+    }
     assert await _in_trash(client) == {parent, child}
     for uuid in (parent, child):
         assert (await client.get(f"{RECORDS}/{uuid}", headers=roles(ADMIN))).status_code == 404
@@ -159,5 +165,11 @@ async def test_a_cascade_into_a_record_nobody_named_is_still_reported(client):
     resp = await _trash(client, [parent])
 
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"action": "trash", "requested": 1, "changed": 1, "cascaded": 1}
+    assert resp.json() == {
+        "action": "trash",
+        "requested": 1,
+        "changed": 1,
+        "unchanged": 0,
+        "cascaded": 1,
+    }
     assert await _in_trash(client) == {parent, child}

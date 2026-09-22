@@ -49,10 +49,15 @@ def _event_for(action: BulkAction, rtype: RecordType, change: bulk_service.Chang
     """The events one record's change publishes — the single-record builders.
 
     A trash yields one per record it reached, cascade included, exactly as
-    ``DELETE /records/{uuid}`` does; everything else yields one. The service
-    could not build these itself: the bus is the endpoint's (architecture rule
-    1), and ``events`` imports Starlette.
+    ``DELETE /records/{uuid}`` does; everything else yields one — except a
+    turn that found nothing to do, which yields none: a publish of an already
+    published record wrote nothing, and an event for it would tell every
+    subscriber a record changed when its own history says it did not. The
+    service could not build these itself: the bus is the endpoint's
+    (architecture rule 1), and ``events`` imports Starlette.
     """
+    if change.unchanged:
+        return []
     if action is BulkAction.TRASH:
         return list(events.trashed(rtype, change.record, change.cascade))
     if action is BulkAction.RESTORE:

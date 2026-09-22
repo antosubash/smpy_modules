@@ -67,7 +67,22 @@ export function useBulkActions(
     try {
       const result = await bulkRecords(typeKey, action, uuids);
       const [key, defaultValue] = DONE[action];
-      let message = t(key, { count: result.changed, defaultValue });
+      // A batch of records that were all already published changed nothing,
+      // and "0 records published" is not what to say about it. Its own
+      // sentence rather than the action's with a zero in it.
+      let message =
+        result.changed === 0 && result.unchanged > 0
+          ? t('records.bulk.done_unchanged_only', {
+              count: result.unchanged,
+              defaultValue: '{count} records were already in that state; nothing changed.',
+            })
+          : t(key, { count: result.changed, defaultValue });
+      if (result.changed > 0 && result.unchanged > 0) {
+        message = `${message} ${t('records.bulk.done_unchanged', {
+          count: result.unchanged,
+          defaultValue: '{count} were already in that state.',
+        })}`;
+      }
       if (result.cascaded > 0) {
         message = `${message} ${t('records.bulk.done_cascaded', {
           count: result.cascaded,

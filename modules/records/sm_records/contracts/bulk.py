@@ -112,16 +112,30 @@ class BulkReport(SQLModel):
 class BulkResult(SQLModel):
     """What a bulk action that refused nothing did.
 
-    ``requested`` counts distinct uuids after the repeats are collapsed, so it
-    is the number ``changed`` is compared against. ``cascaded`` counts records
-    a ``trash`` reached through an ``on_delete: cascade`` relation and which
-    the request therefore never named — zero for every other action, and the
-    one number the caller could not have worked out for itself.
+    ``requested`` counts distinct uuids after the repeats are collapsed, and
+    it is always ``changed + unchanged``: a batch with a refusal in it answers
+    a report instead of this.
+
+    ``unchanged`` counts records the action found already in the state it
+    asks for — a ``publish`` of a published record. They are **not** written:
+    no version bump, no revision, no event. Counted apart from ``changed``
+    because "12 records published" about nine that moved is a number the
+    operator cannot reconcile with the list in front of them, and because the
+    version bump it used to imply churned the history of every record a
+    select-all touched. Zero for ``trash``/``restore``/``purge``, whose
+    already-in-that-state case is a refusal rather than a no-op — those change
+    a record's existence, and a caller acting on a stale list has to be told.
+
+    ``cascaded`` counts records a ``trash`` reached through an ``on_delete:
+    cascade`` relation and which the request therefore never named — zero for
+    every other action, and the one number the caller could not have worked
+    out for itself.
     """
 
     action: BulkAction
     requested: int
     changed: int
+    unchanged: int = 0
     cascaded: int = 0
 
 
