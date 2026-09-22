@@ -16,7 +16,18 @@ loud. It is in-process state (:mod:`sm_records.index._drift`), so it reflects
 verifies run by *this* process; a CLI verify runs in another one and reports on
 its own stdout instead, which the README says.
 
-The third is ``orphaned_locales``: records written in a language the install
+The third is ``invalid_records``: records carrying a stored ``invalid_since``
+mark (§8.3, :mod:`sm_records.services._invalid`) — content a forced schema
+change left behind, which is still served, still editable and satisfies
+nobody's schema. Counted from the column on every check rather than scanned:
+both backends answer ``invalid_since IS NOT NULL`` from that column's own
+index by reading only the entries that have a value, so the cost is
+proportional to how many records are marked. It is *not* an error — forcing a
+change is a decision an operator made on purpose — but an install that has
+carried the same twelve marked records for a month has forgotten about them,
+and the health detail is where that becomes visible.
+
+The fourth is ``orphaned_locales``: records written in a language the install
 has since dropped from ``content_locales``. Dropping one is **not** refused at
 save — the records exist, and refusing the edit would make a typo unfixable —
 so the public API stops serving them (``services.public``) and this is what
@@ -149,6 +160,18 @@ def _orphaned_detail(counts: dict[str, int]) -> str:
     )
 
 
+async def count_invalid_records(session) -> int:
+    """How many live records carry a stored invalid mark, across table sets.
+
+    A thin wrapper over :func:`sm_records.services._invalid.count_live` so the
+    check reads like its other two details; the counting rule, and why it is
+    affordable per check, live with the column.
+    """
+    from sm_records.services import _invalid
+
+    return await _invalid.count_live(session)
+
+
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
     async def check() -> HealthCheckResult:
         db_state = getattr(module, "db", None)
@@ -163,6 +186,9 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
                     select(RecordType.key, RecordType.reindex_pending, RecordType.fields)
                 )
             ).all()
+            # On the same session as the rows above: one connection checked
+            # out per health poll, not two.
+            invalid = await count_invalid_records(session)
         stale, blocked = _stale(rows, limit, now)
         details: list[str] = []
         if stale:
@@ -183,6 +209,12 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         drift = drift_detail()
         if drift is not None:
             details.append(drift)
+        if invalid:
+            details.append(
+                f"invalid_records: {invalid} — record(s) marked as not satisfying their "
+                "type's schema, from a forced schema change; each one's next save clears "
+                "the mark (filter=invalid:eq:true)"
+            )
         # Counted at startup and parked on the instance: see the module
         # docstring for why it is not recounted on a settings edit.
         orphaned = getattr(module, "orphaned_locales", None)

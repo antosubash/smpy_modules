@@ -136,7 +136,7 @@ async def import_type(
         )
         if body.show_in_menu:
             mark_dirty(request.app)
-        return type_read(rtype, 0, 0)
+        return type_read(rtype, 0, 0, 0)
 
     if body.expected_version is None:
         raise ValidationFailed(

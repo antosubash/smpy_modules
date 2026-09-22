@@ -31,7 +31,7 @@ from sm_records.index.writer import write_index
 # with the rest of it in :mod:`sm_records.locales`.
 from sm_records.locales import resolve_locale
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid, tables_for
-from sm_records.services import _claims, _payload
+from sm_records.services import _claims, _invalid, _payload
 from sm_records.services._common import guarded_bump, reload, utcnow
 
 # Re-exported so the delete lifecycle is importable from the one module
@@ -252,6 +252,11 @@ async def update_record(
         record.position = position
     record.updated_by = actor
     record.version = expected_version + 1
+    # The payload above was validated against the type's *current* schema, so
+    # whatever a forced change once found wrong with this row is no longer
+    # true — §8.3's "each one's next ordinary write brings it up to the new
+    # shape", applied to the stored mark (``services._invalid``).
+    _invalid.clear_on_write(record)
     db.add(record)
     await _claims.flush_write(db, rtype, resolved_slug, record.locale)
 

@@ -59,8 +59,8 @@ def _document_classes() -> tuple[type, ...]:
 
 async def _current_dto(db: Any, current: Any) -> Any:
     if isinstance(current, RecordType):
-        live, trashed = await record_counts(db, current)
-        return type_read(current, live, trashed).model_dump(mode="json")
+        live, trashed, invalid = await record_counts(db, current)
+        return type_read(current, live, trashed, invalid).model_dump(mode="json")
     if isinstance(current, _document_classes()):
         rtype = await get_type_by_id(db, current.type_id)
         return record_read(rtype, current).model_dump(mode="json")

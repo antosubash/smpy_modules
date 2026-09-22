@@ -53,6 +53,14 @@ class TypeRead(SQLModel):
     """Records in the trash. Separate from ``record_count`` because the two
     answer different questions: what the type shows, and what deleting it
     would destroy. ``DELETE /types/{key}`` confirms against the *sum*."""
+    invalid_record_count: int
+    """Live records carrying a stored ``invalid_since`` mark — records a
+    forced schema change left behind (§8.3, ``services/_invalid.py``).
+
+    Live only, and a subset of ``record_count``: it is the number the hub row
+    shows next to a link that filters the list by ``invalid:eq:true``, and
+    that listing does not show the trash. Zero on a type nothing has ever
+    scanned, which is every type on a freshly upgraded install."""
     reindex_pending: dict[str, str]
     """Field key (or ``"*"`` for the whole type) -> ISO enqueue time — a
     schema-affecting change that hasn't finished its out-of-request rebuild
@@ -121,9 +129,16 @@ class TypeUpdate(SQLModel):
     orphaned: str | None = None
 
 
-def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -> TypeRead:
-    """Both counts are required rather than defaulted: a caller that forgot
-    the trashed one would silently report a populated type as editable."""
+def type_read(
+    rtype: RecordType,
+    record_count: int,
+    trashed_record_count: int,
+    invalid_record_count: int,
+) -> TypeRead:
+    """Every count is required rather than defaulted: a caller that forgot the
+    trashed one would silently report a populated type as editable, and one
+    that forgot the invalid one would report a clean bill of health for a type
+    whose records a forced change left behind."""
     return TypeRead(
         key=rtype.key,
         label=rtype.label,
@@ -142,6 +157,7 @@ def type_read(rtype: RecordType, record_count: int, trashed_record_count: int) -
         allowed_roles=list(rtype.allowed_roles or []),
         record_count=record_count,
         trashed_record_count=trashed_record_count,
+        invalid_record_count=invalid_record_count,
         reindex_pending=pending_map(rtype),
         created_at=rtype.created_at,
         updated_at=rtype.updated_at,

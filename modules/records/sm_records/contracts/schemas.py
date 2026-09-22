@@ -94,7 +94,17 @@ class RecordRead(SQLModel):
 
     **Always empty on a list response** — filling it costs a validator pass
     per row (:func:`record_list_read`); the badge belongs to the editor, which
-    reads one record."""
+    reads one record. :attr:`invalid_since` is what a list reads instead."""
+    invalid_since: datetime | None
+    """When a scan last found this record wanting, or ``null`` — the *stored*
+    mark (``services/_invalid.py``), filled on every read including a list.
+
+    The two are the same fact at different resolutions and neither replaces
+    the other: ``invalid`` says which fields are wrong *now* and costs a
+    validator pass, ``invalid_since`` says that something was wrong and when,
+    and costs nothing. A row can carry the timestamp with an empty ``invalid``
+    — the payload was fixed in the database rather than through the API, and
+    the next write or rescan clears the mark."""
     translations: list[TranslationRead] | None = None
     """Every record in this one's translation group, itself included, **only**
     under ``?translations=true`` on the single-record read and on the record
@@ -218,6 +228,7 @@ def record_read(
         updated_at=record.updated_at,
         is_deleted=record.is_deleted,
         invalid=[*view["invalid"], *extra_invalid],
+        invalid_since=record.invalid_since,
         translations=translations,
         expanded=expanded,
     )

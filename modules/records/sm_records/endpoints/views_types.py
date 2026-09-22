@@ -133,11 +133,11 @@ async def type_edit(
     settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     rtypes = await type_service.list_types(db)
-    live, trashed = await type_service.record_counts(db, rtype)
+    live, trashed, invalid = await type_service.record_counts(db, rtype)
     return await inertia.render(
         constants._PAGE_TYPE_EDITOR,
         {
-            "type": type_read(rtype, live, trashed).model_dump(mode="json"),
+            "type": type_read(rtype, live, trashed, invalid).model_dump(mode="json"),
             **_editor_context(request, rtypes, settings),
         },
     )

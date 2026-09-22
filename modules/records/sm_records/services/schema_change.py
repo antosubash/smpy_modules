@@ -81,7 +81,9 @@ async def preview(
     diff says nothing could have broken (``_dry_run.change_report``): sent
     with the *stored* fields it answers "which records does the schema refuse
     now", the worklist a forced restrictive change leaves and that an empty
-    diff otherwise reports as ``failing=0``.
+    diff otherwise reports as ``failing=0``. It is also the one preview that
+    **writes**: what it finds is recorded on each record's ``invalid_since``,
+    so the answer outlives the report the operator is reading.
     """
     new_defs, _ = normalise(fields_raw, settings)
     diff = diff_fields(field_defs(rtype), new_defs)
@@ -99,6 +101,13 @@ async def preview(
         diff=diff,
         conflicts=conflicts,
         rescan=rescan,
+        # A rescan is a scan of the schema the records are *stored* against,
+        # so what it finds is true of the install and is written down
+        # (``services._invalid``). A draft preview scans a proposal that may
+        # never be saved, and marking from one would flag records against a
+        # schema nobody applied — which is also what keeps "Preview changes"
+        # a button that writes nothing.
+        mark=rescan,
         on_progress=on_progress,
     )
     return diff, report
@@ -207,16 +216,28 @@ async def apply(
     # The scan is the expensive half of a schema change on a large type, so
     # "Preview changes" then "Save" pays for one pass rather than two when the
     # two describe the same thing — ``_preview.reused_report`` says when.
-    report = reused_report(
-        rtype,
-        current_version=current.version,
-        fields_raw=new_fields if new_fields is not None else list(rtype.fields or []),
-        display_field=changes.get("display_field", rtype.display_field),
-        slug_field=changes.get("slug_field", rtype.slug_field),
-        settings=settings,
-        drop_keys=drop,
+    #
+    # **A forced change never reuses one.** Its scan does not only decide the
+    # refusal, it writes ``invalid_since`` on the records it leaves behind
+    # (``services._invalid``), and a preview's report is a report: it recorded
+    # nothing. So a force pays for its own pass, which is the pass that
+    # produces the worklist. An unforced apply scans with ``mark=True`` too —
+    # the change is about to be stored, so a record the new schema accepts is
+    # one whose mark should go.
+    report = (
+        None
+        if force
+        else reused_report(
+            rtype,
+            current_version=current.version,
+            fields_raw=new_fields if new_fields is not None else list(rtype.fields or []),
+            display_field=changes.get("display_field", rtype.display_field),
+            slug_field=changes.get("slug_field", rtype.slug_field),
+            settings=settings,
+            drop_keys=drop,
+        )
     ) or await change_report(
-        db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, drop_keys=drop
+        db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, drop_keys=drop, mark=True
     )
     if report.failing and not force:
         raise SchemaChangeRefused(report, refusal(rtype, report))

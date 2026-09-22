@@ -37,7 +37,7 @@ from sm_records.schema.compile import (
 )
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
-from sm_records.services import _duplicates
+from sm_records.services import _duplicates, _invalid
 from sm_records.services._common import record_count
 from sm_records.services._payload import field_defs
 from sm_records.settings import RecordsSettings
@@ -103,6 +103,7 @@ async def dry_run(
     orphaned_conflicts: dict[str, int] | None = None,
     drop_keys: frozenset[str] = frozenset(),
     unique_pairs: Sequence[tuple[FieldDefinition, FieldDefinition]] = (),
+    mark: bool = False,
     on_progress: Callable[[int], None] | None = None,
 ) -> DryRunReport:
     """Validate every record against ``new_defs`` without writing anything.
@@ -128,6 +129,10 @@ async def dry_run(
     (§8.8), and judging a record on a value that will not survive the change
     would refuse the change for content nobody is keeping.
 
+    ``mark`` writes what the pass found to ``Record.invalid_since`` — see
+    :mod:`sm_records.services._invalid`, which says which callers may, and why
+    a draft preview is not one of them.
+
     ``unique_pairs`` names the fields gaining ``unique``. They are the one
     restrictive class this per-record pass is structurally blind to —
     duplication is a property of a *pair* of records — so
@@ -140,6 +145,7 @@ async def dry_run(
     checked = failing = 0
     sample: list[FailingRecord] = []
     collector = _duplicates.Collector([old for old, _new in unique_pairs if not old.indexed])
+    marker = _invalid.Marker(db, rtype, enabled=mark)
     async for batch in _batches(db, rtype, batch_size):
         for record in batch:
             checked += 1
@@ -147,6 +153,7 @@ async def dry_run(
             if collector.active:
                 collector.add(record, view, room=DRY_RUN_SAMPLE)
             errors = _errors_for(model, view)
+            marker.judge(record, failed=bool(errors))
             if not errors:
                 continue
             failing += 1
@@ -158,6 +165,7 @@ async def dry_run(
                         errors=tuple(errors),
                     )
                 )
+        await marker.flush()
         if on_progress is not None:
             on_progress(checked)
     return _folded(
@@ -232,6 +240,7 @@ async def change_report(
     conflicts: dict[str, int],
     drop_keys: frozenset[str] = frozenset(),
     rescan: bool = False,
+    mark: bool = False,
     on_progress: Callable[[int], None] | None = None,
 ) -> DryRunReport:
     """The report for one proposed change — scanned, or honestly skipped.
@@ -243,6 +252,8 @@ async def change_report(
     below would answer ``failing=0`` about records nothing looked at. It is
     the only way to re-derive the worklist a forced restrictive change leaves
     behind, since the stored fields are their own diff.
+
+    ``mark`` is passed straight through; a skipped scan writes nothing.
     """
     if not rescan and not needs_dry_run(diff, conflicts):
         # Skipped, but ``checked`` still has to be an honest count of what
@@ -258,6 +269,7 @@ async def change_report(
         orphaned_conflicts=conflicts,
         drop_keys=drop_keys,
         unique_pairs=_duplicates.newly_unique(diff, field_defs(rtype), new_defs),
+        mark=mark,
         on_progress=on_progress,
     )
 

@@ -189,11 +189,27 @@ async def record_count(
     return int((await db.execute(stmt)).scalar_one())
 
 
-async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int]:
-    """``(live, trashed)`` — the pair every ``TypeRead`` is built from."""
+async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int, int]:
+    """``(live, trashed, invalid)`` — the three every ``TypeRead`` is built from.
+
+    A third statement and not a folded ``COUNT(CASE WHEN …)``: the two above
+    differ in whether the framework's soft-delete filter is lifted, which is
+    an execution option rather than a predicate this module writes, and the
+    one-query version would have to restate ``is_deleted`` by hand in all
+    three arms. Each is an indexed count, and this is a screen that lists
+    types rather than a hot path.
+
+    ``invalid`` counts live records only, like ``live`` — it is the number the
+    hub row shows beside a ``filter=invalid:eq:true`` link, and that listing
+    does not show the trash.
+    """
+    # Imported here and not at module scope: ``_invalid`` needs this module's
+    # ``mark_written`` and ``utcnow``, so the two would import each other.
+    from sm_records.services import _invalid
+
     live = await record_count(db, rtype)
     total = await record_count(db, rtype, include_deleted=True)
-    return live, total - live
+    return live, total - live, await _invalid.count_for_type(db, rtype)
 
 
 class PurgedRecord(Protocol):

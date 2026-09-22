@@ -136,7 +136,7 @@ async def create_type(
         mark_dirty(request.app)
     # A freshly created type holds no records, trashed or otherwise — skip
     # the queries rather than count a table it cannot yet appear in.
-    return type_read(rtype, 0, 0)
+    return type_read(rtype, 0, 0, 0)
 
 
 @router.get("/types/{key}", response_model=TypeRead, dependencies=[require_view])

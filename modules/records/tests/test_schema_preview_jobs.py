@@ -2,8 +2,10 @@
 
 The synchronous path is covered by ``test_api_schema.py``; what is new is
 that the same request answers ``202`` with a job id on a big type, that the
-job reports progress and finishes with the *same* report, and that a ``PUT``
-close behind it reuses that report instead of scanning again.
+job reports progress and finishes with the *same* report, and that an
+ordinary ``PUT`` close behind it reuses that report instead of scanning again
+— while a forced one deliberately does not, because its scan is what marks the
+records it leaves behind.
 """
 
 from __future__ import annotations
@@ -67,6 +69,17 @@ def _restrictive(rtype: dict) -> list[dict]:
     return fields
 
 
+def _clean_restrictive(rtype: dict) -> list[dict]:
+    """Restrictive — so it is scanned — and satisfied by every seeded record,
+    so the save it precedes is an ordinary one rather than a ``force``. Every
+    record has a ``title``; none has a ``body``."""
+    fields = [dict(raw) for raw in rtype["fields"]]
+    for raw in fields:
+        if raw["key"] == "title":
+            raw["required"] = True
+    return fields
+
+
 async def test_a_small_type_previews_synchronously(client):
     rtype = await _seed(client, 3)
     resp = await client.post(
@@ -120,7 +133,45 @@ async def test_a_job_is_not_readable_under_another_type(client):
     assert wrong.status_code == 404
 
 
+def _explode(monkeypatch) -> None:
+    """Any scan goes through ``change_report``; making it explode is the only
+    way to prove an apply did not run one."""
+    from sm_records.services import schema_change as module
+
+    async def _boom(*args, **kwargs):  # pragma: no cover - fails the test if reached
+        raise AssertionError("apply re-ran the dry run instead of reusing the preview")
+
+    monkeypatch.setattr(module, "change_report", _boom)
+
+
 async def test_apply_reuses_a_matching_job_report(client, monkeypatch):
+    rtype = await _seed(client, 3)
+    client.app.state.sm_records.settings = RecordsSettings(preview_sync_limit=1)
+    fields = _clean_restrictive(rtype)
+    assert (
+        await client.post(
+            f"{_API}/note/schema/preview", json={"fields": fields}, headers=roles(ADMIN)
+        )
+    ).status_code == 202
+
+    _explode(monkeypatch)
+    resp = await client.put(
+        f"{_API}/note",
+        json={"expected_version": rtype["version"], "fields": fields},
+        headers=roles(ADMIN),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_a_forced_apply_scans_rather_than_reusing_a_report(client):
+    """A forced change's scan is not only how the refusal is decided — it is
+    what writes ``invalid_since`` on the records it leaves behind
+    (``services._invalid``). A report recorded nothing, so an apply that took
+    its answer from one would leave the marks — and the worklist the whole
+    feature is for — unwritten. Asserted on the records rather than on whether
+    ``change_report`` was called: what matters is the outcome, and a future
+    implementation that reuses a report *and* marks would be fine.
+    """
     rtype = await _seed(client, 3)
     client.app.state.sm_records.settings = RecordsSettings(preview_sync_limit=1)
     fields = _restrictive(rtype)
@@ -129,21 +180,23 @@ async def test_apply_reuses_a_matching_job_report(client, monkeypatch):
             f"{_API}/note/schema/preview", json={"fields": fields}, headers=roles(ADMIN)
         )
     ).status_code == 202
+    assert preview_jobs.reusable(
+        # The only type in this test's database, so id 1 — the same spelling
+        # ``test_a_stale_version_is_not_reused`` below uses.
+        type_id=1,
+        type_version=rtype["version"],
+        signature=preview_jobs.fields_hash(fields, "title", None),
+        ttl_seconds=600,
+    ), "the job this test is about did not finish, so it proves nothing"
 
-    # Any second scan would go through ``change_report``; making it explode is
-    # the only way to prove the apply did not run one.
-    from sm_records.services import schema_change as module
-
-    async def _boom(*args, **kwargs):  # pragma: no cover - fails the test if reached
-        raise AssertionError("apply re-ran the dry run instead of reusing the preview")
-
-    monkeypatch.setattr(module, "change_report", _boom)
     resp = await client.put(
         f"{_API}/note",
         json={"expected_version": rtype["version"], "fields": fields, "force": True},
         headers=roles(ADMIN),
     )
     assert resp.status_code == 200, resp.text
+    page = (await client.get(f"{_API}/note/records", headers=roles(ADMIN))).json()
+    assert [item["invalid_since"] is not None for item in page["items"]] == [True] * 3
 
 
 async def test_a_stale_version_is_not_reused(client):

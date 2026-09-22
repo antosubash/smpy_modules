@@ -12,15 +12,17 @@ minutes of HTTP with whatever proxy timeout that implies, so this answers
 ``202 {"job": ..., "status": "running"}`` and the caller polls
 :func:`read_preview_job` for "checked N of M" and then the same report.
 
-Neither path writes anything, which is what makes the 404 on an unknown job
-harmless: the client's answer to it is to preview again.
+A draft preview writes nothing, which is what makes the 404 on an unknown job
+harmless: the client's answer to it is to preview again. A ``rescan`` is the
+exception — it scans the schema the records are stored against and records
+what it finds on each record's ``invalid_since``
+(:mod:`sm_records.services._invalid`) — and re-running one is idempotent, so
+the answer to a 404 does not change.
 """
 
 from __future__ import annotations
 
-import logging
 from functools import partial
-from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -43,56 +45,13 @@ from sm_records.deps import (
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.endpoints.api._responses import TYPE_WRITE, responses
 from sm_records.models import RecordType
-from sm_records.services import preview_jobs, schema_change
+from sm_records.services import preview_jobs, preview_runner, schema_change
 from sm_records.services._common import record_count
 from sm_records.services.errors import NotFound
 from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*TYPE_WRITE))
-
-logger = logging.getLogger(__name__)
-
-
-async def _run_preview_job(
-    db_state: Any,
-    job_id: str,
-    type_id: int,
-    body: SchemaPreviewRequest,
-    sent: dict[str, Any],
-    settings: RecordsSettings,
-) -> None:
-    """The deferred half of :func:`preview_schema`, on its own session.
-
-    ``db_state`` and not the request's session, for the reason
-    :func:`_defer_reindex` gives: by the time a deferred job runs, the session
-    that served the request has been committed and closed. The type is
-    re-loaded by id here for the same reason.
-
-    Nothing is written, so nothing is committed — but the failure still has to
-    land somewhere, because the response went out long ago. It lands on the
-    job, which is what the poller reads.
-    """
-    try:
-        async with db_state.session_factory() as session:
-            rtype = await session.get(RecordType, type_id)
-            if rtype is None:  # pragma: no cover - the type was deleted mid-preview
-                preview_jobs.fail(job_id, "the type no longer exists")
-                return
-            diff, report = await schema_change.preview(
-                session,
-                rtype,
-                body.fields,
-                settings,
-                display_field=sent.get("display_field", MISSING),
-                slug_field=sent.get("slug_field", MISSING),
-                rescan=body.rescan,
-                on_progress=partial(preview_jobs.progress, job_id),
-            )
-        preview_jobs.finish(job_id, diff, report)
-    except Exception as exc:  # pragma: no cover - defensive; preview is tested directly
-        logger.exception("records: deferred schema preview %s failed", job_id)
-        preview_jobs.fail(job_id, str(exc))
 
 
 @router.post(
@@ -120,10 +79,12 @@ async def preview_schema(
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
 ) -> SchemaPreviewRead | JSONResponse:
-    """Writes nothing (design §8.9) — see ``endpoints/api/_errors.py``'s
-    module docstring on why this handler still has no ``try``/``except`` of
-    its own: nothing here can leave writes for ``RecordsErrorRoute`` to
-    discard, because nothing here writes.
+    """Classifies and dry-runs; it changes no schema and no payload (§8.9).
+
+    Under ``rescan`` it does write one thing: the ``invalid_since`` mark the
+    scan found (``services._invalid``). That needs no ``try``/``except`` here
+    — ``RecordsErrorRoute`` rolls the request's session back on every error
+    path, which is the rule its module docstring states.
 
     ``exclude_unset`` is what lets a caller that only ever sends ``fields``
     (today's UI) reach :func:`schema_change.preview` without its
@@ -173,7 +134,17 @@ async def preview_schema(
     )
     defer(
         request,
-        partial(_run_preview_job, request.app.state.sm.db, job.id, rtype.id, body, sent, settings),
+        partial(
+            preview_runner.run_preview_job,
+            request.app.state.sm.db,
+            job.id,
+            rtype.id,
+            body.fields,
+            display_field=sent.get("display_field", MISSING),
+            slug_field=sent.get("slug_field", MISSING),
+            rescan=body.rescan,
+            settings=settings,
+        ),
     )
     return JSONResponse(status_code=202, content={"job": job.id, "status": job.status})
 
