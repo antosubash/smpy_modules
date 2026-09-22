@@ -33,7 +33,6 @@ import io
 import json
 from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +42,15 @@ from sm_records.index.query import Filter, Sort, build_query, only_trashed
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.schema.compile import to_jsonable
 from sm_records.schema.fields import FieldDefinition
-from sm_records.schema.types import FieldType
+
+# Re-exported: how one *cell* is spelled — and escaped — lives in
+# ``_export_cells`` for the file cap. See its docstring for the seam.
+from sm_records.services._export_cells import (
+    ENVELOPE_COLUMNS,
+    csv_cell,
+    csv_header,
+    escape_formula,
+)
 from sm_records.services._payload import field_defs, read_view
 from sm_records.services.types import get_type_by_id
 from sm_records.settings import RecordsSettings
@@ -52,43 +59,13 @@ __all__ = [
     "ENVELOPE_COLUMNS",
     "csv_cell",
     "csv_header",
+    "escape_formula",
     "export_filename",
     "iter_csv",
     "iter_json",
     "record_row",
     "walk_records",
 ]
-
-ENVELOPE_COLUMNS = (
-    "uuid",
-    "slug",
-    "locale",
-    "translation_group",
-    "status",
-    "position",
-    "published_at",
-)
-"""The fixed columns of §5 that travel with every record, whatever its type.
-
-``locale`` and ``translation_group`` travel because a file that lost them
-could not be imported back into a multilingual install without silently
-collapsing every record into the default language and breaking every
-translation group apart (Phase 5 §4.3). ``translation_group`` is opaque to the
-importer — it is carried, never interpreted.
-
-First rather than last in the CSV: ``uuid`` is the column an operator edits a
-file *against* (it is what ``match_by`` defaults to), and a spreadsheet whose
-identity column is off the right-hand edge past forty user fields is one
-people mis-align by hand. The declared fields follow, in declaration order.
-Import is driven by the header row, so neither order is load-bearing on the
-way back in.
-"""
-
-_JSON_CELL_TYPES = frozenset({FieldType.MULTISELECT, FieldType.JSON, FieldType.MEDIA})
-"""Field types whose value is JSON-encoded inside its CSV cell. A list or an
-object has no flat spelling that survives a round trip, and inventing one
-(semicolons, repeated columns) is how a value containing the separator
-silently becomes two values."""
 
 
 def export_filename(type_key: str, suffix: str, *, today: date | None = None) -> str:
@@ -199,60 +176,6 @@ async def iter_json(
                 first = False
             yield "".join(chunk)
         yield "]}"
-
-
-def csv_cell(field: FieldDefinition | None, value: Any) -> str:
-    """One payload value as its CSV cell.
-
-    The wire form the module already uses, never a new one: a ``number`` is
-    the decimal *string* ``to_jsonable`` stores (a float round trip is the
-    precision loss §7.3 exists to prevent), a boolean is ``true``/``false``
-    rather than Python's capitalised spelling, and a date is ISO because that
-    is what the payload holds.
-
-    A relation is ``type:uuid`` — flat, greppable, and unambiguous because
-    neither half can contain a colon (``TYPE_KEY_PATTERN``, and a uuid is
-    hex). A to-many relation is a JSON list of those, for the same reason
-    ``multiselect`` is a JSON list: any flat separator is a value somebody's
-    content contains.
-
-    **No formula-injection prefix.** A cell beginning ``=``, ``+``, ``-`` or
-    ``@`` is written verbatim. Prefixing it with an apostrophe would make the
-    export lossy — the importer cannot tell the mitigation from a value that
-    genuinely starts with one — and this file's contract is that it
-    round-trips. The README says so next to the export documentation, because
-    it is a real decision with a real consequence: opening an untrusted
-    export in a spreadsheet is on the reader, as it is for every other CSV.
-    """
-    if value is None:
-        return ""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if field is not None and field.type is FieldType.RELATION:
-        return _relation_cell(value)
-    if field is not None and field.type in _JSON_CELL_TYPES:
-        return json.dumps(to_jsonable(value))
-    if isinstance(value, Decimal | datetime | date):
-        return str(to_jsonable(value))
-    if isinstance(value, list | dict):
-        return json.dumps(to_jsonable(value))
-    return str(value)
-
-
-def _relation_cell(value: Any) -> str:
-    if isinstance(value, list):
-        return json.dumps([_one_ref(item) for item in value])
-    return _one_ref(value)
-
-
-def _one_ref(value: Any) -> str:
-    if isinstance(value, dict):
-        return f"{value.get('type') or ''}:{value.get('uuid') or ''}"
-    return str(value)
-
-
-def csv_header(defs: list[FieldDefinition]) -> list[str]:
-    return [*ENVELOPE_COLUMNS, *(field.key for field in defs)]
 
 
 async def iter_csv(

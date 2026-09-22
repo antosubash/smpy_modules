@@ -108,14 +108,15 @@ async def test_csv_round_trip_keeps_uuid_data_and_relations(client):
         assert item["data"] == before[uuid]["data"], uuid
 
 
-async def test_csv_escaping_and_no_formula_mitigation(client):
-    """Commas, quotes, newlines and unicode survive; a leading ``=`` is left
-    alone on purpose.
+async def test_csv_escaping_and_formula_mitigation(client):
+    """Commas, quotes, newlines and unicode survive; a leading ``=`` is escaped.
 
-    No apostrophe is prefixed to a cell starting ``=``/``+``/``-``/``@``. The
-    mitigation is not lossless — the importer cannot tell it from a value that
-    genuinely begins with one — and this file's whole contract is that it
-    round-trips. The README says so where it documents the export.
+    A cell starting ``=``/``+``/``-``/``@`` (or a tab, a carriage return, or an
+    apostrophe) is written with a leading apostrophe — the mitigation this file
+    used to refuse on the grounds that it was lossy. It is not, because the
+    apostrophe is escaped too and the importer strips exactly one from every
+    cell, which is what the second half of this test proves: the same hostile
+    value comes back byte for byte.
     """
     await make_type(client, PRODUCT, [field("name", "text", indexed=True)])
     hostile = '=SUM(A1:A2), "quoted", line\nbreak, naïve — ünïcode'
@@ -123,8 +124,8 @@ async def test_csv_escaping_and_no_formula_mitigation(client):
 
     table = await export_text(client, PRODUCT, "csv")
     parsed = list(csv.reader(io.StringIO(table, newline="")))
-    assert parsed[1][parsed[0].index("name")] == hostile
-    assert '"=SUM(A1:A2)' in table
+    assert parsed[1][parsed[0].index("name")] == "\x27" + hostile
+    assert '"\x27=SUM(A1:A2)' in table
 
     await drop_type(client, PRODUCT, 1)
     await make_type(client, PRODUCT, [field("name", "text", indexed=True)])

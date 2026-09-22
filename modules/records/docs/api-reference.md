@@ -843,11 +843,12 @@ date and a datetime are ISO. `multiselect`, `json` and `media` cells are
 JSON-encoded. A relation is `type:uuid`; a to-many relation is a JSON list of
 those. An empty cell means null.
 
-> **No CSV formula-injection mitigation is applied**, deliberately. A cell
-> beginning `=`, `+`, `-` or `@` is written verbatim rather than prefixed with
-> an apostrophe: the prefix is not lossless, and these files are meant to round
-> trip. Treat an export from an untrusted source as you would any other CSV
-> before opening it in a spreadsheet.
+> **CSV formula injection is escaped.** A cell beginning `=`, `+`, `-`, `@`, a
+> tab, a carriage return **or an apostrophe** is written with a leading
+> apostrophe. The importer strips exactly one leading apostrophe from every
+> cell, so `export → import` is still exact — escaping the apostrophe itself is
+> what makes that true. A CSV written by hand carries no doubling, so a
+> hand-typed `'12` imports as `12`.
 
 ### Record import
 

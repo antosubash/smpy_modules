@@ -960,12 +960,16 @@ decimal string, a boolean is `true`/`false`, a date is ISO. `multiselect`,
 to-many relation a JSON list of those. UTF-8 with **no** BOM, `\r\n` line
 endings per RFC 4180.
 
-> **No CSV formula-injection mitigation is applied**, deliberately. A cell
-> beginning `=`, `+`, `-` or `@` is written verbatim rather than prefixed with
-> an apostrophe. The prefix is not lossless — an importer cannot tell it from
-> a value that genuinely starts with one — and these files are meant to round
-> trip. Treat an export from an untrusted source the way you would any other
-> CSV before opening it in a spreadsheet.
+> **CSV formula injection is escaped, losslessly.** A cell beginning `=`, `+`,
+> `-`, `@`, a tab, a carriage return **or an apostrophe** is written with a
+> leading apostrophe, which Excel and LibreOffice both read as "the rest of
+> this cell is literal text" — so a `text` value of `=cmd|' /C calc'!A0`,
+> chosen by anyone who can create a record, no longer runs in the spreadsheet
+> of whichever admin clicked Export. Escaping the apostrophe *itself* is what
+> keeps the round trip exact: the importer strips exactly one leading
+> apostrophe from every cell, so a value that genuinely starts with one
+> survives. The one cost is a CSV written **by hand** rather than exported —
+> it carries no doubling, so a hand-typed `'12` imports as `12`.
 
 **Import options** (query string, or multipart form fields, which win):
 

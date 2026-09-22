@@ -3,19 +3,17 @@
 The division of labour with :mod:`sm_records.services.import_` is strict and
 worth keeping: **this module decides what the file says, and never what it
 means.** A cell that is not valid JSON is a parse problem and is reported
-here; a cell that is valid JSON but fails the field's constraints is a
-validation problem and is not this module's business. That is what lets the
-importer promise "the whole file is parsed before anything is written" — a
-parse that could also reject on schema grounds would have to be re-run after
-every write to stay true.
+here; one that is valid JSON but fails the field's constraints is a validation
+problem and is not this module's business. That is what lets the importer
+promise "the whole file is parsed before anything is written" — a parse that
+could also reject on schema grounds would have to be re-run after every write.
 
-Two shapes go in. JSON is the export's own document (``{"type": …,
-"records": […]}``) or a bare list of rows, because one of those is what you
-get by exporting and the other is what you get by writing the file by hand.
-CSV is the export's header-driven table, read by the ``csv`` module rather
-than by splitting on commas: a quoted value containing a comma, a quote or a
-newline is ordinary content, and a hand-rolled split silently turns each of
-them into extra columns.
+Two shapes go in. JSON is the export's own document or a bare list of rows. CSV
+is the export's header-driven table, read by the ``csv`` module rather than by
+splitting on commas: a quoted value containing a comma, a quote or a newline is
+ordinary content, and a hand-rolled split turns each into extra columns. Each
+CSV cell is un-escaped on the way through (:func:`_unescape`), the exact
+inverse of what the exporter applies.
 """
 
 from __future__ import annotations
@@ -32,8 +30,8 @@ from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportRowError
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
+from sm_records.services._export_cells import APOSTROPHE, ENVELOPE_COLUMNS
 from sm_records.services.errors import ImportParseFailed
-from sm_records.services.export import ENVELOPE_COLUMNS
 
 __all__ = ["ImportRow", "ParsedFile", "parse_csv", "parse_json"]
 
@@ -41,13 +39,11 @@ __all__ = ["ImportRow", "ParsedFile", "parse_csv", "parse_json"]
 def _nul_error(number: int, name: str | None, uuid: Any = None) -> ImportRowError:
     """One row's refusal for a cell carrying ``\x00``.
 
-    A *row* error and not a parse failure for the whole file, which is the
-    whole point: a NUL reaching the database is a driver-level 500, so under
-    ``on_error=skip`` one bad cell in a 10,000-row file used to discard the
-    other 9,999 and answer 500 rather than writing them and reporting the one.
-    Reported here rather than left to the payload validator because the
-    envelope columns — ``slug``, ``translation_group``, ``uuid`` — never reach
-    that validator and are columns all the same.
+    A *row* error and not a failure for the whole file: a NUL reaching the
+    database is a driver-level 500, so under ``on_error=skip`` one bad cell in
+    a 10,000-row file used to discard the other 9,999. Reported here rather
+    than left to the payload validator because the envelope columns (``slug``,
+    ``translation_group``, ``uuid``) never reach it and are columns all the same.
     """
     return ImportRowError(
         row=number, field=name, uuid=None if uuid is None else str(uuid), message=NUL_PROBLEM
@@ -193,8 +189,9 @@ def parse_csv(text: str, defs: list[FieldDefinition]) -> ParsedFile:
         data: dict[str, Any] = {}
         envelope: dict[str, Any] = {}
         failed = False
-        for name, cell in zip(header, raw_row, strict=True):
+        for name, raw_cell in zip(header, raw_row, strict=True):
             field = by_key.get(name)
+            cell = _unescape(raw_cell)
             if has_nul(cell):
                 errors.append(_nul_error(number, name, envelope.get("uuid")))
                 failed = True
@@ -214,6 +211,20 @@ def parse_csv(text: str, defs: list[FieldDefinition]) -> ParsedFile:
         if not failed:
             rows.append(ImportRow(number=number, data=data, envelope=_clean(envelope)))
     return ParsedFile(rows, errors)
+
+
+def _unescape(cell: str) -> str:
+    """Undo :func:`sm_records.services._export_cells.escape_formula` — exactly
+    one leading apostrophe, from every cell.
+
+    Every cell, not only the ones that look dangerous: the escape doubles an
+    apostrophe that was already there, so ``''x`` is the content ``'x`` and
+    ``'x`` is the content ``x``. One added on the way out, one taken off on the
+    way in, and the round trip is lossless. The cost is a CSV written *by
+    hand*, which carries no doubling and loses a leading apostrophe — the
+    README states that next to the export.
+    """
+    return cell[1:] if cell.startswith(APOSTROPHE) else cell
 
 
 def _clean(envelope: dict[str, Any]) -> dict[str, Any]:
