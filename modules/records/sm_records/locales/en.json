@@ -208,7 +208,8 @@
   },
   "errors": {
     "offline": "Couldn't reach the server. Your changes are still on this page; try again.",
-    "session_expired": "Your session has expired. Taking you to the sign-in page — your changes are still on this page until you leave it."
+    "session_expired": "Your session has expired. Taking you to the sign-in page — your changes are still on this page until you leave it.",
+    "server_error": "Something went wrong on the server. It's not clear whether your last change was saved — check before trying again."
   },
   "type_editor": {
     "title_new": "New type",

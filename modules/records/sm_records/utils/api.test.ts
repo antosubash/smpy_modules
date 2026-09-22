@@ -92,7 +92,24 @@ describe('request() error shaping', () => {
     expect((err as ApiError).message).toContain('session has expired');
   });
 
-  it('falls back to the status line when the body is not JSON', async () => {
+  it('falls back to the status line for a 4xx this build does not recognise, when the body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response('<html>teapot</html>', { status: 418, statusText: "I'm a teapot" }),
+        ),
+    );
+
+    await expect(getType('faq')).rejects.toMatchObject({
+      status: 418,
+      message: "Request failed (418 I'm a teapot)",
+      body: null,
+    });
+  });
+
+  it('falls back to a plain-language message, not the status line, for a 5xx with no usable body (U34)', async () => {
     vi.stubGlobal(
       'fetch',
       vi
@@ -102,11 +119,10 @@ describe('request() error shaping', () => {
         ),
     );
 
-    await expect(getType('faq')).rejects.toMatchObject({
-      status: 500,
-      message: 'Request failed (500 Server Error)',
-      body: null,
-    });
+    const err = await getType('faq').catch((caught: unknown) => caught);
+    expect(err).toMatchObject({ status: 500, body: null });
+    expect((err as ApiError).message).not.toContain('Request failed');
+    expect((err as ApiError).message).toContain('went wrong on the server');
   });
 });
 

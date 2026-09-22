@@ -74,7 +74,22 @@ export function messageFor(status: number, statusText: string, body: ApiErrorBod
       'Your session has expired. Taking you to the sign-in page — your changes are still on this page until you leave it.',
     );
   }
-  const fallback = `Request failed (${status} ${statusText})`.trim();
+  // U34: R12 covered the offline case (`OFFLINE_STATUS`) and 401 above; a
+  // 5xx with no usable detail fell through to the raw status line —
+  // "Request failed (500 Internal Server Error)" — machine text with no
+  // statement of whether the write landed and no next step. A 5xx means
+  // the server, not this request, is the problem, so the one honest "next
+  // step" is "try again"; a 4xx this build doesn't otherwise recognise
+  // keeps the status-line fallback, since that range usually does mean
+  // something about the request itself worth showing verbatim for support
+  // purposes.
+  const fallback =
+    status >= 500
+      ? translate(
+          'records.errors.server_error',
+          "Something went wrong on the server. It's not clear whether your last change was saved — check before trying again.",
+        )
+      : `Request failed (${status} ${statusText})`.trim();
   if (!body) return fallback;
   if (body.errors?.length) return summarizeErrors(body.errors);
   if (typeof body.detail === 'string' && body.detail.trim()) return body.detail;
