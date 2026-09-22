@@ -122,9 +122,20 @@ need no `indexed: true`:
 | `locale` | `eq` `ne` `in` `is_null` — matched whole, never by prefix |
 | `position` | `eq` `ne` `in` `gt` `gte` `lt` `lte` `is_null` |
 | `published_at`, `created_at`, `updated_at` | `eq` `ne` `in` `gt` `gte` `lt` `lte` `is_null` |
+| `invalid` | `eq` `ne` `is_null` — a **boolean** over the `invalid_since` column |
+
+`invalid` is the one fixed column whose name is not its column's. The row
+stores `invalid_since`, a nullable timestamp, and the filter is the boolean
+view of it: `invalid:eq:true` is `invalid_since IS NOT NULL`, and
+`invalid:eq:false`, `invalid:ne:true` and `invalid:is_null:true` all select
+the records with no mark. `contains`, `starts_with` and the ordered operators
+are refused by name — they would compare against a timestamp the name does not
+mention. **`?sort=invalid` orders by that timestamp**, under `NULLS LAST`: the
+marked records first, oldest mark first, everything else behind them.
 
 Fixed-column names are reserved as field keys, so a type cannot declare one and
-have it answered from the wrong place.
+have it answered from the wrong place. That covers `invalid` and
+`invalid_since` alike.
 
 ### `?sort=` — repeatable, a leading `-` is descending
 
@@ -405,7 +416,8 @@ curl -s -b cookies.txt \
 | `published_at`, `created_at` | datetime / datetime \| null | |
 | `updated_at` | datetime \| null | |
 | `is_deleted` | bool | |
-| `invalid` | list of `{field, message}` | Non-empty on a record a forced schema change marked |
+| `invalid` | list of `{field, message}` | What does not validate *right now*, per field. Costs a validator pass, so it is **always `[]` on a list response** — the single-record read is where it is filled |
+| `invalid_since` | datetime \| null | When a scan last found this record wanting — the stored mark, filled on a list row too. Written by a forced schema change or by `rescan`; cleared by the record's next successful write |
 | `translations` | list of `TranslationRead` \| null | Only under `?translations=true` |
 | `expanded` | object \| null | Only under `?expand=`; `{field_key: [ExpandedRef, …]}` in payload order |
 
@@ -434,7 +446,8 @@ curl -s -b cookies.txt -X POST \
   "display_title": "Hello 0", "position": 0,
   "published_at": "2026-09-21T14:17:45.748333Z",
   "created_at": "2026-09-21T14:17:45.748470Z", "updated_at": null,
-  "is_deleted": false, "invalid": [], "translations": null, "expanded": null
+  "is_deleted": false, "invalid": [], "invalid_since": null,
+  "translations": null, "expanded": null
 }
 ```
 
@@ -715,7 +728,7 @@ caller cannot read.
 
 | Parameter | Meaning |
 |---|---|
-| `group_by` | An indexed field, a virtual field, or a fixed column (`status`, `locale`, `slug`, `position`, `published_at`, `created_at`, `updated_at`, `display_title`) |
+| `group_by` | An indexed field, a virtual field, or a fixed column (`status`, `locale`, `slug`, `position`, `published_at`, `created_at`, `updated_at`, `display_title`, `invalid`) |
 | `metric` | `count` (default), `sum:<number field>`, or `min:<field>` / `max:<field>` over a number, date, datetime or text field |
 | `filter` | Repeats; means exactly what it means on the list |
 | `locale` | Shorthand for `filter=locale:eq:<tag>` |
@@ -1062,8 +1075,17 @@ published records anonymously under `public_route_prefix`
 
 `PublicRecordRead` carries `uuid`, `slug`, `locale`, `display_title`,
 `published_at`, `data` and `translations` — **nothing else**. The audit columns,
-`version`, `status`, `invalid` and the reserved `_orphaned` sub-key are removed
-from the *shape*, not filtered out of the query.
+`version`, `status`, `invalid`, `invalid_since` and the reserved `_orphaned`
+sub-key are removed from the *shape*, not filtered out of the query.
+
+The public filter grammar does not answer about `invalid` either — a `400`
+naming it, the same refusal an unindexed field gets. A public read is a read
+of *published* records, and whether one of them is behind its schema is the
+admin's problem: answering would let an anonymous caller count a type's
+unhealthy records, and binary-search when they became unhealthy. The limits
+(`max_filter_terms`, `max_sort_terms`, `max_in_values`, `max_count`) are
+unchanged by any of this — `invalid` is one more fixed column, not a new kind
+of term.
 
 ```bash
 curl -s 'http://localhost:8000/api/records/public/product?page_size=2&sort=-published_at'

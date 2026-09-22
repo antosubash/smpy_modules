@@ -21,8 +21,10 @@ layer Orchard Core builds on it. **No table is ever created at runtime.**
   never queried**: no JSON extraction, no `LIKE` over a payload. Beside it sit
   the *fixed columns* every record has whatever its type declares — `status`,
   `display_title`, `slug`, `locale`, `position`, `published_at`, `created_at`,
-  `updated_at` — the module's `ContentItemIndex`, filterable and sortable with
-  no index table at all.
+  `updated_at` and `invalid_since` — the module's `ContentItemIndex`,
+  filterable and sortable with no index table at all. `invalid_since` is the
+  one whose grammar name differs from its column (`invalid`, a boolean over
+  it); `index/_fixed._FIXED_ALIAS` is where the two meet.
 - `records_revision`, `records_type_revision` — append-only history, record
   revisions pruned to `revision_limit`.
 - Six index tables, one per value kind (§7.3), each carrying `record_id`,
@@ -109,6 +111,45 @@ rewrite the module ever does is the `_orphaned` sub-key on an explicit
 `discard`; the index is derived and rebuilt out of request. Field keys are
 immutable: a rename decomposes into remove-then-add and is classified as both.
 
+### What "marked" means, and where the mark lives
+
+Two representations of one fact, and neither replaces the other.
+
+*Derived.* `services._payload.read_view` runs the compiled validator on read
+and returns `invalid`, a list of `{field, message}`. It is the authority for
+the record being edited and it costs a validator pass, which is why
+`record_list_read` passes `with_invalid=False` and every list row's `invalid`
+is `[]`.
+
+*Stored.* `Record.invalid_since`, a nullable timestamp, written and cleared by
+`services/_invalid.py`. Three rules, all stated there:
+
+- **written only by a scan of the schema records are stored against** — the
+  inline pass of a forced `apply`, and the `rescan` behind "Check records".
+  Never by a draft preview, whose model is a proposal that may never be saved;
+- **cleared by the record's next successful write** (create, update, restore,
+  import — that write validated against the current schema), and by a scan
+  that finds the record clean;
+- **the timestamp does not move.** A record that was already marked and still
+  fails keeps the instant it first did.
+
+The writes are core `UPDATE`s: the framework's audit listener stamps
+`updated_at`/`updated_by` on any ORM-modified row, and a mark is not an edit —
+restamping would reorder the default `-updated_at` listing and name an author
+for a change nobody made. `set_committed_value` puts the value back on the
+instances the scan holds so the identity map agrees without them going dirty.
+
+Two consequences worth stating. **A forced `apply` never reuses a preview's
+report** (`_preview.reused_report`): its scan is what writes the marks, and a
+report recorded nothing. And **`rescan` is the one preview that writes**,
+which is why the deferred job body lives in `services/preview_runner.py` and
+commits — the same argument `reindex_runner` makes.
+
+Duplicates are deliberately outside the column: a record sharing a
+newly-unique value fails no per-record rule, and `_duplicates` yields counts
+and a sample rather than ids. It is surfaced the way it always was, by
+`conflicts_for` topping up `invalid` on the single-record read.
+
 **Newly unique is the one restrictive class a payload scan cannot see.** The dry
 run validates one record at a time; duplication is a property of a *pair*. So
 `services/_duplicates.py` runs alongside it — one `GROUP BY … HAVING` per key
@@ -134,9 +175,10 @@ does not make a write re-claim a value the row already holds.
    service raising `HTTPException` would be unusable from the CLI, from a
    background task and from another module.
 2. **Services never commit.** `get_db` owns the request's transaction; flush if
-   you need DB-assigned values. Exactly two callers commit, and both say why in
-   their docstring: `cli_io` (no request exists) and `services/reindex_runner`
-   (a deferred job has no `get_db`).
+   you need DB-assigned values. Exactly three callers commit, and each says
+   why in its docstring: `cli_io` (no request exists) and the two deferred-job
+   runners, `services/reindex_runner` and `services/preview_runner`, which
+   have no `get_db` to commit for them.
 
 Because the error route turns an exception into a *response* inside the handler,
 `get_db` never sees it and would commit whatever the refused call already wrote.

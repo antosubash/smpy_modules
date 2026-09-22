@@ -40,8 +40,13 @@ unusable sidebar.
 
 `/admin/records/` is headed **Records**, with the subtitle *"Every record type
 in this install."* Each type is a row showing its icon, label, description and
-**{n} records** (plus **({n} trashed)** when the Trash is not empty), and a
-badge **In sidebar** when that is on.
+**{n} records** (plus **({n} trashed)** when the Trash is not empty, and
+**({n} invalid)** when a schema check has marked any), and a badge
+**In sidebar** when that is on.
+
+The invalid count is a link: it opens that type's record list filtered to
+exactly those records. A count is only useful one click from the records it
+counts.
 
 Two actions per row:
 
@@ -289,9 +294,15 @@ filter is written into the URL as `?filter=field:op:value`, so a filtered list
 is a link you can share; Back undoes it.
 
 **Field** offers the indexed fields of the type plus the fixed columns every
-record has. Where a declared field's label collides with a fixed column, the
-option shows the key in brackets — *Status (order_status)* against
+record has — Title, Status, Language (when the install publishes more than
+one) and **Invalid**. Where a declared field's label collides with a fixed
+column, the option shows the key in brackets — *Status (order_status)* against
 *Status (status)*.
+
+**Invalid** takes a Yes/No value and offers **is** alone: it asks whether a
+record carries the mark a schema check left on it (see [Records that no longer
+fit the schema](#records-that-no-longer-fit-the-schema)), and "invalid since
+before Tuesday" is not a question this control is pretending to answer.
 
 **Condition** offers only the operators that mean something for that field's
 kind:
@@ -645,15 +656,34 @@ reapplied deliberately.
 
 ### Records that no longer fit the schema
 
-A record marked invalid by a forced schema change shows the badge **Outdated
-schema** on the list and, in the editor, a panel headed **This record does not
-satisfy the current schema** naming the fields. The record still holds its
-values and is still editable; saving it validates against the current schema
-like any other save.
+A record a forced schema change left behind shows the badge **Invalid** on the
+list — in the table and on the phone cards — and, in the editor, a panel headed
+**This record does not satisfy the current schema** naming the fields. The
+record still holds its values and is still editable; saving it validates
+against the current schema like any other save, and that save clears the badge.
 
-**Fields changed since this was saved** is a different, milder notice: the type's
-schema moved on since this record was last written, and the record will be
-rewritten at the current schema version on its next save.
+Hover the badge and it says *when*: "This record has not satisfied its schema
+since {date}." The list does not say *what* is wrong — that costs a check per
+row — so open the record for the per-field messages.
+
+**Working through them.** The filter bar has **Invalid** in its Field
+dropdown, on every type: choose it, leave the value on **Yes**, and Apply. The
+resulting URL is `?filter=invalid:eq:true`, which is also what the Records hub
+links to when it shows "(3 invalid)" beside a type's record count, and what
+**Check records** offers at the end of its report. Sorting by **Invalid** puts
+the marked records first, oldest mark first.
+
+A badge appears when a check found the record wanting and goes when the record
+is saved successfully. Two things follow. A record somebody fixed in the
+database rather than through this screen keeps its badge until the next
+**Check records**; and a record that stopped fitting for a reason no save
+caused — a schema rolled back, a payload edited outside the app — does not
+carry one until that same button looks.
+
+**Outdated schema** is a different, milder badge: the type's schema moved on
+since this record was last written, and the record will be rewritten at the
+current schema version on its next save. It says nothing about whether the
+record still fits.
 
 ---
 
@@ -745,16 +775,19 @@ The threshold is the `preview_sync_limit` setting (5,000 records by default).
 ### Check records
 
 **Check records** sits next to Preview changes. *""Check records" runs the same
-dry run against the schema exactly as it is saved. Neither button writes
-anything."* It answers with **Records checked against the saved schema**.
+dry run against the schema exactly as it is saved, and marks the records that
+fail so the list can show them. "Preview changes" writes nothing."* It answers
+with **Records checked against the saved schema**.
 
-**Its one limitation is stated on screen.** If nothing has changed since the
-schema was saved, the server does not re-scan: *"Nothing has changed since this
-schema was saved, so the server did not re-scan these {n} records — it runs the
-check only for a change that could break something."* That is an honest "we did
-not look", not a clean bill of health. To actually re-validate every record
-against the current schema, make a change that could break something (or preview
-one) — or export the type and re-import it as a dry run.
+It is the one button here that writes, and what it writes is the **Invalid**
+badge: every record the scan finds wanting is marked, and every record it
+finds clean has its mark removed. That is what makes it the way back to a
+worklist — including one nobody wrote down at the time, and one that has
+drifted since. Under the report, **Show the {n} marked records** opens the list
+filtered to exactly them.
+
+It is safe to press as often as you like: it reads every record and rewrites
+nothing but that one flag.
 
 ### Refusal, and forcing
 
@@ -780,9 +813,11 @@ opening one shows what no longer fits. This list is a sample of {shown} and is
 lost when you leave this page."* Each sample entry links to its record, and
 **Copy record IDs** puts them on the clipboard.
 
-> **Copy that list before you navigate away.** It is not stored anywhere. The
-> record list has no "invalid" badge and no "invalid" filter, so once the panel
-> is gone the only way to find the marked records again is to open them.
+> **The panel itself is not stored anywhere**, and it is a sample rather than
+> the whole list. The full worklist is: the same apply marked every failing
+> record, so `?filter=invalid:eq:true` on that type's list has all of them,
+> the hub row counts them, and **Check records** re-derives the list whenever
+> you want it. Copy the IDs if you want *this* sample; you no longer have to.
 
 ### Removing a field, and putting it back
 

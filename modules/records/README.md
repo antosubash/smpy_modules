@@ -206,7 +206,7 @@ the numbers the list would show.
 
 | parameter | does |
 |---|---|
-| `?group_by=` | an indexed field, a virtual field an index provider projects, or a fixed column (`status`, `locale`, `slug`, `position`, `published_at`, `created_at`, `updated_at`, `display_title`) |
+| `?group_by=` | an indexed field, a virtual field an index provider projects, or a fixed column (`status`, `locale`, `slug`, `position`, `published_at`, `created_at`, `updated_at`, `display_title`, `invalid`) |
 | `?metric=` | `count` (the default), `sum:<number field>`, or `min:<field>` / `max:<field>` over a number, date, datetime or text field |
 | `?filter=` | repeats, and means exactly what it means on the list |
 | `?locale=` | shorthand for `filter=locale:eq:<tag>` |
@@ -416,10 +416,12 @@ published records anonymously at two routes, under `public_route_prefix`
 | `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
 
 A record reads back as `uuid`, `slug`, `locale`, `translations`,
-`display_title`, `published_at` and `data` — nothing else. The audit columns, `version`, `status`, `invalid` and
+`display_title`, `published_at` and `data` — nothing else. The audit columns, `version`, `status`, `invalid`,
+`invalid_since` and
 the reserved `_orphaned` sub-key (a deleted field's retained values, which are
 the admin's undo buffer) are removed from the *shape*, not filtered out of the
-query.
+query. The public filter grammar does not answer about `invalid` either:
+whether a published record is behind its schema is the admin's problem.
 
 The rules worth knowing before you point a site at it:
 
@@ -910,7 +912,11 @@ record (trash included) so you can see what would break before saving.
   tightened constraint, a removed choice, a newly unique field) is refused
   with the report unless every record passes. Send `force: true` to apply it
   anyway: the failing records are **marked, not rewritten** — they read back
-  with `invalid` naming the fields, and the editor shows it.
+  with `invalid` naming the fields, and the scan stores the mark on each one
+  as `invalid_since`, so the list badges them and `?filter=invalid:eq:true`
+  is the worklist. Each record's next successful save clears its own mark;
+  `POST .../schema/preview` with `rescan: true` ("Check records") re-derives
+  the whole list, marking what now fails and unmarking what no longer does.
 - A **destructive** change (removing a field) keeps the value on each
   record; it moves under the reserved `_orphaned` key on that record's next
   write. Re-adding a key that still holds orphaned values is refused until

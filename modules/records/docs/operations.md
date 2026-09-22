@@ -79,7 +79,7 @@ make migrate
 module.** The module ships SQLModel tables; each consuming host autogenerates
 its own revisions against them.
 
-In this repo, nine revisions belong to records:
+In this repo, ten revisions belong to records:
 
 | Revision | What it adds |
 |---|---|
@@ -92,9 +92,18 @@ In this repo, nine revisions belong to records:
 | `fe3ea2dfe0fb` | Scopes the `(translation_group, locale)` unique index by `type_id` |
 | `c4a17b9de0f2` | Descending indexes for the nullable sortable columns (a PostgreSQL planner fix) |
 | `b81c5f3a27d6` | `records_type.show_in_menu` — NOT NULL with `server_default=false()` |
+| `8f3d223f8605` | `<table set>_record.invalid_since` and its index — the stored "this record does not fit the schema" mark, on the global table **and on every collection's** |
 
 That is **eleven `records_*` tables** on a host with no collections, plus
 **eight `records_c_<name>_*` tables** per declared collection.
+
+`8f3d223f8605` is nullable with no server default and no backfill, so it
+applies in the time one `ALTER TABLE` and one `CREATE INDEX` take per record
+table and needs no downtime window. `NULL` is the honest state of every
+existing row — nothing has scanned them — so an upgraded install reads exactly
+as it did until the next forced schema change or **Check records** marks
+anything. Downgrading drops the column and loses only which records were
+marked; the derived badge is unaffected and a later check re-derives the list.
 
 ### The `records@base` caveat
 
@@ -386,7 +395,7 @@ reset=…)` directly instead of shelling out.
 
 ## Health checks
 
-The module registers one health check, `records.reindex`. Three separate faults
+The module registers one health check, `records.reindex`. Four separate faults
 degrade `/health/ready` through it, and they are reported together rather than
 one hiding another.
 
@@ -423,7 +432,30 @@ This is **in-process state**: it reflects verifies run by *this* worker. A CLI
 instead. **Clear it** with a clean verify or a rebuild
 (`python -m sm_records.cli reindex --type KEY`).
 
-### 3. Orphaned locales
+### 3. Invalid records
+
+```
+invalid_records: 12 — record(s) marked as not satisfying their type's schema,
+from a forced schema change; each one's next save clears the mark
+(filter=invalid:eq:true)
+```
+
+Counted from `invalid_since` on every check, which is affordable because both
+backends answer `IS NOT NULL` out of that column's own index by reading only
+the entries that have a value — the cost is the number of marked records, not
+the number of records.
+
+**It is not an error.** Forcing a restrictive change is a decision somebody
+made deliberately, and the records are still served and still editable. What
+the line is against is forgetting: an install that has carried the same twelve
+marked records for a month is one where nobody wrote down the worklist.
+**Clear it** by working through
+`/admin/records/<type>?filter=invalid:eq:true` — each record's next successful
+save clears its own mark — or, if the schema was the mistake, by relaxing the
+rule and running **Check records**, which clears the mark on every record that
+now fits.
+
+### 4. Orphaned locales
 
 ```
 orphaned_locales: {de: 12} — records in a language this install no longer
