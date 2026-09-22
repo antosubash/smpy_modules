@@ -131,6 +131,18 @@ and this prevents the confusion."""
 MAX_DISPLAY_TITLE_LEN: Final = 300
 MAX_SLUG_LEN: Final = 200
 
+MIN_POSITION: Final = -(2**31)
+MAX_POSITION: Final = 2**31 - 1
+"""The range ``Record.position`` can actually hold.
+
+``position: int`` is a SQLAlchemy ``Integer``, which is a 32-bit column on
+Postgres — so ``2**31`` was not a large hand-ordering value, it was
+``asyncpg.exceptions.DataError: value out of int32 range`` raised while
+binding the parameter, i.e. a 500 on an ordinary create. Bound where the
+write path can name the field, not on the DTO, so the refusal is this
+module's ``{"detail", "errors"}`` and reaches the importer's per-row report
+by the same route every other bad envelope value does."""
+
 TEXT_INDEX_LEN: Final = 512
 """Characters of a text value that land in the indexed column. 512 chars is
 2048 bytes at four-byte UTF-8, under Postgres's 2704-byte btree ceiling —

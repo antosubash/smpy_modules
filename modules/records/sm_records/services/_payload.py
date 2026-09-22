@@ -16,7 +16,13 @@ import json
 import re
 from typing import Any
 
-from sm_records.constants import MAX_DISPLAY_TITLE_LEN, MAX_SLUG_LEN, ORPHANED_KEY
+from sm_records.constants import (
+    MAX_DISPLAY_TITLE_LEN,
+    MAX_POSITION,
+    MAX_SLUG_LEN,
+    MIN_POSITION,
+    ORPHANED_KEY,
+)
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -92,6 +98,24 @@ def validate(
             [{"field": "__root__", "message": f"payload exceeds {max_payload_bytes} bytes"}],
         )
     return values, stored
+
+
+def check_position(position: int | None) -> None:
+    """Refuse a ``position`` the column cannot hold.
+
+    ``Record.position`` is a 32-bit ``Integer``, so ``2**31`` is not a large
+    number here — it is ``value out of int32 range`` raised by the driver while
+    binding the parameter, which no exception handler downstream can turn into
+    anything but a 500. Checked in the write path rather than declared as
+    ``ge``/``le`` on ``RecordCreate``/``RecordUpdate`` so that all three
+    callers get one answer in one shape: the API's 422 naming the field, and
+    the importer's per-row error, which is what an envelope column's refusals
+    already look like.
+    """
+    if position is None or MIN_POSITION <= position <= MAX_POSITION:
+        return
+    problem = f"position must be between {MIN_POSITION} and {MAX_POSITION}"
+    raise ValidationFailed(problem, [{"field": "position", "message": problem}])
 
 
 def display_title(rtype: RecordType, values: dict[str, Any]) -> str:

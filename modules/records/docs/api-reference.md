@@ -1146,6 +1146,8 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |
 | `preview_sync_limit` | 5,000 | Records a preview dry-runs inside the request, then `202` |
 | `revision_limit` | 50 | Revisions kept per record |
+| — | 14 | Digits before the decimal point in a `number` **or** `integer` value — `422` over it |
+| — | ±2,147,483,647 | `position` — the range its 32-bit column holds, `422` outside it |
 | — | 32 | Nesting depth of one `json` field value — `422` over it |
 | — | 10,000 | Values (scalars and containers) in one `json` field value — `422` over it |
 | — | 1,000,000 | `?page=` — not a setting; an `OFFSET` that deep has nothing to find |

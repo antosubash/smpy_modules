@@ -74,22 +74,40 @@ def check_decimal(value: Decimal | None) -> Decimal | None:
 
 
 def to_int(value: Any) -> Any:
+    """Coerce to ``int``, under the same digit bound :func:`check_decimal`
+    applies.
+
+    Not a second, looser rule: an ``integer`` field indexes into the *same*
+    ``Numeric(19, 5)`` column a ``number`` field does (``models/_index.py``),
+    so a value past :data:`MAX_INT_DIGITS` is ``numeric field overflow`` from
+    the driver on the statement that writes the index row — a 500, for a value
+    the ``number`` type already answers with a clean 422 naming the digits.
+    Python has no integer ceiling of its own, which is exactly why this has to
+    be stated: ``10**13`` stored and filtered correctly, ``10**14`` did not.
+    """
     if value is None:
         return value
     if isinstance(value, bool):
         raise ValueError("expected an integer, got a boolean")
     if isinstance(value, int):
-        return value
+        return _bounded_int(value)
     if isinstance(value, float | Decimal):
         if value != int(value):
             raise ValueError("must be a whole number")
-        return int(value)
+        return _bounded_int(int(value))
     if isinstance(value, str):
         try:
-            return int(value.strip())
+            parsed = int(value.strip())
         except ValueError:
             raise ValueError("not an integer") from None
+        return _bounded_int(parsed)
     raise ValueError("expected an integer")
+
+
+def _bounded_int(value: int) -> int:
+    if len(str(abs(value))) > MAX_INT_DIGITS:
+        raise ValueError(f"at most {MAX_INT_DIGITS} digits")
+    return value
 
 
 def to_bool(value: Any) -> Any:

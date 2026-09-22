@@ -143,6 +143,7 @@ async def create_record(
     _, values, stored, types = await _prepare(db, rtype, data, settings, None, own_group)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _claims.ensure_slug_free(db, rtype, resolved_slug, resolved_locale)
+    _payload.check_position(position)
 
     record = tables_for(rtype).record(
         uuid=uuid,
@@ -247,6 +248,7 @@ async def update_record(
     record.slug = resolved_slug
     record.display_title = _payload.display_title(rtype, values)
     if position is not None:
+        _payload.check_position(position)
         record.position = position
     record.updated_by = actor
     record.version = expected_version + 1
