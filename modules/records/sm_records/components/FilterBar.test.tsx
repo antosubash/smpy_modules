@@ -64,7 +64,7 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     await setValue(value as HTMLSelectElement, 'false');
     (view.find('form') as HTMLFormElement).requestSubmit();
     expect(applied.at(-1)).toEqual({ field: 'flag', op: 'eq', value: 'false' });
-    view.unmount();
+    await view.unmount();
   });
 
   it('offers a date picker whose value is the wire value', async () => {
@@ -74,7 +74,7 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     expect(value?.value).toBe('2026-01-15');
     (view.find('form') as HTMLFormElement).requestSubmit();
     expect(applied.at(-1)?.value).toBe('2026-01-15');
-    view.unmount();
+    await view.unmount();
   });
 
   it('offers a datetime picker and sends an offset-carrying value', async () => {
@@ -91,7 +91,7 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     (view.find('form') as HTMLFormElement).requestSubmit();
     expect(applied.at(-1)?.field).toBe('seen_at');
     expect(applied.at(-1)?.value).toMatch(/^2026-01-15T10:30:00[+-]\d{2}:\d{2}$/);
-    view.unmount();
+    await view.unmount();
   });
 
   it('repopulates a datetime picker from a shared URL', async () => {
@@ -100,14 +100,14 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     const value = view.find<HTMLInputElement>('#records-filter-value');
     // (happy-dom drops a trailing `:00` from a datetime-local value.)
     expect(value?.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
-    view.unmount();
+    await view.unmount();
   });
 
   it('offers the relation combobox instead of a uuid text box', async () => {
     const { view } = await bar({ field: 'author', op: 'eq', value: '' });
     expect(view.find('[data-testid="records-relation-author"]')).not.toBeNull();
     expect(view.find('input[role="combobox"]')).not.toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('resets the value when the new field needs a different control', async () => {
@@ -118,7 +118,7 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     );
     // A date string has no place in a true/false select.
     expect(view.find<HTMLSelectElement>('#records-filter-value')?.value).toBe('true');
-    view.unmount();
+    await view.unmount();
   });
 
   it('ignores a URL value the select has no option for', async () => {
@@ -128,6 +128,6 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     (view.find('form') as HTMLFormElement).requestSubmit();
     // …and Apply submits what is on screen, not the value that just failed.
     expect(applied.at(-1)?.value).toBe('true');
-    view.unmount();
+    await view.unmount();
   });
 });

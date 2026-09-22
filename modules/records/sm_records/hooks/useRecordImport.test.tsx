@@ -84,7 +84,7 @@ describe('useRecordImport — R10: overlapping dry runs are sequenced', () => {
     // file twice.
     expect(calls).toHaveLength(2);
     expect(calls[1].mode).toBe('create');
-    view.unmount();
+    await view.unmount();
   });
 
   it('ignores a stale response and keeps the spinner up for the live one', async () => {
@@ -112,6 +112,6 @@ describe('useRecordImport — R10: overlapping dry runs are sequenced', () => {
     });
     expect(hook().report?.mode).toBe('create');
     expect(hook().phase).toBe('idle');
-    view.unmount();
+    await view.unmount();
   });
 });

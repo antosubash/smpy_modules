@@ -39,7 +39,7 @@ describe('BooleanField — R7: a never-set boolean says so', () => {
     // indistinguishable from a deliberate "No" — under the very message
     // telling the person to set it.
     expect(view.find('button[role="switch"]')).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('reports a real boolean, and drops the unset option once one is chosen', async () => {
@@ -65,7 +65,7 @@ describe('BooleanField — R7: a never-set boolean says so', () => {
     const select = view.find<HTMLSelectElement>('#record-field-flag');
     expect([...(select?.options ?? [])].map((o) => o.value)).toEqual(['true', 'false']);
     expect(select?.value).toBe('false');
-    view.unmount();
+    await view.unmount();
   });
 
   it('keeps the switch for an optional boolean, labelled "Not set" while it is', async () => {
@@ -75,6 +75,6 @@ describe('BooleanField — R7: a never-set boolean says so', () => {
 
     await view.render(<BooleanField field={field()} value={false} onChange={() => {}} />);
     expect(view.find('[data-testid="records-unset-flag"]')).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 });

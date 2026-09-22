@@ -72,7 +72,7 @@ describe('FieldList — R1: the key lock follows the row, not the key text', () 
     // The lock's own help text is not claiming this field has been created.
     expect(view.host.innerHTML).not.toContain("Can't be changed after the field is created.");
 
-    view.unmount();
+    await view.unmount();
   });
 
   it('still locks a row that came off the wire', async () => {
@@ -83,7 +83,7 @@ describe('FieldList — R1: the key lock follows the row, not the key text', () 
     expect(key?.disabled).toBe(true);
     expect(key?.readOnly).toBe(true);
     expect(view.host.innerHTML).toContain("Can't be changed after the field is created.");
-    view.unmount();
+    await view.unmount();
   });
 });
 

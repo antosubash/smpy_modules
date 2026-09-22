@@ -34,7 +34,9 @@ export type Mounted = {
   root: Root;
   /** Render again — for a parent that owns the component's state. */
   render: (next: React.ReactElement) => Promise<void>;
-  unmount: () => void;
+  /** Inside `act`, so effect cleanups (a window listener, an interval) have
+   *  actually run by the time the next test mounts. */
+  unmount: () => Promise<void>;
   find: <T extends Element = HTMLElement>(selector: string) => T | null;
   all: <T extends Element = HTMLElement>(selector: string) => T[];
   /** The first button (or link) whose text contains `text`. */
@@ -55,8 +57,10 @@ export async function mount(element: React.ReactElement): Promise<Mounted> {
     host,
     root,
     render,
-    unmount: () => {
-      root.unmount();
+    unmount: async () => {
+      await act(async () => {
+        root.unmount();
+      });
       host.remove();
     },
     find: <T extends Element = HTMLElement>(selector: string) =>
@@ -97,8 +101,12 @@ export async function click(el: Element | null | undefined): Promise<void> {
   });
 }
 
-/** Press a key on `el` — `{ key: 'Enter' }` and friends. */
-export async function press(el: Element | null | undefined, init: KeyboardEventInit): Promise<void> {
+/** Press a key on `target` — `{ key: 'Enter' }` and friends. `window` is a
+ *  valid target: a document-level shortcut listens there. */
+export async function press(
+  el: EventTarget | null | undefined,
+  init: KeyboardEventInit,
+): Promise<void> {
   await act(async () => {
     el?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
   });

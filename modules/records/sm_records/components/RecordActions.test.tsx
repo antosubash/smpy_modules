@@ -76,7 +76,7 @@ describe('RecordActions — R4: the unsaved-changes guard is told before we navi
     // Order matters: `onGone` is an ordinary Inertia visit, and the guard
     // reads `allow` synchronously in its `before` handler.
     expect(calls).toEqual(['allow', 'gone']);
-    view.unmount();
+    await view.unmount();
   });
 
   it('calls allowNavigation before onGone on a soft delete', async () => {
@@ -96,6 +96,6 @@ describe('RecordActions — R4: the unsaved-changes guard is told before we navi
     await settle();
     expect(deleted).toHaveBeenCalledOnce();
     expect(calls).toEqual(['allow', 'gone']);
-    view.unmount();
+    await view.unmount();
   });
 });

@@ -132,7 +132,23 @@ function RecordEditor({
           </>
         }
       >
-        <div className="space-y-6">
+        {/* A real `<form>` (R13): Save was a `type="button"` inside plain
+            `<div>`s, so the busiest data-entry screen in the module had no
+            keyboard path to it — the argument `FilterBar` already makes for
+            a screen people type into far less. `RelationPicker` swallows
+            Enter while its listbox is open (the one collision); ⌘S/Ctrl+S
+            lives in `useRecordEditor`. `noValidate`: `useRecordForm`'s
+            validator is what refuses a save, and the browser's own bubble
+            would pre-empt it with a message this module did not write. */}
+        <form
+          className="space-y-6"
+          data-testid="records-editor-form"
+          noValidate
+          onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            if (!pending) void save();
+          }}
+        >
           <RecordEditorHeaderBadges current={current} translatable={type.translatable} />
 
           {conflict && (
@@ -213,7 +229,7 @@ function RecordEditor({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" disabled={pending} onClick={() => void save()}>
+            <Button type="submit" disabled={pending}>
               {pending
                 ? t('records.editor.saving', { defaultValue: 'Saving…' })
                 : t('records.editor.save', { defaultValue: 'Save' })}
@@ -264,7 +280,7 @@ function RecordEditor({
               onRestored={applyRestored}
             />
           )}
-        </div>
+        </form>
       </PageShell>
     </>
   );
