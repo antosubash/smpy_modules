@@ -5,26 +5,24 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
 import type React from 'react';
-import { useRef } from 'react';
 
 import { FilterBar } from '../components/FilterBar';
 import { RecordIoMenu } from '../components/RecordIoMenu';
 import { RecordListEmpty } from '../components/RecordListEmpty';
-import { PAGE_SIZES, RecordPagination } from '../components/RecordPagination';
+import { RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
+import { useRecordListNav } from '../hooks/useRecordListNav';
 import {
-  buildSortParam,
   exportSearchParams,
   filterErrorMessage,
   listStatus,
-  nextSort,
   parseFilterParam,
   parseSort,
   parseTrashedParam,
 } from '../utils/listing';
-import type { FilterOp, RecordPage, TypeRead } from '../utils/types';
+import type { RecordPage, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
@@ -52,7 +50,6 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
   const trashed = parseTrashedParam(search.get('trashed'));
   const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
   const rawPageSize = Number(search.get('page_size')) || records.page_size;
-  const listTop = useRef<HTMLDivElement>(null);
   const currentFilter = parseFilterParam(rawFilter);
   const currentSort = parseSort(search.toString());
   // The admin list always defaults to every locale (design §4.4) — the
@@ -77,58 +74,16 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
   const filterErrorReason = page.props.errors?.filter;
   const exportSearch = exportSearchParams(search.toString(), Boolean(filterErrorReason));
 
-  const goTo = (next: {
-    page?: number;
-    filter?: string | null;
-    sort?: string | null;
-    trashed?: boolean;
-    pageSize?: number;
-  }) => {
-    const params: Record<string, string> = {};
-    const targetPage = next.page ?? records.page;
-    if (targetPage > 1) params.page = String(targetPage);
-    const targetFilter = next.filter === undefined ? rawFilter : next.filter;
-    if (targetFilter) params.filter = targetFilter;
-    const targetSort = next.sort === undefined ? rawSort : next.sort;
-    if (targetSort) params.sort = targetSort;
-    const targetTrashed = next.trashed ?? trashed;
-    if (targetTrashed) params.trashed = 'true';
-    const targetSize = next.pageSize ?? rawPageSize;
-    // The default is the absence of the param, not `?page_size=25`: a URL
-    // that carries only what differs from the default is the one worth
-    // sharing, and the server clamps whatever does arrive.
-    if (targetSize && targetSize !== PAGE_SIZES[0]) params.page_size = String(targetSize);
-    // Toggling `trashed` swaps every prop (`records`, `errors` and, via
-    // `parse_trashed`, what the server even lets through) — a partial reload
-    // only makes sense for staying inside the same trashed/live view.
-    const full = next.trashed !== undefined;
-    const paged = next.page !== undefined || next.pageSize !== undefined;
-    router.get(`/admin/records/${type.key}`, params, {
-      only: full ? undefined : ['records', 'errors'],
-      preserveState: true,
-      preserveScroll: true,
-      // No `replace: true` (UX-R3). Every one of these is a change the user
-      // asked for, and collapsing them all into a single history entry meant
-      // Back left the list entirely instead of undoing the last filter, sort
-      // or page — the universal undo, and the one path `FilterBar`'s
-      // remount-on-`key` was written for.
-      onSuccess: paged ? scrollListIntoView : undefined,
+  const { listTop, loading, goTo, applyFilter, clearFilter, handleSort, toggleTrashed } =
+    useRecordListNav({
+      typeKey: type.key,
+      page: records.page,
+      rawFilter,
+      rawSort,
+      trashed,
+      rawPageSize,
+      currentSort,
     });
-  };
-
-  /** After a page change the rows above the fold are replaced silently —
-   *  `preserveScroll` keeps the reader pinned to the footer they clicked in
-   *  (UX-R18). Put the top of the list back on screen instead. */
-  const scrollListIntoView = () => {
-    listTop.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  };
-
-  const applyFilter = (field: string, op: FilterOp, value: string) =>
-    goTo({ page: 1, filter: `${field}:${op}:${value}` });
-  const clearFilter = () => goTo({ page: 1, filter: null });
-  const handleSort = (field: string) =>
-    goTo({ page: 1, sort: buildSortParam(nextSort(currentSort, field)) ?? null });
-  const toggleTrashed = () => goTo({ page: 1, trashed: !trashed });
 
   const { handleDelete, handleRestore, handlePurge } = useRecordListMutations(type.key, t);
 
@@ -218,7 +173,16 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
             </div>
           )}
 
-          <div ref={listTop} className="scroll-mt-4">
+          <div
+            ref={listTop}
+            className={
+              loading
+                ? 'scroll-mt-4 opacity-60 transition-opacity pointer-events-none'
+                : 'scroll-mt-4 transition-opacity'
+            }
+            aria-busy={loading}
+            data-testid="records-list-wrapper"
+          >
             {records.items.length === 0 ? (
               <RecordListEmpty
                 typeKey={type.key}
@@ -266,6 +230,7 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
             total={known}
             capped={records.total_capped}
             itemCount={records.items.length}
+            loading={loading}
             onGo={(next) => goTo({ page: next })}
             onPageSize={(size) => goTo({ page: 1, pageSize: size })}
           />

@@ -94,6 +94,7 @@ export function RecordPagination({
   total,
   capped,
   itemCount,
+  loading = false,
   onGo,
   onPageSize,
 }: {
@@ -107,6 +108,10 @@ export function RecordPagination({
    *  partial page by however far the real count ran past the cap (UX-2); the
    *  rows on screen are the one number that is always right. */
   itemCount: number;
+  /** U12: a page/size change is in flight — the buttons disable rather than
+   *  stay clickable while the request is on the wire, which used to invite
+   *  a second click that raced the first. */
+  loading?: boolean;
   onGo: (page: number) => void;
   /** Writes `?page_size=` and returns to page 1 — the row the reader was
    *  looking at is on a different page under a different size anyway. */
@@ -138,6 +143,7 @@ export function RecordPagination({
             id="records-page-size"
             className="w-auto"
             value={String(pageSize)}
+            disabled={loading}
             onChange={(e) => onPageSize(Number(e.target.value))}
           >
             {PAGE_SIZES.map((size) => (
@@ -152,7 +158,7 @@ export function RecordPagination({
             type="button"
             variant="outline"
             size="sm"
-            disabled={onFirst}
+            disabled={onFirst || loading}
             onClick={() => onGo(1)}
           >
             {t('records.records.first', { defaultValue: 'First' })}
@@ -161,7 +167,7 @@ export function RecordPagination({
             type="button"
             variant="outline"
             size="sm"
-            disabled={onFirst}
+            disabled={onFirst || loading}
             onClick={() => onGo(page - 1)}
           >
             {t('records.records.previous', { defaultValue: 'Previous' })}
@@ -170,7 +176,7 @@ export function RecordPagination({
             type="button"
             variant="outline"
             size="sm"
-            disabled={onLast}
+            disabled={onLast || loading}
             onClick={() => onGo(page + 1)}
           >
             {t('records.records.next', { defaultValue: 'Next' })}
@@ -179,7 +185,7 @@ export function RecordPagination({
             type="button"
             variant="outline"
             size="sm"
-            disabled={onLast}
+            disabled={onLast || loading}
             onClick={() => onGo(lastPage)}
           >
             {t('records.records.last', { defaultValue: 'Last' })}
