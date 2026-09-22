@@ -10,7 +10,8 @@ import { RecordRowAction } from './RecordRowAction';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 
 /**
- * The record list below `sm` (UX-R4): one card per record instead of a table
+ * The record list below `md` (UX-R4, breakpoint raised from `sm` by U8): one
+ *  card per record instead of a table
  * whose action column sat past the right edge of a 390px document, with no
  * scrollbar to say so on the screens that clipped it.
  *

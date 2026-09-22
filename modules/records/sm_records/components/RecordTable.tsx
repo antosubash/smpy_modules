@@ -46,10 +46,12 @@ function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
  * `position`/`published_at`/`updated_at` and actions. Split out of
  * `RecordList` to keep that page under the 300-line cap.
  *
- * Below `sm` the same records render as stacked cards instead (UX-R4): a
- * table of eight `whitespace-nowrap` columns cannot be reduced to the two or
- * three a phone holds, and what fell off the right edge of the document
- * there was the action column.
+ * Below `md` the same records render as stacked cards instead (UX-R4; the
+ * breakpoint was `sm` until U8): a table of eight `whitespace-nowrap`
+ * columns cannot be reduced to the two or three a narrow viewport holds, and
+ * between 640px and ~1000px it used to neither reduce nor reflow — it just
+ * silently dropped Total, the dates and the Actions column off the right
+ * edge with no scrollbar, shadow or fade to say more was there.
  *
  * One tree or the other, chosen by a media query rather than both rendered
  * with one hidden by a breakpoint class: a hidden copy is still in the DOM,
