@@ -88,6 +88,10 @@ describe('filterKind — R8/M12', () => {
     // demanded the stored value through free text instead.
     expect(filterKind('tier', 'select')).toBe('select');
     expect(filterKind('tags', 'multiselect')).toBe('select');
+    // U14: the two numeric kinds get their own control, distinct from each
+    // other — `FilterValueInput` picks `inputMode` from which one it is.
+    expect(filterKind('rank', 'number')).toBe('number');
+    expect(filterKind('quantity', 'integer')).toBe('integer');
   });
 
   it('keeps the two fixed columns with closed value sets on their own', () => {

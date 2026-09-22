@@ -6,7 +6,13 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import type { FilterKind } from '../utils/filters';
 import { localeLabel } from '../utils/locale';
 import type { FieldDef } from '../utils/types';
-import { choicesOf, isoToLocalInput, localInputToIso, relationTarget } from '../utils/values';
+import {
+  choicesOf,
+  fieldConstraints,
+  isoToLocalInput,
+  localInputToIso,
+  relationTarget,
+} from '../utils/values';
 import { RelationPicker } from './RelationPicker';
 
 const VALUE_ID = 'records-filter-value';
@@ -78,7 +84,8 @@ export function FilterValueInput({
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={VALUE_ID}>{label}</Label>
-      {selectFor(t, kind, value, locales, field, onChange) ?? inputFor(kind, value, onChange)}
+      {selectFor(t, kind, value, locales, field, onChange) ??
+        inputFor(kind, value, field, onChange)}
     </div>
   );
 }
@@ -149,7 +156,21 @@ function selectFor(
   return null;
 }
 
-function inputFor(kind: FilterKind, value: string, onChange: (next: string) => void) {
+/** A `constraints.min`/`.max` as an `<input min/max>` can take it — absent
+ *  (or not a finite number) reads as "no bound", the same as the editor's
+ *  own `checkRange` (utils/validation.ts) treats it. */
+function bound(constraints: Record<string, unknown>, key: 'min' | 'max'): number | undefined {
+  const raw = constraints[key];
+  const num = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function inputFor(
+  kind: FilterKind,
+  value: string,
+  field: FieldDef | undefined,
+  onChange: (next: string) => void,
+) {
   if (kind === 'date') {
     return (
       <Input id={VALUE_ID} type="date" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -163,6 +184,28 @@ function inputFor(kind: FilterKind, value: string, onChange: (next: string) => v
         step="1"
         value={isoToLocalInput(value)}
         onChange={(e) => onChange(e.target.value ? localInputToIso(e.target.value) : '')}
+      />
+    );
+  }
+  // U14: the same `type="number"` box the rest of this bar's typed controls
+  // get, with the same bounds the editor's own `NumberField`/`IntegerField`
+  // check (`constraints.min`/`.max` — utils/validation.ts's `checkRange`).
+  // Unlike the editor, this *is* `type="number"` rather than text with an
+  // `inputMode` hint: the value here only ever builds a `?filter=` query
+  // string, so there is no five-decimal round-trip to a stored `Numeric`
+  // column for a browser-normalised value to threaten.
+  if ((kind === 'number' || kind === 'integer') && field) {
+    const constraints = fieldConstraints(field);
+    return (
+      <Input
+        id={VALUE_ID}
+        type="number"
+        inputMode={kind === 'integer' ? 'numeric' : 'decimal'}
+        step={kind === 'integer' ? '1' : 'any'}
+        min={bound(constraints, 'min')}
+        max={bound(constraints, 'max')}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
       />
     );
   }

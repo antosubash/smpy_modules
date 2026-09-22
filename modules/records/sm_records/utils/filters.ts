@@ -88,6 +88,11 @@ export function disambiguateLabels<T extends { key: string; label: string }>(fie
  * be — a boolean meant typing `true` (the server's `coerce_bool` also takes
  * `yes`/`on`/`1`, which nothing in the UI said), a date meant typing
  * `YYYY-MM-DD` by hand, and a relation meant pasting a 32-character uuid.
+ *
+ * U14: `number`/`integer` were the two kinds still on plain text after every
+ * other one got a typed control this round — `FilterValueInput.inputFor`
+ * gives both a `type="number"` box (`inputMode` further split by which of
+ * the two it is, same as the editor's own `NumberField`/`IntegerField`).
  */
 export type FilterKind =
   | 'status'
@@ -97,6 +102,8 @@ export type FilterKind =
   | 'datetime'
   | 'relation'
   | 'select'
+  | 'number'
+  | 'integer'
   | 'text';
 
 const KIND_BY_FIELD_TYPE: Record<string, FilterKind> = {
@@ -112,6 +119,8 @@ const KIND_BY_FIELD_TYPE: Record<string, FilterKind> = {
   // erroring, unlike every other kind's bad-value case.
   select: 'select',
   multiselect: 'select',
+  number: 'number',
+  integer: 'integer',
 };
 
 export function filterKind(key: string, fieldType?: string): FilterKind {
