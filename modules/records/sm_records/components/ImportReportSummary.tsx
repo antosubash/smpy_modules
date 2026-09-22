@@ -1,6 +1,7 @@
 import { useT } from '@simple-module-py/i18n';
 
 import type { ImportReport, ImportRowError } from '../utils/io';
+import { EMPTY_CELL } from '../utils/values';
 
 /** A version refusal is worded by `services/_import_rows.py` and always
  *  names the escape hatch by its wire name, since that is the one thing a
@@ -73,7 +74,7 @@ export function ImportReportSummary({ report }: { report: ImportReport }) {
             <li key={`${error.row}-${error.field ?? ''}-${error.message}`}>
               {t('records.io.error_row', {
                 row: error.row,
-                field: error.field ?? '—',
+                field: error.field ?? EMPTY_CELL,
                 message: error.message,
                 defaultValue: 'Row {row} ({field}): {message}',
               })}

@@ -102,6 +102,12 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
               />
             </div>
           }
+          // Reopening the dialog used to show the previous attempt's
+          // digits, which read as though the count had already been
+          // confirmed (polish note).
+          onOpenChange={(open) => {
+            if (!open) setTyped('');
+          }}
           confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
           cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
           pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}

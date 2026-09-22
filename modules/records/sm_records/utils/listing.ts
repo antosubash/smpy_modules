@@ -215,3 +215,20 @@ export function parseFilterParam(raw: string | null): FilterValue {
     value: raw.slice(second + 1),
   };
 }
+
+/**
+ * What "Export" should send, given the list's own query string.
+ *
+ * "Export" means "export what I am looking at", so the screen's
+ * `filter`/`sort`/`trashed` travel with the download. The one exception is
+ * a filter the server has already refused (`errors.filter` on the page):
+ * carrying it makes the export the same refusal, as a raw JSON 400 in a new
+ * tab with nothing around it to explain (polish note). Everything else the
+ * screen is showing still goes.
+ */
+export function exportSearchParams(search: string, filterFailed: boolean): string {
+  if (!filterFailed) return search;
+  const params = new URLSearchParams(search);
+  params.delete('filter');
+  return params.toString();
+}

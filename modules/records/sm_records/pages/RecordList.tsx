@@ -17,6 +17,7 @@ import { restoredToast, trashToast } from '../components/trashToast';
 import { deleteRecord, restoreRecord } from '../utils/api-records';
 import {
   buildSortParam,
+  exportSearchParams,
   filterErrorMessage,
   listStatus,
   nextSort,
@@ -75,6 +76,7 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
   // as well, but `SortableHeader` never offers one, so that branch shouldn't
   // be reachable from this UI short of a hand-edited URL.
   const filterErrorReason = page.props.errors?.filter;
+  const exportSearch = exportSearchParams(search.toString(), Boolean(filterErrorReason));
 
   const goTo = (next: {
     page?: number;
@@ -173,10 +175,12 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
             </Button>
             {/* `search` and not `''`: "Export" means "export what this screen
                 is showing", so the current `filter`/`sort`/`trashed` travel
-                with it — `exportUrl` drops only `page`. */}
+                with it — `exportUrl` drops only `page`, and `exportSearch`
+                drops a `filter` the list is already showing an error for
+                (polish note: that download is a raw JSON 400 in a new tab). */}
             <RecordIoMenu
               typeKey={type.key}
-              search={search.toString()}
+              search={exportSearch}
               canEdit={canEdit}
               fields={type.fields}
               trashed={trashed}

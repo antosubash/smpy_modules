@@ -22,6 +22,13 @@ import type { FieldDef } from './types';
 
 export type FormValues = Record<string, unknown>;
 
+/** What a cell shows when there is no value. A typographic marker rather
+ *  than a sentence, so it is not translated — but it is *one* marker, named
+ *  once, instead of a bare `'—'` ternary branch in each table (polish note:
+ *  that shape is what an untranslated-string check flags, and three files
+ *  spelled it separately). */
+export const EMPTY_CELL = '—';
+
 /** A `relation` value, as design §9 defines it. */
 export type RelationValue = { type: string; uuid: string };
 

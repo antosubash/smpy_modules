@@ -36,6 +36,10 @@ export function useUnsavedGuard(dirty: boolean): { allow: () => void } {
     const onUnload = (event: BeforeUnloadEvent) => {
       if (!dirtyRef.current || allowRef.current) return;
       event.preventDefault();
+      // Current Chrome/Firefox/Safari honour `preventDefault` alone; an
+      // older engine only shows its dialog for a non-empty `returnValue`,
+      // and the string itself has been ignored for years (polish note).
+      event.returnValue = '';
     };
     window.addEventListener('beforeunload', onUnload);
     return () => {

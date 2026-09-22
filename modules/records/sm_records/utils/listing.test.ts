@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSortParam,
+  exportSearchParams,
   filterErrorReasonKey,
   listColumns,
   nextSort,
@@ -162,5 +163,24 @@ describe('parseTrashedParam', () => {
     for (const raw of ['0', 'false', 'no', 'off', 'n', 'f', null, '', 'garbage']) {
       expect(parseTrashedParam(raw)).toBe(false);
     }
+  });
+});
+
+describe('exportSearchParams — polish: Export never carries a refused filter', () => {
+  const query = 'filter=title%3Aeq%3Ax&sort=-updated_at&trashed=true&page=3';
+
+  it('exports exactly what the screen is showing while the filter works', () => {
+    expect(exportSearchParams(query, false)).toBe(query);
+  });
+
+  it('drops only the filter once the server has refused it', () => {
+    const out = new URLSearchParams(exportSearchParams(query, true));
+    expect(out.get('filter')).toBeNull();
+    expect(out.get('sort')).toBe('-updated_at');
+    expect(out.get('trashed')).toBe('true');
+  });
+
+  it('leaves an empty query alone', () => {
+    expect(exportSearchParams('', true)).toBe('');
   });
 });

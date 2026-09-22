@@ -2,9 +2,7 @@ import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
-import { formatDateTime } from '../utils/values';
-
-const DASH = '—';
+import { EMPTY_CELL as DASH, formatDateTime } from '../utils/values';
 
 type Choice = { value: string; label: string };
 

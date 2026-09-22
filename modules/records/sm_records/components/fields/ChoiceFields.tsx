@@ -77,8 +77,13 @@ export function MultiSelectField({ field, value, onChange, error, disabled }: Fi
             {t('records.fields.no_choices', { defaultValue: 'This field has no choices yet.' })}
           </p>
         )}
-        {choices.map((choice) => {
-          const boxId = `${groupId}-${choice.value}`;
+        {choices.map((choice, index) => {
+          // Indexed, not `${groupId}-${choice.value}`: a choice value with a
+          // space or a `#` in it makes an id that `htmlFor` still resolves
+          // but `querySelector` cannot (polish note). The list is a fixed
+          // array from the schema, so the index is stable for the render
+          // that uses it; React still keys the row by `choice.value`.
+          const boxId = `${groupId}-${index}`;
           return (
             <div key={choice.value} className="flex items-center gap-2">
               <Checkbox
