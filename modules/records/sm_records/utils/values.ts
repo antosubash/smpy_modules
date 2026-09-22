@@ -158,8 +158,19 @@ export function toFormValue(field: FieldDef, raw: unknown): unknown {
   }
 }
 
-/** One form value → its wire shape, or `undefined` when the field is empty. */
-export function toApiValue(field: FieldDef, value: unknown): unknown {
+/** One form value → its wire shape, or `undefined` when the field is empty.
+ *
+ * `original` is the value the server last sent for this field, when the
+ * caller has it. It exists for one rule, which is the same rule the header
+ * states for `number`: **never re-serialise what was not edited.** A
+ * `datetime-local` input holds `HH:MM:SS`, while the server stores and
+ * returns microseconds (`…T09:38:38.477871Z`), so opening a record and
+ * saving it rewrote every sub-second `datetime` to `.000000` — and, because
+ * `useRecordForm` builds its dirty baseline through this same pair, the
+ * truncation read as "no unsaved changes", so nothing warned and a save of
+ * any *other* field carried it through (R2). When the stored value renders
+ * to exactly the string in the input, the stored value is what goes back. */
+export function toApiValue(field: FieldDef, value: unknown, original?: unknown): unknown {
   switch (field.type) {
     case 'boolean':
       return typeof value === 'boolean' ? value : undefined;
@@ -185,7 +196,12 @@ export function toApiValue(field: FieldDef, value: unknown): unknown {
     }
     case 'datetime': {
       const text = asText(value).trim();
-      return text === '' ? undefined : localInputToIso(text);
+      if (text === '') return undefined;
+      // Untouched: the input still shows what the stored value renders to,
+      // so send the stored value back byte for byte rather than the
+      // second-resolution re-serialisation of it.
+      if (typeof original === 'string' && isoToLocalInput(original) === text) return original;
+      return localInputToIso(text);
     }
     case 'multiselect':
       return Array.isArray(value) && value.length > 0 ? [...value] : undefined;
@@ -244,7 +260,7 @@ export function buildPayload(
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {};
   for (const field of fields) {
-    const wire = toApiValue(field, values[field.key]);
+    const wire = toApiValue(field, values[field.key], original ? original[field.key] : undefined);
     if (wire !== undefined) data[field.key] = wire;
     else if (original && Object.hasOwn(original, field.key)) data[field.key] = null;
   }

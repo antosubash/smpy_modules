@@ -152,6 +152,39 @@ describe('relation values', () => {
   });
 });
 
+describe('datetime keeps what it was given — R2', () => {
+  const when = field('datetime', { key: 'when' });
+  const stored = '2026-01-15T10:30:00.123456+00:00';
+
+  it('sends the stored microsecond value back verbatim when the input is untouched', () => {
+    const inForm = toFormValue(when, stored);
+    expect(toApiValue(when, inForm, stored)).toBe(stored);
+  });
+
+  it('and buildPayload therefore reads clean instead of silently truncating', () => {
+    const fields = [when];
+    const original = { when: stored };
+    const payload = buildPayload(fields, toFormValues(fields, original), original);
+    // Byte for byte what the server holds: before R2 this was
+    // "2026-01-15T10:30:00+01:00", the dirty check compared the truncation
+    // against itself and said "no unsaved changes", and a save of any other
+    // field wrote the lost microseconds through.
+    expect(payload.when).toBe(stored);
+  });
+
+  it('still re-serialises a value the person actually edited', () => {
+    const edited = toApiValue(when, '2026-01-15T11:45:00', stored);
+    expect(edited).not.toBe(stored);
+    expect(edited as string).toMatch(/^2026-01-15T11:45:00[+-]\d{2}:\d{2}$/);
+  });
+
+  it('has nothing to preserve on a create, and stamps the offset as before', () => {
+    expect(toApiValue(when, '2026-01-15T11:45:00') as string).toMatch(
+      /^2026-01-15T11:45:00[+-]\d{2}:\d{2}$/,
+    );
+  });
+});
+
 describe('buildPayload', () => {
   const fields = [field('text', { key: 'title' }), field('text', { key: 'subtitle' })];
 
