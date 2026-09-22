@@ -280,6 +280,11 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     assignment: it must not bump the value any optimistic-concurrency caller is
     comparing against, and it must still be a write.
 
+    ``updated_at`` is held to its own value for the same reason: a lock is not
+    an edit, and ``AuditMixin``'s ``onupdate=func.now()`` fires on any
+    ``UPDATE`` not naming the column — moving the row's "last changed" and
+    leaving the attribute expired, the trap ``_common.guarded_bump`` documents.
+
     This serialises every write to the type on SQLite, which is the trade §7.8
     describes and the README states. It is taken for every write rather than
     only for types with a ``unique`` field: the slug claim of §5 is the same
@@ -289,7 +294,7 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
         await db.execute(
             sa_update(RecordType)
             .where(RecordType.id == rtype.id)
-            .values(version=RecordType.version)
+            .values(version=RecordType.version, updated_at=RecordType.updated_at)
         )
         return
     await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())

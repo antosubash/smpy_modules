@@ -104,16 +104,40 @@ def mark_written(db: AsyncSession) -> None:
 
 
 async def guarded_bump(db: AsyncSession, model: Any, row_id: int, expected_version: int) -> bool:
-    """``… SET version = version + 1 WHERE id = :id AND version = :expected``.
+    """``… SET version = version + 1, updated_at = now WHERE id = :id AND version = :expected``.
 
     ``True`` when the row was still at ``expected_version``; ``False`` when
     somebody else got there first, which is the caller's 409. See the module
     docstring for why the caller then writes its columns through the ORM.
+
+    **``updated_at`` is written here explicitly, and that is not cosmetic.**
+    ``AuditMixin`` declares it ``onupdate=func.now()``, so *any* ``UPDATE`` of
+    the row — including this one — carries a value the ORM cannot know.
+    SQLAlchemy's answer is to **expire the attribute** on the instance in the
+    identity map and re-read it when somebody asks. That re-read is a lazy
+    load, and the caller that asks is the synchronous ``record_read`` building
+    the response after the endpoint's last ``await`` — so it runs outside the
+    async greenlet and raises ``MissingGreenlet``: an unhandled 500 on a write
+    that had already done its work (GH: the functional QA's finding 1,
+    reproduced 5/5 on Postgres). It only ever surfaced *sometimes* because the
+    framework's ``before_flush`` audit listener assigns ``updated_at`` on any
+    row it considers modified, which un-expires it — and a write whose columns
+    all happen to keep their values (re-saving a form unchanged) is not
+    modified, so nothing put the value back.
+
+    Assigning a timestamp here means the column is in ``values()``, so Core
+    never applies the ``onupdate`` default, the ORM can evaluate the literal
+    into the instance, and **no attribute is left expired by this statement**.
+    It is also the honest value: this statement is the write, and it is the
+    same ``datetime.now(UTC)`` the audit listener would have used.
     """
+    values: dict[str, Any] = {"version": model.version + 1}
+    if getattr(model, "updated_at", None) is not None:
+        values["updated_at"] = utcnow()
     result = await db.execute(
         sa_update(model)
         .where(model.id == row_id, model.version == expected_version)
-        .values(version=model.version + 1)
+        .values(**values)
     )
     if result.rowcount:
         mark_written(db)

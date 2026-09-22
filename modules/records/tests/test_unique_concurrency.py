@@ -210,3 +210,9 @@ def test_lock_type_is_a_write_on_sqlite_and_a_row_lock_elsewhere(dialect):
     assert "with_for_update" in source
     if dialect == "sqlite":
         assert "version=RecordType.version" in source
+        # …and the no-op write must name ``updated_at`` too. ``AuditMixin``
+        # declares it ``onupdate=func.now()``, so an UPDATE that leaves it out
+        # turns a lock into an edit *and* leaves the attribute expired on the
+        # in-memory type row — which a synchronous ``type_read`` then reads off
+        # the async greenlet. See ``_common.guarded_bump``'s docstring.
+        assert "updated_at=RecordType.updated_at" in source
