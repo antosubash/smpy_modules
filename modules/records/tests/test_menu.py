@@ -83,7 +83,11 @@ def test_sync_adds_items_and_leaves_foreign_ones_alone():
 
     ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
 
-    assert [item.label for item in registry.all_items] == ["Reports", "All record types", "Companies"]
+    assert [item.label for item in registry.all_items] == [
+        "Reports",
+        "All record types",
+        "Companies",
+    ]
     assert [item.label for item in ours] == ["Companies"]
 
 
@@ -173,12 +177,18 @@ async def test_refresh_honours_the_window_and_the_dirty_flag(db_state):
     module = _module(db_state, menu_refresh_seconds=300)
 
     assert await menu.refresh(module, force=True) is True
-    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == [
+        "All record types",
+        "Companies",
+    ]
 
     # Inside the window, and nothing said otherwise.
     await seed_type(db_state, "order", [], label_plural="Orders", show_in_menu=True)
     assert await menu.refresh(module) is False
-    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == [
+        "All record types",
+        "Companies",
+    ]
 
     # What a type write in this process does — the endpoints call it through
     # ``menu.mark_dirty``.
@@ -211,7 +221,10 @@ async def test_a_failed_read_keeps_the_previous_items(db_state, caplog):
     with caplog.at_level("WARNING"):
         assert await menu.refresh(module) is False
 
-    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == [
+        "All record types",
+        "Companies",
+    ]
     assert "sidebar" in caplog.text
 
 
