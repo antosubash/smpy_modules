@@ -158,7 +158,7 @@ test.describe('Records — import / export from the list toolbar', () => {
 
     await expect(dialog.getByText('Import preview')).toBeVisible();
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '2 row(s): 2 to create, 0 to update, 0 unchanged, 0 failed',
+      '2 rows: 2 to create, 0 to update, 0 unchanged, 0 failed',
     );
     // R21: the dialog names the file and restates the rules it was checked
     // against, instead of asking the operator to trust the counts alone.
@@ -181,7 +181,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     // Past tense once it has actually happened (UX-10) — the preview above
     // used "to create"/"to update", this one does not.
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '2 row(s): 2 created, 0 updated, 0 unchanged, 0 failed',
+      '2 rows: 2 created, 0 updated, 0 unchanged, 0 failed',
     );
     await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
     // R26: the dialog is the one announcement of the outcome — no success
@@ -222,7 +222,7 @@ test.describe('Records — import / export from the list toolbar', () => {
 
       await expect(page.getByTestId('records-import-report')).toBeVisible();
       await expect(page.getByTestId('records-import-counts')).toHaveText(
-        '1 row(s): 0 to create, 0 to update, 1 unchanged, 0 failed',
+        '1 row: 0 to create, 0 to update, 1 unchanged, 0 failed',
       );
 
       // Nothing moved: `skipped` is what keeps a re-import from bumping every
@@ -248,7 +248,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     const dialog = await importFile(page, jsonFile([{ data: { title: 'Fine' } }, { data: {} }]));
 
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '2 row(s): 1 to create, 0 to update, 0 unchanged, 1 failed',
+      '2 rows: 1 to create, 0 to update, 0 unchanged, 1 failed',
     );
     await expect(dialog.getByText(/^Row 2 \(title\):/)).toBeVisible();
     // A run with a failing row cannot be applied from here: the button used
@@ -260,7 +260,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     await expect(apply).toBeDisabled();
     const blocked = page.getByTestId('records-import-blocked');
     await expect(blocked).toHaveText(
-      '1 of 2 row(s) can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+      '1 of 2 rows can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     );
     await expect(apply).toHaveAttribute('aria-describedby', 'records-import-blocked');
   });
@@ -280,7 +280,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     );
 
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '1 row(s): 0 to create, 0 to update, 0 unchanged, 1 failed',
+      '1 row: 0 to create, 0 to update, 0 unchanged, 1 failed',
     );
     await expect(dialog.getByText(/locale is fixed for its lifetime/)).toBeVisible();
     await expect(dialog.getByText(/create a translation instead/)).toBeVisible();
@@ -289,7 +289,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     await expect(apply).toBeVisible();
     await expect(apply).toBeDisabled();
     await expect(page.getByTestId('records-import-blocked')).toContainText(
-      "1 of 1 row(s) can't be imported, so nothing will be written.",
+      "1 of 1 row can't be imported, so nothing will be written.",
     );
   });
 });

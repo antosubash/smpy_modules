@@ -72,7 +72,7 @@ test.describe('Records — import options and trash export', () => {
     // cannot say which version it is changing.
     const dialog = await importFile(page, editedFile);
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '1 row(s): 0 to create, 0 to update, 0 unchanged, 1 failed',
+      '1 row: 0 to create, 0 to update, 0 unchanged, 1 failed',
     );
     await expect(dialog.getByText(/^Row 1 \(version\):/)).toBeVisible();
     await expect(dialog.getByText(/carries no 'version'/)).toBeVisible();
@@ -86,7 +86,7 @@ test.describe('Records — import options and trash export', () => {
     await expect(apply).toBeVisible();
     await expect(apply).toBeDisabled();
     await expect(page.getByTestId('records-import-blocked')).toContainText(
-      "1 of 1 row(s) can't be imported, so nothing will be written.",
+      "1 of 1 row can't be imported, so nothing will be written.",
     );
     const before = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
     expect((await before.json()).data.title).toBe('Original');
@@ -101,14 +101,14 @@ test.describe('Records — import options and trash export', () => {
     await page.keyboard.press('Escape');
 
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '1 row(s): 0 to create, 1 to update, 0 unchanged, 0 failed',
+      '1 row: 0 to create, 1 to update, 0 unchanged, 0 failed',
     );
     await expect(page.getByTestId('records-import-file-summary')).toContainText(
       'overwrite unversioned rows: on',
     );
     await page.getByTestId('records-import-apply').click();
     await expect(page.getByTestId('records-import-counts')).toHaveText(
-      '1 row(s): 0 created, 1 updated, 0 unchanged, 0 failed',
+      '1 row: 0 created, 1 updated, 0 unchanged, 0 failed',
     );
     // The options trigger is only offered before a write — the run it
     // configured has now happened.

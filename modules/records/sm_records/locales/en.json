@@ -613,8 +613,10 @@
     "errors_truncated": "Only the first errors are listed; fix these and try again.",
     "titles_unavailable": "Rows are identified by number, not title.",
     "apply": "Apply import",
-    "apply_blocked": "{failed} of {total} row can't be imported, so nothing will be written. Fix it and try again, or choose \"Skip it and write the rest\" under Import options.",
-    "apply_blocked_other": "{failed} of {total} rows can't be imported, so nothing will be written. Fix them and try again, or choose \"Skip it and write the rest\" under Import options.",
+    "apply_blocked": "{failed} of {count} row can't be imported, so nothing will be written.",
+    "apply_blocked_other": "{failed} of {count} rows can't be imported, so nothing will be written.",
+    "apply_blocked_fix": "Fix it and try again, or choose \"Skip it and write the rest\" under Import options.",
+    "apply_blocked_fix_other": "Fix them and try again, or choose \"Skip it and write the rest\" under Import options.",
     "close": "Done"
   },
   "type_io": {

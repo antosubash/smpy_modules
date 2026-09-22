@@ -184,12 +184,15 @@ describe('importApplyBlockedReason', () => {
 
   // U10: "row(s)" used to be the one un-pluralized noun in a round that
   // otherwise carries `_one`/`_other` throughout.
-  it('pluralizes on the failed count, not the total', () => {
+  it('declines "rows" by the total and "fix it/them" by the failed count', () => {
     expect(importApplyBlockedReason(fakePluralT, report({ failed: 1, total: 3 }), 'abort')).toBe(
-      '1 of 3 row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
+      '1 of 3 rows can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     );
     expect(importApplyBlockedReason(fakePluralT, report({ failed: 2, total: 3 }), 'abort')).toBe(
       '2 of 3 rows can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+    );
+    expect(importApplyBlockedReason(fakePluralT, report({ failed: 1, total: 1 }), 'abort')).toBe(
+      '1 of 1 row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     );
   });
 });

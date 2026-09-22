@@ -224,17 +224,22 @@ export function importApplyBlockedReason(
 ): string | null {
   if (!report.dry_run || report.failed === 0) return null;
   if (onError === 'skip') return null;
-  return t('records.io.apply_blocked', {
+  // U10: "N of M rows" declines by M (the total), while "Fix it/them" declines
+  // by N (the failed rows) — two nouns, two plural forms, so two keys.
+  const sentence = t('records.io.apply_blocked', {
     failed: report.failed,
-    total: report.total,
-    // U10: the noun this pluralizes is `failed` ("N of M row(s)"), not
-    // `total` — `total` never changes what "row" declines to here.
+    count: report.total,
+    defaultValue: "{failed} of {count} row can't be imported, so nothing will be written.",
+    defaultValue_other: "{failed} of {count} rows can't be imported, so nothing will be written.",
+  });
+  const remedy = t('records.io.apply_blocked_fix', {
     count: report.failed,
     defaultValue:
-      '{failed} of {total} row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
+      'Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     defaultValue_other:
-      '{failed} of {total} rows can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+      'Fix them and try again, or choose "Skip it and write the rest" under Import options.',
   });
+  return `${sentence} ${remedy}`;
 }
 
 /**
