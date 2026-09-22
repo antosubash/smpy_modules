@@ -37,6 +37,7 @@ export function SaveBar({
   fieldKeys,
   pending,
   dirty,
+  isNew = false,
   onSave,
 }: {
   /** The active 422's `errors[]`, exactly as it arrived — a stable
@@ -48,6 +49,11 @@ export function SaveBar({
   fieldKeys: readonly string[];
   pending: boolean;
   dirty: boolean;
+  /** U29: a brand-new type is never "unchanged" — there is nothing yet to
+   *  have changed. "No changes to save" belongs on the edit screen, where
+   *  it answers "why is Save disabled on a draft I just loaded"; on the
+   *  create screen the same sentence answered a question nobody asked. */
+  isNew?: boolean;
   onSave: () => void;
 }) {
   const { t } = useT();
@@ -89,7 +95,7 @@ export function SaveBar({
             ? t('records.editor.saving', { defaultValue: 'Saving…' })
             : t('records.editor.save', { defaultValue: 'Save' })}
         </Button>
-        {!dirty && !pending && (
+        {!dirty && !pending && !isNew && (
           <span className="text-sm text-muted-foreground" data-testid="records-no-changes">
             {t('records.type_editor.no_changes', { defaultValue: 'No changes to save' })}
           </span>

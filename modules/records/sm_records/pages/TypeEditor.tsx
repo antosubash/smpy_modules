@@ -229,6 +229,7 @@ function TypeEditor({
             fieldKeys={fieldKeys}
             pending={pending}
             dirty={dirty}
+            isNew={isNew}
             onSave={() => void save()}
           />
 

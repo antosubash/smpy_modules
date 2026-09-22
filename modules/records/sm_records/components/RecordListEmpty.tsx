@@ -19,6 +19,7 @@ export function RecordListEmpty({
   trashed,
   filtered,
   errorMessage,
+  canImport = false,
   onClear,
 }: {
   typeKey: string;
@@ -32,6 +33,15 @@ export function RecordListEmpty({
    *  data. When this is set it *replaces* that line rather than sitting
    *  beside it, so the box never makes two contradictory claims at once. */
   errorMessage?: string | null;
+  /** U30: a brand-new type's empty box offered only "New record" — one row
+   *  at a time — when Import (the toolbar button above) is how most people
+   *  actually fill a new type. The control itself stays in the toolbar
+   *  (its file input and dry-run state live in `RecordIoMenu`); this only
+   *  makes it discoverable from the one screen an operator is looking at
+   *  when they need it. Gated the same way the toolbar's own Import button
+   *  is — `canEdit` — so a viewer is not pointed at a control they can't
+   *  use. */
+  canImport?: boolean;
   onClear: () => void;
 }) {
   const { t } = useT();
@@ -62,6 +72,13 @@ export function RecordListEmpty({
               {t('records.records.new', { defaultValue: 'New record' })}
             </Link>
           </Button>
+          {canImport && (
+            <p className="mt-2 text-sm" data-testid="records-empty-import-hint">
+              {t('records.records.empty_import_hint', {
+                defaultValue: 'Adding several at once? Use Import in the toolbar above.',
+              })}
+            </p>
+          )}
         </>
       )}
     </div>

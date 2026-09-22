@@ -36,3 +36,37 @@ describe('RecordListEmpty — U10: a refused filter must not also claim "no matc
     expect(html).toContain('data-testid="records-empty-filter-error"');
   });
 });
+
+describe('RecordListEmpty — U30: Import is discoverable from a brand-new, empty type', () => {
+  it('shows the Import hint next to New record when the caller can edit', () => {
+    const html = renderToStaticMarkup(
+      <RecordListEmpty
+        typeKey="book"
+        trashed={false}
+        filtered={false}
+        canImport
+        onClear={() => {}}
+      />,
+    );
+    expect(html).toContain('data-testid="records-empty-import-hint"');
+    expect(html).toContain('Import');
+  });
+
+  it('says nothing about Import for a caller who cannot edit', () => {
+    const html = renderToStaticMarkup(
+      <RecordListEmpty typeKey="book" trashed={false} filtered={false} onClear={() => {}} />,
+    );
+    expect(html).not.toContain('data-testid="records-empty-import-hint"');
+  });
+
+  it('says nothing about Import in the filtered or trashed states', () => {
+    const filtered = renderToStaticMarkup(
+      <RecordListEmpty typeKey="book" trashed={false} filtered canImport onClear={() => {}} />,
+    );
+    expect(filtered).not.toContain('records-empty-import-hint');
+    const trashedHtml = renderToStaticMarkup(
+      <RecordListEmpty typeKey="book" trashed filtered={false} canImport onClear={() => {}} />,
+    );
+    expect(trashedHtml).not.toContain('records-empty-import-hint');
+  });
+});

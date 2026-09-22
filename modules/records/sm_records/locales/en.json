@@ -31,6 +31,7 @@
   "records": {
     "title": "Records",
     "empty": "No records yet",
+    "empty_import_hint": "Adding several at once? Use Import in the toolbar above.",
     "empty_filtered": "No records match this filter.",
     "new": "New record",
     "display_title": "Title",

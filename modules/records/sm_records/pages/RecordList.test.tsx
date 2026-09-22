@@ -119,3 +119,22 @@ describe('RecordList — U14/Missing-15: a public type shows its public URL on t
     await view.unmount();
   });
 });
+
+function emptyRecords(): RecordPage {
+  return { items: [], total: 0, total_capped: false, page: 1, page_size: 25, next_cursor: null };
+}
+
+describe('RecordList — U30: nothing to filter on a brand-new, empty type', () => {
+  it('hides the filter bar when there is no filter, no trash toggle and zero records', async () => {
+    const view = await mount(<RecordList type={type()} records={emptyRecords()} />);
+    expect(view.find('[data-testid="records-filter-bar"]')).toBeNull();
+    expect(view.find('[data-testid="records-empty-state"]')).not.toBeNull();
+    await view.unmount();
+  });
+
+  it('shows the filter bar once there is at least one record', async () => {
+    const view = await mount(<RecordList type={type()} records={records()} />);
+    expect(view.find('[data-testid="records-filter-bar"]')).not.toBeNull();
+    await view.unmount();
+  });
+});

@@ -107,6 +107,11 @@ function RecordList({
   // and the cursor contract (`next_cursor`) is what an API client walks past
   // it with.
   const known = records.total ?? 0;
+  // U30: nothing to filter — no filter active, not viewing the trash, and
+  // this render's own result is empty, which with no filter in force means
+  // the type has no records at all (not merely none matching a query).
+  const genuinelyEmpty =
+    records.items.length === 0 && !trashed && !currentFilter && !filterErrorReason;
 
   return (
     <>
@@ -174,16 +179,23 @@ function RecordList({
             scrolls inside its own box, and nothing else here may push the
             document sideways on a phone. */}
         <div className="min-w-0 overflow-x-clip">
-          <div className="mb-4">
-            <FilterBar
-              key={rawFilter ?? '__none__'}
-              fields={type.fields}
-              current={currentFilter}
-              onApply={applyFilter}
-              onClear={clearFilter}
-              locales={showLocaleUI ? contentLocales : []}
-            />
-          </div>
+          {/* U30: a brand-new, unfiltered, non-trashed type with zero
+              records has nothing to filter — the full Field/Condition/
+              Value/Apply bar above an empty box read as chrome for a
+              feature the screen could not use yet. Any filter, the trash
+              toggle, or a single record brings it straight back. */}
+          {!genuinelyEmpty && (
+            <div className="mb-4">
+              <FilterBar
+                key={rawFilter ?? '__none__'}
+                fields={type.fields}
+                current={currentFilter}
+                onApply={applyFilter}
+                onClear={clearFilter}
+                locales={showLocaleUI ? contentLocales : []}
+              />
+            </div>
+          )}
 
           {filterErrorReason && (
             <div
@@ -210,6 +222,7 @@ function RecordList({
                 trashed={trashed}
                 filtered={Boolean(currentFilter) || Boolean(filterErrorReason)}
                 errorMessage={filterErrorReason ? filterErrorMessage(t, filterErrorReason) : null}
+                canImport={canEdit}
                 onClear={clearFilter}
               />
             ) : (
