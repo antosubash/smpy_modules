@@ -9,7 +9,12 @@ import { formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectCell } from './RecordSelectCell';
-import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
+import {
+  InvalidBadge,
+  RecordLocaleBadge,
+  RecordStatusBadge,
+  SchemaStaleBadge,
+} from './RecordStatusBadge';
 
 /**
  * The record list below `md` (UX-R4, breakpoint raised from `sm` by U8): one
@@ -80,6 +85,7 @@ export function RecordCardList({
               </Link>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <RecordStatusBadge status={record.status} />
+                {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
                 {record.schema_stale && <SchemaStaleBadge />}
                 {showLocale && <RecordLocaleBadge locale={record.locale} />}
               </div>

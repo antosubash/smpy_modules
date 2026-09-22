@@ -77,6 +77,17 @@ export function fixedFilterFields(t: Translate, locales: string[]): FilterableFi
       kind: 'status',
     },
   ];
+  // `invalid`, and deliberately not `invalid_since`: the column is a
+  // timestamp and the filter is the boolean view of it, so this reuses the
+  // Yes/No select every `boolean` field gets (`sm_records.index._fixed`).
+  // `eq` alone — the server refuses the ordered operators on it by name, and
+  // `is_null` would be a second spelling of "No" in the same dropdown.
+  fields.push({
+    key: 'invalid',
+    label: t('records.records.invalid_filter', { defaultValue: 'Invalid' }),
+    ops: ['eq'],
+    kind: 'boolean',
+  });
   if (locales.length > 1) {
     fields.push({
       key: 'locale',

@@ -17,7 +17,12 @@ import { RecordCardList } from './RecordCardList';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
-import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
+import {
+  InvalidBadge,
+  RecordLocaleBadge,
+  RecordStatusBadge,
+  SchemaStaleBadge,
+} from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
 
 /** U6: `listColumns` is silent by design when a type has no indexed field —
@@ -219,6 +224,7 @@ export function RecordTable({
               <TableCell>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <RecordStatusBadge status={record.status} />
+                  {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
                   {record.schema_stale && <SchemaStaleBadge />}
                 </div>
               </TableCell>

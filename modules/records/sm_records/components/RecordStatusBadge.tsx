@@ -3,6 +3,7 @@ import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
 import { localeLabel } from '../utils/locale';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
+import { formatDateTime } from '../utils/values';
 
 /** See `utils/api.ts`'s header comment / the module report for why `t()`
  *  takes a string literal here rather than `keys.records.…` — the installed
@@ -61,6 +62,7 @@ export function RecordEditorHeaderBadges({
             {t('records.records.schema_stale', { defaultValue: 'Outdated schema' })}
           </Badge>
         )}
+        {current.invalid_since && <InvalidBadge since={current.invalid_since} />}
         {current.is_deleted && (
           <Badge variant="destructive">
             {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
@@ -77,6 +79,32 @@ export function RecordEditorHeaderBadges({
         </p>
       )}
     </div>
+  );
+}
+
+/** A record failed its type's schema the last time anything checked — the
+ *  stored `invalid_since` mark (design §8.3: "marked, not hidden"). The row
+ *  is still listed, still editable and still says which fields are wrong when
+ *  you open it; this is what makes the list say so too, since `invalid` is
+ *  empty on every list row by construction.
+ *
+ *  `title` names the date rather than the fields: the per-field messages cost
+ *  a validator pass the list does not pay, and the record's own screen has
+ *  them. */
+export function InvalidBadge({ since }: { since: string }) {
+  const { t } = useT();
+  return (
+    <Badge
+      variant="outline"
+      data-testid="records-invalid-badge"
+      className="border-destructive/50 text-destructive"
+      title={t('records.records.invalid_badge_help', {
+        date: formatDateTime(since),
+        defaultValue: 'This record has not satisfied its schema since {date}. Open it to see why.',
+      })}
+    >
+      {t('records.records.invalid_badge', { defaultValue: 'Invalid' })}
+    </Badge>
   );
 }
 

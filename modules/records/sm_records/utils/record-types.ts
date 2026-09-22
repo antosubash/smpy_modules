@@ -130,6 +130,13 @@ export type RecordRead = {
    *  a `force`d restrictive schema change or a schema rollback the record no
    *  longer fits. */
   invalid: { field: string; message: string }[];
+  /** When a scan last found this record wanting, or `null` — the *stored*
+   *  mark (`services/_invalid.py`), and unlike `invalid` it is filled on a
+   *  list row too. The list is where it matters: `invalid` is empty there by
+   *  construction, because filling it would cost a validator pass per row.
+   *  Written by a forced schema change or a rescan, cleared by the record's
+   *  next successful save. */
+  invalid_since: string | null;
   /** Relation targets resolved under an explicit `?expand=a,b` (design §9):
    *  field key -> one `ExpandedRef` per stored reference, in payload order.
    *  `undefined`/`null` when the caller did not ask (a plain list row, or a

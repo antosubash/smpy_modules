@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
@@ -177,6 +178,7 @@ export function SchemaPreviewPanel({
           type="button"
           variant="outline"
           disabled={!dirty || pending}
+          data-testid="records-preview-changes"
           onClick={() => void runPreview('draft')}
         >
           {!pending
@@ -202,7 +204,7 @@ export function SchemaPreviewPanel({
       <p className="text-sm text-muted-foreground">
         {t('records.type_editor.preview.check_help', {
           defaultValue:
-            '"Check records" runs the same dry run against the schema exactly as it is saved. Neither button writes anything.',
+            '"Check records" runs the same dry run against the schema exactly as it is saved, and marks the records that fail so the list can show them. "Preview changes" writes nothing.',
         })}
       </p>
       {(error || failed) && !expired && (
@@ -245,6 +247,24 @@ export function SchemaPreviewPanel({
               sends `rescan: true` above. The report below is therefore a real
               scan of the stored schema, and is rendered as one. */}
           <DryRunReportView report={preview.report} />
+          {/* The report names at most `DRY_RUN_SAMPLE` records; the scan just
+              marked *every* one it found, so this is where the rest of the
+              worklist is. Only after a saved-schema check: a draft preview
+              marked nothing, and the link would list whatever an earlier
+              check left behind under a report about something else. */}
+          {mode === 'saved' && preview.report.failing > 0 && (
+            <Link
+              href={`/admin/records/${typeKey}?filter=invalid:eq:true`}
+              className="inline-block text-sm text-primary hover:underline"
+              data-testid="records-check-records-link"
+            >
+              {t('records.type_editor.preview.check_worklist', {
+                count: preview.report.failing,
+                defaultValue: 'Show the {count} marked record',
+                defaultValue_other: 'Show the {count} marked records',
+              })}
+            </Link>
+          )}
         </div>
       )}
     </div>

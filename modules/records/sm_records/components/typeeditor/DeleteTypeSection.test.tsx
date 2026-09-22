@@ -26,6 +26,7 @@ function type(overrides: Partial<TypeRead> = {}): TypeRead {
     translatable: false,
     record_count: 5,
     trashed_record_count: 2,
+    invalid_record_count: 0,
     version: 1,
     fields: [],
     ...overrides,

@@ -192,6 +192,22 @@ function Types({ types, public_route_prefix }: Props) {
                           })}
                         </span>
                       )}
+                      {/* A link and not a count: the number is only useful if
+                          it is one click from the records it counts, which is
+                          the list filtered by the same flag. */}
+                      {type.invalid_record_count > 0 && (
+                        <Link
+                          href={`/admin/records/${type.key}?filter=invalid:eq:true`}
+                          className="ml-1 text-destructive hover:underline"
+                          data-testid="records-type-invalid-count"
+                        >
+                          {t('records.types.invalid_record_count', {
+                            count: type.invalid_record_count,
+                            defaultValue: '({count} invalid)',
+                            defaultValue_other: '({count} invalid)',
+                          })}
+                        </Link>
+                      )}
                     </TableCell>
                     <TableCell className="text-right align-top">
                       <Link

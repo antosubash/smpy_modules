@@ -31,6 +31,7 @@ function baseType(overrides: Partial<TypeRead> = {}): TypeRead {
     collection: null,
     record_count: 0,
     trashed_record_count: 0,
+    invalid_record_count: 0,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: null,
     reindex_pending: {},

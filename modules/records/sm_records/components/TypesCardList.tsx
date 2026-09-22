@@ -96,6 +96,19 @@ export function TypesCardList({
                     })}
                   </span>
                 )}
+                {type.invalid_record_count > 0 && (
+                  <Link
+                    href={`/admin/records/${type.key}?filter=invalid:eq:true`}
+                    className="ml-1 text-destructive hover:underline"
+                    data-testid="records-type-invalid-count"
+                  >
+                    {t('records.types.invalid_record_count', {
+                      count: type.invalid_record_count,
+                      defaultValue: '({count} invalid)',
+                      defaultValue_other: '({count} invalid)',
+                    })}
+                  </Link>
+                )}
               </p>
               <Link
                 href={`/admin/records/types/${type.key}`}

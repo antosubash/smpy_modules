@@ -65,6 +65,7 @@ function type(): TypeRead {
     schema_version: 1,
     record_count: 1,
     trashed_record_count: 0,
+    invalid_record_count: 0,
     reindex_pending: {},
   } as unknown as TypeRead;
 }

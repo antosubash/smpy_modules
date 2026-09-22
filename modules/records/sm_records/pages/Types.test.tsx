@@ -25,6 +25,7 @@ function type(overrides: Partial<TypeRead> = {}): TypeRead {
     collection: null,
     record_count: 12,
     trashed_record_count: 0,
+    invalid_record_count: 0,
     is_public: false,
     ...overrides,
   } as unknown as TypeRead;

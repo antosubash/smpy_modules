@@ -45,6 +45,11 @@ export type TypeRead = {
   collection: string | null;
   record_count: number;
   trashed_record_count: number;
+  /** Live records carrying a stored invalid mark — what a forced schema
+   *  change left behind (design §8.3). A subset of `record_count`, and the
+   *  number the hub row shows beside a link that filters the list by
+   *  `invalid:eq:true`. */
+  invalid_record_count: number;
   created_at: string;
   updated_at: string | null;
   /** Field key (or `"*"` for the whole type) -> ISO timestamp since a
