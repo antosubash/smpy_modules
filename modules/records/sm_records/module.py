@@ -132,14 +132,22 @@ class RecordsModule(ModuleBase):
         permission dependencies."""
         # ``label_key`` is not on the released framework's ``MenuItem`` yet
         # (0.0.26); the literal label stands until it is, as in every sibling.
+        # U17: this used to sit in the shared "Content" group, a header away
+        # from the per-type entries it is the hub for — the parent read as a
+        # peer of another module's screen rather than what it actually is.
+        # It now shares its children's own "Records" group, first by
+        # ``order`` (below ``MENU_ORDER_TYPE``, and the registry's sort is
+        # stable), and named for what that makes it: not a screen of its
+        # own so much as the way into every type that doesn't have its own
+        # entry.
         registry.add(
             MenuItem(
-                label="Records",
+                label="All record types",
                 url=constants.MENU_URL,
                 icon=constants.MENU_ICON,
                 order=constants.MENU_ORDER,
                 section=MenuSection.ADMIN_SIDEBAR,
-                group=constants.MENU_GROUP,
+                group=constants.MENU_GROUP_TYPES,
             )
         )
         # Kept, because a type opting into its own entry (``show_in_menu``) is

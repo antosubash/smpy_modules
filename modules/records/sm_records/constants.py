@@ -26,18 +26,25 @@ VIEW_PREFIX: Final = "/admin/records"
 # Trailing slash: the list route is registered at "/" under VIEW_PREFIX, so
 # linking to the bare prefix costs a 307 round trip on every navigation.
 MENU_URL: Final = f"{VIEW_PREFIX}/"
-MENU_GROUP: Final = "Content"
 MENU_ICON: Final = "database"
 MENU_ORDER: Final = 300
 
 MENU_GROUP_TYPES: Final = "Records"
-"""Sidebar group for a per-type entry (:func:`sm_records.menu.type_menu_items`).
+"""Sidebar group for both the hub entry (:func:`sm_records.module.
+RecordsModule.register_menu_items`) and every per-type entry
+(:func:`sm_records.menu.type_menu_items`).
 
-Deliberately its own group and not :data:`MENU_GROUP`: a type called "Pages"
-sitting as a peer of pagebuilder's "Pages" or news' "Articles" under the
-shared "Content" heading gives no sign it is a record type rather than
-another module's screen. The hub entry stays in :data:`MENU_GROUP` — it is
-how every *other* type is reached, not itself a type."""
+Deliberately its own group and not the shared "Content" one: a type called
+"Pages" sitting as a peer of pagebuilder's "Pages" or news' "Articles" under
+"Content" gives no sign it is a record type rather than another module's
+screen. The hub used to sit in "Content" on its own (UX review U17) — once a
+per-type group existed to hold its children, a parent separated from them by
+a group header read as a peer of pagebuilder's "Pages" rather than what it
+actually is: the entry every other type is reached through. It now sits at
+the top of its own children's group (``MENU_ORDER`` stays below
+:data:`MENU_ORDER_TYPE`, so the registry's stable sort by ``order`` keeps it
+first), labelled to say what it is now that it shares a heading with its
+children rather than living apart from them."""
 
 MENU_ORDER_TYPE: Final = MENU_ORDER + 1
 """Order of a per-type sidebar entry — one past the hub, so every type a host

@@ -30,14 +30,16 @@ def _type(key: str, plural: str, *, icon: str | None = None, roles: list[str] | 
 
 
 def _hub() -> MenuItem:
-    """The module's own "Records" entry, as ``register_menu_items`` adds it."""
+    """The module's own hub entry, as ``register_menu_items`` adds it (U17:
+    now in the same "Records" group as its per-type children, first by
+    ``order``, labelled "All record types")."""
     return MenuItem(
-        label="Records",
+        label="All record types",
         url=constants.MENU_URL,
         icon=constants.MENU_ICON,
         order=constants.MENU_ORDER,
         section=MenuSection.ADMIN_SIDEBAR,
-        group=constants.MENU_GROUP,
+        group=constants.MENU_GROUP_TYPES,
     )
 
 
@@ -49,7 +51,7 @@ def test_item_carries_the_types_label_url_icon_and_roles():
     assert item.icon == "building"
     assert item.roles == ["ops"]
     assert item.section is MenuSection.ADMIN_SIDEBAR
-    # Its own group, not the hub's — see MENU_GROUP_TYPES's docstring.
+    # Same group as the hub (U17) — see MENU_GROUP_TYPES's docstring.
     assert item.group == constants.MENU_GROUP_TYPES
     # One past the hub, so the types cluster directly under it.
     assert item.order == constants.MENU_ORDER + 1
@@ -81,7 +83,7 @@ def test_sync_adds_items_and_leaves_foreign_ones_alone():
 
     ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
 
-    assert [item.label for item in registry.all_items] == ["Reports", "Records", "Companies"]
+    assert [item.label for item in registry.all_items] == ["Reports", "All record types", "Companies"]
     assert [item.label for item in ours] == ["Companies"]
 
 
@@ -97,7 +99,7 @@ def test_sync_replaces_only_the_items_it_added_last_time():
     )
 
     labels = [item.label for item in registry.all_items]
-    assert labels == ["Reports", "Records", "Firms", "Orders"]
+    assert labels == ["Reports", "All record types", "Firms", "Orders"]
     assert "Companies" not in labels
     assert [item.label for item in ours] == ["Firms", "Orders"]
 
@@ -109,7 +111,7 @@ def test_sync_with_nothing_opted_in_removes_our_items_and_keeps_the_hub():
 
     ours = menu.sync_type_menu(registry, [], previous=ours)
 
-    assert [item.label for item in registry.all_items] == ["Records"]
+    assert [item.label for item in registry.all_items] == ["All record types"]
     assert ours == []
 
 
@@ -171,19 +173,19 @@ async def test_refresh_honours_the_window_and_the_dirty_flag(db_state):
     module = _module(db_state, menu_refresh_seconds=300)
 
     assert await menu.refresh(module, force=True) is True
-    assert [item.label for item in module.menu_registry.all_items] == ["Records", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
 
     # Inside the window, and nothing said otherwise.
     await seed_type(db_state, "order", [], label_plural="Orders", show_in_menu=True)
     assert await menu.refresh(module) is False
-    assert [item.label for item in module.menu_registry.all_items] == ["Records", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
 
     # What a type write in this process does — the endpoints call it through
     # ``menu.mark_dirty``.
     module.mark_menu_dirty()
     assert await menu.refresh(module) is True
     assert [item.label for item in module.menu_registry.all_items] == [
-        "Records",
+        "All record types",
         "Companies",
         "Orders",
     ]
@@ -209,7 +211,7 @@ async def test_a_failed_read_keeps_the_previous_items(db_state, caplog):
     with caplog.at_level("WARNING"):
         assert await menu.refresh(module) is False
 
-    assert [item.label for item in module.menu_registry.all_items] == ["Records", "Companies"]
+    assert [item.label for item in module.menu_registry.all_items] == ["All record types", "Companies"]
     assert "sidebar" in caplog.text
 
 

@@ -156,7 +156,7 @@ async def test_a_type_that_asked_for_it_is_in_the_shared_props(worker_client):
     items = await _sidebar(worker_client, ADMIN)
 
     labels = [item["label"] for item in items]
-    assert labels == ["Records", "Companies"]
+    assert labels == ["All record types", "Companies"]
     entry = items[1]
     assert entry["url"] == "/admin/records/company"
     assert entry["icon"] == "building"
@@ -189,7 +189,7 @@ async def test_toggling_the_switch_shows_up_on_the_next_page_request(menu_client
             headers=roles(ADMIN),
         )
     ).json()
-    assert [item["label"] for item in await _sidebar(menu_client, ADMIN)] == ["Records"]
+    assert [item["label"] for item in await _sidebar(menu_client, ADMIN)] == ["All record types"]
 
     updated = await menu_client.put(
         f"{_TYPES}/company",
@@ -201,7 +201,7 @@ async def test_toggling_the_switch_shows_up_on_the_next_page_request(menu_client
     # No waiting for ``menu_refresh_seconds``: the write marked this process
     # dirty, so the next request that renders a sidebar re-reads.
     assert [item["label"] for item in await _sidebar(menu_client, ADMIN)] == [
-        "Records",
+        "All record types",
         "Companies",
     ]
 
@@ -227,7 +227,7 @@ async def test_deleting_a_shown_type_removes_its_entry(menu_client):
     )
     assert deleted.status_code == 204
 
-    assert [item["label"] for item in await _sidebar(menu_client, ADMIN)] == ["Records"]
+    assert [item["label"] for item in await _sidebar(menu_client, ADMIN)] == ["All record types"]
 
 
 async def test_renaming_the_plural_relabels_the_entry(menu_client):
@@ -252,4 +252,4 @@ async def test_renaming_the_plural_relabels_the_entry(menu_client):
     )
 
     labels = [item["label"] for item in await _sidebar(menu_client, ADMIN)]
-    assert labels == ["Records", "Firms"]
+    assert labels == ["All record types", "Firms"]
