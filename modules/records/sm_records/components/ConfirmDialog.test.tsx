@@ -1,0 +1,56 @@
+// @vitest-environment happy-dom
+import { describe, expect, it } from 'vitest';
+
+import { click, mount } from '../test-dom';
+import { ConfirmDialog } from './ConfirmDialog';
+
+/** Radix renders the dialog into a portal on `document.body`. */
+function confirmButton(): HTMLElement | null {
+  return document.querySelector('[data-slot="alert-dialog-action"]');
+}
+
+describe('ConfirmDialog — U1: the confirm button renders the variant it is given', () => {
+  it('renders the destructive variant, not the primary one, when destructive', async () => {
+    const view = await mount(
+      <ConfirmDialog
+        trigger={<button type="button">Open</button>}
+        title="Delete this thing"
+        description="Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        pendingLabel="Deleting…"
+        destructive
+        onConfirm={async () => undefined}
+      />,
+    );
+    await click(view.button('Open'));
+    const btn = confirmButton();
+    expect(btn).not.toBeNull();
+    // The button carries `data-variant` from `buttonVariants` and its class
+    // list is the destructive one — not the green primary `bg-primary`.
+    expect(btn?.getAttribute('data-variant')).toBe('destructive');
+    expect(btn?.className).toContain('bg-destructive');
+    expect(btn?.className).not.toContain('bg-primary');
+    await view.unmount();
+  });
+
+  it('renders the default variant when not destructive', async () => {
+    const view = await mount(
+      <ConfirmDialog
+        trigger={<button type="button">Open</button>}
+        title="Save this thing"
+        description="Proceed?"
+        confirmLabel="Save"
+        cancelLabel="Cancel"
+        pendingLabel="Saving…"
+        onConfirm={async () => undefined}
+      />,
+    );
+    await click(view.button('Open'));
+    const btn = confirmButton();
+    expect(btn?.getAttribute('data-variant')).toBe('default');
+    expect(btn?.className).toContain('bg-primary');
+    expect(btn?.className).not.toContain('bg-destructive');
+    await view.unmount();
+  });
+});

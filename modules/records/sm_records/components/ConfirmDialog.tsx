@@ -103,7 +103,7 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending || confirmDisabled}
-            className={destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+            variant={destructive ? 'destructive' : 'default'}
             onClick={(e) => {
               e.preventDefault();
               void confirm();
