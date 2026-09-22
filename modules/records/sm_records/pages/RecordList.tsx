@@ -225,7 +225,7 @@ function RecordList({
                 typeKey={type.key}
                 trashed={trashed}
                 selection={selection}
-                filter={filterErrorReason ? null : rawFilter}
+                filters={filterErrorReason ? [] : search.getAll('filter')}
                 total={known}
                 capped={records.total_capped}
               />

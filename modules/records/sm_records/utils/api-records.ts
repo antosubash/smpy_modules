@@ -134,12 +134,21 @@ export function bulkRecords(
 
 export type TrashEmptied = { purged: number; filtered: boolean };
 
-/** Purge the type's whole trash, or — with the list's own `filter=` term —
+/** Purge the type's whole trash, or — with the list's own `filter=` terms —
  *  the part of it the screen is showing. Takes no uuids and is not bounded by
- *  `max_bulk_records`. */
-export function emptyTrash(typeKey: string, filter?: string | null): Promise<TrashEmptied> {
-  const qs = filter ? `?${new URLSearchParams({ filter }).toString()}` : '';
-  return request(`/types/${encodeURIComponent(typeKey)}/records/trash/empty${qs}`, {
+ *  `max_bulk_records`.
+ *
+ *  Every term, not the first: `?filter=` repeats and the server ANDs them, so
+ *  sending one of two would empty *more* than the screen listed — the one
+ *  mistake an irreversible action must not make. */
+export function emptyTrash(
+  typeKey: string,
+  filters: readonly string[] = [],
+): Promise<TrashEmptied> {
+  const qs = new URLSearchParams();
+  for (const term of filters) if (term) qs.append('filter', term);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return request(`/types/${encodeURIComponent(typeKey)}/records/trash/empty${suffix}`, {
     method: 'POST',
   });
 }

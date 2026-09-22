@@ -27,17 +27,17 @@ export function RecordListBulk({
   typeKey,
   trashed,
   selection,
-  filter,
+  filters,
   total,
   capped = false,
 }: {
   typeKey: string;
   trashed: boolean;
   selection: RecordSelection;
-  /** The list's current `filter=` term, or null when none is in force (or
-   *  when the one in the URL was refused — "empty what this screen shows"
-   *  has to mean the query the screen actually ran). */
-  filter: string | null;
+  /** Every `filter=` term the list is showing — empty when none is in force,
+   *  and empty when the URL's was refused, because "empty what this screen
+   *  shows" has to mean the query the screen actually ran. */
+  filters: readonly string[];
   /** The listing's `total`: what "Empty trash" is about, and the number the
    *  operator types to confirm it. */
   total: number;
@@ -46,7 +46,7 @@ export function RecordListBulk({
   const { t } = useT();
   const bulk = useBulkActions(typeKey, t, {
     uuids: selection.uuids,
-    filter,
+    filters,
     onDone: selection.clear,
   });
 
@@ -56,7 +56,7 @@ export function RecordListBulk({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <EmptyTrashButton
             count={total}
-            filtered={Boolean(filter)}
+            filtered={filters.length > 0}
             capped={capped}
             onEmpty={bulk.empty}
           />

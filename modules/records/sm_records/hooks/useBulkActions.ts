@@ -41,13 +41,14 @@ export function useBulkActions(
   t: Translate,
   {
     uuids,
-    filter,
+    filters = [],
     onDone,
   }: {
     /** The selection, in page order — what the request names. */
     uuids: string[];
-    /** The list's current `filter=` term, for "empty this filtered trash". */
-    filter?: string | null;
+    /** Every `filter=` term the list is showing, for "empty this filtered
+     *  trash": the server ANDs them, and sending fewer would empty more. */
+    filters?: readonly string[];
     onDone: () => void;
   },
 ) {
@@ -106,7 +107,7 @@ export function useBulkActions(
   const empty = async (filtered: boolean) => {
     setPending(true);
     try {
-      const result = await emptyTrash(typeKey, filtered ? filter : null);
+      const result = await emptyTrash(typeKey, filtered ? filters : []);
       router.reload({ only: ['records'] });
       onDone();
       announce(
