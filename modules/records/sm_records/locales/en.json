@@ -165,6 +165,7 @@
     "cancel": "Cancel",
     "saved": "Saved",
     "created": "Record created",
+    "duplicate": "Save as copy",
     "fields_need_attention": "{count} field needs attention",
     "fields_need_attention_one": "{count} field needs attention",
     "fields_need_attention_other": "{count} fields need attention",

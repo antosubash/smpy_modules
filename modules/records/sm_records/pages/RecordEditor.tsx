@@ -8,7 +8,7 @@ import type React from 'react';
 import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
-import { RecordActions } from '../components/RecordActions';
+import { RecordEditorActionsRow } from '../components/RecordEditorActionsRow';
 import { RecordEditorTypeLink } from '../components/RecordEditorTypeLink';
 import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
 import { RecordForm } from '../components/RecordForm';
@@ -83,6 +83,7 @@ function RecordEditor({
     save,
     reloadFromConflict,
     applyRestored,
+    duplicate,
   } = useRecordEditor(type, record, { showLocalePicker, defaultLocale });
 
   const backHref = `/admin/records/${type.key}`;
@@ -231,43 +232,16 @@ function RecordEditor({
             slugSourceLabel={slugSource}
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" disabled={pending}>
-              {pending
-                ? t('records.editor.saving', { defaultValue: 'Saving…' })
-                : t('records.editor.save', { defaultValue: 'Save' })}
-            </Button>
-
-            {current && (
-              <RecordActions
-                typeKey={type.key}
-                record={current}
-                allowNavigation={allowNavigation}
-                onRestored={applyRestored}
-                onGone={() => router.visit(backHref)}
-              />
-            )}
-
-            {/* A save refused by the client validator — or, since U5, by the
-                server (a 422 or a 409 collision) — used to change nothing
-                the person could see from here beyond the inline error, which
-                may be a screen above (R6). This says how many, beside the
-                button that appeared to do nothing, the same way regardless
-                of which side found the problem. */}
-            {form.errorCount > 0 && (
-              <p
-                className="text-sm text-destructive"
-                role="alert"
-                data-testid="records-save-summary"
-              >
-                {t('records.editor.fields_need_attention', {
-                  count: form.errorCount,
-                  defaultValue: '{count} field needs attention',
-                  defaultValue_other: '{count} fields need attention',
-                })}
-              </p>
-            )}
-          </div>
+          <RecordEditorActionsRow
+            typeKey={type.key}
+            current={current}
+            pending={pending}
+            errorCount={form.errorCount}
+            allowNavigation={allowNavigation}
+            onRestored={applyRestored}
+            onGone={() => router.visit(backHref)}
+            onDuplicate={duplicate}
+          />
 
           {current && (
             <RecordReferrers

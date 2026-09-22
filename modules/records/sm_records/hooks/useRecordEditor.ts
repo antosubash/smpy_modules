@@ -6,44 +6,13 @@ import { toast } from 'sonner';
 import { ApiError } from '../utils/api';
 import { createRecord, updateRecord } from '../utils/api-records';
 import { conflictField, humanizeCollisionDetail } from '../utils/conflicts';
+import { rememberCreated, takeCreated } from '../utils/created-flag';
+import { type DuplicatePayload, rememberDuplicate, takeDuplicate } from '../utils/duplicate';
 import { firstErrorInDomOrder, focusInvalidInput } from '../utils/focus-invalid';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { parsePosition } from '../utils/values';
 import { useRecordForm } from './useRecordForm';
 import { useUnsavedGuard } from './useUnsavedGuard';
-
-/** Where a create leaves word that it happened, for the editor it navigates
- *  to (R22a).
- *
- * `sessionStorage` and not a query parameter or component state: the create
- * *navigates*, so nothing this hook holds survives it — and a `?created=1`
- * would sit in the address bar of a URL people copy and share, claiming the
- * record was created again every time it is opened. Read once and cleared,
- * so a reload doesn't repeat the toast either. */
-const CREATED_FLAG = 'sm-records-created-uuid';
-
-/** Remember it now; the page this navigates to is the one that will say so.
- *  A browser with storage blocked simply doesn't get the toast. */
-function rememberCreated(uuid: string): void {
-  try {
-    window.sessionStorage.setItem(CREATED_FLAG, uuid);
-  } catch {
-    // Private mode, blocked site data — nothing to recover, and a missing
-    // confirmation must never fail a save that already succeeded.
-  }
-}
-
-/** …and take it, if it is this record's. */
-function takeCreated(uuid: string | undefined): boolean {
-  if (typeof window === 'undefined' || uuid === undefined) return false;
-  try {
-    if (window.sessionStorage.getItem(CREATED_FLAG) !== uuid) return false;
-    window.sessionStorage.removeItem(CREATED_FLAG);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * `RecordEditor`'s own state and save/conflict/restore handlers, split out
@@ -65,14 +34,28 @@ export function useRecordEditor(
 ) {
   const { t } = useT();
   const isNew = record === null;
+  // "Save as copy" (Missing-item): a one-time, synchronous read so the very
+  // first render of a fresh `/…/new` visit already has it — a `useEffect`
+  // would paint blank first and prefill a beat later. A ref, not state: this
+  // is read-and-cleared exactly once per mount, the same lazy-init shape
+  // `useRecordForm`'s own lazy `useState` initializers already rely on.
+  const duplicateRef = useRef<DuplicatePayload | null | undefined>(undefined);
+  if (duplicateRef.current === undefined) {
+    duplicateRef.current = isNew ? takeDuplicate(type.key) : null;
+  }
+  const duplicateSource = duplicateRef.current;
   const [current, setCurrent] = useState<RecordRead | null>(record);
-  const [status, setStatus] = useState<RecordStatus>(record?.status ?? 'draft');
+  const [status, setStatus] = useState<RecordStatus>(
+    duplicateSource?.status ?? record?.status ?? 'draft',
+  );
   const [slug, setSlug] = useState(record?.slug ?? '');
-  const [position, setPosition] = useState(String(record?.position ?? 0));
+  const [position, setPosition] = useState(
+    String(duplicateSource?.position ?? record?.position ?? 0),
+  );
   const [locale, setLocale] = useState(opts.defaultLocale);
   const [conflict, setConflict] = useState<RecordRead | null>(null);
   const [pending, setPending] = useState(false);
-  const form = useRecordForm(type, record);
+  const form = useRecordForm(type, record, duplicateSource?.data ?? null);
 
   /** Unsaved work is the form's values *and* the envelope inputs around it —
    *  a status flipped to Published and nothing else is still an edit worth
@@ -268,6 +251,17 @@ export function useRecordEditor(
     form.reset(restored);
   };
 
+  /** "Save as copy": stash `current` (minus its `unique` fields — see
+   *  `utils/duplicate.ts`) and visit `/…/{key}/new`, which reads it back in
+   *  the `duplicateRef` above. An ordinary Inertia visit, so a dirty form
+   *  still gets `useUnsavedGuard`'s "leave this page?" first — nothing here
+   *  has to ask separately. */
+  const duplicate = () => {
+    if (!current) return;
+    rememberDuplicate(type.key, type.fields, current);
+    router.visit(`/admin/records/${type.key}/new`);
+  };
+
   return {
     isNew,
     current,
@@ -290,5 +284,6 @@ export function useRecordEditor(
     save,
     reloadFromConflict,
     applyRestored,
+    duplicate,
   };
 }

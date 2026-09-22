@@ -17,59 +17,30 @@ import { useT } from '@simple-module-py/i18n';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { bareFieldKey } from '../utils/focus-invalid';
+import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator, type Translate } from '../utils/validation';
 import { buildPayload, type FormValues, toFormValues } from '../utils/values';
 
-function asObject(text: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function pretty(data: Record<string, unknown> | null): string {
-  return JSON.stringify(data ?? {}, null, 2);
-}
-
-/** A payload as one comparable string, key order made irrelevant.
- *
- * `JSON.stringify` alone would call a re-ordered but identical payload a
- * change, and "is this form dirty" (R12c) has to answer about the *values* —
- * `buildPayload` walks the fields in declaration order, but a raw-JSON edit
- * round-trips through whatever order the person typed. */
-function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a < b ? -1 : a > b ? 1 : 0,
-    );
-    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
-/** What the record looked like when it was loaded, in `stable()` form — the
- *  baseline `dirty` compares against. Derived through `toFormValues` and back
- *  so it is the same round trip the live values take: a stored value the form
- *  normalises (a datetime, an empty optional) must not read as an edit. */
-function baselineOf(fields: TypeRead['fields'], data: Record<string, unknown> | null): string {
-  return stable(buildPayload(fields, toFormValues(fields, data), data));
-}
-
 export type RecordFormState = ReturnType<typeof useRecordForm>;
 
-export function useRecordForm(type: TypeRead, record: RecordRead | null) {
+export function useRecordForm(
+  type: TypeRead,
+  record: RecordRead | null,
+  /** "Save as copy" (Missing-item): the duplicate source's data, only ever
+   *  passed when `record` is `null` (a fresh new-record visit). `dirty`
+   *  still has to compare against a *blank* record, not this — leaving a
+   *  prefilled-but-unsaved copy must warn the same as typing into an
+   *  ordinary new record would (R12c), so only the seed values below read
+   *  it; `baseline` (further down) deliberately does not. */
+  initialData?: Record<string, unknown> | null,
+) {
   const { t } = useT();
   const fields = type.fields;
+  const seedData = record?.data ?? initialData ?? null;
 
-  const [values, setValues] = useState<FormValues>(() =>
-    toFormValues(fields, record?.data ?? null),
-  );
-  const [original, setOriginal] = useState<Record<string, unknown> | null>(record?.data ?? null);
+  const [values, setValues] = useState<FormValues>(() => toFormValues(fields, seedData));
+  const [original, setOriginal] = useState<Record<string, unknown> | null>(seedData);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
   // `record.invalid` — "marked, not hidden" (design §8.3): a record a
@@ -79,7 +50,7 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
   // re-derive it from whatever the next response actually says.
   const [invalidErrors, setInvalidErrors] = useState<ValidationError[]>(record?.invalid ?? []);
   const [raw, setRaw] = useState(false);
-  const [rawText, setRawText] = useState(() => pretty(record?.data ?? null));
+  const [rawText, setRawText] = useState(() => pretty(seedData));
   const [rawError, setRawError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState(() => baselineOf(fields, record?.data ?? null));
   /** The key the editor should take the person to when a save is refused by
