@@ -118,6 +118,28 @@ def _check_version(record: Record, expected: int | None) -> None:
         raise Conflict(f"record {record.uuid} has changed since it was read")
 
 
+def _attributed(
+    cascade: Sequence[tuple[Record, RecordType]],
+    rtype: RecordType,
+    record: Record,
+    named: frozenset[str],
+) -> list[tuple[Record, RecordType]]:
+    """``cascade`` without the records this batch also names in their own right.
+
+    Each of those has a turn of its own and publishes its own
+    ``RecordTrashed`` with ``cascaded_from`` unset — the caller did name it —
+    so left in here one record would publish two events and count as
+    ``changed`` and as ``cascaded`` both. Matched on the type's id as well as
+    the uuid: a uuid is unique within a table set, not across them (Phase 5
+    §6.3), and ``named`` lists records of *this* type.
+    """
+    return [
+        (doomed, its_type)
+        for doomed, its_type in cascade
+        if doomed.uuid == record.uuid or not (its_type.id == rtype.id and doomed.uuid in named)
+    ]
+
+
 async def _apply_one(
     db: AsyncSession,
     rtype: RecordType,
@@ -128,15 +150,33 @@ async def _apply_one(
     settings: RecordsSettings,
     actor: str | None,
     roles: Sequence[str] | None,
+    named: frozenset[str],
+    trashed: set[str],
 ) -> Change:
-    """One record's turn — the single-record service call and nothing else."""
+    """One record's turn — the single-record service call and nothing else.
+
+    ``named`` is every uuid the request listed, ``trashed`` every uuid the pass
+    has already put in the trash, cascades included — together, what keeps a
+    self-relation from being an order-dependent refusal. A cascade into the
+    *same* type (a category tree, a threaded type) reaches records a list
+    screen may well have selected too, and by their own turn they are gone, so
+    ``get_record`` would refuse them — and the batch with them — for a removal
+    the batch itself performed. Such a turn counts as changed. A record
+    trashed *before* the request is still a refusal, as on the single-record
+    endpoint: there the caller is acting on a state they never read.
+    """
     if action is BulkAction.TRASH:
+        if uuid in trashed:
+            already = await record_service.get_deleted_record(db, rtype, uuid)
+            _check_version(already, expected)
+            return Change(already, cascade=[(already, rtype)])
         record = await record_service.get_record(db, rtype, uuid)
         _check_version(record, expected)
         cascade = await record_service.soft_delete_record(
             db, rtype, record, actor=actor, settings=settings, roles=roles
         )
-        return Change(record, cascade=list(cascade))
+        trashed.update(doomed.uuid for doomed, its_type in cascade if its_type.id == rtype.id)
+        return Change(record, cascade=_attributed(cascade, rtype, record, named))
     if action is BulkAction.RESTORE:
         record = await record_service.get_deleted_record(db, rtype, uuid)
         _check_version(record, expected)
@@ -207,6 +247,10 @@ async def apply_bulk(
     versions = expected_versions or {}
     changes: list[Change] = []
     failures: list[BulkFailure] = []
+    # What a later turn needs to know about the earlier ones — see
+    # ``_apply_one``. A failed turn adds nothing: it raises before it could.
+    named = frozenset(wanted)
+    trashed: set[str] = set()
     # Before the first savepoint, and load-bearing twice over — see the module
     # docstring's third paragraph.
     await lock_type(db, rtype)
@@ -225,6 +269,8 @@ async def apply_bulk(
                         settings=settings,
                         actor=actor,
                         roles=roles,
+                        named=named,
+                        trashed=trashed,
                     )
                 )
         except RecordsError as exc:
@@ -244,6 +290,8 @@ async def apply_bulk(
             f"{len(failures)} of {len(wanted)} record(s) refused {action.value}; "
             "nothing was changed",
         )
+    # Every pair but the record's own; ``_attributed`` already took the named
+    # ones out, so nothing counts as changed *and* cascaded.
     cascaded = sum(max(len(change.cascade) - 1, 0) for change in changes)
     return (
         BulkResult(action=action, requested=len(wanted), changed=len(changes), cascaded=cascaded),
