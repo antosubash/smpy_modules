@@ -161,6 +161,18 @@ first refusal would end the pass with one failure named out of five. And
 with it through the error route's rollback, which is what makes "nothing was
 changed" true rather than aspirational.
 
+**On SQLite a third one is needed to make the second true**, and it is why the
+batch takes `lock_type` before the loop. pysqlite emits `BEGIN` only before
+the first DML statement it recognises, so a batch whose first statement was
+`SAVEPOINT` had that savepoint start the transaction and its `RELEASE` commit
+it — the outer rollback then undid nothing. `lock_type` is an `UPDATE` on
+SQLite (a `SELECT … FOR UPDATE` on Postgres), so the savepoints nest inside a
+transaction that exists. It is also the right thing on its own terms: every
+single-record write takes that lock inside `_prepare`, and trash, restore and
+purge never reach it. `tests/test_bulk_sqlite_transaction.py` pins the
+behaviour on a SQLite database of its own, whatever backend the suite was
+pointed at.
+
 It reports back through `bulk.Change`, deliberately event-shaped without being
 an event: the service cannot publish (rule 1), so it hands the endpoint the
 record, the cascade and the previous status, and the endpoint picks the

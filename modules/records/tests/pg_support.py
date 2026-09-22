@@ -21,6 +21,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from simple_module_db.listeners import register_listeners
+from simple_module_db.session import init_db
+from sqlalchemy.pool import StaticPool
+
 
 def _shared() -> Any:
     """Load ``<repo>/tests/pg_support.py`` under a name of its own.
@@ -68,3 +72,28 @@ async def make_db_state() -> Any:
     from sm_records.models import Base
 
     return await _pg.make_db_state(Base.metadata, *_extra_metadata())
+
+
+async def make_sqlite_db_state() -> Any:
+    """In-memory SQLite, whatever ``SM_TEST_DATABASE_URL`` says.
+
+    For the tests that are *about* SQLite rather than merely willing to run on
+    it — pysqlite's transaction control is a behaviour of that driver, and a
+    test of it that quietly became a Postgres test on the Postgres job would
+    stop covering the thing it was written for. Everything else goes through
+    :func:`make_db_state` and runs on whichever backend the suite was pointed
+    at.
+
+    The body is the SQLite branch of the shared ``make_db_state``:
+    ``StaticPool``, so every session in the test talks to the same
+    ``:memory:`` database, and ``register_listeners``, because the
+    soft-delete filter is an ORM execute hook rather than a column default.
+    """
+    from sm_records.models import Base
+
+    state = init_db(_pg.SQLITE_URL, poolclass=StaticPool)
+    register_listeners(state)
+    async with state.engine.begin() as conn:
+        for metadata in (Base.metadata, *_extra_metadata()):
+            await conn.run_sync(metadata.create_all)
+    return state
