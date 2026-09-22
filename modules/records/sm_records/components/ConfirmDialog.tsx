@@ -32,6 +32,7 @@ export function ConfirmDialog({
   pendingLabel,
   destructive = false,
   confirmDisabled = false,
+  initialFocusId,
   onOpenChange,
   onConfirm,
 }: {
@@ -54,6 +55,14 @@ export function ConfirmDialog({
    *  referrer-aware delete dialog) that still wants the reason visible in
    *  `description`/`body` rather than the dialog refusing to open at all. */
   confirmDisabled?: boolean;
+  /** U8: the id of a control inside `body` to focus on open, in place of
+   *  Radix `AlertDialog`'s own default (the Cancel button — deliberate
+   *  there for a plain yes/no, but wrong for a dialog whose whole point is
+   *  the input in `body`, such as a typed confirmation). Radix focuses
+   *  Cancel via its own `onOpenAutoFocus`, which runs *after* whatever this
+   *  passes — `event.preventDefault()` is what keeps it from immediately
+   *  taking focus back. */
+  initialFocusId?: string;
   /** Fires with the new open state, before anything else in this component
    *  reacts to it — a caller that needs to fetch something to fill in
    *  `description`/`body` starts that fetch here, on open. */
@@ -88,7 +97,15 @@ export function ConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={change}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent
+        onOpenAutoFocus={(event) => {
+          if (!initialFocusId) return;
+          const el = document.getElementById(initialFocusId);
+          if (!el) return;
+          event.preventDefault();
+          el.focus();
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

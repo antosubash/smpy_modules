@@ -68,18 +68,16 @@ export function EmptyTrashButton({
   return (
     <ConfirmDialog
       trigger={
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          data-testid="records-empty-trash"
-          disabled={count === 0}
-        >
+        <Button type="button" variant="destructive" size="sm" data-testid="records-empty-trash">
           {label}
         </Button>
       }
       title={label}
       description={emptyTrashDescription(t, { count, filtered, capped, typeKey })}
+      // U8: the dialog exists to collect what gets typed into this box —
+      // Radix `AlertDialog`'s own default (Cancel) left it opening with
+      // focus on the one control that is not the point of it.
+      initialFocusId={inputId}
       body={
         <div className="grid gap-2">
           <Label htmlFor={inputId}>

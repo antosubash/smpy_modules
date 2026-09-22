@@ -106,6 +106,18 @@ describe('EmptyTrashButton — unbounded and irreversible, so it is typed', () =
     expect(confirmButton()?.disabled).toBe(false);
   });
 
+  it('U8: focuses the confirmation input on open, not Cancel', async () => {
+    const view = await mount(trashButton());
+    await click(view.find('[data-testid="records-empty-trash"]'));
+    expect(document.activeElement?.id).toBe('records-empty-trash-confirm');
+  });
+
+  it('U16: never renders the confirm trigger disabled — the empty-trash case returns null instead', async () => {
+    const view = await mount(trashButton());
+    const trigger = view.find<HTMLButtonElement>('[data-testid="records-empty-trash"]');
+    expect(trigger?.disabled).toBe(false);
+  });
+
   it('forgets a half-typed count when the dialog is closed', async () => {
     const view = await mount(trashButton());
     await click(view.find('[data-testid="records-empty-trash"]'));

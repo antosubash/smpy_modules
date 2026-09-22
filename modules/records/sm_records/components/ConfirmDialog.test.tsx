@@ -54,3 +54,43 @@ describe('ConfirmDialog — U1: the confirm button renders the variant it is giv
     await view.unmount();
   });
 });
+
+describe('ConfirmDialog — U8: initial focus can be redirected off Cancel', () => {
+  it('focuses the named element on open when initialFocusId is given', async () => {
+    const view = await mount(
+      <ConfirmDialog
+        trigger={<button type="button">Open</button>}
+        title="Empty trash"
+        description="Type the count to confirm."
+        body={<input id="confirm-dialog-focus-target" data-testid="target" />}
+        confirmLabel="Empty trash"
+        cancelLabel="Cancel"
+        pendingLabel="Emptying…"
+        destructive
+        initialFocusId="confirm-dialog-focus-target"
+        onConfirm={async () => undefined}
+      />,
+    );
+    await click(view.button('Open'));
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('target');
+    await view.unmount();
+  });
+
+  it("keeps Radix's own default (Cancel) when no initialFocusId is given", async () => {
+    const view = await mount(
+      <ConfirmDialog
+        trigger={<button type="button">Open</button>}
+        title="Delete this thing"
+        description="Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        pendingLabel="Deleting…"
+        destructive
+        onConfirm={async () => undefined}
+      />,
+    );
+    await click(view.button('Open'));
+    expect(document.activeElement?.getAttribute('data-slot')).toBe('alert-dialog-cancel');
+    await view.unmount();
+  });
+});
