@@ -37,8 +37,14 @@ export type TypeEditorProps = {
  *  client-only identity minted by `formHelpers.ts::newFieldUid` when the
  *  field is loaded or added. React keys the rows by it (UX review R10) and
  *  `stripUids` takes it back off before anything is sent, so the wire shape
- *  is unchanged. */
-export type EditableField = FieldDef & { uid: string };
+ *  is unchanged.
+ *
+ *  `fromServer` is the other client-only flag, and it is what the
+ *  immutable-key rule (§8.7) is actually about: this *row* came from the
+ *  API, so its key is already written into records. Keyed by row identity
+ *  and never by key value — a brand-new row that happens to spell an
+ *  existing key is a typo to fix, not a saved field to protect (R1). */
+export type EditableField = FieldDef & { uid: string; fromServer: boolean };
 
 /** One choice of a `select`/`multiselect` field's `options.choices`. */
 export type Choice = { value: string; label: string };

@@ -20,7 +20,6 @@ export function FieldsCard({
   current,
   isNew,
   fields,
-  originalKeys,
   targetTypes,
   displayField,
   slugField,
@@ -33,7 +32,6 @@ export function FieldsCard({
   current: TypeRead | null;
   isNew: boolean;
   fields: EditableField[];
-  originalKeys: ReadonlySet<string>;
   targetTypes: TargetType[];
   displayField: string;
   slugField: string;
@@ -68,7 +66,6 @@ export function FieldsCard({
         )}
         <FieldList
           fields={fields}
-          originalKeys={originalKeys}
           targetTypes={targetTypes}
           disabled={disabled}
           errors={errors}

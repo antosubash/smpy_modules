@@ -60,7 +60,6 @@ function TypeEditor({
   const [current, setCurrent] = useState<TypeRead | null>(type);
   const [values, setValues] = useState(metadataFrom(type));
   const [fields, setFields] = useState<EditableField[]>(() => withUids(type?.fields ?? []));
-  const [originalKeys] = useState<Set<string>>(new Set((type?.fields ?? []).map((f) => f.key)));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
   // The dry-run report of the change that was last forced through (R7a) —
@@ -240,7 +239,6 @@ function TypeEditor({
             current={current}
             isNew={isNew}
             fields={fields}
-            originalKeys={originalKeys}
             targetTypes={target_types}
             displayField={values.displayField}
             slugField={values.slugField}

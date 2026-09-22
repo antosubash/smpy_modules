@@ -23,9 +23,10 @@ export function newFieldUid(): string {
   return `field-${Date.now().toString(36)}-${uidCounter}`;
 }
 
-/** Give every field coming off the wire its own `uid`. */
+/** Give every field coming off the wire its own `uid`, and mark it as one
+ *  the server already holds — `fromServer` is what locks its key (R1). */
 export function withUids(fields: FieldDef[]): EditableField[] {
-  return fields.map((field) => ({ ...field, uid: newFieldUid() }));
+  return fields.map((field) => ({ ...field, uid: newFieldUid(), fromServer: true }));
 }
 
 /**

@@ -8,6 +8,7 @@ import { newFieldUid } from './formHelpers';
 import type { EditableField, TargetType } from './types';
 
 const EMPTY_FIELD: Omit<EditableField, 'key' | 'uid'> = {
+  fromServer: false,
   type: 'text',
   label: '',
   required: false,
@@ -29,10 +30,13 @@ function move<T>(list: T[], from: number, to: number): T[] {
 /**
  * The field list editor. Phase 3 lifts the Phase 1 lock (design §16): a
  * populated type's fields are editable here too, `disabled` only reflects
- * whether a save/preview request is in flight. `originalKeys` is the field
- * keys the type had when this page loaded — the immutable-key rule (§8.7)
- * only bites those; a field added in this session can still have its key
- * fixed before the first save ever sends it.
+ * whether a save/preview request is in flight. The immutable-key rule
+ * (§8.7) bites a row that came off the wire — `field.fromServer` — and
+ * nothing else: a field added in this session can still have its key fixed
+ * before the first save ever sends it, *including* when it currently spells
+ * a key some other field already uses. Locking on the key's value instead
+ * (`originalKeys.has(field.key)`) disabled a new row's own input the moment
+ * the typo appeared, leaving "Remove field" as the only way out (R1).
  *
  * Rows are collapsed by default and keyed by `field.uid` (UX review R9/R10).
  * The keying is the fix for the reorder bug: with `key={index}` React kept
@@ -44,14 +48,12 @@ function move<T>(list: T[], from: number, to: number): T[] {
  */
 export function FieldList({
   fields,
-  originalKeys,
   targetTypes,
   disabled,
   errors,
   onChange,
 }: {
   fields: EditableField[];
-  originalKeys: ReadonlySet<string>;
   targetTypes: TargetType[];
   disabled: boolean;
   errors: ValidationError[];
@@ -134,7 +136,7 @@ export function FieldList({
               index={index}
               total={fields.length}
               expanded={expanded.has(field.uid)}
-              keyLocked={originalKeys.has(field.key)}
+              keyLocked={field.fromServer}
               siblingKeys={fields.filter((_, i) => i !== index).map((f) => f.key)}
               targetTypes={targetTypes}
               disabled={disabled}
