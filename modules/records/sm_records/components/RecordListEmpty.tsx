@@ -27,11 +27,13 @@ export function RecordListEmpty({
   /** A `?filter=` is in force — including one the index layer refused, where
    *  the notice above says why and this box says what to do about it. */
   filtered: boolean;
-  /** U10: the index layer refused the filter (a reindex in progress, an
+  /** U10/U12: the index layer refused the filter (a reindex in progress, an
    *  unsupported operator, a bad value) — nothing was actually queried, so
    *  "No records match this filter" would assert something false about the
-   *  data. When this is set it *replaces* that line rather than sitting
-   *  beside it, so the box never makes two contradictory claims at once. */
+   *  data. `RecordList`'s own amber banner (`records-filter-error`) already
+   *  says *why* in the server's own words; this box, once set, says only
+   *  that nothing is shown *because* the filter was refused, rather than
+   *  repeating that same sentence a second time immediately below it. */
   errorMessage?: string | null;
   /** U30: a brand-new type's empty box offered only "New record" — one row
    *  at a time — when Import (the toolbar button above) is how most people
@@ -55,10 +57,16 @@ export function RecordListEmpty({
       ) : filtered ? (
         <>
           <p data-testid={errorMessage ? 'records-empty-filter-error' : 'records-empty-filtered'}>
-            {errorMessage ??
-              t('records.records.empty_filtered', {
-                defaultValue: 'No records match this filter.',
-              })}
+            {errorMessage
+              ? // U12: the reason itself is already on screen, in the amber
+                // banner above — repeating it here read as the same sentence
+                // twice, one above the other.
+                t('records.records.empty_filter_refused', {
+                  defaultValue: 'Nothing to show — the filter above could not be applied.',
+                })
+              : t('records.records.empty_filtered', {
+                  defaultValue: 'No records match this filter.',
+                })}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onClear}>
             {t('records.records.filter_clear', { defaultValue: 'Clear' })}

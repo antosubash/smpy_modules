@@ -36,6 +36,7 @@
     "empty": "No records yet",
     "empty_import_hint": "Adding several at once? Use Import in the toolbar above.",
     "empty_filtered": "No records match this filter.",
+    "empty_filter_refused": "Nothing to show — the filter above could not be applied.",
     "new": "New record",
     "display_title": "Title",
     "status": "Status",
