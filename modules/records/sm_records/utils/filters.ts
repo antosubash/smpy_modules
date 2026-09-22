@@ -96,6 +96,7 @@ export type FilterKind =
   | 'date'
   | 'datetime'
   | 'relation'
+  | 'select'
   | 'text';
 
 const KIND_BY_FIELD_TYPE: Record<string, FilterKind> = {
@@ -103,6 +104,14 @@ const KIND_BY_FIELD_TYPE: Record<string, FilterKind> = {
   date: 'date',
   datetime: 'datetime',
   relation: 'relation',
+  // U11: the table, the record editor and the type editor all show a
+  // select/multiselect field by its choice *label* ("California"); the
+  // filter used to be the one place that demanded the stored *value*
+  // ("CA") through a free-text box with no hint — and a value the field
+  // doesn't recognise (a typo, "banana") 0-results silently rather than
+  // erroring, unlike every other kind's bad-value case.
+  select: 'select',
+  multiselect: 'select',
 };
 
 export function filterKind(key: string, fieldType?: string): FilterKind {
@@ -127,15 +136,25 @@ export function normaliseFilterValue(
   kind: FilterKind,
   value: string,
   locales: readonly string[],
+  /** The field's stored choice values (U11) — only consulted for `kind ===
+   *  'select'`, since that's the only kind whose closed set isn't fixed at
+   *  build time. Empty means "no choices configured yet", which normalises
+   *  to `''` the same way an empty `locales` does for `locale`. */
+  choices: readonly string[] = [],
 ): string {
   if (kind === 'status') return value === 'published' ? 'published' : 'draft';
   if (kind === 'locale') return locales.includes(value) ? value : (locales[0] ?? '');
   if (kind === 'boolean') return value === 'false' ? 'false' : 'true';
+  if (kind === 'select') return choices.includes(value) ? value : (choices[0] ?? '');
   return value;
 }
 
 /** The value a freshly chosen field starts on — a select has no empty state
  *  to leave it in, so it starts on its first option. */
-export function defaultFilterValue(kind: FilterKind, locales: readonly string[]): string {
-  return normaliseFilterValue(kind, '', locales);
+export function defaultFilterValue(
+  kind: FilterKind,
+  locales: readonly string[],
+  choices: readonly string[] = [],
+): string {
+  return normaliseFilterValue(kind, '', locales, choices);
 }

@@ -8,7 +8,6 @@ import { useState } from 'react';
 import {
   defaultFilterValue,
   disambiguateLabels,
-  type FilterKind,
   filterKind,
   normaliseFilterValue,
   opsForFieldType,
@@ -16,89 +15,12 @@ import {
 import type { FilterValue } from '../utils/listing';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 import { FilterValueInput } from './FilterValueInput';
-
-/** Labels for the filter grammar's operators. A plain `t()` call per op
- *  (rather than a module-scope `Record<FilterOp, string>`) so the strings
- *  stay reachable by `make ci-check-untranslated` — a config object is
- *  exactly the blind spot that check can't see through. */
-// `useT()`'s `t` is overloaded against a generated translation-key union;
-// typing this parameter against it (rather than accepting any translator)
-// either blows up TS with an "excessively deep" instantiation over the
-// template-literal key, or fails to unify with the real `TFunction`'s
-// overload set when called here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
-
-function opLabel(t: Translate, op: FilterOp): string {
-  const defaults: Record<FilterOp, string> = {
-    eq: 'is',
-    ne: 'is not',
-    contains: 'contains',
-    starts_with: 'starts with',
-    gt: '>',
-    gte: '>=',
-    lt: '<',
-    lte: '<=',
-    in: 'is one of (comma-separated)',
-    is_null: 'is empty',
-  };
-  return t(`records.filters.op.${op}`, { defaultValue: defaults[op] });
-}
+import { choiceValues, type FilterableField, fixedFilterFields, opLabel } from './filterBarFields';
 
 // The shape lives in `utils/listing.ts` beside the parser that produces it
 // from the URL; re-exported here because every consumer of this component
 // already imports it from this module.
 export type { FilterValue };
-
-type FilterableField = {
-  key: string;
-  label: string;
-  ops: readonly FilterOp[];
-  /** Which value control this field takes (R8/M12) — see `filterKind`. */
-  kind: FilterKind;
-  /** The schema field itself, for the kinds whose control needs more than
-   *  the key (a `relation` needs its `options.target_type`). */
-  def?: FieldDef;
-};
-
-/** The fixed columns every type can filter on regardless of its schema
- *  (`sm_records.index.query.FIXED_COLUMNS`), narrowed to the one operator
- *  each is actually useful with here: `status` is a two-value enum, so
- *  anything but "is" is unhelpful noise, and `display_title` is free text,
- *  where "starts with" and "contains" are the two ops the fixed-column query
- *  layer accepts for it (`fixed_clause`: both need a text column, `gt`/`lt`
- *  need an ordered one — `display_title` is text and not ordered). `locale`
- *  only joins the list when the caller passes more than one — a single-locale
- *  install has nothing to filter between (design §4.4). */
-function fixedFilterFields(t: Translate, locales: string[]): FilterableField[] {
-  const fields: FilterableField[] = [
-    {
-      key: 'display_title',
-      // `starts_with` first: it is the one an index on
-      // `(type_id, display_title, id)` can answer (F9), and `contains`
-      // — `ILIKE '%term%'` — is a read of every row of the type by
-      // construction.
-      label: t('records.records.display_title', { defaultValue: 'Title' }),
-      ops: ['starts_with', 'contains'],
-      kind: 'text',
-    },
-    {
-      key: 'status',
-      label: t('records.records.status', { defaultValue: 'Status' }),
-      ops: ['eq'],
-      kind: 'status',
-    },
-  ];
-  if (locales.length > 1) {
-    fields.push({
-      key: 'locale',
-      label: t('records.records.locale', { defaultValue: 'Language' }),
-      ops: ['eq'],
-      kind: 'locale',
-    });
-  }
-  return fields;
-}
 
 /**
  * One filter term — a field, an operator, and a value — that navigates via a
@@ -180,7 +102,8 @@ export function FilterBar({
   // own instead, saying what it is, and Apply is held until another field
   // is chosen.
   const unknownField = current && !fieldByKey.has(current.field) ? current.field : null;
-  const initialKind = fieldByKey.get(initialField)?.kind ?? 'text';
+  const initialActive = fieldByKey.get(initialField);
+  const initialKind = initialActive?.kind ?? 'text';
 
   const [field, setField] = useState(initialField);
   const [op, setOp] = useState<FilterOp>(initialOp);
@@ -188,7 +111,12 @@ export function FilterBar({
   // handed a value it has no option for shows its first option while state
   // holds the other one.
   const [value, setValue] = useState(() =>
-    normaliseFilterValue(initialKind, current?.value ?? '', locales),
+    normaliseFilterValue(
+      initialKind,
+      current?.value ?? '',
+      locales,
+      choiceValues(initialActive?.def),
+    ),
   );
 
   if (filterable.length === 0) return null;
@@ -208,7 +136,9 @@ export function FilterBar({
     // show it — a date string in a boolean select, or a uuid pointing at
     // another type, cannot.
     const sameTarget = nextKind !== 'relation' || next?.def === active?.def;
-    if (nextKind !== kind || !sameTarget) setValue(defaultFilterValue(nextKind, locales));
+    if (nextKind !== kind || !sameTarget) {
+      setValue(defaultFilterValue(nextKind, locales, choiceValues(next?.def)));
+    }
   };
 
   // A `<form>` and not a `<div>` (UX-R2): the value input is the most-typed

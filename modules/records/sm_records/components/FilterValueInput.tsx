@@ -6,7 +6,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import type { FilterKind } from '../utils/filters';
 import { localeLabel } from '../utils/locale';
 import type { FieldDef } from '../utils/types';
-import { isoToLocalInput, localInputToIso, relationTarget } from '../utils/values';
+import { choicesOf, isoToLocalInput, localInputToIso, relationTarget } from '../utils/values';
 import { RelationPicker } from './RelationPicker';
 
 const VALUE_ID = 'records-filter-value';
@@ -78,7 +78,7 @@ export function FilterValueInput({
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={VALUE_ID}>{label}</Label>
-      {selectFor(t, kind, value, locales, onChange) ?? inputFor(kind, value, onChange)}
+      {selectFor(t, kind, value, locales, field, onChange) ?? inputFor(kind, value, onChange)}
     </div>
   );
 }
@@ -88,6 +88,7 @@ function selectFor(
   kind: FilterKind,
   value: string,
   locales: readonly string[],
+  field: FieldDef | undefined,
   onChange: (next: string) => void,
 ) {
   if (kind === 'status') {
@@ -122,6 +123,26 @@ function selectFor(
         <NativeSelectOption value="false">
           {t('records.fields.boolean_no', { defaultValue: 'No' })}
         </NativeSelectOption>
+      </NativeSelect>
+    );
+  }
+  // U11: the table, the record editor and the type editor all present a
+  // select/multiselect field by its choice label; this was the one place
+  // that instead demanded the stored value through a free-text box with no
+  // dropdown and no hint. `choicesOf` is the same reader the editor's own
+  // `ChoiceFields` uses, so an empty choice list here means what it means
+  // there — nothing configured yet — and falls through to the plain text
+  // box below rather than rendering a `<select>` with no options.
+  if (kind === 'select' && field) {
+    const choices = choicesOf(field);
+    if (choices.length === 0) return null;
+    return (
+      <NativeSelect id={VALUE_ID} value={value} onChange={(e) => onChange(e.target.value)}>
+        {choices.map((choice) => (
+          <NativeSelectOption key={choice.value} value={choice.value}>
+            {choice.label}
+          </NativeSelectOption>
+        ))}
       </NativeSelect>
     );
   }

@@ -37,6 +37,17 @@ const FIELDS = [
     label: 'Author',
     options: { target_type: 'person' },
   }),
+  field({
+    key: 'state',
+    type: 'select',
+    label: 'State',
+    options: {
+      choices: [
+        { value: 'CA', label: 'California' },
+        { value: 'NY', label: 'New York' },
+      ],
+    },
+  }),
 ];
 
 type Applied = { field: string; op: FilterOp; value: string };
@@ -100,6 +111,27 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     const value = view.find<HTMLInputElement>('#records-filter-value');
     // (happy-dom drops a trailing `:00` from a datetime-local value.)
     expect(value?.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+    await view.unmount();
+  });
+
+  it('offers the choice labels for a select field, and submits the stored value (U11)', async () => {
+    const { view, applied } = await bar({ field: 'state', op: 'eq', value: 'CA' });
+    const value = view.find<HTMLSelectElement>('#records-filter-value');
+    expect(value?.tagName).toBe('SELECT');
+    expect([...(value?.options ?? [])].map((o) => o.value)).toEqual(['CA', 'NY']);
+    expect([...(value?.options ?? [])].map((o) => o.textContent)).toEqual([
+      'California',
+      'New York',
+    ]);
+    await setValue(value as HTMLSelectElement, 'NY');
+    (view.find('form') as HTMLFormElement).requestSubmit();
+    expect(applied.at(-1)).toEqual({ field: 'state', op: 'eq', value: 'NY' });
+    await view.unmount();
+  });
+
+  it('falls back to the first choice for a select value the field no longer has', async () => {
+    const { view } = await bar({ field: 'state', op: 'eq', value: 'banana' });
+    expect(view.find<HTMLSelectElement>('#records-filter-value')?.value).toBe('CA');
     await view.unmount();
   });
 

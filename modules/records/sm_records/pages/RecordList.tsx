@@ -224,6 +224,7 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
                 typeKey={type.key}
                 trashed={trashed}
                 filtered={Boolean(currentFilter) || Boolean(filterErrorReason)}
+                errorMessage={filterErrorReason ? filterErrorMessage(t, filterErrorReason) : null}
                 onClear={clearFilter}
               />
             ) : (
@@ -243,14 +244,20 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
 
           {/* A filter, a sort or a page swaps the rows through a partial
             reload with no focus move, so a screen reader was never told the
-            page had become a different page (UX-R15). */}
+            page had become a different page (UX-R15). U10: a refused filter
+            used to announce "0 records, page 1 of 1" here — an assertion
+            about data that was never queried — while a sighted user read the
+            real reason in the amber banner above. Announce that reason
+            instead when it's set, so both surfaces agree. */}
           <p className="sr-only" role="status" aria-live="polite" data-testid="records-list-status">
-            {listStatus(t, {
-              count: records.items.length,
-              page: records.page,
-              pages: Math.max(1, Math.ceil(known / records.page_size)),
-              capped: records.total_capped,
-            })}
+            {filterErrorReason
+              ? filterErrorMessage(t, filterErrorReason)
+              : listStatus(t, {
+                  count: records.items.length,
+                  page: records.page,
+                  pages: Math.max(1, Math.ceil(known / records.page_size)),
+                  capped: records.total_capped,
+                })}
           </p>
 
           <RecordPagination

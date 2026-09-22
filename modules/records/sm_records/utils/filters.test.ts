@@ -83,7 +83,11 @@ describe('filterKind — R8/M12', () => {
     expect(filterKind('seen_at', 'datetime')).toBe('datetime');
     expect(filterKind('author', 'relation')).toBe('relation');
     expect(filterKind('title', 'text')).toBe('text');
-    expect(filterKind('tags', 'multiselect')).toBe('text');
+    // U11: select/multiselect present as a closed choice set everywhere
+    // else in the module — the filter used to be the one place that
+    // demanded the stored value through free text instead.
+    expect(filterKind('tier', 'select')).toBe('select');
+    expect(filterKind('tags', 'multiselect')).toBe('select');
   });
 
   it('keeps the two fixed columns with closed value sets on their own', () => {
@@ -98,6 +102,10 @@ describe('normaliseFilterValue — a select never desyncs from its options', () 
     expect(normaliseFilterValue('boolean', 'maybe', [])).toBe('true');
     expect(normaliseFilterValue('status', 'archived', [])).toBe('draft');
     expect(normaliseFilterValue('locale', 'fr', ['en', 'de'])).toBe('en');
+    // U11: a stale/hand-edited `banana` falls back to the field's first
+    // choice, the same as every other closed-set kind — not a silent
+    // zero-result free-text value.
+    expect(normaliseFilterValue('select', 'banana', [], ['CA', 'NY'])).toBe('CA');
   });
 
   it('keeps a value the control can show, and leaves free text alone', () => {
@@ -108,6 +116,7 @@ describe('normaliseFilterValue — a select never desyncs from its options', () 
     expect(normaliseFilterValue('datetime', '2026-01-15T10:30:00+00:00', [])).toBe(
       '2026-01-15T10:30:00+00:00',
     );
+    expect(normaliseFilterValue('select', 'NY', [], ['CA', 'NY'])).toBe('NY');
   });
 
   it('starts a freshly chosen field on the first option its control offers', () => {
@@ -116,5 +125,9 @@ describe('normaliseFilterValue — a select never desyncs from its options', () 
     expect(defaultFilterValue('locale', ['en', 'de'])).toBe('en');
     expect(defaultFilterValue('date', [])).toBe('');
     expect(defaultFilterValue('relation', [])).toBe('');
+    expect(defaultFilterValue('select', [], ['CA', 'NY'])).toBe('CA');
+    // No choices configured yet — the same empty-set fallback `locale`
+    // gets with a single-locale install.
+    expect(defaultFilterValue('select', [], [])).toBe('');
   });
 });

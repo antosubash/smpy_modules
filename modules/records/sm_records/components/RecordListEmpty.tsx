@@ -18,6 +18,7 @@ export function RecordListEmpty({
   typeKey,
   trashed,
   filtered,
+  errorMessage,
   onClear,
 }: {
   typeKey: string;
@@ -25,6 +26,12 @@ export function RecordListEmpty({
   /** A `?filter=` is in force — including one the index layer refused, where
    *  the notice above says why and this box says what to do about it. */
   filtered: boolean;
+  /** U10: the index layer refused the filter (a reindex in progress, an
+   *  unsupported operator, a bad value) — nothing was actually queried, so
+   *  "No records match this filter" would assert something false about the
+   *  data. When this is set it *replaces* that line rather than sitting
+   *  beside it, so the box never makes two contradictory claims at once. */
+  errorMessage?: string | null;
   onClear: () => void;
 }) {
   const { t } = useT();
@@ -37,10 +44,11 @@ export function RecordListEmpty({
         <p>{t('records.trash.empty', { defaultValue: 'No trashed records' })}</p>
       ) : filtered ? (
         <>
-          <p data-testid="records-empty-filtered">
-            {t('records.records.empty_filtered', {
-              defaultValue: 'No records match this filter.',
-            })}
+          <p data-testid={errorMessage ? 'records-empty-filter-error' : 'records-empty-filtered'}>
+            {errorMessage ??
+              t('records.records.empty_filtered', {
+                defaultValue: 'No records match this filter.',
+              })}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onClear}>
             {t('records.records.filter_clear', { defaultValue: 'Clear' })}
