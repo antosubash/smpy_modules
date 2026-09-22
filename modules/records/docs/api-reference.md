@@ -1062,7 +1062,7 @@ walking a large public type is exactly the caller that should use them.
 | `400` | An import file that is not the format it claims, or a header naming an unknown column | `{"detail"}` |
 | `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
-| `401` | No session | `{"detail": "Authentication required"}` |
+| `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
 | `403` | The type's `allowed_roles` exclude the caller | `{"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}` |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
@@ -1124,6 +1124,14 @@ counted, never named.
 **Every refusal rolls the request's session back.** A refused delete that had
 already cleared one `set_null` reference before meeting a `restrict` deeper down
 commits nothing.
+
+**The `401` is the framework's, not this module's.** `AuthMiddleware` answers
+an anonymous request to any `/api/*` path before a single route dependency
+runs, so `{"detail": "Not authenticated"}` is what a caller with no session
+actually receives — this table used to promise
+`{"detail": "Authentication required"}`, which is the wording of the
+*permission* dependency underneath it and is reachable only on an install
+running no auth provider at all.
 
 **A write body is refused before it is read.** `max_payload_bytes` bounds one
 record's serialized `data`, which can only be measured after the whole request
