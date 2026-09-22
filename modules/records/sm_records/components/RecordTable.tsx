@@ -9,12 +9,14 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { useIsNarrow } from '../hooks/useIsNarrow';
+import type { RecordSelection } from '../hooks/useRecordSelection';
 import { listColumns, type SortState } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCardList } from './RecordCardList';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
+import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
 
@@ -64,6 +66,7 @@ export function RecordTable({
   sort,
   trashed = false,
   showLocale = false,
+  selection,
   onSort,
   onDelete,
   onRestore,
@@ -72,6 +75,10 @@ export function RecordTable({
   type: TypeRead;
   records: RecordRead[];
   sort: SortState;
+  /** Absent for a caller with no bulk actions to offer (a viewer, who cannot
+   *  act on a selection anyway): the column is then not rendered at all,
+   *  rather than rendered and inert. */
+  selection?: RecordSelection;
   /** The list is showing the trash (`?trashed=true`): the row action is
    *  "Restore" rather than "Delete" — deleting an already-trashed row makes
    *  no sense, and restoring one that isn't does not either. */
@@ -102,6 +109,7 @@ export function RecordTable({
         <RecordCardList
           type={type}
           records={records}
+          selection={selection}
           trashed={trashed}
           showLocale={showLocale}
           showPosition={showPosition}
@@ -119,6 +127,15 @@ export function RecordTable({
       <Table>
         <TableHeader>
           <TableRow>
+            {selection && (
+              <TableHead className="w-10">
+                <RecordSelectAllCell
+                  checked={selection.allSelected}
+                  indeterminate={selection.someSelected}
+                  onToggle={selection.toggleAll}
+                />
+              </TableHead>
+            )}
             <SortableHeader
               field="display_title"
               label={t('records.records.display_title', { defaultValue: 'Title' })}
@@ -180,7 +197,17 @@ export function RecordTable({
               key={record.uuid}
               data-testid="records-record-row"
               data-record-uuid={record.uuid}
+              data-selected={selection?.isSelected(record.uuid) ? 'true' : undefined}
             >
+              {selection && (
+                <TableCell>
+                  <RecordSelectCell
+                    checked={selection.isSelected(record.uuid)}
+                    title={record.display_title}
+                    onToggle={(extend) => selection.toggle(record.uuid, extend)}
+                  />
+                </TableCell>
+              )}
               <TableCell className="font-medium">
                 <Link
                   href={`/admin/records/${type.key}/${record.uuid}`}

@@ -197,6 +197,17 @@ export const FILTER_OPS: FilterOp[] = [
   'is_null',
 ];
 
+/** The `report` a refused `POST …/records/bulk` carries: which records said
+ *  no, and what each of them alone would have answered. Nothing was written.
+ *  Mirrored in `utils/api-records.ts` as `BulkReport`, which is what callers
+ *  use; declared here because `ApiErrorBody` cannot import from a module that
+ *  imports it. */
+export type BulkReportBody = {
+  action: string;
+  requested: number;
+  failed: { uuid: string; status: number; message: string }[];
+};
+
 /** A single `422` field error, as the API reports it. */
 export type ValidationError = { field: string; message: string };
 
@@ -214,9 +225,12 @@ export type ApiErrorBody = {
   more?: number;
   field?: string;
   reason?: string;
-  /** A restrictive schema change would leave records invalid — re-send with
-   *  `force: true` (§8.2) or change the fields. */
-  report?: DryRunReport;
+  /** Two refusals ride on one key, told apart by their shape and by the
+   *  route that answered: a restrictive schema change that would leave
+   *  records invalid — re-send with `force: true` (§8.2) or change the
+   *  fields — and a bulk action at least one named record refused, which is
+   *  the one with `failed` on it. */
+  report?: DryRunReport | BulkReportBody;
   /** Re-adding a key that still holds `_orphaned` values on some records
    *  (§8.8) — re-send with `orphaned: 'restore' | 'discard'`. */
   conflicts?: Record<string, number>;

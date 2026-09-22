@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 
-import { mount } from '../test-dom';
+import { act, click, mount } from '../test-dom';
 import type { FieldDef, RecordRead, TypeRead } from '../utils/types';
 
 vi.mock('@inertiajs/react', () => ({
@@ -96,6 +96,85 @@ describe('RecordTable — U6: a type with no indexed field says so under the tab
       />,
     );
     expect(view.find('[data-testid="records-no-indexed-columns"]')).toBeNull();
+    await view.unmount();
+  });
+});
+
+const { useRecordSelection } = await import('../hooks/useRecordSelection');
+
+/** The table with a real selection behind it — the hook is what a row's tick
+ *  box actually talks to, and mocking it would test the mock. */
+function Selectable({ records }: { records: RecordRead[] }) {
+  const selection = useRecordSelection(records.map((r) => r.uuid));
+  return (
+    <>
+      <output data-testid="picked">{selection.uuids.join(',')}</output>
+      <RecordTable
+        type={type()}
+        records={records}
+        sort={null}
+        selection={selection}
+        onSort={() => {}}
+        onDelete={noop}
+        onRestore={noop}
+        onPurge={noop}
+      />
+    </>
+  );
+}
+
+describe('RecordTable — the tick column', () => {
+  it('is absent entirely without a selection: a viewer gets no inert boxes', async () => {
+    const view = await mount(
+      <RecordTable
+        type={type()}
+        records={[record()]}
+        sort={null}
+        onSort={() => {}}
+        onDelete={noop}
+        onRestore={noop}
+        onPurge={noop}
+      />,
+    );
+    expect(view.find('[data-testid="records-select-row"]')).toBeNull();
+    expect(view.find('[data-testid="records-select-all"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('ticks one row per box, and the header box ticks the page', async () => {
+    const rows = [record(), { ...record(), uuid: 'r2', display_title: 'Second' }];
+    const view = await mount(<Selectable records={rows} />);
+
+    await click(view.all('[data-testid="records-select-row"]')[1]);
+    expect(view.find('[data-testid="picked"]')?.textContent).toBe('r2');
+
+    await click(view.find('[data-testid="records-select-all"]'));
+    expect(view.find('[data-testid="picked"]')?.textContent).toBe('r1,r2');
+    await view.unmount();
+  });
+
+  it('names each box after its record, so twenty-five are not all "Select"', async () => {
+    const view = await mount(<Selectable records={[record()]} />);
+    const box = view.find('[data-testid="records-select-row"]');
+    expect(box?.getAttribute('aria-label')).toContain('Select');
+    await view.unmount();
+  });
+
+  it('extends the selection on Shift+click', async () => {
+    const rows = [
+      record(),
+      { ...record(), uuid: 'r2' },
+      { ...record(), uuid: 'r3' },
+    ] as RecordRead[];
+    const view = await mount(<Selectable records={rows} />);
+    const boxes = view.all('[data-testid="records-select-row"]');
+
+    await click(boxes[0]);
+    await act(async () => {
+      boxes[2].dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    });
+
+    expect(view.find('[data-testid="picked"]')?.textContent).toBe('r1,r2,r3');
     await view.unmount();
   });
 });

@@ -62,7 +62,11 @@ export function useSchemaApply(onApplied: (result: TypeRead) => void) {
         return result;
       } catch (err) {
         if (err instanceof ApiError && err.status === 409 && err.body?.report) {
-          setState({ ...IDLE, report: err.body.report });
+          // `report` is a union since the bulk routes started using the same
+          // key; a schema refusal is the one with `checked` on it, and no
+          // other 409 this hook sees carries a report at all.
+          const report = err.body.report;
+          setState({ ...IDLE, report: 'checked' in report ? report : null });
         } else if (err instanceof ApiError && err.status === 409 && err.body?.conflicts) {
           setState({ ...IDLE, conflicts: err.body.conflicts });
         } else if (err instanceof ApiError && err.status === 409 && err.body?.current) {

@@ -93,3 +93,53 @@ export function purgeRecord(typeKey: string, uuid: string): Promise<void> {
     { method: 'DELETE' },
   );
 }
+
+/** The five whole-record transitions `POST …/records/bulk` takes. */
+export type BulkAction = 'trash' | 'restore' | 'purge' | 'publish' | 'unpublish';
+
+/** One record the server would not apply the action to, and why. `status` is
+ *  what that record alone would have answered. */
+export type BulkFailure = { uuid: string; status: number; message: string };
+
+/** The `report` a refused batch carries in its `409` body. Nothing was
+ *  written — the caller deselects what this names and sends the rest. */
+export type BulkReport = { action: BulkAction; requested: number; failed: BulkFailure[] };
+
+export type BulkResult = {
+  action: BulkAction;
+  requested: number;
+  changed: number;
+  /** Records a `trash` reached through an `on_delete: cascade` relation and
+   *  which the request never named. */
+  cascaded: number;
+};
+
+/** All or nothing: a batch that refuses one record refuses all of them, with
+ *  a `409` whose `body.report` is a `BulkReport` (see `ApiError`). */
+export function bulkRecords(
+  typeKey: string,
+  action: BulkAction,
+  uuids: string[],
+  expectedVersions?: Record<string, number>,
+): Promise<BulkResult> {
+  return request(`/types/${encodeURIComponent(typeKey)}/records/bulk`, {
+    method: 'POST',
+    body: JSON.stringify({
+      action,
+      uuids,
+      ...(expectedVersions ? { expected_versions: expectedVersions } : {}),
+    }),
+  });
+}
+
+export type TrashEmptied = { purged: number; filtered: boolean };
+
+/** Purge the type's whole trash, or — with the list's own `filter=` term —
+ *  the part of it the screen is showing. Takes no uuids and is not bounded by
+ *  `max_bulk_records`. */
+export function emptyTrash(typeKey: string, filter?: string | null): Promise<TrashEmptied> {
+  const qs = filter ? `?${new URLSearchParams({ filter }).toString()}` : '';
+  return request(`/types/${encodeURIComponent(typeKey)}/records/trash/empty${qs}`, {
+    method: 'POST',
+  });
+}

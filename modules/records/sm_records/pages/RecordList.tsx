@@ -8,6 +8,7 @@ import type React from 'react';
 
 import { FilterBar } from '../components/FilterBar';
 import { RecordIoMenu } from '../components/RecordIoMenu';
+import { RecordListBulk } from '../components/RecordListBulk';
 import { RecordListEmpty } from '../components/RecordListEmpty';
 import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
 import { RecordPagination } from '../components/RecordPagination';
@@ -15,6 +16,7 @@ import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
 import { useRecordListNav } from '../hooks/useRecordListNav';
+import { useRecordSelection } from '../hooks/useRecordSelection';
 import {
   exportSearchParams,
   filterErrorMessage,
@@ -98,6 +100,8 @@ function RecordList({
     });
 
   const { handleDelete, handleRestore, handlePurge } = useRecordListMutations(type.key, t);
+  // Only the rows this page is showing — see `useRecordSelection`.
+  const selection = useRecordSelection(records.items.map((record) => record.uuid));
 
   // `total` is exact only up to `RecordsSettings.max_count` (F4): beyond it
   // the API reports the cap with `total_capped`, and the footer says
@@ -216,6 +220,16 @@ function RecordList({
             aria-busy={loading}
             data-testid="records-list-wrapper"
           >
+            {canEdit && (
+              <RecordListBulk
+                typeKey={type.key}
+                trashed={trashed}
+                selection={selection}
+                filter={filterErrorReason ? null : rawFilter}
+                total={known}
+                capped={records.total_capped}
+              />
+            )}
             {records.items.length === 0 ? (
               <RecordListEmpty
                 typeKey={type.key}
@@ -231,6 +245,7 @@ function RecordList({
                 records={records.items}
                 sort={currentSort}
                 trashed={trashed}
+                selection={canEdit ? selection : undefined}
                 showLocale={showLocaleUI}
                 onSort={handleSort}
                 onDelete={handleDelete}

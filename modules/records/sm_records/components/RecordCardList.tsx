@@ -2,11 +2,13 @@ import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { Fragment } from 'react';
 
+import type { RecordSelection } from '../hooks/useRecordSelection';
 import { listColumns } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
+import { RecordSelectCell } from './RecordSelectCell';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 
 /**
@@ -29,12 +31,15 @@ export function RecordCardList({
   trashed = false,
   showLocale = false,
   showPosition = false,
+  selection,
   onDelete,
   onRestore,
   onPurge,
 }: {
   type: TypeRead;
   records: RecordRead[];
+  /** Same contract as `RecordTable`'s: absent means no tick boxes at all. */
+  selection?: RecordSelection;
   trashed?: boolean;
   showLocale?: boolean;
   /** Some row on this page has a non-zero `position` (UX-R25) — otherwise
@@ -53,9 +58,19 @@ export function RecordCardList({
           key={record.uuid}
           data-testid="records-record-card"
           data-record-uuid={record.uuid}
+          data-selected={selection?.isSelected(record.uuid) ? 'true' : undefined}
           className="rounded-lg border p-3"
         >
           <div className="flex items-start justify-between gap-2">
+            {selection && (
+              <div className="pt-0.5">
+                <RecordSelectCell
+                  checked={selection.isSelected(record.uuid)}
+                  title={record.display_title}
+                  onToggle={(extend) => selection.toggle(record.uuid, extend)}
+                />
+              </div>
+            )}
             <div className="min-w-0">
               <Link
                 href={`/admin/records/${type.key}/${record.uuid}`}
