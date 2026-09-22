@@ -1172,7 +1172,8 @@ class MyModule(ModuleBase):
         bus.subscribe(RecordTypeChanged, self.on_type_changed)
 
     async def on_record_updated(self, event: RecordUpdated) -> None:
-        ...  # event.type_key, event.uuid, event.version, event.status_before/after
+        # event.type_key, event.uuid, event.version, event.status_before/after
+        ...
 ```
 
 The set is `RecordCreated`, `RecordUpdated`, `RecordTrashed`,
