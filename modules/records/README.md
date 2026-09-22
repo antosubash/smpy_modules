@@ -105,6 +105,32 @@ on its next page request, and the others within the window (5 seconds by
 default, `0` to re-read on every page request). Nothing about the record data
 is affected — only which links the sidebar is showing.
 
+### Acting on many records at once
+
+`POST /api/records/types/{key}/records/bulk` takes
+`{"action": "trash"|"restore"|"purge"|"publish"|"unpublish", "uuids": [...]}`
+and an optional `expected_versions` map, and the record list exposes it as a
+tick box per row plus a toolbar. Every record goes through the same service
+call the single-record endpoint makes, so `allowed_roles`, the `on_delete`
+cascade, slug and `unique` claims, revisions and events all behave exactly as
+they do for one record.
+
+**It is all-or-nothing.** If even one record refuses — a `restrict` referrer,
+a stale `expected_version`, a type the caller may not write, a payload the
+current schema no longer accepts — nothing is written and the `409` carries a
+report naming each failing uuid with the status that record alone would have
+answered. The admin UI renders that as a list with "deselect the ones that
+failed", which is the point: a batch you cannot half-apply needs a refusal you
+can act on. One request may name up to `max_bulk_records` (500) records.
+
+`POST /api/records/types/{key}/records/trash/empty` purges the type's trash,
+or — with the listing grammar's `?filter=` — the part of it a screen is
+showing. It names nothing, so it is not bounded by `max_bulk_records` and is
+set-based rather than a pass over records; it still publishes one
+`RecordPurged` per record. In the UI it is the **Empty trash** button in the
+Trash view, with filter-aware copy and the same typed-count guard the type
+delete uses.
+
 ### Paging a large type
 
 `GET /api/records/types/{key}/records` takes `?page=` and `?page_size=` as it
@@ -282,6 +308,7 @@ variables are read. Configure on the Settings screen or with
 | `preview_job_ttl_seconds` | 600 (10 min) | no |
 | `max_import_bytes` | 52428800 (50 MB) | no |
 | `max_import_rows` | 20000 | no |
+| `max_bulk_records` | 500 | no |
 | `public_cache_seconds` | 60 | no |
 | `max_fields_per_type` | 100 | no |
 | `max_indexed_fields_per_type` | 25 | no |
@@ -296,7 +323,9 @@ be authored in — see [Content languages](#content-languages).
 [Sidebar entries](#sidebar-entries).
 
 `max_count` is how far a list page's `total` is counted exactly — see
-[Paging a large type](#paging-a-large-type). `preview_sync_limit` is the
+[Paging a large type](#paging-a-large-type). `max_bulk_records` is how many
+records one bulk request may name — see
+[Acting on many records at once](#acting-on-many-records-at-once). `preview_sync_limit` is the
 largest type a schema preview will dry-run inside the request, and
 `preview_job_ttl_seconds` is how long a finished preview's report stays
 reusable by the save that follows it — see

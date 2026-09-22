@@ -144,6 +144,34 @@ Every error path therefore rolls the session back explicitly and clears the
 has-writes flag — which is what makes `on_error=abort` and a refused cascading
 delete mean *nothing was written*.
 
+### Bulk, and the one thing it adds
+
+`services/bulk.py` does not re-implement anything: each record it names goes
+through the same `services.records` call the single-record endpoint makes, so
+`allowed_roles`, the `on_delete` cascade, the claims, the revisions and the
+index writes cannot drift from the one-record path. What it adds is the
+confirmation semantics — a pass that continues past a refusal so the report
+can name every one of them, and then refuses the batch entirely.
+
+Two mechanisms carry that. Each record's turn runs inside `db.begin_nested()`
+(the shape `services/import_` uses per row), because a refused write leaves
+the session needing a rollback and rolling the outer transaction back at the
+first refusal would end the pass with one failure named out of five. And
+`BulkRefused` — raised, not returned — is what takes the outer transaction
+with it through the error route's rollback, which is what makes "nothing was
+changed" true rather than aspirational.
+
+It reports back through `bulk.Change`, deliberately event-shaped without being
+an event: the service cannot publish (rule 1), so it hands the endpoint the
+record, the cascade and the previous status, and the endpoint picks the
+`events` builder from the action it asked for.
+
+`services/_empty_trash.py` is the opposite shape and re-exported from the same
+module: it names no records, so it is one statement per table over an id set —
+`purge_type_records`'s shape narrowed to the trash and to a filter, identities
+read first because a `RecordPurged` is the one event nobody can reconstruct
+afterwards.
+
 Endpoints may resolve dependencies, parse the query grammar, call services,
 serialize contracts and schedule deferred jobs. They may not build SQL, commit
 or decide domain rules. The one thing an endpoint does that a service cannot is

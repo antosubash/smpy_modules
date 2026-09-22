@@ -373,6 +373,62 @@ To clear a claim, open the trashed record and use **Delete permanently**
 (*"This cannot be undone. Delete this record permanently?"*). **Restore** puts
 it back (*"Restore this record?"*).
 
+**Empty trash** clears the whole thing at once. It is filter-aware: with a
+filter in force it offers *"Delete the 12 trashed records matching this filter
+permanently?"* and empties only those, and with none *"Delete all 12 trashed
+records permanently?"*. Either way you type the number to enable the button —
+the same guard deleting a Record Type uses, and for the same reason: nothing
+here can be undone and nothing bounds how much of it there is. On a type whose
+count is capped at 10,000 the sentence says *more than* 10,000 and there is no
+number to type.
+
+### Acting on several records at once
+
+Every row carries a tick box, and the one in the header ticks everything on
+the page. A toolbar appears with the first tick, saying how many are selected:
+
+- on the live list — **Move to Trash**, **Publish**, **Unpublish**;
+- in the Trash — **Restore**, **Delete permanently**.
+
+**Clear selection** unticks everything. Each action confirms first and the
+confirmation states the count.
+
+Selecting with the keyboard: Tab to a row's box and press Space. Shift+click a
+second box to take everything between it and the last one you clicked — a
+range only ever adds, so nothing outside it is untucked.
+
+**The selection is what is on screen.** Changing the page, the sort or the
+filter clears it, and so does running an action, because the list reloads. It
+is never twelve rows you can no longer see.
+
+#### All or nothing
+
+A bulk action either applies to every record you selected or to none of them.
+If even one refuses — it is referenced by a `restrict` relation, someone else
+edited it since the page loaded, it is not yours to write, its payload no
+longer fits the schema — **nothing is changed**, and a panel appears naming
+each record that refused and why:
+
+> 2 of 12 records could not be changed, so nothing was changed.
+> `9d9addcb…` — 3 record(s) still reference 9d9addcb…
+> `0e13ba71…` — no article record with uuid '0e13ba71…'
+
+**Deselect the 2 that failed** unticks exactly those and leaves the other ten
+ticked, so pressing the action again applies it to the part that can take it.
+
+The alternative — applying it to the ten and reporting the two — would leave
+you reconciling a report against a list that had already changed underneath
+it, for actions that cannot be undone in one step. This way the list you are
+looking at is either entirely before or entirely after.
+
+One request may name up to 500 records (the `max_bulk_records` setting); a
+bigger selection than one page of the list is not something the tick boxes can
+build anyway. **Empty trash** is not bounded by it — it names nothing.
+
+Trashing a record still cascades: a record trashed this way takes its
+`on_delete: cascade` referrers with it, and the confirmation afterwards says
+how many went along.
+
 ### Export
 
 The **Export** button is a menu (it carries a chevron) with **Download JSON**
