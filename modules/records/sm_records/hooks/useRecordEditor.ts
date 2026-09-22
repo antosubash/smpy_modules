@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { ApiError } from '../utils/api';
 import { createRecord, updateRecord } from '../utils/api-records';
 import { conflictField } from '../utils/conflicts';
-import { focusInvalidInput } from '../utils/focus-invalid';
+import { firstErrorInDomOrder, focusInvalidInput } from '../utils/focus-invalid';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { parsePosition } from '../utils/values';
 import { useRecordForm } from './useRecordForm';
@@ -196,8 +196,14 @@ export function useRecordEditor(
         setConflict(err.body.current as RecordRead);
       } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         form.setServerErrors(err.body.errors);
-        const first = err.body.errors[0]?.field;
-        if (first) focusInvalidInput(first.startsWith('data.') ? first.slice(5) : first);
+        // In render order, not in the server's enumeration order (R17) —
+        // the same rule `useRecordForm` applies to the client validator's
+        // errors, so the two paths agree about where a refused save lands.
+        const first = firstErrorInDomOrder(
+          err.body.errors,
+          type.fields.map((field) => field.key),
+        );
+        if (first) focusInvalidInput(first);
       } else if (err instanceof ApiError && err.status === 409) {
         markCollision(err);
       } else {

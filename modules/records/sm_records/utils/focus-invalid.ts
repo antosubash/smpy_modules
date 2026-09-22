@@ -40,3 +40,43 @@ export function focusInvalidInput(key: string): void {
     if (input instanceof HTMLElement) input.focus({ preventScroll: true });
   }, 0);
 }
+
+/** The envelope inputs in the order `RecordEditor` renders them: `status`
+ *  sits in the header above the fields, `slug` and `position` in the
+ *  "Advanced" disclosure below them. */
+const BEFORE_FIELDS = ['status'];
+const AFTER_FIELDS = ['slug', 'position'];
+
+/** `data.title` → `title`; a bare key is returned as it came. */
+export function bareFieldKey(field: string): string {
+  return field.startsWith('data.') ? field.slice(5) : field;
+}
+
+/**
+ * Which refusal to take the person to, out of a 422 naming several (R17).
+ *
+ * **First in the order the inputs are rendered**, not first in whatever
+ * order the server happened to enumerate — the wording is
+ * `useRecordForm`'s, which has always done this for the client validator's
+ * own errors, and the two paths should not disagree. A 422 could otherwise
+ * scroll to the bottom field while an error sat above the fold.
+ *
+ * A key this screen has no input for keeps its position relative to the
+ * other unplaceable ones and sorts after everything it can place — there is
+ * nothing to scroll to, so it must not win the race against something there
+ * is.
+ */
+export function firstErrorInDomOrder(
+  errors: readonly { field: string }[],
+  fieldKeys: readonly string[],
+): string | null {
+  const order = [...BEFORE_FIELDS, ...fieldKeys, ...AFTER_FIELDS];
+  let best: { key: string; rank: number } | null = null;
+  for (const entry of errors) {
+    const key = bareFieldKey(entry.field);
+    const index = order.indexOf(key);
+    const rank = index === -1 ? Number.MAX_SAFE_INTEGER : index;
+    if (best === null || rank < best.rank) best = { key, rank };
+  }
+  return best?.key ?? null;
+}
