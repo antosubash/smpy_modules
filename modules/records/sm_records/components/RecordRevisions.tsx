@@ -24,6 +24,22 @@ import { ConfirmDialog } from './ConfirmDialog';
  * moved on since — §8.3's "invalid under current schema" case) any other
  * save can.
  */
+/** `RevisionEvent` (`models/_record.py`) as a word rather than the wire
+ *  value `create`/`update`/`delete`/`restore` (R11). An event this build
+ *  does not know still prints, as itself. Exported for its own test, the
+ *  way `RecordDeleteDialog` exports its two halves. */
+export function revisionEvent(t: Translate, event: string): string {
+  const defaults: Record<string, string> = {
+    create: 'Created',
+    update: 'Updated',
+    delete: 'Deleted',
+    restore: 'Restored',
+  };
+  const fallback = defaults[event];
+  if (!fallback) return event;
+  return t(`records.editor.revisions.event.${event}`, { defaultValue: fallback });
+}
+
 export function RecordRevisions({
   typeKey,
   uuid,
@@ -157,7 +173,7 @@ export function RecordRevisions({
                         defaultValue: 'v{version}',
                       })}
                       {' · '}
-                      {rev.event}
+                      {revisionEvent(t, rev.event)}
                       {' · '}
                       {rev.display_title}
                     </p>

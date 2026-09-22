@@ -16,7 +16,7 @@ import {
   MAX_LABEL_LEN,
   uniqueAllowed,
 } from './rules';
-import { type EditableField, FIELD_TYPES, type TargetType } from './types';
+import { type EditableField, FIELD_TYPES, type FieldTypeName, type TargetType } from './types';
 
 // See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
 // against `useT()`'s real, key-union-overloaded signature either blows up
@@ -38,6 +38,31 @@ function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
     max: MAX_KEY_LEN,
     defaultValue: defaults[code],
   });
+}
+
+/** The field-type select used to show the wire value itself — `longtext`,
+ *  `multiselect`, `datetime` (R11). These are the names of the closed set in
+ *  `schema/types.py`, written for the person choosing one. A `t()` call per
+ *  type rather than a module-scope map, so the strings stay reachable by the
+ *  untranslated-string check — a config object is exactly its blind spot. */
+function fieldTypeName(t: Translate, type: FieldTypeName): string {
+  const defaults: Record<FieldTypeName, string> = {
+    text: 'Text',
+    longtext: 'Long text',
+    number: 'Number',
+    integer: 'Whole number',
+    boolean: 'Yes / no',
+    date: 'Date',
+    datetime: 'Date and time',
+    select: 'Choice',
+    multiselect: 'Several choices',
+    email: 'Email address',
+    url: 'URL',
+    json: 'JSON',
+    media: 'Media',
+    relation: 'Link to a record',
+  };
+  return t(`records.type_editor.field_type_name.${type}`, { defaultValue: defaults[type] });
 }
 
 /**
@@ -123,7 +148,7 @@ export function FieldRowBody({
           >
             {FIELD_TYPES.map((ft) => (
               <NativeSelectOption key={ft} value={ft}>
-                {ft}
+                {fieldTypeName(t, ft)}
               </NativeSelectOption>
             ))}
           </NativeSelect>

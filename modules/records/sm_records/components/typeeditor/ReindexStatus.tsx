@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { reindexType } from '../../utils/api';
 import type { TypeRead } from '../../utils/types';
+import { formatDateTime } from '../../utils/values';
 import { pendingEntries, shouldPoll } from './reindexPending';
 
 const POLL_MS = 5000;
@@ -71,7 +72,10 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
                 : entry.key}
               {' — '}
               {t('records.type_editor.reindex.since', {
-                time: entry.since,
+                // The raw ISO string used to be printed here while every
+                // other timestamp in the module goes through the viewer's
+                // own locale (R11).
+                time: formatDateTime(entry.since),
                 defaultValue: 'since {time}',
               })}
             </li>

@@ -1,5 +1,5 @@
 import { useT } from '@simple-module-py/i18n';
-
+import { displayFieldKey } from '../utils/errors-display';
 import type { ValidationError } from '../utils/types';
 
 /**
@@ -30,7 +30,7 @@ export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
       <ul className="mt-1 list-inside list-disc text-destructive">
         {errors.map((entry) => (
           <li key={`${entry.field}:${entry.message}`}>
-            {entry.field}: {entry.message}
+            {displayFieldKey(entry.field)}: {entry.message}
           </li>
         ))}
       </ul>

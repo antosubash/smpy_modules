@@ -186,6 +186,12 @@
       "restore": "Restore this version",
       "restore_confirm": "Restore the data from v{version}?",
       "restored": "Version restored",
+      "event": {
+        "create": "Created",
+        "update": "Updated",
+        "delete": "Deleted",
+        "restore": "Restored"
+      },
       "restore_schema_mismatch": "This version no longer fits the type's current schema.",
       "restore_schema_mismatch_detail": "This version no longer fits the type's current schema: {detail}"
     }
@@ -248,6 +254,22 @@
     "field_key": "Key",
     "field_key_locked": "Can't be changed after the field is created.",
     "field_type": "Type",
+    "field_type_name": {
+      "text": "Text",
+      "longtext": "Long text",
+      "number": "Number",
+      "integer": "Whole number",
+      "boolean": "Yes / no",
+      "date": "Date",
+      "datetime": "Date and time",
+      "select": "Choice",
+      "multiselect": "Several choices",
+      "email": "Email address",
+      "url": "URL",
+      "json": "JSON",
+      "media": "Media",
+      "relation": "Link to a record"
+    },
     "field_required": "Required",
     "field_unique": "Unique",
     "field_indexed": "Indexed",

@@ -17,6 +17,7 @@ import { RecordEditorHeaderBadges } from '../components/RecordStatusBadge';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTranslations } from '../components/RecordTranslations';
 import { useRecordEditor } from '../hooks/useRecordEditor';
+import { displayFieldKey } from '../utils/errors-display';
 import type { RecordRead, TranslationRead, TypeRead } from '../utils/types';
 
 type Props = {
@@ -160,7 +161,7 @@ function RecordEditor({
             >
               {unplaceable.map((entry) => (
                 <li key={`${entry.field}:${entry.message}`}>
-                  {entry.field}: {entry.message}
+                  {displayFieldKey(entry.field)}: {entry.message}
                 </li>
               ))}
             </ul>
