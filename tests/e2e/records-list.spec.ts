@@ -11,7 +11,7 @@ import {
 
 /**
  * The generic record list (design §12's `RecordList.tsx`): the filter bar,
- * which only ever offers indexed fields plus the two fixed columns (§7.2),
+ * which only ever offers indexed fields plus the three fixed columns (§7.2),
  * the sortable headers, the refusal notice for a filter the index layer
  * won't build, and paging.
  */
@@ -51,7 +51,7 @@ async function seedListType(page: Page): Promise<string> {
 }
 
 test.describe('Records — list, filter, sort, page', () => {
-  test('offers only indexed fields and the two fixed columns as filters', async ({ page }) => {
+  test('offers only indexed fields and the three fixed columns as filters', async ({ page }) => {
     await login(page);
     const key = await seedListType(page);
     await page.goto(`/admin/records/${key}`);
@@ -63,6 +63,7 @@ test.describe('Records — list, filter, sort, page', () => {
       'Flag',
       'Title',
       'Status',
+      'Invalid',
     ]);
 
     // Per-kind operator sets, minus `in` (the wire format joins on a bare

@@ -120,13 +120,21 @@ export function apiGetType(page: Page, key: string): Promise<TypeRead> {
   return api(page, 'GET', `/types/${key}`);
 }
 
-export function apiUpdateType(
+export async function apiUpdateType(
   page: Page,
   key: string,
   expectedVersion: number,
   changes: Json,
 ): Promise<TypeRead> {
-  return api(page, 'PUT', `/types/${key}`, { expected_version: expectedVersion, ...changes });
+  const updated = await api<TypeRead>(page, 'PUT', `/types/${key}`, {
+    expected_version: expectedVersion,
+    ...changes,
+  });
+  // Same GH #257 window as `readable`: the 200 can arrive before the commit,
+  // and a page rendered in between (the sidebar sync reads the type row)
+  // still shows the old value. Wait on the row's version, not on a clock.
+  await expect.poll(async () => (await apiGetType(page, key)).version).toBe(updated.version);
+  return updated;
 }
 
 export function apiListTypes(page: Page): Promise<{ items: TypeRead[] }> {
