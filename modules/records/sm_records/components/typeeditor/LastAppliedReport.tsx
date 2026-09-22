@@ -2,8 +2,8 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 
+import { humanizeDryRunMessage } from '../../utils/dry-run-messages';
 import type { DryRunReport } from '../../utils/types';
-import { humanizeDryRunMessage } from './dryRunMessages';
 
 /**
  * The dry-run report of the change that was just forced through, kept on

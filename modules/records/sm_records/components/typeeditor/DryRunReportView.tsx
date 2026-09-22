@@ -1,7 +1,7 @@
 import { useT } from '@simple-module-py/i18n';
 
+import { humanizeDryRunMessage } from '../../utils/dry-run-messages';
 import type { DryRunReport } from '../../utils/types';
-import { humanizeDryRunMessage } from './dryRunMessages';
 import { OrphanedConflictsList } from './OrphanedConflictsList';
 
 /**

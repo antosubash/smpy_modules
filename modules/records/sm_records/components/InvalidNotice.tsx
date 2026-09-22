@@ -1,4 +1,5 @@
 import { useT } from '@simple-module-py/i18n';
+import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
 import type { ValidationError } from '../utils/types';
 
@@ -9,6 +10,13 @@ import type { ValidationError } from '../utils/types';
  * `fieldErrors`, so the affected input's own error slot lights up too;
  * saving with fixes clears both at once, since the next response's `invalid`
  * is what `reset()` re-derives from.
+ *
+ * U9: `entry.message` is pydantic's own wording verbatim (§8.3 again — it is
+ * carried straight from the dry run that marked the record), so it goes
+ * through the same `humanizeDryRunMessage` the type editor's dry-run report
+ * already applies — otherwise the same condition read "required, but this
+ * record has no value for it" there and "Input should be a valid string"
+ * here, for one and the same record.
  */
 export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
   const { t } = useT();
@@ -30,7 +38,7 @@ export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
       <ul className="mt-1 list-inside list-disc text-destructive">
         {errors.map((entry) => (
           <li key={`${entry.field}:${entry.message}`}>
-            {displayFieldKey(entry.field)}: {entry.message}
+            {displayFieldKey(entry.field)}: {humanizeDryRunMessage(t, entry.message)}
           </li>
         ))}
       </ul>

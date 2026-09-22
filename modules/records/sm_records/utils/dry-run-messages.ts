@@ -1,12 +1,24 @@
 /**
- * Humanizes a dry-run failure's `message` (U13a) — `services/_dry_run.py`
- * runs each record's stored `data` back through pydantic against the
- * *proposed* schema, and forwards whatever pydantic says verbatim. That is
- * accurate for a developer and misleading for an operator: making
+ * Humanizes a pydantic validation message (U13a) — `services/_dry_run.py`
+ * runs each record's stored `data` back through pydantic against a
+ * *proposed* schema and forwards whatever pydantic says verbatim; the same
+ * wording reaches the client on an ordinary record read too, in
+ * `record.invalid` (design §8.3 — a record a schema change or rollback no
+ * longer fits is "marked, not hidden", and this is that mark's message).
+ * Both are accurate for a developer and misleading for an operator: making
  * `starts_on` required and checking a record that has never had a value
  * for it comes back `"Input should be a valid date"`, which reads as a
  * formatting problem in the *stored* value — there isn't one, the record
  * simply has none, and the field just stopped being optional.
+ *
+ * U9: this used to run only inside the dry-run report (`DryRunReportView`,
+ * `LastAppliedReport`) — `InvalidNotice` and the per-field error slot
+ * (`useRecordForm`'s `fieldErrors`) printed `record.invalid`'s own message
+ * verbatim, so the very same condition read as "required, but this record
+ * has no value for it" in one screen and "Input should be a valid string"
+ * in the other, for one and the same record. In `utils/` rather than
+ * `components/typeeditor/` now that both the type editor and the record
+ * editor read it.
  *
  * Recognised by a stable substring rather than parsed structurally, the
  * same choice `friendlyImportError` (utils/io.ts) makes for the import

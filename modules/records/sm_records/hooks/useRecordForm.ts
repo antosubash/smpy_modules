@@ -16,6 +16,7 @@
 import { useT } from '@simple-module-py/i18n';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { bareFieldKey } from '../utils/focus-invalid';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
@@ -75,12 +76,19 @@ export function useRecordForm(
   /** Per-field messages. Precedence, low to high: the record's own
    *  `invalid` marker (stale until the next save), the client validator's
    *  courtesy check, then the server's 422 — the freshest server opinion
-   *  always wins the tie. */
+   *  always wins the tie.
+   *
+   *  U9: `invalidErrors` carries pydantic's own wording verbatim (design
+   *  §8.3), same as a dry-run report's `sample[].errors` — humanized here
+   *  too, so "required, but this record has no value for it" reads the same
+   *  under this input as it does in the type editor's own report for the
+   *  same condition. `clientErrors`/`serverErrors` are this module's own
+   *  copy already. */
   const fieldErrors = useMemo(() => {
     const merged: Record<string, string> = {};
     for (const entry of invalidErrors) {
       const key = entry.field.startsWith('data.') ? entry.field.slice(5) : entry.field;
-      if (fieldKeys.has(key)) merged[key] = entry.message;
+      if (fieldKeys.has(key)) merged[key] = humanizeDryRunMessage(t, entry.message);
     }
     Object.assign(merged, clientErrors);
     for (const entry of serverErrors) {
@@ -90,7 +98,7 @@ export function useRecordForm(
       if (fieldKeys.has(key)) merged[key] = entry.message;
     }
     return merged;
-  }, [invalidErrors, clientErrors, serverErrors, fieldKeys]);
+  }, [invalidErrors, clientErrors, serverErrors, fieldKeys, t]);
 
   /** The 422s that are about the record envelope, not a schema field —
    *  `status`, `slug`, `position`, and anything this build cannot place. */

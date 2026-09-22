@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { humanizeDryRunMessage } from './dryRunMessages';
+import { humanizeDryRunMessage } from './dry-run-messages';
 
 function fakeT(_key: string, opts: { defaultValue: string }): string {
   return opts.defaultValue;
