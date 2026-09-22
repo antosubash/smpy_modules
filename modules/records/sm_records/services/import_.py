@@ -46,7 +46,7 @@ from sm_records.contracts.io import (
     ImportRowError,
     OnError,
 )
-from sm_records.models import RecordType
+from sm_records.models import Record, RecordType
 from sm_records.services import _payload
 from sm_records.services._import_match import match_field
 from sm_records.services._import_parse import parse_csv, parse_json
@@ -99,6 +99,7 @@ async def _write(
     settings: RecordsSettings,
     actor: str | None,
     errors: list[ImportRowError],
+    written: list[tuple[str, Record]] | None,
 ) -> tuple[int, int]:
     counts = {"created": 0, "updated": 0}
     for plan in plans:
@@ -111,10 +112,12 @@ async def _write(
         }
         if options.on_error is OnError.ABORT:
             try:
-                result = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+                result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
             except RecordsError as exc:
                 raise _RowWriteError(plan.row.number, plan.row.uuid, exc) from exc
             counts[result] += 1
+            if written is not None:
+                written.append((result, row_record))
             continue
         try:
             # A savepoint per row: a refused write leaves the session needing
@@ -122,8 +125,10 @@ async def _write(
             # every valid row with it — which is ``abort``'s behaviour, not
             # this one's.
             async with db.begin_nested():
-                result = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+                result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
             counts[result] += 1
+            if written is not None:
+                written.append((result, row_record))
         except RecordsError as exc:
             errors.append(
                 ImportRowError(row=plan.row.number, uuid=plan.row.uuid, message=exc.detail)
@@ -184,8 +189,17 @@ async def import_records(
     options: ImportOptions,
     settings: RecordsSettings,
     actor: str | None = None,
+    written: list[tuple[str, Record]] | None = None,
 ) -> ImportReport:
-    """Parse, validate, plan, and — unless this is a dry run — write."""
+    """Parse, validate, plan, and — unless this is a dry run — write.
+
+    ``written`` is an optional sink the caller passes to learn *which* records
+    each row wrote: ``("created" | "updated", record)`` in file order, only
+    for rows that actually wrote. The report's counts cannot answer that, and
+    the endpoint needs it to publish one domain event per record rather than
+    one per file (:mod:`sm_records.events`). A dry run appends nothing,
+    because it wrote nothing.
+    """
     started = perf_counter()
     defs = _payload.field_defs(rtype)
     if options.match_by not in ("uuid", "slug"):
@@ -224,7 +238,14 @@ async def import_records(
         _refuse(options, tally, errors, started)
     try:
         tally.created, tally.updated = await _write(
-            db, rtype, plans, options=options, settings=settings, actor=actor, errors=errors
+            db,
+            rtype,
+            plans,
+            options=options,
+            settings=settings,
+            actor=actor,
+            errors=errors,
+            written=written,
         )
     except _RowWriteError as failure:
         errors.append(

@@ -26,6 +26,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.contracts.io import (
     ImportFormat,
     ImportMode,
@@ -162,9 +163,16 @@ async def import_records(
         match_by=text_option(form, "match_by", match_by),
         force=flag_option(form, "force", force),
     )
-    return await import_service.import_records(
-        db, rtype, text, fmt=chosen, options=options, settings=settings, actor=who
+    # One event per row that wrote, not one per file: a subscriber acts on
+    # records, and an import is many ordinary writes (``_import_rows.write_row``
+    # goes through ``create_record``/``update_record`` for exactly that reason).
+    # A dry run fills nothing, because it wrote nothing.
+    written: list[Any] = []
+    report = await import_service.import_records(
+        db, rtype, text, fmt=chosen, options=options, settings=settings, actor=who, written=written
     )
+    events.publish(request, *events.imported(rtype, written))
+    return report
 
 
 @router.get("/types/{key}/export", response_model=TypeExport, dependencies=[require_view])
@@ -263,6 +271,7 @@ async def import_type(
     rtype = await type_service.get_type(db, body.key)
     _check_roles_for_discard(request, rtype, body.orphaned)
     changes = _update_changes(request, rtype, body)
+    before = list(rtype.fields or [])
     updated = await type_service.update_type(
         db,
         rtype,
@@ -278,5 +287,6 @@ async def import_type(
     # the sidebar, and nothing else here has.
     if affects_menu(changes):
         mark_dirty(request.app)
+    events.publish(request, events.type_changed(updated, before))
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))

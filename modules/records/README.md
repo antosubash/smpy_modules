@@ -1119,6 +1119,53 @@ python -m sm_records.cli reindex --type KEY # one type
 It is idempotent and resumable — index rows are derived from the stored
 payloads, so running it twice converges.
 
+### Subscribing to what records do
+
+The module publishes domain events on the framework's bus, and subscribes to
+nothing. A host handles them in its own `register_event_handlers`:
+
+```python
+from simple_module_core.events import EventBus
+from sm_records.contracts.events import RecordTypeChanged, RecordUpdated
+
+
+class MyModule(ModuleBase):
+    def register_event_handlers(self, bus: EventBus, app=None) -> None:
+        bus.subscribe(RecordUpdated, self.on_record_updated)
+        bus.subscribe(RecordTypeChanged, self.on_type_changed)
+
+    async def on_record_updated(self, event: RecordUpdated) -> None:
+        ...  # event.type_key, event.uuid, event.version, event.status_before/after
+```
+
+The set is `RecordCreated`, `RecordUpdated`, `RecordTrashed`,
+`RecordRestored`, `RecordPurged`, `RecordTypeChanged` and `RecordTypeDeleted`
+— see
+[docs/architecture.md § Extension points](docs/architecture.md#extension-points)
+for what each carries and why. Four properties are worth knowing before you
+rely on them:
+
+- **They arrive after the commit.** The write is already visible to any
+  session by the time a handler runs, and a request that rolled back publishes
+  nothing.
+- **Bulk paths speak in records.** An import publishes one event per row that
+  wrote (a dry run publishes none), a delete that cascades publishes one per
+  record it reached — with `cascaded_from` naming the record the operator
+  actually asked about — and deleting a type publishes one `RecordPurged` per
+  record before the `RecordTypeDeleted`.
+- **They carry identifiers, not payloads.** Read the record if you need its
+  content. The exception is `RecordPurged`, which is the one event whose
+  subject is gone.
+- **Handler failures are the bus's business, not yours to be careful about.**
+  `EventBus.publish` gathers with `return_exceptions=True` and logs; a
+  subscriber that raises does not take the write down, and does not stop the
+  other subscribers.
+
+`RecordTypeChanged` is the one to reach for if you register an index or reduce
+provider: `index_affecting_keys` names the fields whose stored shape just
+moved, which is what the "run the CLI afterwards" note below is asking you to
+notice by hand.
+
 ### Extending the index
 
 The built-in projection writes one index row per field marked `indexed: true`.

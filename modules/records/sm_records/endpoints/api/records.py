@@ -13,7 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants
+from sm_records import constants, events
 from sm_records.contracts.schemas import (
     RecordCreate,
     RecordPage,
@@ -155,6 +155,7 @@ async def create_record(
         actor=who,
         locale=body.locale,
     )
+    events.publish(request, events.created(rtype, record))
     return record_read(rtype, record)
 
 
@@ -223,6 +224,9 @@ async def update_record(
         )
         raise ValidationFailed(problem, [{"field": constants.LOCALE_PARAM, "message": problem}])
     record = await record_service.get_record(db, rtype, uuid)
+    # Read before the write: ``update_record`` mutates the instance, so
+    # afterwards there is only one status left to compare against.
+    was = record.status.value
     updated = await record_service.update_record(
         db,
         rtype,
@@ -235,50 +239,5 @@ async def update_record(
         position=body.position,
         actor=who,
     )
+    events.publish(request, events.updated(rtype, updated, status_before=was))
     return record_read(rtype, updated)
-
-
-@router.delete("/records/{uuid}", status_code=204, dependencies=[require_edit])
-async def delete_record(
-    uuid: str,
-    request: Request,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-    who: str | None = Depends(actor),
-) -> None:
-    check_type_roles(request, rtype)
-    record = await record_service.get_record(db, rtype, uuid)
-    # ``roles`` and not only ``check_type_roles``: the delete may cascade into
-    # — or rewrite — records of types this URL never names, and design §10's
-    # narrowing has to reach those too. See ``services._lifecycle``.
-    await record_service.soft_delete_record(
-        db, rtype, record, actor=who, settings=settings, roles=caller_roles(request)
-    )
-
-
-@router.post("/records/{uuid}/restore", response_model=RecordRead, dependencies=[require_edit])
-async def restore_record(
-    uuid: str,
-    request: Request,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-    who: str | None = Depends(actor),
-) -> RecordRead:
-    check_type_roles(request, rtype)
-    record = await record_service.get_deleted_record(db, rtype, uuid)
-    restored = await record_service.restore_record(db, rtype, record, settings=settings, actor=who)
-    return record_read(rtype, restored)
-
-
-@router.delete("/records/{uuid}/purge", status_code=204, dependencies=[require_edit])
-async def purge_record(
-    uuid: str,
-    request: Request,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-) -> None:
-    check_type_roles(request, rtype)
-    record = await record_service.get_deleted_record(db, rtype, uuid)
-    await record_service.hard_delete_record(db, rtype, record)

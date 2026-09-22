@@ -13,6 +13,7 @@ from functools import partial
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.contracts.schema_change import (
     TypeRestoreRequest,
     TypeRevisionListResponse,
@@ -57,11 +58,10 @@ def _defer_reindex(request: Request, rtype: RecordType, settings: RecordsSetting
 
     :func:`sm_records.deferred.defer`, *not* FastAPI's background tasks. Such a
     task runs inside the route's dependency teardown, so the request's session
-    still holds its transaction while the rebuild wants one: on SQLite that is
-    a deadlock the driver ends with ``database is locked`` after its busy
-    timeout, and on any backend the rebuild reads the schema row as it was
-    before the change it was scheduled for. :mod:`sm_records.deferred` explains
-    the ordering.
+    still holds its transaction while the rebuild wants one: on SQLite a
+    deadlock the driver ends with ``database is locked``, and on any backend a
+    rebuild reading the schema row as it was before the change it was
+    scheduled for. :mod:`sm_records.deferred` explains the ordering.
 
     ``rtype.id`` is read here rather than inside the job: by the time the job
     runs the session that loaded the row is closed.
@@ -186,6 +186,7 @@ async def update_type(
         raise ValidationFailed(problem, [{"field": "key", "message": problem}])
     if "fields" in changes:
         changes["fields_raw"] = changes.pop("fields")
+    before = list(rtype.fields or [])
     updated = await type_service.update_type(
         db,
         rtype,
@@ -201,6 +202,7 @@ async def update_type(
     # case on this route and never touch navigation.
     if affects_menu(changes):
         mark_dirty(request.app)
+    events.publish(request, events.type_changed(updated, before))
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
 
@@ -217,13 +219,16 @@ async def delete_type(
     Deleting a type purges every record it holds, trash included — the widest
     write in the module. A caller the list excludes is refused a single record
     write and has a cascade into this type downgraded to ``restrict``
-    (``services._lifecycle._role_blocked``); letting the same caller destroy
-    all of it instead was the one gap in that rule, not a deliberate
-    exception. Same check, same admin semantics, as every record write.
+    (``services._lifecycle._role_blocked``); letting the same caller destroy all
+    of it was the one gap in that rule, not a deliberate exception.
     """
     check_type_roles(request, rtype)
     shown = rtype.show_in_menu
-    await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
+    key = rtype.key
+    purged = await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
+    # ``key`` before the call, the rows out of it: afterwards the type row is
+    # gone, and ``RecordPurged`` is the one event nothing can be looked up for.
+    events.publish(request, *events.type_deleted(key, purged))
     # Read before the delete: afterwards the row is gone and the attribute is
     # a question about an expired instance.
     if shown:
@@ -279,6 +284,7 @@ async def restore_type_revision(
     ``PUT``, mapped by the same ``RecordsErrorRoute``, and the same
     reindex-scheduling rule below it."""
     _check_roles_for_discard(request, rtype, body.orphaned)
+    before = list(rtype.fields or [])
     updated, _ = await schema_change.rollback(
         db,
         rtype,
@@ -289,5 +295,6 @@ async def restore_type_revision(
         force=body.force,
         orphaned=body.orphaned,
     )
+    events.publish(request, events.type_changed(updated, before))
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))

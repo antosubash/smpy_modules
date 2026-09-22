@@ -185,6 +185,45 @@ that it cannot, but that drift is **detectable**.
 and the public routes are wired from `on_startup`, not the construction hooks,
 because both depend on settings hydrated at lifespan start.
 
+**Domain events** (`contracts/events.py`) are the subscribe-only seam: the
+module publishes, and a host handles them in its own
+`register_event_handlers(bus, app=...)`. They are dataclasses because the
+framework's `Event` base is one (`simple_module_core.events`), not because
+this module departs from the repo's SQLModel rule.
+
+| Event | Published by | Carries |
+|---|---|---|
+| `RecordCreated` | `POST /records`, `POST …/translations`, each import row that created | `type_key`, `uuid`, `locale`, `translation_group`, `status` |
+| `RecordUpdated` | `PUT /records/{uuid}`, a revision restore, each import row that updated | `type_key`, `uuid`, `version`, `status_before`, `status_after` |
+| `RecordTrashed` | `DELETE /records/{uuid}` — one per record the delete reached | `type_key`, `uuid`, `cascaded_from` |
+| `RecordRestored` | `POST …/restore` | `type_key`, `uuid` |
+| `RecordPurged` | `DELETE …/purge`, and one per record of a deleted type | `type_key`, `uuid`, `locale`, `translation_group` |
+| `RecordTypeChanged` | `PUT /types/{key}`, a schema rollback, a `mode=update` type import | `type_key`, `schema_version`, `kind`, `index_affecting_keys` |
+| `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `purged` |
+
+Three decisions are worth the sentence they cost. **Publishing is a status
+transition, not its own event**: `RecordUpdated` carries the status pair rather
+than there being a `RecordPublished`, which would double-fire on a
+create-as-published. **`cascaded_from` exists because a delete reaches records
+of types the URL never named** (§9's `cascade`), and no subscriber could
+reconstruct which. **`RecordPurged` is the only event that has to be complete
+in itself**, because it is the only one whose subject cannot be read back.
+
+They are published **from the endpoint, after the commit**: services never
+import FastAPI and the bus arrives on `app.state`, so the seam is the one
+`menu.mark_dirty` already uses — and `sm_records/deferred.py` is what makes it
+after the commit, so a subscriber never sees an event for a write that rolled
+back. Bulk paths emit per record: an import publishes one event per row that
+wrote (a dry run publishes none), a cascade one per record trashed, a type
+delete one `RecordPurged` per record and then the `RecordTypeDeleted`. A host
+with no subscribers pays an `EventBus.publish` that returns before gathering
+anything.
+
+`RecordTypeChanged` is what makes `register_reduce_provider`'s "run the CLI
+afterwards" caveat automatable: `index_affecting_keys` names the fields whose
+stored shape just moved, so a provider knows its projection is stale without
+diffing anything itself.
+
 ## The wire contracts
 
 `contracts/` is the only thing endpoints serialize, split by subject: `schemas`

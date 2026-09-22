@@ -17,6 +17,7 @@ from fastapi import APIRouter
 from sm_records.endpoints.api import (
     aggregate,
     io,
+    lifecycle,
     preview,
     records,
     referrers,
@@ -43,6 +44,10 @@ router.include_router(aggregate.router)
 # ``/types/{key}/records/{uuid}/…``, and registration order is what Starlette
 # matches in.
 router.include_router(translations.router)
+# Before ``records`` for the same reason, and it is the same resource seen
+# from the other side: ``/types/{key}/records/{uuid}/restore`` and
+# ``…/purge`` sit under the path ``records`` claims for one record.
+router.include_router(lifecycle.router)
 router.include_router(records.router)
 router.include_router(referrers.router)
 router.include_router(revisions.router)

@@ -67,8 +67,14 @@ async def soft_delete_record(
     actor: str | None = None,
     settings: RecordsSettings,
     roles: Sequence[str] | None = None,
-) -> None:
+) -> list[tuple[Record, RecordType]]:
     """Trash a record, honouring the ``on_delete`` of everything pointing at it.
+
+    Returns every ``(record, type)`` pair it trashed, the one named included —
+    the plan, after it has been applied. The endpoint publishes one
+    ``RecordTrashed`` per pair (:mod:`sm_records.events`), and it is the only
+    place that knows which records a cascade reached: they belong to types the
+    URL never mentioned, so nothing downstream could reconstruct the list.
 
     Plan, then apply. The whole referrer graph is walked first and *every*
     ``restrict`` in it collected — not only the ones one level down — before a
@@ -99,6 +105,7 @@ async def soft_delete_record(
         await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
     for doomed, doomed_type in trash:
         await _trash(db, doomed, doomed_type, actor=actor, settings=settings)
+    return list(trash)
 
 
 async def restore_record(
@@ -178,12 +185,18 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     await _purge(db, tables, [record])
 
 
-async def purge_type_records(db: AsyncSession, rtype: RecordType) -> int:
-    """Hard-delete every record of a type, trashed or live. Returns the count.
+async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Record]:
+    """Hard-delete every record of a type, trashed or live. Returns the rows.
 
     Deleting a type is the one operation that purges live records, so it
     cannot go through :func:`hard_delete_record` — which refuses anything not
     already in the trash, on purpose.
+
+    The rows rather than a count, because a ``RecordPurged`` is the one event
+    a subscriber cannot recover from by re-reading and therefore has to carry
+    what the row held. They are expunged, not expired, so their loaded
+    attributes are still readable afterwards; ``len()`` is the count every
+    caller used before.
     """
     tables = tables_for(rtype)
     cls = tables.record
@@ -196,4 +209,4 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> int:
     # no foreign key to cascade through, so this is what removes them.
     await drop_type_rows(db, rtype.id)
     await _purge(db, tables, records)
-    return len(records)
+    return records

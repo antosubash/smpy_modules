@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
-from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.models import Record, RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
 from sm_records.services._common import record_count, record_counts, type_id_map
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
@@ -158,7 +158,9 @@ async def create_type(
     return rtype
 
 
-async def delete_type(db: AsyncSession, rtype: RecordType, *, confirm_record_count: int) -> None:
+async def delete_type(
+    db: AsyncSession, rtype: RecordType, *, confirm_record_count: int
+) -> list[Record]:
     """Delete a type and everything stored against it.
 
     ``confirm_record_count`` has to match what the type actually holds (§8.9):
@@ -171,6 +173,9 @@ async def delete_type(db: AsyncSession, rtype: RecordType, *, confirm_record_cou
     on a confirmation of ``0``, which destroyed all fifty. ``TypeRead`` carries
     ``trashed_record_count`` alongside ``record_count`` so the dialog can show
     the operator the number this check will actually compare against.
+
+    Returns the records it purged, for the ``RecordPurged`` events the endpoint
+    publishes — the one event whose subject no subscriber can read back.
     """
     held = await record_count(db, rtype, include_deleted=True)
     if confirm_record_count != held:
@@ -192,10 +197,11 @@ async def delete_type(db: AsyncSession, rtype: RecordType, *, confirm_record_cou
         raise ReferencedByOthers(
             f"type {rtype.key!r} is the target of a relation on {referring}", referring
         )
-    await purge_type_records(db, rtype)
+    purged = await purge_type_records(db, rtype)
     # Explicit, not via the FK's ON DELETE CASCADE: SQLite leaves foreign keys
     # unenforced unless the pragma is on, so the cascade would clean up on
     # Postgres and orphan rows on the default dev backend.
     await db.execute(sa_delete(RecordTypeRevision).where(RecordTypeRevision.type_id == rtype.id))
     await db.delete(rtype)
     await db.flush()
+    return purged

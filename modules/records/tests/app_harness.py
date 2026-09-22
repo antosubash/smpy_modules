@@ -26,6 +26,7 @@ from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from inertia import InertiaConfig, inertia_dependency_factory
 from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
@@ -166,7 +167,11 @@ async def build_app(
     registry = PermissionRegistry()
     module.register_permissions(registry)
     _register_roles(registry)
-    app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
+    # A real bus, so every test in the suite runs the publish path this module
+    # attaches to its writes (:mod:`sm_records.events`) rather than its
+    # "no bus, do nothing" branch. With nobody subscribed it costs one
+    # ``EventBus.publish`` that returns before gathering anything.
+    app.state.sm = SimpleNamespace(db=db_state, permissions=registry, event_bus=EventBus())
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()

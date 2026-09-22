@@ -203,8 +203,13 @@ async def write_row(
     settings: RecordsSettings,
     actor: str | None,
     force: bool,
-) -> str:
-    """Write one row and say what it did: ``"created"`` or ``"updated"``.
+) -> tuple[str, Record]:
+    """Write one row and say what it did and to which record.
+
+    ``("created" | "updated", record)`` — the row for the sake of
+    ``services.import_.import_records``'s optional sink, which the endpoint
+    turns into one domain event per written row (:mod:`sm_records.events`).
+    A count could not: an event names a record.
 
     Through ``create_record``/``update_record`` and never a bulk insert.
     Everything those do is load-bearing for a *file* too, and more so: the
@@ -253,7 +258,7 @@ async def write_row(
                     f"uuid {row.uuid} is already in use by another record, or its "
                     "translation group already has a record in this language"
                 ) from exc
-        return "created"
+        return "created", created
 
     expected = row.version
     if expected is None:
@@ -276,7 +281,7 @@ async def write_row(
         position=envelope.position,
         actor=actor,
     )
-    return "updated"
+    return "updated", record
 
 
 def mode_error(mode: ImportMode, record: Record | None) -> str | None:

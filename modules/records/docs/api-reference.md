@@ -22,6 +22,7 @@ Contents:
 [Translations](#translation-endpoints) ·
 [Aggregate](#aggregate) ·
 [Schema changes](#schema-change-endpoints) ·
+[Domain events](#domain-events) ·
 [Import and export](#import-and-export-formats) ·
 [Public read API](#public-read-api) ·
 [Errors](#error-table) ·
@@ -746,8 +747,38 @@ is to preview again, which writes nothing.
 A save straight after a preview does not scan twice: `PUT` reuses a completed
 job's report when it was taken against the same type, the same proposed fields
 and the same `version`, within `preview_job_ttl_seconds` (600). A save with no
-matching preview, or one resolving orphaned keys with `discard`, always runs its
-own pass.
+matching preview, one sent with `rescan`, or one resolving orphaned keys with
+`discard`, always runs its own pass.
+
+---
+
+## Domain events
+
+Every write above also publishes on the framework's event bus — in-process,
+after the request has committed, to whatever the host subscribed in its own
+`register_event_handlers`. They are not part of the HTTP contract and a host
+that subscribes to nothing never notices them; they are listed here because
+they are the only way to observe a write without polling.
+
+| Event | Published by | Carries |
+|---|---|---|
+| `RecordCreated` | `POST /records`, `POST …/translations`, each import row that created | `type_key`, `uuid`, `locale`, `translation_group`, `status` |
+| `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated | `type_key`, `uuid`, `version`, `status_before`, `status_after` |
+| `RecordTrashed` | `DELETE /records/{uuid}`, once per record the delete reached | `type_key`, `uuid`, `cascaded_from` |
+| `RecordRestored` | `POST …/restore` | `type_key`, `uuid` |
+| `RecordPurged` | `DELETE …/purge`, and once per record of a deleted type | `type_key`, `uuid`, `locale`, `translation_group` |
+| `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `schema_version`, `kind`, `index_affecting_keys` |
+| `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `purged` |
+
+Publishing is a status transition on `RecordUpdated` rather than an event of
+its own, so a create-as-published is one event and not two. `cascaded_from` is
+`null` for the record the caller named and its uuid for every record the
+delete reached through a `cascade` relation. A refused write publishes
+nothing, and neither does a dry-run import.
+
+See
+[architecture.md § Extension points](architecture.md#extension-points) for the
+reasoning and the README for a worked subscriber.
 
 ---
 
