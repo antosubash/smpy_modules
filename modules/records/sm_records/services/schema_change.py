@@ -21,12 +21,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import REINDEX_ALL
 from sm_records.index.reindex import pending_map
-from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.models import RecordType
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
@@ -36,6 +35,10 @@ from sm_records.services._common import guarded_bump, reload, utcnow
 from sm_records.services._dry_run import change_report, refusal
 from sm_records.services._payload import field_defs
 from sm_records.services._preview import MISSING, pointer_preview_changes, reused_report
+
+# Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
+# this module's surface; it lives in ``_rollback`` for the 300-line cap.
+from sm_records.services._rollback import rollback
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
 from sm_records.services.errors import (
     Conflict,
@@ -62,6 +65,7 @@ async def preview(
     *,
     display_field: Any = MISSING,
     slug_field: Any = MISSING,
+    rescan: bool = False,
     on_progress: Callable[[int], None] | None = None,
 ) -> tuple[SchemaDiff, DryRunReport]:
     """Classify a proposed ``fields`` list and dry-run it. Writes nothing.
@@ -72,8 +76,12 @@ async def preview(
     diff as an index-affecting entry, so a pointer-only edit still previews.
 
     ``on_progress`` belongs to the deferred path (``services.preview_jobs``):
-    the scan reports its running ``checked`` count per batch so a polling
-    client can show it, and it is ``None`` when the caller is waiting.
+    the scan reports its ``checked`` count per batch for a polling client, and
+    is ``None`` when the caller is waiting. ``rescan`` scans even when the
+    diff says nothing could have broken (``_dry_run.change_report``): sent
+    with the *stored* fields it answers "which records does the schema refuse
+    now", the worklist a forced restrictive change leaves and that an empty
+    diff otherwise reports as ``failing=0``.
     """
     new_defs, _ = normalise(fields_raw, settings)
     diff = diff_fields(field_defs(rtype), new_defs)
@@ -84,7 +92,14 @@ async def preview(
         db, rtype, _added_keys(diff), batch_size=settings.reindex_batch_size
     )
     report = await change_report(
-        db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, on_progress=on_progress
+        db,
+        rtype,
+        new_defs,
+        settings,
+        diff=diff,
+        conflicts=conflicts,
+        rescan=rescan,
+        on_progress=on_progress,
     )
     return diff, report
 
@@ -122,22 +137,21 @@ async def apply(
     changes: dict[str, Any] | None = None,
 ) -> tuple[RecordType, SchemaDiff]:
     """Classify, refuse or write. Design §8.2, §8.5, §8.6, §8.8.
-    ``fields_raw`` omitted keeps the current field list — the pointer-only
-    edit (``display_field``/``slug_field``, in ``changes`` with any other plain
-    column), which belongs here because ``display_field`` alone enqueues a
-    whole-type rebuild.
+    ``fields_raw`` omitted keeps the current field list — the pointer-only edit
+    (``display_field``/``slug_field``, in ``changes`` with any other plain
+    column), which belongs here because ``display_field`` enqueues a rebuild.
 
     ``force=True`` applies a restrictive change **and leaves the failing rows
     untouched** — not mutated, not hidden, not migrated: they read back with an
-    ``invalid`` list naming the fields (§8.2/§8.3), and the next ordinary write
-    of each brings it up to the new shape.
+    ``invalid`` list naming the fields (§8.2/§8.3), and each one's next
+    ordinary write brings it up to the new shape.
 
     ``orphaned`` is ``"restore"`` or ``"discard"``, required exactly when the
     report carries ``orphaned_conflicts`` (§8.8). ``"restore"`` writes nothing
     — the read path already falls back to ``_orphaned`` for a declared key —
-    but it is still dry-run first and still refusable: §8.8 offers a restore
-    where the values *validate*, and values written under a definition that
-    has since changed need not. ``"discard"`` is the one bulk payload write.
+    but is still dry-run first and still refusable: §8.8 offers a restore where
+    the values *validate*, and values written under a definition that has since
+    changed need not. ``"discard"`` is the one bulk payload write.
 
     A ``fields_raw`` equal to what is stored is not a change: the schema bump,
     the revision snapshot and the rebuild are skipped, and only ``version``
@@ -146,8 +160,8 @@ async def apply(
     The version bump is deliberately *not* the first statement, though §8.6
     describes it that way: the row lock and version check happen first, so a
     stale caller gets its 409 before the scan — but the guarded ``UPDATE``
-    itself happens after the dry run, so a refusal leaves nothing written, as
-    a property of this module rather than of callers remembering to roll back.
+    happens after the dry run, so a refusal leaves nothing written as a
+    property of this module rather than of callers remembering to roll back.
     """
     changes = dict(changes or {})
     new_defs, new_fields = (
@@ -163,14 +177,13 @@ async def apply(
 
     if new_fields is not None and new_fields == list(rtype.fields or []):
         # A resend of the list already stored is not a schema change, and
-        # ``rollback`` sends one every time an operator undoes something that
-        # touched only a pointer or a label — or rolls back to where they
-        # already are. Treated as a change it would bump ``schema_version``,
-        # which restamps nothing but marks every record ``schema_stale``,
-        # snapshot a revision identical to the last, and enqueue a rebuild of
-        # the whole index for no difference. ``version`` still moves below:
-        # the row was written (``updated_by``), and that is what
-        # ``update_type`` does for any other no-op edit.
+        # ``rollback`` sends one whenever an operator undoes something that
+        # touched only a pointer or a label — or rolls back to where they are.
+        # Treated as a change it would bump ``schema_version``, which restamps
+        # nothing but marks every record ``schema_stale``, snapshot a revision
+        # identical to the last, and rebuild the whole index for no difference.
+        # ``version`` still moves below: the row was written (``updated_by``),
+        # which is what ``update_type`` does for any other no-op edit.
         new_fields = None
 
     if new_fields is not None:
@@ -241,52 +254,3 @@ async def apply(
         db, rtype, list(diff.keys(ChangeClass.INDEX_AFFECTING)), whole_type=display_moved
     )
     return rtype, diff
-
-
-async def rollback(
-    db: AsyncSession,
-    rtype: RecordType,
-    *,
-    to_version: int,
-    expected_version: int,
-    settings: RecordsSettings,
-    actor: str | None = None,
-    force: bool = False,
-    orphaned: str | None = None,
-) -> tuple[RecordType, SchemaDiff]:
-    """Write an earlier schema revision back, as a new change (§8.6).
-
-    Not a restore in the "put the row back" sense: the earlier ``fields`` go
-    through :func:`apply` and are classified against what is stored *now*.
-    Undoing a field deletion is therefore an addition, which meets §8.8's
-    orphaned-key refusal — the point: the values are still there, and whether
-    they come back is the operator's call, not the undo's.
-    """
-    revision = (
-        (
-            await db.execute(
-                select(RecordTypeRevision).where(
-                    RecordTypeRevision.type_id == rtype.id,
-                    RecordTypeRevision.version == to_version,
-                )
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if revision is None:
-        raise NotFound(f"record type {rtype.key!r} has no revision at version {to_version}")
-    return await apply(
-        db,
-        rtype,
-        fields_raw=list(revision.fields or []),
-        expected_version=expected_version,
-        settings=settings,
-        actor=actor,
-        force=force,
-        orphaned=orphaned,
-        changes={
-            "display_field": revision.display_field,
-            "slug_field": revision.slug_field,
-        },
-    )

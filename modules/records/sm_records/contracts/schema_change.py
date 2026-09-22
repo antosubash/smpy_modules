@@ -74,6 +74,16 @@ class SchemaPreviewRequest(SQLModel):
     fields: list[dict[str, Any]]
     display_field: str | None = None
     slug_field: str | None = None
+    rescan: bool = False
+    """Scan the records even when the diff is empty — the "Check records"
+    button, which asks "which records do not fit the schema *as it is*".
+
+    Without it that question has no answer: ``needs_dry_run`` sees nothing
+    restrictive in an empty diff and ``change_report`` short-circuits to
+    ``checked=N, failing=0``, which reads as "everything is fine" when it
+    means "nothing was checked". That is exactly the state a forced
+    restrictive change leaves behind, and re-deriving the worklist afterwards
+    is what the panel needs."""
 
 
 class SchemaPreviewRead(SQLModel):

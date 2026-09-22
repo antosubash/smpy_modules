@@ -49,12 +49,12 @@ export function SchemaPreviewPanel({
   typeKey: string;
   /** The type as the server last returned it. "Check records" (UX review
    *  R7b) previews *this* rather than the draft: the same endpoint, the
-   *  schema exactly as saved. Note what the server then does — a no-change
-   *  preview is not restrictive, so `_dry_run.py::needs_dry_run` skips the
-   *  scan and answers `failing: 0` without reading a record. The panel says
-   *  so rather than dressing that up as a clean bill of health; re-deriving
-   *  the worklist of a forced apply needs a rescan the API does not offer
-   *  yet (or R7c's stored flag). */
+   *  schema exactly as saved, with `rescan: true` — which is what makes the
+   *  answer real. A no-change preview is not restrictive, so without the flag
+   *  `_dry_run.py::needs_dry_run` skips the scan and answers `failing: 0`
+   *  without reading a record; with it the server scans against the stored
+   *  schema and names the records that no longer fit, which is the worklist a
+   *  forced apply leaves behind. */
   saved: TypeRead;
   fields: EditableField[];
   /** The editor's current `display_field`/`slug_field` form values (empty
@@ -109,6 +109,11 @@ export function SchemaPreviewPanel({
               fields: saved.fields,
               display_field: saved.display_field,
               slug_field: saved.slug_field,
+              // The saved schema is its own diff, so there is nothing for the
+              // server to classify as restrictive and it would skip the scan.
+              // This is the question "which records does the schema refuse
+              // now", which only a forced scan answers.
+              rescan: true,
             },
       );
       if ('job' in result) {
@@ -235,25 +240,11 @@ export function SchemaPreviewPanel({
               })}
             </p>
           )}
-          {/* A preview of the saved schema is, by construction, a preview of
-              no change — and `services/_dry_run.py::needs_dry_run` skips the
-              scan for one, answering `checked: N, failing: 0` without having
-              looked at a record. Rendering that as a dry-run result would say
-              "0 would fail" about records that are marked invalid, which is
-              the opposite of what R7b is for; so the no-change answer gets
-              its own sentence instead. Re-deriving the worklist needs the
-              server to accept a rescan (or R7c's stored flag). */}
-          {mode === 'saved' && preview.changes.length === 0 ? (
-            <p className="text-sm text-muted-foreground" data-testid="records-check-not-rescanned">
-              {t('records.type_editor.preview.check_skipped', {
-                count: preview.report.checked,
-                defaultValue:
-                  'Nothing has changed since this schema was saved, so the server did not re-scan these {count} records — it runs the check only for a change that could break something.',
-              })}
-            </p>
-          ) : (
-            <DryRunReportView report={preview.report} />
-          )}
+          {/* A preview of the saved schema is a preview of no change, and the
+              server skips the scan for one — which is why "Check records"
+              sends `rescan: true` above. The report below is therefore a real
+              scan of the stored schema, and is rendered as one. */}
+          <DryRunReportView report={preview.report} />
         </div>
       )}
     </div>

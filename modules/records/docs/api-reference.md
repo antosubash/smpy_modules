@@ -664,8 +664,16 @@ Worth knowing:
 
 ### `POST …/schema/preview`
 
-Body is `SchemaPreviewRequest`: `fields`\*, `display_field`, `slug_field`.
-Pointers only affect the diff when actually sent. Writes nothing.
+Body is `SchemaPreviewRequest`: `fields`\*, `display_field`, `slug_field`,
+`rescan`. Pointers only affect the diff when actually sent. Writes nothing.
+
+`rescan: true` scans the records whatever the diff says. Without it a preview
+whose `fields` are what is already stored has an empty diff, nothing in it is
+restrictive, and the report short-circuits to `checked: N, failing: 0` — an
+honest answer to "what would this change break" and a misleading one to "what
+does not fit the schema now". Send the stored `fields` with `rescan: true` to
+re-derive the worklist a `force`d restrictive change left behind; this is what
+the type editor's **Check records** button does.
 
 Up to `preview_sync_limit` records (5,000 by default) it answers `200` with
 `SchemaPreviewRead`:
@@ -680,10 +688,17 @@ Up to `preview_sync_limit` records (5,000 by default) it answers `200` with
     "sample": [{"uuid": "9d9addcbec0e46959ac5be78e15197e5",
                 "display_title": "Hello 0",
                 "errors": [{"field": "author", "message": "Input should be a valid string"}]}],
-    "orphaned_conflicts": {}, "clean": false
+    "orphaned_conflicts": {}, "duplicates": {}, "clean": false
   }
 }
 ```
+
+`duplicates` maps each key gaining `unique` to how many records already hold a
+value another record holds. Those records are counted in `failing` as well, so
+the change is refused without `force` like any other restrictive one; the map
+is separate because `force` does not leave *these* recoverable — every other
+marked record is fixed by its next ordinary write, and a duplicate cannot be
+until one side's value changes or the field stops being unique.
 
 `kind` is the most severe class in the diff: `additive`, `index_affecting`,
 `restrictive`, `destructive`. `what` is a stable machine label —

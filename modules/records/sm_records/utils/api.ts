@@ -248,6 +248,11 @@ export type SchemaPreviewBody = {
   fields: FieldDef[];
   display_field: string | null;
   slug_field: string | null;
+  /** Scan the records even when the diff is empty — what "Check records"
+   *  sends. Re-previewing the saved schema is by construction a preview of no
+   *  change, and without this the server skips the scan and answers
+   *  `failing: 0` without having read a record. */
+  rescan?: boolean;
 };
 
 /** `POST /types/{key}/schema/preview` — writes nothing; classifies the

@@ -85,6 +85,7 @@ async def _run_preview_job(
                 settings,
                 display_field=sent.get("display_field", MISSING),
                 slug_field=sent.get("slug_field", MISSING),
+                rescan=body.rescan,
                 on_progress=partial(preview_jobs.progress, job_id),
             )
         preview_jobs.finish(job_id, diff, report)
@@ -121,6 +122,14 @@ async def preview_schema(
     202 body is ``{"job": ..., "status": "running"}`` and the caller polls
     :func:`read_preview_job`. The count includes the trash, because the scan
     does (§8.9).
+
+    ``rescan`` scans whatever the diff says, which is what "Check records"
+    needs: it resends the *stored* fields, so the diff is empty and the report
+    would otherwise short-circuit to ``failing=0`` — a clean bill of health
+    for records nothing looked at. It is the only way to re-derive the
+    worklist a forced restrictive change leaves behind. Both paths take it,
+    and it is part of a deferred job's signature so a later *save* can never
+    reuse a "Check records" report (``services.preview_jobs.fields_hash``).
     """
     sent = body.model_dump(exclude_unset=True)
     total = await record_count(db, rtype, include_deleted=True)
@@ -132,6 +141,7 @@ async def preview_schema(
             settings,
             display_field=sent.get("display_field", MISSING),
             slug_field=sent.get("slug_field", MISSING),
+            rescan=body.rescan,
         )
         return schema_preview_read(diff, report)
     job = preview_jobs.start(
@@ -142,6 +152,7 @@ async def preview_schema(
             body.fields,
             sent.get("display_field", rtype.display_field),
             sent.get("slug_field", rtype.slug_field),
+            rescan=body.rescan,
         ),
         total=total,
         ttl_seconds=settings.preview_job_ttl_seconds,

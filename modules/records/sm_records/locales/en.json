@@ -342,7 +342,6 @@
       "check_button": "Check records",
       "check_help": "\"Check records\" runs the same dry run against the schema exactly as it is saved. Neither button writes anything.",
       "check_title": "Records checked against the saved schema",
-      "check_skipped": "Nothing has changed since this schema was saved, so the server did not re-scan these {count} records — it runs the check only for a change that could break something.",
       "no_changes": "No changes.",
       "kind_additive": "Additive",
       "kind_index_affecting": "Rebuilds index",

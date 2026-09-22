@@ -87,17 +87,29 @@ class PreviewJob:
 _jobs: dict[str, PreviewJob] = {}
 
 
-def fields_hash(fields_raw: Any, display_field: Any = None, slug_field: Any = None) -> str:
+def fields_hash(
+    fields_raw: Any,
+    display_field: Any = None,
+    slug_field: Any = None,
+    *,
+    rescan: bool = False,
+) -> str:
     """A digest of *what was previewed*, not of the type.
 
     Everything that changes what the dry run would conclude goes in: the
-    proposed field list and both pointers. ``default=str`` because a raw
-    field definition is plain JSON in practice but is not guaranteed to be —
-    a stray ``Decimal`` from a caller must produce a stable digest rather than
-    a ``TypeError`` in the middle of a preview.
+    proposed field list, both pointers, and ``rescan``. ``default=str``
+    because a raw field definition is plain JSON in practice but is not
+    guaranteed to be — a stray ``Decimal`` from a caller must produce a stable
+    digest rather than a ``TypeError`` in the middle of a preview.
+
+    ``rescan`` is in the digest so an *apply* can never reuse a "Check
+    records" report (``_preview.reused_report``). That report answers a
+    different question — what the schema refuses now, rather than what the
+    change would break — and a save of the same field list would inherit its
+    ``failing`` count and be refused for records the change does not touch.
     """
     payload = json.dumps(
-        {"f": fields_raw, "d": display_field, "s": slug_field},
+        {"f": fields_raw, "d": display_field, "s": slug_field, "r": rescan},
         sort_keys=True,
         default=str,
     )

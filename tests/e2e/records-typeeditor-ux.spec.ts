@@ -167,18 +167,16 @@ test.describe('Records — type editor UX', () => {
     await expect(last.getByTestId('records-last-applied-sample').getByRole('link')).toHaveCount(2);
     await expect(last.getByTestId('records-copy-uuids')).toBeVisible();
 
-    // R7b: "Check records" dry-runs the schema exactly as saved. The server
-    // skips the scan for a no-change preview (`_dry_run.py::needs_dry_run`),
-    // so what it must never do is render that as "0 would fail" over records
-    // it never looked at — it says so instead.
+    // R7b: "Check records" dry-runs the schema exactly as saved. It sends
+    // `rescan: true`, because the saved schema is its own diff and the server
+    // would otherwise skip the scan and answer "0 would fail" about records
+    // it never looked at. With the flag it re-derives the worklist the forced
+    // apply left behind — the two records above, by name.
     await page.getByTestId('records-check-records').click();
     const preview = page.getByTestId('records-schema-preview');
     await expect(preview).toBeVisible();
     await expect(preview.getByTestId('records-check-records-title')).toBeVisible();
-    await expect(preview.getByTestId('records-check-not-rescanned')).toContainText(
-      'did not re-scan these 2 records',
-    );
-    await expect(preview).not.toContainText('would fail');
+    await expect(preview).toContainText('2 records checked, 2 would fail');
 
     await apiDeleteType(page, key, 2);
   });

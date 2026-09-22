@@ -231,9 +231,20 @@ async def change_report(
     diff: SchemaDiff,
     conflicts: dict[str, int],
     drop_keys: frozenset[str] = frozenset(),
+    rescan: bool = False,
     on_progress: Callable[[int], None] | None = None,
 ) -> DryRunReport:
-    if not needs_dry_run(diff, conflicts):
+    """The report for one proposed change — scanned, or honestly skipped.
+
+    ``rescan`` forces the scan whatever the diff says. The caller is the
+    preview endpoint's "Check records", whose question is not "what would this
+    change do" but "what does not fit the schema *as it is*" — and for that
+    the diff is empty, ``needs_dry_run`` is ``False``, and the short circuit
+    below would answer ``failing=0`` about records nothing looked at. It is
+    the only way to re-derive the worklist a forced restrictive change leaves
+    behind, since the stored fields are their own diff.
+    """
+    if not rescan and not needs_dry_run(diff, conflicts):
         # Skipped, but ``checked`` still has to be an honest count of what
         # was skipped (incl. trash — §8.9's own reasoning for the delete
         # confirmation), or "N records checked, 0 would fail" lies about N.
