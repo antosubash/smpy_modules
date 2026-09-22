@@ -789,6 +789,19 @@ does not fit the schema now". Send the stored `fields` with `rescan: true` to
 re-derive the worklist a `force`d restrictive change left behind; this is what
 the type editor's **Check records** button does.
 
+**With `rescan: true`, `fields` has to be the stored list.** This is the one
+preview that *writes* — what the scan finds is recorded on each record's
+`invalid_since` — and that mark is defined as the result of a scan of the
+schema records are actually stored against. A `rescan` whose normalised
+`fields` differ from the type's current ones is therefore refused with `422`
+naming `fields`, before anything is scanned or marked; without the refusal any
+caller could persist a worklist for a schema the type was never changed to.
+Draft previews are unaffected: they write nothing, so they take any `fields`
+at all. Above `preview_sync_limit` the scan is deferred, so the same refusal
+reaches the caller as a failed job (`GET …/schema/preview/{job}` →
+`{"status": "failed", "error": …}`) rather than as a `422`; nothing is marked
+either way.
+
 Up to `preview_sync_limit` records (5,000 by default) it answers `200` with
 `SchemaPreviewRead`:
 
@@ -1238,6 +1251,7 @@ kind of route can produce, with the body schema
 | `413` | Any other `/api/records/*` write body over `max_payload_bytes` + 65,536 | `{"detail"}` — refused from `Content-Length`, before the body is read |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
+| `422` | `rescan: true` with `fields` that are not the type's stored ones | `{"detail", "errors"}` — nothing was scanned or marked |
 | `422` | A NUL (`\x00`) in a payload value, a `unique` value, a type label or a field definition | `{"detail", "errors"}` |
 | `422` | `locale` on `PUT /records/{uuid}` | FastAPI validation error |
 | `422` | `match_by` naming a non-unique field; an unknown `format`; an undeclared `collection` | `{"detail", "errors"}` |

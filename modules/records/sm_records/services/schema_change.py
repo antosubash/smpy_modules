@@ -45,6 +45,7 @@ from sm_records.services.errors import (
     NotFound,
     OrphanedKeyConflict,
     SchemaChangeRefused,
+    ValidationFailed,
 )
 from sm_records.settings import RecordsSettings
 
@@ -84,9 +85,26 @@ async def preview(
     diff otherwise reports as ``failing=0``. It is also the one preview that
     **writes**: what it finds is recorded on each record's ``invalid_since``,
     so the answer outlives the report the operator is reading.
+
+    **Which is why ``rescan`` takes the stored fields and nothing else.** Rule
+    1 of the mark (``services._invalid``) is that the column is written only
+    by a scan of the schema records are *actually stored against*, and a
+    request body's ``fields`` are a proposal. Trusting the caller to resend the
+    stored ones is a hope, not a rule: the shipped type editor does, and a
+    script, a second UI or a future dirty-editor path could persist a worklist
+    for a schema the type was never changed to. So a ``rescan`` whose
+    normalised ``fields`` differ from the stored ones is refused, and the
+    marking pass is given ``field_defs(rtype)`` rather than the body's.
     """
     new_defs, _ = normalise(fields_raw, settings)
-    diff = diff_fields(field_defs(rtype), new_defs)
+    stored_defs = field_defs(rtype)
+    if rescan and new_defs != stored_defs:
+        raise ValidationFailed(
+            "rescan checks the records against the schema they are stored against, so "
+            "'fields' has to be the type's current field list",
+            [{"field": "fields", "message": "does not match the stored schema"}],
+        )
+    diff = diff_fields(stored_defs, new_defs)
     pointer_changes = pointer_preview_changes(rtype, display_field, slug_field)
     if pointer_changes:
         diff = SchemaDiff(changes=(*diff.changes, *pointer_changes))
@@ -96,7 +114,9 @@ async def preview(
     report = await change_report(
         db,
         rtype,
-        new_defs,
+        # A rescan scans the stored definitions whatever the body carried —
+        # a property of this function, not of the check above staying put.
+        stored_defs if rescan else new_defs,
         settings,
         diff=diff,
         conflicts=conflicts,

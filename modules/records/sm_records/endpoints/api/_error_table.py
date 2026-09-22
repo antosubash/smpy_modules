@@ -207,6 +207,11 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         422,
+        "`rescan: true` with `fields` that are not the type's stored ones",
+        '`{"detail", "errors"}` — nothing was scanned or marked',
+    ),
+    ErrorRow(
+        422,
         "A NUL (`\\x00`) in a payload value, a `unique` value, a type label or a field definition",
         '`{"detail", "errors"}`',
     ),
