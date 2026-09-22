@@ -921,9 +921,18 @@ read:
 
 `GET /types/{key}/export` → `TypeExport`: `key`, `label`, `label_plural`,
 `description`, `icon`, `fields`, `display_field`, `slug_field`, `is_public`,
-`show_in_menu`, `translatable`, `allowed_roles`. Deliberately `TypeCreate`-
-shaped: `record_count`, `version`, `schema_version` and `reindex_pending` are
-facts about this install's copy and do not travel.
+`show_in_menu`, `translatable`, `allowed_roles`, `collection`. Deliberately
+`TypeCreate`-shaped: `record_count`, `version`, `schema_version` and
+`reindex_pending` are facts about this install's copy and do not travel.
+
+`collection` does, because it is a property of the definition rather than of
+this install's copy: a collection-backed type exported without it landed on the
+next install as a shared-tables type with no warning anywhere. On a create it
+reaches `create_type`, so a name this host has not declared is the same `422`
+`POST /types` gives; on `mode=update` a value that differs from the stored one
+is the same `409` `PUT /types/{key}` gives, since a collection is assigned at
+creation and never after. An echo of the current value is not a change and is
+dropped, so re-importing this install's own export is unaffected.
 
 `POST /types/import` takes `TypeImportRequest` — a `TypeExport` plus `mode`
 (`create` default, or `update`), `expected_version`, `force` and `orphaned` —

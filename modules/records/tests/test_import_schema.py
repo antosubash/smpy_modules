@@ -40,6 +40,10 @@ async def test_type_export_is_importable_shaped(client):
         # at the next one still able to hold translations (Phase 5 §4.1).
         "translatable",
         "allowed_roles",
+        # Carried because it is a property of the *definition*: without it a
+        # collection-backed type landed on the next install as a shared-tables
+        # type with no warning anywhere.
+        "collection",
     }
     # Facts about *this* install's copy, deliberately absent — see
     # ``contracts/io.py``.

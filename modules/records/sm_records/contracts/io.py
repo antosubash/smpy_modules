@@ -134,6 +134,22 @@ class TypeExport(SQLModel):
     """Carried so a definition exported from a multilingual install arrives at
     the next one still able to hold translations (Phase 5 §4.1)."""
     allowed_roles: list[str] = SQLField(default_factory=list)
+    collection: str | None = None
+    """Which table set this type's documents live in (Phase 5 §6.2).
+
+    A property of the *definition*, not of this install's copy of it — unlike
+    ``record_count`` or ``version``, which is why those do not travel and this
+    does. Dropped from the export, a collection-backed type landed on the next
+    install as a shared-tables type with no warning anywhere, and an explicit
+    ``collection`` in an import body was ignored rather than refused, while the
+    same value on ``POST /types`` was a clean 422.
+
+    It reaches ``create_type`` on a create, so an undeclared name is that same
+    422; on ``mode=update`` a value that differs from the stored one is the 409
+    ``PUT /types/{key}`` already gives, because a collection is assigned at
+    creation and never after. An echo of the current value is not a change and
+    is dropped, so re-importing this install's own export is unaffected.
+    """
 
 
 class TypeImportRequest(TypeExport):
@@ -166,4 +182,5 @@ def type_export(rtype: RecordType) -> TypeExport:
         show_in_menu=rtype.show_in_menu,
         translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),
+        collection=rtype.collection,
     )

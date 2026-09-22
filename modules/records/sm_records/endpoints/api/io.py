@@ -211,6 +211,12 @@ def _update_changes(request: Request, rtype: RecordType, body: TypeImportRequest
 
     ``key`` is dropped rather than refused: it is the path here — it is what
     resolved ``rtype`` three lines up — so it cannot disagree with itself.
+
+    ``collection`` stays in the change set and is handled by ``update_type``'s
+    own ``_check_collection_unchanged``: an echo of the stored value is
+    dropped, a *different* one is the 409 ``PUT /types/{key}`` gives. A
+    collection is assigned at creation and never after, and a file must not be
+    able to ask for a move silently.
     """
     changes = body.model_dump(
         exclude_unset=True,
@@ -257,6 +263,7 @@ async def import_type(
             translatable=body.translatable,
             show_in_menu=body.show_in_menu,
             allowed_roles=body.allowed_roles,
+            collection=body.collection,
             actor=who,
         )
         if body.show_in_menu:

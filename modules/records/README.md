@@ -1036,6 +1036,15 @@ editor, not a side effect of importing a file. An export re-imported onto the
 install it came from sends the list already stored, so a round trip is
 unaffected.
 
+**`collection` travels with the definition.** It is a property of the
+definition rather than of this install's copy of it — unlike `record_count` or
+`version`, which is why those do not travel and this does. On a create, a name
+this host has not declared is the same `422` `POST /types` gives; on
+`mode=update`, a value that differs from the stored one is the same `409` `PUT
+/types/{key}` gives, because a collection is assigned at creation and never
+after. Dropped from the export, as it was, a collection-backed type landed on
+the next install as a shared-tables type with no warning anywhere.
+
 **From the command line** (from the repo root, like every entry point here):
 
 ```bash
