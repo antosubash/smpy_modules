@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import NoReturn
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.io import (
@@ -141,6 +142,14 @@ async def _write(
             errors.append(
                 ImportRowError(row=plan.row.number, uuid=plan.row.uuid, message=exc.detail)
             )
+            # Rolling the savepoint back expires whatever the refused write
+            # touched inside it. On SQLite that is the type row — ``lock_type``
+            # bumps it there, where Postgres only locks it — and the caller
+            # reads ``rtype`` again afterwards (the report, one event per
+            # written row). Reload it here, inside the greenlet, rather than
+            # leave the next attribute access to a lazy load that has none.
+            if inspect(rtype).expired_attributes:
+                await db.refresh(rtype)
     return counts["created"], counts["updated"]
 
 
