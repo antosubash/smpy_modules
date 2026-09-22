@@ -14,11 +14,6 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
-from sm_records.contracts.schema_change import (
-    TypeRestoreRequest,
-    TypeRevisionListResponse,
-    type_revision_read,
-)
 from sm_records.contracts.schemas import (
     TypeCreate,
     TypeListResponse,
@@ -41,8 +36,7 @@ from sm_records.deps import (
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.menu import affects_menu, mark_dirty
 from sm_records.models import RecordType
-from sm_records.services import _orphaned, reindex_runner, schema_change
-from sm_records.services import revisions as revision_service
+from sm_records.services import _orphaned, reindex_runner
 from sm_records.services import types as type_service
 from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
@@ -250,51 +244,3 @@ async def reindex_type(
     """
     _defer_reindex(request, rtype, settings)
     return {"scheduled": True}
-
-
-@router.get(
-    "/types/{key}/revisions", response_model=TypeRevisionListResponse, dependencies=[require_view]
-)
-async def list_type_revisions(
-    rtype: RecordType = Depends(load_schema_type), db: AsyncSession = Depends(request_db)
-) -> TypeRevisionListResponse:
-    """Every historical definition of this type — ``load_schema_type``, the
-    same gate :func:`read_type` applies: the history of a schema is the
-    schema, one version at a time."""
-    revisions = await revision_service.list_type_revisions(db, rtype)
-    return TypeRevisionListResponse(items=[type_revision_read(r) for r in revisions])
-
-
-@router.post(
-    "/types/{key}/revisions/{version}/restore",
-    response_model=TypeRead,
-    dependencies=[require_manage_types],
-)
-async def restore_type_revision(
-    version: int,
-    body: TypeRestoreRequest,
-    request: Request,
-    rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
-    settings: RecordsSettings = Depends(get_settings),
-    who: str | None = Depends(actor),
-) -> TypeRead:
-    """A schema rollback goes through :func:`schema_change.rollback`, which is
-    :func:`schema_change.apply` under a new name (§8.6) — same 409 shapes as
-    ``PUT``, mapped by the same ``RecordsErrorRoute``, and the same
-    reindex-scheduling rule below it."""
-    _check_roles_for_discard(request, rtype, body.orphaned)
-    before = list(rtype.fields or [])
-    updated, _ = await schema_change.rollback(
-        db,
-        rtype,
-        to_version=version,
-        expected_version=body.expected_version,
-        settings=settings,
-        actor=who,
-        force=body.force,
-        orphaned=body.orphaned,
-    )
-    events.publish(request, events.type_changed(updated, before))
-    _schedule_reindex_if_pending(request, updated, settings)
-    return type_read(updated, *await type_service.record_counts(db, updated))

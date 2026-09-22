@@ -14,13 +14,13 @@ import type {
   ReferrersResponse,
   TranslationRead,
   TypeRead,
-  TypeRevision,
+  TypeRevisionPage,
 } from './types';
 
 // ---- Type revisions ---------------------------------------------------------
 
-export function listTypeRevisions(key: string): Promise<{ items: TypeRevision[] }> {
-  return request(`/types/${encodeURIComponent(key)}/revisions`);
+export function listTypeRevisions(key: string, page = 1): Promise<TypeRevisionPage> {
+  return request(`/types/${encodeURIComponent(key)}/revisions?page=${page}`);
 }
 
 /** A schema rollback shares `updateType`'s body shape and 409s (§8.6). */

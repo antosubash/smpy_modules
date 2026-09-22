@@ -559,6 +559,17 @@ payload through the ordinary update path, so it is validated against the
 `TypeRevisionRead`: `id`, `version`, `schema_version`, `fields`,
 `display_field`, `slug_field`, `created_at`, `created_by`.
 
+`GET /types/{key}/revisions` is **paged**, with the record list's own `page`
+and `page_size` (clamped by `max_page_size`, defaulted by `default_page_size`)
+— `{"items": [TypeRevisionRead, …], "total": N, "page": N, "page_size": N}`,
+newest first. `total` is exact rather than capped by `max_count`: the count is
+per type and cheap, and a "312+" would be useless to a panel whose job is to
+find one particular past version. Type revisions are never pruned — they are
+what a rollback reads, so a cap would eventually delete the version somebody
+wants back — which is why the *response* is what is bounded. Unpaged, it grew
+for the lifetime of the type and was re-downloaded on every open of the schema
+screen (measured: 31 revisions of a four-field type is 24 KB, ~780 B each).
+
 `POST /types/{key}/revisions/{version}/restore` takes `TypeRestoreRequest`
 (`expected_version`\*, `force`, `orphaned`) and runs the rollback through the
 schema-change pipeline — so it is classified, dry-run and refusable like any
@@ -1064,7 +1075,7 @@ walking a large public type is exactly the caller that should use them.
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
-| `403` | The type's `allowed_roles` exclude the caller | `{"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}` |
+| `403` | The type's `allowed_roles` exclude the caller | `{"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}` — names the roles, deliberately |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
@@ -1125,6 +1136,16 @@ counted, never named.
 **Every refusal rolls the request's session back.** A refused delete that had
 already cleared one `set_null` reference before meeting a `restrict` deeper down
 commits nothing.
+
+**The `allowed_roles` `403` names the roles, and that is deliberate.** A
+`records.view` holder outside a type's list learns that the type exists — a
+contrast with the `404` an unknown key gets — *and* the exact role names that
+would grant access. It is a trade, made knowingly: the message is what an
+admin debugging a permission needs, and the alternative (a `404` for a
+narrowed type) makes a misconfigured `allowed_roles` indistinguishable from a
+deleted type on every screen. Role names are otherwise install-private, so an
+install that treats them as sensitive should read this row before relying on
+narrowing as concealment: it narrows *access*, not *existence*.
 
 **The `401` is the framework's, not this module's.** `AuthMiddleware` answers
 an anonymous request to any `/api/*` path before a single route dependency

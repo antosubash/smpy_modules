@@ -8,12 +8,13 @@ impossible.
 
 Type revisions are never capped. Types are few and schema edits are rare, so
 the table stays tiny — and it is what makes the rollback of §8.6 possible,
-which a cap would eventually delete.
+which a cap would eventually delete. What *is* bounded is the response: see
+:func:`list_type_revisions`.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
@@ -44,13 +45,38 @@ async def list_revisions(db: AsyncSession, record: Record) -> list[RecordRevisio
     return list((await db.execute(stmt)).scalars().all())
 
 
-async def list_type_revisions(db: AsyncSession, rtype: RecordType) -> list[RecordTypeRevision]:
+async def list_type_revisions(
+    db: AsyncSession, rtype: RecordType, *, limit: int | None = None, offset: int = 0
+) -> list[RecordTypeRevision]:
+    """One page of a type's schema history, newest first.
+
+    ``limit`` is the endpoint's page size and is what keeps this response
+    bounded. Type revisions are never pruned — they are what makes the
+    rollback of §8.6 possible, and a cap would eventually delete the version
+    somebody wants back — so the *list* has to be the thing that is bounded
+    instead. Measured: 30 schema edits on a four-field type produced 31
+    revisions and 24 KB, i.e. ~780 B each; a sixty-field type edited a few
+    hundred times is a multi-MB response on every open of the schema screen.
+
+    ``None`` keeps the whole history, which is what the perf suite and any
+    non-HTTP caller wants: nothing here is paging for a screen.
+    """
     stmt = (
         select(RecordTypeRevision)
         .where(RecordTypeRevision.type_id == rtype.id)
         .order_by(RecordTypeRevision.id.desc())
     )
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def count_type_revisions(db: AsyncSession, rtype: RecordType) -> int:
+    """How many the type has in all — exact, and cheap for the same reason
+    the list needed paging and not a cap: the table is small per type, it is
+    just unbounded over time."""
+    stmt = select(func.count(RecordTypeRevision.id)).where(RecordTypeRevision.type_id == rtype.id)
+    return int((await db.execute(stmt)).scalar_one())
 
 
 async def write_revision(

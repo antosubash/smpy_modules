@@ -30,17 +30,29 @@ export function TypeRevisions({
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<TypeRevision[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const { items: list } = await listTypeRevisions(type.key);
-      setItems(list);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : String(err));
-    }
-  }, [type.key]);
+  // `GET /types/{key}/revisions` is paged: type revisions are never pruned —
+  // they are what a rollback reads — so an unpaged panel re-downloaded the
+  // whole history of the type every time it opened. `append` is the "Load
+  // more" button below; a reload after a restore starts from page 1 again,
+  // because the restore has just added a revision at the top.
+  const load = useCallback(
+    async (next = 1, append = false) => {
+      setLoadError(null);
+      try {
+        const result = await listTypeRevisions(type.key, next);
+        setItems((current) => (append && current ? [...current, ...result.items] : result.items));
+        setTotal(result.total);
+        setPage(result.page);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [type.key],
+  );
 
   // A successful restore creates a new revision snapshot on the server (of
   // the schema *before* the restore), so the list this panel is already
@@ -160,6 +172,21 @@ export function TypeRevisions({
                 </li>
               ))}
             </ul>
+          )}
+          {items && items.length < total && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="records-type-revisions-more"
+              onClick={() => void load(page + 1, true)}
+            >
+              {t('records.type_editor.revisions.load_more', {
+                shown: items.length,
+                total,
+                defaultValue: 'Load more ({shown} of {total})',
+              })}
+            </Button>
           )}
 
           <SchemaConflictPanel

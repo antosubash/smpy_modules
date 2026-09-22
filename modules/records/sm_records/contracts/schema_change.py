@@ -127,7 +127,20 @@ class TypeRevisionRead(SQLModel):
 
 
 class TypeRevisionListResponse(SQLModel):
+    """One page of a type's schema history.
+
+    Paged like the record list and for a plainer reason than that one: type
+    revisions are never pruned (they are what a rollback reads), so without a
+    page the response grows for the lifetime of the type and is re-downloaded
+    on every open of the schema screen. ``total`` is exact rather than capped
+    — the count is per type and cheap, and a "312+" here would be useless to
+    a panel whose job is to find one particular past version.
+    """
+
     items: list[TypeRevisionRead]
+    total: int = 0
+    page: int = 1
+    page_size: int = 0
 
 
 class TypeRestoreRequest(SQLModel):

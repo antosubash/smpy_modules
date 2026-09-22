@@ -119,6 +119,19 @@ export type SchemaPreviewJob = {
   error: string | null;
 };
 
+/** One page of `GET /types/{key}/revisions`.
+ *
+ * Paged because type revisions are never pruned — they are what a rollback
+ * reads — so the response grew for the lifetime of the type and was
+ * re-downloaded on every open of the schema screen. `total` is exact.
+ */
+export type TypeRevisionPage = {
+  items: TypeRevision[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 /** One snapshot of a type's schema, from `GET /types/{key}/revisions`. */
 export type TypeRevision = {
   id: number;

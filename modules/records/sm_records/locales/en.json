@@ -379,7 +379,8 @@
       "field_count_other": "{count} fields",
       "restore": "Restore this schema",
       "restore_confirm": "Restore the schema from v{version}? This is checked the same way any other schema change is.",
-      "restored": "Schema restored"
+      "restored": "Schema restored",
+      "load_more": "Load more ({shown} of {total})"
     }
   },
   "fields": {
