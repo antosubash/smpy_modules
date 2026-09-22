@@ -3,9 +3,9 @@
 
 Every record has this projection whatever its type declares: ``status``,
 ``display_title``, ``slug``, ``position``, ``published_at``, ``created_at``,
-``updated_at``. They are real columns on ``records_record``, so a filter over
-one is an ordinary predicate with no index table, no ``indexed: true`` and no
-semi-join — which is exactly why they live here and not in
+``updated_at`` and ``invalid``. They are real columns on ``records_record``,
+so a filter over one is an ordinary predicate with no index table, no
+``indexed: true`` and no semi-join — which is exactly why they live here and not in
 :mod:`sm_records.index.query`, whose whole subject is the other kind: which
 index table, which record, which refusal.
 
@@ -22,7 +22,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.sql import ColumnElement
 
-from sm_records.index._coerce import coerce_datetime, coerce_text
+from sm_records.index._coerce import coerce_bool, coerce_datetime, coerce_text
 from sm_records.index._predicates import (
     LIKE_ESCAPE_CHAR,
     FilterOp,
@@ -38,6 +38,8 @@ __all__ = [
     "PUBLIC_FIXED_COLUMNS",
     "SORT_INDEXED_FIXED_COLUMNS",
     "fixed_clause",
+    "fixed_column",
+    "fixed_expression",
 ]
 
 FIXED_COLUMNS: frozenset[str] = frozenset(
@@ -50,11 +52,22 @@ FIXED_COLUMNS: frozenset[str] = frozenset(
         "published_at",
         "created_at",
         "updated_at",
+        "invalid",
     }
 )
 """The projection every record has regardless of its type — the module's
 ``ContentItemIndex``. Filterable and sortable directly, with no index table
 and no ``indexed: true`` anywhere.
+
+``invalid`` is the odd one: the grammar name is not the column name. The row
+stores ``invalid_since``, a nullable timestamp (§8.3, ``services/_invalid.py``),
+and nobody filtering a list wants to compare timestamps — the question is
+"show me the records something is wrong with". So ``invalid`` is a *boolean
+view* of that column, ``eq:true`` meaning ``invalid_since IS NOT NULL``, and
+:data:`_FIXED_ALIAS` is where the two names meet. A sort on it orders by the
+timestamp, which puts the marked records first (oldest mark first) and the
+rest after them — the same grouping the boolean would give, and more
+informative within it.
 
 ``locale`` is here rather than in an index table because a record's language is
 a property of the *document*, like its status: the ``records_index_*`` tables
@@ -81,8 +94,38 @@ list. They are refused by name, the same 400 an unindexed field gets, rather
 than answered.
 """
 
+_FIXED_ALIAS: dict[str, str] = {"invalid": "invalid_since"}
+"""Grammar name -> column name, for the one fixed column where they differ.
+
+One mapping rather than a special case per reader: every function below, the
+sort terms in :mod:`sm_records.index._sorting` and the aggregate's group
+expression all resolve a name through :func:`fixed_column`, so a second column
+that wants a friendlier name in the URL adds one entry here."""
+
+
+def fixed_column(record: Any, name: str) -> Any:
+    """The mapped column one fixed-column name refers to, on ``record``'s
+    table set — the alias resolved, if it has one."""
+    return getattr(record, _FIXED_ALIAS.get(name, name))
+
+
+def fixed_expression(record: Any, name: str) -> Any:
+    """What a *value* of this fixed column is, as opposed to which column it
+    lives in: for ``invalid`` the boolean the grammar names, and the column
+    itself for everything else.
+
+    The aggregate layer is the caller — grouping by ``invalid`` has to produce
+    two groups and not one per instant a record was marked. The filter and
+    sort builders below keep the raw column: a predicate wants ``IS NULL``
+    rather than ``(col IS NOT NULL) = true``, which is the same rows and not
+    the same index scan.
+    """
+    column = fixed_column(record, name)
+    return column.isnot(None) if name in _FIXED_BOOLEAN else column
+
+
 NOT_NULL_FIXED_COLUMNS: frozenset[str] = frozenset(
-    name for name in FIXED_COLUMNS if not getattr(Record, name).property.columns[0].nullable
+    name for name in FIXED_COLUMNS if not fixed_column(Record, name).property.columns[0].nullable
 )
 """The fixed columns the database guarantees a value for.
 
@@ -113,6 +156,11 @@ can be answered by reading that index backwards, end to end, with no sorter
 at all. Everything else pays a sorter regardless, and there the tiebreaker
 must stay ascending — see that function for what it costs when it does not.
 """
+
+_FIXED_BOOLEAN = frozenset({"invalid"})
+"""Fixed columns the grammar asks a yes/no question about. See
+:data:`_FIXED_ALIAS`: the stored column is a timestamp, and the filter is the
+boolean "does it have one"."""
 
 _FIXED_TEXT = frozenset({"display_title", "slug"})
 """Fixed columns ``contains``/``starts_with`` are meaningful on. ``locale`` is
@@ -145,6 +193,33 @@ def _fixed_value(field: str, value: Any) -> Any:
     return text
 
 
+def _boolean_clause(column: Any, field: str, op: FilterOp, value: Any) -> ColumnElement[bool]:
+    """``invalid`` (and any later member of :data:`_FIXED_BOOLEAN`).
+
+    Three operators and no more. ``contains`` over a yes/no is meaningless,
+    and the ordered ones would be a comparison against the *timestamp* under a
+    name that does not mention it — "records invalid since before Tuesday" is
+    a reasonable question and not one ``invalid:lt:...`` should be trusted to
+    be asking.
+
+    ``is_null`` reads as it does everywhere else — "this record has no value"
+    — which here is the same set as ``eq:false``: an unmarked record is one
+    with no ``invalid_since``. Both spellings are accepted rather than one
+    refused, because a caller arriving from another fixed column has no reason
+    to expect the difference.
+    """
+    if op is FilterOp.IS_NULL:
+        return column.is_(None) if value in (None, True) else column.isnot(None)
+    if op not in (FilterOp.EQ, FilterOp.NE):
+        raise QueryError(field, "unsupported_op", f"{field!r} takes eq, ne or is_null")
+    wanted = coerce_bool(value)
+    if wanted is None:
+        raise QueryError(field, "bad_value", f"{field!r} takes true or false")
+    if op is FilterOp.NE:
+        wanted = not wanted
+    return column.isnot(None) if wanted else column.is_(None)
+
+
 def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnElement[bool]:
     """Fixed columns are real columns, so these are ordinary predicates —
     except for ``ne``, which also matches a NULL. SQL's ``<> NULL`` is unknown
@@ -157,7 +232,9 @@ def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnEle
     every set is built by one factory, so which columns exist, which are
     ``NOT NULL`` and which carry a ``(type_id, col, id)`` index are facts about
     the *shape*, and a collection cannot differ in any of them."""
-    column = getattr(record, field)
+    column = fixed_column(record, field)
+    if field in _FIXED_BOOLEAN:
+        return _boolean_clause(column, field, op, value)
     if op is FilterOp.IS_NULL:
         return column.is_(None) if value in (None, True) else column.isnot(None)
     if op is FilterOp.CONTAINS:

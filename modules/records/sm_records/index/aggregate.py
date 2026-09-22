@@ -36,7 +36,7 @@ from sqlalchemy.orm import aliased
 
 from sm_records.index._fields import declared_keys, indexed_map
 from sm_records.index._filters import filtered, resolve
-from sm_records.index._fixed import FIXED_COLUMNS
+from sm_records.index._fixed import FIXED_COLUMNS, fixed_expression
 from sm_records.index._predicates import SORT_ATTR, QueryError
 from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
@@ -52,6 +52,12 @@ FIXED_KIND: dict[str, IndexKind] = {
     "published_at": IndexKind.DATETIME,
     "created_at": IndexKind.DATETIME,
     "updated_at": IndexKind.DATETIME,
+    # A boolean, although the column behind it is a timestamp: grouping by
+    # ``invalid`` has to give two groups rather than one per instant a record
+    # was marked, which is what ``_fixed.fixed_expression`` renders. BOOL is
+    # in neither ``SUM_KINDS`` nor ``ORDER_KINDS``, so ``count`` is the only
+    # metric it can carry — the only one that means anything over a flag.
+    "invalid": IndexKind.BOOL,
 }
 """What kind of value each fixed column holds, for the metric rules below.
 Listed rather than derived because it answers a question about *meaning* —
@@ -118,7 +124,7 @@ def _column(
     collection type reads that collection's tables (Phase 5 §6.3).
     """
     if name in FIXED_COLUMNS:
-        return getattr(tables.record, name), FIXED_KIND[name], None, False
+        return fixed_expression(tables.record, name), FIXED_KIND[name], None, False
     field = resolve(rtype, indexed, declared, name)
     table = tables.index[field.kind]
     return getattr(table, SORT_ATTR[field.kind]), field.kind, (table, field.key), field.many

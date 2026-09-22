@@ -38,7 +38,11 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import ColumnElement
 
 from sm_records.index._fields import IndexedField
-from sm_records.index._fixed import NOT_NULL_FIXED_COLUMNS, SORT_INDEXED_FIXED_COLUMNS
+from sm_records.index._fixed import (
+    NOT_NULL_FIXED_COLUMNS,
+    SORT_INDEXED_FIXED_COLUMNS,
+    fixed_column,
+)
 from sm_records.index._predicates import SORT_ATTR
 from sm_records.models import TableSet
 from sm_records.schema.types import IndexKind
@@ -84,8 +88,14 @@ class SortTerm:
 
 
 def fixed_term(record: Any, name: str, desc: bool) -> SortTerm:
-    """A sort on a column every record has, in the caller's table set."""
-    column = getattr(record, name)
+    """A sort on a column every record has, in the caller's table set.
+
+    ``fixed_column`` and not ``getattr``: ``invalid`` is a grammar name for
+    the ``invalid_since`` column (``_fixed._FIXED_ALIAS``), and this orders by
+    the timestamp — which puts the marked records first, oldest mark first,
+    and the rest behind them under ``NULLS LAST``.
+    """
+    column = fixed_column(record, name)
     return SortTerm(
         expr=column,
         desc=desc,
