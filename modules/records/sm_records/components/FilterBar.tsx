@@ -172,6 +172,14 @@ export function FilterBar({
   const initialOp =
     current?.op && initialOps.includes(current.op) ? current.op : (initialOps[0] ?? 'eq');
 
+  // A `?filter=` naming a field this type no longer has — de-indexed, or
+  // renamed, or simply a hand-edited link (R16). The select used to be
+  // handed this key with no matching option, so the browser displayed the
+  // *first* option while state still held the missing one, and Apply
+  // re-submitted the filter that had just failed. It gets an option of its
+  // own instead, saying what it is, and Apply is held until another field
+  // is chosen.
+  const unknownField = current && !fieldByKey.has(current.field) ? current.field : null;
   const initialKind = fieldByKey.get(initialField)?.kind ?? 'text';
 
   const [field, setField] = useState(initialField);
@@ -228,12 +236,27 @@ export function FilterBar({
           value={field}
           onChange={(e) => selectField(e.target.value)}
         >
+          {unknownField && field === unknownField && (
+            <NativeSelectOption value={unknownField}>
+              {t('records.records.filter_unknown_field', {
+                field: unknownField,
+                defaultValue: '{field} (not filterable)',
+              })}
+            </NativeSelectOption>
+          )}
           {filterable.map((f) => (
             <NativeSelectOption key={f.key} value={f.key}>
               {f.label}
             </NativeSelectOption>
           ))}
         </NativeSelect>
+        {field === unknownField && (
+          <p className="text-sm text-muted-foreground" data-testid="records-filter-unknown">
+            {t('records.records.filter_unknown_help', {
+              defaultValue: 'This type has no filterable field by that name. Pick another.',
+            })}
+          </p>
+        )}
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="records-filter-op">
@@ -261,7 +284,7 @@ export function FilterBar({
         />
       )}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!field}>
+        <Button type="submit" size="sm" disabled={!field || field === unknownField}>
           {t('records.records.filter_apply', { defaultValue: 'Apply' })}
         </Button>
         {current && (

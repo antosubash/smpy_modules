@@ -131,3 +131,40 @@ describe('FilterBar — R8/M12: a control per kind, same URL grammar', () => {
     await view.unmount();
   });
 });
+
+describe('FilterBar — R16: a URL filter naming a field this type has not', () => {
+  it('shows the missing field as its own option instead of desyncing the select', async () => {
+    const { view } = await bar({ field: 'gone', op: 'eq', value: 'x' });
+    const select = view.find<HTMLSelectElement>('#records-filter-field');
+    // Before R16 the select's value fell back to the first option while
+    // state still held `gone`, so the screen named a field the filter was
+    // not about.
+    expect(select?.value).toBe('gone');
+    // (i18next is unconfigured under vitest, so the label is the raw
+    // template; what matters is that the option exists and is selected.)
+    expect([...(select?.options ?? [])][0].value).toBe('gone');
+    expect(view.find('[data-testid="records-filter-unknown"]')).not.toBeNull();
+    await view.unmount();
+  });
+
+  it('will not re-submit the filter that just failed', async () => {
+    const { view } = await bar({ field: 'gone', op: 'eq', value: 'x' });
+    const apply = view.button('Apply') as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+    await view.unmount();
+  });
+
+  it('drops the option again once a real field is chosen', async () => {
+    const { view, applied } = await bar({ field: 'gone', op: 'eq', value: 'x' });
+    await setValue(
+      view.find<HTMLSelectElement>('#records-filter-field') as HTMLSelectElement,
+      'flag',
+    );
+    const select = view.find<HTMLSelectElement>('#records-filter-field');
+    expect([...(select?.options ?? [])].map((o) => o.value)).not.toContain('gone');
+    expect(view.find('[data-testid="records-filter-unknown"]')).toBeNull();
+    (view.find('form') as HTMLFormElement).requestSubmit();
+    expect(applied.at(-1)).toEqual({ field: 'flag', op: 'eq', value: 'true' });
+    await view.unmount();
+  });
+});

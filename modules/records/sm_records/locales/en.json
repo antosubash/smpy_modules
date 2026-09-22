@@ -64,6 +64,8 @@
     "filter_field": "Field",
     "filter_op": "Condition",
     "filter_value": "Value",
+    "filter_unknown_field": "{field} (not filterable)",
+    "filter_unknown_help": "This type has no filterable field by that name. Pick another.",
     "filter_apply": "Apply",
     "filter_clear": "Clear",
     "position": "Position",
