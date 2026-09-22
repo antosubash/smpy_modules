@@ -378,9 +378,14 @@ filter in force it offers *"Delete the 12 trashed records matching this filter
 permanently?"* and empties only those, and with none *"Delete all 12 trashed
 records permanently?"*. Either way you type the number to enable the button —
 the same guard deleting a Record Type uses, and for the same reason: nothing
-here can be undone and nothing bounds how much of it there is. On a type whose
-count is capped at 10,000 the sentence says *more than* 10,000 and there is no
-number to type.
+here can be undone and nothing bounds how much of it there is.
+
+On a type whose count is capped at 10,000 there is no exact number to type, so
+the dialog asks for the type's key instead: *"This permanently deletes more
+than 10,000 trashed records. Type `product` to confirm."* (with *matching this
+filter* added when one is in force). Typing `10000` does not enable it — the
+number on screen is a floor rather than a total, and the largest, least
+reversible case is the last one that should be a single click.
 
 ### Acting on several records at once
 

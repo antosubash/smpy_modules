@@ -56,6 +56,7 @@ export function RecordListBulk({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <EmptyTrashButton
             count={total}
+            typeKey={typeKey}
             filtered={filters.length > 0}
             capped={capped}
             onEmpty={bulk.empty}

@@ -57,29 +57,43 @@ describe('bulkActions — the two sets never mix', () => {
 
 describe('emptyTrashDescription — what it is actually about to delete', () => {
   it('says "all" with no filter in force', () => {
-    const copy = emptyTrashDescription(fakeT, { count: 12, filtered: false });
+    const copy = emptyTrashDescription(fakeT, { count: 12, filtered: false, typeKey: 'product' });
     expect(copy).toContain('all 12 trashed records');
     expect(copy).not.toContain('filter');
     expect(copy).toContain('cannot be undone');
   });
 
   it('says "matching this filter" when one is', () => {
-    const copy = emptyTrashDescription(fakeT, { count: 12, filtered: true });
+    const copy = emptyTrashDescription(fakeT, { count: 12, filtered: true, typeKey: 'product' });
     expect(copy).toContain('the 12 trashed records matching this filter');
     expect(copy).not.toContain('all 12');
   });
 
-  it('says "more than" rather than a total nobody counted when the count is capped', () => {
-    const copy = emptyTrashDescription(fakeT, { count: 10000, filtered: false, capped: true });
-    expect(copy).toContain('more than 10000');
-    const filtered = emptyTrashDescription(fakeT, { count: 10000, filtered: true, capped: true });
-    expect(filtered).toContain('matching this filter');
-    expect(filtered).toContain('more than 10000');
+  it('says "more than", and asks for the type key, when the count is capped', () => {
+    // There is no exact total to ask for, so the sentence names what to type
+    // instead of a number that is not the number.
+    const copy = emptyTrashDescription(fakeT, {
+      count: 10000,
+      filtered: false,
+      capped: true,
+      typeKey: 'product',
+    });
+    expect(copy).toContain('more than 10000 trashed records');
+    expect(copy).toContain('Type product to confirm');
+
+    const filtered = emptyTrashDescription(fakeT, {
+      count: 10000,
+      filtered: true,
+      capped: true,
+      typeKey: 'product',
+    });
+    expect(filtered).toContain('more than 10000 trashed records matching this filter');
+    expect(filtered).toContain('Type product to confirm');
   });
 
   it('is singular for one record', () => {
-    expect(emptyTrashDescription(fakeT, { count: 1, filtered: false })).toContain(
-      '1 trashed record permanently',
-    );
+    expect(
+      emptyTrashDescription(fakeT, { count: 1, filtered: false, typeKey: 'product' }),
+    ).toContain('1 trashed record permanently');
   });
 });

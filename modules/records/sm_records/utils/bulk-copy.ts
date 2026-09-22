@@ -94,25 +94,36 @@ export function bulkActions(t: Translate, { count, trashed }: { count: number; t
  *
  * Filter-aware on purpose: the button empties what the screen is showing, and
  * an irreversible action whose copy claimed more than it does — or less — is
- * the one mistake this dialog exists to prevent. `capped` is the listing's
- * `total_capped`: the number is a floor rather than the number, so the
- * sentence says "more than" instead of asserting a total nobody counted.
+ * the one mistake this dialog exists to prevent.
+ *
+ * `capped` is the listing's `total_capped`: the number is a floor rather than
+ * the number, so the sentence says "more than" instead of asserting a total
+ * nobody counted — and it names what to type instead, since there is no exact
+ * count to ask for. That is the type's key, the way a repository host asks
+ * for a repository name before deleting one.
  */
 export function emptyTrashDescription(
   t: Translate,
-  { count, filtered, capped = false }: { count: number; filtered: boolean; capped?: boolean },
+  {
+    count,
+    filtered,
+    capped = false,
+    typeKey,
+  }: { count: number; filtered: boolean; capped?: boolean; typeKey: string },
 ): string {
   if (capped) {
     return filtered
       ? t('records.bulk.confirm_empty_trash_filtered_capped', {
           count,
+          key: typeKey,
           defaultValue:
-            'Delete every trashed record matching this filter — more than {count} — permanently? This cannot be undone.',
+            'This permanently deletes more than {count} trashed records matching this filter. Type {key} to confirm.',
         })
       : t('records.bulk.confirm_empty_trash_capped', {
           count,
+          key: typeKey,
           defaultValue:
-            'Delete every trashed record — more than {count} — permanently? This cannot be undone.',
+            'This permanently deletes more than {count} trashed records. Type {key} to confirm.',
         });
   }
   return filtered
