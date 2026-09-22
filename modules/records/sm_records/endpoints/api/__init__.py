@@ -17,6 +17,7 @@ from fastapi import APIRouter
 from sm_records.endpoints.api import (
     aggregate,
     io,
+    io_types,
     lifecycle,
     preview,
     records,
@@ -36,6 +37,10 @@ router.include_router(types.router)
 # ``/types/{key}/records/{uuid}`` would otherwise swallow
 # ``/types/{key}/records/export`` as a record whose uuid is "export".
 router.include_router(io.router)
+# Beside ``io``: the type-definition half of import/export, split off for
+# the file cap. Its paths (``/types/import``, ``/types/{key}/export``) are
+# distinct from every other router's, so its position is not load-bearing.
+router.include_router(io_types.router)
 # Before ``records`` for the reason ``io`` is: ``/types/{key}/records/{uuid}``
 # would otherwise match ``/types/{key}/records/aggregate`` as a record whose
 # uuid is "aggregate".

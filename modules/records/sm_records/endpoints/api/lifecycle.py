@@ -28,11 +28,16 @@ from sm_records.deps import (
     require_edit,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import WRITE, responses
 from sm_records.models import RecordType
 from sm_records.services import records as record_service
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
+router = APIRouter(
+    prefix="/types/{key}",
+    route_class=RecordsErrorRoute,
+    responses=responses(*WRITE),
+)
 
 
 @router.delete("/records/{uuid}", status_code=204, dependencies=[require_edit])

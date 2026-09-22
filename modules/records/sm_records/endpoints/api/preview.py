@@ -41,6 +41,7 @@ from sm_records.deps import (
     require_manage_types,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import TYPE_WRITE, responses
 from sm_records.models import RecordType
 from sm_records.services import preview_jobs, schema_change
 from sm_records.services._common import record_count
@@ -48,7 +49,7 @@ from sm_records.services.errors import NotFound
 from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsErrorRoute)
+router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*TYPE_WRITE))
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,19 @@ async def _run_preview_job(
     "/types/{key}/schema/preview",
     response_model=None,
     dependencies=[require_manage_types],
+    responses={
+        200: {
+            "model": SchemaPreviewRead,
+            "description": "The dry run, done inside the request.",
+        },
+        202: {
+            "model": SchemaPreviewJobRead,
+            "description": (
+                "The type is over `preview_sync_limit`, so the scan runs out of request; "
+                "poll `GET /types/{key}/schema/preview/{job}`."
+            ),
+        },
+    },
 )
 async def preview_schema(
     body: SchemaPreviewRequest,

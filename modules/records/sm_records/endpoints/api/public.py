@@ -62,11 +62,12 @@ from sm_records.deps import (
 )
 from sm_records.endpoints.api import _public_cache
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import PUBLIC_READ, responses
 from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.services import public as public_service
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsErrorRoute)
+router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*PUBLIC_READ))
 
 _Handler = TypeVar("_Handler", bound=Callable[..., Any])
 

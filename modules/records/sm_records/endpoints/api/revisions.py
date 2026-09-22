@@ -51,6 +51,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import WRITE, responses
 
 # The two helpers a schema rollback shares with every other type write — the
 # ``orphaned="discard"`` role check and the deferred reindex. Imported rather
@@ -65,7 +66,11 @@ from sm_records.services import types as type_service
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
+router = APIRouter(
+    prefix="/types/{key}",
+    route_class=RecordsErrorRoute,
+    responses=responses(*WRITE),
+)
 
 
 @router.get(

@@ -41,6 +41,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import WRITE, responses
 from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import CursorError, Filter, Sort
 from sm_records.models import RecordStatus, RecordType
@@ -50,7 +51,11 @@ from sm_records.services import records as record_service
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
+router = APIRouter(
+    prefix="/types/{key}",
+    route_class=RecordsErrorRoute,
+    responses=responses(*WRITE),
+)
 
 
 def _status(raw: str | None) -> RecordStatus | None:

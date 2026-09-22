@@ -34,6 +34,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import TYPE_WRITE, responses
 from sm_records.menu import affects_menu, mark_dirty
 from sm_records.models import RecordType
 from sm_records.services import _orphaned, reindex_runner
@@ -42,7 +43,7 @@ from sm_records.services._common import role_blocked
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsErrorRoute)
+router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*TYPE_WRITE))
 
 
 def _defer_reindex(request: Request, rtype: RecordType, settings: RecordsSettings) -> None:

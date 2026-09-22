@@ -31,13 +31,18 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import LISTING, responses
 from sm_records.models import RecordType
 from sm_records.services import _relations
 from sm_records.services import records as record_service
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
+router = APIRouter(
+    prefix="/types/{key}",
+    route_class=RecordsErrorRoute,
+    responses=responses(*LISTING),
+)
 
 
 @router.get(

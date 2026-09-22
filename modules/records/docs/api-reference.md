@@ -1081,6 +1081,15 @@ page of the same query — and not merely when some row somewhere was touched.
 
 ## Error table
 
+**This table is `sm_records/endpoints/api/_error_table.py`.** The rows below
+are that module's `ERROR_TABLE`, cell for cell and in order, and
+`tests/test_openapi_errors.py` fails if either moves without the other — a
+generated schema and a hand-maintained table are two descriptions of one
+contract, and two descriptions drift. `GET /openapi.json` builds each
+operation's `responses` from it, so every route documents the statuses its
+kind of route can produce, with the body schema
+(`sm_records/contracts/errors.py`) a generated client needs to parse them.
+
 | Status | When | Body |
 |---|---|---|
 | `400` | A filter or sort naming an unknown field | `{"detail", "field", "reason": "unknown"}` |
@@ -1097,7 +1106,7 @@ page of the same query — and not merely when some row somewhere was touched.
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
-| `403` | The type's `allowed_roles` exclude the caller | `{"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}` — names the roles, deliberately |
+| `403` | The type's `allowed_roles` exclude the caller | `{"detail"}` — names the type and the roles, deliberately |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
@@ -1109,7 +1118,7 @@ page of the same query — and not merely when some row somewhere was touched.
 | `409` | A filter or sort on a field mid-rebuild | `{"detail", "field", "reason": "reindexing"}` |
 | `409` | `DELETE /types/{key}` with a wrong `confirm_record_count` | `{"detail"}` |
 | `409` | A changed `collection` on `PUT /types/{key}` | `{"detail"}` |
-| `409` | Translating a non-translatable type, a source already in the target locale, or a locale a sibling already holds | `{"detail"}` |
+| `409` | A translation a type or a sibling will not allow | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
@@ -1145,9 +1154,16 @@ Worked examples:
  "current": {"uuid": "9d9addcbec0e46959ac5be78e15197e5", "version": 1, "…": "…"}}
 ```
 ```json
+{"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}
+```
+```json
 {"detail": "1 record(s) still reference 5082f5ca57a1417698e2ebffc6409ca9",
  "referrers": ["9bd09b7c3b984495a552d15f25ec7f94"], "hidden": 0, "more": 0}
 ```
+
+The three `409`s a translation can meet are spelled out under
+[Translation endpoints](#translation-endpoints): the type is not `translatable`, the source is
+already in the target locale, or a sibling already holds that language.
 
 A `restrict` refusal speaks the same three numbers the referrers panel does:
 `detail` counts every blocker, `referrers` lists at most 50 uuids of the ones

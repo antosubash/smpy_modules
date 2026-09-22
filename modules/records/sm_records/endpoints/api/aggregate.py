@@ -36,13 +36,18 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._responses import LISTING, responses
 from sm_records.index.aggregate import parse_metric
 from sm_records.index.query import Filter, FilterOp, QueryError
 from sm_records.models import RecordType
 from sm_records.services import aggregate as aggregate_service
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(prefix="/types/{key}", route_class=RecordsErrorRoute)
+router = APIRouter(
+    prefix="/types/{key}",
+    route_class=RecordsErrorRoute,
+    responses=responses(*LISTING),
+)
 
 
 @router.get("/records/aggregate", response_model=AggregateResponse, dependencies=[require_view])
