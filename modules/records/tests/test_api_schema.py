@@ -60,6 +60,7 @@ async def test_preview_returns_the_classification_and_report_and_writes_nothing(
         "failing": 0,
         "sample": [],
         "orphaned_conflicts": {},
+        "duplicates": {},
         "clean": True,
     }
 

@@ -28,7 +28,7 @@ from sm_records.models import RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services.errors import Conflict
 
-__all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type"]
+__all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type", "taken_by"]
 
 
 def _slug_taken(type_key: str, slug: str, locale: str) -> Conflict:
@@ -146,6 +146,7 @@ async def ensure_unique(
     *,
     exclude_id: int | None = None,
     exclude_group: str | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> None:
     """Design §7.8: ``unique`` is application-enforced, against the index.
 
@@ -191,34 +192,69 @@ async def ensure_unique(
     A trashed sibling is still a sibling and still exempt; a trashed
     *non*-sibling still blocks, because ``include_deleted`` keeps the trash's
     claims and a restore must find them intact.
+
+    **``previous`` exempts a value this record already holds.** A write does
+    not *make* a claim it is already making, and refusing one is how a record
+    becomes unsaveable rather than merely wrong: a ``unique`` flag forced onto
+    a field that already held duplicates (§8.2) leaves two records sharing a
+    value, and without this every subsequent write to either — a status
+    change, a typo fixed in an unrelated field — was a 409 about a field the
+    write did not touch, with no path back except turning ``unique`` off
+    again. The check still refuses a *third* record reaching for that value,
+    and still refuses either of the two moving to some other taken one, so the
+    rule §7.8 states is unchanged for every claim that is actually new. It is
+    the coerced view that is compared, not the raw payload, because that is
+    what the index row is projected from and therefore what "the same claim"
+    means.
     """
-    record = tables_for(rtype).record
     for field in defs:
         if not field.unique:
             continue
         value = values.get(field.key)
-        if value is None:
+        if value is None or (previous is not None and previous.get(field.key) == value):
             continue
-        try:
-            stmt = exists_query(
-                rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)]
-            )
-            if exclude_id is not None:
-                stmt = stmt.where(record.id != exclude_id)
-            if exclude_group is not None:
-                stmt = stmt.where(record.translation_group != exclude_group)
-            taken = (
-                (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
-            )
-        except QueryError as exc:
-            if exc.reason != "reindexing":
-                raise
-            raise Conflict(
-                f"{field.key!r} is being reindexed, so its uniqueness cannot be checked; "
-                "writes to this type are refused until the rebuild completes"
-            ) from exc
-        if taken is not None:
+        if await taken_by(
+            db, rtype, field, value, exclude_id=exclude_id, exclude_group=exclude_group
+        ):
             raise Conflict(f"{field.key!r} must be unique; {value!r} is already taken")
+
+
+async def taken_by(
+    db: AsyncSession,
+    rtype: RecordType,
+    field: FieldDefinition,
+    value: Any,
+    *,
+    exclude_id: int | None = None,
+    exclude_group: str | None = None,
+) -> bool:
+    """Does any *other* record of ``rtype`` already hold ``value`` in ``field``?
+
+    The statement :func:`ensure_unique` used to build inline, lifted so the
+    read-only caller that asks the same question can ask it the same way —
+    :func:`sm_records.services._duplicates.conflicts_for`, which turns the
+    answer into the ``invalid`` badge a record left duplicated by a forced
+    ``unique_added`` wears. A second spelling of this query would be a second
+    opinion about what "already taken" means.
+    """
+    record = tables_for(rtype).record
+    try:
+        stmt = exists_query(
+            rtype, list(rtype.fields or []), [Filter(field.key, FilterOp.EQ, value)]
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(record.id != exclude_id)
+        if exclude_group is not None:
+            stmt = stmt.where(record.translation_group != exclude_group)
+        taken = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
+    except QueryError as exc:
+        if exc.reason != "reindexing":
+            raise
+        raise Conflict(
+            f"{field.key!r} is being reindexed, so its uniqueness cannot be checked; "
+            "writes to this type are refused until the rebuild completes"
+        ) from exc
+    return taken is not None
 
 
 async def lock_type(db: AsyncSession, rtype: RecordType) -> None:

@@ -109,6 +109,21 @@ rewrite the module ever does is the `_orphaned` sub-key on an explicit
 `discard`; the index is derived and rebuilt out of request. Field keys are
 immutable: a rename decomposes into remove-then-add and is classified as both.
 
+**Newly unique is the one restrictive class a payload scan cannot see.** The dry
+run validates one record at a time; duplication is a property of a *pair*. So
+`services/_duplicates.py` runs alongside it — one `GROUP BY … HAVING` per key
+against the index table for a field that is already indexed, and a collector
+riding on the dry run's own walk for one gaining `unique` and `indexed`
+together — and folds its count into `DryRunReport.failing` plus a per-key
+`duplicates` map. Two records in the same `translation_group` are not
+duplicates of each other, because `_claims.ensure_unique` exempts siblings.
+`force` is still the escape hatch, but it is the one restrictive class it does
+not leave *recoverable*: every other marked record is fixed by its next
+ordinary write, and a duplicate cannot be. Such a record is marked on the
+single-record read (`_duplicates.conflicts_for` tops up `invalid`) and stays
+saveable for any write that leaves the contested value alone — `ensure_unique`
+does not make a write re-claim a value the row already holds.
+
 ## The services layer
 
 `services/` is the domain. Two rules hold everywhere:

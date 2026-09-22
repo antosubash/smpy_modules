@@ -172,6 +172,7 @@ def record_read(
     defs: list[FieldDefinition] | None = None,
     expanded: dict[str, list[ExpandedRef]] | None = None,
     translations: list[TranslationRead] | None = None,
+    extra_invalid: Sequence[dict[str, str]] = (),
 ) -> RecordRead:
     """The one lenient read every caller gets: ``read_view`` fills a missing
     key from ``default`` and flags a row stamped at an old schema version
@@ -188,6 +189,15 @@ def record_read(
     ``expanded`` and ``translations`` are passed through untouched: resolving
     either is the service's job (``services/expand.py``,
     ``services/_translations.py``), this only carries them.
+
+    ``extra_invalid`` is appended to the badge. ``read_view``'s own ``invalid``
+    is whatever the compiled validator says about *this* payload, which cannot
+    cover a rule about a pair of records: a field forced ``unique`` over
+    existing duplicates leaves a record whose payload validates perfectly and
+    which no write is accepted for. The caller that is willing to pay a query
+    per ``unique`` field — the single-record read, never a list — passes
+    ``services._duplicates.conflicts_for`` here, so §8.3's "marked, not
+    hidden" holds for that class too.
     """
     view = read_view(rtype, record, with_invalid=with_invalid, defs=defs)
     return RecordRead(
@@ -207,7 +217,7 @@ def record_read(
         created_at=record.created_at,
         updated_at=record.updated_at,
         is_deleted=record.is_deleted,
-        invalid=view["invalid"],
+        invalid=[*view["invalid"], *extra_invalid],
         translations=translations,
         expanded=expanded,
     )

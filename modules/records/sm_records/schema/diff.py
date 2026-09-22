@@ -132,6 +132,10 @@ def _flags(old: FieldDefinition, new: FieldDefinition) -> list[SchemaChange]:
     if old.unique != new.unique:
         # Newly unique is restrictive because the records that exist may
         # already hold duplicates — nothing checked them until now (§7.8).
+        # Restrictive is only a promise if something can *see* the failure,
+        # and the per-record dry run cannot: duplication is a property of a
+        # pair. ``services._duplicates`` is the scan that keeps this
+        # classification honest, and it keys on this ``what`` value.
         out.append(
             SchemaChange(
                 kind=ChangeClass.RESTRICTIVE if new.unique else ChangeClass.ADDITIVE,

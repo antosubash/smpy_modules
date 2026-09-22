@@ -74,6 +74,19 @@ class DryRunReport:
     """Keys being (re-)added that already exist under ``_orphaned`` on some
     records, with the count — §8.8 refuses these until the caller chooses
     ``restore`` or ``discard``."""
+    duplicates: dict[str, int] = field(default_factory=dict)
+    """Keys gaining ``unique`` that records already hold duplicates of, with
+    how many records hold one — :mod:`sm_records.services._duplicates`.
+
+    Counted inside ``failing`` as well, which is what makes the change
+    refusable without ``force`` like any other restrictive failure. It is
+    carried separately because it is the one restrictive class ``force`` does
+    not leave *recoverable*: every other marked record is fixed by its next
+    ordinary write, and a duplicate cannot be — the write is refused until one
+    of the values changes. The refusal says so, and it can only say so if it
+    knows which half of ``failing`` is which. A record failing both a payload
+    rule and this one is counted twice, so ``failing`` is capped at
+    ``checked``: "12 of 10" would be a worse lie than a slight undercount."""
 
     @property
     def clean(self) -> bool:

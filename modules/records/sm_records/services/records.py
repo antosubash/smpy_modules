@@ -17,7 +17,7 @@ having in front of you while reading it:
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,9 +30,8 @@ from sm_records.index.writer import write_index
 # with the rest of it in :mod:`sm_records.locales`.
 from sm_records.locales import resolve_locale
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid, tables_for
-from sm_records.schema.fields import FieldDefinition
-from sm_records.services import _claims, _payload, _relations
-from sm_records.services._common import guarded_bump, reload, type_id_map, utcnow
+from sm_records.services import _claims, _payload
+from sm_records.services._common import guarded_bump, reload, utcnow
 
 # Re-exported so the delete lifecycle is importable from the one module
 # endpoints already use; it lives in ``_lifecycle`` only for the file cap.
@@ -49,6 +48,10 @@ from sm_records.services._listing import RecordListPage, list_records
 
 # Re-exported: ``read_view`` lives in ``_payload`` with the payload reading.
 from sm_records.services._payload import read_view
+
+# Re-exported for the same reason: the shared front half of both write paths
+# (validate, lock, check) lives in ``_prepare`` for the file cap.
+from sm_records.services._prepare import prepare as _prepare
 
 # Re-exported: a translation is an ordinary record, so the two functions that
 # make one and list one live beside the lifecycle they are part of — in
@@ -97,53 +100,6 @@ async def get_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
 async def get_deleted_record(db: AsyncSession, rtype: RecordType, uuid: str) -> Record:
     """The trash view."""
     return await _by_uuid(db, rtype, uuid, trashed=True)
-
-
-class _Prepared(NamedTuple):
-    """What both write paths need out of :func:`_prepare`.
-
-    ``types`` rides along rather than being looked up again: ``{key: id}`` is
-    read once here for the relation check and is the same mapping the index
-    writer's resolver needs (``index.providers.TypeResolver``), which used to
-    make ``SELECT key, id FROM records_type`` a twice-per-write statement. It
-    is an argument and not a module-level cache because types are created and
-    deleted at runtime, and a stale id would reach the one thing that must not
-    have one — the ``relation`` rows ``on_delete`` is enforced from (§9).
-    """
-
-    defs: list[FieldDefinition]
-    values: dict[str, Any]
-    stored: dict[str, Any]
-    types: dict[str, int]
-
-
-async def _prepare(
-    db: AsyncSession,
-    rtype: RecordType,
-    data: dict[str, Any],
-    settings: RecordsSettings,
-    exclude_id: int | None,
-    group: str,
-) -> _Prepared:
-    """Validate, then the two checks no database constraint can make.
-
-    The type row is locked before them and not before validation: the lock
-    exists to close the check-then-act window of §7.8, and holding it across
-    pydantic's work would serialise writes on a type for no benefit.
-
-    ``group`` is the write's translation group, known by both write paths
-    before they call: siblings are exempt from each other's ``unique`` claims
-    (:func:`sm_records.services._claims.ensure_unique`).
-    """
-    defs = _payload.field_defs(rtype)
-    values, stored = _payload.validate(
-        rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
-    )
-    await _claims.lock_type(db, rtype)
-    types = await type_id_map(db)
-    await _relations.check_targets(db, defs, values, types)
-    await _claims.ensure_unique(db, rtype, defs, values, exclude_id=exclude_id, exclude_group=group)
-    return _Prepared(defs, values, stored, types)
 
 
 async def create_record(
@@ -261,7 +217,9 @@ async def update_record(
     # the one place the old payload still exists.
     previous_data = dict(record.data or {})
     own_group = record.translation_group
-    defs, values, stored, types = await _prepare(db, rtype, data, settings, record.id, own_group)
+    defs, values, stored, types = await _prepare(
+        db, rtype, data, settings, record.id, own_group, previous=previous_data
+    )
     stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)
     # ``record.locale`` and never an argument: a record's language is fixed for

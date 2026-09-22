@@ -33,7 +33,7 @@ from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
 from sm_records.services._claims import lock_type
 from sm_records.services._common import guarded_bump, reload, utcnow
-from sm_records.services._dry_run import change_report
+from sm_records.services._dry_run import change_report, refusal
 from sm_records.services._payload import field_defs
 from sm_records.services._preview import MISSING, pointer_preview_changes, reused_report
 from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
@@ -87,14 +87,6 @@ async def preview(
         db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, on_progress=on_progress
     )
     return diff, report
-
-
-def _refusal(rtype: RecordType, report: DryRunReport) -> str:
-    return (
-        f"{report.failing} of {report.checked} {rtype.key} record(s) would not satisfy the new "
-        "schema; re-send with a default that makes them valid, or force=True to apply the "
-        "change and mark them"
-    )
 
 
 async def _mark_pending(
@@ -214,7 +206,7 @@ async def apply(
         db, rtype, new_defs, settings, diff=diff, conflicts=conflicts, drop_keys=drop
     )
     if report.failing and not force:
-        raise SchemaChangeRefused(report, _refusal(rtype, report))
+        raise SchemaChangeRefused(report, refusal(rtype, report))
 
     pointer_moved = any(
         name in changes and changes[name] != getattr(rtype, name) for name in _POINTERS

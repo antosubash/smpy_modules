@@ -56,6 +56,11 @@ class DryRunReportRead(SQLModel):
     failing: int
     sample: list[FailingRecordRead]
     orphaned_conflicts: dict[str, int]
+    duplicates: dict[str, int] = {}
+    """Keys gaining ``unique`` that some records already hold duplicates of,
+    and how many records hold one. Already counted inside ``failing``; kept
+    apart so the panel can say that ``force`` does not leave these
+    recoverable — see :class:`~sm_records.schema.changes.DryRunReport`."""
     clean: bool
 
 
@@ -152,6 +157,7 @@ def dry_run_report_read(report: DryRunReport) -> DryRunReportRead:
             for r in report.sample
         ],
         orphaned_conflicts=dict(report.orphaned_conflicts),
+        duplicates=dict(report.duplicates),
         clean=report.clean,
     )
 
