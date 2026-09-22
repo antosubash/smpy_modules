@@ -123,6 +123,7 @@
   "bulk": {
     "select_record": "Select {title}",
     "select_all": "Select every record on this page",
+    "select_all_label": "Select all on this page",
     "selected": "{count} selected",
     "selected_one": "{count} selected",
     "selected_other": "{count} selected",

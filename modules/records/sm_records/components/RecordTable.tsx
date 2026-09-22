@@ -11,6 +11,7 @@ import {
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { RecordSelection } from '../hooks/useRecordSelection';
 import { listColumns, type SortState } from '../utils/listing';
+import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCardList } from './RecordCardList';
@@ -197,72 +198,79 @@ export function RecordTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {records.map((record) => (
-            <TableRow
-              key={record.uuid}
-              data-testid="records-record-row"
-              data-record-uuid={record.uuid}
-              data-selected={selection?.isSelected(record.uuid) ? 'true' : undefined}
-            >
-              {selection && (
+          {records.map((record) => {
+            // U5: a record whose display field is empty otherwise leaves
+            // the title link with no text and the row's own controls with
+            // no accessible name — exactly the Invalid worklist's case.
+            const title = recordDisplayTitle(record, type);
+            return (
+              <TableRow
+                key={record.uuid}
+                data-testid="records-record-row"
+                data-record-uuid={record.uuid}
+                data-selected={selection?.isSelected(record.uuid) ? 'true' : undefined}
+              >
+                {selection && (
+                  <TableCell>
+                    <RecordSelectCell
+                      checked={selection.isSelected(record.uuid)}
+                      title={title}
+                      onToggle={(extend) => selection.toggle(record.uuid, extend)}
+                    />
+                  </TableCell>
+                )}
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/admin/records/${type.key}/${record.uuid}`}
+                    className="hover:underline"
+                  >
+                    {title}
+                  </Link>
+                </TableCell>
                 <TableCell>
-                  <RecordSelectCell
-                    checked={selection.isSelected(record.uuid)}
-                    title={record.display_title}
-                    onToggle={(extend) => selection.toggle(record.uuid, extend)}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <RecordStatusBadge status={record.status} />
+                    {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
+                    {record.schema_stale && <SchemaStaleBadge />}
+                  </div>
+                </TableCell>
+                {showLocale && (
+                  <TableCell>
+                    <RecordLocaleBadge locale={record.locale} />
+                  </TableCell>
+                )}
+                {columns.map((field) => (
+                  <TableCell key={field.key} className="text-muted-foreground">
+                    <RecordCell
+                      field={field}
+                      value={record.data[field.key]}
+                      expanded={record.expanded?.[field.key] ?? undefined}
+                    />
+                  </TableCell>
+                ))}
+                {showPosition && (
+                  <TableCell className="text-muted-foreground">{record.position}</TableCell>
+                )}
+                <TableCell className="text-muted-foreground">
+                  {record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {formatDateTime(record.updated_at ?? record.created_at)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <RecordRowAction
+                    typeKey={type.key}
+                    record={record}
+                    title={title}
+                    trashed={trashed}
+                    onDelete={onDelete}
+                    onRestore={onRestore}
+                    onPurge={onPurge}
                   />
                 </TableCell>
-              )}
-              <TableCell className="font-medium">
-                <Link
-                  href={`/admin/records/${type.key}/${record.uuid}`}
-                  className="hover:underline"
-                >
-                  {record.display_title}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <RecordStatusBadge status={record.status} />
-                  {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
-                  {record.schema_stale && <SchemaStaleBadge />}
-                </div>
-              </TableCell>
-              {showLocale && (
-                <TableCell>
-                  <RecordLocaleBadge locale={record.locale} />
-                </TableCell>
-              )}
-              {columns.map((field) => (
-                <TableCell key={field.key} className="text-muted-foreground">
-                  <RecordCell
-                    field={field}
-                    value={record.data[field.key]}
-                    expanded={record.expanded?.[field.key] ?? undefined}
-                  />
-                </TableCell>
-              ))}
-              {showPosition && (
-                <TableCell className="text-muted-foreground">{record.position}</TableCell>
-              )}
-              <TableCell className="text-muted-foreground">
-                {record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {formatDateTime(record.updated_at ?? record.created_at)}
-              </TableCell>
-              <TableCell className="text-right">
-                <RecordRowAction
-                  typeKey={type.key}
-                  record={record}
-                  trashed={trashed}
-                  onDelete={onDelete}
-                  onRestore={onRestore}
-                  onPurge={onPurge}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
       {columns.length === 0 && <NoIndexedColumnsNotice typeKey={type.key} />}

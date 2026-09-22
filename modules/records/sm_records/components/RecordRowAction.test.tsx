@@ -51,6 +51,7 @@ describe('RecordRowAction — U4: the Trash view can release a record for good',
       <RecordRowAction
         typeKey="book"
         record={record()}
+        title={record().display_title}
         trashed
         onDelete={onDelete}
         onRestore={onRestore}
@@ -73,6 +74,7 @@ describe('RecordRowAction — U4: the Trash view can release a record for good',
       <RecordRowAction
         typeKey="book"
         record={record({ is_deleted: false })}
+        title={record().display_title}
         trashed={false}
         onDelete={async () => undefined}
         onRestore={async () => undefined}
@@ -95,6 +97,7 @@ describe('RecordRowAction — U27: every row action names the record it acts on'
       <RecordRowAction
         typeKey="book"
         record={record({ is_deleted: false, display_title: 'Dune' })}
+        title="Dune"
         trashed={false}
         onDelete={async () => undefined}
         onRestore={async () => undefined}
@@ -115,6 +118,7 @@ describe('RecordRowAction — U27: every row action names the record it acts on'
       <RecordRowAction
         typeKey="book"
         record={record({ display_title: 'Dune' })}
+        title="Dune"
         trashed
         onDelete={async () => undefined}
         onRestore={async () => undefined}

@@ -160,6 +160,22 @@ describe('RecordTable — the tick column', () => {
     await view.unmount();
   });
 
+  it('U5: falls back to the type label and short uuid when the display title is empty', async () => {
+    const blank = {
+      ...record(),
+      uuid: '3f2a1c9e84b34e0e9a1b2c3d4e5f6789',
+      display_title: '',
+    };
+    const view = await mount(<Selectable records={[blank]} />);
+    // The title cell's link is never routed through `t()`, so this is the
+    // one place the fallback text is actually observable under vitest
+    // (i18next is unconfigured — see `RecordRowAction.test.tsx`'s U27
+    // tests for why the aria-labels below cannot assert the same thing).
+    const link = view.find('td a');
+    expect(link?.textContent).toBe('QA UX Event 3f2a1c9e…');
+    await view.unmount();
+  });
+
   it('extends the selection on Shift+click', async () => {
     const rows = [
       record(),

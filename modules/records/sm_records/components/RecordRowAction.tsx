@@ -18,6 +18,7 @@ import { RecordDeleteDialog } from './RecordDeleteDialog';
 export function RecordRowAction({
   typeKey,
   record,
+  title,
   trashed,
   onDelete,
   onRestore,
@@ -25,6 +26,11 @@ export function RecordRowAction({
 }: {
   typeKey: string;
   record: RecordRead;
+  /** U5: the record's display title, or the caller's own fallback
+   *  (`recordDisplayTitle`) when it has none — so the accessible name is
+   *  never "Delete " for a record whose display field is empty, exactly the
+   *  invalid worklist's case. */
+  title: string;
   trashed: boolean;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
@@ -54,7 +60,7 @@ export function RecordRowAction({
               variant="ghost"
               size="sm"
               aria-label={t('records.records.restore_named', {
-                title: record.display_title,
+                title,
                 defaultValue: 'Restore {title}',
               })}
             >
@@ -78,7 +84,7 @@ export function RecordRowAction({
               size="sm"
               className="text-destructive"
               aria-label={t('records.records.purge_named', {
-                title: record.display_title,
+                title,
                 defaultValue: 'Delete {title} permanently',
               })}
             >
@@ -108,7 +114,7 @@ export function RecordRowAction({
           variant="ghost"
           size="sm"
           aria-label={t('records.records.delete_named', {
-            title: record.display_title,
+            title,
             defaultValue: 'Delete {title}',
           })}
         >
