@@ -53,11 +53,12 @@ export function RecordEditorHeaderBadges({
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-1.5">
+        {/* U13(c): this used to say "Fields changed since this was saved"
+            while the list badge for the identical condition said "Outdated
+            schema" — two names for one fact. One label, everywhere. */}
         {current.schema_stale && (
           <Badge variant="outline" className="border-amber-500 text-amber-600">
-            {t('records.editor.schema_stale', {
-              defaultValue: 'Fields changed since this was saved',
-            })}
+            {t('records.records.schema_stale', { defaultValue: 'Outdated schema' })}
           </Badge>
         )}
         {current.is_deleted && (

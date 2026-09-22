@@ -1,6 +1,7 @@
 import { useT } from '@simple-module-py/i18n';
 
 import type { DryRunReport } from '../../utils/types';
+import { humanizeDryRunMessage } from './dryRunMessages';
 import { OrphanedConflictsList } from './OrphanedConflictsList';
 
 /**
@@ -31,7 +32,7 @@ export function DryRunReportView({ report }: { report: DryRunReport }) {
               <ul className="ml-4 list-inside list-disc text-muted-foreground">
                 {rec.errors.map((e) => (
                   <li key={`${rec.uuid}:${e.field}`}>
-                    {e.field}: {e.message}
+                    {e.field}: {humanizeDryRunMessage(t, e.message)}
                   </li>
                 ))}
               </ul>
