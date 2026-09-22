@@ -24,9 +24,10 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
   const [typed, setTyped] = useState('');
   const [referrers, setReferrers] = useState<string[] | null>(null);
   const total = type.record_count + type.trashed_record_count;
+  const countMatches = typed.trim() !== '' && Number(typed) === total;
 
   const confirm = async () => {
-    if (Number(typed) !== total || typed.trim() === '') {
+    if (!countMatches) {
       throw new Error(
         t('records.type_editor.delete_count_mismatch', {
           defaultValue: "That doesn't match. Type the exact number to confirm.",
@@ -45,6 +46,8 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
   };
 
   const inputId = 'type-editor-delete-confirm';
+  const hintId = 'type-editor-delete-confirm-hint';
+  const showMismatch = typed.trim() !== '' && !countMatches;
 
   return (
     <Card className="border-destructive/50">
@@ -99,7 +102,25 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
                 inputMode="numeric"
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
+                aria-describedby={hintId}
+                aria-invalid={showMismatch || undefined}
               />
+              <p
+                id={hintId}
+                role={showMismatch ? 'alert' : undefined}
+                className={
+                  showMismatch ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
+                }
+              >
+                {showMismatch
+                  ? t('records.type_editor.delete_count_mismatch', {
+                      defaultValue: "That doesn't match. Type the exact number to confirm.",
+                    })
+                  : t('records.type_editor.delete_count_hint', {
+                      count: total,
+                      defaultValue: 'Type {count} to enable Delete.',
+                    })}
+              </p>
             </div>
           }
           // Reopening the dialog used to show the previous attempt's
@@ -112,6 +133,7 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
           cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
           pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
           destructive
+          confirmDisabled={!countMatches}
           onConfirm={confirm}
         />
       </CardContent>

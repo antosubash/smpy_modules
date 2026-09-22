@@ -326,6 +326,7 @@
     "delete_confirm_description": "This permanently deletes \"{label}\" and its {count} record(s) (live and trashed). Type {count} to confirm.",
     "delete_confirm_label": "Record count",
     "delete_count_mismatch": "That doesn't match. Type the exact number to confirm.",
+    "delete_count_hint": "Type {count} to enable Delete.",
     "referrers_notice": "Other types still have a relation field pointing at this one:",
     "last_applied": {
       "title": "Last applied change left {count} record invalid",
