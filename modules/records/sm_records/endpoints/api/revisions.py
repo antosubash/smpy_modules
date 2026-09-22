@@ -33,7 +33,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
-from sm_records.models import RecordRevision, RecordType
+from sm_records.models import RecordType, tables_of
 from sm_records.services import records as record_service
 from sm_records.services import revisions as revision_service
 from sm_records.services.errors import NotFound
@@ -73,10 +73,16 @@ async def get_record_revision(
     payload it snapshotted. A revision id from another record is a 404 — see
     ``services.revisions.restore``'s own docstring for why that is a 404
     rather than a 403: nothing else in the API takes a revision id, so there
-    is no resource here the caller is being refused access to."""
+    is no resource here the caller is being refused access to.
+
+    The lookup is against ``tables_of(record).revision``, the type's own
+    revision log, not the global ``RecordRevision``: ids restart per table, so
+    the global class would happily return an unrelated record's snapshot for a
+    collection type."""
     record = await record_service.get_record(db, rtype, uuid)
-    stmt = select(RecordRevision).where(
-        RecordRevision.id == revision_id, RecordRevision.record_id == record.id
+    revision_table = tables_of(record).revision
+    stmt = select(revision_table).where(
+        revision_table.id == revision_id, revision_table.record_id == record.id
     )
     revision = (await db.execute(stmt)).scalars().first()
     if revision is None:

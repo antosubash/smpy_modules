@@ -163,7 +163,13 @@ async def restore(
     Nothing from the revision is dropped, and nothing about the client-facing
     rule changes: an inbound payload carrying ``_orphaned`` is still refused.
 
-    The revision must belong to this record. Nothing else in the API takes a
+    The revision must belong to this record, and it is looked up in the
+    record's **own** revision table (``tables_of(record).revision``) exactly as
+    :func:`list_revisions` and :func:`write_revision` do. Naming the global
+    ``RecordRevision`` here would match by ``(id, record_id)`` against another
+    table entirely: two collections number their records independently and so
+    does the global set, so a collection record's restore would write an
+    unrelated record's payload over it. Nothing else in the API takes a
     revision id, so an id from another record is a 404 rather than a 403 —
     there is no resource here the caller is being refused access to.
 
@@ -171,12 +177,13 @@ async def restore(
     appends, so the history shows "restored from" as its own event rather than
     as an ordinary update that happens to repeat an older payload.
     """
+    revision_table = tables_of(record).revision
     revision = (
         (
             await db.execute(
-                select(RecordRevision).where(
-                    RecordRevision.id == revision_id,
-                    RecordRevision.record_id == record.id,
+                select(revision_table).where(
+                    revision_table.id == revision_id,
+                    revision_table.record_id == record.id,
                 )
             )
         )
