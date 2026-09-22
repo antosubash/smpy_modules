@@ -23,6 +23,7 @@ from typing import Any
 from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.index._batch import current_batch
 from sm_records.index.providers import TypeResolver
 from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.writer import project, row_values, write_index
@@ -78,13 +79,25 @@ async def reindex_batch(
     today is :func:`reindex_type` under
     :mod:`sm_records.services.reindex_runner`, which owns its own session and
     commits explicitly.
+
+    **The batch is re-read here, not projected as the caller read it.** The
+    runner commits per batch, so the caller's ``SELECT`` and this function's
+    ``DELETE`` are in the same transaction but not in the same instant, and an
+    ordinary edit committed in between would have its index rows deleted and
+    replaced by a projection of the pre-edit payload — permanently.
+    :func:`sm_records.index._batch.current_batch` re-reads the rows under a
+    row lock where the dialect has one and drops the ones whose ``version``
+    moved; a dropped row keeps the rows its own writer wrote, which are
+    already right, and is not touched at all. That is why the ``DELETE`` is
+    keyed on the ids of the *kept* rows rather than on the caller's batch.
     """
-    ids = [record.id for record in records if record.id is not None]
+    kept = await current_batch(db, records, rtype)
+    ids = [record.id for record in kept if record.id is not None]
     if not ids:
         return
     tables = tables_for(rtype)
     rows: dict[type, list[dict]] = {}
-    for record in records:
+    for record in kept:
         for entry in project(record, rtype, resolve_type_id):
             table, values = row_values(tables, entry, record.id, rtype.id)
             rows.setdefault(table, []).append(values)
@@ -126,6 +139,12 @@ async def reindex_type(
     reading: one ``DELETE`` and one bulk ``INSERT`` per index table per batch.
     ``touched`` is passed through to it and names the tables written, for a
     caller that wants to ``ANALYZE`` them once the walk is done.
+
+    The count is of records *walked*, not of records whose rows this run
+    rewrote: :func:`reindex_batch` drops a record another writer has committed
+    since the batch was read, because that writer already wrote its index rows
+    from the payload it stored. Counting it as walked is the honest number —
+    the walk did reach it and the type's index is complete when the walk ends.
 
     Batching bounds the number of rows in memory, not the transaction: nothing
     here commits, and a long-running rebuild that wants to commit per batch

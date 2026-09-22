@@ -24,7 +24,7 @@ from sm_records.models import GLOBAL, IndexReduce, tables_for
 from sm_records.schema.types import IndexKind
 from sm_records.services import records as record_service
 from sm_records.services import reindex_runner
-from sm_records.services.reindex_runner import _recompute_titles
+from sm_records.services._titles import recompute_titles
 from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 
@@ -75,7 +75,7 @@ async def test_the_title_rebuild_walks_the_collections_documents(db, gig):
     means it needs the collection's record table and not the global one."""
     record = await make_collection_record(db, gig, {"name": "Launch", "capacity": 1})
     assert record.display_title == ""
-    assert await _recompute_titles(db, gig, 10) == 1
+    assert await recompute_titles(db, gig, 10) == 1
     await db.refresh(record)
     assert record.display_title == "Launch"
 

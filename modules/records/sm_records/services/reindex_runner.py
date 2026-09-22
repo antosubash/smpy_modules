@@ -41,10 +41,9 @@ from sm_records.index.reindex import (
     reindex_type,
 )
 from sm_records.models import RecordType, tables_for
-from sm_records.schema.compile import from_stored
 from sm_records.services._claims import lock_type
 from sm_records.services._common import mark_written, reload, type_resolver
-from sm_records.services._payload import display_title, field_defs
+from sm_records.services._titles import recompute_titles
 from sm_records.settings import RecordsSettings
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
@@ -78,48 +77,6 @@ async def pending_type_ids(db: AsyncSession) -> list[int]:
     """
     rows = (await db.execute(select(RecordType.id, RecordType.reindex_pending))).all()
     return [int(type_id) for type_id, pending in rows if pending and type_id is not None]
-
-
-async def _recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int) -> int:
-    """Rebuild every record's denormalised ``display_title`` (§18 Q2).
-
-    Resolved there in favour of the reindex owning it, because this is where
-    the batched, resumable machinery already is. Read through ``from_stored``
-    so the title comes from the value as the *current* schema reads it — a
-    ``number`` that is still stored as the string a ``text`` field wrote.
-
-    The trash is included: a restored record showing the title of a pointer
-    that was replaced months ago is exactly the staleness this fixes.
-    """
-    defs = field_defs(rtype)
-    record_cls = tables_for(rtype).record
-    last_id, total = 0, 0
-    while True:
-        batch = (
-            (
-                await db.execute(
-                    select(record_cls)
-                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
-                    .order_by(record_cls.id)
-                    .limit(batch_size)
-                    .execution_options(include_deleted=True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not batch:
-            return total
-        for record in batch:
-            values = from_stored(defs, dict(record.data or {}))
-            record.display_title = display_title(rtype, values)
-            db.add(record)
-            last_id = record.id or last_id
-            total += 1
-        # Committed rather than flushed, for the reason ``run_pending`` gives
-        # ``reindex_type``'s ``after_batch``: one batch of the write lock at a
-        # time, and a half-finished title pass is repeated by the next run.
-        await db.commit()
 
 
 async def _clear_rebuilt(
@@ -261,7 +218,7 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
             after_batch=session.commit,
         )
         if REINDEX_ALL in pending:
-            await _recompute_titles(session, rtype, settings.reindex_batch_size)
+            await recompute_titles(session, rtype, settings.reindex_batch_size)
 
         await _clear_rebuilt(session, rtype, keys, started_at_schema)
         # Every statement the rebuild issues is core DML, which never fires the
