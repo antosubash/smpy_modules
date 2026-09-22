@@ -53,9 +53,20 @@ export function SchemaConflictPanel({
           <ConfirmDialog
             trigger={
               <Button type="button" variant="destructive">
+                {/* U3: `report.failing` counts live and trashed records
+                    alike (§8.9's own reasoning — a trashed record still
+                    reads back under the schema on restore), while the
+                    hub's `invalid_record_count` badge this operator will
+                    check afterwards counts live ones only. "(including
+                    trashed)" is what keeps the two from reading as a
+                    contradiction rather than two honestly different
+                    scopes. */}
                 {t('records.type_editor.preview.apply_anyway', {
                   count: report.failing,
-                  defaultValue: 'Apply anyway — {count} records will be marked invalid',
+                  defaultValue:
+                    'Apply anyway — {count} record will be marked invalid (including trashed)',
+                  defaultValue_other:
+                    'Apply anyway — {count} records will be marked invalid (including trashed)',
                 })}
               </Button>
             }
@@ -65,7 +76,9 @@ export function SchemaConflictPanel({
             description={t('records.type_editor.preview.apply_anyway_description', {
               count: report.failing,
               defaultValue:
-                '{count} record(s) will be marked as not satisfying the schema, rather than being changed or deleted.',
+                '{count} record will be marked as not satisfying the schema (including trashed), rather than being changed or deleted.',
+              defaultValue_other:
+                '{count} records will be marked as not satisfying the schema (including trashed), rather than being changed or deleted.',
             })}
             confirmLabel={t('records.type_editor.preview.apply_anyway_confirm', {
               defaultValue: 'Apply anyway',

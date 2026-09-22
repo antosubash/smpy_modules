@@ -97,3 +97,27 @@ describe('R7c: "Check records" hands over the worklist it just wrote', () => {
     await view.unmount();
   });
 });
+
+describe('U3: the link never claims a count its own destination might not show', () => {
+  it('carries no count in its own label — the live-only worklist could show fewer', async () => {
+    const view = await press('records-check-records', report(12));
+    // `report.failing` counts live *and* trashed records; the worklist this
+    // links to (`?filter=invalid:eq:true`, no `trashed=`) lists live ones
+    // only. The count moved to a sentence above the link instead of sitting
+    // inside a promise the link's own destination could contradict.
+    expect(view.find(LINK)?.textContent).toBe('Show the marked records');
+    await view.unmount();
+  });
+
+  it('discloses the wider (live + trashed) scope next to the link', async () => {
+    const view = await press('records-check-records', report(12));
+    // (i18next is unconfigured under vitest, so `{count}` is not
+    // interpolated here — see `RecordRowAction.test.tsx`'s U27 tests for
+    // the same note. What matters is that the disclosure sentence itself
+    // renders, mentioning the Trash.)
+    const note = view.find('[data-testid="records-schema-preview"] p.text-muted-foreground');
+    expect(note?.textContent).toContain('{count}');
+    expect(note?.textContent).toContain('Trash');
+    await view.unmount();
+  });
+});

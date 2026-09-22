@@ -251,19 +251,36 @@ export function SchemaPreviewPanel({
               marked *every* one it found, so this is where the rest of the
               worklist is. Only after a saved-schema check: a draft preview
               marked nothing, and the link would list whatever an earlier
-              check left behind under a report about something else. */}
+              check left behind under a report about something else.
+
+              U3: `report.failing` (like `report.checked`) counts live *and*
+              trashed records (`_dry_run.py` scans both), but the worklist
+              this links to lists live records only — the trash has its own
+              toggle. The label used to promise "Show the {failing} marked
+              records" and land on a shorter list, so the count moved off the
+              link entirely: the sentence above discloses the real, wider
+              scope, and the link itself makes no count the destination
+              could disagree with. */}
           {mode === 'saved' && preview.report.failing > 0 && (
-            <Link
-              href={`/admin/records/${typeKey}?filter=invalid:eq:true`}
-              className="inline-block text-sm text-primary hover:underline"
-              data-testid="records-check-records-link"
-            >
-              {t('records.type_editor.preview.check_worklist', {
-                count: preview.report.failing,
-                defaultValue: 'Show the {count} marked record',
-                defaultValue_other: 'Show the {count} marked records',
-              })}
-            </Link>
+            <>
+              <p className="text-sm text-muted-foreground">
+                {t('records.type_editor.preview.report_marked_note', {
+                  count: preview.report.failing,
+                  defaultValue: '{count} record is marked invalid, including any in the Trash.',
+                  defaultValue_other:
+                    '{count} records are marked invalid, including any in the Trash.',
+                })}
+              </p>
+              <Link
+                href={`/admin/records/${typeKey}?filter=invalid:eq:true`}
+                className="inline-block text-sm text-primary hover:underline"
+                data-testid="records-check-records-link"
+              >
+                {t('records.type_editor.preview.check_worklist', {
+                  defaultValue: 'Show the marked records',
+                })}
+              </Link>
+            </>
           )}
         </div>
       )}
