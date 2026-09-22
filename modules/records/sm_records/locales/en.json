@@ -440,6 +440,7 @@
     "decimals": "At most {scale} decimal places are stored",
     "int_digits": "At most {digits} digits before the decimal point",
     "not_an_integer": "Must be a whole number",
+    "position": "Must be a whole number — use 0 for no particular order.",
     "min": "Must be at least {min}",
     "max": "Must be at most {max}",
     "boolean": "Expected true or false",

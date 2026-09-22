@@ -229,6 +229,29 @@ export function toApiValue(field: FieldDef, value: unknown, original?: unknown):
   }
 }
 
+/**
+ * The record envelope's `position` input → the integer the API takes, or
+ * `null` when what is in the box is not one (R14).
+ *
+ * `Number(position) || 0` was the old conversion, and it had three silent
+ * failures in it: a browser hands back `''` for text a `type="number"`
+ * input cannot parse, so typing garbage saved `0` with no message; `1e3`
+ * saved `1000`; and `3.7` went to the server to come back as a 422 that
+ * this input is the only sensible place to show. Parsed by pattern rather
+ * than by `Number`, because every one of those is a number to `Number`.
+ *
+ * An empty box is *not* zero: the box being empty is exactly what a
+ * browser reports for unparseable text, so reading it as 0 is the silent
+ * coercion this exists to stop. Clearing the field asks for a number, and
+ * `0` is the number that means "unordered".
+ */
+export function parsePosition(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^[+-]?\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
 /** Every field's stored value → the form's initial state. */
 export function toFormValues(fields: FieldDef[], data: Record<string, unknown> | null): FormValues {
   const out: FormValues = {};

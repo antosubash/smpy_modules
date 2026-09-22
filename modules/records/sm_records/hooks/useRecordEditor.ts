@@ -3,22 +3,14 @@ import { useT } from '@simple-module-py/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { fieldIdForKey } from '../components/fields/FieldShell';
 import { ApiError } from '../utils/api';
 import { createRecord, updateRecord } from '../utils/api-records';
 import { conflictField } from '../utils/conflicts';
+import { focusInvalidInput } from '../utils/focus-invalid';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
+import { parsePosition } from '../utils/values';
 import { useRecordForm } from './useRecordForm';
 import { useUnsavedGuard } from './useUnsavedGuard';
-
-/** The envelope inputs a 422 or a collision 409 can name, and the ids
- *  `RecordEnvelopeFields` gives them — a schema field's id comes from
- *  `fieldIdForKey` instead. */
-const ENVELOPE_INPUT_IDS: Record<string, string> = {
-  status: 'record-status',
-  slug: 'record-slug',
-  position: 'record-position',
-};
 
 /** Where a create leaves word that it happened, for the editor it navigates
  *  to (R22a).
@@ -51,30 +43,6 @@ function takeCreated(uuid: string | undefined): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Take the person to the input a refused save is about (UX review R6).
- *
- * Deferred a tick: the message that names the field is React state, and on
- * the slug's path it also has to open the "Advanced" disclosure it lives in
- * — neither is in the DOM while the click handler that called this is still
- * running. Focus *and* scroll, because a focused input below the fold is not
- * "identified to the user" in the sense WCAG 3.3.1 means.
- */
-function focusInvalidInput(key: string): void {
-  if (typeof document === 'undefined') return;
-  const id = ENVELOPE_INPUT_IDS[key] ?? fieldIdForKey(key);
-  window.setTimeout(() => {
-    const input = document.getElementById(id);
-    // A group control (a checkbox list, the relation picker) has no element
-    // at that id; its label does, and scrolling there is still the right
-    // answer even though there is nothing to focus.
-    const anchor = input ?? document.getElementById(`${id}-label`);
-    if (!anchor) return;
-    anchor.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    if (input instanceof HTMLElement) input.focus({ preventScroll: true });
-  }, 0);
 }
 
 /**
@@ -170,10 +138,24 @@ export function useRecordEditor(
   const save = async (overwriteVersion?: number) => {
     setConflict(null);
     const data = form.validateAndBuild();
-    if (data === null) {
+    // Every schema field gets a client-side check; the envelope's one
+    // numeric input used to get none (R14). Checked after the field
+    // validator so its own `setServerErrors([])` cannot wipe this message.
+    const positionValue = parsePosition(position);
+    if (positionValue === null) {
+      form.setServerErrors([
+        {
+          field: 'position',
+          message: t('records.validation.position', {
+            defaultValue: 'Must be a whole number — use 0 for no particular order.',
+          }),
+        },
+      ]);
+    }
+    if (data === null || positionValue === null) {
       // The refusal is already on screen — under an input that may be a
       // screen or more above the button just pressed. Go there (R6).
-      const first = form.firstInvalidKey();
+      const first = data === null ? form.firstInvalidKey() : 'position';
       if (first) focusInvalidInput(first);
       return;
     }
@@ -182,7 +164,7 @@ export function useRecordEditor(
       data,
       status,
       slug: slug || null,
-      position: Number(position) || 0,
+      position: positionValue,
       ...(opts.showLocalePicker ? { locale } : {}),
     };
     setPending(true);

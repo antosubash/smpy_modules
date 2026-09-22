@@ -173,6 +173,10 @@ export function RecordAdvancedFields({
           <Input
             id={POSITION_ID}
             type="number"
+            // Whole numbers only, in the spinner as well as in the check
+            // `useRecordEditor` runs on the way out (R14).
+            step="1"
+            inputMode="numeric"
             value={position}
             aria-invalid={!!positionError}
             onChange={(e) => onPositionChange(e.target.value)}

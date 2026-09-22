@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, mount, press, settle } from '../test-dom';
+import { act, mount, press, settle, setValue } from '../test-dom';
 import type { RecordRead, TypeRead } from '../utils/types';
 
 const updated = vi.fn();
@@ -142,6 +142,34 @@ describe('RecordEditor — R13: the editor is a form with a keyboard path to Sav
     const view = await editor();
     await press(window, { key: 's' });
     expect(updated).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+});
+
+describe('RecordEditor — R14: position is checked before it is sent', () => {
+  beforeEach(() => updated.mockClear());
+
+  it('refuses a fractional position inline instead of saving 0 or 422ing', async () => {
+    const view = await editor();
+    await setValue(view.find<HTMLInputElement>('#record-position') as HTMLInputElement, '3.7');
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    expect(updated).not.toHaveBeenCalled();
+    expect(view.host.textContent).toContain('Must be a whole number');
+    await view.unmount();
+  });
+
+  it('sends a whole number as a number, not a coerced string', async () => {
+    const view = await editor();
+    await setValue(view.find<HTMLInputElement>('#record-position') as HTMLInputElement, '12');
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    expect(updated).toHaveBeenCalledOnce();
+    expect(updated.mock.calls[0][3]).toMatchObject({ position: 12 });
     await view.unmount();
   });
 });

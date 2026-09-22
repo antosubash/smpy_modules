@@ -6,6 +6,7 @@ import {
   formatDateTime,
   isoToLocalInput,
   localInputToIso,
+  parsePosition,
   toApiValue,
   toFormValue,
   toFormValues,
@@ -215,5 +216,28 @@ describe('toFormValues', () => {
   it('materialises every declared key, even one the payload lacks', () => {
     const fields = [field('text', { key: 'a' }), field('multiselect', { key: 'b' })];
     expect(toFormValues(fields, { a: 'x' })).toEqual({ a: 'x', b: [] });
+  });
+});
+
+describe("parsePosition — R14: the envelope's one numeric input is checked too", () => {
+  it('takes a whole number, signed or not', () => {
+    expect(parsePosition('0')).toBe(0);
+    expect(parsePosition('42')).toBe(42);
+    expect(parsePosition(' 7 ')).toBe(7);
+    expect(parsePosition('-3')).toBe(-3);
+    expect(parsePosition('+3')).toBe(3);
+  });
+
+  it('refuses what `Number(position) || 0` used to swallow', () => {
+    // A browser hands back '' for text a number input cannot parse — the
+    // case that saved 0 with no message at all.
+    expect(parsePosition('')).toBeNull();
+    expect(parsePosition('   ')).toBeNull();
+    expect(parsePosition('abc')).toBeNull();
+    // 1e3 silently saved 1000.
+    expect(parsePosition('1e3')).toBeNull();
+    // 3.7 went to the server and came back a 422.
+    expect(parsePosition('3.7')).toBeNull();
+    expect(parsePosition('9007199254740993')).toBeNull();
   });
 });
