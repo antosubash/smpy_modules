@@ -25,10 +25,12 @@ import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
 import { SaveBar } from '../components/typeeditor/SaveBar';
 import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
 import { TypeEditorFooter } from '../components/typeeditor/TypeEditorFooter';
+import { TypeIoMenu } from '../components/typeeditor/TypeIoMenu';
 import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
 import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
+import { useTypeImport } from '../hooks/useTypeImport';
 import { useTypeSync } from '../hooks/useTypeSync';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { ApiError, createType, updateType } from '../utils/api';
@@ -44,10 +46,9 @@ const TYPES_LIST_HREF = '/admin/records/';
  * pointers *below* it (UX review R19: on a new type they have nothing to
  * point at until a field exists), and, on an existing type, the danger zone.
  * Phase 3 lifts the Phase 1 lock: a populated type's `fields`,
- * `display_field` and `slug_field` are editable here too, checked by
- * "Preview changes" before saving and by the save itself, which the server
- * enforces with a dry-run (§8.2) rather than trusting the client to have run
- * one. */
+ * `display_field` and `slug_field` are editable here too, checked by the
+ * save itself, which the server enforces with a dry-run (§8.2) rather than
+ * trusting the client to have run one. */
 function TypeEditor({
   type,
   target_types,
@@ -63,13 +64,11 @@ function TypeEditor({
   const [fields, setFields] = useState<EditableField[]>(() => withUids(type?.fields ?? []));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
   const [pending, setPending] = useState(false);
-  // The dry-run report of the change that was last forced through (R7a) —
-  // `useSchemaApply` clears its own on success, and that report is the only
-  // inventory of the records the force just marked invalid.
+  // The dry-run report of the change last forced through (R7a) — the only
+  // inventory of the records that force just marked invalid.
   const [lastApplied, setLastApplied] = useState<DryRunReport | null>(null);
-  // A 409 from turning "Translatable" off while foreign-locale records exist
-  // (design §4.1) — not one of `useSchemaApply`'s four known 409/422 shapes,
-  // so it is rethrown to here rather than handled there.
+  // A 409 from turning "Translatable" off while foreign-locale records
+  // exist (§4.1) — none of `useSchemaApply`'s shapes, so it lands here.
   const [translatableError, setTranslatableError] = useState<string | null>(null);
 
   const applySaved = (saved: TypeRead) => {
@@ -102,14 +101,12 @@ function TypeEditor({
   const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
   const dirty = typeIsDirty(current, values, fields);
   const guard = useUnsavedGuard(dirty);
-  // Read by `useTypeSync`'s effect, which reacts to the `type` prop alone:
-  // a background reindex poll must not re-baseline `current.version` under
-  // a draft (R15).
+  // Read by `useTypeSync`'s effect: a background reindex poll must not
+  // re-baseline `current.version` under a draft (R15).
   dirtyRef.current = dirty;
 
-  /** Force a refused change through, keeping its report on screen
-   *  afterwards — `retryWith` answers `null` when the retry was itself
-   *  refused, and there is nothing applied to report in that case. */
+  /** Force a refused change through, keeping its report on screen after —
+   *  `retryWith` answers `null` when the retry was itself refused. */
   const forceApply = async () => {
     const report = schemaApply.report;
     const result = await schemaApply.retryWith({ force: true });
@@ -131,8 +128,7 @@ function TypeEditor({
           fields: stripUids(fields),
           ...extraCreateFields(values),
         });
-        // The draft has just been written; the guard must not then ask about
-        // it on the way to the editor for the type it became.
+        // Written; the guard must not ask about it on the way out.
         guard.allow();
         router.visit(`/admin/records/types/${created.key}`);
         return;
@@ -142,8 +138,7 @@ function TypeEditor({
       changedTranslatable = 'translatable' in changes;
       if (Object.keys(changes).length === 0) {
         // Unreachable while Save is disabled on a clean draft (R22b), kept
-        // as the honest answer rather than a green "Saved" for a write that
-        // never happened.
+        // as the honest answer rather than a green "Saved" for a no-op.
         toast(t('records.type_editor.no_changes', { defaultValue: 'No changes to save' }));
         return;
       }
@@ -155,9 +150,8 @@ function TypeEditor({
       // (`current`/`report`/`conflicts`), so it lands here instead of there.
       if (err instanceof ApiError && err.status === 409 && changedTranslatable) {
         setTranslatableError(err.body?.detail ?? err.message);
-        // The switch itself moved on click; the server refused, so it
-        // reverts to what is actually saved rather than sit disagreeing with
-        // the error text underneath it (UX-7).
+        // The switch moved on click and the server refused, so it reverts
+        // rather than sit disagreeing with the error under it (UX-7).
         if (current) setValues((prev) => ({ ...prev, translatable: current.translatable }));
       } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         setCreateErrors(err.body.errors);
@@ -168,6 +162,18 @@ function TypeEditor({
       setPending(false);
     }
   };
+
+  // M3: a definition for *this* type is an ordinary schema update,
+  // refusals and all; one naming another key creates that type.
+  const { importDefinition } = useTypeImport({
+    current,
+    run: schemaApply.run,
+    reset: schemaApply.reset,
+    onCreated: (created) => {
+      guard.allow();
+      router.visit(`/admin/records/types/${created.key}`);
+    },
+  });
 
   const reloadFromConflict = (server: TypeRead) => {
     applySaved(server);
@@ -193,9 +199,16 @@ function TypeEditor({
       <PageShell
         title={title}
         actions={
-          <Button variant="outline" onClick={() => router.visit(TYPES_LIST_HREF)}>
-            {t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          </Button>
+          <>
+            <TypeIoMenu
+              currentKey={current?.key ?? null}
+              pending={pending || schemaApply.pending}
+              onImport={importDefinition}
+            />
+            <Button variant="outline" onClick={() => router.visit(TYPES_LIST_HREF)}>
+              {t('records.editor.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+          </>
         }
       >
         <div className="space-y-6">

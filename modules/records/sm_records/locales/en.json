@@ -494,6 +494,25 @@
     "apply": "Apply import",
     "close": "Close"
   },
+  "type_io": {
+    "menu": "Definition",
+    "export": "Download definition",
+    "import": "Import definition…",
+    "import_title": "Import a type definition",
+    "apply": "Import definition",
+    "will_create": "Creates a new type \"{label}\" ({key}).",
+    "will_update": "Updates this type ({key}) from the definition.",
+    "field_count": "{count} field",
+    "field_count_one": "{count} field",
+    "field_count_other": "{count} fields",
+    "create_help": "Nothing about the type you are editing changes; you will land on the new type.",
+    "update_help": "Checked against this type’s records first, exactly as the same change made here would be — anything it would break is reported instead of applied.",
+    "error_not_json": "That file isn't valid JSON — open it in a text editor and check it's complete.",
+    "error_not_object": "That file isn't a type definition: the top level has to be a JSON object.",
+    "error_missing_key": "That definition has no \"key\", so there is no type to create or update.",
+    "error_missing_label": "That definition has no \"label\".",
+    "error_missing_fields": "That definition has no \"fields\" list."
+  },
   "widget": {
     "loading": "Loading records…",
     "error": "Couldn't load records right now.",
