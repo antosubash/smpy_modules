@@ -14,15 +14,29 @@ import { restoredToast, trashToast } from './trashToast';
 export function RecordActions({
   typeKey,
   record,
+  allowNavigation,
   onRestored,
   onGone,
 }: {
   typeKey: string;
   record: RecordRead;
+  /** `useRecordEditor`'s `allowNavigation`, called immediately before
+   *  `onGone()` (R4). `onGone` is an ordinary Inertia visit, so a dirty form
+   *  otherwise made `useUnsavedGuard` ask "you have unsaved changes, leave
+   *  this page?" about a record that no longer exists — and cancelling left
+   *  the person on the editor of a deleted one. The create path already
+   *  does exactly this before its own visit. */
+  allowNavigation?: () => void;
   onRestored: (restored: RecordRead) => void;
   onGone: () => void;
 }) {
   const { t } = useT();
+  /** The work is written (or the record is gone); the guard must not ask
+   *  about it on the way out. */
+  const leave = () => {
+    allowNavigation?.();
+    onGone();
+  };
   const cancelLabel = t('records.editor.cancel', { defaultValue: 'Cancel' });
   const pendingLabel = t('records.editor.saving', { defaultValue: 'Saving…' });
 
@@ -51,7 +65,7 @@ export function RecordActions({
               router.reload({ only: ['records'] });
             },
           });
-          onGone();
+          leave();
         }}
       />
     );
@@ -95,7 +109,7 @@ export function RecordActions({
         destructive
         onConfirm={async () => {
           await purgeRecord(typeKey, record.uuid);
-          onGone();
+          leave();
         }}
       />
     </>

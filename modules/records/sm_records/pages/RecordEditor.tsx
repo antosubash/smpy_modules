@@ -67,6 +67,7 @@ function RecordEditor({
   const {
     isNew,
     current,
+    allowNavigation,
     status,
     slug,
     position,
@@ -221,6 +222,7 @@ function RecordEditor({
               <RecordActions
                 typeKey={type.key}
                 record={current}
+                allowNavigation={allowNavigation}
                 onRestored={applyRestored}
                 onGone={() => router.visit(backHref)}
               />
