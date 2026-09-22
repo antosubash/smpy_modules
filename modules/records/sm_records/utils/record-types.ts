@@ -29,6 +29,40 @@ export type TranslationRead = {
   is_deleted: boolean;
 };
 
+/**
+ * U20: the Languages panel is a page prop (`views.py::record_edit`'s
+ * `translations`), fetched once at load — a save that changes the title
+ * updates `current` (`useRecordEditor.ts`) but left this list showing what
+ * was true when the page opened, so after saving "Herbstgipfel" the h1
+ * updated and the panel kept reading "Autumn Summit" for the very record
+ * being edited.
+ *
+ * Patches the entry whose `locale` matches `current`'s from `current`
+ * itself, rather than refetching — `current` already *is* the freshest copy
+ * of that sibling. Every other locale's entry is untouched: this component
+ * has no fresher data about them than the page load gave it.
+ */
+export function withCurrentPatched(
+  translations: readonly TranslationRead[],
+  current: Pick<
+    TranslationRead,
+    'locale' | 'uuid' | 'status' | 'display_title' | 'is_deleted'
+  > | null,
+): TranslationRead[] {
+  if (!current) return [...translations];
+  return translations.map((sibling) =>
+    sibling.locale === current.locale
+      ? {
+          ...sibling,
+          uuid: current.uuid,
+          status: current.status,
+          display_title: current.display_title,
+          is_deleted: current.is_deleted,
+        }
+      : sibling,
+  );
+}
+
 /** One stored relation reference, resolved under `?expand=` (design §9).
  *  Mirrors `contracts/relations.py::ExpandedRef` — exactly one of the three
  *  states holds: resolved (`display_title` set), `dangling` (target trashed

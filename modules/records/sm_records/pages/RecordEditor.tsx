@@ -19,6 +19,7 @@ import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTranslations } from '../components/RecordTranslations';
 import { useRecordEditor } from '../hooks/useRecordEditor';
 import { displayFieldKey } from '../utils/errors-display';
+import { withCurrentPatched } from '../utils/record-types';
 import type { RecordRead, TranslationRead, TypeRead } from '../utils/types';
 
 type Props = {
@@ -167,7 +168,7 @@ function RecordEditor({
               typeKey={type.key}
               record={current}
               locales={contentLocales}
-              translations={translations ?? []}
+              translations={withCurrentPatched(translations ?? [], current)}
             />
           )}
 

@@ -242,3 +242,39 @@ describe('RecordEditor — U5: a server rejection gets the same summary as a cli
     await view.unmount();
   });
 });
+
+describe('RecordEditor — U20: the Languages panel reflects a just-saved title', () => {
+  it('shows the new title without a page reload once the save resolves', async () => {
+    const translatableType = { ...type(), translatable: true } as TypeRead;
+    updateImpl = () =>
+      Promise.resolve({ ...record(), display_title: 'Herbstgipfel' } as RecordRead);
+    const view = await mount(
+      <RecordEditor
+        type={translatableType}
+        record={record()}
+        content_locales={['en', 'de']}
+        translations={[
+          { locale: 'en', uuid: 'u1', status: 'draft', display_title: 'Dune', is_deleted: false },
+          {
+            locale: 'de',
+            uuid: 'u2',
+            status: 'draft',
+            display_title: 'Herbstgipfel-alt',
+            is_deleted: false,
+          },
+        ]}
+      />,
+    );
+    expect(view.host.textContent).toContain('Dune');
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    // The current record's own sibling entry ('en') now reads the saved
+    // title, with no navigation and no refetch of `translations`.
+    expect(view.find('[data-testid="records-translations"]')?.textContent).toContain(
+      'Herbstgipfel',
+    );
+    await view.unmount();
+  });
+});
