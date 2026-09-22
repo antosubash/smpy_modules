@@ -17,8 +17,6 @@
     "record_count": "{count} record",
     "record_count_one": "{count} record",
     "record_count_other": "{count} records",
-    "view_records": "View records",
-    "edit": "Edit",
     "trashed_record_count": "({count} trashed)",
     "trashed_record_count_one": "({count} trashed)",
     "trashed_record_count_other": "({count} trashed)",
@@ -197,9 +195,6 @@
     }
   },
   "errors": {
-    "not_found": "Not found",
-    "validation": "Validation failed",
-    "conflict": "Conflict",
     "offline": "Couldn't reach the server. Your changes are still on this page; try again.",
     "session_expired": "Your session has expired. Taking you to the sign-in page — your changes are still on this page until you leave it."
   },
@@ -424,10 +419,8 @@
     "deleted": "Deleted",
     "deleted_title": "The record this pointed at has been deleted.",
     "restricted": "Restricted",
-    "remove": "Remove",
     "remove_named": "Remove {title}",
     "search_placeholder": "Search by title…",
-    "search_label": "Search for a record",
     "search_field_label": "Search {label}",
     "searching": "Searching…",
     "no_results": "No matching records",
