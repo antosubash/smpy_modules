@@ -391,7 +391,8 @@
     "no_choices": "This field has no choices yet.",
     "unknown_type": "This field type ({type}) is not editable in this version.",
     "boolean_yes": "Yes",
-    "boolean_no": "No"
+    "boolean_no": "No",
+    "boolean_unset": "Not set"
   },
   "form": {
     "no_fields": "This type has no fields yet. Add some on its schema screen."
