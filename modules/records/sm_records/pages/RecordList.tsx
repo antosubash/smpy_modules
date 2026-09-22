@@ -137,6 +137,12 @@ function RecordList({
               canEdit={canEdit}
               fields={type.fields}
               trashed={trashed}
+              // U16: export honours the list's current filter, so the menu
+              // says so — `exportSearch` (above) drops the filter on a
+              // refused one, so this mirrors it rather than claiming
+              // "filtered" for an export that will not actually be one.
+              filtered={Boolean(currentFilter) && !filterErrorReason}
+              recordCount={known}
               {...(max_import_bytes ? { maxImportBytes: max_import_bytes } : {})}
             />
             {canEdit && (

@@ -232,6 +232,38 @@ export function importApplyBlockedReason(
   });
 }
 
+/**
+ * U16: "Download CSV"/"Download JSON" disclosed nothing about *how much* —
+ * export honours the list's current filter and the trash toggle (verified:
+ * `state:eq:CA` → 4 rows on screen, 4 rows in the file), and an admin
+ * exporting for a backup right after filtering got a silent subset. Says
+ * the scope in the menu item itself, so the count is read before the click
+ * rather than discovered after opening the download.
+ */
+export function exportScopeLabel(
+  t: Translate,
+  { trashed, filtered, count }: { trashed: boolean; filtered: boolean; count: number },
+): string {
+  if (trashed) {
+    return t('records.io.scope_trashed', {
+      count,
+      defaultValue: '{count} trashed record',
+      defaultValue_other: '{count} trashed records',
+    });
+  }
+  if (filtered) {
+    return t('records.io.scope_filtered', {
+      count,
+      defaultValue: '{count} filtered record',
+      defaultValue_other: '{count} filtered records',
+    });
+  }
+  return t('records.io.scope_all', {
+    count,
+    defaultValue: 'all {count} records',
+  });
+}
+
 /** The parser's own errors (`services/_io_upload.py`) are accurate but
  *  written for the log, not the person who just picked a file — one names a
  *  query parameter no browser upload can send, the other quotes a JSON

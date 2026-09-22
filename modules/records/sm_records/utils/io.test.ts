@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { OFFLINE_STATUS } from './api-net';
 import {
   DEFAULT_MAX_IMPORT_BYTES,
+  exportScopeLabel,
   formatImportLimit,
   importApplyBlockedReason,
   importFileTooLarge,
@@ -162,5 +163,46 @@ describe('importApplyBlockedReason', () => {
 
   it('is null once the operator has switched to on_error: skip — Apply can run', () => {
     expect(importApplyBlockedReason(fakeT, report({ failed: 1, total: 3 }), 'skip')).toBeNull();
+  });
+});
+
+// U16: the export menu never disclosed how much a download actually covers.
+describe('exportScopeLabel', () => {
+  /** `fakeT` above always resolves to the singular `defaultValue` — this
+   *  picks `defaultValue_other` for a `count` other than one, the same
+   *  i18next contract `RecordDeleteDialog.test.tsx`'s own stand-in mirrors. */
+  function fakePluralT(
+    _key: string,
+    opts: { count?: number; defaultValue: string; defaultValue_other?: string } & Record<
+      string,
+      unknown
+    >,
+  ): string {
+    const template =
+      opts.count !== undefined && opts.count !== 1 && opts.defaultValue_other
+        ? opts.defaultValue_other
+        : opts.defaultValue;
+    return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts[name] ?? ''));
+  }
+
+  it('names the trashed count when the list is showing the trash', () => {
+    expect(exportScopeLabel(fakePluralT, { trashed: true, filtered: false, count: 1 })).toBe(
+      '1 trashed record',
+    );
+    expect(exportScopeLabel(fakePluralT, { trashed: true, filtered: true, count: 3 })).toBe(
+      '3 trashed records',
+    );
+  });
+
+  it('names the filtered count when a filter is in force and the list is not trashed', () => {
+    expect(exportScopeLabel(fakePluralT, { trashed: false, filtered: true, count: 4 })).toBe(
+      '4 filtered records',
+    );
+  });
+
+  it('says "all N records" with no filter and no trash toggle', () => {
+    expect(exportScopeLabel(fakePluralT, { trashed: false, filtered: false, count: 181 })).toBe(
+      'all 181 records',
+    );
   });
 });

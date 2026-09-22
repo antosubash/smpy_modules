@@ -92,3 +92,11 @@ describe('RecordIoMenu — U3: a bad row explains itself instead of removing App
     await view.unmount();
   });
 });
+
+// U16 note: `exportScopeLabel`, the function these `filtered`/`recordCount`
+// props feed the menu items through, is covered directly in
+// utils/io.test.ts. Driving the Radix `DropdownMenu` itself open to read
+// the rendered item text is not exercised anywhere else in this module's
+// tests (its `DropdownMenuContent` is not force-mounted, and no test here
+// has previously needed to open one), so this stays at the unit level
+// rather than adding a first, possibly-flaky interaction test for it.

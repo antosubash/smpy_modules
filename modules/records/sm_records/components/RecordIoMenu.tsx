@@ -20,6 +20,7 @@ import { useRef } from 'react';
 import { useRecordImport } from '../hooks/useRecordImport';
 import {
   DEFAULT_MAX_IMPORT_BYTES,
+  exportScopeLabel,
   exportUrl,
   importApplyBlockedReason,
   importOptionsSummary,
@@ -42,6 +43,8 @@ export function RecordIoMenu({
   canEdit,
   fields,
   trashed = false,
+  filtered = false,
+  recordCount = 0,
   maxImportBytes = DEFAULT_MAX_IMPORT_BYTES,
 }: {
   typeKey: string;
@@ -53,6 +56,14 @@ export function RecordIoMenu({
   /** The list is showing the trash: the export menu says so next to the
    *  links, since that file cannot be re-imported (UX-11). */
   trashed?: boolean;
+  /** A `?filter=` is in force (U16) — export honours it the same way the
+   *  list does, so the menu says "filtered" rather than implying a full
+   *  export. */
+  filtered?: boolean;
+  /** `records.total` under the list's current filter/trashed state (U16) —
+   *  what the download actually contains, said before the click rather
+   *  than discovered after. */
+  recordCount?: number;
   /** `RecordsSettings.max_import_bytes`, as `views.py::record_list` sends
    *  it. A file over it is refused here (R9/M13) instead of being uploaded
    *  in full to be answered with a 413. */
@@ -75,6 +86,7 @@ export function RecordIoMenu({
   // result (`dry_run: false`), the run they described already happened.
   const canAdjustOptions = canEdit && file !== null && dryRunNow;
   const blockedReason = report ? importApplyBlockedReason(t, report, options.onError) : null;
+  const scope = exportScopeLabel(t, { trashed, filtered, count: recordCount });
 
   return (
     <>
@@ -88,12 +100,18 @@ export function RecordIoMenu({
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <a href={exportUrl(typeKey, 'json', search)} data-testid="records-export-json">
-              {t('records.io.export_json', { defaultValue: 'Download JSON' })}
+              {t('records.io.export_json_scoped', {
+                scope,
+                defaultValue: 'Download JSON ({scope})',
+              })}
             </a>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <a href={exportUrl(typeKey, 'csv', search)} data-testid="records-export-csv">
-              {t('records.io.export_csv', { defaultValue: 'Download CSV' })}
+              {t('records.io.export_csv_scoped', {
+                scope,
+                defaultValue: 'Download CSV ({scope})',
+              })}
             </a>
           </DropdownMenuItem>
           {trashed && (
