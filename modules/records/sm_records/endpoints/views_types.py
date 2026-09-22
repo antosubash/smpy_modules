@@ -40,11 +40,20 @@ router = APIRouter(route_class=RecordsViewErrorRoute)
 
 @router.get("/", response_model=None)
 async def type_list(
-    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(request_db)
+    request: Request,
+    inertia: InertiaDep,
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
 ) -> InertiaResponse:
     """The same omission ``GET /api/records/types`` makes: a type whose
     ``allowed_roles`` exclude the caller is not a card they can open, so it is
-    not a card (§10)."""
+    not a card (§10).
+
+    ``public_route_prefix`` rides along for the same reason
+    ``_editor_context`` sends it to the schema editor (Missing-15): a public
+    type's URL is otherwise verifiable nowhere but that editor, and the hub
+    is where most visits to a type actually start (UX-R13.1's row-links-to-
+    records design)."""
     rtypes = [
         rtype
         for rtype in await type_service.list_types(db)
@@ -54,7 +63,10 @@ async def type_list(
         type_read(rtype, *await type_service.record_counts(db, rtype)).model_dump(mode="json")
         for rtype in rtypes
     ]
-    return await inertia.render(constants._PAGE_TYPES, {"types": types})
+    return await inertia.render(
+        constants._PAGE_TYPES,
+        {"types": types, "public_route_prefix": settings.public_route_prefix},
+    )
 
 
 def _editor_context(

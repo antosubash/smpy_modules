@@ -25,6 +25,7 @@ function type(overrides: Partial<TypeRead> = {}): TypeRead {
     collection: null,
     record_count: 12,
     trashed_record_count: 0,
+    is_public: false,
     ...overrides,
   } as unknown as TypeRead;
 }
@@ -72,6 +73,44 @@ describe('Types — the table is unchanged at desktop widths', () => {
     const view = await mount(<Types types={[type()]} />);
     expect(view.find('table')).not.toBeNull();
     expect(view.find('[data-testid="records-type-card"]')).toBeNull();
+    await view.unmount();
+  });
+});
+
+/** Missing-item: "per-type public URL surface" — the type editor already
+ *  shows this (`PublicField`) and U14 put it on the per-type record list
+ *  (`RecordListPublicUrl`); this closes the last gap, the hub itself, which
+ *  is where UX-R13.1 says most visits to a type actually start. */
+describe('Types — a public type shows its public URL on the hub too', () => {
+  afterEach(() => {
+    // @ts-expect-error — undo the stub between tests
+    window.matchMedia = undefined;
+  });
+
+  it('shows the public URL in the desktop table row when the type is public', async () => {
+    setNarrow(false);
+    const view = await mount(
+      <Types types={[type({ is_public: true })]} public_route_prefix="/api/records/public" />,
+    );
+    const code = view.find('[data-testid="records-list-public-url"]');
+    expect(code?.textContent).toBe('/api/records/public/order');
+    await view.unmount();
+  });
+
+  it('shows nothing when the type is not public, on the table', async () => {
+    setNarrow(false);
+    const view = await mount(<Types types={[type({ is_public: false })]} />);
+    expect(view.find('[data-testid="records-list-public-url"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('shows the public URL on the phone card too', async () => {
+    setNarrow(true);
+    const view = await mount(
+      <Types types={[type({ is_public: true })]} public_route_prefix="/api/records/public" />,
+    );
+    const code = view.find('[data-testid="records-list-public-url"]');
+    expect(code?.textContent).toBe('/api/records/public/order');
     await view.unmount();
   });
 });

@@ -3,6 +3,7 @@ import { useT } from '@simple-module-py/i18n';
 import { NavIcon } from '@simple-module-py/ui/components/NavIcon';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import type { TypeRead } from '../utils/types';
+import { RecordListPublicUrl } from './RecordListPublicUrl';
 import { navIconName } from './typeeditor/navIcons';
 
 /**
@@ -14,7 +15,13 @@ import { navIconName } from './typeeditor/navIcons';
  * "Edit schema" a visible link in the card body rather than an action
  * column.
  */
-export function TypesCardList({ types }: { types: TypeRead[] }) {
+export function TypesCardList({
+  types,
+  publicRoutePrefix,
+}: {
+  types: TypeRead[];
+  publicRoutePrefix?: string;
+}) {
   const { t } = useT();
   return (
     <ul className="space-y-3">
@@ -58,6 +65,9 @@ export function TypesCardList({ types }: { types: TypeRead[] }) {
                 >
                   {type.description}
                 </p>
+              )}
+              {type.is_public && (
+                <RecordListPublicUrl typeKey={type.key} publicRoutePrefix={publicRoutePrefix} />
               )}
               <p className="mt-1 font-mono text-xs text-muted-foreground">
                 {type.key}

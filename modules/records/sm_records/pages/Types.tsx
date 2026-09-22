@@ -17,13 +17,14 @@ import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 
+import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { TypesCardList } from '../components/TypesCardList';
 import { navIconName } from '../components/typeeditor/navIcons';
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { TypeRead } from '../utils/types';
 
-type Props = { types: TypeRead[] };
+type Props = { types: TypeRead[]; public_route_prefix?: string };
 
 /** Above this many types the list stops being scannable and earns a filter
  *  box (UX review R13.4). Below it the box would be one more control between
@@ -34,7 +35,7 @@ const FILTER_THRESHOLD = 12;
  *  opens: every record type in this install, each row linking to *its
  *  records* (UX review R13.1 — browsing content is the frequent action;
  *  editing the schema is the rare one, and is a row action). */
-function Types({ types }: Props) {
+function Types({ types, public_route_prefix }: Props) {
   const { t } = useT();
   const [query, setQuery] = useState('');
   const narrow = useIsNarrow();
@@ -101,7 +102,7 @@ function Types({ types }: Props) {
               })}
             </div>
           ) : narrow ? (
-            <TypesCardList types={visible} />
+            <TypesCardList types={visible} publicRoutePrefix={public_route_prefix} />
           ) : (
             <Table>
               <TableHeader>
@@ -154,6 +155,12 @@ function Types({ types }: Props) {
                             >
                               {type.description}
                             </p>
+                          )}
+                          {type.is_public && (
+                            <RecordListPublicUrl
+                              typeKey={type.key}
+                              publicRoutePrefix={public_route_prefix}
+                            />
                           )}
                         </div>
                       </div>

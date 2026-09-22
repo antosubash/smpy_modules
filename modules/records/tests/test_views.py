@@ -42,8 +42,13 @@ async def test_type_list_view(client, records_app):
     assert resp.status_code == 200
     body = resp.json()
     assert body["component"] == "Records/Types"
-    assert set(body["props"]) >= {"types"}
+    # Missing-item ("per-type public URL surface"): the hub is where most
+    # visits to a type start (UX-R13.1), so it needs the same
+    # ``public_route_prefix`` the schema editor and the per-type list
+    # already carry (design §11 — DB-backed, not derivable in the browser).
+    assert set(body["props"]) == {"types", "public_route_prefix"}
     assert [item["key"] for item in body["props"]["types"]] == ["product"]
+    assert body["props"]["public_route_prefix"] == "/api/records/public"
 
 
 async def test_record_list_view(client, records_app):
