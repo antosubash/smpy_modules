@@ -192,11 +192,21 @@ class RecordsModule(ModuleBase):
 
         The sync is :mod:`sm_records.menu`, and middleware for a different
         reason — see below.
+
+        The body guard is :mod:`sm_records._body_limit`, and middleware
+        because a router dependency runs *after* FastAPI has read and parsed
+        the body for the endpoint's model — which is the cost it exists to
+        avoid. The framework offers nothing shared to hook into here.
         """
+        from sm_records._body_limit import BodyLimitMiddleware
         from sm_records._menu_middleware import MenuSyncMiddleware
         from sm_records.deferred import DeferredJobsMiddleware
 
         app.add_middleware(DeferredJobsMiddleware)
+        # Added before the two below so it ends up *outside* them
+        # (``add_middleware`` is LIFO): a body this module will not read must
+        # not have a sidebar sync or a deferred-job drain wrapped around it.
+        app.add_middleware(BodyLimitMiddleware)
         # Parked before the middleware that reads it so a handler can reach
         # this instance through ``request.app`` — today only to mark the
         # sidebar stale after a type write (:func:`sm_records.menu.mark_dirty`).

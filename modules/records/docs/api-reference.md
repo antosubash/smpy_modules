@@ -1069,6 +1069,7 @@ walking a large public type is exactly the caller that should use them.
 | `409` | Translating a non-translatable type, a source already in the target locale, or a locale a sibling already holds | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
+| `413` | Any other `/api/records/*` write body over `max_payload_bytes` + 65,536 | `{"detail"}` — refused from `Content-Length`, before the body is read |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
 | `422` | A NUL (`\x00`) in a payload value, a `unique` value, a type label or a field definition | `{"detail", "errors"}` |
@@ -1114,6 +1115,16 @@ counted, never named.
 already cleared one `set_null` reference before meeting a `restrict` deeper down
 commits nothing.
 
+**A write body is refused before it is read.** `max_payload_bytes` bounds one
+record's serialized `data`, which can only be measured after the whole request
+has been read and parsed — so the module also bounds the *body*, from
+`Content-Length`, at `max_payload_bytes` plus 64 KiB of envelope headroom, and
+counts the bytes of a request that declares no length. That ceiling is
+deliberately looser than the setting: it is the size past which a request is
+not worth reading, while the route's own `422` remains the exact contract and
+still names the precise number. `POST …/records/import` is exempt and keeps
+`max_import_bytes`.
+
 **Every `/api/records/*` response is JSON, including the ones nothing
 planned for.** An unanticipated exception is logged with the request's
 `x-correlation-id`, the request's session is rolled back, and the body is
@@ -1155,6 +1166,7 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_in_values` | 200 | Values in one `in:` list — `400` over it |
 | `max_aggregate_groups` | 1,000 | Groups one aggregate returns, then `truncated: true` |
 | `max_payload_bytes` | 262,144 | One record's serialized `data` |
+| `max_payload_bytes` + 65,536 | 327,680 | Any `/api/records/*` write body except the import — `413` **before** the body is read |
 | `max_import_bytes` | 52,428,800 | One import body — `413` **before** parsing |
 | `max_fields_per_type` | 100 | Field definitions per type |
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |
