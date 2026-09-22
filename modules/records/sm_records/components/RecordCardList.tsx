@@ -30,6 +30,7 @@ export function RecordCardList({
   showPosition = false,
   onDelete,
   onRestore,
+  onPurge,
 }: {
   type: TypeRead;
   records: RecordRead[];
@@ -40,6 +41,7 @@ export function RecordCardList({
   showPosition?: boolean;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
+  onPurge: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
   const columns = listColumns(type);
@@ -73,6 +75,7 @@ export function RecordCardList({
                 trashed={trashed}
                 onDelete={onDelete}
                 onRestore={onRestore}
+                onPurge={onPurge}
               />
             </div>
           </div>

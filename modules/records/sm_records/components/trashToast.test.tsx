@@ -5,7 +5,7 @@ const error = vi.fn();
 vi.mock('sonner', () => ({ toast: { success, error } }));
 vi.mock('@inertiajs/react', () => ({ Link: ({ children }: { children?: unknown }) => children }));
 
-const { trashToast } = await import('./trashToast');
+const { trashToast, purgedToast } = await import('./trashToast');
 
 function fakeT(key: string, opts?: Record<string, unknown>): string {
   return (opts?.defaultValue as string) ?? key;
@@ -44,5 +44,13 @@ describe('trashToast — R5: a refused Undo is announced, not swallowed', () => 
     await Promise.resolve();
     expect(restore).toHaveBeenCalledOnce();
     expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe('purgedToast — U4/U9: an irreversible action still says it happened', () => {
+  it('raises a plain success toast with no Undo action', () => {
+    success.mockClear();
+    purgedToast(fakeT);
+    expect(success).toHaveBeenCalledWith('Deleted permanently');
   });
 });

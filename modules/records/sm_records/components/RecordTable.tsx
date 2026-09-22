@@ -66,6 +66,7 @@ export function RecordTable({
   onSort,
   onDelete,
   onRestore,
+  onPurge,
 }: {
   type: TypeRead;
   records: RecordRead[];
@@ -81,6 +82,7 @@ export function RecordTable({
   onSort: (field: string) => void;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
+  onPurge: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
   const narrow = useIsNarrow();
@@ -103,6 +105,7 @@ export function RecordTable({
         showPosition={showPosition}
         onDelete={onDelete}
         onRestore={onRestore}
+        onPurge={onPurge}
       />
     );
   }
@@ -214,6 +217,7 @@ export function RecordTable({
                 trashed={trashed}
                 onDelete={onDelete}
                 onRestore={onRestore}
+                onPurge={onPurge}
               />
             </TableCell>
           </TableRow>

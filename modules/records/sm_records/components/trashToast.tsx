@@ -52,3 +52,13 @@ export function trashToast(
 export function restoredToast(t: Translate): void {
   toast.success(t('records.records.restored', { defaultValue: 'Record restored' }));
 }
+
+/** A third, irreversible outcome (U4/U9): unlike a soft delete, a purge has
+ *  no Undo to offer, so the toast is a plain confirmation rather than an
+ *  action — but it still owes the operator the same "this happened" that
+ *  `trashToast` gives the reversible case, since the row action's only other
+ *  feedback is the row disappearing from a table the operator may not be
+ *  looking at. */
+export function purgedToast(t: Translate): void {
+  toast.success(t('records.records.purged', { defaultValue: 'Deleted permanently' }));
+}

@@ -13,8 +13,7 @@ import { RecordListEmpty } from '../components/RecordListEmpty';
 import { PAGE_SIZES, RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
-import { restoredToast, trashToast } from '../components/trashToast';
-import { deleteRecord, restoreRecord } from '../utils/api-records';
+import { useRecordListMutations } from '../hooks/useRecordListMutations';
 import {
   buildSortParam,
   exportSearchParams,
@@ -25,7 +24,7 @@ import {
   parseSort,
   parseTrashedParam,
 } from '../utils/listing';
-import type { FilterOp, RecordPage, RecordRead, TypeRead } from '../utils/types';
+import type { FilterOp, RecordPage, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
@@ -131,20 +130,7 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
     goTo({ page: 1, sort: buildSortParam(nextSort(currentSort, field)) ?? null });
   const toggleTrashed = () => goTo({ page: 1, trashed: !trashed });
 
-  const handleDelete = async (record: RecordRead) => {
-    await deleteRecord(type.key, record.uuid);
-    router.reload({ only: ['records'] });
-    // A soft delete that said nothing at all was a reversible action wearing
-    // an irreversible one's face (UX-R8): the toast names the Trash, undoes
-    // the delete, and links the trashed view for anyone who reads it late.
-    trashToast(t, { typeKey: type.key, onUndo: () => handleRestore(record) });
-  };
-
-  const handleRestore = async (record: RecordRead) => {
-    await restoreRecord(type.key, record.uuid);
-    router.reload({ only: ['records'] });
-    restoredToast(t);
-  };
+  const { handleDelete, handleRestore, handlePurge } = useRecordListMutations(type.key, t);
 
   // `total` is exact only up to `RecordsSettings.max_count` (F4): beyond it
   // the API reports the cap with `total_capped`, and the footer says
@@ -250,6 +236,7 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
                 onSort={handleSort}
                 onDelete={handleDelete}
                 onRestore={handleRestore}
+                onPurge={handlePurge}
               />
             )}
           </div>

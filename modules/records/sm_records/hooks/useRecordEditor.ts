@@ -116,7 +116,7 @@ export function useRecordEditor(
     const detail = typeof err.body?.detail === 'string' ? err.body.detail : err.message;
     const inTrash = t('records.editor.unique_in_trash', {
       defaultValue:
-        'A record with this value already exists — it may be in the Trash, which keeps its claim until it is deleted permanently.',
+        'A record with this value already exists — it may be in the Trash. Open the Trash and either restore it and change its value, or delete it permanently to release the value.',
     });
     const field = conflictField(
       detail,
