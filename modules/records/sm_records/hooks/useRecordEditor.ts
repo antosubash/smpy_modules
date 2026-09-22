@@ -126,7 +126,16 @@ export function useRecordEditor(
       toast.error(detail);
       return;
     }
-    form.setServerErrors([{ field, message: `${detail} ${inTrash}` }]);
+    // The slug field is the one collision an operator often never typed
+    // into — it derives from Title by default — so naming *that* recovery
+    // is what the generic "already taken" sentence is missing (U5).
+    const extra =
+      field === 'slug'
+        ? t('records.editor.slug_collision_help', {
+            defaultValue: ' Change the Title, or set a distinct Slug under Advanced.',
+          })
+        : '';
+    form.setServerErrors([{ field, message: `${detail} ${inTrash}${extra}` }]);
     focusInvalidInput(field);
   };
 

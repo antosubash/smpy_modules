@@ -16,6 +16,7 @@
 import { useT } from '@simple-module-py/i18n';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { bareFieldKey } from '../utils/focus-invalid';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator, type Translate } from '../utils/validation';
 import { buildPayload, type FormValues, toFormValues } from '../utils/values';
@@ -261,9 +262,21 @@ export function useRecordForm(type: TypeRead, record: RecordRead | null) {
     serverErrors,
     setServerErrors,
     /** How many fields the last client-side validation is still unhappy
-     *  about — the count the editor's summary next to Save reports, and it
-     *  falls as they are fixed because `setValue` re-checks (R6). */
+     *  about — falls as they are fixed because `setValue` re-checks (R6). */
     clientErrorCount: Object.keys(clientErrors).length,
+    /** The count the editor's "N fields need attention" summary next to Save
+     *  actually reports (U5). `validateAndBuild` clears `serverErrors` before
+     *  it runs, so a save that reached the server already passed the client
+     *  validator — the two counts are never simultaneously nonzero, and
+     *  falling back to the server one gives a 409 collision or a 422 the same
+     *  role="alert" treatment the client path always had. Distinct field
+     *  keys, not raw error count: a collision sets exactly one entry, but a
+     *  422 naming both a schema field and `slug` should read "2", not risk
+     *  double-counting a field two error sources happen to both mention. */
+    errorCount:
+      Object.keys(clientErrors).length > 0
+        ? Object.keys(clientErrors).length
+        : new Set(serverErrors.map((entry) => bareFieldKey(entry.field))).size,
     clearErrors,
     reset,
     raw,

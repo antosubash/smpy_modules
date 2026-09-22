@@ -2,9 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, mount, press, settle, setValue } from '../test-dom';
+import { ApiError } from '../utils/api';
 import type { RecordRead, TypeRead } from '../utils/types';
 
 const updated = vi.fn();
+/** U5 tests override this to reject like the server would; every other test
+ *  leaves it at the default resolved record. */
+let updateImpl: (...args: unknown[]) => Promise<RecordRead>;
 
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,
@@ -15,7 +19,7 @@ vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 vi.mock('../utils/api-records', () => ({
   updateRecord: (...args: unknown[]) => {
     updated(...(args as []));
-    return Promise.resolve(record());
+    return updateImpl(...args);
   },
   createRecord: vi.fn(),
   deleteRecord: vi.fn(),
@@ -88,6 +92,19 @@ function record(): RecordRead {
 
 async function editor() {
   return mount(<RecordEditor type={type()} record={record()} />);
+}
+
+beforeEach(() => {
+  updateImpl = () => Promise.resolve(record());
+});
+
+/** `focusInvalidInput` (utils/focus-invalid.ts) defers its work a macrotask
+ *  — `settle()`'s microtask flush does not reach it — so U5's tests need one
+ *  more turn of the real event loop before checking `document.activeElement`. */
+async function settleTimers(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 describe('RecordEditor — R13: the editor is a form with a keyboard path to Save', () => {
@@ -170,6 +187,54 @@ describe('RecordEditor — R14: position is checked before it is sent', () => {
     await settle();
     expect(updated).toHaveBeenCalledOnce();
     expect(updated.mock.calls[0][3]).toMatchObject({ position: 12 });
+    await view.unmount();
+  });
+});
+
+describe('RecordEditor — U5: a server rejection gets the same summary as a client one', () => {
+  it('shows the role=alert summary and moves focus on a slug collision (409)', async () => {
+    updateImpl = () =>
+      Promise.reject(
+        new ApiError(
+          409,
+          { detail: "slug 'dune' is already used by another book record in 'en'" },
+          'conflict',
+        ),
+      );
+    const view = await editor();
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    await settleTimers();
+    const summary = view.find('[data-testid="records-save-summary"]');
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).toContain('field needs attention');
+    // The recovery clause the review asked for, and the input the person
+    // never typed into is where the message (and focus) land.
+    expect(view.host.textContent).toContain('Change the Title');
+    expect(document.activeElement?.id).toBe('record-slug');
+    await view.unmount();
+  });
+
+  it('shows the summary and focuses the first field named by a 422', async () => {
+    updateImpl = () =>
+      Promise.reject(
+        new ApiError(
+          422,
+          { errors: [{ field: 'title', message: 'already used by another record' }] },
+          'invalid',
+        ),
+      );
+    const view = await editor();
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    await settleTimers();
+    const summary = view.find('[data-testid="records-save-summary"]');
+    expect(summary?.textContent).toContain('field needs attention');
+    expect(document.activeElement?.id).toBe('record-field-title');
     await view.unmount();
   });
 });

@@ -245,18 +245,20 @@ function RecordEditor({
               />
             )}
 
-            {/* A save refused by the client validator used to change nothing
-                the person could see from here — the offending field could be
-                a screen above (R6). This says how many, beside the button
-                that appeared to do nothing. */}
-            {form.clientErrorCount > 0 && (
+            {/* A save refused by the client validator — or, since U5, by the
+                server (a 422 or a 409 collision) — used to change nothing
+                the person could see from here beyond the inline error, which
+                may be a screen above (R6). This says how many, beside the
+                button that appeared to do nothing, the same way regardless
+                of which side found the problem. */}
+            {form.errorCount > 0 && (
               <p
                 className="text-sm text-destructive"
                 role="alert"
                 data-testid="records-save-summary"
               >
                 {t('records.editor.fields_need_attention', {
-                  count: form.clientErrorCount,
+                  count: form.errorCount,
                   defaultValue: '{count} field needs attention',
                   defaultValue_other: '{count} fields need attention',
                 })}

@@ -160,6 +160,7 @@
     "fields_need_attention_one": "{count} field needs attention",
     "fields_need_attention_other": "{count} fields need attention",
     "unique_in_trash": "A record with this value already exists — it may be in the Trash. Open the Trash and either restore it and change its value, or delete it permanently to release the value.",
+    "slug_collision_help": " Change the Title, or set a distinct Slug under Advanced.",
     "invalid_json": "Invalid JSON",
     "conflict_title": "This record changed while you were editing",
     "conflict_help": "Someone else saved a change to this record since you opened it. Reload to see the latest version, or overwrite it with what you have.",
