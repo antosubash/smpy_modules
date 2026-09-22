@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
@@ -17,27 +16,12 @@ import {
 } from '@simple-module-py/ui/components/ui/dropdown-menu';
 import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
 import { ChevronDownIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { toast } from 'sonner';
-import {
-  DEFAULT_MAX_IMPORT_BYTES,
-  exportUrl,
-  formatImportLimit,
-  friendlyImportError,
-  type ImportReport,
-  importFileTooLarge,
-  importOptionsSummary,
-  importRecords,
-} from '../utils/io';
+import { useRef } from 'react';
+import { useRecordImport } from '../hooks/useRecordImport';
+import { DEFAULT_MAX_IMPORT_BYTES, exportUrl, importOptionsSummary } from '../utils/io';
 import type { FieldDef } from '../utils/types';
 import { ImportReportSummary } from './ImportReportSummary';
-import {
-  DEFAULT_IMPORT_OPTIONS,
-  type ImportOptionsValue,
-  RecordImportOptions,
-} from './RecordImportOptions';
-
-type Phase = 'idle' | 'checking' | 'applying';
+import { RecordImportOptions } from './RecordImportOptions';
 
 /** Export (JSON / CSV) and Import for the record-list toolbar.
  *
@@ -71,82 +55,14 @@ export function RecordIoMenu({
 }) {
   const { t } = useT();
   const input = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [report, setReport] = useState<ImportReport | null>(null);
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [options, setOptions] = useState<ImportOptionsValue>(DEFAULT_IMPORT_OPTIONS);
-  const busy = phase !== 'idle';
-
-  // `overrideOptions` lets a change made *while the dialog is already open*
-  // (the options trigger now lives inside it, above Apply — R21) re-run the
-  // dry run against the new choice immediately, instead of the closed-over
-  // `options` state from before the click that changed it.
-  const run = async (chosen: File, dryRun: boolean, overrideOptions?: ImportOptionsValue) => {
-    const opts = overrideOptions ?? options;
-    setPhase(dryRun ? 'checking' : 'applying');
-    try {
-      const result = await importRecords(typeKey, chosen, {
-        dryRun,
-        mode: opts.mode,
-        onError: opts.onError,
-        matchBy: opts.matchBy,
-        force: opts.force,
-      });
-      setReport(result);
-      // R26: the dialog switches to "Import result" for this same outcome —
-      // announcing it a second time with a toast was the duplicate the
-      // review filed. The dialog stays open and names the reload below.
-      // Reload whenever the apply actually wrote a row, not only on a
-      // clean run (M3): `on_error: 'skip'` can write every good row and
-      // still report `failed > 0`, and gating on `failed === 0` alone left
-      // those writes invisible behind the dialog until a manual page
-      // reload. Same partial reload a delete/restore uses
-      // (`pages/RecordList.tsx`).
-      if (!dryRun && result.created + result.updated > 0) {
-        router.reload({ only: ['records'] });
-      }
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      toast.error(friendlyImportError(t, raw));
-    } finally {
-      setPhase('idle');
-    }
-  };
-
-  const limitText = formatImportLimit(maxImportBytes);
+  const { file, report, phase, options, busy, limitText, pick, changeOptions, apply, close } =
+    useRecordImport(typeKey, maxImportBytes);
 
   const onPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0] ?? null;
     // Reset immediately so picking the *same* file twice still fires change.
     event.target.value = '';
-    if (!chosen) return;
-    if (importFileTooLarge(chosen.size, maxImportBytes)) {
-      // Said here, before the upload: the server's own refusal is a 413
-      // that arrives only after the whole file has gone up the wire
-      // (R9/M13).
-      toast.error(
-        t('records.io.too_large', {
-          name: chosen.name,
-          limit: limitText,
-          defaultValue: '"{name}" is larger than the {limit} import limit.',
-        }),
-      );
-      return;
-    }
-    setFile(chosen);
-    await run(chosen, true);
-  };
-
-  // Changing an option while the preview is on screen re-runs the dry run
-  // against the same file right away (R21) — the alternative, closing the
-  // dialog to reopen a toolbar popover and re-picking the file to see the
-  // effect, is the flow the review filed this against.
-  const onOptionsChange = (patch: Partial<ImportOptionsValue>) => {
-    setOptions((prev) => {
-      const next = { ...prev, ...patch };
-      if (file) void run(file, true, next);
-      return next;
-    });
+    if (chosen) await pick(chosen);
   };
 
   const dryRunNow = report ? report.dry_run : phase === 'checking';
@@ -220,7 +136,7 @@ export function RecordIoMenu({
         </>
       )}
 
-      <Dialog open={report !== null || busy} onOpenChange={(open) => !open && setReport(null)}>
+      <Dialog open={report !== null || busy} onOpenChange={(open) => !open && close()}>
         <DialogContent data-testid="records-import-report">
           <DialogHeader>
             <DialogTitle>
@@ -262,13 +178,13 @@ export function RecordIoMenu({
               <RecordImportOptions
                 fields={fields}
                 value={options}
-                onChange={onOptionsChange}
+                onChange={changeOptions}
                 disabled={busy}
               />
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" disabled={busy} onClick={() => setReport(null)}>
+            <Button type="button" variant="outline" disabled={busy} onClick={close}>
               {t('records.io.close', { defaultValue: 'Close' })}
             </Button>
             {report?.dry_run && report.failed === 0 && file && (
@@ -276,7 +192,7 @@ export function RecordIoMenu({
                 type="button"
                 disabled={busy}
                 data-testid="records-import-apply"
-                onClick={() => void run(file, false)}
+                onClick={() => void apply()}
               >
                 {t('records.io.apply', { defaultValue: 'Apply import' })}
               </Button>
