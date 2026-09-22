@@ -34,6 +34,12 @@ tables per test costs more than the tests do.
 ``alembic_version`` is left alone: a database this may run against could have
 been migrated rather than ``create_all``-ed, and truncating the version table
 would make it look unmigrated to anything that checks.
+
+**A test database is built with ``create_all(checkfirst=True)``, which creates
+missing tables and never alters an existing one** — so after a model change
+(a new column, a new index) an existing Postgres test database has to be
+dropped and recreated, or the whole suite errors on the column that is not
+there.
 """
 
 from __future__ import annotations

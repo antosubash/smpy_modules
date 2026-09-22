@@ -13,6 +13,7 @@ Re-exported from ``export``, so no caller has to learn this module exists.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -25,6 +26,7 @@ __all__ = [
     "APOSTROPHE",
     "ENVELOPE_COLUMNS",
     "FORMULA_LEADERS",
+    "PLAIN_NUMBER",
     "csv_cell",
     "csv_header",
     "escape_formula",
@@ -83,11 +85,12 @@ def csv_cell(field: FieldDefinition | None, value: Any) -> str:
     ``multiselect`` is a JSON list: any flat separator is a value somebody's
     content contains.
 
-    **Then :func:`escape_formula`, on every cell without exception** — the
-    envelope columns included, because ``translation_group`` is carried
-    through an import verbatim and is therefore as caller-chosen as any
-    payload value. Uniformity is also what makes the strip on the way back in
-    a single rule rather than a per-column table.
+    **Then :func:`escape_formula`, on every cell** — the envelope columns
+    included, because ``translation_group`` is carried through an import
+    verbatim and is therefore as caller-chosen as any payload value.
+    Uniformity is also what makes the strip on the way back in a single rule
+    rather than a per-column table. Its one exemption is a plain negative
+    number, which no spreadsheet reads as a formula (:data:`PLAIN_NUMBER`).
     """
     if value is None:
         return ""
@@ -115,6 +118,10 @@ record chooses that value. The conventional mitigation is a leading
 apostrophe, which Excel and LibreOffice both read as "the rest of this cell is
 literal text".
 
+``-`` is on the list because ``-1+cmd|…`` is a formula, not because a minus
+sign is; :data:`PLAIN_NUMBER` is the exemption that keeps every negative
+number in an export from being spelled ``'-5``.
+
 Escaping the apostrophe **too** is what keeps the file round-tripping, and is
 the whole answer to the objection this module used to record here — that the
 prefix is lossy because an importer cannot tell it from a value that genuinely
@@ -126,9 +133,37 @@ loses a leading apostrophe on import; the README says so.
 """
 
 
+PLAIN_NUMBER = re.compile(r"[-+]?\d+(?:\.\d+)?\Z")
+"""A cell that is only a number: optional sign, digits, optional decimals.
+
+The one exemption from the escape, and only for a leading ``-``. Every
+negative number in an export is a cell starting with a hyphen — a ``number``
+field, a negative ``position``, a minus in somebody's text — and ``'-5`` is
+what the spreadsheet then shows, in the column the escape exists to make
+*readable*. ``-5`` is not a formula: a spreadsheet evaluates it to minus five
+and there is nothing for it to call. ``-1+1`` is one, and is not matched here;
+neither is ``-1e5``, ``-.5`` or anything else the grammar does not spell out,
+because the failure mode of being too generous is the vulnerability and the
+failure mode of being too strict is an apostrophe.
+
+``+5`` keeps its apostrophe: a leading ``+`` is not how anyone writes a
+number, and narrowing the exemption to the character that actually occurs is
+what keeps this one line of reasoning rather than a second grammar.
+"""
+
+
 def escape_formula(cell: str) -> str:
-    """One cell, safe to open in a spreadsheet. See :data:`FORMULA_LEADERS`."""
-    return APOSTROPHE + cell if cell.startswith(FORMULA_LEADERS) else cell
+    """One cell, safe to open in a spreadsheet. See :data:`FORMULA_LEADERS`.
+
+    A plain *negative number* is the exemption — :data:`PLAIN_NUMBER` says
+    why. Everything else that starts with a leader is prefixed, apostrophes
+    included, so the import unescape stays the single rule it is.
+    """
+    if not cell.startswith(FORMULA_LEADERS):
+        return cell
+    if cell.startswith("-") and PLAIN_NUMBER.match(cell):
+        return cell
+    return APOSTROPHE + cell
 
 
 def _relation_cell(value: Any) -> str:

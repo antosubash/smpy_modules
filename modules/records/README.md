@@ -1018,8 +1018,12 @@ endings per RFC 4180.
 > of whichever admin clicked Export. Escaping the apostrophe *itself* is what
 > keeps the round trip exact: the importer strips exactly one leading
 > apostrophe from every cell, so a value that genuinely starts with one
-> survives. The one cost is a CSV written **by hand** rather than exported —
-> it carries no doubling, so a hand-typed `'12` imports as `12`.
+> survives. **A plain negative number is the one exemption** — `-5`, `-5.25`,
+> a negative `position` — because a spreadsheet evaluates it to itself and
+> prefixing it turned every column of figures into `'-5`. Anything else that
+> begins with a hyphen (`-1+1`, `-cmd`) is still escaped. The one cost is a
+> CSV written **by hand** rather than exported — it carries no doubling, so a
+> hand-typed `'12` imports as `12`.
 
 **Import options** (query string, or multipart form fields, which win):
 

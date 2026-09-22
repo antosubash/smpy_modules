@@ -105,6 +105,37 @@ as it did until the next forced schema change or **Check records** marks
 anything. Downgrading drops the column and loses only which records were
 marked; the derived badge is unaffected and a later check re-derives the list.
 
+### Before upgrading past `8f3d223f8605`: `invalid` is now a reserved field key
+
+The same change made `invalid` a fixed filter/sort column, and
+`constants.RESERVED_FIELD_KEYS` derives itself from that set — so `invalid`
+and `invalid_since` join `status`, `slug`, `locale` and the rest as keys a
+type may not declare. **There is no migration guard for an install that
+already declared one**, and the consequence is not only a refused schema save:
+the stored definitions are re-validated on every read
+(`services/_payload.field_defs`), so such a type answers `422` to every
+request that touches it, the anonymous public API included.
+
+Check before you upgrade — there is nothing to do if this returns no rows,
+which is the usual case:
+
+```sql
+-- PostgreSQL (`records_type.fields` is a `json` column)
+SELECT key FROM records_type
+WHERE fields::jsonb @> '[{"key": "invalid"}]'
+   OR fields::jsonb @> '[{"key": "invalid_since"}]';
+
+-- SQLite, where the same column is text
+SELECT key FROM records_type
+WHERE fields LIKE '%"key": "invalid"%' OR fields LIKE '%"key":"invalid"%';
+```
+
+If it returns a type, rename the field **before** the upgrade — through the
+type editor, which is still a normal remove-and-add rename (the old key's
+values land under `_orphaned`, §8.2) — and re-point anything that filters or
+sorts on it. Renaming afterwards is the same operation but has to be done in
+SQL, because the editor cannot load a type it refuses to validate.
+
 ### The `records@base` caveat
 
 The first revision carries `branch_labels = ("records",)`, which makes it

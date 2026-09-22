@@ -127,9 +127,11 @@ def _unescape(cell: str) -> str:
     Every cell, not only the ones that look dangerous: the escape doubles an
     apostrophe that was already there, so ``''x`` is the content ``'x`` and
     ``'x`` is the content ``x``. One added on the way out, one taken off on the
-    way in, and the round trip is lossless. The cost is a CSV written *by
-    hand*, which carries no doubling and loses a leading apostrophe — the
-    README states that next to the export.
+    way in, and the round trip is lossless. It stays lossless over the
+    exporter's one exemption too — a plain negative number is written bare, so
+    there is no apostrophe here to take off and ``-5`` reads back as ``-5``.
+    The cost is a CSV written *by hand*, which carries no doubling and loses a
+    leading apostrophe — the README states that next to the export.
     """
     return cell[1:] if cell.startswith(APOSTROPHE) else cell
 

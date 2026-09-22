@@ -26,11 +26,17 @@ _DANGEROUS = [
     "=cmd|' /C calc'!A0",
     "+1+1",
     "-2+3",
+    "-1+1",
+    "-cmd",
     "@SUM(A1)",
     "\tstarts-with-tab",
     "\rstarts-with-cr",
 ]
 _HARMLESS = ["plain text", "a=b", "x - y", ""]
+_NEGATIVE_NUMBERS = ["-5", "-5.25", "-0", "-12345.00001"]
+"""Cells a spreadsheet evaluates to themselves. Every negative number in an
+export starts with a hyphen, and prefixing those made a readable column of
+figures into a column of ``'-5``."""
 
 
 async def _type(client, key: str) -> dict:
@@ -73,6 +79,27 @@ async def test_a_dangerous_cell_is_written_with_a_leading_apostrophe(client):
     assert exported == sorted("'" + value for value in _DANGEROUS)
 
 
+async def test_a_plain_negative_number_is_written_bare(client):
+    """The exemption: ``-5`` is not a formula, it is minus five, and the
+    apostrophe was showing up in every column of figures."""
+    await _type(client, "csvneg")
+    for position, value in enumerate(_NEGATIVE_NUMBERS):
+        await _create(client, "csvneg", {"name": f"row{position}", "note": value})
+    exported = sorted(_cells(await _export_csv(client, "csvneg"), "note"))
+    assert exported == sorted(_NEGATIVE_NUMBERS)
+
+
+async def test_a_hyphen_cell_that_is_not_a_number_is_still_escaped(client):
+    """The exemption is a *number*, not a leading hyphen — ``-1+1`` is an
+    expression and ``-cmd`` is a cell reference away from being one."""
+    await _type(client, "csvhyph")
+    values = ["-1+1", "-cmd", "-1e5", "-.5", "-5 apples", "-"]
+    for position, value in enumerate(values):
+        await _create(client, "csvhyph", {"name": f"row{position}", "note": value})
+    exported = sorted(_cells(await _export_csv(client, "csvhyph"), "note"))
+    assert exported == sorted("'" + value for value in values)
+
+
 async def test_a_harmless_cell_is_written_verbatim(client):
     await _type(client, "csvplain")
     for position, value in enumerate(_HARMLESS):
@@ -102,7 +129,13 @@ async def test_export_then_import_round_trips_every_shape(client):
     # The empty string is left out on purpose: an empty cell means ``None`` to
     # the importer, which is a round-trip asymmetry this module has always had
     # and nothing to do with the escape. It is covered verbatim above.
-    values = [*_DANGEROUS, *filter(None, _HARMLESS), "'tis a quote", "''already doubled"]
+    values = [
+        *_DANGEROUS,
+        *_NEGATIVE_NUMBERS,
+        *filter(None, _HARMLESS),
+        "'tis a quote",
+        "''already doubled",
+    ]
     for position, value in enumerate(values):
         await _create(client, "csvout", {"name": f"row{position}", "note": value})
 
@@ -123,8 +156,8 @@ async def test_export_then_import_round_trips_every_shape(client):
 
 
 async def test_the_envelope_columns_round_trip_too(client):
-    """``position`` is negative here, so the escape touches it — and the
-    importer has to give the number back, not a string with an apostrophe."""
+    """``position`` is negative here — a plain number, so it is written bare
+    (the exemption) and the importer has to give the number back."""
     await _type(client, "csvenv")
     resp = await client.post(
         f"{_API}/csvenv/records",
@@ -133,7 +166,7 @@ async def test_the_envelope_columns_round_trip_too(client):
     )
     assert resp.status_code == 201, resp.text
     exported = await _export_csv(client, "csvenv")
-    assert _cells(exported, "position") == ["'-7"]
+    assert _cells(exported, "position") == ["-7"]
 
     imported = await client.post(
         f"{_API}/csvenv/records/import?dry_run=false&format=csv&on_error=abort",
