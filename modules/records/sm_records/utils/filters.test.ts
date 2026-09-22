@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { disambiguateLabels, opsForFieldType } from './filters';
+import {
+  defaultFilterValue,
+  disambiguateLabels,
+  filterKind,
+  normaliseFilterValue,
+  opsForFieldType,
+} from './filters';
 
 /**
  * Mirrors `sm_records.index._predicates._ALLOWED` — see that dict for the
@@ -67,5 +73,48 @@ describe('disambiguateLabels', () => {
       { key: 'b', label: 'Dup', ops: ['ne'] },
     ]);
     expect(first).toEqual({ key: 'a', label: 'Dup (a)', ops: ['eq'] });
+  });
+});
+
+describe('filterKind — R8/M12', () => {
+  it('sends each field type to the control that can express its values', () => {
+    expect(filterKind('flag', 'boolean')).toBe('boolean');
+    expect(filterKind('due', 'date')).toBe('date');
+    expect(filterKind('seen_at', 'datetime')).toBe('datetime');
+    expect(filterKind('author', 'relation')).toBe('relation');
+    expect(filterKind('title', 'text')).toBe('text');
+    expect(filterKind('tags', 'multiselect')).toBe('text');
+  });
+
+  it('keeps the two fixed columns with closed value sets on their own', () => {
+    expect(filterKind('status')).toBe('status');
+    expect(filterKind('locale')).toBe('locale');
+    expect(filterKind('display_title')).toBe('text');
+  });
+});
+
+describe('normaliseFilterValue — a select never desyncs from its options', () => {
+  it('falls back for a value the control has no option for', () => {
+    expect(normaliseFilterValue('boolean', 'maybe', [])).toBe('true');
+    expect(normaliseFilterValue('status', 'archived', [])).toBe('draft');
+    expect(normaliseFilterValue('locale', 'fr', ['en', 'de'])).toBe('en');
+  });
+
+  it('keeps a value the control can show, and leaves free text alone', () => {
+    expect(normaliseFilterValue('boolean', 'false', [])).toBe('false');
+    expect(normaliseFilterValue('status', 'published', [])).toBe('published');
+    expect(normaliseFilterValue('locale', 'de', ['en', 'de'])).toBe('de');
+    expect(normaliseFilterValue('text', 'anything at all', [])).toBe('anything at all');
+    expect(normaliseFilterValue('datetime', '2026-01-15T10:30:00+00:00', [])).toBe(
+      '2026-01-15T10:30:00+00:00',
+    );
+  });
+
+  it('starts a freshly chosen field on the first option its control offers', () => {
+    expect(defaultFilterValue('boolean', [])).toBe('true');
+    expect(defaultFilterValue('status', [])).toBe('draft');
+    expect(defaultFilterValue('locale', ['en', 'de'])).toBe('en');
+    expect(defaultFilterValue('date', [])).toBe('');
+    expect(defaultFilterValue('relation', [])).toBe('');
   });
 });

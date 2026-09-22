@@ -1,15 +1,21 @@
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import type React from 'react';
 import { useState } from 'react';
 
-import { disambiguateLabels, opsForFieldType } from '../utils/filters';
+import {
+  defaultFilterValue,
+  disambiguateLabels,
+  type FilterKind,
+  filterKind,
+  normaliseFilterValue,
+  opsForFieldType,
+} from '../utils/filters';
 import type { FilterValue } from '../utils/listing';
-import { localeLabel } from '../utils/locale';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
+import { FilterValueInput } from './FilterValueInput';
 
 /** Labels for the filter grammar's operators. A plain `t()` call per op
  *  (rather than a module-scope `Record<FilterOp, string>`) so the strings
@@ -44,7 +50,16 @@ function opLabel(t: Translate, op: FilterOp): string {
 // already imports it from this module.
 export type { FilterValue };
 
-type FilterableField = { key: string; label: string; ops: readonly FilterOp[] };
+type FilterableField = {
+  key: string;
+  label: string;
+  ops: readonly FilterOp[];
+  /** Which value control this field takes (R8/M12) — see `filterKind`. */
+  kind: FilterKind;
+  /** The schema field itself, for the kinds whose control needs more than
+   *  the key (a `relation` needs its `options.target_type`). */
+  def?: FieldDef;
+};
 
 /** The fixed columns every type can filter on regardless of its schema
  *  (`sm_records.index.query.FIXED_COLUMNS`), narrowed to the one operator
@@ -65,11 +80,13 @@ function fixedFilterFields(t: Translate, locales: string[]): FilterableField[] {
       // construction.
       label: t('records.records.display_title', { defaultValue: 'Title' }),
       ops: ['starts_with', 'contains'],
+      kind: 'text',
     },
     {
       key: 'status',
       label: t('records.records.status', { defaultValue: 'Status' }),
       ops: ['eq'],
+      kind: 'status',
     },
   ];
   if (locales.length > 1) {
@@ -77,6 +94,7 @@ function fixedFilterFields(t: Translate, locales: string[]): FilterableField[] {
       key: 'locale',
       label: t('records.records.locale', { defaultValue: 'Language' }),
       ops: ['eq'],
+      kind: 'locale',
     });
   }
   return fields;
@@ -126,6 +144,8 @@ export function FilterBar({
       // (`query._term` short-circuits before `value_clause`), so unlike the
       // comparison operators it doesn't vary by kind.
       ops: [...opsForFieldType(f.type).filter((op) => op !== 'in'), 'is_null'],
+      kind: filterKind(f.key, f.type),
+      def: f,
     }));
   // A fixed column is dropped when a declared field already claims the key,
   // so the dropdown can never list one twice. Moot since those names became
@@ -152,23 +172,35 @@ export function FilterBar({
   const initialOp =
     current?.op && initialOps.includes(current.op) ? current.op : (initialOps[0] ?? 'eq');
 
+  const initialKind = fieldByKey.get(initialField)?.kind ?? 'text';
+
   const [field, setField] = useState(initialField);
   const [op, setOp] = useState<FilterOp>(initialOp);
-  const [value, setValue] = useState(current?.value ?? '');
+  // Normalised, for the same reason `initialOp` is: a closed-set control
+  // handed a value it has no option for shows its first option while state
+  // holds the other one.
+  const [value, setValue] = useState(() =>
+    normaliseFilterValue(initialKind, current?.value ?? '', locales),
+  );
 
   if (filterable.length === 0) return null;
 
-  const allowedOps = fieldByKey.get(field)?.ops ?? FILTER_OPS;
+  const active = fieldByKey.get(field);
+  const allowedOps = active?.ops ?? FILTER_OPS;
+  const kind = active?.kind ?? 'text';
   const needsValue = op !== 'is_null';
-  const isStatus = field === 'status';
-  const isLocale = field === 'locale';
 
   const selectField = (nextField: string) => {
     setField(nextField);
-    const nextOps = fieldByKey.get(nextField)?.ops ?? FILTER_OPS;
+    const next = fieldByKey.get(nextField);
+    const nextOps = next?.ops ?? FILTER_OPS;
     if (!nextOps.includes(op)) setOp(nextOps[0] ?? 'eq');
-    if (nextField === 'status' && value !== 'draft' && value !== 'published') setValue('draft');
-    if (nextField === 'locale' && !locales.includes(value)) setValue(locales[0] ?? '');
+    const nextKind = next?.kind ?? 'text';
+    // A value only survives a field change when the same control can still
+    // show it — a date string in a boolean select, or a uuid pointing at
+    // another type, cannot.
+    const sameTarget = nextKind !== 'relation' || next?.def === active?.def;
+    if (nextKind !== kind || !sameTarget) setValue(defaultFilterValue(nextKind, locales));
   };
 
   // A `<form>` and not a `<div>` (UX-R2): the value input is the most-typed
@@ -219,54 +251,14 @@ export function FilterBar({
           ))}
         </NativeSelect>
       </div>
-      {needsValue && isStatus && (
-        <div className="grid gap-1.5">
-          <Label htmlFor="records-filter-value">
-            {t('records.records.filter_value', { defaultValue: 'Value' })}
-          </Label>
-          <NativeSelect
-            id="records-filter-value"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          >
-            <NativeSelectOption value="draft">
-              {t('records.records.draft', { defaultValue: 'Draft' })}
-            </NativeSelectOption>
-            <NativeSelectOption value="published">
-              {t('records.records.published', { defaultValue: 'Published' })}
-            </NativeSelectOption>
-          </NativeSelect>
-        </div>
-      )}
-      {needsValue && isLocale && (
-        <div className="grid gap-1.5">
-          <Label htmlFor="records-filter-value">
-            {t('records.records.filter_value', { defaultValue: 'Value' })}
-          </Label>
-          <NativeSelect
-            id="records-filter-value"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          >
-            {locales.map((tag) => (
-              <NativeSelectOption key={tag} value={tag}>
-                {localeLabel(tag)}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
-      )}
-      {needsValue && !isStatus && !isLocale && (
-        <div className="grid gap-1.5">
-          <Label htmlFor="records-filter-value">
-            {t('records.records.filter_value', { defaultValue: 'Value' })}
-          </Label>
-          <Input
-            id="records-filter-value"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </div>
+      {needsValue && (
+        <FilterValueInput
+          kind={kind}
+          field={active?.def}
+          value={value}
+          locales={locales}
+          onChange={setValue}
+        />
       )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={!field}>

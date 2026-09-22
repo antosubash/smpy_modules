@@ -77,3 +77,65 @@ export function disambiguateLabels<T extends { key: string; label: string }>(fie
     (seen.get(field.label) ?? 0) > 1 ? { ...field, label: `${field.label} (${field.key})` } : field,
   );
 }
+
+/**
+ * Which *control* the filter bar should offer for a field, as opposed to
+ * which operators it allows (R8/M12).
+ *
+ * `status` and `locale` are the two fixed columns that have a closed value
+ * set of their own; the rest follow the field's declared `type`. Everything
+ * this map does not name is free text, which is what the whole bar used to
+ * be — a boolean meant typing `true` (the server's `coerce_bool` also takes
+ * `yes`/`on`/`1`, which nothing in the UI said), a date meant typing
+ * `YYYY-MM-DD` by hand, and a relation meant pasting a 32-character uuid.
+ */
+export type FilterKind =
+  | 'status'
+  | 'locale'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'relation'
+  | 'text';
+
+const KIND_BY_FIELD_TYPE: Record<string, FilterKind> = {
+  boolean: 'boolean',
+  date: 'date',
+  datetime: 'datetime',
+  relation: 'relation',
+};
+
+export function filterKind(key: string, fieldType?: string): FilterKind {
+  if (key === 'status') return 'status';
+  if (key === 'locale') return 'locale';
+  if (!fieldType) return 'text';
+  return KIND_BY_FIELD_TYPE[fieldType] ?? 'text';
+}
+
+/**
+ * A value the chosen control can actually represent.
+ *
+ * Every closed-set control (`status`, `locale`, `boolean`) has to answer
+ * this, for the same reason `FilterBar` re-checks the op it was handed: the
+ * value may come from a hand-edited or stale URL, and a `<select>` whose
+ * `value` matches no `<option>` displays the *first* option while state
+ * holds something else — so Apply then re-submits the filter that just
+ * failed (the R16 shape, one control down). Free-text kinds keep whatever
+ * they were given.
+ */
+export function normaliseFilterValue(
+  kind: FilterKind,
+  value: string,
+  locales: readonly string[],
+): string {
+  if (kind === 'status') return value === 'published' ? 'published' : 'draft';
+  if (kind === 'locale') return locales.includes(value) ? value : (locales[0] ?? '');
+  if (kind === 'boolean') return value === 'false' ? 'false' : 'true';
+  return value;
+}
+
+/** The value a freshly chosen field starts on — a select has no empty state
+ *  to leave it in, so it starts on its first option. */
+export function defaultFilterValue(kind: FilterKind, locales: readonly string[]): string {
+  return normaliseFilterValue(kind, '', locales);
+}
