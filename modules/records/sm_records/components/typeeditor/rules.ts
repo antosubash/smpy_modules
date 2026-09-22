@@ -99,6 +99,18 @@ export function slugFieldAllowed(type: string): boolean {
  *  `sm_records.constants.TYPE_KEY_PATTERN`. */
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
+/** `sm_records.constants.MAX_KEY_LEN` — `schema/_keys.py` refuses a longer
+ *  key with a 422 whose `field` is the over-long key itself, which
+ *  `groupErrors` then cannot attribute to any row input. The user guide
+ *  documents the rule ("at most 64 characters"), so the editor has to
+ *  enforce it too. Pinned against the Python constant by
+ *  `tests/test_reserved_keys_sync.py`. */
+export const MAX_KEY_LEN = 64;
+
+/** `sm_records.constants.MAX_LABEL_LEN`, same contract as `MAX_KEY_LEN` —
+ *  the label inputs carry it as a `maxLength`. */
+export const MAX_LABEL_LEN = 200;
+
 /** Whether a field of this `type` can be `indexed` — and therefore ever
  *  `unique`, since `unique` has nothing to check against otherwise. */
 export function indexable(type: string): boolean {
@@ -121,7 +133,7 @@ export function uniqueAllowed(field: FieldTypeAndOptions): boolean {
   return true;
 }
 
-export type KeyError = 'required' | 'reserved' | 'pattern' | 'duplicate';
+export type KeyError = 'required' | 'reserved' | 'pattern' | 'too_long' | 'duplicate';
 
 /** Validate a proposed field (or type) key against the rules
  *  `schema/fields.py::_validate_key` enforces. `existingKeys` should exclude
@@ -131,6 +143,8 @@ export function keyValid(key: string, existingKeys: readonly string[]): KeyError
   if (!key) return 'required';
   if (RESERVED_FIELD_KEYS.has(key)) return 'reserved';
   if (!KEY_PATTERN.test(key)) return 'pattern';
+  // Same order `_validate_key` checks in: pattern first, then length.
+  if (key.length > MAX_KEY_LEN) return 'too_long';
   if (existingKeys.includes(key)) return 'duplicate';
   return null;
 }

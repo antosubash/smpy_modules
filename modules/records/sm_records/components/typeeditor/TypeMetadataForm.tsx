@@ -11,7 +11,7 @@ import { keyFromLabel, pluralFromLabel } from './formHelpers';
 import { IconField } from './IconField';
 import { PublicField } from './PublicField';
 import { RolesMultiSelect } from './RolesMultiSelect';
-import { type KeyError as KeyErrorCode, keyValid } from './rules';
+import { type KeyError as KeyErrorCode, keyValid, MAX_KEY_LEN, MAX_LABEL_LEN } from './rules';
 import { SidebarField } from './SidebarField';
 import type { TypeMetadataValues } from './types';
 
@@ -104,6 +104,7 @@ export function TypeMetadataForm({
             <Input
               id={ID.key}
               value={values.key}
+              maxLength={MAX_KEY_LEN}
               placeholder={t('records.type_editor.key_placeholder', {
                 defaultValue: 'blog_post',
               })}
@@ -143,6 +144,7 @@ export function TypeMetadataForm({
         <Input
           id={ID.label}
           value={values.label}
+          maxLength={MAX_LABEL_LEN}
           onChange={(e) => onLabelChange(e.target.value)}
           aria-invalid={!!fieldMessage(errors, 'label')}
         />
@@ -156,6 +158,7 @@ export function TypeMetadataForm({
         <Input
           id={ID.labelPlural}
           value={values.labelPlural}
+          maxLength={MAX_LABEL_LEN}
           onChange={(e) => {
             pluralTouched.current = true;
             onChange({ labelPlural: e.target.value });
@@ -253,7 +256,7 @@ export function TypeMetadataForm({
   );
 }
 
-/** The type key's inline refusals — the same four `rules.ts::keyValid`
+/** The type key's inline refusals — the same set `rules.ts::keyValid`
  *  returns for a field key, worded for a type (R19). */
 function typeKeyError(t: Translate, code: KeyErrorCode, key: string): string {
   const defaults = {
@@ -261,7 +264,12 @@ function typeKeyError(t: Translate, code: KeyErrorCode, key: string): string {
     reserved: '"{key}" is reserved by the module.',
     pattern:
       'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
+    too_long: 'Must be at most {max} characters.',
     duplicate: 'Another type already uses this key.',
   };
-  return t(`records.type_editor.type_key_error.${code}`, { key, defaultValue: defaults[code] });
+  return t(`records.type_editor.type_key_error.${code}`, {
+    key,
+    max: MAX_KEY_LEN,
+    defaultValue: defaults[code],
+  });
 }

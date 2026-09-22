@@ -7,7 +7,15 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
-import { indexable, indexedForced, keyValid, uniqueAllowed } from './rules';
+import {
+  indexable,
+  indexedForced,
+  type KeyError,
+  keyValid,
+  MAX_KEY_LEN,
+  MAX_LABEL_LEN,
+  uniqueAllowed,
+} from './rules';
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
 // See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
@@ -16,19 +24,20 @@ import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
 type Translate = (...args: any[]) => string;
 
-function keyErrorMessage(
-  t: Translate,
-  code: 'required' | 'reserved' | 'pattern' | 'duplicate',
-  key: string,
-): string {
+function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
   const defaults = {
     required: 'A key is required.',
     reserved: '"{key}" is reserved by the module: it names a column every record already has.',
     pattern:
       'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
+    too_long: 'Must be at most {max} characters.',
     duplicate: 'Another field already uses this key.',
   };
-  return t(`records.type_editor.key_error.${code}`, { key, defaultValue: defaults[code] });
+  return t(`records.type_editor.key_error.${code}`, {
+    key,
+    max: MAX_KEY_LEN,
+    defaultValue: defaults[code],
+  });
 }
 
 /**
@@ -79,6 +88,7 @@ export function FieldRowBody({
           <Input
             id={`${idBase}-key`}
             value={field.key}
+            maxLength={MAX_KEY_LEN}
             disabled={disabled || keyLocked}
             readOnly={keyLocked}
             onChange={(e) => onChange({ key: e.target.value })}
@@ -126,6 +136,7 @@ export function FieldRowBody({
           <Input
             id={`${idBase}-label`}
             value={field.label}
+            maxLength={MAX_LABEL_LEN}
             disabled={disabled}
             onChange={(e) => onChange({ label: e.target.value })}
           />

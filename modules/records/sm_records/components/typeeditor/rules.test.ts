@@ -5,6 +5,8 @@ import {
   indexable,
   indexedForced,
   keyValid,
+  MAX_KEY_LEN,
+  MAX_LABEL_LEN,
   normaliseOnToggle,
   RESERVED_FIELD_KEYS,
   slugFieldAllowed,
@@ -76,9 +78,24 @@ describe('keyValid', () => {
     expect(keyValid('title', ['title', 'price'])).toBe('duplicate');
   });
 
+  it('rejects a key past MAX_KEY_LEN, which the API 422s (R3)', () => {
+    // The user guide documents the cap; before R3 the editor accepted it
+    // and the save came back 422 with the over-long key as `field`, which
+    // `groupErrors` cannot attribute to any row input.
+    expect(keyValid('a'.repeat(MAX_KEY_LEN + 1), [])).toBe('too_long');
+    expect(keyValid('a'.repeat(MAX_KEY_LEN), [])).toBeNull();
+  });
+
   it('accepts a well-formed, unique key', () => {
     expect(keyValid('release_date', ['title', 'price'])).toBeNull();
     expect(keyValid('a', [])).toBeNull();
+  });
+});
+
+describe('length caps mirror the API (R3)', () => {
+  it('states the two the server enforces — pinned by tests/test_reserved_keys_sync.py', () => {
+    expect(MAX_KEY_LEN).toBe(64);
+    expect(MAX_LABEL_LEN).toBe(200);
   });
 });
 

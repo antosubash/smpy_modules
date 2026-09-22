@@ -211,6 +211,7 @@
       "required": "A key is required.",
       "reserved": "\"{key}\" is reserved by the module.",
       "pattern": "Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.",
+      "too_long": "Must be at most {max} characters.",
       "duplicate": "Another type already uses this key."
     },
     "icon": "Icon",
@@ -261,6 +262,7 @@
       "required": "A key is required.",
       "reserved": "\"{key}\" is reserved by the module: it names a column every record already has.",
       "pattern": "Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.",
+      "too_long": "Must be at most {max} characters.",
       "duplicate": "Another field already uses this key."
     },
     "min_length": "Minimum length",
