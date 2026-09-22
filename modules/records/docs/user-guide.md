@@ -296,14 +296,21 @@ option shows the key in brackets — *Status (order_status)* against
 **Condition** offers only the operators that mean something for that field's
 kind:
 
-| Field kind | Conditions offered |
+| Field kind | Conditions offered (with the token each writes into the URL) |
 |---|---|
-| `text`, `longtext`*, `select`, `multiselect`, `email`, `url` | **is**, **is not**, **contains**, **starts with**, **is empty** |
-| `number`, `integer`, `date`, `datetime` | **is**, **is not**, **>**, **>=**, **<**, **<=**, **is empty** |
-| `boolean` | **is**, **is not**, **is empty** |
-| `relation` | **is**, **is not**, **is empty** |
+| `text`, `longtext`*, `select`, `multiselect`, `email`, `url` | **is** `eq`, **is not** `ne`, **contains** `contains`, **starts with** `starts_with`, **is empty** `is_null` |
+| `number`, `integer`, `date`, `datetime` | **is** `eq`, **is not** `ne`, **>** `gt`, **>=** `gte`, **<** `lt`, **<=** `lte`, **is empty** `is_null` |
+| `boolean` | **is** `eq`, **is not** `ne`, **is empty** `is_null` |
+| `relation` | **is** `eq`, **is not** `ne`, **is empty** `is_null` |
 
 \* only if it were indexable, which it is not — it never appears in the picker.
+
+The token is the `op` in `?filter=field:op:value`, which is what you need to
+hand-build one: **is not** on `order_status` is `?filter=order_status:ne:paid`,
+not `?filter=order_status:is not:paid`. **is empty** takes `true` or `false`
+as its value (`?filter=notes:is_null:true`). The full grammar — every operator,
+what each value must look like per field kind, and the limits — is
+[api-reference.md § Query grammar](api-reference.md#query-grammar).
 
 The URL grammar additionally accepts **is one of (comma-separated)**
 (`in:a,b,c`), which the bar does not offer.
@@ -720,6 +727,15 @@ lost when you leave this page."* Each sample entry links to its record, and
 
 Removing a field is **destructive** but not lossy: each record keeps the value
 under a reserved `_orphaned` key, moved there on that record's next write.
+
+**It does disappear from view in the meantime.** From the moment you save the
+schema change, nothing reads that value back: the record editor, the list, an
+export, the API and the public API all show the record without it, because the
+type no longer declares the field. The value is still in the database — it is
+what a re-add can restore below — but "retained" means recoverable, not
+visible. Nothing is copied into `_orphaned` until the record is next written,
+either, so a record nobody edits keeps its value at the top level of the stored
+payload and still does not show it.
 
 Re-adding a field with the same key is refused while orphaned values exist, and
 the editor asks which you want under **These fields still hold values from a
