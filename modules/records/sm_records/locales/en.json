@@ -467,6 +467,8 @@
     "summary": "{total} row(s): {created} to create, {updated} to update, {skipped} unchanged, {failed} failed",
     "summary_result": "{total} row(s): {created} created, {updated} updated, {skipped} unchanged, {failed} failed",
     "error_row": "Row {row} ({field}): {message}",
+    "too_large": "\"{name}\" is larger than the {limit} import limit.",
+    "limit_note": "Files up to {limit}.",
     "error_unknown_format": "Couldn't tell whether that file is JSON or CSV — save it with a .json or .csv extension and try again.",
     "error_bad_json": "That file isn't valid JSON — open it in a text editor and check it's complete.",
     "errors_truncated": "Only the first errors are listed; fix these and try again.",

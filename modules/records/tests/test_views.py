@@ -66,11 +66,16 @@ async def test_record_list_view(client, records_app):
         "trashed",
         "content_locales",
         "default_locale",
+        # The import menu refuses an over-size file before uploading it
+        # (review R9/M13); the limit is a DB-backed setting the browser has
+        # no other way to know.
+        "max_import_bytes",
     }
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
     # Always present, so a partial reload after a bad filter clears the notice.
     assert body["props"]["errors"] == {}
+    assert body["props"]["max_import_bytes"] > 0
 
 
 async def test_record_new_view(client, records_app):

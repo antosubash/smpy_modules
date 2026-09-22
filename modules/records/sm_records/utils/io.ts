@@ -7,12 +7,20 @@
  * call that went through `request()` would have to unset a header that
  * helper exists to set.
  *
+ * What it does *not* get to skip is what `request()` does about the
+ * connection rather than the payload (R9): an expired session redirects to
+ * the sign-in page with `next` pointing back here, and a `fetch` that
+ * rejects outright becomes the module's own offline `ApiError` instead of a
+ * raw `TypeError: Failed to fetch`. Both live in `utils/api-net.ts` for
+ * exactly this reuse.
+ *
  * Export is a plain `<a href>` rather than a `fetch`: the response carries
  * `Content-Disposition: attachment`, so the browser saves it, streaming, with
  * no blob buffered in the tab. Fetching it to build an object URL would undo
  * the one property the endpoint was written for.
  */
 
+import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
 import type { FieldDef } from './types';
 
 // The rest of this module types `t` loosely for the same reason
@@ -41,6 +49,27 @@ export type ImportReport = {
 };
 
 const BASE = '/api/records';
+
+/** `RecordsSettings.max_import_bytes`'s own default (`settings.py`, 50 MiB).
+ *
+ * The *effective* limit travels as a prop (`views.py::record_list` sends
+ * `max_import_bytes`, since an operator may have changed it); this is the
+ * fallback for a caller that has no prop to read, and it is pinned against
+ * the Python default by `tests/test_reserved_keys_sync.py`. Before R9 the
+ * whole file was posted and the server answered 413 *after* the upload —
+ * 50 MB uphill on a domestic connection to be told the limit exists. */
+export const DEFAULT_MAX_IMPORT_BYTES = 52428800;
+
+/** Whether this file is small enough to be worth sending. */
+export function importFileTooLarge(size: number, limit: number): boolean {
+  return size > limit;
+}
+
+/** The limit as a person reads it — one decimal, MB, for the dialog's own
+ *  sentence and for the refusal. */
+export function formatImportLimit(limit: number): string {
+  return `${Math.round((limit / (1024 * 1024)) * 10) / 10} MB`;
+}
 
 /** The download URL for one type, carrying the list screen's own
  *  `filter`/`sort`/`trashed` so "Export" means "export what I am looking at"
@@ -137,11 +166,22 @@ export async function importRecords(
   if (options.matchBy) body.append('match_by', options.matchBy);
   if (options.force) body.append('force', 'true');
 
-  const response = await fetch(`${BASE}/types/${encodeURIComponent(typeKey)}/records/import`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/types/${encodeURIComponent(typeKey)}/records/import`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body,
+    });
+  } catch {
+    // A dropped connection mid-upload — the one failure most likely on a
+    // request this size.
+    throw offlineError();
+  }
+  if (response.status === 401) {
+    handleUnauthorized();
+    throw new ApiError(401, await parseBody(response), messageFor(401, response.statusText, null));
+  }
   const text = await response.text().catch(() => '');
   let parsed: { report?: ImportReport; detail?: string } | ImportReport | null = null;
   try {
@@ -163,4 +203,25 @@ export async function importRecords(
   if (report) return report;
   const detail = (parsed as { detail?: string } | null)?.detail;
   throw new Error(detail || `Import failed (${response.status})`);
+}
+
+/** The parser's own errors (`services/_io_upload.py`) are accurate but
+ *  written for the log, not the person who just picked a file — one names a
+ *  query parameter no browser upload can send, the other quotes a JSON
+ *  parser's own message. Recognised by a stable substring rather than
+ *  rewritten server-side, so this stays a UI concern (UX-5). */
+export function friendlyImportError(t: Translate, raw: string): string {
+  if (raw.includes('cannot tell whether this is JSON or CSV')) {
+    return t('records.io.error_unknown_format', {
+      defaultValue:
+        "Couldn't tell whether that file is JSON or CSV — save it with a .json or .csv extension and try again.",
+    });
+  }
+  if (raw.includes('is not valid JSON')) {
+    return t('records.io.error_bad_json', {
+      defaultValue:
+        "That file isn't valid JSON — open it in a text editor and check it's complete.",
+    });
+  }
+  return raw;
 }

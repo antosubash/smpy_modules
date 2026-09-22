@@ -255,6 +255,10 @@ async def record_list(
         "records": records_page.model_dump(mode="json"),
         "errors": errors,
         "trashed": trashed,
+        # The import menu refuses an over-size file before uploading it, and
+        # says the limit in its dialog (review R9/M13). The browser has no
+        # other way to know a DB-backed setting.
+        "max_import_bytes": settings.max_import_bytes,
         # No default locale filter anywhere above: the admin list defaults to
         # **all** locales (§4.4), because an editor's question is "what
         # exists", not "what exists in English". The selector narrows it with

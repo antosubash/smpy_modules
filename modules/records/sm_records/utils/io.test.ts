@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { importOptionsSummary } from './io';
+import { OFFLINE_STATUS } from './api-net';
+import {
+  DEFAULT_MAX_IMPORT_BYTES,
+  formatImportLimit,
+  importFileTooLarge,
+  importOptionsSummary,
+  importRecords,
+} from './io';
 import type { FieldDef } from './types';
 
 /** A passthrough translator resolves every call to its English default —
@@ -77,5 +84,53 @@ describe('importOptionsSummary', () => {
       'records.io.summary_match_by',
       { label: 'Record ID (uuid)', defaultValue: 'match by {label}' },
     ]);
+  });
+});
+
+describe('the import size guard — R9/M13', () => {
+  it('refuses a file over the limit and passes everything under it', () => {
+    expect(importFileTooLarge(DEFAULT_MAX_IMPORT_BYTES + 1, DEFAULT_MAX_IMPORT_BYTES)).toBe(true);
+    expect(importFileTooLarge(DEFAULT_MAX_IMPORT_BYTES, DEFAULT_MAX_IMPORT_BYTES)).toBe(false);
+    expect(importFileTooLarge(10, DEFAULT_MAX_IMPORT_BYTES)).toBe(false);
+  });
+
+  it('states the default the settings module ships (pinned in tests/test_reserved_keys_sync.py)', () => {
+    expect(DEFAULT_MAX_IMPORT_BYTES).toBe(52428800);
+    expect(formatImportLimit(DEFAULT_MAX_IMPORT_BYTES)).toBe('50 MB');
+    expect(formatImportLimit(1572864)).toBe('1.5 MB');
+  });
+});
+
+describe("importRecords shares api.ts's connection handling — R9", () => {
+  const file = new File(['[]'], 'rows.json', { type: 'application/json' });
+
+  it("turns a rejected fetch into the module's offline ApiError, not a raw TypeError", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (() => Promise.reject(new TypeError('Failed to fetch'))) as typeof fetch;
+    try {
+      await expect(importRecords('book', file)).rejects.toMatchObject({
+        name: 'ApiError',
+        status: OFFLINE_STATUS,
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('answers a 401 with the session-expired message instead of "Import failed (401)"', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response('{"detail":"Not authenticated"}', { status: 401 }),
+      )) as typeof fetch;
+    try {
+      await expect(importRecords('book', file)).rejects.toMatchObject({
+        name: 'ApiError',
+        status: 401,
+        message: expect.stringContaining('session has expired'),
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

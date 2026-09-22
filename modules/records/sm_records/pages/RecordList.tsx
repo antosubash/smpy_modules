@@ -32,6 +32,10 @@ type Props = {
   /** Every content locale the module runs (`views.py::record_list`); absent
    *  degrades to "no language UI", same as the editor's own prop. */
   content_locales?: string[];
+  /** `RecordsSettings.max_import_bytes` — the import menu refuses a bigger
+   *  file client-side and says the limit (R9/M13). Absent falls back to the
+   *  setting's own default. */
+  max_import_bytes?: number;
 };
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
@@ -39,7 +43,7 @@ const EDIT_PERMISSION = 'records.edit';
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
  *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
  *  can be bookmarked or shared. */
-function RecordList({ type, records, content_locales }: Props) {
+function RecordList({ type, records, content_locales, max_import_bytes }: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
@@ -176,6 +180,7 @@ function RecordList({ type, records, content_locales }: Props) {
               canEdit={canEdit}
               fields={type.fields}
               trashed={trashed}
+              {...(max_import_bytes ? { maxImportBytes: max_import_bytes } : {})}
             />
             {canEdit && (
               <Button

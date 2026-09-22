@@ -19,7 +19,16 @@ import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
 import { ChevronDownIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { exportUrl, type ImportReport, importOptionsSummary, importRecords } from '../utils/io';
+import {
+  DEFAULT_MAX_IMPORT_BYTES,
+  exportUrl,
+  formatImportLimit,
+  friendlyImportError,
+  type ImportReport,
+  importFileTooLarge,
+  importOptionsSummary,
+  importRecords,
+} from '../utils/io';
 import type { FieldDef } from '../utils/types';
 import { ImportReportSummary } from './ImportReportSummary';
 import {
@@ -27,31 +36,6 @@ import {
   type ImportOptionsValue,
   RecordImportOptions,
 } from './RecordImportOptions';
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
-
-/** The parser's own errors (`services/_io_upload.py`) are accurate but
- *  written for the log, not the person who just picked a file — one names a
- *  query parameter no browser upload can send, the other quotes a JSON
- *  parser's own message. Recognised by a stable substring rather than
- *  rewritten server-side, so this stays a UI concern (UX-5). */
-function friendlyImportError(t: Translate, raw: string): string {
-  if (raw.includes('cannot tell whether this is JSON or CSV')) {
-    return t('records.io.error_unknown_format', {
-      defaultValue:
-        "Couldn't tell whether that file is JSON or CSV — save it with a .json or .csv extension and try again.",
-    });
-  }
-  if (raw.includes('is not valid JSON')) {
-    return t('records.io.error_bad_json', {
-      defaultValue:
-        "That file isn't valid JSON — open it in a text editor and check it's complete.",
-    });
-  }
-  return raw;
-}
 
 type Phase = 'idle' | 'checking' | 'applying';
 
@@ -69,6 +53,7 @@ export function RecordIoMenu({
   canEdit,
   fields,
   trashed = false,
+  maxImportBytes = DEFAULT_MAX_IMPORT_BYTES,
 }: {
   typeKey: string;
   search: string;
@@ -79,6 +64,10 @@ export function RecordIoMenu({
   /** The list is showing the trash: the export menu says so next to the
    *  links, since that file cannot be re-imported (UX-11). */
   trashed?: boolean;
+  /** `RecordsSettings.max_import_bytes`, as `views.py::record_list` sends
+   *  it. A file over it is refused here (R9/M13) instead of being uploaded
+   *  in full to be answered with a 413. */
+  maxImportBytes?: number;
 }) {
   const { t } = useT();
   const input = useRef<HTMLInputElement>(null);
@@ -124,11 +113,26 @@ export function RecordIoMenu({
     }
   };
 
+  const limitText = formatImportLimit(maxImportBytes);
+
   const onPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0] ?? null;
     // Reset immediately so picking the *same* file twice still fires change.
     event.target.value = '';
     if (!chosen) return;
+    if (importFileTooLarge(chosen.size, maxImportBytes)) {
+      // Said here, before the upload: the server's own refusal is a 413
+      // that arrives only after the whole file has gone up the wire
+      // (R9/M13).
+      toast.error(
+        t('records.io.too_large', {
+          name: chosen.name,
+          limit: limitText,
+          defaultValue: '"{name}" is larger than the {limit} import limit.',
+        }),
+      );
+      return;
+    }
     setFile(chosen);
     await run(chosen, true);
   };
@@ -234,6 +238,11 @@ export function RecordIoMenu({
               {file.name}
               {' — '}
               {importOptionsSummary(t, options, fields)}
+              <br />
+              {t('records.io.limit_note', {
+                limit: limitText,
+                defaultValue: 'Files up to {limit}.',
+              })}
             </p>
           )}
           {busy && (
