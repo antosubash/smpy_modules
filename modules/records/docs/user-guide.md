@@ -395,7 +395,7 @@ confirmation states the count.
 
 Selecting with the keyboard: Tab to a row's box and press Space. Shift+click a
 second box to take everything between it and the last one you clicked — a
-range only ever adds, so nothing outside it is untucked.
+range only ever adds, so nothing outside it is unticked.
 
 **The selection is what is on screen.** Changing the page, the sort or the
 filter clears it, and so does running an action, because the list reloads. It
@@ -404,10 +404,10 @@ is never twelve rows you can no longer see.
 #### All or nothing
 
 A bulk action either applies to every record you selected or to none of them.
-If even one refuses — it is referenced by a `restrict` relation, someone else
-edited it since the page loaded, it is not yours to write, its payload no
-longer fits the schema — **nothing is changed**, and a panel appears naming
-each record that refused and why:
+If even one refuses — it is referenced by a `restrict` relation, somebody
+trashed or restored it in another tab, it belongs to a type you may not write,
+its payload no longer fits the schema — **nothing is changed**, and a panel
+appears naming each record that refused and why:
 
 > 2 of 12 records could not be changed, so nothing was changed.
 > `9d9addcb…` — 3 record(s) still reference 9d9addcb…
