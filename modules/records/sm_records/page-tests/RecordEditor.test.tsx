@@ -162,6 +162,25 @@ describe('RecordEditor — R13: the editor is a form with a keyboard path to Sav
     expect(updated).not.toHaveBeenCalled();
     await view.unmount();
   });
+
+  it('U13: still saves on ⇧⌘S and on CapsLock+⌘S, where the browser reports "S"', async () => {
+    // Shift held or CapsLock on both report `event.key === 'S'`, not `'s'`
+    // — the one thing a browser's own KeyboardEvent cannot tell apart.
+    const view = await editor();
+    await press(window, { key: 'S', metaKey: true, shiftKey: true });
+    expect(updated).toHaveBeenCalledOnce();
+    await settle();
+    await press(window, { key: 'S', ctrlKey: true });
+    expect(updated).toHaveBeenCalledTimes(2);
+    await view.unmount();
+  });
+
+  it('still lets Alt+S through to the browser, whatever the case', async () => {
+    const view = await editor();
+    await press(window, { key: 'S', metaKey: true, altKey: true });
+    expect(updated).not.toHaveBeenCalled();
+    await view.unmount();
+  });
 });
 
 describe('RecordEditor — R14: position is checked before it is sent', () => {

@@ -220,7 +220,15 @@ export function useRecordEditor(
   pendingRef.current = pending;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 's' || event.altKey) return;
+      // U13: `event.key` is `'S'` with Shift held or CapsLock on — a plain
+      // `!== 's'` missed ⇧⌘S and CapsLock+⌘S both, falling through to the
+      // browser's own "Save page" dialog on the busiest data-entry screen in
+      // the module. `event.code` would dodge the case question entirely, but
+      // ties the shortcut to physical key position (wrong on a non-QWERTY
+      // layout where the "S" character sits elsewhere) — comparing the
+      // lowercased key is what every other single-letter shortcut here would
+      // want too.
+      if (event.key.toLowerCase() !== 's' || event.altKey) return;
       if (!(event.metaKey || event.ctrlKey)) return;
       // The browser's own "save this page" is never what someone means with
       // an editor open.
