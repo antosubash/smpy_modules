@@ -116,11 +116,18 @@ export function RecordCell({
       );
 
     case 'number':
-    case 'integer':
+    case 'integer': {
       // `number` arrives as a string (e.g. "9.99", design doc §7.3 /
-      // Decimal's JSON encoding); `integer` arrives as a JSON number.
-      // Either way the wire value is already the display value.
-      return <span>{String(value)}</span>;
+      // Decimal's JSON encoding); `integer` arrives as a JSON number. U28:
+      // both used to print the raw wire value verbatim — "2262.22",
+      // "4749" — with no thousands separator, next to dates that *are*
+      // locale-formatted. `Number()` on a wire value this module already
+      // validated as numeric cannot produce `NaN`; the fallback is only
+      // for a payload from a build old enough to have stored something
+      // else under the key.
+      const n = typeof value === 'number' ? value : Number(value);
+      return <span>{Number.isFinite(n) ? n.toLocaleString() : String(value)}</span>;
+    }
 
     case 'date': {
       // A bare calendar day ("YYYY-MM-DD", design doc §7.3) has no

@@ -84,3 +84,46 @@ describe('RecordRowAction — U4: the Trash view can release a record for good',
     await view.unmount();
   });
 });
+
+describe('RecordRowAction — U27: every row action names the record it acts on', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('carries the record title in aria-label on a live row, not just "Delete"', async () => {
+    const view = await mount(
+      <RecordRowAction
+        typeKey="book"
+        record={record({ is_deleted: false, display_title: 'Dune' })}
+        trashed={false}
+        onDelete={async () => undefined}
+        onRestore={async () => undefined}
+        onPurge={async () => undefined}
+      />,
+    );
+    const btn = view.find<HTMLButtonElement>('button');
+    // (i18next is unconfigured under vitest, so `{title}` is not
+    // interpolated — what matters here is that this button's accessible
+    // name is a distinct, record-specific key rather than the plain
+    // "Delete" every other row would share.)
+    expect(btn?.getAttribute('aria-label')).toBe('Delete {title}');
+    await view.unmount();
+  });
+
+  it('carries a distinct, record-naming aria-label on Restore and Delete permanently', async () => {
+    const view = await mount(
+      <RecordRowAction
+        typeKey="book"
+        record={record({ display_title: 'Dune' })}
+        trashed
+        onDelete={async () => undefined}
+        onRestore={async () => undefined}
+        onPurge={async () => undefined}
+      />,
+    );
+    const buttons = view.all<HTMLButtonElement>('button');
+    const labels = buttons.map((btn) => btn.getAttribute('aria-label'));
+    expect(labels).toEqual(['Restore {title}', 'Delete {title} permanently']);
+    await view.unmount();
+  });
+});

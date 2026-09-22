@@ -30,9 +30,17 @@ describe('RecordCell', () => {
     expect(html(field({ type: 'text' }), undefined)).toContain('—');
   });
 
-  it('renders number/integer values as-is', () => {
+  it('renders number/integer values, locale-formatted (U28)', () => {
     expect(html(field({ type: 'number' }), '9.99')).toContain('9.99');
     expect(html(field({ type: 'integer' }), 7)).toContain('7');
+    // A thousands separator, next to dates that already got locale
+    // formatting — the review's own example values.
+    expect(html(field({ type: 'number' }), '2262.22')).toContain('2,262.22');
+    expect(html(field({ type: 'integer' }), 4749)).toContain('4,749');
+  });
+
+  it('falls back to the raw string for a value that is not actually numeric', () => {
+    expect(html(field({ type: 'number' }), 'not-a-number')).toContain('not-a-number');
   });
 
   it('renders boolean true as a check and false as a dash', () => {

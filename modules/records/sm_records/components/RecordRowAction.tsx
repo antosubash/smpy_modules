@@ -36,6 +36,12 @@ export function RecordRowAction({
   onPurge: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
+  // U27: every row's Delete/Restore/Delete-permanently button had the exact
+  // same accessible name — 25 identical "Delete"s on a page a screen-reader
+  // user navigates by name. The visible label stays short (a table cell has
+  // no room for "Delete Deluxe Sleeping Bag" on every row); `aria-label`
+  // carries the record's title the same way the relation chips' own
+  // "Remove {title}" button already does.
   if (trashed) {
     const restoreLabel = t('records.editor.restore', { defaultValue: 'Restore' });
     const purgeLabel = t('records.editor.purge', { defaultValue: 'Delete permanently' });
@@ -43,7 +49,15 @@ export function RecordRowAction({
       <div className="flex justify-end gap-1">
         <ConfirmDialog
           trigger={
-            <Button type="button" variant="ghost" size="sm">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('records.records.restore_named', {
+                title: record.display_title,
+                defaultValue: 'Restore {title}',
+              })}
+            >
               {restoreLabel}
             </Button>
           }
@@ -58,7 +72,16 @@ export function RecordRowAction({
         />
         <ConfirmDialog
           trigger={
-            <Button type="button" variant="ghost" size="sm" className="text-destructive">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive"
+              aria-label={t('records.records.purge_named', {
+                title: record.display_title,
+                defaultValue: 'Delete {title} permanently',
+              })}
+            >
               {purgeLabel}
             </Button>
           }
@@ -80,7 +103,15 @@ export function RecordRowAction({
       typeKey={typeKey}
       uuid={record.uuid}
       trigger={
-        <Button type="button" variant="ghost" size="sm">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={t('records.records.delete_named', {
+            title: record.display_title,
+            defaultValue: 'Delete {title}',
+          })}
+        >
           {t('records.records.delete', { defaultValue: 'Delete' })}
         </Button>
       }
