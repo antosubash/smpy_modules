@@ -12,11 +12,8 @@ import { RecordsToaster } from '../components/RecordsToaster';
 import { groupErrors } from '../components/typeeditor/errors';
 import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
-  buildChanges,
-  extraCreateFields,
   metadataFrom,
   schemaIsDirty,
-  stripUids,
   typeIsDirty,
   withUids,
 } from '../components/typeeditor/formHelpers';
@@ -30,11 +27,12 @@ import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
 import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
+import { useTypeEditorSave } from '../hooks/useTypeEditorSave';
 import { useTypeImport } from '../hooks/useTypeImport';
 import { useTypeSync } from '../hooks/useTypeSync';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
-import { ApiError, createType, updateType } from '../utils/api';
-import type { DryRunReport, TypeRead, ValidationError } from '../utils/types';
+import { updateType } from '../utils/api';
+import type { DryRunReport, TypeRead } from '../utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
 
@@ -62,14 +60,9 @@ function TypeEditor({
   const { current, externalChange, adopt, dirtyRef } = useTypeSync(type);
   const [values, setValues] = useState(metadataFrom(type));
   const [fields, setFields] = useState<EditableField[]>(() => withUids(type?.fields ?? []));
-  const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
-  const [pending, setPending] = useState(false);
   // The dry-run report of the change last forced through (R7a) — the only
   // inventory of the records that force just marked invalid.
   const [lastApplied, setLastApplied] = useState<DryRunReport | null>(null);
-  // A 409 from turning "Translatable" off while foreign-locale records
-  // exist (§4.1) — none of `useSchemaApply`'s shapes, so it lands here.
-  const [translatableError, setTranslatableError] = useState<string | null>(null);
 
   const applySaved = (saved: TypeRead) => {
     adopt(saved);
@@ -91,6 +84,29 @@ function TypeEditor({
     [current],
   );
 
+  const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
+  const dirty = typeIsDirty(current, values, fields);
+  const guard = useUnsavedGuard(dirty);
+  // Read by `useTypeSync`'s effect: a background reindex poll must not
+  // re-baseline `current.version` under a draft (R15).
+  dirtyRef.current = dirty;
+
+  const { pending, createErrors, translatableError, save } = useTypeEditorSave({
+    isNew,
+    current,
+    values,
+    fields,
+    guard,
+    schemaApply,
+    attemptUpdate,
+    // The switch moved on click and the server refused, so it reverts
+    // rather than sit disagreeing with the error under it (UX-7).
+    onTranslatableRevert: () => {
+      if (current) setValues((prev) => ({ ...prev, translatable: current.translatable }));
+    },
+    t,
+  });
+
   const activeErrors = isNew ? createErrors : schemaApply.errors;
   // Three-way, not two: an error naming neither an input nor a row (a
   // `__root__` one) used to be handed to the field list and dropped there,
@@ -98,12 +114,6 @@ function TypeEditor({
   // renders what nothing else owns.
   const fieldKeys = fields.map((field) => field.key);
   const errorGroups = groupErrors(activeErrors, fieldKeys);
-  const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
-  const dirty = typeIsDirty(current, values, fields);
-  const guard = useUnsavedGuard(dirty);
-  // Read by `useTypeSync`'s effect: a background reindex poll must not
-  // re-baseline `current.version` under a draft (R15).
-  dirtyRef.current = dirty;
 
   /** Force a refused change through, keeping its report on screen after —
    *  `retryWith` answers `null` when the retry was itself refused. */
@@ -112,55 +122,6 @@ function TypeEditor({
     const result = await schemaApply.retryWith({ force: true });
     if (result) setLastApplied(report);
     return result;
-  };
-
-  const save = async () => {
-    setPending(true);
-    setTranslatableError(null);
-    let changedTranslatable = false;
-    try {
-      if (isNew) {
-        setCreateErrors([]);
-        const created = await createType({
-          key: values.key,
-          label: values.label,
-          label_plural: values.labelPlural,
-          fields: stripUids(fields),
-          ...extraCreateFields(values),
-        });
-        // Written; the guard must not ask about it on the way out.
-        guard.allow();
-        router.visit(`/admin/records/types/${created.key}`);
-        return;
-      }
-      if (!current) return;
-      const changes = buildChanges(current, values, fields);
-      changedTranslatable = 'translatable' in changes;
-      if (Object.keys(changes).length === 0) {
-        // Unreachable while Save is disabled on a clean draft (R22b), kept
-        // as the honest answer rather than a green "Saved" for a no-op.
-        toast(t('records.type_editor.no_changes', { defaultValue: 'No changes to save' }));
-        return;
-      }
-      schemaApply.reset();
-      await schemaApply.run(attemptUpdate, { expected_version: current.version, ...changes });
-    } catch (err) {
-      // Turning "Translatable" off while records in another locale exist —
-      // a 409 that carries none of `useSchemaApply`'s four known shapes
-      // (`current`/`report`/`conflicts`), so it lands here instead of there.
-      if (err instanceof ApiError && err.status === 409 && changedTranslatable) {
-        setTranslatableError(err.body?.detail ?? err.message);
-        // The switch moved on click and the server refused, so it reverts
-        // rather than sit disagreeing with the error under it (UX-7).
-        if (current) setValues((prev) => ({ ...prev, translatable: current.translatable }));
-      } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
-        setCreateErrors(err.body.errors);
-      } else {
-        toast.error(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setPending(false);
-    }
   };
 
   // M3: a definition for *this* type is an ordinary schema update,
@@ -281,6 +242,10 @@ function TypeEditor({
             onRestored={applySaved}
             onDeleted={() => {
               guard.allow();
+              // U9: the module's most destructive action ended in silence —
+              // seven records and a schema gone, with a missing row in a
+              // table the operator may not be looking at as the only sign.
+              toast.success(t('records.type_editor.deleted', { defaultValue: 'Type deleted' }));
               router.visit(TYPES_LIST_HREF);
             }}
           />

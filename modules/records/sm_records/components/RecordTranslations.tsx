@@ -3,6 +3,7 @@ import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { createTranslation } from '../utils/api-history';
 import { localeLabel } from '../utils/locale';
@@ -58,6 +59,17 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
     setError(null);
     try {
       const created = await createTranslation(typeKey, record.uuid, { locale: target });
+      // U9: this used to be entirely silent — a new record appeared, the URL
+      // changed, and nothing said the action had actually done anything. The
+      // toast names the language it created, since that's the one thing the
+      // destination page's own header doesn't repeat back (it shows the
+      // record's title, not "this is the German translation").
+      toast.success(
+        t('records.translations.created', {
+          locale: localeLabel(target),
+          defaultValue: '{locale} translation created',
+        }),
+      );
       // Straight into the new sibling: the next thing to do is translate it.
       router.visit(`/admin/records/${typeKey}/${created.uuid}`);
     } catch (err) {

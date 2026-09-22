@@ -114,6 +114,7 @@
     "open": "Open",
     "add": "Add translation",
     "creating": "Creating…",
+    "created": "{locale} translation created",
     "trashed": "Trashed"
   },
   "list": {
@@ -211,6 +212,8 @@
     "section_fields": "Fields",
     "section_pointers": "Record identity",
     "no_changes": "No changes to save",
+    "created": "Type created",
+    "deleted": "Type deleted",
     "key_immutable": "The key can't be changed once the type is created.",
     "key_placeholder": "blog_post",
     "key_new_help": "Lowercase letters, numbers and underscores, starting with a letter. Chosen once — this can't be changed later.",
