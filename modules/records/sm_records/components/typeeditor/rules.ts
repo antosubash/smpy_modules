@@ -57,6 +57,7 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   'display_title',
   'position',
   'published_at',
+  'invalid_since',
   'created_at',
   'updated_at',
   'created_by',

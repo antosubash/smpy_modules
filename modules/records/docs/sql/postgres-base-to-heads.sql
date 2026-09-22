@@ -990,5 +990,17 @@ CREATE INDEX ix_users_user_email_lower ON users_user (lower(email));
 
 UPDATE alembic_version SET version_num='d2b7a1c4e905' WHERE alembic_version.version_num = 'b81c5f3a27d6';
 
+-- Running upgrade d2b7a1c4e905 -> 8f3d223f8605
+
+ALTER TABLE records_c_events_record ADD COLUMN invalid_since TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX ix_records_c_events_record_invalid_since ON records_c_events_record (invalid_since);
+
+ALTER TABLE records_record ADD COLUMN invalid_since TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX ix_records_record_invalid_since ON records_record (invalid_since);
+
+UPDATE alembic_version SET version_num='8f3d223f8605' WHERE alembic_version.version_num = 'd2b7a1c4e905';
+
 COMMIT;
 

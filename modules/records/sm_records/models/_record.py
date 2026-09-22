@@ -219,6 +219,26 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
             sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
         )
 
+        invalid_since: datetime | None = Field(
+            default=None,
+            sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+        )
+        """When this record stopped satisfying its type's schema, or ``NULL``.
+
+        The **stored** half of §8.3's "marked, not hidden". The badge itself
+        has always been *derived* (``services._payload.read_view`` validates
+        the payload on read), which is right for one record and unusable for a
+        list: a page of fifty would pay fifty validator passes to draw fifty
+        badges, so the list turns the check off — and nothing could then show,
+        count or filter what a forced change had left behind.
+
+        Written and cleared by :mod:`sm_records.services._invalid`, which
+        documents when. A *timestamp* rather than a flag because "since when"
+        is the only extra fact the marking knows; the filter grammar reads it
+        as the boolean ``invalid`` (:mod:`sm_records.index._fixed`), and the
+        public read shape does not carry it at all.
+        """
+
     class _Revision(SQLModel):
         id: int | None = Field(default=None, primary_key=True)
         record_id: int = Field(
