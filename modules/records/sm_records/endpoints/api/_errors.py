@@ -19,136 +19,94 @@ request's session back explicitly, and clears the flag so ``get_db``'s own
 exit takes the read-only branch. The session is the one
 :func:`sm_records.deps.request_db` parked on ``request.scope``.
 
-``Conflict.current`` is the one case that needs more than the exception's own
-attributes: it holds the ORM row a stale write collided with, and the
-contract wants it serialised as a ``RecordRead`` or ``TypeRead``. That read
-runs on a fresh, short-lived session rather than the request's own, and it
-happens *before* the rollback — a rollback expires every instance in the
-request's identity map, and refreshing one from async code outside a greenlet
-is a ``MissingGreenlet``, not a response.
+**Two route classes, because two routers owe their callers two different
+answers.** :class:`RecordsErrorRoute` serves ``/api/records/*`` and answers
+JSON, always — including for the exceptions nobody anticipated, which used to
+fall through to the host's handler and come back as a 42 KB Inertia HTML
+document to a client that had sent ``Accept: application/json``, with the
+request's session never rolled back. :class:`RecordsViewErrorRoute` serves the
+Inertia screens under ``/admin/records/*``, where the same ``NotFound`` has to
+be the host's error *page*: a stale bookmark, a renamed type or a record
+purged in another tab dumped a JSON blob into the browser window, while a
+FastAPI validation error on the very same screen rendered HTML.
+
+What each mapped exception's body looks like lives next door in
+:mod:`sm_records.endpoints.api._error_bodies`, split off for the file cap.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Coroutine
 from typing import Any
 
 from fastapi import Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from sm_records.contracts.schema_change import dry_run_report_read
-from sm_records.contracts.schemas import record_read, type_read
 from sm_records.deps import request_session
+from sm_records.endpoints.api._error_bodies import response_for
 from sm_records.index.query import QueryError
-from sm_records.models import RecordType, table_sets
 from sm_records.services._common import SESSION_HAS_WRITES_KEY
-from sm_records.services.errors import (
-    Conflict,
-    ImportRefused,
-    NotFound,
-    OrphanedKeyConflict,
-    RecordsError,
-    ReferencedByOthers,
-    SchemaChangeRefused,
-    ValidationFailed,
-)
-from sm_records.services.types import get_type_by_id, record_counts
+from sm_records.services.errors import RecordsError
 
-__all__ = ["RecordsErrorRoute"]
+__all__ = ["RecordsErrorRoute", "RecordsViewErrorRoute"]
+
+logger = logging.getLogger(__name__)
+
+INTERNAL_ERROR = "internal error"
+"""What an unanticipated failure says on the JSON API. Deliberately opaque:
+the detail goes to the log under the correlation id the response already
+carries as ``x-correlation-id``, and a stack-derived message on an API is an
+information leak with no caller who can act on it."""
 
 
-def _document_classes() -> tuple[type, ...]:
-    """Every declared table set's document class.
+_RERAISE = (StarletteHTTPException, RequestValidationError)
+"""Always somebody else's: FastAPI raises both from inside the route handler,
+and the host's handlers for them already content-negotiate."""
 
-    ``isinstance(current, Record)`` was enough while there was one; since
-    Phase 5 §6 a conflict may carry a collection's record, whose class is a
-    sibling of the global one and not a subclass of it. Read per call rather
-    than memoised at import, because a host declares its collections before
-    ``create_app`` and this module may be imported either side of that.
+
+def _host_handles(request: Request, exc: Exception) -> bool:
+    """Has the app registered a handler for *this* exception class?
+
+    The rule the catch-all needs, stated once: an exception somebody answers
+    deliberately is not an unhandled one, whatever this module has heard of.
+    Read off ``app.exception_handlers`` rather than hard-coded, so a host that
+    registers its own domain exception keeps getting its own status — the
+    framework registers ``NotFoundError`` exactly that way.
+
+    ``Exception`` itself is excluded on purpose: the host registers a
+    last-resort handler under that key (``_error_handlers`` renders the SPA
+    error document from it), and honouring it would re-raise everything and
+    leave the JSON API answering HTML — which is the whole defect.
     """
-    return tuple(tables.record for tables in table_sets())
+    if isinstance(exc, _RERAISE):
+        return True
+    handlers = getattr(request.app, "exception_handlers", None) or {}
+    return any(
+        key is not Exception and isinstance(key, type) and isinstance(exc, key) for key in handlers
+    )
 
 
-async def _current_dto(db: Any, current: Any) -> Any:
-    if isinstance(current, RecordType):
-        live, trashed = await record_counts(db, current)
-        return type_read(current, live, trashed).model_dump(mode="json")
-    if isinstance(current, _document_classes()):
-        rtype = await get_type_by_id(db, current.type_id)
-        return record_read(rtype, current).model_dump(mode="json")
-    return current
+def _correlation(request: Request) -> str:
+    """The request's correlation id, for the log line that names the failure.
 
-
-async def _conflict_body(request: Request, exc: Conflict) -> dict[str, Any]:
-    body: dict[str, Any] = {"detail": exc.detail}
-    if exc.current is None:
-        return body
-    session = request.app.state.sm.db.session_factory()
+    ``request.state`` first (``CorrelationIdMiddleware`` puts it there and
+    echoes it as ``x-correlation-id``), the context variable second, and an
+    empty string when neither exists — a module that declined to log because
+    the host does not run that middleware would be the wrong kind of strict.
+    """
+    cid = getattr(request.state, "correlation_id", None)
+    if cid:
+        return str(cid)
     try:
-        body["current"] = await _current_dto(session, exc.current)
-    except NotFound:
-        # The writer that won the race deleted the row outright. "It is gone"
-        # is not something this response can express, but a 409 without
-        # ``current`` is the honest half of it — and it beats the 500 that
-        # letting the lookup escape used to produce.
-        pass
-    finally:
-        await session.close()
-    return body
+        from simple_module_hosting.logging import correlation_id
 
-
-async def _response_for(request: Request, exc: Exception) -> JSONResponse:
-    if isinstance(exc, ValidationFailed):
-        return JSONResponse(
-            {"detail": exc.detail, "errors": exc.errors}, status_code=exc.status_code
-        )
-    if isinstance(exc, ReferencedByOthers):
-        # ``hidden`` and ``more`` are always present, at zero when there is
-        # nothing to say: a client that has to tell "no hidden blockers" from
-        # "this server does not report them" would guess, and the number it
-        # would guess about is the difference between ``detail``'s count and
-        # the list it can show.
-        return JSONResponse(
-            {
-                "detail": exc.detail,
-                "referrers": exc.referrers,
-                "hidden": exc.hidden,
-                "more": exc.more,
-            },
-            status_code=exc.status_code,
-        )
-    if isinstance(exc, SchemaChangeRefused):
-        # Checked ahead of the generic ``Conflict`` branch below: this is one,
-        # but its whole point is the dry-run report riding along with it
-        # (design §8.2), not a ``current`` row to reload.
-        report = dry_run_report_read(exc.report).model_dump(mode="json")
-        return JSONResponse({"detail": exc.detail, "report": report}, status_code=exc.status_code)
-    if isinstance(exc, ImportRefused):
-        # An ``on_error=abort`` import that found a bad row. Like
-        # ``SchemaChangeRefused`` above, the useful part of the refusal is the
-        # report riding with it — the caller fixes the rows it names and
-        # re-posts the same file — and, like that one, the rollback below is
-        # what makes "nothing was imported" true rather than aspirational.
-        return JSONResponse(
-            {"detail": exc.detail, "report": exc.report.model_dump(mode="json")},
-            status_code=exc.status_code,
-        )
-    if isinstance(exc, OrphanedKeyConflict):
-        # Same reasoning as above: a ``Conflict`` subclass whose payload is
-        # its own (design §8.8), not the generic ``current`` row.
-        return JSONResponse(
-            {"detail": exc.detail, "conflicts": exc.conflicts}, status_code=exc.status_code
-        )
-    if isinstance(exc, Conflict):
-        return JSONResponse(await _conflict_body(request, exc), status_code=exc.status_code)
-    if isinstance(exc, QueryError):
-        status = 409 if exc.reason == "reindexing" else 400
-        return JSONResponse(
-            {"detail": str(exc), "field": exc.field, "reason": exc.reason}, status_code=status
-        )
-    assert isinstance(exc, RecordsError)
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return correlation_id.get("")
+    except Exception:  # pragma: no cover - a framework without the context var
+        return ""
 
 
 async def _discard_writes(request: Request) -> None:
@@ -164,7 +122,36 @@ async def _discard_writes(request: Request) -> None:
     session.info.pop(SESSION_HAS_WRITES_KEY, None)
 
 
+async def _error_page(request: Request, exc: Exception) -> Response:
+    """The host's Inertia error document for a view route's refusal.
+
+    ``render_error_page`` is imported at call time and behind a guard, because
+    it is the host's and this module is published on its own: a harness that
+    mounted these routers without ``app.state.sm.inertia_config`` — and an
+    older framework that does not export the function — must still get an
+    answer rather than an ``AttributeError`` on top of the original refusal.
+    The JSON body is that fallback, which is exactly what this route class
+    used to send unconditionally.
+    """
+    config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
+    if config is None:
+        return await response_for(request, exc)
+    try:
+        from simple_module_hosting._error_handlers import render_error_page
+
+        status = getattr(exc, "status_code", 400)
+        detail = getattr(exc, "detail", None) or str(exc)
+        return await render_error_page(request, status, detail)
+    except Exception:  # pragma: no cover - a host whose error page is itself broken
+        logger.exception("records: rendering the error page failed; answering JSON")
+        return await response_for(request, exc)
+
+
 class RecordsErrorRoute(APIRoute):
+    """The JSON API's route class: every failure leaves as JSON."""
+
+    views = False
+
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         handler = super().get_route_handler()
 
@@ -172,8 +159,51 @@ class RecordsErrorRoute(APIRoute):
             try:
                 return await handler(request)
             except (RecordsError, QueryError) as exc:
-                response = await _response_for(request, exc)
+                response = (
+                    await _error_page(request, exc)
+                    if self.views
+                    else await response_for(request, exc)
+                )
                 await _discard_writes(request)
                 return response
+            except Exception as exc:
+                if _host_handles(request, exc):
+                    # Not unanticipated: somebody upstream registered a handler
+                    # for this exact class and it produces a status of its own.
+                    # Without this branch the catch-all turned every 400 the
+                    # grammar raises and every 422 FastAPI raises for a bad
+                    # query parameter into a 500.
+                    raise
+                # The rollback is ours either way — see the module docstring:
+                # a caught exception is one the session never hears about, and
+                # ``get_db`` would otherwise find the has-writes flag and
+                # commit whatever the failed handler had already written.
+                await _discard_writes(request)
+                if self.views:
+                    # A view's unanticipated failure belongs to the host's own
+                    # handler, which renders the 500 page every other screen in
+                    # the app already shows.
+                    raise
+                logger.exception(
+                    "records: unhandled %s on %s [%s]",
+                    type(exc).__name__,
+                    request.url.path,
+                    _correlation(request),
+                )
+                return JSONResponse({"detail": INTERNAL_ERROR}, status_code=500)
 
         return wrapped
+
+
+class RecordsViewErrorRoute(RecordsErrorRoute):
+    """The Inertia screens' route class: a refusal is a rendered error page.
+
+    Only the *mapped* errors change hands — a ``NotFound`` for a type key that
+    no longer exists, a ``Forbidden`` from ``allowed_roles``, a ``QueryError``
+    from a deep link with a bad ``?sort=``. Everything else is re-raised for
+    the host, which already renders an error page for it; this class exists
+    because a ``RecordsError`` never reached that handler at all, and answered
+    a browser with a JSON blob in the window.
+    """
+
+    views = True

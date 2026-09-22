@@ -186,6 +186,12 @@ async def build_app(
         root_directory=".",
     )
     app.state.inertia_dependency = inertia_dependency_factory(inertia_config)
+    # Parked where the framework parks it, because the view router's error
+    # class renders the host's Inertia error page from exactly this attribute
+    # (``endpoints/api/_errors.RecordsViewErrorRoute``). Without it those
+    # routes fall back to JSON and the test that a browser gets HTML would
+    # pass against the behaviour it exists to refuse.
+    app.state.sm.inertia_config = inertia_config
 
     if menus:
         # Added before the module's own middleware so it ends up *outside* it:

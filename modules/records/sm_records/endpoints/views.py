@@ -34,7 +34,7 @@ from sm_records.deps import (
     require_view,
 )
 from sm_records.endpoints import views_types
-from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import Filter, QueryError, Sort
 from sm_records.models import RecordType
@@ -45,7 +45,7 @@ from sm_records.services import types as type_service
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsErrorRoute, dependencies=[require_view])
+router = APIRouter(route_class=RecordsViewErrorRoute, dependencies=[require_view])
 # First, and that is not cosmetic: ``/types/new`` and ``/types/{key}`` must be
 # matched before the generic ``/{key}`` record list below, and Starlette
 # matches in registration order.

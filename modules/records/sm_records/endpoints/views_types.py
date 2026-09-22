@@ -29,13 +29,13 @@ from sm_records.deps import (
     request_db,
     require_manage_types,
 )
-from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.models import RecordType
 from sm_records.services import types as type_service
 from sm_records.services._common import role_blocked
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsErrorRoute)
+router = APIRouter(route_class=RecordsViewErrorRoute)
 
 
 @router.get("/", response_model=None)

@@ -1076,6 +1076,7 @@ walking a large public type is exactly the caller that should use them.
 | `422` | `match_by` naming a non-unique field; an unknown `format`; an undeclared `collection` | `{"detail", "errors"}` |
 | `422` | `on_error=abort` and a bad row | `{"detail", "report": ImportReport}` |
 | `422` | `page` outside `1 … 1000000`, `page_size` below 1 | FastAPI validation error |
+| `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
 
 Worked examples:
 
@@ -1112,6 +1113,19 @@ counted, never named.
 **Every refusal rolls the request's session back.** A refused delete that had
 already cleared one `set_null` reference before meeting a `restrict` deeper down
 commits nothing.
+
+**Every `/api/records/*` response is JSON, including the ones nothing
+planned for.** An unanticipated exception is logged with the request's
+`x-correlation-id`, the request's session is rolled back, and the body is
+`{"detail": "internal error"}` — never the SPA's HTML error document, which is
+what an API client used to receive for a request that sent
+`Accept: application/json`. The detail stays in the log: a stack-derived
+message on an API is an information leak with no caller who can act on it.
+
+The `/admin/records/*` **view** routes are the mirror of that rule: a refusal
+there renders the host's error page, so a stale bookmark or a renamed type
+shows the same 404 screen every other part of the app shows rather than a JSON
+blob in the browser window.
 
 **A NUL byte is refused wherever a string enters.** Postgres cannot store
 `\x00` in `text`, `varchar` or `jsonb`, and its driver refuses to bind such a
