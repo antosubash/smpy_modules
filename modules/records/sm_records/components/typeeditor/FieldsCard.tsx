@@ -49,7 +49,7 @@ export function FieldsCard({
         <p className="text-sm text-muted-foreground">
           {t('records.type_editor.field_indexed_hint', {
             defaultValue:
-              'The single most consequential choice on this screen: filterable and sortable, at the cost of a write per save.',
+              'Tick "Indexed" on the fields worth filtering, sorting or showing as list columns — each one costs a write per save.',
           })}
         </p>
       </CardHeader>

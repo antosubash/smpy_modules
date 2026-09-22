@@ -200,6 +200,7 @@ export function FieldRowBody({
             // `rules.ts::indexedForced`) the box is checked and locked,
             // rather than accepting a click that snaps straight back.
             disabled={disabled || !indexable(field.type) || indexedForced(field)}
+            aria-describedby={`${idBase}-indexed-hint`}
             onCheckedChange={(checked) => onPatch({ indexed: checked === true })}
           />
           <Label htmlFor={`${idBase}-indexed`} className="font-normal">
@@ -207,6 +208,19 @@ export function FieldRowBody({
           </Label>
         </div>
       </div>
+
+      {/* U6: the hint the header once carried was moved off this checkbox
+          entirely (R23) and lost its referent in the process — this is that
+          consequence, back where the decision is actually made, one field
+          at a time. `utils/listing.ts::listColumns` is what makes the last
+          clause literally true: only an indexed field can be a list column,
+          and only the first four of those show. */}
+      <p id={`${idBase}-indexed-hint`} className="-mt-1 text-xs text-muted-foreground">
+        {t('records.type_editor.field_indexed_row_hint', {
+          defaultValue:
+            "Indexed fields can be filtered, sorted and shown as list columns; the first four indexed fields are the list's columns.",
+        })}
+      </p>
 
       <div className="grid gap-1.5">
         <Label htmlFor={`${idBase}-help`}>

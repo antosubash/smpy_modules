@@ -28,6 +28,27 @@ function matchesNarrow(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(NARROW).matches;
 }
 
+/** U6: `listColumns` is silent by design when a type has no indexed field —
+ *  the table then shows only Title and Status, and nothing on the list
+ *  screen said why until this. Rendered under the table/cards either way,
+ *  linking straight to the field editor rather than making the operator
+ *  find their own way to "Indexed". */
+function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
+  const { t } = useT();
+  return (
+    <p className="mt-2 text-sm text-muted-foreground" data-testid="records-no-indexed-columns">
+      {t('records.records.no_indexed_columns', {
+        defaultValue: 'No fields are indexed, so only the title and status are shown.',
+      })}{' '}
+      <Link href={`/admin/records/types/${typeKey}`} className="underline">
+        {t('records.records.no_indexed_columns_link', {
+          defaultValue: 'Tick "Indexed" on a field to add a column.',
+        })}
+      </Link>
+    </p>
+  );
+}
+
 function useIsNarrow(): boolean {
   const subscribe = useCallback((onChange: () => void) => {
     if (typeof window === 'undefined' || !window.matchMedia) return () => {};
@@ -97,132 +118,141 @@ export function RecordTable({
 
   if (narrow) {
     return (
-      <RecordCardList
-        type={type}
-        records={records}
-        trashed={trashed}
-        showLocale={showLocale}
-        showPosition={showPosition}
-        onDelete={onDelete}
-        onRestore={onRestore}
-        onPurge={onPurge}
-      />
+      <>
+        <RecordCardList
+          type={type}
+          records={records}
+          trashed={trashed}
+          showLocale={showLocale}
+          showPosition={showPosition}
+          onDelete={onDelete}
+          onRestore={onRestore}
+          onPurge={onPurge}
+        />
+        {columns.length === 0 && <NoIndexedColumnsNotice typeKey={type.key} />}
+      </>
     );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortableHeader
-            field="display_title"
-            label={t('records.records.display_title', { defaultValue: 'Title' })}
-            sort={sort}
-            onSort={onSort}
-          />
-          <SortableHeader
-            field="status"
-            label={t('records.records.status', { defaultValue: 'Status' })}
-            sort={sort}
-            onSort={onSort}
-          />
-          {showLocale && (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
             <SortableHeader
-              field="locale"
-              label={t('records.records.locale', { defaultValue: 'Language' })}
+              field="display_title"
+              label={t('records.records.display_title', { defaultValue: 'Title' })}
               sort={sort}
               onSort={onSort}
             />
-          )}
-          {columns.map((field) => (
             <SortableHeader
-              key={field.key}
-              field={field.key}
-              label={field.label}
-              sort={sort}
-              onSort={onSort}
-              ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
-            />
-          ))}
-          {showPosition && (
-            <SortableHeader
-              field="position"
-              label={t('records.records.position', { defaultValue: 'Position' })}
+              field="status"
+              label={t('records.records.status', { defaultValue: 'Status' })}
               sort={sort}
               onSort={onSort}
             />
-          )}
-          <SortableHeader
-            field="published_at"
-            label={t('records.records.published_at', { defaultValue: 'Published on' })}
-            sort={sort}
-            onSort={onSort}
-          />
-          <SortableHeader
-            field="updated_at"
-            label={t('records.records.updated_at', { defaultValue: 'Updated' })}
-            sort={sort}
-            onSort={onSort}
-          />
-          <TableHead className="text-right">
-            {t('records.records.actions', { defaultValue: 'Actions' })}
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {records.map((record) => (
-          <TableRow
-            key={record.uuid}
-            data-testid="records-record-row"
-            data-record-uuid={record.uuid}
-          >
-            <TableCell className="font-medium">
-              <Link href={`/admin/records/${type.key}/${record.uuid}`} className="hover:underline">
-                {record.display_title}
-              </Link>
-            </TableCell>
-            <TableCell>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <RecordStatusBadge status={record.status} />
-                {record.schema_stale && <SchemaStaleBadge />}
-              </div>
-            </TableCell>
             {showLocale && (
-              <TableCell>
-                <RecordLocaleBadge locale={record.locale} />
-              </TableCell>
+              <SortableHeader
+                field="locale"
+                label={t('records.records.locale', { defaultValue: 'Language' })}
+                sort={sort}
+                onSort={onSort}
+              />
             )}
             {columns.map((field) => (
-              <TableCell key={field.key} className="text-muted-foreground">
-                <RecordCell
-                  field={field}
-                  value={record.data[field.key]}
-                  expanded={record.expanded?.[field.key] ?? undefined}
-                />
-              </TableCell>
+              <SortableHeader
+                key={field.key}
+                field={field.key}
+                label={field.label}
+                sort={sort}
+                onSort={onSort}
+                ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
+              />
             ))}
             {showPosition && (
-              <TableCell className="text-muted-foreground">{record.position}</TableCell>
-            )}
-            <TableCell className="text-muted-foreground">
-              {record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {formatDateTime(record.updated_at ?? record.created_at)}
-            </TableCell>
-            <TableCell className="text-right">
-              <RecordRowAction
-                typeKey={type.key}
-                record={record}
-                trashed={trashed}
-                onDelete={onDelete}
-                onRestore={onRestore}
-                onPurge={onPurge}
+              <SortableHeader
+                field="position"
+                label={t('records.records.position', { defaultValue: 'Position' })}
+                sort={sort}
+                onSort={onSort}
               />
-            </TableCell>
+            )}
+            <SortableHeader
+              field="published_at"
+              label={t('records.records.published_at', { defaultValue: 'Published on' })}
+              sort={sort}
+              onSort={onSort}
+            />
+            <SortableHeader
+              field="updated_at"
+              label={t('records.records.updated_at', { defaultValue: 'Updated' })}
+              sort={sort}
+              onSort={onSort}
+            />
+            <TableHead className="text-right">
+              {t('records.records.actions', { defaultValue: 'Actions' })}
+            </TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {records.map((record) => (
+            <TableRow
+              key={record.uuid}
+              data-testid="records-record-row"
+              data-record-uuid={record.uuid}
+            >
+              <TableCell className="font-medium">
+                <Link
+                  href={`/admin/records/${type.key}/${record.uuid}`}
+                  className="hover:underline"
+                >
+                  {record.display_title}
+                </Link>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <RecordStatusBadge status={record.status} />
+                  {record.schema_stale && <SchemaStaleBadge />}
+                </div>
+              </TableCell>
+              {showLocale && (
+                <TableCell>
+                  <RecordLocaleBadge locale={record.locale} />
+                </TableCell>
+              )}
+              {columns.map((field) => (
+                <TableCell key={field.key} className="text-muted-foreground">
+                  <RecordCell
+                    field={field}
+                    value={record.data[field.key]}
+                    expanded={record.expanded?.[field.key] ?? undefined}
+                  />
+                </TableCell>
+              ))}
+              {showPosition && (
+                <TableCell className="text-muted-foreground">{record.position}</TableCell>
+              )}
+              <TableCell className="text-muted-foreground">
+                {record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {formatDateTime(record.updated_at ?? record.created_at)}
+              </TableCell>
+              <TableCell className="text-right">
+                <RecordRowAction
+                  typeKey={type.key}
+                  record={record}
+                  trashed={trashed}
+                  onDelete={onDelete}
+                  onRestore={onRestore}
+                  onPurge={onPurge}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {columns.length === 0 && <NoIndexedColumnsNotice typeKey={type.key} />}
+    </>
   );
 }

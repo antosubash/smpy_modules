@@ -58,3 +58,13 @@ describe('FieldRowBody — R11: the Type select says words, not wire values', ()
     expect(out).toMatch(/id="field-row-0-label"[^>]*maxLength="200"/);
   });
 });
+
+describe('FieldRowBody — U6: the Indexed checkbox names its own consequence', () => {
+  it('renders a hint naming the list-column consequence, wired to the checkbox', () => {
+    const out = html();
+    expect(out).toContain('id="field-row-0-indexed-hint"');
+    expect(out).toContain('aria-describedby="field-row-0-indexed-hint"');
+    expect(out).toContain('filtered, sorted and shown as list columns');
+    expect(out).toContain('first four indexed fields');
+  });
+});
