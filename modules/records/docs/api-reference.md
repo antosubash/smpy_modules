@@ -417,7 +417,7 @@ curl -s -b cookies.txt \
 | `updated_at` | datetime \| null | |
 | `is_deleted` | bool | |
 | `invalid` | list of `{field, message}` | What does not validate *right now*, per field. Costs a validator pass, so it is **always `[]` on a list response** — the single-record read is where it is filled |
-| `invalid_since` | datetime \| null | When a scan last found this record wanting — the stored mark, filled on a list row too. Written by a forced schema change or by `rescan`; cleared by the record's next successful write |
+| `invalid_since` | datetime \| null | When a scan last found this record wanting — the stored mark, filled on a list row too. Written by a forced schema change or by `rescan`; cleared by the record's next successful write — a restore is not one, since it validates nothing |
 | `translations` | list of `TranslationRead` \| null | Only under `?translations=true` |
 | `expanded` | object \| null | Only under `?expand=`; `{field_key: [ExpandedRef, …]}` in payload order |
 

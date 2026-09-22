@@ -108,17 +108,78 @@ async def test_a_refused_restrictive_change_marks_nothing(client):
     assert (await read(client, state["uuids"][0]))["invalid_since"] is None
 
 
-async def test_restoring_a_marked_record_clears_it(client):
-    """A restore reindexes under the current schema and validates nothing, so
-    it must not carry a claim forward that nothing re-checked."""
-    state = await type_with(client, {"name": "Widget"})
-    await force_required_sku(client, state["type"])
-    uuid = state["uuids"][0]
-
+async def _trash_and_restore(client, uuid: str) -> None:
     trashed = await client.delete(f"{TYPES}/product/records/{uuid}", headers=roles(ADMIN))
     assert trashed.status_code == 204, trashed.text
     restored = await client.post(f"{TYPES}/product/records/{uuid}/restore", headers=roles(ADMIN))
     assert restored.status_code == 200, restored.text
+
+
+async def test_restoring_a_marked_record_keeps_the_mark(client):
+    """A restore reindexes under the current schema and validates *nothing* —
+    the payload comes back exactly as it went in — so it fixes nothing and has
+    no business dropping a mark. Clearing it made the two representations of
+    one fact disagree on the very next read: the derived list still named the
+    failing field while the column said the record was fine."""
+    state = await type_with(client, {"name": "Widget"})
+    await force_required_sku(client, state["type"])
+    uuid = state["uuids"][0]
+
+    await _trash_and_restore(client, uuid)
+
+    after = await read(client, uuid)
+    assert [entry["field"] for entry in after["invalid"]] == ["sku"]
+    assert after["invalid_since"] is not None
+
+
+async def test_the_worklist_still_lists_a_restored_record(client):
+    """What the column is *for*: the filter behind the hub count and the
+    "Check records" worklist reads it, not the validator."""
+    state = await type_with(client, {"name": "Widget"})
+    await force_required_sku(client, state["type"])
+    uuid = state["uuids"][0]
+
+    await _trash_and_restore(client, uuid)
+
+    page = await client.get(f"{TYPES}/product/records?filter=invalid:eq:true", headers=roles(ADMIN))
+    assert page.status_code == 200, page.text
+    assert [item["uuid"] for item in page.json()["items"]] == [uuid]
+    assert page.json()["total"] == 1
+
+
+async def test_a_bulk_restore_keeps_the_mark_too(client):
+    """Bulk composes the single-record call, so it inherits this — stated as a
+    test because "by composition" is a claim that stops being true silently."""
+    state = await type_with(client, {"name": "Widget"})
+    await force_required_sku(client, state["type"])
+    uuid = state["uuids"][0]
+    assert (
+        await client.delete(f"{TYPES}/product/records/{uuid}", headers=roles(ADMIN))
+    ).status_code == 204
+
+    resp = await client.post(
+        f"{TYPES}/product/records/bulk",
+        json={"action": "restore", "uuids": [uuid]},
+        headers=roles(ADMIN),
+    )
+    assert resp.status_code == 200, resp.text
+    assert (await read(client, uuid))["invalid_since"] is not None
+
+
+async def test_a_restored_record_that_was_fixed_is_still_cleared_by_its_next_write(client):
+    """The mark surviving a restore is not the mark becoming permanent: the
+    ordinary write §8.3 promises still clears it, restore or no restore."""
+    state = await type_with(client, {"name": "Widget"})
+    await force_required_sku(client, state["type"])
+    uuid = state["uuids"][0]
+    await _trash_and_restore(client, uuid)
+
+    fixed = await client.put(
+        f"{TYPES}/product/records/{uuid}",
+        json={"expected_version": 1, "data": {"name": "Widget", "sku": "W-1"}},
+        headers=roles(ADMIN),
+    )
+    assert fixed.status_code == 200, fixed.text
     assert (await read(client, uuid))["invalid_since"] is None
 
 

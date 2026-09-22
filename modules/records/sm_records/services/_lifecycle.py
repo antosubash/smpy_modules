@@ -20,7 +20,6 @@ from sm_records.index._reduce_write import apply_delta, drop_type_rows
 from sm_records.index.reindex import reindex_record
 from sm_records.index.writer import delete_index
 from sm_records.models import Record, RecordType, RevisionEvent, TableSet, tables_for
-from sm_records.services import _invalid
 from sm_records.services._common import (
     PurgedRecord,
     mark_written,
@@ -134,11 +133,15 @@ async def restore_record(
     record.deleted_at = None
     record.deleted_by = None
     record.updated_by = actor
-    # The row is reindexed below under the *current* schema, and the mark it
-    # carried into the trash describes a check made against whatever the
-    # schema was then. Cleared rather than kept: a restore is not a
-    # validation, and "Check records" is what re-derives the list.
-    _invalid.clear_on_write(record)
+    # The ``invalid_since`` mark is deliberately **not** cleared here. The
+    # reindex below is not a validation — the payload comes back exactly as it
+    # went in — so a restore fixes nothing, and clearing would leave the two
+    # representations of one fact disagreeing on the very next read: the
+    # derived ``invalid`` list still names the failing fields while the column
+    # says the record is fine, and the worklist, the per-type count and the
+    # health check all lose it. Rule 1 in ``services._invalid`` is that only a
+    # scan of the stored schema writes this column, and "Check records" is
+    # that scan.
     db.add(record)
     await db.flush()
     await write_revision(

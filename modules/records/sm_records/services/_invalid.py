@@ -18,10 +18,12 @@ a list passes ``with_invalid=False`` in the first place.
   list that may never be saved, and marking from it would flag records against
   a schema nobody applied.
 * **It is cleared by the record's next successful write** — create, update,
-  restore, import — because that write validated against the current schema
-  and is precisely the fix §8.3 promises. A scan that finds a record clean
-  clears it too, which is how a record fixed outside the module (a payload
-  edited in ``psql``, a field's constraint relaxed) stops being marked.
+  import — because that write validated against the current schema and is
+  precisely the fix §8.3 promises. A scan that finds a record clean clears it
+  too, which is how a record fixed outside the module (a payload edited in
+  ``psql``, a field's constraint relaxed) stops being marked. A **restore** is
+  not one of them: it writes the row without looking at the payload, so it
+  fixes nothing and leaves the mark where it was.
 * **The timestamp is not moved by a later scan.** A record that was already
   marked and still fails keeps the instant it first did, which is the only
   thing "since" can honestly mean.
@@ -68,15 +70,16 @@ _COLUMN = "invalid_since"
 def clear_on_write(record: Record) -> None:
     """A record that was just written validly is not invalid any more.
 
-    Called from the ORM write paths (``records.update_record``,
-    ``_lifecycle.restore_record``), where the row is being updated anyway — so
-    this is a column in an ``UPDATE`` that was already happening rather than a
-    statement of its own. Unconditional: assigning ``None`` to an attribute
-    that already holds it is not a change SQLAlchemy emits.
+    Called from the ORM write path that validated (``records.update_record``),
+    where the row is being updated anyway — so this is a column in an
+    ``UPDATE`` that was already happening rather than a statement of its own.
+    Unconditional: assigning ``None`` to an attribute that already holds it is
+    not a change SQLAlchemy emits.
 
-    A create needs nothing — a new row's column defaults to ``NULL`` — and a
-    trash does not clear: a trashed record still holds the payload the schema
-    refuses, and a restore is what re-reads it.
+    A create needs nothing — a new row's column defaults to ``NULL``. A trash
+    does not clear, because a trashed record still holds the payload the
+    schema refuses; and neither does a **restore**, because bringing that same
+    payload back is not a check of it (``_lifecycle.restore_record``).
     """
     record.invalid_since = None
 

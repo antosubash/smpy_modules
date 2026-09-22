@@ -127,9 +127,10 @@ is `[]`.
 - **written only by a scan of the schema records are stored against** — the
   inline pass of a forced `apply`, and the `rescan` behind "Check records".
   Never by a draft preview, whose model is a proposal that may never be saved;
-- **cleared by the record's next successful write** (create, update, restore,
-  import — that write validated against the current schema), and by a scan
-  that finds the record clean;
+- **cleared by the record's next successful write** (create, update, import —
+  that write validated against the current schema), and by a scan that finds
+  the record clean. A restore is **not** one of them: it writes the row
+  without looking at the payload, so it fixes nothing and the mark stays;
 - **the timestamp does not move.** A record that was already marked and still
   fails keeps the instant it first did.
 
