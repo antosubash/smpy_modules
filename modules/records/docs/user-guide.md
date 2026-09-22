@@ -426,7 +426,7 @@ its payload no longer fits the schema — **nothing is changed**, and a panel
 appears naming each record that refused and why:
 
 > 2 of 12 records could not be changed, so nothing was changed.
-> `9d9addcb…` — 3 record(s) still reference 9d9addcb…
+> `9d9addcb…` — 3 record(s) still reference this record
 > `0e13ba71…` — no article record with uuid '0e13ba71…'
 
 **Deselect the 2 that failed** unticks exactly those and leaves the other ten

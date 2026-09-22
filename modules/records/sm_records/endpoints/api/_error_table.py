@@ -133,7 +133,7 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ErrorRow(
         409,
         "A delete blocked by `on_delete: restrict`",
-        '`{"detail", "referrers": [uuid, …], "hidden": n, "more": n}`',
+        '`{"detail", "total": n, "referrers": [uuid, …], "hidden": n, "more": n}`',
     ),
     ErrorRow(
         409,

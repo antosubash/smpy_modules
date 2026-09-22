@@ -81,15 +81,20 @@ class ConflictBody(SQLModel):
     which conflict it was and a client has to look at it either way.
 
     ``current`` is the row a stale write collided with (``RecordRead`` or
-    ``TypeRead``); ``referrers``/``hidden``/``more`` a delete blocked by
-    ``on_delete: restrict``; ``report`` a schema change that would leave
-    records invalid; ``conflicts`` a re-added key that still holds orphaned
-    values; ``field``/``reason`` a filter on a field mid-rebuild. A slug or
-    ``unique`` collision carries none of them.
+    ``TypeRead``); ``total``/``referrers``/``hidden``/``more`` a delete
+    blocked by ``on_delete: restrict``; ``report`` a schema change that would
+    leave records invalid; ``conflicts`` a re-added key that still holds
+    orphaned values; ``field``/``reason`` a filter on a field mid-rebuild. A
+    slug or ``unique`` collision carries none of them.
+
+    ``total`` is how many records block the delete — ``referrers`` plus
+    ``hidden`` plus ``more`` — and it is a field rather than something to
+    parse out of ``detail``, whose sentence is prose and is translated.
     """
 
     detail: str
     current: dict[str, Any] | None = None
+    total: int | None = None
     referrers: list[str] | None = None
     hidden: int | None = None
     more: int | None = None

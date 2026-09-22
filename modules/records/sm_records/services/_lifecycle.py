@@ -99,12 +99,17 @@ async def soft_delete_record(
     if blockers:
         # ``blockers.total`` and not ``len(listed)``: the count has to stay the
         # one the referrers panel and the delete dialog speak, whether or not
-        # every blocker is one this caller may be told the uuid of.
+        # every blocker is one this caller may be told the uuid of. It travels
+        # as a field as well as in the sentence, and the sentence does **not**
+        # name the blocked record: its uuid is in the URL here and in
+        # ``BulkFailure.uuid`` in a batch, where interpolating it printed the
+        # same 32 hex characters twice on one line and nothing else.
         raise ReferencedByOthers(
-            f"{blockers.total} record(s) still reference {record.uuid}",
+            f"{blockers.total} record(s) still reference this record",
             blockers.listed,
             hidden=blockers.hidden,
             more=blockers.more,
+            total=blockers.total,
         )
     for ref, target_uuid in set_nulls:
         await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)

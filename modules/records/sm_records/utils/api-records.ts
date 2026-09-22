@@ -99,7 +99,20 @@ export type BulkAction = 'trash' | 'restore' | 'purge' | 'publish' | 'unpublish'
 
 /** One record the server would not apply the action to, and why. `status` is
  *  what that record alone would have answered. */
-export type BulkFailure = { uuid: string; status: number; message: string };
+export type BulkFailure = {
+  uuid: string;
+  status: number;
+  message: string;
+  /** A delete blocked by `on_delete: restrict` carries its blockers here —
+   *  the same four keys the single-record `409` sends, so one shape renders
+   *  either. `total` counts them all, `referrers` lists the ones this caller
+   *  may read, `hidden` and `more` count the rest. `null` on every other kind
+   *  of refusal, which has no blockers to report. */
+  total?: number | null;
+  referrers?: string[] | null;
+  hidden?: number | null;
+  more?: number | null;
+};
 
 /** The `report` a refused batch carries in its `409` body. Nothing was
  *  written — the caller deselects what this names and sends the rest. */

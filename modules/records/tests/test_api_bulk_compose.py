@@ -101,7 +101,7 @@ async def test_a_cascade_reaches_records_the_batch_never_named(client):
 async def test_a_restrict_referrer_refuses_the_whole_batch(client):
     await _brands(client, on_delete="restrict")
     brands = [await _brand_record(client, "Acme"), await _brand_record(client, "Other")]
-    await _product_for(client, brands[0])
+    blocker = await _product_for(client, brands[0])
 
     resp = await _bulk_brands(client, "trash", brands)
 
@@ -110,6 +110,18 @@ async def test_a_restrict_referrer_refuses_the_whole_batch(client):
     assert [entry["uuid"] for entry in failed] == [brands[0]]
     assert failed[0]["status"] == 409
     assert "still reference" in failed[0]["message"]
+    # The refusal travels whole: the blocked record is ``uuid``, the records
+    # blocking it are ``referrers``, and the count is ``total`` — the same
+    # four keys the single-record 409 sends. Flattened into ``message``, the
+    # panel had a 32-hex string and nothing to render a title from.
+    assert failed[0]["total"] == 1
+    assert failed[0]["referrers"] == [blocker]
+    assert (failed[0]["hidden"], failed[0]["more"]) == (0, 0)
+    # And the message no longer repeats the uuid that is already in ``uuid``.
+    assert brands[0] not in failed[0]["message"]
+    # A refusal with no blockers carries none of them rather than zeroes.
+    unknown = await _bulk_brands(client, "trash", ["f" * 32])
+    assert unknown.json()["report"]["failed"][0]["referrers"] is None
     # The unblocked brand stayed put: all or nothing, including the half of
     # the batch that had nothing wrong with it.
     for uuid in brands:

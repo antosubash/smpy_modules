@@ -501,7 +501,8 @@ and *nothing is written*:
     "action": "trash",
     "requested": 5,
     "failed": [
-      {"uuid": "9d9a…", "status": 409, "message": "3 record(s) still reference 9d9a…"},
+      {"uuid": "9d9a…", "status": 409, "message": "3 record(s) still reference this record",
+       "total": 3, "referrers": ["0b71…", "4c02…", "e5df…"], "hidden": 0, "more": 0},
       {"uuid": "0e13…", "status": 404, "message": "no article record with uuid '0e13…'"}
     ]
   }
@@ -1246,7 +1247,7 @@ kind of route can produce, with the body schema
 | `404` | A preview job this process does not hold | `{"detail"}` |
 | `409` | `expected_version` no longer matches | `{"detail", "current": RecordRead \| TypeRead}` |
 | `409` | A slug or `unique` value already claimed (possibly by a trashed record) | `{"detail"}` |
-| `409` | A delete blocked by `on_delete: restrict` | `{"detail", "referrers": [uuid, …], "hidden": n, "more": n}` |
+| `409` | A delete blocked by `on_delete: restrict` | `{"detail", "total": n, "referrers": [uuid, …], "hidden": n, "more": n}` |
 | `409` | A restrictive schema change that would leave records invalid | `{"detail", "report": DryRunReportRead}` |
 | `409` | Re-adding a key that still holds orphaned values | `{"detail", "conflicts": {key: n}}` |
 | `409` | A filter or sort on a field mid-rebuild | `{"detail", "field", "reason": "reindexing"}` |
@@ -1295,7 +1296,7 @@ Worked examples:
 {"detail": "type 'book' is restricted to roles ['editor']; caller holds none of them"}
 ```
 ```json
-{"detail": "1 record(s) still reference 5082f5ca57a1417698e2ebffc6409ca9",
+{"detail": "1 record(s) still reference this record", "total": 1,
  "referrers": ["9bd09b7c3b984495a552d15f25ec7f94"], "hidden": 0, "more": 0}
 ```
 
@@ -1304,10 +1305,17 @@ The three `409`s a translation can meet are spelled out under
 already in the target locale, or a sibling already holds that language.
 
 A `restrict` refusal speaks the same three numbers the referrers panel does:
-`detail` counts every blocker, `referrers` lists at most 50 uuids of the ones
+`total` counts every blocker, `referrers` lists at most 50 uuids of the ones
 this caller may read, `more` says how many visible blockers were left off, and
 `hidden` counts blockers whose type narrows `allowed_roles` past the caller —
-counted, never named.
+counted, never named. `detail` says `total` again in a sentence, and
+deliberately does **not** name the record being deleted: its uuid is in the
+URL here and in `BulkFailure.uuid` in a batch, and a refusal panel that
+printed it twice on one line had nothing left to say.
+
+The same four keys ride on each entry of a bulk refusal's `report.failed`, so
+a client has one shape to read whether it deleted one record or fifty. They
+are absent (`null`) on every other kind of failure.
 
 **Every refusal rolls the request's session back.** A refused delete that had
 already cleared one `set_null` reference before meeting a `restrict` deeper down

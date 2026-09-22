@@ -91,14 +91,17 @@ async def response_for(request: Request, exc: Exception) -> JSONResponse:
             {"detail": exc.detail, "errors": exc.errors}, status_code=exc.status_code
         )
     if isinstance(exc, ReferencedByOthers):
-        # ``hidden`` and ``more`` are always present, at zero when there is
-        # nothing to say: a client that has to tell "no hidden blockers" from
-        # "this server does not report them" would guess, and the number it
-        # would guess about is the difference between ``detail``'s count and
-        # the list it can show.
+        # ``total``, ``hidden`` and ``more`` are always present, the last two
+        # at zero when there is nothing to say: a client that has to tell "no
+        # hidden blockers" from "this server does not report them" would
+        # guess, and the number it would guess about is the difference between
+        # ``total`` and the list it can show. ``total`` is a field because
+        # ``detail`` is a sentence, and a count read back out of prose is a
+        # count that breaks when the prose is translated.
         return JSONResponse(
             {
                 "detail": exc.detail,
+                "total": exc.total,
                 "referrers": exc.referrers,
                 "hidden": exc.hidden,
                 "more": exc.more,

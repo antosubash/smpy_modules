@@ -90,11 +90,23 @@ class BulkFailure(SQLModel):
     ``restrict`` relation, 422 for a payload the current schema no longer
     accepts. The batch's own status is always 409: the request as a whole
     conflicts with the state the records are in.
+
+    ``total``/``referrers``/``hidden``/``more`` are the four keys the
+    single-record ``409`` sends for a delete blocked by ``on_delete:
+    restrict``, carried through the report rather than flattened into
+    ``message``: the refusal panel renders a record by its title and can only
+    do that from identifiers, and a count parsed back out of an English
+    sentence stops being a count in any other language. ``None`` on every
+    other kind of refusal, which has no blockers to report.
     """
 
     uuid: str
     status: int
     message: str
+    total: int | None = None
+    referrers: list[str] | None = None
+    hidden: int | None = None
+    more: int | None = None
 
 
 class BulkReport(SQLModel):

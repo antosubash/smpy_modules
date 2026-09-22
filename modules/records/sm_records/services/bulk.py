@@ -66,7 +66,7 @@ from sm_records.services._claims import lock_type
 # ``_empty_trash`` for that reason and for the file cap. Callers still import
 # one module.
 from sm_records.services._empty_trash import Identity, empty_trash
-from sm_records.services.errors import BulkRefused, RecordsError
+from sm_records.services.errors import BulkRefused, RecordsError, ReferencedByOthers
 from sm_records.settings import RecordsSettings
 
 __all__ = ["Change", "Identity", "apply_bulk", "empty_trash"]
@@ -87,6 +87,27 @@ def _distinct(uuids: Iterable[str]) -> list[str]:
             seen.add(uuid)
             out.append(uuid)
     return out
+
+
+def _failure(uuid: str, exc: RecordsError) -> BulkFailure:
+    """One refused record, with the structured half of the refusal kept.
+
+    A ``restrict`` blocker is the one refusal whose 409 carries more than a
+    sentence, and flattening it to ``message`` was what left the panel with a
+    uuid and nothing to render. The four keys are the single-record body's,
+    unchanged, so a client has one shape to read either way.
+    """
+    if isinstance(exc, ReferencedByOthers):
+        return BulkFailure(
+            uuid=uuid,
+            status=exc.status_code,
+            message=exc.detail,
+            total=exc.total,
+            referrers=exc.referrers,
+            hidden=exc.hidden,
+            more=exc.more,
+        )
+    return BulkFailure(uuid=uuid, status=exc.status_code, message=exc.detail)
 
 
 async def apply_bulk(
@@ -143,7 +164,7 @@ async def apply_bulk(
                     )
                 )
         except RecordsError as exc:
-            failures.append(BulkFailure(uuid=uuid, status=exc.status_code, message=exc.detail))
+            failures.append(_failure(uuid, exc))
             # Rolling the savepoint back expires whatever the refused record's
             # attempt touched inside it — on SQLite that includes the type row,
             # which ``_prepare``'s own ``lock_type`` writes to. Reload it here,

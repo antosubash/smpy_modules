@@ -81,16 +81,29 @@ class ReferencedByOthers(Conflict):
     way to withhold. ``more`` is how many *visible* blockers were left off the
     list, which is capped for the same reason ``ImportReport`` caps its errors
     — a hundred thousand referrers is not a response anybody can read.
-    ``detail`` counts all three, so the number the caller is told stays the
-    number that blocked them.
+    ``total`` is all three and is the number ``detail`` speaks. It is carried
+    as a field rather than left for a client to parse back out of the
+    sentence, which is also why the sentence no longer names the blocked
+    record: that uuid is in the URL of a single-record delete and in
+    ``BulkFailure.uuid`` of a batch, and interpolating it made the bulk
+    refusal panel print the same 32-hex string twice with nothing else on the
+    line. Defaults to the three numbers added up, for the type-delete caller
+    that has a plain list and no cap.
     """
 
     def __init__(
-        self, detail: str, referrers: list[str], *, hidden: int = 0, more: int = 0
+        self,
+        detail: str,
+        referrers: list[str],
+        *,
+        hidden: int = 0,
+        more: int = 0,
+        total: int | None = None,
     ) -> None:
         self.referrers = referrers
         self.hidden = hidden
         self.more = more
+        self.total = total if total is not None else len(referrers) + hidden + more
         super().__init__(detail)
 
 

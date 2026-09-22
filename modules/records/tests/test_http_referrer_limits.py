@@ -90,7 +90,14 @@ async def test_a_restrict_refusal_counts_hidden_blockers_and_names_visible_ones(
     assert hidden["uuid"] not in body["referrers"]
     assert body["hidden"] == 1
     assert body["more"] == 0
+    # ``total`` is the same number ``detail`` speaks, as a field: a count a
+    # client has to parse back out of a sentence stops being a count as soon
+    # as the sentence is translated.
+    assert body["total"] == 2
     assert body["detail"].startswith("2 record(s) still reference")
+    # And the sentence does not name the record the caller asked to delete —
+    # it is in the URL here, and in ``BulkFailure.uuid`` in a batch.
+    assert author["uuid"] not in body["detail"]
 
 
 async def test_the_blocker_list_is_capped_and_says_how_many_more(client):
@@ -128,6 +135,7 @@ async def test_the_blocker_list_is_capped_and_says_how_many_more(client):
     assert len(body["referrers"]) == BLOCKER_CAP
     assert body["more"] == 3
     assert body["hidden"] == 0
+    assert body["total"] == BLOCKER_CAP + 3
     assert body["detail"].startswith(f"{BLOCKER_CAP + 3} record(s) still reference")
 
 
