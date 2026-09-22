@@ -82,12 +82,41 @@ TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 MAX_KEY_LEN: Final = 64
 MAX_LABEL_LEN: Final = 200
 
-MAX_COLLECTION_NAME_LEN: Final = 32
+MAX_COLLECTION_NAME_LEN: Final = 22
 """A collection's name, which obeys ``TYPE_KEY_PATTERN`` too (Phase 5 §6.1).
 
-Shorter than a key because the name is a table-name *prefix*: Postgres
-truncates an identifier at 63 bytes, and the longest thing built on it —
-``ix_records_c_<name>_index_datetime_lookup`` — has to fit under that."""
+Much shorter than a key because the name is a table-name *prefix*, and every
+index built on it has to stay inside Postgres's 63-byte identifier limit. The
+longest one is ``ix_records_c_<name>_record_type_status_position`` — the
+document table's, not an index table's — at 41 characters plus the name, so 22
+lands exactly on 63 and 23 raises ``IdentifierError`` at ``create_all`` or at
+``alembic revision --autogenerate``. (It said 32 until the suffixes were
+measured, which accepted 23-30 and moved the failure from the ``ValueError``
+:func:`sm_records.models._tables.declare` raises at import time, where there is
+a person reading a traceback, to the host's next migration run.)
+``tests/test_collections_ddl.py`` measures it rather than trusting this
+sentence, so the constant and the index names cannot drift apart again.
+
+**Foreign-key names are a separate story and are deliberately not what this
+bounds.** ``fk_records_c_<name>_index_datetime_record_id_records_c_<name>_record``
+is over 63 for every collection name there is, including ``events`` — the
+framework's naming convention spells it and SQLAlchemy's identifier preparer
+hash-truncates it at DDL time (``…_records_c_even_2956``). Nothing disagrees
+about it: Alembic compares foreign keys by their column signature rather than
+by name, and a migration goes through the same preparer as ``create_all``, so
+both sides name the same physical constraint. What it costs is that a
+hand-written ``DROP CONSTRAINT`` has to use the truncated spelling ``psql``
+shows, not the logical one."""
+
+MAX_COLLECTION_COLUMN_LEN: Final = 32
+"""The stored width of ``RecordType.collection``, and deliberately *not*
+:data:`MAX_COLLECTION_NAME_LEN`.
+
+The rule about how long a name may be is enforced where names are declared, in
+code, at import; the column only has to be wide enough to hold one. Keeping the
+width where it has always been means tightening the rule costs no migration in
+any host — and a value between the two lengths cannot get in, because nothing
+can declare the collection it would name."""
 
 RESERVED_COLLECTION_NAMES: Final = frozenset(
     {"default", "global", "records", "type", "index", "reduce"}

@@ -9,7 +9,7 @@ from simple_module_db.mixins import AuditMixin
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, false
 from sqlmodel import Field
 
-from sm_records.constants import MAX_COLLECTION_NAME_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
+from sm_records.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
 from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
 
 
@@ -52,7 +52,7 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """Which field's value becomes ``Record.display_title``."""
     slug_field: str | None = Field(default=None, max_length=MAX_KEY_LEN)
 
-    collection: str | None = Field(default=None, max_length=MAX_COLLECTION_NAME_LEN)
+    collection: str | None = Field(default=None, max_length=MAX_COLLECTION_COLUMN_LEN)
     """Which **table set** this type's documents live in — Phase 5 §6.2.
 
     ``None`` is the global tables, which is what every type written before this

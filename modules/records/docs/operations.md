@@ -150,9 +150,10 @@ alembic -c host/alembic.ini revision --autogenerate -m "records events collectio
 alembic -c host/alembic.ini upgrade heads
 ```
 
-A collection name must match `^[a-z][a-z0-9_]*$`, be at most 32 characters (it
-is a table-name prefix and the longest index built on it must fit inside
-PostgreSQL's 63-byte identifier limit) and not be one of `default`, `global`,
+A collection name must match `^[a-z][a-z0-9_]*$`, be at most 22 characters (it
+is a table-name prefix and the longest index built on it,
+`ix_records_c_<name>_record_type_status_position`, must fit inside
+PostgreSQL's 63-byte identifier limit — at 22 it lands exactly on 63) and not be one of `default`, `global`,
 `records`, `type`, `index`, `reduce`. Declaring the same name twice is a no-op;
 declaring one **after** the app is built is a `RuntimeError`, because those
 tables are in no migration.
@@ -594,7 +595,14 @@ Differences that matter:
   ascending btree on PostgreSQL, so the planner ignored the index and sorted the
   type.
 - **Identifier length.** PostgreSQL truncates identifiers at 63 bytes, which is
-  why a collection name is capped at 32 characters.
+  why a collection name is capped at 22 characters —
+  `ix_records_c_<name>_record_type_status_position` is the longest identifier a
+  table set builds, and 22 puts it exactly on the limit. Foreign-key names are
+  longer still and are not what the cap protects: the naming convention spells
+  both table names into one identifier, so every collection's index-to-document
+  key is past 63 and SQLAlchemy hash-truncates it
+  (`fk_records_c_events_index_date_record_id_records_c_even_2956`). A
+  hand-written `DROP CONSTRAINT` has to use that spelling, not the logical one.
 - **Index key length.** The text index column is 512 characters — 2,048 bytes at
   four-byte UTF-8, under PostgreSQL's 2,704-byte btree ceiling. Redo that
   arithmetic before raising it.

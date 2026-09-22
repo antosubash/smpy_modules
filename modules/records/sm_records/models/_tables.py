@@ -41,9 +41,11 @@ __all__ = [
 
 MAX_COLLECTION_NAME_LEN = constants.MAX_COLLECTION_NAME_LEN
 RESERVED_COLLECTION_NAMES = constants.RESERVED_COLLECTION_NAMES
-"""Re-exported from :mod:`sm_records.constants`, which is where the *type*
-column's ``max_length`` reads them from — ``models._type`` must not import this
-module, whose import builds every table set."""
+"""Re-exported from :mod:`sm_records.constants`, which is where ``models._type``
+reads its own constants from — that module must not import this one, whose
+import builds every table set. The ``collection`` column's width is
+:data:`~sm_records.constants.MAX_COLLECTION_COLUMN_LEN` and is deliberately
+wider than the name limit enforced here; see its docstring."""
 
 _KEY_RE = re.compile(constants.TYPE_KEY_PATTERN)
 
@@ -124,7 +126,8 @@ def _validate(name: str) -> None:
     if len(name) > MAX_COLLECTION_NAME_LEN:
         raise ValueError(
             f"collection name {name!r} must be at most {MAX_COLLECTION_NAME_LEN} characters: "
-            "it is a table-name prefix, and the longest table built on it has to stay inside "
+            "it is a table-name prefix, and the longest index built on it "
+            "(ix_records_c_<name>_record_type_status_position) has to stay inside "
             "Postgres's 63-byte identifier limit"
         )
     if name in RESERVED_COLLECTION_NAMES:

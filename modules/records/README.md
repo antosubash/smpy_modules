@@ -589,9 +589,10 @@ autogenerate cannot see the tables. In this repo `host/alembic.ini` sets
 `prepend_sys_path = %(here)s` and `env.py` imports `records_collections` when
 it exists.
 
-A name must match `^[a-z][a-z0-9_]*$`, be at most 32 characters (it is a
-table-name prefix, and the longest index built on it has to fit inside
-Postgres's 63-byte identifier limit), and not be one of `default`, `global`,
+A name must match `^[a-z][a-z0-9_]*$`, be at most 22 characters (it is a
+table-name prefix, and the longest index built on it —
+`ix_records_c_<name>_record_type_status_position` — has to fit inside
+Postgres's 63-byte identifier limit, which at 22 it exactly does), and not be one of `default`, `global`,
 `records`, `type`, `index`, `reduce`. Declaring the same name twice is a no-op;
 declaring one **after** the app has been built is a `RuntimeError`, because
 those tables are in no migration and every write to them would be a

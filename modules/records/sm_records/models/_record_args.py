@@ -12,6 +12,19 @@ them are read back by name elsewhere (:class:`~sm_records.models._record.RecordT
 and because index names are schema-global on Postgres:
 ``ix_records_record_type_slug`` can exist exactly once, so a collection's copy
 has to be spelled from its own prefix or the second ``CREATE INDEX`` fails.
+
+The longest identifier any table set builds is one of these —
+``ix_<prefix>record_type_status_position`` — and it is what
+:data:`sm_records.constants.MAX_COLLECTION_NAME_LEN` is measured against, so a
+suffix here that grows shortens the longest collection name a host may declare.
+``tests/test_collections_name_limit.py`` fails rather than the host's next
+migration. Foreign-key names are longer still and are *not* what the limit
+bounds: the framework's naming convention spells both table names into one
+identifier, so every collection's index-to-document keys are past 63 and
+SQLAlchemy's preparer hash-truncates them at DDL time. Nothing disagrees about
+that — Alembic matches foreign keys by column signature, and a migration
+truncates identically — but a hand-written ``DROP CONSTRAINT`` has to use the
+truncated spelling, not the logical one.
 """
 
 from __future__ import annotations
