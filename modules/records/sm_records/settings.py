@@ -30,11 +30,12 @@ from __future__ import annotations
 from typing import Any, Final
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from sm_records import constants
 from sm_records.settings_checks import (
     DEFAULT_PUBLIC_ROUTE_PREFIX,
+    StoredSourcesOnly,
     check_content_locales,
     check_limits,
     check_public_route_prefix,
@@ -45,52 +46,31 @@ _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 """Marks a field the module reads once, while booting. See the module docstring."""
 
 
-class RecordsSettings(BaseSettings):
+class RecordsSettings(StoredSourcesOnly, BaseSettings):
     # ``use_attribute_docstrings`` puts the prose under each field on the
     # Settings screen: the admin UI renders ``FieldInfo.description``, and
     # without this every field would arrive there unexplained while the
     # explanation sat in the source three lines below it.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only — no env, no ``.env``, no secrets directory.
-
-        The hydrator passes stored overrides as keyword arguments, so any field
-        has exactly two answers: what the database says, or the default
-        declared here. Dropping the env sources rather than merely not
-        documenting them is deliberate — a stray ``SM_RECORDS_*`` in a shell or
-        a deploy manifest would otherwise quietly outrank the value an operator
-        can see and edit on the Settings screen.
-        """
-        return (init_settings,)
-
     public_route_prefix: str = Field(
         default=DEFAULT_PUBLIC_ROUTE_PREFIX, json_schema_extra=_RESTART
     )
     """URL prefix for the anonymous read API of public record types.
 
-    ``GET {prefix}/{type_key}`` and ``GET {prefix}/{type_key}/{uuid}`` serve
-    the published records of a type whose ``is_public`` is set, to callers
-    with no session at all (design §10). A type that is not public is a 404
-    on both, indistinguishable from one that does not exist.
+    ``GET {prefix}/{type_key}`` and ``GET {prefix}/{type_key}/{uuid}`` serve the
+    published records of a type whose ``is_public`` is set, to callers with no
+    session at all (design §10). A type that is not public is a 404 on both,
+    indistinguishable from one that does not exist.
 
     Read once, while booting: :mod:`sm_records.boot` mounts the router and
     exempts the prefix from ``AuthMiddleware`` from ``on_startup``, so a new
     value needs a restart — which is what ``requires_restart`` tells the
-    operator on the Settings screen. The exemption is registered as a prefix
-    rule terminating in ``/``; a value sharing its first characters with the
-    admin API (``/api/records``) is therefore still safe, and a value that is
-    a *parent* of it — or of ``/admin`` — is refused outright by
-    :func:`check_public_route_prefix`, as are ``/`` and a value with no
-    leading slash.
+    operator. The exemption is a prefix rule terminating in ``/``, so a value
+    sharing its first characters with the admin API (``/api/records``) is still
+    safe; a value that is a *parent* of it — or of ``/admin`` — is refused by
+    :func:`check_public_route_prefix`, as are ``/`` and a value with no leading
+    slash.
     """
 
     content_locales: tuple[str, ...] = Field(
@@ -100,20 +80,16 @@ class RecordsSettings(BaseSettings):
 
     Edited on the Settings screen as a JSON array — ``["en","de","fr"]``. A
     single entry (the default) is what a monolingual install runs on and costs
-    it nothing: every record is in that locale, no type is translatable, and
-    the public API behaves exactly as it did before there was such a thing as a
-    language.
+    it nothing: every record is in that locale, no type is translatable, and the
+    public API behaves as it did before there was such a thing as a language.
 
     **Deliberately this module's own setting and not pagebuilder's.**
     ``records`` must not depend on ``pagebuilder`` — it is published on its own
     and a host may install either without the other — and the two may
-    legitimately publish in different language sets: a site can run a
-    four-language marketing site off pagebuilder while its product catalogue is
-    English-only. A host that wants them aligned sets both; the README says so.
-
-    Distinct again from the host's ``SM_I18N_SUPPORTED_LOCALES``, which decides
-    what language the *admin console* speaks rather than what the content is
-    published in.
+    legitimately publish in different language sets. A host that wants them
+    aligned sets both; the README says so. Distinct again from the host's
+    ``SM_I18N_SUPPORTED_LOCALES``, which decides what the *admin console*
+    speaks rather than what the content is published in.
     """
 
     default_content_locale: str = Field(
@@ -162,6 +138,23 @@ class RecordsSettings(BaseSettings):
     max_payload_bytes: int = 262144
     """Reject a record write whose ``data`` payload, serialized, exceeds this
     many bytes (default 256 KB)."""
+
+    public_cache_seconds: int = Field(default=60, ge=0)
+    """``max-age`` on an anonymous read, and whether it is cacheable at all.
+
+    ``GET {public_route_prefix}/…`` is the one surface with no session behind
+    it, so it is the one a CDN or a reverse proxy can hold — and it sent
+    neither ``ETag`` nor ``Cache-Control``, so every anonymous reader was a
+    full page build. ``updated_at``/``published_at`` are already on the row,
+    which makes a weak validator nearly free; a conditional GET that matches is
+    a ``304`` with no body.
+
+    ``0`` sends ``no-store`` instead and skips the validator, for an install
+    whose "published" means "visible the instant it is saved".
+
+    Nothing on the admin API takes this: those responses are per-caller and
+    ``InertiaCache`` already forces them private.
+    """
 
     max_import_bytes: int = 52428800
     """Reject an import whose uploaded body exceeds this many bytes (default
@@ -234,10 +227,8 @@ class RecordsSettings(BaseSettings):
     request for a large one, with whatever proxy timeout that implies. Above
     this many records the endpoint answers ``202`` with a job id and runs the
     scan through the module's deferred-job mechanism; the caller polls
-    ``GET /types/{key}/schema/preview/{job}``.
-
-    ``0`` sends every preview through the job, which is the setting to reach
-    for behind a proxy with a short timeout.
+    ``GET /types/{key}/schema/preview/{job}``. ``0`` sends every preview
+    through the job, which is the setting to reach for behind a short timeout.
     """
 
     preview_job_ttl_seconds: int = Field(default=600, ge=0)

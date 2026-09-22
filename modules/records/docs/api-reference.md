@@ -1055,6 +1055,28 @@ either way.
 `?after=`, `?total=false` and the `max_count` bound all apply, and a client
 walking a large public type is exactly the caller that should use them.
 
+**Both anonymous reads are cacheable.** They carry a weak `ETag` over the
+content they are about to return and `Cache-Control: public, max-age=N`, where
+`N` is the `public_cache_seconds` setting (60 by default). A conditional GET
+whose `If-None-Match` matches is a `304` with no body, carrying the same
+`ETag` and `Cache-Control` so a cache can refresh its entry. Comparison is
+weak and `*` matches, per RFC 9110 §13.1.2. Setting `public_cache_seconds` to
+`0` sends `Cache-Control: no-store` and no validator at all, which is the
+setting for an install whose "published" means "visible the instant it is
+saved".
+
+The validator covers the *content*, so it changes when the answer does — a row
+edited, a row unpublished out of the page, a different `?filter=`, a different
+page of the same query — and not merely when some row somewhere was touched.
+
+> **A shared cache still cannot store these responses on a stock host.** Every
+> anonymous response also carries `Vary: Cookie` and a fresh
+> `Set-Cookie: session=…` (the value decodes to `{"__i18n_locale": "en"}`),
+> written on every request by `InertiaLayoutDataMiddleware` —
+> `simple_module_hosting/_inertia_shared.py:54`. This module writes nothing to
+> the session and does not work around it; until it is fixed upstream, these
+> headers help a browser and a private cache rather than a CDN.
+
 ---
 
 ## Error table
@@ -1209,6 +1231,7 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_payload_bytes` + 65,536 | 327,680 | Any `/api/records/*` write body except the import — `413` **before** the body is read |
 | `max_import_bytes` | 52,428,800 | One import body — `413` **before** parsing |
 | `max_import_rows` | 20,000 | Rows in one import — `413` **before** anything is written |
+| `public_cache_seconds` | 60 | `max-age` on an anonymous read; `0` is `no-store` |
 | `max_fields_per_type` | 100 | Field definitions per type |
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |
 | `preview_sync_limit` | 5,000 | Records a preview dry-runs inside the request, then `202` |

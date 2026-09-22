@@ -282,6 +282,7 @@ variables are read. Configure on the Settings screen or with
 | `preview_job_ttl_seconds` | 600 (10 min) | no |
 | `max_import_bytes` | 52428800 (50 MB) | no |
 | `max_import_rows` | 20000 | no |
+| `public_cache_seconds` | 60 | no |
 | `max_fields_per_type` | 100 | no |
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
@@ -426,6 +427,19 @@ The rules worth knowing before you point a site at it:
   [Paging a large type](#paging-a-large-type). A client walking a large public
   type is precisely the caller that should not be paying for an `OFFSET` and a
   count it never reads.
+- **Both reads are cacheable.** They carry a weak `ETag` over the content they
+  are about to return and `Cache-Control: public, max-age=N`, where `N` is the
+  `public_cache_seconds` setting (60 by default). A conditional GET whose
+  `If-None-Match` matches is a `304` with no body. Set it to `0` for
+  `Cache-Control: no-store` and no validator, on an install whose "published"
+  means "visible the instant it is saved".
+
+  > A *shared* cache still cannot store these on a stock host: every anonymous
+  > response also carries `Vary: Cookie` and a fresh `Set-Cookie: session=…`,
+  > written on every request by the framework's `InertiaLayoutDataMiddleware`
+  > (`simple_module_hosting/_inertia_shared.py:54`). This module writes nothing
+  > to the session and does not work around it; until that is fixed upstream,
+  > the headers help a browser and a private cache rather than a CDN.
 
 ## Permissions
 

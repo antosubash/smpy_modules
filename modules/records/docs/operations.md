@@ -191,6 +191,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `max_payload_bytes` | `262144` (256 KB) | no | One record's serialized `data` |
 | `max_import_bytes` | `52428800` (50 MB) | no | One import body, refused `413` **before** parsing |
 | `max_import_rows` | `20000` | no | Rows in one import, refused `413` **before** anything is written |
+| `public_cache_seconds` | `60` | no | `max-age` on an anonymous read; `0` sends `no-store` and no `ETag` |
 | `max_fields_per_type` | `100` | no | Field definitions per type |
 | `max_indexed_fields_per_type` | `25` | no | Indexed field definitions per type. Must not exceed `max_fields_per_type` |
 | `max_count` | `10000` | no | How far a list's `total` is counted exactly before `total_capped` |

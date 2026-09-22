@@ -22,6 +22,13 @@ Two rules the handlers exist to enforce, beyond what the services do:
   operational state an anonymous caller has no business seeing. So
   ``QueryError`` is caught and flattened, reason and all.
 
+Both handlers finish through :mod:`sm_records.endpoints.api._public_cache`,
+which is the only reason their return annotation is ``Any``: a conditional GET
+whose validator matches is answered with a bare ``304``, and a handler that
+returns a ``Response`` is one FastAPI hands straight back. The declared
+``response_model`` is still what the schema documents and what every other
+request is serialised through.
+
 ``HEAD`` is declared explicitly, from the same ``PUBLIC_ROUTE_METHODS`` the
 exemption is pinned to. Starlette's own ``Route`` adds ``HEAD`` to every
 ``GET``, but FastAPI's ``APIRoute`` takes the method set verbatim — so a bare
@@ -34,7 +41,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, locales
@@ -53,6 +60,7 @@ from sm_records.deps import (
     parse_sorts,
     request_db,
 )
+from sm_records.endpoints.api import _public_cache
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.services import public as public_service
@@ -106,6 +114,8 @@ def _read_route(path: str, **kwargs: Any) -> Callable[[_Handler], _Handler]:
 @_read_route("/{type_key}", response_model=PublicRecordPage)
 async def list_public_records(
     type_key: str,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     page: int = Query(default=1, ge=1, le=MAX_PAGE),
@@ -114,7 +124,7 @@ async def list_public_records(
     filters: list[Filter] = Depends(parse_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     locale: str | None = Query(default=None, alias=constants.LOCALE_PARAM),
-) -> PublicRecordPage:
+) -> Any:
     """Published records of a public type, with the admin filter/sort grammar.
 
     ``page_size`` is clamped to ``max_page_size`` rather than refused, and no
@@ -165,7 +175,7 @@ async def list_public_records(
     except CursorError as exc:
         raise HTTPException(status_code=400, detail="cannot resume from that cursor") from exc
     siblings = await public_service.published_siblings(db, rtype, result.items, settings=settings)
-    return PublicRecordPage(
+    payload = PublicRecordPage(
         items=public_records_read(rtype, result.items, siblings=siblings),
         total=result.total,
         total_capped=result.total_capped,
@@ -173,15 +183,18 @@ async def list_public_records(
         page=page,
         page_size=settings.clamp_page_size(page_size),
     )
+    return _public_cache.apply(request, response, payload, settings) or payload
 
 
 @_read_route("/{type_key}/{uuid}", response_model=PublicRecordRead)
 async def get_public_record(
     type_key: str,
     uuid: str,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
-) -> PublicRecordRead:
+) -> Any:
     """One published record. A draft, a trashed row, an unknown uuid and a
     private type are one and the same 404 (``services.public.NOT_FOUND``).
 
@@ -199,7 +212,8 @@ async def get_public_record(
     rtype = await public_service.get_public_type(db, type_key)
     record = await public_service.get_public_record(db, rtype, uuid, settings=settings)
     siblings = await public_service.published_siblings(db, rtype, [record], settings=settings)
-    return public_record_read(rtype, record, siblings=siblings.get(record.translation_group))
+    payload = public_record_read(rtype, record, siblings=siblings.get(record.translation_group))
+    return _public_cache.apply(request, response, payload, settings) or payload
 
 
 __all__ = ["router"]
