@@ -98,6 +98,41 @@ describe('TypeImportDialog — M3: what the definition would do, before it does 
     await view.unmount();
   });
 
+  it('U15: labels its own dismiss button Cancel, not Done — nothing has been applied yet', async () => {
+    const view = await mount(
+      <TypeImportDialog
+        fileName="book-schema.json"
+        definition={definition()}
+        failure={null}
+        currentKey="book"
+        pending={false}
+        onApply={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(inDialog('[data-testid="records-type-import-dialog"]')?.textContent).toContain('Cancel');
+    expect(inDialog('[data-testid="records-type-import-dialog"]')?.textContent).not.toContain(
+      'Done',
+    );
+    await view.unmount();
+  });
+
+  it('U15: still says Cancel on the parse-failure branch, where nothing was done', async () => {
+    const view = await mount(
+      <TypeImportDialog
+        fileName="notes.txt"
+        definition={null}
+        failure="not_json"
+        currentKey="book"
+        pending={false}
+        onApply={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(inDialog('[data-testid="records-type-import-dialog"]')?.textContent).toContain('Cancel');
+    await view.unmount();
+  });
+
   it('disables Apply while one is in flight, and closes on Close', async () => {
     const onClose = vi.fn();
     const view = await mount(

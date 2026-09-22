@@ -622,6 +622,7 @@
     "export": "Download definition",
     "import": "Import definition…",
     "import_title": "Import a type definition",
+    "cancel": "Cancel",
     "apply": "Import definition",
     "will_create": "Creates a new type \"{label}\" ({key}).",
     "will_update": "Updates this type ({key}) from the definition.",

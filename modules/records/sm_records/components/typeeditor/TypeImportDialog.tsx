@@ -118,11 +118,16 @@ export function TypeImportDialog({
         )}
 
         <div className="flex justify-end gap-2">
-          {/* U15: the dialog's own X control (framework-owned) has the fixed
-              accessible name "Close" — naming this button the same thing
-              gave the dialog two controls with one name. */}
+          {/* U15: this used to say "Done" — chosen only to avoid colliding
+              with the dialog's own X control (framework-owned, fixed
+              accessible name "Close") — even on the parse-failure branch,
+              where nothing was done. `apply()` (`TypeIoMenu`) closes this
+              dialog itself the moment an import actually succeeds, so this
+              button is never on screen *after* one did; "Cancel" is what
+              it always means, without claiming a completion that has not
+              happened. */}
           <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
-            {t('records.io.close', { defaultValue: 'Done' })}
+            {t('records.type_io.cancel', { defaultValue: 'Cancel' })}
           </Button>
           {definition && (
             <Button
