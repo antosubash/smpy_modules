@@ -24,7 +24,7 @@ vi.mock('../utils/api-history', () => ({
   listRecordRevisions: vi.fn(async () => ({ items: [] })),
 }));
 
-const RecordEditor = (await import('./RecordEditor')).default;
+const RecordEditor = (await import('../pages/RecordEditor')).default;
 const { router } = await import('@inertiajs/react');
 
 function type(): TypeRead {

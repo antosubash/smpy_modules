@@ -24,7 +24,7 @@ vi.mock('@inertiajs/react', () => ({
 vi.mock('../components/RecordIoMenu', () => ({ RecordIoMenu: () => null }));
 vi.mock('../components/RecordsToaster', () => ({ RecordsToaster: () => null }));
 
-const RecordList = (await import('./RecordList')).default;
+const RecordList = (await import('../pages/RecordList')).default;
 
 function type(overrides: Partial<TypeRead> = {}): TypeRead {
   return {

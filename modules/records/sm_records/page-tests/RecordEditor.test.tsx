@@ -32,7 +32,7 @@ vi.mock('../utils/api-history', () => ({
   listRecordRevisions: vi.fn(async () => ({ items: [] })),
 }));
 
-const RecordEditor = (await import('./RecordEditor')).default;
+const RecordEditor = (await import('../pages/RecordEditor')).default;
 
 function type(): TypeRead {
   return {

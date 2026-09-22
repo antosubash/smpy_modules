@@ -12,7 +12,7 @@ vi.mock('@inertiajs/react', () => ({
   ),
 }));
 
-const Types = (await import('./Types')).default;
+const Types = (await import('../pages/Types')).default;
 
 function type(overrides: Partial<TypeRead> = {}): TypeRead {
   return {
