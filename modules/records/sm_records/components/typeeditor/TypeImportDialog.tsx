@@ -118,8 +118,11 @@ export function TypeImportDialog({
         )}
 
         <div className="flex justify-end gap-2">
+          {/* U15: the dialog's own X control (framework-owned) has the fixed
+              accessible name "Close" — naming this button the same thing
+              gave the dialog two controls with one name. */}
           <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
-            {t('records.io.close', { defaultValue: 'Close' })}
+            {t('records.io.close', { defaultValue: 'Done' })}
           </Button>
           {definition && (
             <Button

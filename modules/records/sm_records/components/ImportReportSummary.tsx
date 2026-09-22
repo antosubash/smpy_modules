@@ -61,10 +61,12 @@ export function ImportReportSummary({ report }: { report: ImportReport }) {
         // failed row only, its row number and message, never a uuid the
         // list resolved to a display title. Said here rather than left
         // silent, since "first 5 affected titles" is what was asked for.
+        // U15: the original wording ("showing titles here would need the
+        // import endpoint to return them") explained the team's own backlog
+        // to an operator rather than saying what they can actually rely on.
         <p className="text-muted-foreground" data-testid="records-import-titles-note">
           {t('records.io.titles_unavailable', {
-            defaultValue:
-              'This report lists row numbers, not record titles — showing titles here would need the import endpoint to return them.',
+            defaultValue: 'Rows are identified by number, not title.',
           })}
         </p>
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { conflictField } from './conflicts';
+import { conflictField, humanizeCollisionDetail } from './conflicts';
 
 /**
  * The strings under test are the literal `f"..."` payloads of
@@ -30,5 +30,31 @@ describe('conflictField', () => {
     expect(
       conflictField("a company record in 'de' already exists in that translation group", ['name']),
     ).toBeNull();
+  });
+});
+
+describe('humanizeCollisionDetail — U15: the wire key gives way to the label', () => {
+  it('substitutes the field label into a unique-collision sentence', () => {
+    const detail = "'ticket_code' must be unique; 'TK-1001' is already taken";
+    expect(humanizeCollisionDetail(detail, 'Ticket code', 'QA UX Event')).toBe(
+      "'Ticket code' must be unique; 'TK-1001' is already taken",
+    );
+  });
+
+  it('substitutes the type label into a slug-collision sentence', () => {
+    const detail = "slug 'acme' is already used by another qa_ux_event record in 'en'";
+    expect(humanizeCollisionDetail(detail, null, 'QA UX Event')).toBe(
+      "slug 'acme' is already used by another QA UX Event record in 'en'",
+    );
+  });
+
+  it('leaves an unrecognised detail unchanged', () => {
+    const detail = "a company record in 'de' already exists in that translation group";
+    expect(humanizeCollisionDetail(detail, null, 'Company')).toBe(detail);
+  });
+
+  it('leaves a unique-collision sentence unchanged when no field label is known', () => {
+    const detail = "'sku' must be unique; 'A-1' is already taken";
+    expect(humanizeCollisionDetail(detail, null, 'Product')).toBe(detail);
   });
 });

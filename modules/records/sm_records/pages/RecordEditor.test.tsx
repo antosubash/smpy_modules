@@ -213,6 +213,10 @@ describe('RecordEditor — U5: a server rejection gets the same summary as a cli
     // The recovery clause the review asked for, and the input the person
     // never typed into is where the message (and focus) land.
     expect(view.host.textContent).toContain('Change the Title');
+    // U15: the raw wire type key ('book') gives way to the type's label
+    // ('Book') in the server's own sentence.
+    expect(view.host.textContent).toContain('another Book record');
+    expect(view.host.textContent).not.toContain('another book record');
     expect(document.activeElement?.id).toBe('record-slug');
     await view.unmount();
   });

@@ -39,6 +39,7 @@
     "draft": "Draft",
     "published": "Published",
     "delete": "Delete",
+    "move_to_trash": "Move to Trash",
     "confirm_delete": "Move this record to the Trash? You can restore it until it is deleted permanently.",
     "trashed": "Moved to the Trash",
     "undo": "Undo",
@@ -500,10 +501,10 @@
     "error_unknown_format": "Couldn't tell whether that file is JSON or CSV — save it with a .json or .csv extension and try again.",
     "error_bad_json": "That file isn't valid JSON — open it in a text editor and check it's complete.",
     "errors_truncated": "Only the first errors are listed; fix these and try again.",
-    "titles_unavailable": "This report lists row numbers, not record titles — showing titles here would need the import endpoint to return them.",
+    "titles_unavailable": "Rows are identified by number, not title.",
     "apply": "Apply import",
     "apply_blocked": "{failed} of {total} row(s) can't be imported, so nothing will be written. Fix them and try again, or choose \"Skip it and write the rest\" under Import options.",
-    "close": "Close"
+    "close": "Done"
   },
   "type_io": {
     "menu": "Definition",

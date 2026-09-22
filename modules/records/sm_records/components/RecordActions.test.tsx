@@ -92,6 +92,13 @@ describe('RecordActions — R4: the unsaved-changes guard is told before we navi
     );
     await click(view.button('Delete'));
     await settle();
+    // U15: the dialog's own title/confirm button used to say "Delete" while
+    // its body carefully said "Move this record to the Trash" — the one
+    // word it avoided. Once open, the dialog says what actually happens.
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.textContent).toBe(
+      'Move to Trash',
+    );
+    expect(confirmButton()?.textContent).toBe('Move to Trash');
     await click(confirmButton());
     await settle();
     expect(deleted).toHaveBeenCalledOnce();

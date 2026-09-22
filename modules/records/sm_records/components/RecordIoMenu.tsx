@@ -200,8 +200,11 @@ export function RecordIoMenu({
             </div>
           )}
           <div className="flex justify-end gap-2">
+            {/* U15: the dialog's own X control (framework-owned) has the
+                fixed accessible name "Close" — naming this button the same
+                thing gave the dialog two controls with one name. */}
             <Button type="button" variant="outline" disabled={busy} onClick={close}>
-              {t('records.io.close', { defaultValue: 'Close' })}
+              {t('records.io.close', { defaultValue: 'Done' })}
             </Button>
             {report?.dry_run && file && (
               <Button

@@ -46,3 +46,34 @@ export function conflictField(detail: string, fieldKeys: Iterable<string>): stri
   }
   return null;
 }
+
+/** `slug {slug!r} is already used by another {type_key} record in {locale!r}`
+ *  — the type-key portion, captured so it can be replaced with the type's
+ *  label. */
+const SLUG_TYPE_KEY_RE =
+  /^(slug '.*' is already used by another )([a-z][a-z0-9_]*)( record in .*)$/;
+
+/**
+ * U15: the server's own wording names a field or type by its wire key —
+ * `'ticket_code' must be unique`, `another qa_ux_event record` — which an
+ * operator who only ever sees labels ("Ticket code", "QA UX Event") reads as
+ * implementation detail leaking through. Substitutes the label in, when this
+ * message is one of the two shapes `conflictField` already recognises; any
+ * other detail (a reindex-in-progress conflict, a translation-group clash)
+ * is returned unchanged, same degrade-to-today's-behaviour choice
+ * `conflictField` itself documents.
+ */
+export function humanizeCollisionDetail(
+  detail: string,
+  fieldLabel: string | null,
+  typeLabel: string,
+): string {
+  const trimmed = detail.trim();
+  const slugMatch = SLUG_TYPE_KEY_RE.exec(trimmed);
+  if (slugMatch) return `${slugMatch[1]}${typeLabel}${slugMatch[3]}`;
+  const uniqueMatch = UNIQUE_RE.exec(trimmed);
+  if (uniqueMatch && fieldLabel) {
+    return trimmed.replace(`'${uniqueMatch[1]}'`, `'${fieldLabel}'`);
+  }
+  return detail;
+}

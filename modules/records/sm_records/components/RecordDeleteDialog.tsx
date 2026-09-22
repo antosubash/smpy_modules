@@ -192,13 +192,21 @@ export function RecordDeleteDialog({
 
   const blocked = livingByOnDelete(referrers ?? [], 'restrict').length > 0;
 
+  // U15: the trigger (a table/editor row action) stays "Delete" — the
+  // conventional, unambiguous affordance for the action a person is
+  // choosing. The dialog itself is a different surface: its title and
+  // confirm button used to say "Delete" too, while its own body carefully
+  // said "Move this record to the Trash" — the one word the description
+  // avoided was the one everything around it used. Say what actually
+  // happens, consistently, once the dialog is open.
+  const moveToTrash = t('records.records.move_to_trash', { defaultValue: 'Move to Trash' });
   return (
     <ConfirmDialog
       trigger={trigger}
-      title={t('records.records.delete', { defaultValue: 'Delete' })}
+      title={moveToTrash}
       description={<DialogDescription t={t} loading={loading} loadError={loadError} />}
       body={<DialogDetails t={t} loading={loading} loadError={loadError} referrers={referrers} />}
-      confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
+      confirmLabel={moveToTrash}
       cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
       pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
       destructive

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import { ApiError } from '../utils/api';
 import { createRecord, updateRecord } from '../utils/api-records';
-import { conflictField } from '../utils/conflicts';
+import { conflictField, humanizeCollisionDetail } from '../utils/conflicts';
 import { firstErrorInDomOrder, focusInvalidInput } from '../utils/focus-invalid';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { parsePosition } from '../utils/values';
@@ -126,6 +126,11 @@ export function useRecordEditor(
       toast.error(detail);
       return;
     }
+    // U15: the server's own sentence names the field/type by wire key
+    // ('ticket_code', 'qa_ux_event') — an operator who only ever sees
+    // labels reads that as implementation detail leaking through.
+    const fieldLabel = type.fields.find((one) => one.key === field)?.label ?? null;
+    const humanDetail = humanizeCollisionDetail(detail, fieldLabel, type.label);
     // The slug field is the one collision an operator often never typed
     // into — it derives from Title by default — so naming *that* recovery
     // is what the generic "already taken" sentence is missing (U5).
@@ -135,7 +140,7 @@ export function useRecordEditor(
             defaultValue: ' Change the Title, or set a distinct Slug under Advanced.',
           })
         : '';
-    form.setServerErrors([{ field, message: `${detail} ${inTrash}${extra}` }]);
+    form.setServerErrors([{ field, message: `${humanDetail} ${inTrash}${extra}` }]);
     focusInvalidInput(field);
   };
 
