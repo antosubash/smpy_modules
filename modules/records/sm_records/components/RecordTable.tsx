@@ -8,8 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
-import { useCallback, useSyncExternalStore } from 'react';
-
+import { useIsNarrow } from '../hooks/useIsNarrow';
 import { listColumns, type SortState } from '../utils/listing';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
@@ -18,15 +17,6 @@ import { RecordCell } from './RecordCell';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordLocaleBadge, RecordStatusBadge, SchemaStaleBadge } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
-
-/** Tailwind's `sm` breakpoint, as a query — the width at which the table
- *  stops fitting. Subscribed to rather than read once, so a rotation or a
- *  resized window swaps layouts without a reload. */
-const NARROW = '(max-width: 639.98px)';
-
-function matchesNarrow(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(NARROW).matches;
-}
 
 /** U6: `listColumns` is silent by design when a type has no indexed field —
  *  the table then shows only Title and Status, and nothing on the list
@@ -47,18 +37,6 @@ function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
       </Link>
     </p>
   );
-}
-
-function useIsNarrow(): boolean {
-  const subscribe = useCallback((onChange: () => void) => {
-    if (typeof window === 'undefined' || !window.matchMedia) return () => {};
-    const query = window.matchMedia(NARROW);
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
-  }, []);
-  // The server snapshot is the table: nothing renders this on a server
-  // today, and a wide layout is the safer thing to hydrate into.
-  return useSyncExternalStore(subscribe, matchesNarrow, () => false);
 }
 
 /**

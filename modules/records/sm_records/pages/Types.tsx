@@ -18,7 +18,9 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 
 import { RecordsToaster } from '../components/RecordsToaster';
+import { TypesCardList } from '../components/TypesCardList';
 import { navIconName } from '../components/typeeditor/navIcons';
+import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { TypeRead } from '../utils/types';
 
 type Props = { types: TypeRead[] };
@@ -35,6 +37,7 @@ const FILTER_THRESHOLD = 12;
 function Types({ types }: Props) {
   const { t } = useT();
   const [query, setQuery] = useState('');
+  const narrow = useIsNarrow();
 
   const sorted = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label)), [types]);
   const showFilter = types.length > FILTER_THRESHOLD;
@@ -97,6 +100,8 @@ function Types({ types }: Props) {
                 defaultValue: 'No record type matches "{query}".',
               })}
             </div>
+          ) : narrow ? (
+            <TypesCardList types={visible} />
           ) : (
             <Table>
               <TableHeader>
