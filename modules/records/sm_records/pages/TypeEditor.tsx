@@ -5,7 +5,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { RecordsToaster } from '../components/RecordsToaster';
@@ -29,6 +29,7 @@ import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
 import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
+import { useTypeSync } from '../hooks/useTypeSync';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { ApiError, createType, updateType } from '../utils/api';
 import type { DryRunReport, TypeRead, ValidationError } from '../utils/types';
@@ -57,7 +58,7 @@ function TypeEditor({
 }: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
-  const [current, setCurrent] = useState<TypeRead | null>(type);
+  const { current, externalChange, adopt, dirtyRef } = useTypeSync(type);
   const [values, setValues] = useState(metadataFrom(type));
   const [fields, setFields] = useState<EditableField[]>(() => withUids(type?.fields ?? []));
   const [createErrors, setCreateErrors] = useState<ValidationError[]>([]);
@@ -71,19 +72,8 @@ function TypeEditor({
   // so it is rethrown to here rather than handled there.
   const [translatableError, setTranslatableError] = useState<string | null>(null);
 
-  // `current` is seeded once from `type` (the initial `useState` argument is
-  // only read on mount), so a background `router.reload({ only: ['type'] })'
-  // — the reindex poll (F4) — updated the incoming `type` *prop* without
-  // ever reaching `current`, and `ReindexStatus` (which reads `current`, not
-  // `type`) never saw the cleared `reindex_pending`. Re-sync whenever Inertia
-  // hands this page a new `type` object; `values`/`fields` are deliberately
-  // left alone so an in-progress edit survives a poll.
-  useEffect(() => {
-    setCurrent(type);
-  }, [type]);
-
   const applySaved = (saved: TypeRead) => {
-    setCurrent(saved);
+    adopt(saved);
     setValues(metadataFrom(saved));
     setFields(withUids(saved.fields));
   };
@@ -112,6 +102,10 @@ function TypeEditor({
   const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
   const dirty = typeIsDirty(current, values, fields);
   const guard = useUnsavedGuard(dirty);
+  // Read by `useTypeSync`'s effect, which reacts to the `type` prop alone:
+  // a background reindex poll must not re-baseline `current.version` under
+  // a draft (R15).
+  dirtyRef.current = dirty;
 
   /** Force a refused change through, keeping its report on screen
    *  afterwards — `retryWith` answers `null` when the retry was itself
@@ -205,9 +199,9 @@ function TypeEditor({
         }
       >
         <div className="space-y-6">
-          {schemaApply.versionConflict && (
+          {(schemaApply.versionConflict ?? externalChange) && (
             <TypeConflictNotice
-              current={schemaApply.versionConflict}
+              current={(schemaApply.versionConflict ?? externalChange) as TypeRead}
               onReload={reloadFromConflict}
             />
           )}
