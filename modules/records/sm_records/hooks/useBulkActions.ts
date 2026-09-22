@@ -24,13 +24,17 @@ const DONE: Record<BulkAction, [string, string]> = {
  * Running a bulk action, and what the screen says afterwards.
  *
  * Three outcomes and each needs a different answer. It worked: reload the
- * list, toast, announce, drop the selection — the rows the operator ticked
- * are not the rows on screen any more. **It was refused**: the server changed
- * nothing and named the records that refused, so the report goes on screen
+ * list, toast, drop the selection — the rows the operator ticked are not
+ * the rows on screen any more. The toast (U11) is the *only* announcement a
+ * success gets, the same as every single-row action in this module
+ * (`trashToast`/`restoredToast`/`purgedToast`) already relies on sonner's
+ * own live region for. **It was refused**: the server changed nothing and
+ * named the records that refused, so the report goes on screen
  * (`BulkRefusalReport`) and the *selection stays*, because the next step is
- * to deselect those and retry. Anything else — offline, a 403, a 500 — is
- * re-thrown for `ConfirmDialog`, which shows it inside the dialog the
- * operator is still looking at.
+ * to deselect those and retry — this is the one outcome that still writes
+ * to `announcement`, since it has no toast of its own. Anything else —
+ * offline, a 403, a 500 — is re-thrown for `ConfirmDialog`, which shows it
+ * inside the dialog the operator is still looking at.
  *
  * Resolving on a refusal rather than re-throwing is what closes that dialog:
  * a report of up to `max_bulk_records` lines is not something to read through
@@ -68,10 +72,22 @@ export function useBulkActions(
     if (previousResetKey.current === resetKey) return;
     previousResetKey.current = resetKey;
     setReport(null);
+    // The refusal sentence is the only thing that still writes here (see
+    // `announceDone` below) — goes with the report it was about, same
+    // trigger.
+    setAnnouncement('');
   }, [resetKey]);
 
-  const announce = (message: string) => {
-    setAnnouncement(message);
+  // U11: a *successful* action already has an accessible announcement —
+  // sonner's own toast region — the same one every single-row action in
+  // this module relies on alone (`trashToast`/`restoredToast`/`purgedToast`,
+  // none of which write to a live region of their own). Writing the same
+  // text into `announcement` too doubled it for a screen-reader user (the
+  // module's own `role="status"` region and sonner's, back to back). The
+  // *refusal* case below is different and keeps using `announcement`
+  // directly: it has no toast, so the live region is the only announcement
+  // it gets.
+  const announceDone = (message: string) => {
     toast.success(message);
   };
 
@@ -105,7 +121,7 @@ export function useBulkActions(
       }
       router.reload({ only: ['records'] });
       onDone();
-      announce(message);
+      announceDone(message);
     } catch (err) {
       const body = err instanceof ApiError && err.status === 409 ? err.body?.report : undefined;
       // `report` carries a schema dry run on one route and this on another;
@@ -139,7 +155,7 @@ export function useBulkActions(
       const result = await emptyTrash(typeKey, filtered ? filters : []);
       router.reload({ only: ['records'] });
       onDone();
-      announce(
+      announceDone(
         t('records.bulk.done_empty_trash', {
           count: result.purged,
           defaultValue: '{count} records deleted permanently',

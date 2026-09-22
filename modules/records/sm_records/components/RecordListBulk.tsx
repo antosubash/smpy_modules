@@ -20,9 +20,11 @@ import { RecordBulkToolbar } from './RecordBulkToolbar';
  * tick boxes at all in the other case, so there is never a selection this has
  * to explain it cannot act on. Rendered for *every* such caller though, rows
  * or no rows: the toolbar and "Empty trash" hide themselves when there is
- * nothing to act on, and the live region has to outlive the reload that
- * empties the list — otherwise the one action that leaves no rows behind is
- * the one that announces nothing.
+ * nothing to act on, and the toast that announces a success has to outlive
+ * the reload that empties the list — otherwise the one action that leaves no
+ * rows behind is the one that announces nothing. It does: the `<Toaster>` is
+ * mounted once, in the layout (`RecordsToaster`), outside the part of the
+ * tree a partial reload swaps.
  */
 export function RecordListBulk({
   typeKey,
@@ -91,9 +93,14 @@ export function RecordListBulk({
           onDismiss={bulk.dismissReport}
         />
       )}
-      {/* The list swaps its rows through a partial reload with no focus move,
-          so a bulk action that worked is otherwise silent to a screen reader
-          — the toast is visual and the rows simply change. */}
+      {/* U11: a *successful* action announces through the toast alone now
+          (sonner's own live region), same as every single-row action in
+          this module — this region used to carry the same sentence a
+          second time, so a screen reader read it twice back to back. What
+          is left to say here is the one outcome with no toast: a refused
+          batch (`useBulkActions`'s `run`), which the operator who just
+          confirmed the dialog needs told, not left to notice a panel that
+          appeared silently behind it. */}
       <p className="sr-only" role="status" aria-live="polite" data-testid="records-bulk-status">
         {bulk.announcement}
       </p>

@@ -7,6 +7,9 @@ import type { BulkReport } from '../utils/api-records';
 
 vi.mock('@inertiajs/react', () => ({ router: { reload: vi.fn() } }));
 
+const toastSuccess = vi.fn();
+vi.mock('sonner', () => ({ toast: { success: (...args: unknown[]) => toastSuccess(...args) } }));
+
 const bulkRecords = vi.fn();
 const emptyTrash = vi.fn();
 vi.mock('../utils/api-records', async (importOriginal) => {
@@ -43,6 +46,63 @@ function refusal(): BulkReport {
     failed: [{ uuid: 'aaa', status: 409, message: '1 record(s) still reference aaa' }],
   };
 }
+
+function success(): { changed: number; requested: number; action: string; cascaded: number } {
+  return { action: 'publish', requested: 2, changed: 2, cascaded: 0 };
+}
+
+describe('useBulkActions — U11: a successful action is announced once, not twice', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    bulkRecords.mockReset();
+    emptyTrash.mockReset();
+    toastSuccess.mockReset();
+  });
+
+  it('toasts the result but leaves the live region empty — the toast is the announcement', async () => {
+    let current: Hook | null = null;
+    const view = await mount(<Probe resetKey="a,b" onReady={(h) => (current = h)} />);
+    bulkRecords.mockResolvedValue(success());
+
+    await act(async () => {
+      await (current as unknown as Hook).run('publish');
+    });
+
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
+    // Same as every single-row action (`trashToast`/`restoredToast`/
+    // `purgedToast`) — none of those write anywhere but the toast either.
+    expect((current as unknown as Hook).announcement).toBe('');
+    await view.unmount();
+  });
+
+  it('keeps announcing a refusal in the live region — it has no toast of its own', async () => {
+    let current: Hook | null = null;
+    const view = await mount(<Probe resetKey="a,b" onReady={(h) => (current = h)} />);
+    bulkRecords.mockRejectedValue(new ApiError(409, { report: refusal() }, 'refused'));
+
+    await act(async () => {
+      await (current as unknown as Hook).run('trash');
+    });
+
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect((current as unknown as Hook).announcement).not.toBe('');
+    await view.unmount();
+  });
+
+  it('empties the trash with the same single announcement', async () => {
+    let current: Hook | null = null;
+    const view = await mount(<Probe resetKey="a,b" onReady={(h) => (current = h)} />);
+    emptyTrash.mockResolvedValue({ purged: 3, filtered: false });
+
+    await act(async () => {
+      await (current as unknown as Hook).empty(false);
+    });
+
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
+    expect((current as unknown as Hook).announcement).toBe('');
+    await view.unmount();
+  });
+});
 
 describe('useBulkActions — U2: a refusal report goes with the page it was about', () => {
   beforeEach(() => {
