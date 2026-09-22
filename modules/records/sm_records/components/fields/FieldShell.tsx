@@ -54,6 +54,7 @@ export function FieldShell({
   field,
   error,
   htmlFor,
+  helpFallback,
   children,
 }: {
   field: FieldDef;
@@ -61,6 +62,13 @@ export function FieldShell({
   /** Omitted when the control is a group (checkbox list, chips) rather than
    *  one focusable input — the group gets an `aria-labelledby` instead. */
   htmlFor?: string;
+  /** Shown in place of `field.help` when the schema author left it blank
+   *  (U18) — a field type whose value isn't self-explanatory (`media` is
+   *  the one bare text box in a host that has a media library) gets a
+   *  built-in explanation of what to type rather than nothing at all. A
+   *  schema author's own `help` always wins: this is a fallback, not an
+   *  addition. */
+  helpFallback?: string;
   /** A render prop for the children that need that `aria-labelledby`: the
    *  shell computes the label's id, so it is the shell that has to hand it
    *  over. `RelationField` was the one child that needed it and could not
@@ -70,6 +78,7 @@ export function FieldShell({
 }) {
   const { t } = useT();
   const labelId = fieldLabelId(field);
+  const help = field.help || helpFallback;
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={htmlFor} id={labelId}>
@@ -85,7 +94,7 @@ export function FieldShell({
           </>
         )}
       </Label>
-      {field.help && <p className="text-sm text-muted-foreground">{field.help}</p>}
+      {help && <p className="text-sm text-muted-foreground">{help}</p>}
       {typeof children === 'function' ? children(labelId) : children}
       {error && (
         <p

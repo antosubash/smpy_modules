@@ -422,7 +422,9 @@
     "unknown_type": "This field type ({type}) is not editable in this version.",
     "boolean_yes": "Yes",
     "boolean_no": "No",
-    "boolean_unset": "Not set"
+    "boolean_unset": "Not set",
+    "media_help": "The media library id or the full URL of an uploaded file.",
+    "media_placeholder": "media id or https://…"
   },
   "form": {
     "no_fields": "This type has no fields yet. Add some on its schema screen."
