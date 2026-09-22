@@ -178,6 +178,15 @@ class RecordsSettings(StoredSourcesOnly, BaseSettings):
     the first one past the ceiling: bounded work either way.
     """
 
+    max_bulk_records: int = Field(default=500, ge=1)
+    """Most records one ``POST …/records/bulk`` may name — a ``413`` over it,
+    before a record is touched (default 500). The batch is one transaction and
+    therefore one rollback (:mod:`sm_records.services.bulk`), so every record
+    in it holds its locks until the request commits. It bounds the *named*
+    records only: a ``trash`` that cascades reaches records it never counted,
+    and ``POST …/records/trash/empty`` is outside it entirely, since the point
+    of emptying the trash is not having to name what is in it."""
+
     max_fields_per_type: int = 100
     """Largest number of field definitions a single Record Type may declare."""
 

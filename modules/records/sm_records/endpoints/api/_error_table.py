@@ -171,6 +171,11 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
         '`{"detail"}`',
     ),
     ErrorRow(
+        409,
+        "A bulk action at least one named record refused",
+        '`{"detail", "report": BulkReport}` — nothing was changed',
+    ),
+    ErrorRow(
         413,
         "An import body over `max_import_bytes`",
         '`{"detail"}`',
@@ -179,6 +184,11 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
         413,
         "An import file holding more rows than `max_import_rows`",
         '`{"detail"}` — refused before anything is written',
+    ),
+    ErrorRow(
+        413,
+        "A bulk action naming more than `max_bulk_records` records",
+        '`{"detail"}` — refused before a record is touched',
     ),
     ErrorRow(
         413,
@@ -218,6 +228,11 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ErrorRow(
         422,
         "`page` outside `1 … 1000000`, `page_size` below 1",
+        "FastAPI validation error",
+    ),
+    ErrorRow(
+        422,
+        "An empty `uuids` list, or an `action` that is not one of the five",
         "FastAPI validation error",
     ),
     ErrorRow(

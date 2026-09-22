@@ -16,6 +16,7 @@ from fastapi import APIRouter
 
 from sm_records.endpoints.api import (
     aggregate,
+    bulk,
     io,
     io_types,
     lifecycle,
@@ -53,6 +54,10 @@ router.include_router(translations.router)
 # from the other side: ``/types/{key}/records/{uuid}/restore`` and
 # ``…/purge`` sit under the path ``records`` claims for one record.
 router.include_router(lifecycle.router)
+# Before ``records`` for the reason the three above are: ``/records/bulk`` and
+# ``/records/trash/empty`` sit under the path ``records`` claims for one
+# record, and Starlette matches in registration order.
+router.include_router(bulk.router)
 router.include_router(records.router)
 router.include_router(referrers.router)
 router.include_router(revisions.router)

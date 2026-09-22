@@ -359,6 +359,8 @@ All paths below are under `/api/records/types/{key}`.
 | `DELETE` | `/records/{uuid}` | `records.edit` (+ `allowed_roles`) | Soft delete (trash) |
 | `POST` | `/records/{uuid}/restore` | `records.edit` (+ `allowed_roles`) | Restore from the trash |
 | `DELETE` | `/records/{uuid}/purge` | `records.edit` (+ `allowed_roles`) | Permanent delete |
+| `POST` | `/records/bulk` | `records.edit` (+ `allowed_roles`) | One action over many records, all or nothing |
+| `POST` | `/records/trash/empty` | `records.edit` (+ `allowed_roles`) | Purge the trash, or the filtered part of it |
 | `GET` | `/records/aggregate` | `records.view` (+ `allowed_roles`) | Group and count |
 | `GET` | `/records/export` | `records.view` (+ `allowed_roles`) | Stream JSON or CSV |
 | `POST` | `/records/import` | `records.edit` (+ `allowed_roles`) | Import JSON or CSV |
@@ -456,6 +458,93 @@ are cleared and `cascade` referrers are trashed with it.
 
 A trashed record keeps its slug claim and its `unique` claims until it is
 purged or restored.
+
+### `POST /records/bulk` → `BulkResult`
+
+One action over many records. Body is `BulkRequest`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `action` | `"trash"` \| `"restore"` \| `"purge"` \| `"publish"` \| `"unpublish"` | Required |
+| `uuids` | list of string | At least one, at most `max_bulk_records` (500); repeats collapse |
+| `expected_versions` | `{uuid: int}` \| null | Optional and partial — a uuid it omits is applied at whatever version the row holds |
+
+Every record goes through the same service call the single-record endpoint
+makes, so `allowed_roles`, the `on_delete` cascade, slug and `unique` claims,
+the revision log and the events are the single-record ones. `publish` and
+`unpublish` write the record's own payload back with the new status, which
+bumps its version and appends a revision exactly as an edit would; `trash`,
+`restore` and `purge` leave the version alone and check `expected_versions`
+without bumping it.
+
+**All or nothing.** Every named record is attempted, every refusal is
+collected, and if there is even one the whole batch is refused with a `409`
+and *nothing is written*:
+
+```json
+{
+  "detail": "2 of 5 record(s) refused trash; nothing was changed",
+  "report": {
+    "action": "trash",
+    "requested": 5,
+    "failed": [
+      {"uuid": "9d9a…", "status": 409, "message": "3 record(s) still reference 9d9a…"},
+      {"uuid": "0e13…", "status": 404, "message": "no article record with uuid '0e13…'"}
+    ]
+  }
+}
+```
+
+`BulkFailure.status` is what that record alone would have answered — `404`
+unknown, `403` `allowed_roles`, `409` a stale version or a `restrict`
+relation, `422` a payload the current schema no longer accepts (a `publish`
+of a record a forced schema change marked `invalid`). The batch's own status
+is always `409`. The report is what a caller retries from: deselect what it
+names, send the rest.
+
+A run that refuses nothing answers `200 BulkResult`: `action`, `requested`
+(distinct uuids), `changed`, and `cascaded` — records a `trash` reached
+through an `on_delete: cascade` relation and which the request never named.
+
+```bash
+curl -s -b cookies.txt -X POST \
+  http://localhost:8000/api/records/types/article/records/bulk \
+  -H 'Content-Type: application/json' \
+  -d '{"action": "publish", "uuids": ["9d9addcbec0e46959ac5be78e15197e5"]}'
+```
+
+```json
+{"action": "publish", "requested": 1, "changed": 1, "cascaded": 0}
+```
+
+One event per record, the same ones the single-record paths publish:
+`RecordTrashed` (once per record a cascade reached, as always),
+`RecordRestored`, `RecordPurged`, or `RecordUpdated` with the status
+transition. A refused batch publishes nothing.
+
+### `POST /records/trash/empty` → `TrashEmptied`
+
+Purges every trashed record of the type. Takes the listing grammar's
+`?filter=` — and nothing else, no `sort` or paging — so "empty what this
+screen is showing" is the query the screen listed it with. `?trashed=true` is
+not sent and not needed: this route is about the trash by definition.
+
+```bash
+curl -s -b cookies.txt -X POST \
+  'http://localhost:8000/api/records/types/article/records/trash/empty?filter=topic:eq:news'
+```
+
+```json
+{"purged": 12, "filtered": true}
+```
+
+Deliberately **not** bounded by `max_bulk_records`: the point of emptying the
+trash is not having to name what is in it, and the purge is set-based rather
+than a pass over records. It publishes one `RecordPurged` per record all the
+same — that event is the only way a subscriber hears about a record that is
+no longer there to read. A record still referenced by a `restrict` relation
+is *not* a blocker here: it is already in the trash, which is where the
+`restrict` check happened.
 
 ---
 
@@ -774,10 +863,10 @@ they are the only way to observe a write without polling.
 | Event | Published by | Carries |
 |---|---|---|
 | `RecordCreated` | `POST /records`, `POST …/translations`, each import row that created | `type_key`, `uuid`, `locale`, `translation_group`, `status` |
-| `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated | `type_key`, `uuid`, `version`, `status_before`, `status_after` |
-| `RecordTrashed` | `DELETE /records/{uuid}`, once per record the delete reached | `type_key`, `uuid`, `cascaded_from` |
-| `RecordRestored` | `POST …/restore` | `type_key`, `uuid` |
-| `RecordPurged` | `DELETE …/purge`, and once per record of a deleted type | `type_key`, `uuid`, `locale`, `translation_group` |
+| `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated, each record a bulk `publish`/`unpublish` changed | `type_key`, `uuid`, `version`, `status_before`, `status_after` |
+| `RecordTrashed` | `DELETE /records/{uuid}` and `POST …/records/bulk`, once per record the delete reached | `type_key`, `uuid`, `cascaded_from` |
+| `RecordRestored` | `POST …/restore`, `POST …/records/bulk` | `type_key`, `uuid` |
+| `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, and once per record of a deleted type | `type_key`, `uuid`, `locale`, `translation_group` |
 | `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `purged` |
 
@@ -1120,8 +1209,10 @@ kind of route can produce, with the body schema
 | `409` | A changed `collection` on `PUT /types/{key}` | `{"detail"}` |
 | `409` | A translation a type or a sibling will not allow | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
+| `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
+| `413` | A bulk action naming more than `max_bulk_records` records | `{"detail"}` — refused before a record is touched |
 | `413` | Any other `/api/records/*` write body over `max_payload_bytes` + 65,536 | `{"detail"}` — refused from `Content-Length`, before the body is read |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
@@ -1130,6 +1221,7 @@ kind of route can produce, with the body schema
 | `422` | `match_by` naming a non-unique field; an unknown `format`; an undeclared `collection` | `{"detail", "errors"}` |
 | `422` | `on_error=abort` and a bad row | `{"detail", "report": ImportReport}` |
 | `422` | `page` outside `1 … 1000000`, `page_size` below 1 | FastAPI validation error |
+| `422` | An empty `uuids` list, or an `action` that is not one of the five | FastAPI validation error |
 | `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
 
 Worked examples:
@@ -1247,6 +1339,7 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_payload_bytes` + 65,536 | 327,680 | Any `/api/records/*` write body except the import — `413` **before** the body is read |
 | `max_import_bytes` | 52,428,800 | One import body — `413` **before** parsing |
 | `max_import_rows` | 20,000 | Rows in one import — `413` **before** anything is written |
+| `max_bulk_records` | 500 | Records one `POST …/records/bulk` may name — `413` **before** a record is touched |
 | `public_cache_seconds` | 60 | `max-age` on an anonymous read; `0` is `no-store` |
 | `max_fields_per_type` | 100 | Field definitions per type |
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |

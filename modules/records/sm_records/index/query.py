@@ -56,6 +56,7 @@ __all__ = [
     "decode_cursor",
     "encode_cursor",
     "exists_query",
+    "filtered",
     "fixed_clause",
     "only_trashed",
     "page_query",

@@ -105,12 +105,35 @@ class SchemaChangeRefused(Conflict):
         self.report = report
 
 
-class PayloadTooLarge(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
-    """An uploaded import file over ``max_import_bytes``.
+class BulkRefused(Conflict):
+    """A bulk action at least one of its records would not take.
 
-    413 and **before parsing**, which is the whole point: a limit checked
-    after ``json.loads`` is a limit that has already allocated the thing it
-    was meant to refuse.
+    Carries the :class:`~sm_records.contracts.bulk.BulkReport` naming every
+    one of them, because that is what the caller acts on: bulk is
+    all-or-nothing, so the answer to a refusal is to deselect what the report
+    lists and send the rest.
+
+    A ``Conflict`` — the *batch* conflicts with the state its records are in —
+    although the individual refusals inside it carry their own statuses, which
+    ``BulkFailure.status`` reports per uuid. Raised rather than returned, so
+    ``RecordsErrorRoute`` rolls the request's session back: that rollback is
+    what makes "nothing was written" true rather than aspirational, exactly as
+    it does for an ``on_error=abort`` import.
+    """
+
+    def __init__(self, report: object, detail: str) -> None:
+        super().__init__(detail)
+        self.report = report
+
+
+class PayloadTooLarge(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """More than one request may carry: an uploaded import file over
+    ``max_import_bytes``, a file holding more than ``max_import_rows`` rows,
+    or a bulk action naming more than ``max_bulk_records`` records.
+
+    413 and **before parsing** (and, for bulk, before a record is touched),
+    which is the whole point: a limit checked after ``json.loads`` is a limit
+    that has already allocated the thing it was meant to refuse.
     """
 
     status_code = 413
@@ -158,6 +181,7 @@ class OrphanedKeyConflict(Conflict):
 
 
 __all__ = [
+    "BulkRefused",
     "Conflict",
     "Forbidden",
     "ImportParseFailed",
