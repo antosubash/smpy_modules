@@ -114,7 +114,13 @@ export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unkno
  *  record data, so this has to hold even though every stored `slug`/`uuid`
  *  is already safe on its own. */
 function safeHref(href: string): boolean {
-  if (href.startsWith('/')) return !href.startsWith('//');
+  // A leading slash followed by *either* slash: per WHATWG URL both `//`
+  // and `/\` enter the "special authority" state, so
+  // `new URL('/\evil.example', 'https://good.example/p')` resolves to
+  // `https://evil.example/` exactly as the `//` form does. The old guard
+  // tested only `startsWith('//')` and let the backslash through (R6).
+  if (/^\/[/\\]/.test(href)) return false;
+  if (href.startsWith('/')) return true;
   return /^https:\/\//i.test(href) || /^http:\/\//i.test(href);
 }
 
@@ -129,6 +135,9 @@ export function buildRecordHref(
   const trimmed = template.trim();
   if (trimmed === '') return null;
   if (trimmed.includes('{slug}') && !record.slug) return null;
-  const href = trimmed.replace('{slug}', record.slug ?? '').replace('{uuid}', record.uuid);
+  // `replaceAll`, not `replace`: a template may legitimately name a
+  // placeholder twice (`/a/{slug}/{slug}.html`), and substituting only the
+  // first left a literal `{slug}` in the rendered href (R6).
+  const href = trimmed.replaceAll('{slug}', record.slug ?? '').replaceAll('{uuid}', record.uuid);
   return safeHref(href) ? href : null;
 }

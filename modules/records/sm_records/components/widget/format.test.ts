@@ -134,4 +134,23 @@ describe('buildRecordHref', () => {
   it('rejects a non-http(s) scheme template (M5)', () => {
     expect(buildRecordHref('vbscript:msgbox(1)', { slug: 'a', uuid: 'u' })).toBeNull();
   });
+
+  it('rejects a backslash authority, which resolves off-site exactly as // does (R6)', () => {
+    // The guard used to test `startsWith('//')` alone; WHATWG URL treats
+    // `/\\` the same way, so this left the site while claiming to be a
+    // relative path.
+    expect(buildRecordHref('/\\evil.example', { slug: 's', uuid: 'u' })).toBeNull();
+    expect(buildRecordHref('/\\evil.example/{slug}', { slug: 'a', uuid: 'u' })).toBeNull();
+    // …and that is what it would have resolved to.
+    expect(new URL('/\\evil.example', 'https://good.example/p').href).toBe('https://evil.example/');
+  });
+
+  it('keeps an ordinary single-slash path working', () => {
+    expect(buildRecordHref('/blog/{slug}', { slug: 'a', uuid: 'u' })).toBe('/blog/a');
+  });
+
+  it('substitutes every occurrence of a placeholder, not just the first (R6)', () => {
+    expect(buildRecordHref('/a/{slug}/{slug}', { slug: 'x', uuid: 'u' })).toBe('/a/x/x');
+    expect(buildRecordHref('/a/{uuid}/{uuid}', { slug: 'x', uuid: 'u' })).toBe('/a/u/u');
+  });
 });
