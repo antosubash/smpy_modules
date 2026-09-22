@@ -2,6 +2,8 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { BulkReport } from '../utils/api-records';
+import { shortUuid } from '../utils/record-title';
+import type { RecordRead } from '../utils/types';
 
 /**
  * What a refused bulk action left the operator to act on.
@@ -20,16 +22,25 @@ import type { BulkReport } from '../utils/api-records';
  */
 export function BulkRefusalReport({
   report,
+  records,
   onDeselect,
   onDismiss,
 }: {
   report: BulkReport;
+  /** U1: the page's own records, so a refused uuid can be named by its
+   *  title instead of a raw 32-hex string — `RecordListBulk` already has
+   *  them in scope through `selection`'s own source. A refusal naming a
+   *  record that has since scrolled off the page (or that belongs to a
+   *  related type entirely, as `_lifecycle.py`'s blocker uuids can) falls
+   *  back to the uuid, same as before. */
+  records: readonly Pick<RecordRead, 'uuid' | 'display_title'>[];
   /** Drops exactly the uuids below from the selection. */
   onDeselect: (uuids: string[]) => void;
   onDismiss: () => void;
 }) {
   const { t } = useT();
   const failing = report.failed.map((entry) => entry.uuid);
+  const byUuid = new Map(records.map((record) => [record.uuid, record]));
   return (
     <div
       data-testid="records-bulk-refusal"
@@ -44,11 +55,21 @@ export function BulkRefusalReport({
         })}
       </p>
       <ul className="mt-2 space-y-1" data-testid="records-bulk-refusal-list">
-        {report.failed.map((entry) => (
-          <li key={entry.uuid} className="break-words">
-            <code className="text-xs">{entry.uuid}</code> — {entry.message}
-          </li>
-        ))}
+        {report.failed.map((entry) => {
+          const title = byUuid.get(entry.uuid)?.display_title;
+          return (
+            <li key={entry.uuid} className="break-words">
+              <span className="font-medium">{title || entry.uuid}</span>
+              {title && (
+                <span className="ml-1 text-xs text-muted-foreground" title={entry.uuid}>
+                  ({shortUuid(entry.uuid)})
+                </span>
+              )}
+              {' — '}
+              {entry.message}
+            </li>
+          );
+        })}
       </ul>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button

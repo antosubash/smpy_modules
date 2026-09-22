@@ -224,6 +224,7 @@ function RecordList({
               <RecordListBulk
                 typeKey={type.key}
                 trashed={trashed}
+                records={records.items}
                 selection={selection}
                 filters={filterErrorReason ? [] : search.getAll('filter')}
                 total={known}

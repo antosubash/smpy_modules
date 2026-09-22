@@ -25,7 +25,7 @@ describe('BulkRefusalReport — the refusal an operator can act on', () => {
 
   it('lists every failing record with the reason the server gave', async () => {
     const view = await mount(
-      <BulkRefusalReport report={report()} onDeselect={vi.fn()} onDismiss={vi.fn()} />,
+      <BulkRefusalReport report={report()} records={[]} onDeselect={vi.fn()} onDismiss={vi.fn()} />,
     );
 
     const items = view.all('[data-testid="records-bulk-refusal-list"] li');
@@ -38,7 +38,7 @@ describe('BulkRefusalReport — the refusal an operator can act on', () => {
 
   it('is announced, not merely drawn', async () => {
     const view = await mount(
-      <BulkRefusalReport report={report()} onDeselect={vi.fn()} onDismiss={vi.fn()} />,
+      <BulkRefusalReport report={report()} records={[]} onDeselect={vi.fn()} onDismiss={vi.fn()} />,
     );
     expect(view.find('[data-testid="records-bulk-refusal"]')?.getAttribute('role')).toBe('alert');
   });
@@ -47,7 +47,12 @@ describe('BulkRefusalReport — the refusal an operator can act on', () => {
     const onDeselect = vi.fn();
     const onDismiss = vi.fn();
     const view = await mount(
-      <BulkRefusalReport report={report()} onDeselect={onDeselect} onDismiss={onDismiss} />,
+      <BulkRefusalReport
+        report={report()}
+        records={[]}
+        onDeselect={onDeselect}
+        onDismiss={onDismiss}
+      />,
     );
 
     await click(view.button('Deselect'));
@@ -61,12 +66,57 @@ describe('BulkRefusalReport — the refusal an operator can act on', () => {
     const onDeselect = vi.fn();
     const onDismiss = vi.fn();
     const view = await mount(
-      <BulkRefusalReport report={report()} onDeselect={onDeselect} onDismiss={onDismiss} />,
+      <BulkRefusalReport
+        report={report()}
+        records={[]}
+        onDeselect={onDeselect}
+        onDismiss={onDismiss}
+      />,
     );
 
     await click(view.button('Dismiss'));
 
     expect(onDismiss).toHaveBeenCalled();
     expect(onDeselect).not.toHaveBeenCalled();
+  });
+});
+
+describe('BulkRefusalReport — U1: names a refused record by its title, not just its uuid', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('shows the title (and the short uuid as a detail) for a refused row that is on the page', async () => {
+    const view = await mount(
+      <BulkRefusalReport
+        report={report()}
+        records={[
+          { uuid: 'aaa', display_title: 'Tag 01' },
+          { uuid: 'bbb', display_title: 'Tag 02' },
+        ]}
+        onDeselect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    const items = view.all('[data-testid="records-bulk-refusal-list"] li');
+    expect(items[0].textContent).toContain('Tag 01');
+    expect(items[0].textContent).toContain('still reference');
+    expect(items[1].textContent).toContain('Tag 02');
+  });
+
+  it('falls back to the uuid for a refused row that is not on this page', async () => {
+    const view = await mount(
+      <BulkRefusalReport
+        report={report()}
+        records={[{ uuid: 'bbb', display_title: 'Tag 02' }]}
+        onDeselect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    const items = view.all('[data-testid="records-bulk-refusal-list"] li');
+    // 'aaa' has no match in `records` — a blocker uuid can equally well name
+    // a related record of a *different* type, which is never on this page.
+    expect(items[0].textContent).toContain('aaa');
+    expect(items[1].textContent).toContain('Tag 02');
   });
 });

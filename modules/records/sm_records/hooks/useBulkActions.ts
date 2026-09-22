@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ApiError } from '../utils/api';
@@ -43,6 +43,7 @@ export function useBulkActions(
     uuids,
     filters = [],
     onDone,
+    resetKey,
   }: {
     /** The selection, in page order — what the request names. */
     uuids: string[];
@@ -50,11 +51,24 @@ export function useBulkActions(
      *  trash": the server ANDs them, and sending fewer would empty more. */
     filters?: readonly string[];
     onDone: () => void;
+    /** U2: the identity of "this page", the same way `useRecordSelection`'s
+     *  own `key` is — a page/filter/sort change (or the reload a bulk
+     *  action itself triggers) changes it. The refusal report goes with it:
+     *  a stale report names uuids that may no longer be on screen, and the
+     *  selection it was about has already been reset by the same change. */
+    resetKey: string;
   },
 ) {
   const [report, setReport] = useState<BulkReport | null>(null);
   const [pending, setPending] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+
+  const previousResetKey = useRef(resetKey);
+  useEffect(() => {
+    if (previousResetKey.current === resetKey) return;
+    previousResetKey.current = resetKey;
+    setReport(null);
+  }, [resetKey]);
 
   const announce = (message: string) => {
     setAnnouncement(message);

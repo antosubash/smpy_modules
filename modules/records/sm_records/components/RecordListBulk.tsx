@@ -2,6 +2,7 @@ import { useT } from '@simple-module-py/i18n';
 
 import { useBulkActions } from '../hooks/useBulkActions';
 import type { RecordSelection } from '../hooks/useRecordSelection';
+import type { RecordRead } from '../utils/types';
 import { BulkRefusalReport } from './BulkRefusalReport';
 import { EmptyTrashButton } from './EmptyTrashButton';
 import { RecordBulkToolbar } from './RecordBulkToolbar';
@@ -26,6 +27,7 @@ import { RecordBulkToolbar } from './RecordBulkToolbar';
 export function RecordListBulk({
   typeKey,
   trashed,
+  records,
   selection,
   filters,
   total,
@@ -33,6 +35,11 @@ export function RecordListBulk({
 }: {
   typeKey: string;
   trashed: boolean;
+  /** The page's own records, in the same order `selection` was built from —
+   *  U1: what `BulkRefusalReport` names a refused row by, and U2: the
+   *  source of the reset key that clears that report once these are no
+   *  longer the rows on screen. */
+  records: RecordRead[];
   selection: RecordSelection;
   /** Every `filter=` term the list is showing — empty when none is in force,
    *  and empty when the URL's was refused, because "empty what this screen
@@ -44,10 +51,16 @@ export function RecordListBulk({
   capped?: boolean;
 }) {
   const { t } = useT();
+  // The same page-identity `useRecordSelection` derives its own reset from
+  // — a filter/sort/page change or the reload a bulk action triggers all
+  // change it, which is exactly when a refusal naming these uuids stops
+  // being about anything still on screen (U2).
+  const resetKey = records.map((record) => record.uuid).join(',');
   const bulk = useBulkActions(typeKey, t, {
     uuids: selection.uuids,
     filters,
     onDone: selection.clear,
+    resetKey,
   });
 
   return (
@@ -73,6 +86,7 @@ export function RecordListBulk({
       {bulk.report && (
         <BulkRefusalReport
           report={bulk.report}
+          records={records}
           onDeselect={selection.deselect}
           onDismiss={bulk.dismissReport}
         />
