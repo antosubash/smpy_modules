@@ -1079,6 +1079,7 @@ walking a large public type is exactly the caller that should use them.
 | `409` | Translating a non-translatable type, a source already in the target locale, or a locale a sibling already holds | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
+| `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
 | `413` | Any other `/api/records/*` write body over `max_payload_bytes` + 65,536 | `{"detail"}` — refused from `Content-Length`, before the body is read |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
@@ -1186,6 +1187,7 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_payload_bytes` | 262,144 | One record's serialized `data` |
 | `max_payload_bytes` + 65,536 | 327,680 | Any `/api/records/*` write body except the import — `413` **before** the body is read |
 | `max_import_bytes` | 52,428,800 | One import body — `413` **before** parsing |
+| `max_import_rows` | 20,000 | Rows in one import — `413` **before** anything is written |
 | `max_fields_per_type` | 100 | Field definitions per type |
 | `max_indexed_fields_per_type` | 25 | Indexed field definitions per type |
 | `preview_sync_limit` | 5,000 | Records a preview dry-runs inside the request, then `202` |

@@ -219,6 +219,15 @@ delete one `RecordPurged` per record and then the `RecordTypeDeleted`. A host
 with no subscribers pays an `EventBus.publish` that returns before gathering
 anything.
 
+A type delete's `RecordPurged` events carry **identity only** — `uuid`,
+`locale`, `translation_group` — and never the record's payload. The purge
+itself is set-based (one `DELETE` per index table, one for the revisions and
+one for the documents, all by `type_id`), so there is no row instantiated to
+read a payload from; reading ten thousand of them back to fill events would
+reinstate exactly the per-record cost that made deleting a 10,000-record type
+take 101 s inside one request. A subscriber that needs a record's content must
+have it before the type is deleted.
+
 `RecordTypeChanged` is what makes `register_reduce_provider`'s "run the CLI
 afterwards" caveat automatable: `index_affecting_keys` names the fields whose
 stored shape just moved, so a provider knows its projection is stale without

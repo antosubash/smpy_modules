@@ -18,8 +18,6 @@ inverse of what the exporter applies.
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 from dataclasses import dataclass
 from dataclasses import field as dc_field
@@ -28,15 +26,24 @@ from typing import Any
 from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportRowError
-from sm_records.schema.fields import FieldDefinition
-from sm_records.schema.types import FieldType
-from sm_records.services._export_cells import APOSTROPHE, ENVELOPE_COLUMNS
-from sm_records.services.errors import ImportParseFailed
+from sm_records.services._export_cells import ENVELOPE_COLUMNS
+from sm_records.services.errors import ImportParseFailed, PayloadTooLarge
 
-__all__ = ["ImportRow", "ParsedFile", "parse_csv", "parse_json"]
+__all__ = ["ImportRow", "ParsedFile", "nul_error", "parse_json", "too_many_rows"]
 
 
-def _nul_error(number: int, name: str | None, uuid: Any = None) -> ImportRowError:
+def too_many_rows(limit: int) -> PayloadTooLarge:
+    """``max_import_rows``, as a 413 — the status ``max_import_bytes`` uses.
+
+    The same kind of refusal for the same kind of reason: this file is more
+    work than one request will do. It names the ceiling rather than the
+    count, because the CSV path stops reading at the first row past it and
+    therefore does not know how many more there are.
+    """
+    return PayloadTooLarge(f"the file holds more than {limit} rows, over the {limit}-row limit")
+
+
+def nul_error(number: int, name: str | None, uuid: Any = None) -> ImportRowError:
     """One row's refusal for a cell carrying ``\x00``.
 
     A *row* error and not a failure for the whole file: a NUL reaching the
@@ -49,8 +56,6 @@ def _nul_error(number: int, name: str | None, uuid: Any = None) -> ImportRowErro
         row=number, field=name, uuid=None if uuid is None else str(uuid), message=NUL_PROBLEM
     )
 
-
-_JSON_CELL_TYPES = frozenset({FieldType.MULTISELECT, FieldType.JSON, FieldType.MEDIA})
 
 _ROW_KEYS = frozenset({*ENVELOPE_COLUMNS, "data", "version"})
 """Top-level keys a JSON row may carry. ``published_at`` is accepted and
@@ -99,8 +104,14 @@ class ParsedFile:
     errors: list[ImportRowError]
 
 
-def parse_json(text: str) -> ParsedFile:
-    """The export document, or a bare list of rows."""
+def parse_json(text: str, *, max_rows: int) -> ParsedFile:
+    """The export document, or a bare list of rows.
+
+    ``max_rows`` is checked on the parsed document, before a single row is
+    turned into an ``ImportRow`` — ``json.loads`` has already bounded the
+    work by ``max_import_bytes``, and ``len()`` of the result is the exact
+    count, so this is the cheap and exact half of the ceiling.
+    """
     try:
         document = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -117,6 +128,9 @@ def parse_json(text: str) -> ParsedFile:
         records = document
     else:
         raise ImportParseFailed("a JSON import must be a list of records or an export document")
+
+    if len(records) > max_rows:
+        raise too_many_rows(max_rows)
 
     rows: list[ImportRow] = []
     errors: list[ImportRowError] = []
@@ -137,152 +151,10 @@ def parse_json(text: str) -> ParsedFile:
         envelope = {key: raw[key] for key in _ROW_KEYS - {"data"} if key in raw}
         bad = next((key for key, value in envelope.items() if has_nul(value)), None)
         if bad is not None:
-            errors.append(_nul_error(number, bad))
+            errors.append(nul_error(number, bad))
             continue
         rows.append(ImportRow(number=number, data=dict(data), envelope=envelope))
     return ParsedFile(rows, errors)
-
-
-def _header(reader: Any, defs: list[FieldDefinition]) -> list[str]:
-    try:
-        raw_header = next(reader)
-    except StopIteration:
-        return []
-    if raw_header and raw_header[0].startswith("﻿"):
-        # Written by Excel, never by this module — see ``export.iter_csv``.
-        raw_header[0] = raw_header[0][1:]
-    header = [name.strip() for name in raw_header]
-    known = {*ENVELOPE_COLUMNS, "version", *(field.key for field in defs)}
-    unknown = sorted(set(header) - known)
-    if unknown:
-        raise ImportParseFailed(
-            f"the header names column(s) {unknown} that this type has no field for"
-        )
-    return header
-
-
-def parse_csv(text: str, defs: list[FieldDefinition]) -> ParsedFile:
-    """Header-driven, so column order does not matter and a missing column
-    means "leave it alone" rather than "clear it"."""
-    by_key = {field.key: field for field in defs}
-    # ``newline=""`` so a ``\r\n`` *inside* a quoted cell survives: StringIO's
-    # default universal-newline translation would rewrite it to ``\n`` before
-    # the csv reader ever sees the quotes, silently editing content.
-    reader = csv.reader(io.StringIO(text, newline=""))
-    header = _header(reader, defs)
-    if not header:
-        return ParsedFile([], [])
-
-    rows: list[ImportRow] = []
-    errors: list[ImportRowError] = []
-    for number, raw_row in enumerate(reader, start=1):
-        if not any(cell.strip() for cell in raw_row):
-            continue
-        if len(raw_row) != len(header):
-            errors.append(
-                ImportRowError(
-                    row=number,
-                    message=f"has {len(raw_row)} cell(s), but the header declares {len(header)}",
-                )
-            )
-            continue
-        data: dict[str, Any] = {}
-        envelope: dict[str, Any] = {}
-        failed = False
-        for name, raw_cell in zip(header, raw_row, strict=True):
-            field = by_key.get(name)
-            cell = _unescape(raw_cell)
-            if has_nul(cell):
-                errors.append(_nul_error(number, name, envelope.get("uuid")))
-                failed = True
-                continue
-            if field is None:
-                envelope[name] = cell
-                continue
-            try:
-                data[name] = _decode_cell(field, cell)
-            except ValueError as exc:
-                errors.append(
-                    ImportRowError(
-                        row=number, field=name, message=str(exc), uuid=envelope.get("uuid")
-                    )
-                )
-                failed = True
-        if not failed:
-            rows.append(ImportRow(number=number, data=data, envelope=_clean(envelope)))
-    return ParsedFile(rows, errors)
-
-
-def _unescape(cell: str) -> str:
-    """Undo :func:`sm_records.services._export_cells.escape_formula` — exactly
-    one leading apostrophe, from every cell.
-
-    Every cell, not only the ones that look dangerous: the escape doubles an
-    apostrophe that was already there, so ``''x`` is the content ``'x`` and
-    ``'x`` is the content ``x``. One added on the way out, one taken off on the
-    way in, and the round trip is lossless. The cost is a CSV written *by
-    hand*, which carries no doubling and loses a leading apostrophe — the
-    README states that next to the export.
-    """
-    return cell[1:] if cell.startswith(APOSTROPHE) else cell
-
-
-def _clean(envelope: dict[str, Any]) -> dict[str, Any]:
-    """An empty cell is ``None``, not ``""``.
-
-    ``position`` and ``version`` are the two that would otherwise reach the
-    service as an empty string and blow up as a type error rather than as the
-    "this column was left blank" the operator meant.
-    """
-    out: dict[str, Any] = {}
-    for key, value in envelope.items():
-        text = value.strip() if isinstance(value, str) else value
-        out[key] = None if text == "" else text
-    return out
-
-
-def _decode_cell(field: FieldDefinition, cell: str) -> Any:
-    """A CSV cell as the value the payload model will be handed.
-
-    Deliberately *not* coercion: a scalar is passed through as its string and
-    left for pydantic, so a ``number`` cell and a JSON ``number`` value go
-    through exactly one coercion path rather than two that can disagree. Only
-    the shapes CSV cannot spell flatly — a list, an object, a reference — are
-    decoded here, inverting ``export.csv_cell``.
-    """
-    if cell == "":
-        return None
-    if field.type is FieldType.RELATION:
-        return _decode_relation(field, cell)
-    if field.type in _JSON_CELL_TYPES:
-        try:
-            return json.loads(cell)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"is not valid JSON: {exc.msg}") from exc
-    return cell
-
-
-def _decode_relation(field: FieldDefinition, cell: str) -> Any:
-    if cell.startswith("["):
-        try:
-            items = json.loads(cell)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"is not a valid list of references: {exc.msg}") from exc
-        if not isinstance(items, list):
-            raise ValueError("must be a JSON list of 'type:uuid' references")
-        return [_one_ref(item) for item in items]
-    ref = _one_ref(cell)
-    return [ref] if field.options.get("many") else ref
-
-
-def _one_ref(raw: Any) -> dict[str, str]:
-    if isinstance(raw, dict):
-        return {"type": str(raw.get("type") or ""), "uuid": str(raw.get("uuid") or "")}
-    text = str(raw)
-    if ":" not in text:
-        raise ValueError(f"reference {text!r} must be written as 'type:uuid'")
-    type_key, uuid = text.split(":", 1)
-    return {"type": type_key, "uuid": uuid}
 
 
 def refuses_orphaned(row: ImportRow) -> ImportRowError | None:

@@ -281,6 +281,7 @@ variables are read. Configure on the Settings screen or with
 | `preview_sync_limit` | 5000 | no |
 | `preview_job_ttl_seconds` | 600 (10 min) | no |
 | `max_import_bytes` | 52428800 (50 MB) | no |
+| `max_import_rows` | 20000 | no |
 | `max_fields_per_type` | 100 | no |
 | `max_indexed_fields_per_type` | 25 | no |
 | `reindex_batch_size` | 500 | no |
@@ -997,6 +998,15 @@ endings per RFC 4180.
   body is read, so a chunked upload that declares no length is stopped at the
   first byte over the ceiling rather than buffered whole and refused
   afterwards.
+- `max_import_rows` (a setting, 20,000 by default) refuses a file with more
+  rows than that, also `413` and also before anything is written. The byte
+  ceiling bounds the *file*; this bounds the *work*, because 50 MB is roughly
+  1.7 M rows and that is hours inside one HTTP request — long past any reverse
+  proxy's read timeout, at which point the client sees a 504 while the server
+  keeps writing. A JSON file is counted exactly from the parsed document; a CSV
+  is counted as it is read and the parse stops at the first row past the
+  ceiling, because a quoted cell may contain newlines and there is no cheap
+  exact count to check first.
 
 The report is `{dry_run, mode, total, created, updated, skipped, failed,
 errors: [{row, uuid, field, message}], errors_truncated, duration_ms}`, with
@@ -1168,7 +1178,9 @@ rely on them:
   record before the `RecordTypeDeleted`.
 - **They carry identifiers, not payloads.** Read the record if you need its
   content. The exception is `RecordPurged`, which is the one event whose
-  subject is gone.
+  subject is gone — and even that one carries identity (`uuid`, `locale`,
+  `translation_group`) rather than the payload, because a type delete is
+  set-based and never instantiates the rows it removes.
 - **Handler failures are the bus's business, not yours to be careful about.**
   `EventBus.publish` gathers with `return_exceptions=True` and logs; a
   subscriber that raises does not take the write down, and does not stop the

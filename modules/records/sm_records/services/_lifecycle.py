@@ -20,7 +20,12 @@ from sm_records.index._reduce_write import apply_delta, drop_type_rows
 from sm_records.index.reindex import reindex_record
 from sm_records.index.writer import delete_index
 from sm_records.models import Record, RecordType, RevisionEvent, TableSet, tables_for
-from sm_records.services._common import mark_written, type_resolver, utcnow
+from sm_records.services._common import (
+    PurgedRecord,
+    mark_written,
+    type_resolver,
+    utcnow,
+)
 
 # Split out for the file cap: everything about the referrer graph — walking
 # it, and rewriting the records that point at the one being deleted — lives
@@ -185,28 +190,63 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     await _purge(db, tables, [record])
 
 
-async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Record]:
-    """Hard-delete every record of a type, trashed or live. Returns the rows.
+async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[PurgedRecord]:
+    """Hard-delete every record of a type, trashed or live — **set-based**.
 
     Deleting a type is the one operation that purges live records, so it
-    cannot go through :func:`hard_delete_record` — which refuses anything not
-    already in the trash, on purpose.
+    cannot go through :func:`hard_delete_record`, which refuses anything not
+    already in the trash on purpose.
 
-    The rows rather than a count, because a ``RecordPurged`` is the one event
-    a subscriber cannot recover from by re-reading and therefore has to carry
-    what the row held. They are expunged, not expired, so their loaded
-    attributes are still readable afterwards; ``len()`` is the count every
-    caller used before.
+    **Ten statements, not ten per record.** This used to load every record as
+    an ORM instance, call :func:`delete_index` per record (six ``DELETE``s
+    each, by ``record_id``) and then delete the documents by a ten-thousand-
+    element ``IN`` list: deleting a 10,000-record type took 101 s inside one
+    HTTP request, past any reverse proxy's read timeout, at which point the
+    client sees a 504 while the server keeps deleting. Every index table
+    carries ``type_id`` — it is the discriminator the whole index design is
+    built on — so one ``DELETE ... WHERE type_id = :id`` per table says the
+    same thing, and the documents and revisions go the same way.
+
+    **What is still read is the three columns the events need.** A
+    ``RecordPurged`` is the one event a subscriber cannot recover by
+    re-reading, so it has to carry what the row held; it carries ``uuid``,
+    ``locale`` and ``translation_group`` and nothing else, as a column
+    select rather than as ORM instances. That is one cheap statement for the
+    whole type instead of ten thousand instantiations, and the docs say that
+    a purge event carries identity rather than payload.
+
+    Order matters: the revision delete reads the document table, so it has to
+    run before the documents go.
     """
     tables = tables_for(rtype)
     cls = tables.record
-    stmt = select(cls).where(cls.type_id == rtype.id).execution_options(include_deleted=True)
-    records = list((await db.execute(stmt)).scalars().all())
-    for record in records:
-        await delete_index(db, tables, record.id)
+    purged = list(
+        (
+            await db.execute(
+                select(cls.uuid, cls.locale, cls.translation_group)
+                .where(cls.type_id == rtype.id)
+                .execution_options(include_deleted=True)
+            )
+        ).all()
+    )
+    for table in tables.index_tables:
+        await db.execute(sa_delete(table).where(table.type_id == rtype.id))
     # One statement rather than a delta per live record: the type is going
     # away, so every group of every spec on it goes with it. A reduce row has
     # no foreign key to cascade through, so this is what removes them.
     await drop_type_rows(db, rtype.id)
-    await _purge(db, tables, records)
-    return records
+    # Explicit rather than via the FK's ON DELETE CASCADE, for the reason
+    # ``_purge`` gives: SQLite leaves foreign keys unenforced unless the
+    # pragma is on, so the cascade would clean up on Postgres and orphan rows
+    # on the default dev backend.
+    await db.execute(
+        sa_delete(tables.revision).where(
+            tables.revision.record_id.in_(select(cls.id).where(cls.type_id == rtype.id))
+        )
+    )
+    await db.execute(sa_delete(cls).where(cls.type_id == rtype.id))
+    await db.flush()
+    # Core DML does not fire ``after_flush``, so the request's session would
+    # otherwise take ``get_db``'s read-only branch and never commit the purge.
+    mark_written(db)
+    return purged

@@ -20,6 +20,13 @@ dry run that exists to produce it. A dry run and ``on_error=skip`` are both
 unaffected: the first must report everything, and the second is going to write
 every row that is fine.
 
+**The row ceiling is applied in the parse, not in the write loop.**
+``max_import_rows`` refuses a file that is more work than one request will do
+— a ``413``, the status ``max_import_bytes`` already uses — and it refuses it
+before anything is validated: exactly, from ``len()`` of the parsed JSON
+document, and for CSV at the first row past the ceiling, since a quoted cell
+may contain newlines and there is no cheap exact count to check first.
+
 **``abort`` is the request's transaction, not a loop counter.** Nothing here
 commits (``CLAUDE.md``: the framework's session does). A refused run raises
 :class:`~sm_records.services.errors.ImportRefused`, which ``RecordsErrorRoute``
@@ -48,8 +55,9 @@ from sm_records.contracts.io import (
 )
 from sm_records.models import Record, RecordType
 from sm_records.services import _payload
+from sm_records.services._import_csv import parse_csv
 from sm_records.services._import_match import match_field
-from sm_records.services._import_parse import parse_csv, parse_json
+from sm_records.services._import_parse import parse_json
 from sm_records.services._import_plan import ImportOptions, Plan, plan_rows, validate_rows
 from sm_records.services._import_rows import write_row
 from sm_records.services.errors import ImportRefused, RecordsError
@@ -204,7 +212,12 @@ async def import_records(
     defs = _payload.field_defs(rtype)
     if options.match_by not in ("uuid", "slug"):
         match_field(rtype, defs, options.match_by)
-    parsed = parse_json(text) if fmt is ImportFormat.JSON else parse_csv(text, defs)
+    rows_limit = settings.max_import_rows
+    parsed = (
+        parse_json(text, max_rows=rows_limit)
+        if fmt is ImportFormat.JSON
+        else parse_csv(text, defs, max_rows=rows_limit)
+    )
     errors: list[ImportRowError] = list(parsed.errors)
     tally = _Tally(total=len(parsed.rows) + len({item.row for item in parsed.errors}))
 

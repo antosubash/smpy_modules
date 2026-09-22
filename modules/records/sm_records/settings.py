@@ -17,11 +17,12 @@ would otherwise be built (see :mod:`sm_records.boot`).
 three are the whole ``requires_restart`` set below — the README's settings
 table lists the same three. Both locale values *are* read per request, so
 screens follow an edit immediately; the flag is there because an edit changes
-what the install *publishes* rather than how a page renders. Records already
-written in a dropped locale stay written, the public API stops serving them,
-and they are counted at startup and only there (:mod:`sm_records.health`).
+what the install *publishes* rather than how a page renders. Records written
+in a dropped locale stay written, the public API stops serving them, and they
+are counted at startup and only there (:mod:`sm_records.health`).
 
-Everything else here is read per request and takes effect on save.
+Everything else is read per request and takes effect on save. The cross-field
+checks, and the page-size clamp, live in :mod:`sm_records.settings_checks`.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ from sm_records.settings_checks import (
     check_content_locales,
     check_limits,
     check_public_route_prefix,
+    clamp_page_size,
 )
 
 _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
@@ -61,12 +63,12 @@ class RecordsSettings(BaseSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Init kwargs only — no env, no ``.env``, no secrets directory.
 
-        The hydrator passes stored overrides as keyword arguments, so any
-        field has exactly two answers: what the database says, or the default
+        The hydrator passes stored overrides as keyword arguments, so any field
+        has exactly two answers: what the database says, or the default
         declared here. Dropping the env sources rather than merely not
-        documenting them is deliberate — a stray ``SM_RECORDS_*`` in a shell
-        or a deploy manifest would otherwise quietly outrank the value an
-        operator can see and edit on the Settings screen.
+        documenting them is deliberate — a stray ``SM_RECORDS_*`` in a shell or
+        a deploy manifest would otherwise quietly outrank the value an operator
+        can see and edit on the Settings screen.
         """
         return (init_settings,)
 
@@ -137,14 +139,12 @@ class RecordsSettings(BaseSettings):
     revision_limit: int = Field(default=50, ge=1)
     """How many ``records_revision`` rows are kept per record.
 
-    Append-only revisions are cheap insurance against a bad edit, but
-    unbounded on a busy type they outgrow the document table itself — the
-    oldest revisions beyond this count are pruned on write.
-
-    At least 1: there is no "unlimited" setting, and ``0`` — which an operator
-    would read as "keep no history" — is not representable rather than
-    silently meaning the opposite. Every write appends one, so a limit of 1
-    keeps exactly the current revision.
+    Append-only revisions are cheap insurance against a bad edit, but unbounded
+    on a busy type they outgrow the document table itself — the oldest beyond
+    this count are pruned on write. At least 1: there is no "unlimited"
+    setting, and ``0`` — which an operator would read as "keep no history" — is
+    not representable rather than silently meaning the opposite. Every write
+    appends one, so a limit of 1 keeps exactly the current revision.
     """
 
     max_filter_terms: int = Field(default=20, ge=1)
@@ -170,6 +170,21 @@ class RecordsSettings(BaseSettings):
     is exactly the body that must not be buffered whole to be refused. The
     ceiling is on the file; one oversized row is :attr:`max_payload_bytes`."""
 
+    max_import_rows: int = Field(default=20000, ge=1)
+    """Reject an import holding more rows than this — a ``413``, before a row
+    is written (default 20,000).
+
+    :attr:`max_import_bytes` bounds the *file*; this bounds the *work*. That
+    byte ceiling permits roughly 1.7 M rows, which is hours inside one HTTP
+    request and long past any reverse proxy's read timeout — at which point
+    the client sees a 504 while the server keeps writing.
+
+    A JSON file is counted exactly, from the parsed document, before a row is
+    validated. A CSV has no cheap exact count (a quoted cell may contain
+    newlines), so its rows are counted as they are read and the parse stops at
+    the first one past the ceiling: bounded work either way.
+    """
+
     max_fields_per_type: int = 100
     """Largest number of field definitions a single Record Type may declare."""
 
@@ -178,9 +193,9 @@ class RecordsSettings(BaseSettings):
     declare. Must not exceed :attr:`max_fields_per_type`.
 
     Easy to omit and expensive to add later: every indexed field is a row
-    written per record per save, so a type with 80 indexed fields turns one
-    save into 81 inserts. A visible ceiling makes that a design conversation
-    at schema-editing time instead of an incident.
+    written per record per save, so a type with 80 indexed fields turns one save
+    into 81 inserts. A visible ceiling makes that a design conversation at
+    schema-editing time instead of an incident.
     """
 
     max_count: int = Field(default=10000, ge=1)
@@ -188,14 +203,12 @@ class RecordsSettings(BaseSettings):
 
     A page can stop after ``page_size`` matches; the ``COUNT`` behind ``total``
     never can, so an unbounded one is O(matches) on a request whose page is
-    O(25) — the cost of a filter that matches most of a large type, paid on
-    every page of it. The count is bounded to ``max_count + 1`` rows instead:
-    at or below the ceiling ``total`` is the exact number and ``total_capped``
-    is ``false``, above it ``total`` is ``max_count`` and ``total_capped`` is
-    ``true``, which the list screen renders as "10,000+".
-
-    A caller that pages with ``?after=`` and does not need the number at all
-    should send ``?total=false`` and skip the statement entirely.
+    O(25) — the cost of a filter matching most of a large type, paid on every
+    page of it. The count is bounded to ``max_count + 1`` rows instead: at or
+    below the ceiling ``total`` is exact and ``total_capped`` is ``false``,
+    above it ``total`` is ``max_count`` and ``total_capped`` is ``true``, which
+    the list screen renders as "10,000+". A caller paging with ``?after=`` that
+    does not need the number should send ``?total=false`` and skip it entirely.
     """
 
     max_aggregate_groups: int = Field(default=1000, ge=1)
@@ -207,11 +220,9 @@ class RecordsSettings(BaseSettings):
     every group before it can order them — so the statement is bounded to
     ``max_aggregate_groups + 1`` rows and the response says ``truncated: true``
     when it hit the ceiling. Groups come back by count descending, so what is
-    dropped is always the long tail, which is what a dashboard wants.
-
-    It bounds the **stored** reading (``?reduce=``) identically: a maintained
-    aggregate with a hundred thousand groups is a table as big as the type,
-    and a caller asking for all of it should page a list instead.
+    dropped is always the long tail, which is what a dashboard wants. It bounds
+    the **stored** reading (``?reduce=``) identically: a maintained aggregate
+    with a hundred thousand groups is a table as big as the type.
     """
 
     preview_sync_limit: int = Field(default=5000, ge=0)
@@ -234,12 +245,11 @@ class RecordsSettings(BaseSettings):
 
     Two things read it: the job registry prunes anything older, and ``PUT
     /types/{key}`` reuses a completed job's report instead of re-running the
-    scan inline when the job was taken against the same type, the same
-    proposed fields and the same ``RecordType.version`` — see
-    :func:`sm_records.services.schema_change.apply`.
-
-    ``0`` disables the reuse and prunes every job immediately, which is the
-    setting for an install that would rather pay the second pass.
+    scan inline when the job was taken against the same type, the same proposed
+    fields and the same ``RecordType.version`` — see
+    :func:`sm_records.services.schema_change.apply`. ``0`` disables the reuse
+    and prunes every job immediately, for an install that would rather pay the
+    second pass.
     """
 
     reindex_batch_size: int = 500
@@ -250,33 +260,23 @@ class RecordsSettings(BaseSettings):
     """How stale a per-type admin sidebar entry may get, in seconds.
 
     A type with ``show_in_menu`` has its own sidebar item
-    (:mod:`sm_records.menu`) and the framework's menu registry is filled once
-    at boot, so a worker that did not serve the write re-reads the types at
-    most this often, on a request that renders a sidebar. The worker that
-    *did* serve it re-reads on its next one regardless — so this is the window
-    another process can lag by, not a delay the editor sees. ``0`` re-reads on
-    every page request. No restart: it is read at the moment of the check.
+    (:mod:`sm_records.menu`) and the framework's menu registry is filled once at
+    boot, so a worker that did not serve the write re-reads the types at most
+    this often, on a request that renders a sidebar. The worker that *did*
+    serve it re-reads on its next one regardless — so this is the window another
+    process can lag by, not a delay the editor sees. ``0`` re-reads every time.
     """
 
     reindex_stale_after_seconds: int = 900
     """A ``reindex_pending`` entry (design doc §8.5) older than this degrades
-    ``/health/ready`` and names the type and field (default 15 minutes).
-
-    Turns an orphaned reindex — one whose background task died with the
-    worker that owned it — from a support ticket into an alert.
+    ``/health/ready`` and names the type and field (default 15 minutes). Turns
+    an orphaned reindex — one whose background task died with the worker that
+    owned it — from a support ticket into an alert.
     """
 
     def clamp_page_size(self, requested: int | None) -> int:
-        """The page size a list endpoint actually uses.
-
-        One owner for the rule, because four call sites must agree on it: the
-        admin list, the referrers panel, the anonymous read API and the
-        record-list view. ``None`` means "the caller did not ask" and gets
-        :attr:`default_page_size`; anything above :attr:`max_page_size` is
-        clamped rather than refused, so an anonymous caller probing the
-        ceiling learns nothing and gets a usable page either way.
-        """
-        return max(min(requested or self.default_page_size, self.max_page_size), 1)
+        """See :func:`~sm_records.settings_checks.clamp_page_size`."""
+        return clamp_page_size(self, requested)
 
     @field_validator("public_route_prefix")
     @classmethod

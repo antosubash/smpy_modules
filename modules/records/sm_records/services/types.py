@@ -28,9 +28,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records._text import has_nul
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
-from sm_records.models import Record, RecordType, RecordTypeRevision
+from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
-from sm_records.services._common import record_count, record_counts, type_id_map
+from sm_records.services._common import (
+    PurgedRecord,
+    record_count,
+    record_counts,
+    type_id_map,
+)
 from sm_records.services._schema import (
     check_pointers,
     check_targets,
@@ -187,7 +192,7 @@ async def create_type(
 
 async def delete_type(
     db: AsyncSession, rtype: RecordType, *, confirm_record_count: int
-) -> list[Record]:
+) -> list[PurgedRecord]:
     """Delete a type and everything stored against it.
 
     ``confirm_record_count`` has to match what the type actually holds (§8.9):
@@ -201,8 +206,11 @@ async def delete_type(
     ``trashed_record_count`` alongside ``record_count`` so the dialog can show
     the operator the number this check will actually compare against.
 
-    Returns the records it purged, for the ``RecordPurged`` events the endpoint
-    publishes — the one event whose subject no subscriber can read back.
+    Returns one :class:`~sm_records.services._common.PurgedRecord` per record
+    it purged, for the ``RecordPurged`` events the endpoint publishes — the one
+    event whose subject no subscriber can read back. Identity only (``uuid``,
+    ``locale``, ``translation_group``), because the purge itself is set-based
+    and never instantiates the rows: see :func:`purge_type_records`.
     """
     held = await record_count(db, rtype, include_deleted=True)
     if confirm_record_count != held:

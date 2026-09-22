@@ -137,3 +137,19 @@ def check_limits(settings: Any) -> None:
             f"max_indexed_fields_per_type ({settings.max_indexed_fields_per_type}) "
             f"must not exceed max_fields_per_type ({settings.max_fields_per_type})"
         )
+
+
+def clamp_page_size(settings: Any, requested: int | None) -> int:
+    """The page size a list endpoint actually uses.
+
+    One owner for the rule, because four call sites must agree on it: the
+    admin list, the referrers panel, the anonymous read API and the record-list
+    view. ``None`` means "the caller did not ask" and gets
+    ``default_page_size``; anything above ``max_page_size`` is clamped rather
+    than refused, so an anonymous caller probing the ceiling learns nothing and
+    gets a usable page either way.
+
+    A function here rather than the body of ``RecordsSettings.clamp_page_size``
+    only for that module's file cap; the method remains the call site.
+    """
+    return max(min(requested or settings.default_page_size, settings.max_page_size), 1)

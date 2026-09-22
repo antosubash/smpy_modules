@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
@@ -194,3 +194,23 @@ async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int]:
     live = await record_count(db, rtype)
     total = await record_count(db, rtype, include_deleted=True)
     return live, total - live
+
+
+class PurgedRecord(Protocol):
+    """What a purged record leaves behind: the three columns its event needs.
+
+    ``services._lifecycle.purge_type_records`` deletes a whole type set-based
+    — one statement per table rather than ten per record — so there is no ORM
+    instance afterwards to read a payload from, and there does not need to be:
+    a ``RecordPurged`` addresses a record by ``(type_key, uuid)`` exactly as
+    the API does, and carries its language and its translation group because
+    those are the only facts a subscriber cannot look up once the row is gone.
+
+    A ``Protocol`` rather than a class, because what actually arrives is
+    SQLAlchemy's ``Row`` from a three-column select. Naming the shape is what
+    keeps ``delete_type``'s signature honest about what it hands back.
+    """
+
+    uuid: str
+    locale: str
+    translation_group: str
