@@ -257,13 +257,21 @@ test.describe('Records — schema change', () => {
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
 
-    // A wrong count is refused in the dialog, which stays open.
+    // A wrong count is refused in the dialog, which stays open. The guard
+    // now disarms the button itself instead of waiting for the click to
+    // fail (`DeleteTypeSection`, confirmDisabled), so the refusal is the
+    // disabled button plus the inline mismatch message.
+    const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
+    await expect(confirm).toBeDisabled();
     await dialog.locator('#type-editor-delete-confirm').fill('1');
-    await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(dialog.getByText(/That doesn.t match/)).toBeVisible();
+    await expect(confirm).toBeDisabled();
+    await expect(dialog).toBeVisible();
 
     await dialog.locator('#type-editor-delete-confirm').fill('2');
-    await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(dialog.getByText(/That doesn.t match/)).toHaveCount(0);
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
     await expect(page).toHaveURL(/\/admin\/records\/?$/);
     await expect(
       page.locator(`[data-testid="records-type-row"][data-type-key="${key}"]`),

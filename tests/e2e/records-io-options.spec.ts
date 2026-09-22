@@ -79,7 +79,15 @@ test.describe('Records — import options and trash export', () => {
     // And the menu points at the one option that gets past it — which,
     // before this fix, `RecordIoMenu` did not expose at all.
     await expect(page.getByTestId('records-import-force-hint')).toBeVisible();
-    await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
+    // Apply stays on screen and disarmed, naming the rows that failed, so
+    // the reason it cannot be pressed is readable instead of the button
+    // simply being gone (`RecordIoMenu`, `importApplyBlockedReason`).
+    const apply = page.getByTestId('records-import-apply');
+    await expect(apply).toBeVisible();
+    await expect(apply).toBeDisabled();
+    await expect(page.getByTestId('records-import-blocked')).toContainText(
+      "1 of 1 row(s) can't be imported, so nothing will be written.",
+    );
     const before = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
     expect((await before.json()).data.title).toBe('Original');
 

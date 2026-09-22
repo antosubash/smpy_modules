@@ -19,9 +19,11 @@ type TypeReadWithSidebar = TypeRead & { show_in_menu: boolean };
 
 /**
  * Per-type sidebar entries (design contract: "per-type sidebar entries"):
- * a Record Type with `show_in_menu` gets its own admin sidebar link, next to
- * the "Records" hub, under its own "Records" group (the hub itself stays in
- * "Content") — and the TypeEditor's own "Show in sidebar" switch that drives
+ * a Record Type with `show_in_menu` gets its own admin sidebar link, under
+ * the "Records" group it shares with the hub — which U17 moved out of the
+ * shared "Content" group and renamed "All record types", so the hub reads
+ * as the way into every type rather than as a peer of another module's
+ * screen — and the TypeEditor's own "Show in sidebar" switch that drives
  * it.
  *
  * The sidebar itself (`AdminLayout` -> `SidebarLayout`, `menuKey:
@@ -48,16 +50,22 @@ test.describe('Records — sidebar entries', () => {
 
     await page.goto('/admin/records/');
     const sidebar = page.locator('aside');
-    // The hub stays under "Content"; the type's own entry gets its own
-    // "Records" group header (SidebarLayout.tsx renders one per distinct
-    // `group`, in the order its lowest-`order` item appears).
-    await expect(sidebar.getByText('Content')).toBeVisible();
-    await expect(sidebar.locator('div.uppercase', { hasText: 'Records' })).toBeVisible();
+    // One "Records" group header holds both the hub and the type
+    // (SidebarLayout.tsx renders one per distinct `group`, in the order its
+    // lowest-`order` item appears).
+    const group = sidebar.locator('div.uppercase', { hasText: 'Records' });
+    await expect(group).toBeVisible();
     const link = sidebar.getByRole('link', { name: labelPlural, exact: true });
     await expect(link).toBeVisible();
 
-    // The hub entry is untouched — both links coexist.
-    await expect(sidebar.getByRole('link', { name: 'Records', exact: true })).toBeVisible();
+    // U17: the hub entry is still there, above its children, named for what
+    // it is — both links coexist in the same group.
+    const hub = sidebar.getByRole('link', { name: 'All record types', exact: true });
+    await expect(hub).toBeVisible();
+    await expect(hub).toHaveAttribute('href', '/admin/records/');
+    // The hub is listed first (`MENU_ORDER` < `MENU_ORDER_TYPE`).
+    const names = await sidebar.getByRole('link').allInnerTexts();
+    expect(names.indexOf('All record types')).toBeLessThan(names.indexOf(labelPlural));
 
     await link.click();
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));

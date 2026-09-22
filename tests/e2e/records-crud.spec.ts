@@ -104,8 +104,10 @@ test.describe('Records — record CRUD', () => {
     await recordField(page, 'due').fill('2026-03-04');
     await recordField(page, 'starts').fill('2026-03-04T05:06:07');
     await recordField(page, 'colour').selectOption('green');
-    await page.locator('#record-field-tags-a').click();
-    await page.locator('#record-field-tags-b').click();
+    // One checkbox per choice, located by label: the ids are index-based
+    // now, since a value with a space made one no selector could reach.
+    await page.getByRole('checkbox', { name: 'Alpha', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Beta', exact: true }).click();
     await recordField(page, 'contact').fill('ada@example.com');
     await recordField(page, 'link').fill('https://example.com/a');
     await recordField(page, 'meta').fill('{"k": 1}');
@@ -273,7 +275,9 @@ test.describe('Records — record CRUD', () => {
     const record = await apiCreateRecord(page, key, { data: { title: 'Doomed' } });
 
     await page.goto(`/admin/records/${key}/${record.uuid}`);
-    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Delete');
+    // U15: the action stays "Delete", the dialog it opens says what that
+    // really does — its title and confirm button read "Move to Trash".
+    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Move to Trash');
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));
     await expect(page.getByRole('link', { name: 'Doomed' })).toHaveCount(0);
   });

@@ -158,7 +158,9 @@ test.describe('Records — relations', () => {
       `/admin/records/${bookKey}/${book.uuid}`,
     );
 
-    const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
+    // U15: the trigger is "Delete", the dialog's own confirm is
+    // "Move to Trash" — and on a `restrict` referrer it stays disarmed.
+    const confirm = dialog.getByRole('button', { name: 'Move to Trash', exact: true });
     await expect(confirm).toBeDisabled();
 
     await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -183,7 +185,7 @@ test.describe('Records — relations', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('1 record will have this reference cleared');
 
-    const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
+    const confirm = dialog.getByRole('button', { name: 'Move to Trash', exact: true });
     await expect(confirm).toBeEnabled();
     await confirm.click();
     await expect(dialog).toHaveCount(0);

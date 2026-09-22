@@ -162,9 +162,14 @@ test.describe('Records — import / export from the list toolbar', () => {
     );
     // R21: the dialog names the file and restates the rules it was checked
     // against, instead of asking the operator to trust the counts alone.
-    await expect(page.getByTestId('records-import-file-summary')).toHaveText(
+    const summary = page.getByTestId('records-import-file-summary');
+    await expect(summary).toContainText(
       'records.json — Create or update (upsert) · match by Record ID (uuid) · overwrite unversioned rows: off',
     );
+    // R9/M13 added the size ceiling to the same paragraph — the file is
+    // refused before it is uploaded, so the limit is stated where the file
+    // is named.
+    await expect(summary).toContainText('Files up to 50 MB.');
     // A dry run writes nothing — asserted against the API rather than the
     // screen, since the list behind the dialog was rendered before the
     // import and would look the same either way.
@@ -227,7 +232,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     });
   }
 
-  test('a file with a bad row lists the row errors and offers no "Apply import"', async ({
+  test('a file with a bad row lists the row errors and disarms "Apply import"', async ({
     page,
   }) => {
     await login(page);
@@ -246,9 +251,18 @@ test.describe('Records — import / export from the list toolbar', () => {
       '2 row(s): 1 to create, 0 to update, 0 unchanged, 1 failed',
     );
     await expect(dialog.getByText(/^Row 2 \(title\):/)).toBeVisible();
-    // A run with a failing row cannot be applied from here at all — the
-    // button is absent, not merely disabled (`RecordIoMenu`).
-    await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
+    // A run with a failing row cannot be applied from here: the button used
+    // to vanish, which left nothing on screen saying why. It now stays and
+    // is disarmed, describing itself with the reason (`RecordIoMenu`,
+    // `importApplyBlockedReason`).
+    const apply = page.getByTestId('records-import-apply');
+    await expect(apply).toBeVisible();
+    await expect(apply).toBeDisabled();
+    const blocked = page.getByTestId('records-import-blocked');
+    await expect(blocked).toHaveText(
+      '1 of 2 row(s) can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+    );
+    await expect(apply).toHaveAttribute('aria-describedby', 'records-import-blocked');
   });
 
   test('an import that would move a record between languages is refused inline', async ({
@@ -270,6 +284,12 @@ test.describe('Records — import / export from the list toolbar', () => {
     );
     await expect(dialog.getByText(/locale is fixed for its lifetime/)).toBeVisible();
     await expect(dialog.getByText(/create a translation instead/)).toBeVisible();
-    await expect(page.getByTestId('records-import-apply')).toHaveCount(0);
+    // Same disarmed-with-a-reason treatment as any other failed row.
+    const apply = page.getByTestId('records-import-apply');
+    await expect(apply).toBeVisible();
+    await expect(apply).toBeDisabled();
+    await expect(page.getByTestId('records-import-blocked')).toContainText(
+      "1 of 1 row(s) can't be imported, so nothing will be written.",
+    );
   });
 });

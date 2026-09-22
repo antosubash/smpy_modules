@@ -59,6 +59,12 @@ async function createPublishedPage(
   });
   expect(created.status(), await created.text()).toBe(201);
   const { id } = (await created.json()) as { id: number };
+  // The 201 can arrive before the row is committed (the framework commits in
+  // the session dependency's exit code, after the response — upstream GH
+  // #257), and publishing a page the next request cannot see is a 404.
+  await expect
+    .poll(async () => (await page.request.get(`/api/pagebuilder/pages/${id}`)).status())
+    .toBe(200);
   const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers });
   expect(published.status(), await published.text()).toBe(200);
   return id;

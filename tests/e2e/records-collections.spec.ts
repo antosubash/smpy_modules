@@ -159,7 +159,10 @@ test.describe('Records — collections', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Matinee (moved)' })).toBeVisible();
 
-    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Delete');
+    // U15: the row/editor action stays "Delete", but the dialog it opens
+    // names the reversible thing it really does — its title and confirm
+    // button both read "Move to Trash".
+    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Move to Trash');
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));
     await expect.poll(() => rowTitles(page)).not.toContain('Matinee (moved)');
   });

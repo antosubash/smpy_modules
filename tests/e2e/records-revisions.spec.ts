@@ -81,8 +81,9 @@ test.describe('Records — revisions', () => {
     await page.getByRole('button', { name: 'Show' }).click();
     const items = page.getByTestId('records-revision-item');
     await expect(items).toHaveCount(1);
-    await expect(items.first()).toContainText('create');
-    await expect(items.first()).toContainText('Only');
+    // R11: the row says what happened in words, not the wire value
+    // (`revisionEvent`) — "v1 · Created · <title>", never "· create ·".
+    await expect(items.first()).toContainText('v1 · Created · Only');
   });
 
   test('rolls a type back to an earlier schema snapshot', async ({ page }) => {

@@ -165,7 +165,9 @@ test.describe('Records — list UX', () => {
     await row.getByRole('button', { name: 'Delete' }).click();
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toContainText('Move this record to the Trash?');
-    await dialog.getByRole('button', { name: 'Delete' }).click();
+    // U15: the row action is "Delete", the confirmation "Move to Trash".
+    await expect(dialog.getByRole('heading', { name: 'Move to Trash' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Move to Trash' }).click();
     await expect(dialog).toHaveCount(0);
 
     await expect(page.getByText('Moved to the Trash')).toBeVisible();
@@ -191,7 +193,8 @@ test.describe('Records — list UX', () => {
     await page.getByRole('button', { name: 'Delete' }).click();
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toContainText('Move this record to the Trash?');
-    await dialog.getByRole('button', { name: 'Delete' }).click();
+    await expect(dialog.getByRole('heading', { name: 'Move to Trash' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Move to Trash' }).click();
 
     // The toast survives the visit back to the list the delete triggers —
     // `RecordsToaster` is mounted by the layout both screens share.
@@ -286,7 +289,7 @@ test.describe('Records — list UX', () => {
     await page.goto(`/admin/records/${key}`);
     const row = page.getByTestId('records-record-row').first();
     await row.getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Move to Trash' }).click();
     await expect(page.getByTestId('records-record-row')).toHaveCount(0);
 
     await page.goto(`/admin/records/${key}?trashed=1`);
