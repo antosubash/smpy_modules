@@ -19,6 +19,23 @@ function fakeT(_key: string, opts: { defaultValue: string } & Record<string, unk
   return opts.defaultValue.replace(/\{(\w+)\}/g, (_match, name) => String(opts[name] ?? ''));
 }
 
+/** `fakeT` above always resolves to the singular `defaultValue` — this
+ *  picks `defaultValue_other` for a `count` other than one, the same
+ *  i18next contract `RecordDeleteDialog.test.tsx`'s own stand-in mirrors. */
+function fakePluralT(
+  _key: string,
+  opts: { count?: number; defaultValue: string; defaultValue_other?: string } & Record<
+    string,
+    unknown
+  >,
+): string {
+  const template =
+    opts.count !== undefined && opts.count !== 1 && opts.defaultValue_other
+      ? opts.defaultValue_other
+      : opts.defaultValue;
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts[name] ?? ''));
+}
+
 function field(overrides: Partial<FieldDef> = {}): FieldDef {
   return {
     key: 'email',
@@ -164,27 +181,21 @@ describe('importApplyBlockedReason', () => {
   it('is null once the operator has switched to on_error: skip — Apply can run', () => {
     expect(importApplyBlockedReason(fakeT, report({ failed: 1, total: 3 }), 'skip')).toBeNull();
   });
+
+  // U10: "row(s)" used to be the one un-pluralized noun in a round that
+  // otherwise carries `_one`/`_other` throughout.
+  it('pluralizes on the failed count, not the total', () => {
+    expect(importApplyBlockedReason(fakePluralT, report({ failed: 1, total: 3 }), 'abort')).toBe(
+      '1 of 3 row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
+    );
+    expect(importApplyBlockedReason(fakePluralT, report({ failed: 2, total: 3 }), 'abort')).toBe(
+      '2 of 3 rows can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+    );
+  });
 });
 
 // U16: the export menu never disclosed how much a download actually covers.
 describe('exportScopeLabel', () => {
-  /** `fakeT` above always resolves to the singular `defaultValue` — this
-   *  picks `defaultValue_other` for a `count` other than one, the same
-   *  i18next contract `RecordDeleteDialog.test.tsx`'s own stand-in mirrors. */
-  function fakePluralT(
-    _key: string,
-    opts: { count?: number; defaultValue: string; defaultValue_other?: string } & Record<
-      string,
-      unknown
-    >,
-  ): string {
-    const template =
-      opts.count !== undefined && opts.count !== 1 && opts.defaultValue_other
-        ? opts.defaultValue_other
-        : opts.defaultValue;
-    return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts[name] ?? ''));
-  }
-
   it('names the trashed count when the list is showing the trash', () => {
     expect(exportScopeLabel(fakePluralT, { trashed: true, filtered: false, count: 1 })).toBe(
       '1 trashed record',

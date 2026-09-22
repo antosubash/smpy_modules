@@ -32,18 +32,26 @@ function summaryText(t: Translate, report: ImportReport): string {
     updated: report.updated,
     skipped: report.skipped,
     failed: report.failed,
+    // U10: "row(s)" is the only word here that pluralizes, and it counts
+    // `total` — every other figure is a sub-count within it, not a second
+    // noun of its own.
+    count: report.total,
   };
   if (report.dry_run) {
     return t('records.io.summary', {
       ...vars,
       defaultValue:
-        '{total} row(s): {created} to create, {updated} to update, {skipped} unchanged, {failed} failed',
+        '{total} row: {created} to create, {updated} to update, {skipped} unchanged, {failed} failed',
+      defaultValue_other:
+        '{total} rows: {created} to create, {updated} to update, {skipped} unchanged, {failed} failed',
     });
   }
   return t('records.io.summary_result', {
     ...vars,
     defaultValue:
-      '{total} row(s): {created} created, {updated} updated, {skipped} unchanged, {failed} failed',
+      '{total} row: {created} created, {updated} updated, {skipped} unchanged, {failed} failed',
+    defaultValue_other:
+      '{total} rows: {created} created, {updated} updated, {skipped} unchanged, {failed} failed',
   });
 }
 

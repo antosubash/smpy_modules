@@ -227,8 +227,13 @@ export function importApplyBlockedReason(
   return t('records.io.apply_blocked', {
     failed: report.failed,
     total: report.total,
+    // U10: the noun this pluralizes is `failed` ("N of M row(s)"), not
+    // `total` — `total` never changes what "row" declines to here.
+    count: report.failed,
     defaultValue:
-      '{failed} of {total} row(s) can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+      '{failed} of {total} row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
+    defaultValue_other:
+      '{failed} of {total} rows can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
   });
 }
 
