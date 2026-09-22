@@ -47,6 +47,7 @@
     "view_trash": "View trash",
     "no_indexed_columns": "No fields are indexed, so only the title and status are shown.",
     "no_indexed_columns_link": "Tick \"Indexed\" on a field to add a column.",
+    "public_url_label": "Public at",
     "actions": "Actions",
     "first": "First",
     "previous": "Previous",

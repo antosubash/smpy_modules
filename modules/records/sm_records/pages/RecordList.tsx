@@ -9,6 +9,7 @@ import type React from 'react';
 import { FilterBar } from '../components/FilterBar';
 import { RecordIoMenu } from '../components/RecordIoMenu';
 import { RecordListEmpty } from '../components/RecordListEmpty';
+import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
 import { RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
@@ -34,6 +35,11 @@ type Props = {
    *  file client-side and says the limit (R9/M13). Absent falls back to the
    *  setting's own default. */
   max_import_bytes?: number;
+  /** `RecordsSettings.public_route_prefix` (U14/Missing-15) — shown, with a
+   *  copy button, next to the type's label when `type.is_public` is on.
+   *  Absent falls back to the same default the type editor's own
+   *  `PublicField` uses. */
+  public_route_prefix?: string;
 };
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
@@ -41,7 +47,13 @@ const EDIT_PERMISSION = 'records.edit';
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
  *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
  *  can be bookmarked or shared. */
-function RecordList({ type, records, content_locales, max_import_bytes }: Props) {
+function RecordList({
+  type,
+  records,
+  content_locales,
+  max_import_bytes,
+  public_route_prefix,
+}: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
@@ -149,6 +161,9 @@ function RecordList({ type, records, content_locales, max_import_bytes }: Props)
           </div>
         }
       >
+        {type.is_public && (
+          <RecordListPublicUrl typeKey={type.key} publicRoutePrefix={public_route_prefix} />
+        )}
         {/* Contains the list's own overflow (UX-R4): the table already
             scrolls inside its own box, and nothing else here may push the
             document sideways on a phone. */}

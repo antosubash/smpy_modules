@@ -70,12 +70,17 @@ async def test_record_list_view(client, records_app):
         # (review R9/M13); the limit is a DB-backed setting the browser has
         # no other way to know.
         "max_import_bytes",
+        # U14/Missing-15: a public type's public URL used to be visible
+        # nowhere but the type editor — an admin landing on the list first
+        # (the more common path) had no way to verify it from there.
+        "public_route_prefix",
     }
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
     # Always present, so a partial reload after a bad filter clears the notice.
     assert body["props"]["errors"] == {}
     assert body["props"]["max_import_bytes"] > 0
+    assert body["props"]["public_route_prefix"] == "/api/records/public"
 
 
 async def test_record_new_view(client, records_app):

@@ -9,6 +9,7 @@ import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { RecordActions } from '../components/RecordActions';
+import { RecordEditorTypeLink } from '../components/RecordEditorTypeLink';
 import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
 import { RecordForm } from '../components/RecordForm';
 import { RecordReferrers } from '../components/RecordReferrers';
@@ -46,11 +47,9 @@ const ENVELOPE_KEYS = ['status', 'slug', 'position'];
  * back re-populates the fields from what was typed. A trashed record loads
  * here too (for `records.edit`): the `Deleted` badge above and the
  * restore/purge buttons in `RecordActions` are how it's reached from the UI.
- *
  * Layout follows UX review R16: the record's own fields first, Status (and,
  * on a new translatable record, Language) in the header row beside Cancel,
- * and Slug/Position behind an "Advanced" disclosure under the form.
- */
+ * and Slug/Position behind an "Advanced" disclosure under the form. */
 function RecordEditor({
   type,
   record,
@@ -87,9 +86,9 @@ function RecordEditor({
 
   const backHref = `/admin/records/${type.key}`;
   const envelope = form.envelopeErrors;
-  // Raw mode hides the per-field form, so the field-level 422s it would have
-  // carried are listed here instead — otherwise a save in raw mode is refused
-  // with nothing on screen saying why.
+  // Raw mode hides the per-field form, so the field-level 422s it would
+  // have carried are listed here instead — otherwise a raw-mode save is
+  // refused with nothing on screen saying why.
   const unplaceable = (form.raw ? form.serverErrors : envelope).filter(
     (entry) => !ENVELOPE_KEYS.includes(entry.field),
   );
@@ -112,7 +111,9 @@ function RecordEditor({
             ? t('records.editor.title_new', { defaultValue: 'New record' })
             : (current?.display_title ?? type.label)
         }
-        description={type.label}
+        // U14: was plain text (`type.label`) — no way back to the list but
+        // Cancel/Back. `description` is a plain `string` (framework), so the
+        // link below takes its place instead.
         actions={
           <>
             <RecordHeaderFields
@@ -132,6 +133,7 @@ function RecordEditor({
           </>
         }
       >
+        <RecordEditorTypeLink label={type.label} backHref={backHref} />
         {/* A real `<form>` (R13): Save was a `type="button"` inside plain
             `<div>`s, so the busiest data-entry screen in the module had no
             keyboard path to it — the argument `FilterBar` already makes for

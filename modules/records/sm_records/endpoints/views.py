@@ -259,6 +259,14 @@ async def record_list(
         # says the limit in its dialog (review R9/M13). The browser has no
         # other way to know a DB-backed setting.
         "max_import_bytes": settings.max_import_bytes,
+        # U14/Missing-15: a public type's public URL is otherwise visible
+        # nowhere but the type editor (``_editor_context``'s own comment) —
+        # an admin who lands on the list first (the far more common path,
+        # per the hub's own row-links-to-records design) had no way to
+        # verify the thing they turned on without a detour through "Edit
+        # schema". Same DB-backed setting, same reason the browser can't
+        # derive it on its own.
+        "public_route_prefix": settings.public_route_prefix,
         # No default locale filter anywhere above: the admin list defaults to
         # **all** locales (§4.4), because an editor's question is "what
         # exists", not "what exists in English". The selector narrows it with

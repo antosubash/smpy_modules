@@ -26,13 +26,15 @@ vi.mock('../components/RecordsToaster', () => ({ RecordsToaster: () => null }));
 
 const RecordList = (await import('./RecordList')).default;
 
-function type(): TypeRead {
+function type(overrides: Partial<TypeRead> = {}): TypeRead {
   return {
     key: 'book',
     label: 'Book',
     label_plural: 'Books',
     fields: [],
     display_field: null,
+    is_public: false,
+    ...overrides,
   } as unknown as TypeRead;
 }
 
@@ -93,6 +95,27 @@ describe('RecordList — U12: a page change shows itself instead of asserting st
     });
     expect(wrapper()?.getAttribute('aria-busy')).toBe('false');
     expect(wrapper()?.className).not.toContain('opacity-60');
+    await view.unmount();
+  });
+});
+
+describe('RecordList — U14/Missing-15: a public type shows its public URL on the list, not only the editor', () => {
+  it('shows the public URL when the type is public', async () => {
+    const view = await mount(
+      <RecordList
+        type={type({ is_public: true })}
+        records={records()}
+        public_route_prefix="/api/records/public"
+      />,
+    );
+    const code = view.find('[data-testid="records-list-public-url"]');
+    expect(code?.textContent).toBe('/api/records/public/book');
+    await view.unmount();
+  });
+
+  it('shows nothing when the type is not public', async () => {
+    const view = await mount(<RecordList type={type()} records={records()} />);
+    expect(view.find('[data-testid="records-list-public-url"]')).toBeNull();
     await view.unmount();
   });
 });
