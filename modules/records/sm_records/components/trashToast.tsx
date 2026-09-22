@@ -16,6 +16,14 @@ type Translate = (...args: any[]) => string;
  * So: one toast that names the Trash, with "Undo" restoring the record in
  * place (sonner's own `action`) and a link to the trashed view of this type
  * for the person who notices a minute later instead of a second later.
+ *
+ * A *refused* undo is announced, not swallowed (R5): a restore can
+ * legitimately 409 — a trashed record keeps its `unique`/slug claims, and
+ * another record may have taken one while it sat in the Trash — and a
+ * `void onUndo()` closed the toast and did nothing, with nothing saying
+ * why. The rejection goes to `toast.error` with the server's own sentence,
+ * which is the path every other mutation in the module already takes
+ * (`ConfirmDialog` surfaces it inline; there is no dialog here to hold it).
  */
 export function trashToast(
   t: Translate,
@@ -30,7 +38,9 @@ export function trashToast(
     action: {
       label: t('records.records.undo', { defaultValue: 'Undo' }),
       onClick: () => {
-        void onUndo();
+        void onUndo().catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : String(err));
+        });
       },
     },
   });
