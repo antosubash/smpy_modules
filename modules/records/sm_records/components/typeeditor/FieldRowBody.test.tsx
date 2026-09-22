@@ -68,3 +68,17 @@ describe('FieldRowBody — U6: the Indexed checkbox names its own consequence', 
     expect(out).toContain('first four indexed fields');
   });
 });
+
+describe('FieldRowBody — U19: "Unique" says what it does not cover', () => {
+  it('renders the translation-group exemption, wired to the checkbox, for a field that allows unique', () => {
+    const out = html();
+    expect(out).toContain('id="field-row-0-unique-hint"');
+    expect(out).toContain('aria-describedby="field-row-0-unique-hint"');
+    expect(out).toContain('translations of the same record');
+  });
+
+  it('says nothing for a field type that cannot be unique at all', () => {
+    const out = html({ type: 'longtext' });
+    expect(out).not.toContain('field-row-0-unique-hint');
+  });
+});

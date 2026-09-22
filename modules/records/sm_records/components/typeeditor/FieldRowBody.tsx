@@ -185,6 +185,7 @@ export function FieldRowBody({
             id={`${idBase}-unique`}
             checked={field.unique}
             disabled={disabled || !uniqueAllowed(field)}
+            aria-describedby={uniqueAllowed(field) ? `${idBase}-unique-hint` : undefined}
             onCheckedChange={(checked) => onPatch({ unique: checked === true })}
           />
           <Label htmlFor={`${idBase}-unique`} className="font-normal">
@@ -221,6 +222,23 @@ export function FieldRowBody({
             "Indexed fields can be filtered, sorted and shown as list columns; the first four indexed fields are the list's columns.",
         })}
       </p>
+
+      {/* U19: "Unique" had no scope qualifier anywhere in the editor, and
+          the translation flow pre-fills a new sibling with the source's
+          value with no error — because `_claims.py::ensure_unique`
+          deliberately exempts records in the same translation group from
+          each other's claim ("a SKU should mean the same product in every
+          language"). Said here rather than left for an operator to
+          discover via a collision that, by design, never fires for their
+          own translation. */}
+      {uniqueAllowed(field) && (
+        <p id={`${idBase}-unique-hint`} className="-mt-1 text-xs text-muted-foreground">
+          {t('records.type_editor.field_unique_hint', {
+            defaultValue:
+              'Unique across every record of this type — except between translations of the same record, which may share this value.',
+          })}
+        </p>
+      )}
 
       <div className="grid gap-1.5">
         <Label htmlFor={`${idBase}-help`}>
