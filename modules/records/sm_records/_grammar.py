@@ -17,6 +17,7 @@ from typing import Any, Final, NamedTuple
 from fastapi import Depends, HTTPException, Query, Request
 
 from sm_records import constants
+from sm_records._text import has_nul
 from sm_records.index.query import Filter, FilterOp, Sort
 from sm_records.settings import RecordsSettings
 
@@ -82,7 +83,23 @@ def _too_many(parameter: str, sent: int, cap: int) -> HTTPException:
 
 def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
     """``field:op:value``, split on the first two colons — a value carrying
-    its own colon (a URL, a timestamp) must not be truncated by it."""
+    its own colon (a URL, a timestamp) must not be truncated by it.
+
+    **A NUL anywhere in the term is refused before it is split.** A filter
+    value becomes a bound parameter against a ``text`` column, and Postgres
+    refuses ``\x00`` in one from the driver — so ``?filter=name:eq:a%00b``
+    was a 500, on the admin listing, on the aggregate, and on the anonymous
+    public listing, which needs no session at all. Refusing the whole term
+    rather than only the value half is deliberate: the field name reaches a
+    lookup and the operator reaches an enum, neither of which can match, and
+    one message about one unstorable character is more use than three
+    different refusals depending on which third of the term it landed in.
+    """
+    if has_nul(raw):
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid filter {raw!r}: a filter term must not contain a NUL character",
+        )
     parts = raw.split(":", 2)
     if len(parts) != 3:
         raise HTTPException(

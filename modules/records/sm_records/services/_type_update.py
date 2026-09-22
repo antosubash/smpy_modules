@@ -18,7 +18,13 @@ from sm_records import locales
 from sm_records.models import RecordType, tables_for
 from sm_records.services._common import guarded_bump, record_count, reload
 from sm_records.services._payload import field_defs
-from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
+from sm_records.services._schema import (
+    check_pointers,
+    check_targets,
+    check_type_text,
+    normalise,
+    snapshot,
+)
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.schema_change import apply as apply_schema_change
 from sm_records.settings import RecordsSettings
@@ -153,6 +159,7 @@ async def update_type(
             else f"cannot change {unknown}"
         )
         raise ValidationFailed(problem, [{"field": unknown[0], "message": problem}])
+    check_type_text(changes)
 
     fields_raw = changes.pop("fields_raw", None)
     fields: list[dict[str, Any]] | None = None

@@ -12,12 +12,42 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
 from sm_records.schema.types import FieldType
 from sm_records.services._common import type_id_map, utcnow
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
+
+_TEXT_COLUMNS = ("label", "label_plural", "description", "icon")
+"""The type row's free-text columns. ``key`` is absent because it is matched
+against ``TYPE_KEY_PATTERN`` and ``collection`` because it is matched against
+the declared set."""
+
+
+def check_type_text(values: dict[str, Any]) -> None:
+    """Refuse a NUL in anything about a type that is stored as text.
+
+    Called by both write paths — ``create_type`` and ``update_type`` — over
+    whatever each of them is about to set, so a column absent from the call is
+    not examined and a column present is. A type's labels are written to a
+    ``varchar`` and its ``allowed_roles`` to a JSON column, and Postgres
+    refuses ``\x00`` in both from the driver: a 500 for a value that is simply
+    not storable, where the rest of this module answers 422 and names the
+    field.
+    """
+    for name in _TEXT_COLUMNS:
+        if has_nul(values.get(name)):
+            raise ValidationFailed(
+                f"{name} {NUL_PROBLEM}", [{"field": name, "message": NUL_PROBLEM}]
+            )
+    for role in values.get("allowed_roles") or []:
+        if has_nul(role):
+            raise ValidationFailed(
+                f"allowed_roles {NUL_PROBLEM}",
+                [{"field": "allowed_roles", "message": NUL_PROBLEM}],
+            )
 
 
 def normalise(fields_raw: list[dict[str, Any]], settings: RecordsSettings):

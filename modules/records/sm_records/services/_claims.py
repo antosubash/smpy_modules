@@ -6,8 +6,10 @@ The ``unique`` rule of design §7.8 and the slug rule of §5 are both
 ``INSERT`` that assumes the answer is still true. Neither can be a constraint
 the database enforces on its own — the index tables are shared across every
 field of a kind, so a unique index naming a runtime-chosen field key is not
-expressible — so what closes the window is :func:`lock_type`, and what catches
-the one case the database *can* express is :func:`flush_write`.
+expressible — so what closes the window is
+:func:`~sm_records.services._lock.lock_type` — re-exported here, and split
+into its own module for the file cap — and what catches the one case the
+database *can* express is :func:`flush_write`.
 
 Split out of :mod:`sm_records.services._payload` for the file cap, along the
 seam that was already there: that module is "what the write does to the
@@ -19,14 +21,15 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.index.query import Filter, FilterOp, QueryError, exists_query
 from sm_records.models import RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
-from sm_records.services.errors import Conflict
+from sm_records.services._lock import lock_type
+from sm_records.services.errors import Conflict, ValidationFailed
 
 __all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type", "taken_by"]
 
@@ -90,6 +93,14 @@ async def ensure_slug_free(
     """
     if slug is None:
         return
+    # Before the lookup, not after: the slug is a bound parameter against a
+    # ``text`` column, so a NUL in it is a driver-level failure — a 500 — and
+    # not a slug that is merely free. Every caller inside this module arrives
+    # through ``_payload.slug_for``, whose slugifier already strips the
+    # character; this is the rule stated where the value meets the column, for
+    # a caller that does not.
+    if has_nul(slug):
+        raise ValidationFailed(f"slug {NUL_PROBLEM}", [{"field": "slug", "message": NUL_PROBLEM}])
     record = tables_for(rtype).record
     stmt = select(record.id).where(
         record.type_id == rtype.id, record.locale == locale, record.slug == slug
@@ -213,6 +224,16 @@ async def ensure_unique(
         value = values.get(field.key)
         if value is None or (previous is not None and previous.get(field.key) == value):
             continue
+        # A unique claim is an index lookup, i.e. a bound ``text`` parameter.
+        # The payload validator refuses a NUL long before this, so reaching
+        # here means the value came from somewhere else — a custom provider's
+        # projection, or a row written before that rule. Answering the claim
+        # with the driver's ``CharacterNotInRepertoireError`` would be a 500 on
+        # a write whose real problem is one unstorable character.
+        if has_nul(value):
+            raise ValidationFailed(
+                f"{field.key!r} {NUL_PROBLEM}", [{"field": field.key, "message": NUL_PROBLEM}]
+            )
         if await taken_by(
             db, rtype, field, value, exclude_id=exclude_id, exclude_group=exclude_group
         ):
@@ -237,6 +258,12 @@ async def taken_by(
     ``unique_added`` wears. A second spelling of this query would be a second
     opinion about what "already taken" means.
     """
+    # ``False`` and not a refusal: this is the read-only question the record
+    # editor asks for its duplicate badge (``services._duplicates``), and a
+    # value the index cannot hold is a value no other record can be holding.
+    # The write path refuses it a few lines up, where a refusal is useful.
+    if has_nul(value):
+        return False
     record = tables_for(rtype).record
     try:
         stmt = exists_query(
@@ -255,46 +282,3 @@ async def taken_by(
             "writes to this type are refused until the rebuild completes"
         ) from exc
     return taken is not None
-
-
-async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
-    """Serialise writes of one type — the mitigation design §7.8 names.
-
-    The ``unique`` check is check-then-act, so two concurrent creates carrying
-    the same value can both pass it. Taking the type row first makes the
-    window empty: the second writer waits for the first to commit and then
-    sees its index row.
-
-    **Two statements, because a lock is a dialect feature and not a grammar
-    one.** ``SELECT ... FOR UPDATE`` is the row lock on Postgres; on SQLite it
-    compiles to a plain ``SELECT`` that locks nothing, and the reasoning that
-    "the database is single-writer anyway" is where this went wrong. SQLite is
-    single-*writer*, not single-*transaction*: a read-only transaction takes no
-    lock at all, so eight concurrent creates each ran the check, each found the
-    value free, and each then took the write lock in turn to insert. Eight
-    201s, eight rows — measured. Issuing a write against the type row instead
-    takes SQLite's ``RESERVED`` lock **at the top of the write path**, and
-    ``RESERVED`` is exclusive among writers for the rest of the transaction, so
-    the second writer blocks here rather than at its own ``INSERT`` — which is
-    after its check. ``SET version = version`` is deliberately a no-op
-    assignment: it must not bump the value any optimistic-concurrency caller is
-    comparing against, and it must still be a write.
-
-    ``updated_at`` is held to its own value for the same reason: a lock is not
-    an edit, and ``AuditMixin``'s ``onupdate=func.now()`` fires on any
-    ``UPDATE`` not naming the column — moving the row's "last changed" and
-    leaving the attribute expired, the trap ``_common.guarded_bump`` documents.
-
-    This serialises every write to the type on SQLite, which is the trade §7.8
-    describes and the README states. It is taken for every write rather than
-    only for types with a ``unique`` field: the slug claim of §5 is the same
-    check-then-act, and every type can have one.
-    """
-    if db.get_bind().dialect.name == "sqlite":
-        await db.execute(
-            sa_update(RecordType)
-            .where(RecordType.id == rtype.id)
-            .values(version=RecordType.version, updated_at=RecordType.updated_at)
-        )
-        return
-    await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())

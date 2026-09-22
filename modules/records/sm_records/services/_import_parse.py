@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from dataclasses import field as dc_field
 from typing import Any
 
+from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportRowError
 from sm_records.schema.fields import FieldDefinition
@@ -35,6 +36,23 @@ from sm_records.services.errors import ImportParseFailed
 from sm_records.services.export import ENVELOPE_COLUMNS
 
 __all__ = ["ImportRow", "ParsedFile", "parse_csv", "parse_json"]
+
+
+def _nul_error(number: int, name: str | None, uuid: Any = None) -> ImportRowError:
+    """One row's refusal for a cell carrying ``\x00``.
+
+    A *row* error and not a parse failure for the whole file, which is the
+    whole point: a NUL reaching the database is a driver-level 500, so under
+    ``on_error=skip`` one bad cell in a 10,000-row file used to discard the
+    other 9,999 and answer 500 rather than writing them and reporting the one.
+    Reported here rather than left to the payload validator because the
+    envelope columns — ``slug``, ``translation_group``, ``uuid`` — never reach
+    that validator and are columns all the same.
+    """
+    return ImportRowError(
+        row=number, field=name, uuid=None if uuid is None else str(uuid), message=NUL_PROBLEM
+    )
+
 
 _JSON_CELL_TYPES = frozenset({FieldType.MULTISELECT, FieldType.JSON, FieldType.MEDIA})
 
@@ -121,6 +139,10 @@ def parse_json(text: str) -> ParsedFile:
             errors.append(ImportRowError(row=number, message="'data' must be an object"))
             continue
         envelope = {key: raw[key] for key in _ROW_KEYS - {"data"} if key in raw}
+        bad = next((key for key, value in envelope.items() if has_nul(value)), None)
+        if bad is not None:
+            errors.append(_nul_error(number, bad))
+            continue
         rows.append(ImportRow(number=number, data=dict(data), envelope=envelope))
     return ParsedFile(rows, errors)
 
@@ -173,6 +195,10 @@ def parse_csv(text: str, defs: list[FieldDefinition]) -> ParsedFile:
         failed = False
         for name, cell in zip(header, raw_row, strict=True):
             field = by_key.get(name)
+            if has_nul(cell):
+                errors.append(_nul_error(number, name, envelope.get("uuid")))
+                failed = True
+                continue
             if field is None:
                 envelope[name] = cell
                 continue

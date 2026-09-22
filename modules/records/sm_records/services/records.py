@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records._text import has_nul
 from sm_records.index.providers import TypeIndex
 from sm_records.index.reduce import snapshot
 from sm_records.index.writer import write_index
@@ -83,6 +84,11 @@ async def _by_uuid(db: AsyncSession, rtype: RecordType, uuid: str, *, trashed: b
     """One record of ``rtype`` by uuid, out of whichever table set it lives in
     (Phase 5 §6.3). ``trashed`` lifts the framework's soft-delete filter, which
     is the only way to load a row it hides — restore and purge both need it."""
+    # A uuid carrying a NUL is a bound ``varchar`` parameter and therefore the
+    # driver's own refusal — a 500 where "no such record" is both true and
+    # already expressible. See :mod:`sm_records._text`.
+    if has_nul(uuid):
+        raise NotFound(f"no {rtype.key} record with uuid {uuid!r}")
     cls = tables_for(rtype).record
     stmt = select(cls).where(cls.uuid == uuid, cls.type_id == rtype.id)
     if trashed:

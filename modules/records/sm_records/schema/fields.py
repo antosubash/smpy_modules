@@ -24,6 +24,7 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
+from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.constants import MAX_LABEL_LEN, TYPE_KEY_PATTERN
 from sm_records.schema._keys import KEY_RE as _KEY_RE
 from sm_records.schema._keys import FieldSchemaError, validate_key
@@ -89,6 +90,8 @@ def _validate_choices(key: str, options: dict[str, Any]) -> None:
         value, label = choice.get("value"), choice.get("label")
         _require(isinstance(value, str) and value, key, "each choice needs a non-empty 'value'")
         _require(isinstance(label, str) and label, key, "each choice needs a non-empty 'label'")
+        _require(not has_nul(value), key, f"choice value {NUL_PROBLEM}")
+        _require(not has_nul(label), key, f"choice label {NUL_PROBLEM}")
         _require(value not in seen, key, f"duplicate choice value {value!r}")
         seen.add(str(value))
 
@@ -236,6 +239,12 @@ def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list
             key,
             f"label must be at most {MAX_LABEL_LEN} characters",
         )
+        # ``key`` is pattern-matched and cannot carry one; ``label``, ``help``
+        # and the choice strings are free text, and every one of them is
+        # stored in the type row's JSON ``fields`` column — which Postgres
+        # refuses a NUL in exactly as it refuses one in ``text``.
+        _require(not has_nul(label), key, f"label {NUL_PROBLEM}")
+        _require(not has_nul(entry.get("help")), key, f"help {NUL_PROBLEM}")
         for flag in ("required", "unique", "indexed"):
             _require(isinstance(entry.get(flag, False), bool), key, f"{flag} must be true or false")
         options = entry.get("options") or {}

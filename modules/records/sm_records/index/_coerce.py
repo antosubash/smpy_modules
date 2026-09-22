@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
+from sm_records._text import has_nul
 from sm_records.constants import NUMBER_SCALE
 
 _QUANTUM = Decimal(1).scaleb(-NUMBER_SCALE)
@@ -34,8 +35,22 @@ _FALSE = frozenset({"false", "no", "0", "off"})
 
 def coerce_text(value: object) -> str | None:
     """Anything with a string form is text. ``None`` is absence, not ``"None"``;
-    an empty string is a present, empty value and does index."""
-    if value is None:
+    an empty string is a present, empty value and does index.
+
+    **A string carrying a NUL has no text form this column can hold.** Postgres
+    refuses ``\x00`` in ``text`` outright, from the driver, while binding the
+    parameter — so a value that reached here with one would be a 500 on the
+    write that indexed it and a 500 on any filter that compared against it,
+    the second of those reachable with no session at all. The validator
+    refuses such a value on the way in (:mod:`sm_records._text`); this is the
+    same rule stated where the value actually meets the column, for the two
+    callers that do not come through the validator — a custom index provider
+    (§7.6) and a reindex of a row written before the rule existed. ``None`` and
+    not an exception, because that is this module's whole contract: a value
+    with no place in this table is simply absent from the index, and the query
+    builder turns the same ``None`` into the grammar's own refusal.
+    """
+    if value is None or has_nul(value):
         return None
     if isinstance(value, str):
         return value

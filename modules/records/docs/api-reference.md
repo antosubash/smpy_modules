@@ -1050,6 +1050,7 @@ walking a large public type is exactly the caller that should use them.
 | `400` | `page` and `after` sent together | `{"detail"}` |
 | `400` | A cursor that does not decode, or replayed under a different sort | `{"detail"}` |
 | `400` | An import file that is not the format it claims, or a header naming an unknown column | `{"detail"}` |
+| `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
 | `401` | No session | `{"detail": "Authentication required"}` |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
@@ -1070,6 +1071,7 @@ walking a large public type is exactly the caller that should use them.
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
+| `422` | A NUL (`\x00`) in a payload value, a `unique` value, a type label or a field definition | `{"detail", "errors"}` |
 | `422` | `locale` on `PUT /records/{uuid}` | FastAPI validation error |
 | `422` | `match_by` naming a non-unique field; an unknown `format`; an undeclared `collection` | `{"detail", "errors"}` |
 | `422` | `on_error=abort` and a bad row | `{"detail", "report": ImportReport}` |
@@ -1110,6 +1112,18 @@ counted, never named.
 **Every refusal rolls the request's session back.** A refused delete that had
 already cleared one `set_null` reference before meeting a `restrict` deeper down
 commits nothing.
+
+**A NUL byte is refused wherever a string enters.** Postgres cannot store
+`\x00` in `text`, `varchar` or `jsonb`, and its driver refuses to bind such a
+parameter at all — so every one of these is a `4xx` naming the field rather
+than the `500` the database would otherwise produce: a filter term (`400`), a
+payload value including one nested inside a `json` document (`422`), a `unique`
+value, an explicit slug (stripped by the slugifier, never stored), a type label
+or `allowed_roles` entry, a field `label`/`help`/choice string, and an import
+cell — that last as one `ImportRowError` naming the column, so `on_error=skip`
+writes the rest of the file. A type key or record uuid in a *path* carrying one
+is a `404`: no stored key or uuid can contain a NUL, so "no such thing" is
+exact.
 
 ---
 

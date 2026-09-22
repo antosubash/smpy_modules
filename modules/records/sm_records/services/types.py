@@ -25,12 +25,19 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records._text import has_nul
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
 from sm_records.models import Record, RecordType, RecordTypeRevision
 from sm_records.schema.types import FieldType
 from sm_records.services._common import record_count, record_counts, type_id_map
-from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
+from sm_records.services._schema import (
+    check_pointers,
+    check_targets,
+    check_type_text,
+    normalise,
+    snapshot,
+)
 from sm_records.services._type_update import update_type
 from sm_records.services.errors import (
     Conflict,
@@ -62,6 +69,17 @@ async def list_types(db: AsyncSession) -> list[RecordType]:
 
 
 async def get_type(db: AsyncSession, key: str) -> RecordType:
+    """One type by key, or the 404 every unknown key gets.
+
+    A key carrying a NUL never reaches the statement. ``TYPE_KEY_PATTERN``
+    means no stored key can contain one, so the honest answer is the same 404
+    an unknown key gets — but asked, it was a bound ``varchar`` parameter and
+    therefore the driver's ``CharacterNotInRepertoireError``, i.e. a 500 on
+    ``/api/records/types/a%00b/records`` for any caller who can reach the
+    admin API. :mod:`sm_records._text` has the rest of the reasoning.
+    """
+    if has_nul(key):
+        raise NotFound(f"no record type with key {key!r}")
     rtype = (await db.execute(select(RecordType).where(RecordType.key == key))).scalars().first()
     if rtype is None:
         raise NotFound(f"no record type with key {key!r}")
@@ -130,6 +148,15 @@ async def create_type(
         raise Conflict(f"a record type with key {key!r} already exists")
 
     _check_collection(collection)
+    check_type_text(
+        {
+            "label": label,
+            "label_plural": label_plural,
+            "description": description,
+            "icon": icon,
+            "allowed_roles": allowed_roles,
+        }
+    )
     defs, fields = normalise(fields_raw or [], settings)
     check_pointers(defs, display_field, slug_field)
     await check_targets(db, defs, key)

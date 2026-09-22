@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 
 from pydantic import AfterValidator, BeforeValidator
 
+from sm_records._text import check_no_nul
 from sm_records.constants import TYPE_KEY_PATTERN
 from sm_records.schema._scalars import (
     check_decimal,
@@ -35,6 +36,7 @@ from sm_records.schema._scalars import (
     to_datetime,
     to_decimal,
     to_int,
+    to_text,
 )
 from sm_records.schema.types import FieldType
 
@@ -125,6 +127,8 @@ def _select_check(options: dict[str, Any], *, many: bool):
         if value is None:
             return None
         items = value if many else [value]
+        for item in items:
+            check_no_nul(item)
         if many and len(set(items)) != len(items):
             raise ValueError("contains duplicate values")
         unknown = [item for item in items if item not in allowed]
@@ -196,12 +200,25 @@ def _check_ref_list(value: Any) -> Any:
     return out
 
 
+_NO_NUL = BeforeValidator(to_text)
+"""Applied to every field type whose value reaches a text column — before
+anything else, so a value the column could never hold is refused as that
+rather than as a failed length or pattern check. ``multiselect`` gets it per
+entry through ``_select_check``'s own base; ``json`` gets it inside
+``check_json_shape``; ``relation`` needs none (both halves are pattern-matched
+against ``TYPE_KEY_PATTERN`` and 32 hex characters)."""
+
+
 def _base_and_validators(
     field_type: FieldType, constraints: dict[str, Any], options: dict[str, Any], required: bool
 ) -> tuple[Any, list[Any]]:
     if field_type in _TEXTLIKE:
         extra = {FieldType.EMAIL: _check_email, FieldType.URL: _check_url}.get(field_type)
-        return str, [_text_check(constraints, required=required), *([extra] if extra else [])]
+        return str, [
+            _NO_NUL,
+            _text_check(constraints, required=required),
+            *([extra] if extra else []),
+        ]
     if field_type is FieldType.NUMBER:
         coerce = BeforeValidator(to_decimal)
         return Decimal, [coerce, check_decimal, _range_check(constraints, to_decimal)]
@@ -214,11 +231,11 @@ def _base_and_validators(
     if field_type is FieldType.DATETIME:
         return _datetime, [BeforeValidator(to_datetime)]
     if field_type is FieldType.SELECT:
-        return str, [_select_check(options, many=False)]
+        return str, [_NO_NUL, _select_check(options, many=False)]
     if field_type is FieldType.MULTISELECT:
         return list[str], [_select_check(options, many=True)]
     if field_type is FieldType.MEDIA:
-        return str, [_check_media]
+        return str, [_NO_NUL, _check_media]
     if field_type is FieldType.JSON:
         return Any, [_check_json]
     return Any, [_check_ref_list if options.get("many") else _check_ref]

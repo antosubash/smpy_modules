@@ -44,6 +44,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
+from sm_records._text import has_nul
 from sm_records.index._fields import declared_keys
 from sm_records.index._fixed import PUBLIC_FIXED_COLUMNS
 from sm_records.index.query import (
@@ -148,6 +149,11 @@ def _check_columns(rtype: RecordType, filters: Sequence[Filter], sorts: Sequence
 
 async def get_public_type(db: AsyncSession, key: str) -> RecordType:
     """The type, if it exists *and* is public. Otherwise the shared 404."""
+    if has_nul(key):
+        # Never a bound parameter: the driver refuses ``\x00`` in one, and
+        # this is the surface where that was a 500 to a caller with no session
+        # at all. No stored key can contain one, so the shared 404 is exact.
+        raise NotFound(NOT_FOUND)
     rtype = (await db.execute(select(RecordType).where(RecordType.key == key))).scalars().first()
     if rtype is None or not rtype.is_public:
         raise NotFound(NOT_FOUND)

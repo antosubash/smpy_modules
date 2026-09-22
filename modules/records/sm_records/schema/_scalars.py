@@ -17,10 +17,24 @@ from datetime import datetime as _datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from sm_records._text import check_no_nul, has_nul
 from sm_records.constants import NUMBER_PRECISION, NUMBER_SCALE
 
 MAX_INT_DIGITS = NUMBER_PRECISION - NUMBER_SCALE
 """Digits left of the point that ``Numeric(19, 5)`` can hold."""
+
+
+def to_text(value: Any) -> Any:
+    """The identity, minus the one character a text column cannot hold.
+
+    Every text-like field type routes through here (:mod:`_builders`), so the
+    NUL rule is one refusal with one wording rather than seven copies — and it
+    is a *coercion* step rather than a constraint check because it must run
+    before anything downstream sees the string, including the length and
+    pattern checks whose messages would otherwise be the first thing a caller
+    heard about a value that was never storable.
+    """
+    return check_no_nul(value)
 
 
 def to_decimal(value: Any) -> Any:
@@ -152,6 +166,12 @@ been validated and serialised — this is the cheap bound, taken during the
 walk the depth check is already making."""
 
 
+NUL_IN_JSON = "holds a string with a NUL character (\\x00)"
+"""The NUL wording for a *nested* value. ``_text.NUL_PROBLEM`` says "must not
+contain"; inside a document the offending string may be anywhere, so the
+message says what was found rather than what the field may not be."""
+
+
 def check_json_shape(value: Any) -> Any:
     """Refuse a ``json`` value that nests too deeply or holds too many nodes.
 
@@ -159,9 +179,13 @@ def check_json_shape(value: Any) -> Any:
     value deep enough to be refused is itself a ``RecursionError`` — the 500
     this function exists to replace, arriving from one frame further out.
 
-    The traversal is the same one for both bounds, so a value is walked once.
-    Counting every node (not only the containers) is what makes the second
-    bound meaningful for the flat-and-huge shape the first one cannot see.
+    The traversal is the same one for all three rules, so a value is walked
+    once. Counting every node (not only the containers) is what makes the node
+    bound meaningful for the flat-and-huge shape the depth bound cannot see,
+    and the same visit is where a nested NUL is caught: a ``json`` value is
+    stored in a ``jsonb`` column, which refuses ``\u0000`` exactly as ``text``
+    does, so a NUL three objects down is the same 500 a top-level one is.
+    Object *keys* are walked too — they are strings the column has to store.
     """
     if value is None:
         return value
@@ -172,9 +196,16 @@ def check_json_shape(value: Any) -> Any:
         nodes += 1
         if nodes > MAX_JSON_NODES:
             raise ValueError(f"holds more than {MAX_JSON_NODES} values")
+        if has_nul(node):
+            raise ValueError(NUL_IN_JSON)
         if isinstance(node, dict | list):
             if depth > MAX_JSON_DEPTH:
                 raise ValueError(f"is nested more than {MAX_JSON_DEPTH} levels deep")
-            children = node.values() if isinstance(node, dict) else node
+            if isinstance(node, dict):
+                if any(has_nul(key) for key in node):
+                    raise ValueError(NUL_IN_JSON)
+                children: Any = node.values()
+            else:
+                children = node
             stack.extend((child, depth + 1) for child in children)
     return value
