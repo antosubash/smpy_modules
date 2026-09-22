@@ -28,6 +28,14 @@ import { TypeImportDialog } from './TypeImportDialog';
  * on it; import picks a file, parses it here, and hands the definition to
  * the page — which routes an update through `useSchemaApply`, so a refusal
  * is the report and the "Apply anyway" the editor already has.
+ *
+ * U4: `currentKey === null` on `/types/new` used to hide this menu
+ * entirely — reasonable for Download (there is nothing to export yet), but
+ * `useTypeImport` already implements a definition naming any *other* key as
+ * a **create** (`services`'s own `mode=create`), so importing straight from
+ * a file was reachable from `POST /types/import` and from no button on this
+ * screen. The menu still renders on `/types/new`, minus the one item that
+ * genuinely has nothing to export.
  */
 export function TypeIoMenu({
   currentKey,
@@ -77,8 +85,6 @@ export function TypeIoMenu({
     }
   };
 
-  if (!currentKey) return null;
-
   return (
     <>
       <input
@@ -97,15 +103,18 @@ export function TypeIoMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <a
-              href={typeExportUrl(currentKey)}
-              download={typeExportFilename(currentKey)}
-              data-testid="records-type-export"
-            >
-              {t('records.type_io.export', { defaultValue: 'Download definition' })}
-            </a>
-          </DropdownMenuItem>
+          {/* Nothing to export before the type exists. */}
+          {currentKey && (
+            <DropdownMenuItem asChild>
+              <a
+                href={typeExportUrl(currentKey)}
+                download={typeExportFilename(currentKey)}
+                data-testid="records-type-export"
+              >
+                {t('records.type_io.export', { defaultValue: 'Download definition' })}
+              </a>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => input.current?.click()}>
             {t('records.type_io.import', { defaultValue: 'Import definition…' })}
           </DropdownMenuItem>
