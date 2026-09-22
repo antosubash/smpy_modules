@@ -4,6 +4,7 @@ import { OFFLINE_STATUS } from './api-net';
 import {
   DEFAULT_MAX_IMPORT_BYTES,
   formatImportLimit,
+  importApplyBlockedReason,
   importFileTooLarge,
   importOptionsSummary,
   importRecords,
@@ -132,5 +133,34 @@ describe("importRecords shares api.ts's connection handling — R9", () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+});
+
+// U3: one bad row must not silently remove Apply — it must say why the
+// button is blocked (or not block it at all, once `on_error: skip` is
+// chosen).
+describe('importApplyBlockedReason', () => {
+  function report(overrides: Partial<{ dry_run: boolean; failed: number; total: number }> = {}) {
+    return { dry_run: true, failed: 0, total: 3, ...overrides };
+  }
+
+  it('is null for a clean dry run', () => {
+    expect(importApplyBlockedReason(fakeT, report({ failed: 0 }), 'abort')).toBeNull();
+  });
+
+  it('is null once the report is no longer a dry run — that write already happened', () => {
+    expect(
+      importApplyBlockedReason(fakeT, report({ dry_run: false, failed: 1 }), 'abort'),
+    ).toBeNull();
+  });
+
+  it('names the failed/total counts and the skip escape hatch when on_error is abort', () => {
+    const reason = importApplyBlockedReason(fakeT, report({ failed: 1, total: 3 }), 'abort');
+    expect(reason).toContain('1 of 3');
+    expect(reason).toContain('Skip it and write the rest');
+  });
+
+  it('is null once the operator has switched to on_error: skip — Apply can run', () => {
+    expect(importApplyBlockedReason(fakeT, report({ failed: 1, total: 3 }), 'skip')).toBeNull();
   });
 });

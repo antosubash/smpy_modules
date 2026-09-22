@@ -205,6 +205,33 @@ export async function importRecords(
   throw new Error(detail || `Import failed (${response.status})`);
 }
 
+/** Whether Apply should be offered at all, and why not when it shouldn't be.
+ *
+ * `null` means Apply can run. A non-`dry_run` report is never blocked here —
+ * it already happened. A dry run with `failed === 0` is never blocked
+ * either. The one case this names is a dry run that found failing rows
+ * *and* the operator is still on `on_error: 'abort'`: the server would
+ * refuse the whole write, so offering an enabled Apply that always 422s is
+ * worse than not offering one, but removing the button with no explanation
+ * (U3) left the dialog looking like the feature had vanished. Naming the
+ * `on_error: 'skip'` escape hatch here — rather than just disabling — is
+ * what lets an operator get unstuck without hunting through Import options.
+ */
+export function importApplyBlockedReason(
+  t: Translate,
+  report: Pick<ImportReport, 'dry_run' | 'failed' | 'total'>,
+  onError: 'abort' | 'skip',
+): string | null {
+  if (!report.dry_run || report.failed === 0) return null;
+  if (onError === 'skip') return null;
+  return t('records.io.apply_blocked', {
+    failed: report.failed,
+    total: report.total,
+    defaultValue:
+      '{failed} of {total} row(s) can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
+  });
+}
+
 /** The parser's own errors (`services/_io_upload.py`) are accurate but
  *  written for the log, not the person who just picked a file — one names a
  *  query parameter no browser upload can send, the other quotes a JSON

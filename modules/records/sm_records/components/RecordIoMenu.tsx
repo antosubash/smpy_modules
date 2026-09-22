@@ -18,7 +18,12 @@ import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
 import { ChevronDownIcon } from 'lucide-react';
 import { useRef } from 'react';
 import { useRecordImport } from '../hooks/useRecordImport';
-import { DEFAULT_MAX_IMPORT_BYTES, exportUrl, importOptionsSummary } from '../utils/io';
+import {
+  DEFAULT_MAX_IMPORT_BYTES,
+  exportUrl,
+  importApplyBlockedReason,
+  importOptionsSummary,
+} from '../utils/io';
 import type { FieldDef } from '../utils/types';
 import { ImportReportSummary } from './ImportReportSummary';
 import { RecordImportOptions } from './RecordImportOptions';
@@ -69,6 +74,7 @@ export function RecordIoMenu({
   // Options only matter before a write happens — once `report` is a real
   // result (`dry_run: false`), the run they described already happened.
   const canAdjustOptions = canEdit && file !== null && dryRunNow;
+  const blockedReason = report ? importApplyBlockedReason(t, report, options.onError) : null;
 
   return (
     <>
@@ -173,6 +179,16 @@ export function RecordIoMenu({
             </div>
           )}
           {report && <ImportReportSummary report={report} />}
+          {blockedReason && (
+            <p
+              id="records-import-blocked"
+              className="text-sm text-destructive"
+              role="alert"
+              data-testid="records-import-blocked"
+            >
+              {blockedReason}
+            </p>
+          )}
           {canAdjustOptions && (
             <div>
               <RecordImportOptions
@@ -187,10 +203,11 @@ export function RecordIoMenu({
             <Button type="button" variant="outline" disabled={busy} onClick={close}>
               {t('records.io.close', { defaultValue: 'Close' })}
             </Button>
-            {report?.dry_run && report.failed === 0 && file && (
+            {report?.dry_run && file && (
               <Button
                 type="button"
-                disabled={busy}
+                disabled={busy || blockedReason !== null}
+                aria-describedby={blockedReason ? 'records-import-blocked' : undefined}
                 data-testid="records-import-apply"
                 onClick={() => void apply()}
               >

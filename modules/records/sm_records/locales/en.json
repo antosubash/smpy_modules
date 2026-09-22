@@ -493,6 +493,7 @@
     "errors_truncated": "Only the first errors are listed; fix these and try again.",
     "titles_unavailable": "This report lists row numbers, not record titles — showing titles here would need the import endpoint to return them.",
     "apply": "Apply import",
+    "apply_blocked": "{failed} of {total} row(s) can't be imported, so nothing will be written. Fix them and try again, or choose \"Skip it and write the rest\" under Import options.",
     "close": "Close"
   },
   "type_io": {
