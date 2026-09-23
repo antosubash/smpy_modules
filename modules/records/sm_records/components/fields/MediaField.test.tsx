@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, mount, settle } from '../../test-dom';
+import { act, click, mount, settle } from '../../test-dom';
 import { clearMediaCache } from '../../utils/media-api';
 import {
   API,
@@ -146,8 +146,13 @@ describe('MediaField with a media library', () => {
     expect(items).toHaveLength(2);
     await click(items[1]);
     expect(onChange).toHaveBeenCalledWith(MANUAL.id);
-    await flush();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
     expect(document.querySelector('[data-testid="records-media-dialog"]')).toBeNull();
+    // Back on the button that opened it — Radix would only return focus to a
+    // `Dialog.Trigger`, which this is not.
+    expect(document.activeElement?.id).toBe('record-field-image');
     await view.unmount();
   });
 

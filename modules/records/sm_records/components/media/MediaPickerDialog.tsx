@@ -207,20 +207,27 @@ function PickerBody({
 /**
  * Choose a file from the media library, or upload one — the `media` field's
  * picker. Radix supplies the modal behaviour the field needs: focus moves
- * into the dialog and is trapped there, Escape closes it, and focus returns
- * to the button that opened it. Picking a file (click, Enter or Space on an
- * item) and a finished upload both hand the file to `onPick` and close.
+ * into the dialog and is trapped there, and Escape closes it. Picking a file
+ * (click, Enter or Space on an item) and a finished upload both hand the file
+ * to `onPick` and close.
+ *
+ * Focus goes back to `returnFocusId` on close. Radix returns it only to a
+ * `Dialog.Trigger`, and this dialog is opened by the field's own button
+ * rather than a trigger — without this, closing it dropped focus on the page
+ * body and a keyboard user started again from the top of the form.
  */
 export function MediaPickerDialog({
   api,
   open,
   currentId,
+  returnFocusId,
   onOpenChange,
   onPick,
 }: {
   api: MediaApi;
   open: boolean;
   currentId: string | null;
+  returnFocusId?: string;
   onOpenChange: (open: boolean) => void;
   onPick: (file: MediaFile) => void;
 }) {
@@ -231,6 +238,12 @@ export function MediaPickerDialog({
         showCloseButton={false}
         className="flex max-h-[90dvh] flex-col gap-3 p-4 sm:max-w-3xl sm:p-6"
         data-testid="records-media-dialog"
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusId ? document.getElementById(returnFocusId) : null;
+          if (!target) return;
+          event.preventDefault();
+          target.focus();
+        }}
       >
         <DialogHeader>
           <DialogTitle>

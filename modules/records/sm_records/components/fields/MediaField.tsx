@@ -48,10 +48,10 @@ function MediaPickerField({
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            {/* One button for Choose and Replace, not two: Radix returns focus
-                to the element that opened the dialog, and a Choose that
-                became a different Replace node on pick would drop it on the
-                page body. Named with the field's label as well, so two media
+            {/* One button for Choose and Replace, not two: the dialog returns
+                focus to it by id on close, and a Choose that became a
+                different Replace node on pick would leave nothing there to
+                return to. Named with the field's label as well, so two media
                 fields on one form do not offer two identical "Choose" buttons. */}
             <Button
               id={id}
@@ -92,6 +92,7 @@ function MediaPickerField({
             api={api}
             open={open}
             currentId={stored || null}
+            returnFocusId={id}
             onOpenChange={setOpen}
             onPick={(file) => onChange(file.id)}
           />
