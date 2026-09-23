@@ -7,6 +7,7 @@ import type React from 'react';
 
 import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
 import { FilterBar } from '../components/FilterBar';
+import { displayedColumns } from '../components/RecordColumnCells';
 import { RecordListActions } from '../components/RecordListActions';
 import { RecordListBulk } from '../components/RecordListBulk';
 import { RecordListEmpty } from '../components/RecordListEmpty';
@@ -159,7 +160,12 @@ function RecordList({
               !genuinelyEmpty && (
                 <ColumnChooser
                   available={columns.available}
-                  resolved={columns.resolved}
+                  // What the table shows, so the panel's ticks match the
+                  // screen (the default view's all-zero Position included).
+                  resolved={{
+                    ...columns.resolved,
+                    columns: displayedColumns(columns.resolved, records.items),
+                  }}
                   onChange={columns.change}
                   onReset={columns.reset}
                 />

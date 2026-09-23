@@ -186,6 +186,18 @@ describe('RecordList — changing columns', () => {
     await view.unmount();
   });
 
+  it('starts from what the table shows: an all-zero Position stays out of the choice', async () => {
+    const view = await mount(<RecordList type={type} records={records()} />);
+    await openPanel(view);
+    const position = document.body.querySelector('[data-column="position"]');
+    expect(position?.getAttribute('data-chosen')).toBe('false');
+    await click(document.body.querySelector('#records-column-toggle-blurb'));
+    expect(replace.mock.calls[0][0].url).toBe(
+      '/admin/records/book?columns=status,price,author,published_at,updated_at,blurb',
+    );
+    await view.unmount();
+  });
+
   it('drops a sort whose column is hidden, through the usual list navigation', async () => {
     pageUrl = '/admin/records/book?sort=-price&columns=price,author';
     const view = await mount(<RecordList type={type} records={records()} />);
