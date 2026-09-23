@@ -22,6 +22,18 @@ Middleware is the first place that is genuinely *after* that exit stack: the
 user middleware stack wraps the router, so ``await self.app(...)`` returns only
 once every dependency has torn down and ``get_db`` has committed. The job list
 rides on ``scope`` so a handler can add to it with nothing but its ``Request``.
+
+**A job runs in the tenant that queued it** (tenancy design §A.5). Running
+after the exit stack also means running outside ``TenantMiddleware`` and
+outside records' own binding, and both have reset ``current_tenant_id`` by the
+time the drain runs (FACT 2″). Left alone, a job would run unbound: a type
+write's reindex would load its type under no filter, or the wrong one, and
+quietly rebuild nothing. So :func:`defer` captures
+:func:`~sm_records.tenancy.bound_tenant` when the job is queued, and wraps the
+job in :func:`~sm_records.tenancy.tenant_scope`. Queuing a job with no tenant
+bound is a bug in the caller, so :func:`defer` raises
+:class:`~sm_records.tenancy.TenantUnbound` at that point. The alternative is a
+failure in the drain, where it only reaches a log.
 """
 
 from __future__ import annotations
@@ -29,10 +41,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Final
 
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from sm_records.tenancy import bound_tenant, tenant_scope
 
 __all__ = ["SCOPE_KEY", "DeferredJobsMiddleware", "defer"]
 
@@ -56,6 +71,18 @@ rather than at whatever actually failed.
 _orphans: set[asyncio.Task] = set()
 
 
+async def _in_tenant(tenant: str, job: Job) -> object:
+    """Run ``job`` bound to the tenant that queued it.
+
+    :func:`tenant_scope` re-enters a tenant that is already bound. That
+    happens when the drain runs inside a binding of its own, such as a test
+    task or a single-mode harness. A *different* tenant is refused: a job must
+    never run as another tenant.
+    """
+    with tenant_scope(tenant):
+        return await job()
+
+
 def defer(request: Request, job: Job) -> None:
     """Run ``job`` once this request's session has been committed and closed.
 
@@ -65,7 +92,11 @@ def defer(request: Request, job: Job) -> None:
     routers by hand, a harness) the job is detached onto the event loop
     instead: it still will not deadlock the request, because nothing awaits it,
     but it may start before the commit lands, so the case is logged.
+
+    Either way, the job runs in the tenant bound when :func:`defer` is called
+    (see the module docstring).
     """
+    job = partial(_in_tenant, bound_tenant(), job)
     jobs = request.scope.get(SCOPE_KEY)
     if jobs is None:
         logger.warning(

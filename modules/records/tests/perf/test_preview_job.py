@@ -133,6 +133,7 @@ async def test_apply_reuses_a_completed_preview(perf_db_copy, tmp_path):
             settings = RecordsSettings(preview_job_ttl_seconds=ttl)
             if with_preview:
                 job = preview_jobs.start(
+                    tenant_id=rtype.tenant_id,
                     type_key=rtype.key,
                     type_id=rtype.id,
                     type_version=rtype.version,

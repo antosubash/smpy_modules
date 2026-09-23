@@ -120,6 +120,7 @@ async def preview_schema(
         )
         return schema_preview_read(diff, report)
     job = preview_jobs.start(
+        tenant_id=rtype.tenant_id,
         type_key=rtype.key,
         type_id=rtype.id,
         type_version=rtype.version,
@@ -169,9 +170,15 @@ async def read_preview_job(
     a report about one type's records, and ``records.manage_types`` is
     type-agnostic, so serving job X under type Y would let a caller read a
     report they asked for under a URL that says otherwise.
+
+    The check compares the type **id**, never the key (tenancy design §H).
+    ``rtype`` was loaded under the caller's tenant, and ids are global. So a
+    job started in one tenant is a 404 under another tenant's type with the
+    same key, and so is a job started for a type since deleted and recreated
+    under the same key.
     """
-    found = preview_jobs.get(job)
-    if found is None or found.type_key != rtype.key:
+    found = preview_jobs.get_for_type(job, rtype.id)
+    if found is None:
         raise NotFound(f"no schema preview job {job!r} for {rtype.key!r}")
     return schema_preview_job_read(found)
 

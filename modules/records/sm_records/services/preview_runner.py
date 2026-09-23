@@ -20,6 +20,12 @@ A draft preview still writes nothing, and its commit is a no-op over a
 transaction that only read. That is worth one unconditional statement rather
 than a branch: which of the two this call is depends on ``rescan``, and the
 rule "the runner commits its own session" should not.
+
+**It runs in the job's tenant** (tenancy design §A.5). The job records the
+tenant of the type it was started for, and the whole run is inside
+``tenant_scope(job.tenant_id)``. A deferred job arrives already bound to that
+tenant, so the scope re-enters it. What it adds is that the runner is correct
+on its own, whoever calls it.
 """
 
 from __future__ import annotations
@@ -32,6 +38,7 @@ from sm_records.models import RecordType
 from sm_records.services import preview_jobs, schema_change
 from sm_records.services.schema_change import MISSING
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import tenant_scope
 
 __all__ = ["run_preview_job"]
 
@@ -63,26 +70,54 @@ async def run_preview_job(
     there is nobody left to raise at. The poller reads it and the client's
     answer is to preview again.
     """
+    job = preview_jobs.get(job_id)
+    if job is None:  # pragma: no cover - only finished jobs are pruned
+        return
     try:
-        async with db_state.session_factory() as session:
-            rtype = await session.get(RecordType, type_id)
-            if rtype is None:  # pragma: no cover - the type was deleted mid-preview
-                preview_jobs.fail(job_id, "the type no longer exists")
-                return
-            diff, report = await schema_change.preview(
-                session,
-                rtype,
+        with tenant_scope(job.tenant_id):
+            await _scan(
+                db_state,
+                job_id,
+                type_id,
                 fields,
-                settings,
                 display_field=display_field,
                 slug_field=slug_field,
                 rescan=rescan,
-                on_progress=partial(preview_jobs.progress, job_id),
+                settings=settings,
             )
-            # See the module docstring: a rescan's marks have no other way of
-            # being committed, and a draft preview's commit is a no-op.
-            await session.commit()
-        preview_jobs.finish(job_id, diff, report)
     except Exception as exc:  # pragma: no cover - defensive; preview is tested directly
         logger.exception("records: deferred schema preview %s failed", job_id)
         preview_jobs.fail(job_id, str(exc))
+
+
+async def _scan(
+    db_state: Any,
+    job_id: str,
+    type_id: int,
+    fields: list[dict[str, Any]],
+    *,
+    display_field: Any,
+    slug_field: Any,
+    rescan: bool,
+    settings: RecordsSettings,
+) -> None:
+    """:func:`run_preview_job`'s work, inside the job's tenant."""
+    async with db_state.session_factory() as session:
+        rtype = await session.get(RecordType, type_id)
+        if rtype is None:  # pragma: no cover - the type was deleted mid-preview
+            preview_jobs.fail(job_id, "the type no longer exists")
+            return
+        diff, report = await schema_change.preview(
+            session,
+            rtype,
+            fields,
+            settings,
+            display_field=display_field,
+            slug_field=slug_field,
+            rescan=rescan,
+            on_progress=partial(preview_jobs.progress, job_id),
+        )
+        # See the module docstring: a rescan's marks have no other way of
+        # being committed, and a draft preview's commit is a no-op.
+        await session.commit()
+    preview_jobs.finish(job_id, diff, report)

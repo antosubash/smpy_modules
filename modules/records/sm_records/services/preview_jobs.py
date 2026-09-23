@@ -22,6 +22,12 @@ falls back to the synchronous path, which is what it would have done anyway.
 The one place a report is *reused* is ``PUT /types/{key}``
 (:func:`sm_records.services.schema_change.apply`), under the guard
 :func:`reusable` states.
+
+**A job belongs to one tenant's type** (tenancy design §H). The registry is
+process-global, so each job records ``tenant_id`` and ``type_id``. The poll
+endpoint matches the job on ``type_id`` and never on the key, because two
+tenants can hold the same key under different ids. The runner binds the job's
+``tenant_id`` (:mod:`sm_records.services.preview_runner`).
 """
 
 from __future__ import annotations
@@ -43,6 +49,7 @@ __all__ = [
     "fields_hash",
     "finish",
     "get",
+    "get_for_type",
     "progress",
     "reusable",
     "start",
@@ -63,6 +70,8 @@ class PreviewJob:
     """One running or finished dry run."""
 
     id: str
+    tenant_id: str
+    """The tenant the type belongs to, and the one the deferred scan runs in."""
     type_key: str
     type_id: int
     type_version: int
@@ -138,6 +147,7 @@ def _prune(ttl_seconds: int) -> None:
 
 def start(
     *,
+    tenant_id: str,
     type_key: str,
     type_id: int,
     type_version: int,
@@ -147,6 +157,7 @@ def start(
 ) -> PreviewJob:
     job = PreviewJob(
         id=uuid.uuid4().hex,
+        tenant_id=tenant_id,
         type_key=type_key,
         type_id=type_id,
         type_version=type_version,
@@ -163,6 +174,17 @@ def start(
 
 def get(job_id: str) -> PreviewJob | None:
     return _jobs.get(job_id)
+
+
+def get_for_type(job_id: str, type_id: int) -> PreviewJob | None:
+    """The job, only when it was started for this ``type_id``.
+
+    Type ids are global and the caller loaded the type under its own tenant,
+    so this also keeps a job id started in one tenant from being read
+    through another tenant's type with the same key.
+    """
+    job = _jobs.get(job_id)
+    return job if job is not None and job.type_id == type_id else None
 
 
 def progress(job_id: str, checked: int) -> None:

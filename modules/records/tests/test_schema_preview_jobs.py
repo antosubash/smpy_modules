@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 from sm_records.services import preview_jobs
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import DEFAULT_TENANT
 
 from tests.app_harness import ADMIN, roles
 
@@ -204,6 +205,7 @@ async def test_a_stale_version_is_not_reused(client):
     describes a schema that is no longer the one being changed."""
     rtype = await _seed(client, 3)
     job = preview_jobs.start(
+        tenant_id=DEFAULT_TENANT,
         type_key="note",
         type_id=1,
         type_version=rtype["version"] - 1,
@@ -225,6 +227,7 @@ async def test_a_stale_version_is_not_reused(client):
 async def test_the_registry_is_bounded(client):
     for n in range(preview_jobs.MAX_JOBS + 10):
         job = preview_jobs.start(
+            tenant_id=DEFAULT_TENANT,
             type_key=f"t{n}",
             type_id=n,
             type_version=1,
@@ -234,6 +237,12 @@ async def test_the_registry_is_bounded(client):
         )
         preview_jobs.fail(job.id, "done with it")
     preview_jobs.start(
-        type_key="last", type_id=0, type_version=1, signature="z", total=0, ttl_seconds=600
+        tenant_id=DEFAULT_TENANT,
+        type_key="last",
+        type_id=0,
+        type_version=1,
+        signature="z",
+        total=0,
+        ttl_seconds=600,
     )
     assert len(preview_jobs._jobs) <= preview_jobs.MAX_JOBS

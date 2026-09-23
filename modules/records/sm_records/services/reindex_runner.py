@@ -20,6 +20,15 @@ services layer refuses to, because the framework's ``get_db`` owns the request's
 transaction. A runner started from a deferred job has no request and no
 ``get_db``: nothing else would ever commit its session, and the rebuild would
 roll back silently.
+
+**It binds the type's own tenant** (tenancy design §A.5). The runner takes a
+type *id*, and an id is global. So the runner reads the type across tenants
+(:func:`sm_records._cross_tenant.read_all`) and runs everything after that
+inside ``tenant_scope(rtype.tenant_id)``. A deferred job arrives already bound
+to the tenant that queued it, and that is the same tenant, so the scope
+re-enters it. A job bound to a different tenant is refused with
+``TenantIsolationError`` and does not rebuild another tenant's type. The CLI
+arrives unbound and gets the binding here.
 """
 
 from __future__ import annotations
@@ -31,6 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records._cross_tenant import read_all
 from sm_records.constants import REINDEX_ALL
 from sm_records.index._analyze import analyze_tables, index_table_names
 from sm_records.index.reduce_rebuild import rebuild_type
@@ -45,6 +55,7 @@ from sm_records.services._claims import lock_type
 from sm_records.services._common import mark_written, reload, type_resolver
 from sm_records.services._titles import recompute_titles
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import tenant_scope
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
 
@@ -69,13 +80,15 @@ def _is_locked(exc: OperationalError) -> bool:
 
 
 async def pending_type_ids(db: AsyncSession) -> list[int]:
-    """Every type with at least one ``reindex_pending`` entry.
+    """Every type, **in every tenant**, with at least one ``reindex_pending`` entry.
 
     Filtered in Python: the column is plain ``JSON``, so "is this object empty"
     is spelled differently on every backend, and there are tens of types rather
-    than millions.
+    than millions. Read across tenants (:func:`read_all`) because the ids go
+    to :func:`run_pending`, which binds each type's own tenant.
     """
-    rows = (await db.execute(select(RecordType.id, RecordType.reindex_pending))).all()
+    stmt = select(RecordType.id, RecordType.reindex_pending).order_by(RecordType.id)
+    rows = (await read_all(db, stmt)).all()
     return [int(type_id) for type_id, pending in rows if pending and type_id is not None]
 
 
@@ -174,68 +187,73 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
     idempotent — while clearing one that was never rebuilt is not.
     """
     async with db_state.session_factory() as session:
-        rtype = (
-            (await session.execute(select(RecordType).where(RecordType.id == type_id)))
-            .scalars()
-            .first()
-        )
+        # Across tenants, then bound to the row's own tenant: see the module
+        # docstring. The session is fresh, so nothing is pending on it.
+        stmt = select(RecordType).where(RecordType.id == type_id)
+        rtype = (await read_all(session, stmt)).scalars().first()
         if rtype is None:
             return 0
-        pending = pending_map(rtype)
-        if not pending:
-            # Nothing is pending for the *map* indexes — but a reduce index
-            # carries no marker and never will: registering or changing a spec
-            # is the host deploying code, not a schema edit this module can
-            # see (Phase 5 §5.2). So the operator who pressed "reindex", or
-            # ran the CLI against this type, still has work here, and it is
-            # this. With no spec registered it issues no statements at all.
-            if await rebuild_type(session, rtype, batch_size=settings.reindex_batch_size):
-                mark_written(session)
-                await session.commit()
-            return 0
-        started_at_schema = rtype.schema_version
+        with tenant_scope(rtype.tenant_id):
+            return await _rebuild(session, rtype, settings=settings)
 
-        keys = list(pending)
-        field_keys = [key for key in keys if key != REINDEX_ALL]
-        declared = {str(raw.get("key")) for raw in rtype.fields or []}
-        removed = [key for key in field_keys if key not in declared]
-        if removed:
-            await delete_field_rows(session, rtype, removed)
 
-        touched: set[str] = set(index_table_names(tables_for(rtype))) if removed else set()
-        count = await reindex_type(
-            session,
-            rtype,
-            resolve_type_id=await type_resolver(session),
-            batch_size=settings.reindex_batch_size,
-            field_keys=field_keys or None,
-            touched=touched,
-            # Commit per batch. SQLite has one write lock for the whole file,
-            # so a rebuild that held its transaction for every record of a big
-            # type would refuse every concurrent write for that whole time;
-            # a partial rebuild is safe here precisely because the markers are
-            # cleared last, so an interrupted run is repeated rather than lost.
-            after_batch=session.commit,
-        )
-        if REINDEX_ALL in pending:
-            await recompute_titles(session, rtype, settings.reindex_batch_size)
-
-        await _clear_rebuilt(session, rtype, keys, started_at_schema)
-        # Every statement the rebuild issues is core DML, which never fires the
-        # listener the framework commits on. This session has no request behind
-        # it either way, so say so explicitly.
-        mark_written(session)
-        await session.commit()
-
-        # After the commit, not inside it: ``ANALYZE`` takes the write lock,
-        # and the rebuild has no reason to keep holding one while it runs. The
-        # index of this type was just rewritten wholesale, which is the moment
-        # the planner's statistics are most out of date and cheapest to refresh
-        # — see :mod:`sm_records.index._analyze`.
-        if touched:
-            await analyze_tables(session, touched)
+async def _rebuild(session: AsyncSession, rtype: RecordType, *, settings: RecordsSettings) -> int:
+    """The body of :func:`_run_pending_once`, inside the type's tenant."""
+    pending = pending_map(rtype)
+    if not pending:
+        # Nothing is pending for the *map* indexes — but a reduce index
+        # carries no marker and never will: registering or changing a spec
+        # is the host deploying code, not a schema edit this module can
+        # see (Phase 5 §5.2). So the operator who pressed "reindex", or
+        # ran the CLI against this type, still has work here, and it is
+        # this. With no spec registered it issues no statements at all.
+        if await rebuild_type(session, rtype, batch_size=settings.reindex_batch_size):
+            mark_written(session)
             await session.commit()
-        return count
+        return 0
+    started_at_schema = rtype.schema_version
+
+    keys = list(pending)
+    field_keys = [key for key in keys if key != REINDEX_ALL]
+    declared = {str(raw.get("key")) for raw in rtype.fields or []}
+    removed = [key for key in field_keys if key not in declared]
+    if removed:
+        await delete_field_rows(session, rtype, removed)
+
+    touched: set[str] = set(index_table_names(tables_for(rtype))) if removed else set()
+    count = await reindex_type(
+        session,
+        rtype,
+        resolve_type_id=await type_resolver(session),
+        batch_size=settings.reindex_batch_size,
+        field_keys=field_keys or None,
+        touched=touched,
+        # Commit per batch. SQLite has one write lock for the whole file,
+        # so a rebuild that held its transaction for every record of a big
+        # type would refuse every concurrent write for that whole time;
+        # a partial rebuild is safe here precisely because the markers are
+        # cleared last, so an interrupted run is repeated rather than lost.
+        after_batch=session.commit,
+    )
+    if REINDEX_ALL in pending:
+        await recompute_titles(session, rtype, settings.reindex_batch_size)
+
+    await _clear_rebuilt(session, rtype, keys, started_at_schema)
+    # Every statement the rebuild issues is core DML, which never fires the
+    # listener the framework commits on. This session has no request behind
+    # it either way, so say so explicitly.
+    mark_written(session)
+    await session.commit()
+
+    # After the commit, not inside it: ``ANALYZE`` takes the write lock,
+    # and the rebuild has no reason to keep holding one while it runs. The
+    # index of this type was just rewritten wholesale, which is the moment
+    # the planner's statistics are most out of date and cheapest to refresh
+    # — see :mod:`sm_records.index._analyze`.
+    if touched:
+        await analyze_tables(session, touched)
+        await session.commit()
+    return count
 
 
 async def schedule(db_state, type_id: int, settings: RecordsSettings) -> int:

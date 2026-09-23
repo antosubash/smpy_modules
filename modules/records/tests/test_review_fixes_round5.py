@@ -24,6 +24,7 @@ from sm_records.services import types as type_service
 from sm_records.services._preview import reused_report
 from sm_records.services.reindex_runner import run_pending
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 
 from tests.round5_helpers import rel, text
@@ -154,6 +155,7 @@ def jobs():
 
 def finished(jobs, *, type_key: str, type_id: int, version: int, signature: str):
     job = jobs.start(
+        tenant_id=DEFAULT_TENANT,
         type_key=type_key,
         type_id=type_id,
         type_version=version,
