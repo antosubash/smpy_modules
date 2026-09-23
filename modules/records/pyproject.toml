@@ -48,5 +48,8 @@ asyncio_mode = "auto"
 # measures; it is minutes, not seconds, and it is not a correctness gate. It
 # is excluded here so ``pytest`` and CI keep running only the normal suite —
 # run it explicitly with ``pytest -m perf tests/perf``.
-markers = ["perf: performance measurement, excluded from the default run"]
+markers = [
+    "perf: performance measurement, excluded from the default run",
+    "unbound_tenant: run with no records tenant bound (tests/conftest.py binds 'default' otherwise)",
+]
 addopts = "-m 'not perf'"

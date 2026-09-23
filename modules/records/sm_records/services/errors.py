@@ -65,6 +65,21 @@ class Forbidden(RecordsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 403
 
 
+class TenantRequired(Forbidden):
+    """A multi-tenant host, and a caller whose account has no tenant of its own.
+
+    Refused rather than guessed (tenancy design §A.3): the framework would let
+    such a user pick any tenant by header, and the only tenant holding data
+    after the migration is ``default`` — so a fallback would hand the bootstrap
+    admin, and every user created through the users UI, the legacy data.
+
+    ``code`` travels in the body so a client can tell this 403 from a missing
+    permission without parsing the sentence.
+    """
+
+    code = "tenant_required"
+
+
 class ReferencedByOthers(Conflict):
     """A delete blocked by ``on_delete: restrict`` relations pointing at it.
 
@@ -205,5 +220,6 @@ __all__ = [
     "RecordsError",
     "ReferencedByOthers",
     "SchemaChangeRefused",
+    "TenantRequired",
     "ValidationFailed",
 ]

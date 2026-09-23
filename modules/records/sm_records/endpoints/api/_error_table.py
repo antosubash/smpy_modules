@@ -106,6 +106,11 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
         '`{"detail"}` — names the type and the roles, deliberately',
     ),
     ErrorRow(
+        403,
+        "*Multi-tenant hosts* — the signed-in account has no tenant of its own",
+        '`{"detail", "code": "tenant_required"}` — even when a tenant header was sent',
+    ),
+    ErrorRow(
         404,
         "Unknown type key, unknown uuid, a record in the trash on a non-trash read",
         '`{"detail"}`',

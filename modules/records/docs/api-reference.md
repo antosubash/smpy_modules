@@ -1308,6 +1308,7 @@ kind of route can produce, with the body schema
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
 | `403` | The type's `allowed_roles` exclude the caller | `{"detail"}` — names the type and the roles, deliberately |
+| `403` | *Multi-tenant hosts* — the signed-in account has no tenant of its own | `{"detail", "code": "tenant_required"}` — even when a tenant header was sent |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |

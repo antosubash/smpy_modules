@@ -17,6 +17,7 @@ from typing import Any, Final
 from sm_records.contracts.errors import (
     ConflictBody,
     ErrorDetail,
+    ForbiddenBody,
     QueryErrorBody,
     ValidationErrorBody,
 )
@@ -35,7 +36,7 @@ __all__ = [
 _MODELS: Final[dict[int, Any]] = {
     400: QueryErrorBody,
     401: ErrorDetail,
-    403: ErrorDetail,
+    403: ForbiddenBody,
     404: ErrorDetail,
     409: ConflictBody,
     413: ErrorDetail,

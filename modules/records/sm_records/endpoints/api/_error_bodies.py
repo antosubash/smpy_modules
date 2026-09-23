@@ -148,4 +148,10 @@ async def response_for(request: Request, exc: Exception) -> JSONResponse:
             {"detail": str(exc), "field": exc.field, "reason": exc.reason}, status_code=status
         )
     assert isinstance(exc, RecordsError)
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    body: dict[str, Any] = {"detail": exc.detail}
+    code = getattr(exc, "code", None)
+    if code is not None:
+        # ``TenantRequired``: a 403 a client must tell apart from a missing
+        # permission without reading the sentence.
+        body["code"] = code
+    return JSONResponse(body, status_code=exc.status_code)

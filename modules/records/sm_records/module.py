@@ -242,6 +242,9 @@ class RecordsModule(ModuleBase):
         ``reindex_stale_after_seconds`` as the operator set it.
         """
         self.db = getattr(app.state, "sm", None) and app.state.sm.db
+        from sm_records import tenancy
+
+        tenancy.configure(app)  # single or multi, from the built stack (tenancy §A.3)
         services = getattr(app.state, constants.PACKAGE, None)
         if services is not None and getattr(services, "settings", None) is not None:
             self.settings = services.settings

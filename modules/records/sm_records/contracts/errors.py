@@ -24,6 +24,7 @@ __all__ = [
     "ConflictBody",
     "ErrorDetail",
     "FieldError",
+    "ForbiddenBody",
     "QueryErrorBody",
     "ValidationErrorBody",
 ]
@@ -38,6 +39,15 @@ class ErrorDetail(SQLModel):
     """
 
     detail: str
+
+
+class ForbiddenBody(SQLModel):
+    """A 403: the flat refusal, plus ``code`` when the reason is one a client
+    branches on. Today that is only ``tenant_required`` (a multi-tenant host,
+    and an account with no tenant); a missing permission carries no ``code``."""
+
+    detail: str
+    code: str | None = None
 
 
 class FieldError(SQLModel):

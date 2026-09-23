@@ -16,6 +16,7 @@ from sm_records.settings import RecordsSettings
 
 if TYPE_CHECKING:
     from sm_records.media import MediaApi
+    from sm_records.tenancy import TenancyMode
 
 
 @dataclass
@@ -27,6 +28,10 @@ class RecordsServices:
     """The media library the ``media`` field picker talks to, resolved once in
     ``on_startup`` by :func:`sm_records.media.configure`; ``None`` until then,
     and afterwards on a host that has none."""
+    tenancy: TenancyMode | None = None
+    """Single- or multi-tenant, read off the built middleware stack in
+    ``on_startup`` by :func:`sm_records.tenancy.configure`; ``None`` until then,
+    when :func:`sm_records.tenancy.mode_of` detects it on demand."""
 
 
 __all__ = ["RecordsServices"]
