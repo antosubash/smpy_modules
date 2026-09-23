@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, locales
 from sm_records.contracts.schemas import (
-    RecordPage,
     record_list_read,
     record_read,
     type_read,
@@ -33,10 +32,10 @@ from sm_records.deps import (
     request_db,
     require_view,
 )
-from sm_records.endpoints import views_types
+from sm_records.endpoints import _list_view, views_types
 from sm_records.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.endpoints.api.translations import translations_of
-from sm_records.index.query import Filter, QueryError, Sort
+from sm_records.index.query import Filter, Sort
 from sm_records.models import RecordType
 from sm_records.services import _relations
 from sm_records.services import expand as expand_service
@@ -180,13 +179,21 @@ async def record_list(
     parsed: tuple[list[Filter], str | None] = Depends(parse_view_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     trashed: bool = Depends(parse_trashed),
+    after: str | None = Query(default=None),
 ) -> InertiaResponse:
-    """First page, deep-linkable via the same ``page``/``sort``/``filter``
-    grammar as ``GET /api/records/types/{key}/records`` — the UI reads the
-    list client-side thereafter, but the initial render has to match what a
-    shared URL promises. ``?trashed=true`` (``records.edit`` only, see
-    ``parse_trashed``) lists the trash instead — the only way the admin ever
-    enumerates soft-deleted rows to restore one (FAIL-3)."""
+    """First page, deep-linkable via the same ``page``/``after``/``sort``/
+    ``filter`` grammar as ``GET /api/records/types/{key}/records`` — a shared
+    URL has to render what it promises. ``?trashed=true`` (``records.edit``
+    only, see ``parse_trashed``) lists the trash instead — the only way the
+    admin ever enumerates soft-deleted rows to restore one (FAIL-3).
+
+    ``?after=<cursor>`` is the footer's way past ``max_count``, where the
+    numbered pager stops (``_list_view``): the page comes back with
+    ``page: null`` and the next ``next_cursor``. Every refusal the API
+    answers with a 400 — a malformed filter, a refused field, a cursor that
+    does not decode or belongs to another sort, ``page`` and ``after``
+    together — is a reason in ``errors["filter"]`` here, rendered as the
+    list's notice rather than an error modal."""
     counts = await type_service.record_counts(db, rtype)
     effective_sorts = list(sorts) if sorts else list(_DEFAULT_SORTS)
     # ``?page_size=`` the same way the JSON API takes it, clamped to
@@ -195,40 +202,20 @@ async def record_list(
     # piece of this screen's state already lives.
     size = settings.clamp_page_size(page_size)
     filters, malformed = parsed
-    errors: dict[str, str] = {}
-    items: list = []
-    total: int | None = 0
-    capped = False
-    next_cursor: str | None = None
-    if malformed is not None:
-        # A ``?filter=`` term that does not parse at all, which the API answers
-        # with a 400 raised from the dependency. Here it joins the same
-        # ``errors`` bag a refused-but-well-formed filter uses, for the same
-        # reason: this is a page navigation, and a bare status code is an
-        # Inertia error modal over a screen that already knows how to say what
-        # is wrong with a filter.
-        errors["filter"] = malformed
-    else:
-        try:
-            items, total, capped, next_cursor = await record_service.list_records(
-                db,
-                rtype,
-                settings=settings,
-                filters=filters,
-                sorts=effective_sorts,
-                page=page,
-                page_size=size,
-                trashed=trashed,
-            )
-        except QueryError as exc:
-            # A page navigation, not an API call: Inertia reserves 409 for its
-            # own asset-version handshake and shows any other error status in a
-            # modal, so a filter on a field that is mid-reindex (design §8.5),
-            # unknown or unindexed cannot be a status code here. The screen
-            # renders empty with the reason in Inertia's own ``errors`` bag —
-            # the same channel form validation uses — and shows it inline.
-            items, total, capped, next_cursor = [], 0, False, None
-            errors["filter"] = exc.reason
+    cursor = after or None
+    items, total, capped, next_cursor, refused = await _list_view.run_listing(
+        db,
+        rtype,
+        settings=settings,
+        filters=filters,
+        malformed=malformed,
+        sorts=effective_sorts,
+        page=page,
+        page_size=size,
+        trashed=trashed,
+        after=cursor,
+    )
+    errors: dict[str, str] = {} if refused is None else {"filter": refused}
     # Always, for every relation column the screen renders (§9: the generic
     # list is the one caller that always expands). One batched query per
     # relation field for the whole page — never one per row, which is what
@@ -236,14 +223,14 @@ async def record_list(
     expanded = await expand_service.expand(
         db, rtype, items, expand_service.relation_field_keys(rtype), roles=caller_roles(request)
     )
-    records_page = RecordPage(
+    records_page = _list_view.RecordListViewPage(
         # One lenient read per row and no per-row validation — see
         # ``contracts.schemas.record_list_read``.
         items=record_list_read(rtype, items, expanded=expanded),
         total=total,
         total_capped=capped,
         next_cursor=next_cursor,
-        page=page,
+        page=None if cursor else page,
         page_size=size,
     )
     # ``errors`` is sent on every render, empty or not: the list refetches

@@ -388,7 +388,7 @@ sm_records/
 ├── index/           query building, writing, reindex, reduce, providers
 ├── services/        the domain; raises RecordsError, never commits
 ├── contracts/       wire DTOs
-├── endpoints/       api/* (JSON) and views*.py (Inertia)
+├── endpoints/       api/* (JSON), views*.py (Inertia) + _list_view.py (the list screen's offset/keyset query)
 ├── seed/            the demo dataset
 ├── pages/*.tsx      auto-discovered Inertia pages — nothing else goes here
 ├── components/      everything extracted out of a page (+ hooks/, utils/)

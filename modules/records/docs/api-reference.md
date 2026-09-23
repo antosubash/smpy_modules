@@ -189,6 +189,26 @@ behind each sort field, and on the public API the `?locale=` it was narrowed to.
 Replaying it under a different sort is a `400`, as is a cursor that does not
 decode.
 
+**In the admin list screen.** `GET /admin/records/{key}` (the Inertia view)
+takes `after` too, beside `page`, `page_size`, `filter`, `sort` and `trashed`,
+and it is the same cursor: the view's `records` prop carries `next_cursor` on
+every page, and a `next_cursor` from this endpoint resumes the view under the
+same explicit `sort`. The view's default order (`position`, then `updated_at`
+descending) is not this endpoint's, so a cursor minted with no `?sort=` on one
+is refused by the other. A page reached by `after` comes back with
+`page: null` — it is past the numbered pages and has no number — and still
+counts `total` up to `max_count`.
+
+The view never answers with an error status: a page navigation that failed
+would be an error modal over a screen that can say what went wrong. Each
+paging `400` above is instead the list's notice, via `errors.filter` on a
+`200` with no rows:
+
+| Request | `errors.filter` |
+|---|---|
+| A cursor that does not decode, or was produced under another sort, trash view or field kind | `bad_cursor` |
+| `page` (other than `1`) and `after` together — refused, as here, not resolved in favour of either | `page_and_after` |
+
 ### `?expand=` — admin only
 
 `?expand=a,b` and `?expand=a&expand=b` both work. Named relation fields are
