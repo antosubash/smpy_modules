@@ -372,6 +372,7 @@
     "translatable_help": "Records can exist in several languages ({locales}); each translation is its own record with its own slug.",
     "show_in_menu": "Show in sidebar",
     "show_in_menu_help": "Adds {label_plural} to the admin sidebar, in its own Records group right after Content.",
+    "show_in_menu_multi_note": "Sidebar entries are per-install, not per-tenant, so this host shows only the \"Records\" hub. Every type stays reachable from there.",
     "collection": "Collection",
     "collection_shared": "Shared tables",
     "collection_help": "Gives this type its own document and index tables. Chosen once — a type can't be moved between collections later.",
