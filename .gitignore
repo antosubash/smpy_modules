@@ -24,6 +24,9 @@ host/*.db
 
 # Runtime upload storage (PagebuilderSettings.media_root)
 var/
+# file_storage's local backend (DEFAULT_FS_ROOT = ./uploads), which the dev
+# host creates in the repo root
+uploads/
 
 # Env
 .env

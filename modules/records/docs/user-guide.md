@@ -451,7 +451,13 @@ hides the sorted column). A link that no longer fits — made for
 another sort, or edited by hand — opens on the notice *"This link can't
 continue the list: it was made for a different sort or view, or it has been
 changed. Go back to the first page."* with a **First page** button, rather than
-an error.
+an error. That includes a link built from the JSON API's `next_cursor` (for
+example `/admin/records/<key>?after=…`) when the API call had no explicit
+`?sort=`: the list's default order (Position, then Updated, newest first) is
+not the API's, so such a cursor only continues the list when the link carries
+the same `sort=` the API call did (see the API reference, Paging). When a
+link's filter or sort itself cannot be applied, the box offers **Clear filter
+and sort** instead, since the first page would be refused the same way.
 
 ### Trash
 
