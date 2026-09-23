@@ -101,11 +101,11 @@ describe('resolveListColumns — ?columns= in the link', () => {
     const resolved = resolveListColumns({
       type,
       showLocale: false,
-      raw: 'body,i3,updated_at,title',
+      raw: 'body,i3,updated_at,i1',
       saved: null,
     });
     expect(resolved.source).toBe('url');
-    expect(keys(resolved)).toEqual(['body', 'i3', 'updated_at', 'title']);
+    expect(keys(resolved)).toEqual(['body', 'i3', 'updated_at', 'i1']);
     expect(resolved.unknown).toEqual([]);
   });
 
@@ -195,12 +195,29 @@ describe('resolveListColumns — precedence against the saved choice', () => {
 });
 
 describe('availableColumns', () => {
-  it('offers the envelope toggles first, then every declared field, display field included', () => {
+  it('offers the envelope toggles first, then every declared field but the display field', () => {
     const all = availableColumns(type, false).map((c) => c.key);
     expect(all.slice(0, 4)).toEqual(['status', 'position', 'published_at', 'updated_at']);
-    expect(all).toContain('title');
+    // Review 4, ux F6: Title already is the display field.
+    expect(all).not.toContain('title');
     expect(all).toContain('meta');
     expect(availableColumns(type, true).map((c) => c.key)).toContain('locale');
+  });
+
+  it('drops the display field from a link or a saved choice without a notice', () => {
+    const linked = resolveListColumns({ type, showLocale: false, raw: 'title,i2', saved: null });
+    expect(keys(linked)).toEqual(['i2']);
+    expect(linked.unknown).toEqual([]);
+    // Naming only the display field is "Title only", not an unknown link.
+    const only = resolveListColumns({ type, showLocale: false, raw: 'title', saved: null });
+    expect([only.source, keys(only), only.unknown]).toEqual(['url', [], []]);
+    const saved = resolveListColumns({
+      type,
+      showLocale: false,
+      raw: null,
+      saved: ['title', 'i3'],
+    });
+    expect([saved.source, keys(saved)]).toEqual(['saved', ['i3']]);
   });
 });
 

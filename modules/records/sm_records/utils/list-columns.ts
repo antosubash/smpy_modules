@@ -82,12 +82,16 @@ export type ResolvedColumns = {
 type ColumnType = Pick<TypeRead, 'fields'> & Partial<Pick<TypeRead, 'display_field'>>;
 
 /** Everything the chooser can offer for a type, envelope first. Language is
- *  offered only where the list shows language UI at all. */
+ *  offered only where the list shows language UI at all. The display field
+ *  is not offered: the Title column already is that field, always shown —
+ *  a second copy of it was a second "Title" column (review 4, ux F6). */
 export function availableColumns(type: ColumnType, showLocale: boolean): ListColumn[] {
   const envelope = ENVELOPE_COLUMNS.filter((key) => key !== 'locale' || showLocale);
   return [
     ...envelope.map((key): ListColumn => ({ kind: 'envelope', key })),
-    ...type.fields.map((field): ListColumn => ({ kind: 'field', key: field.key, field })),
+    ...type.fields
+      .filter((field) => field.key !== type.display_field)
+      .map((field): ListColumn => ({ kind: 'field', key: field.key, field })),
   ];
 }
 
@@ -165,16 +169,21 @@ export function resolveListColumns({
   withMedia?: boolean;
 }): ResolvedColumns {
   const byKey = new Map(availableColumns(type, showLocale).map((c) => [c.key, c]));
+  // The display field is the Title column, already shown: a link or a saved
+  // choice naming it is not naming an unknown column, so it is dropped
+  // without a notice.
+  const shownAnyway = (key: string) => key.trim() === type.display_field;
   if (raw !== null) {
-    const tokens = raw.split(',').filter((token) => token.trim());
+    const tokens = raw.split(',').filter((token) => token.trim() && !shownAnyway(token));
     const picked = pickColumns(tokens, byKey);
     if (picked.columns.length > 0 || tokens.length === 0) return { ...picked, source: 'url' };
     const fallback = resolveListColumns({ type, showLocale, raw: null, saved, withMedia });
     return { ...fallback, unknown: picked.unknown };
   }
   if (saved) {
-    const picked = pickColumns(saved, byKey);
-    if (picked.columns.length > 0 || saved.length === 0) {
+    const savedKeys = saved.filter((key) => !shownAnyway(key));
+    const picked = pickColumns(savedKeys, byKey);
+    if (picked.columns.length > 0 || savedKeys.length === 0) {
       return { columns: picked.columns, source: 'saved', unknown: [], truncated: 0 };
     }
   }
