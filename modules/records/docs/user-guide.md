@@ -549,6 +549,10 @@ and **Download CSV**.
    always every field of every record it includes.
 2. Pick a format. The file is named `<key>-<date>.json` or `.csv`.
 
+Each item says how much it covers — *"Download CSV (4 filtered records)"*,
+*"(all 181 records)"*. Past the count cap it says *"32+"*, like the footer's
+*"of 32+"*: the file still holds every matching record, however many that is.
+
 Exporting while the Trash is showing exports the trashed records, and the menu
 warns: *"A trash export can't be re-imported — restore or purge the records
 first."*

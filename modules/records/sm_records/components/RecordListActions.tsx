@@ -41,6 +41,7 @@ export function RecordListActions({
   exportSearch,
   filtered,
   recordCount,
+  recordCountCapped = false,
   maxImportBytes,
   columnsMenu,
   onToggleTrashed,
@@ -61,6 +62,8 @@ export function RecordListActions({
    *  for an export that will not actually be one. */
   filtered: boolean;
   recordCount: number;
+  /** `records.total_capped` — the export menu then says "N+". */
+  recordCountCapped?: boolean;
   maxImportBytes?: number;
   /** The "Columns" menu, when the list has anything to show columns of. */
   columnsMenu?: React.ReactNode;
@@ -81,6 +84,7 @@ export function RecordListActions({
         trashed={trashed}
         filtered={filtered}
         recordCount={recordCount}
+        recordCountCapped={recordCountCapped}
         {...(maxImportBytes ? { maxImportBytes } : {})}
       />
       {canEdit && (

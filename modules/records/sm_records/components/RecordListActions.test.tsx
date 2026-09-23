@@ -9,7 +9,13 @@ vi.mock('@inertiajs/react', () => ({
   ),
   router: { visit: vi.fn() },
 }));
-vi.mock('./RecordIoMenu', () => ({ RecordIoMenu: () => <button type="button">Export</button> }));
+let ioProps: Record<string, unknown> = {};
+vi.mock('./RecordIoMenu', () => ({
+  RecordIoMenu: (props: Record<string, unknown>) => {
+    ioProps = props;
+    return <button type="button">Export</button>;
+  },
+}));
 
 const { RecordListActions, TOOLBAR_CLASS } = await import('./RecordListActions');
 
@@ -55,6 +61,26 @@ describe('RecordListActions — the toolbar wraps inside PageShell', () => {
       'Trash',
       'New record',
     ]);
+    await view.unmount();
+  });
+});
+
+describe('RecordListActions — the export menu learns the count is capped', () => {
+  it('passes total_capped through, so the menu can say "32+" (review 4, ux F4)', async () => {
+    const view = await mount(
+      <RecordListActions
+        typeKey="book"
+        fields={[]}
+        canEdit={false}
+        trashed={false}
+        exportSearch="filter=a%3Aeq%3Ab"
+        filtered
+        recordCount={32}
+        recordCountCapped
+        onToggleTrashed={() => {}}
+      />,
+    );
+    expect(ioProps).toMatchObject({ recordCount: 32, recordCountCapped: true, filtered: true });
     await view.unmount();
   });
 });

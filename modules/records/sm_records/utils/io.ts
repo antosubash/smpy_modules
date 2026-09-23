@@ -23,6 +23,8 @@
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
 import type { FieldDef } from './types';
 
+export { exportScopeLabel } from './export-scope';
+
 // The rest of this module types `t` loosely for the same reason
 // `pages/RecordList.tsx` does — see that file's comment.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
@@ -243,38 +245,6 @@ export function importApplyBlockedReason(
       'Fix them and try again, or choose "Skip it and write the rest" under Import options.',
   });
   return `${sentence} ${remedy}`;
-}
-
-/**
- * U16: "Download CSV"/"Download JSON" disclosed nothing about *how much* —
- * export honours the list's current filter and the trash toggle (verified:
- * `state:eq:CA` → 4 rows on screen, 4 rows in the file), and an admin
- * exporting for a backup right after filtering got a silent subset. Says
- * the scope in the menu item itself, so the count is read before the click
- * rather than discovered after opening the download.
- */
-export function exportScopeLabel(
-  t: Translate,
-  { trashed, filtered, count }: { trashed: boolean; filtered: boolean; count: number },
-): string {
-  if (trashed) {
-    return t('records.io.scope_trashed', {
-      count,
-      defaultValue: '{count} trashed record',
-      defaultValue_other: '{count} trashed records',
-    });
-  }
-  if (filtered) {
-    return t('records.io.scope_filtered', {
-      count,
-      defaultValue: '{count} filtered record',
-      defaultValue_other: '{count} filtered records',
-    });
-  }
-  return t('records.io.scope_all', {
-    count,
-    defaultValue: 'all {count} records',
-  });
 }
 
 /** The parser's own errors (`services/_io_upload.py`) are accurate but

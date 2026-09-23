@@ -45,6 +45,7 @@ export function RecordIoMenu({
   trashed = false,
   filtered = false,
   recordCount = 0,
+  recordCountCapped = false,
   maxImportBytes = DEFAULT_MAX_IMPORT_BYTES,
 }: {
   typeKey: string;
@@ -64,6 +65,9 @@ export function RecordIoMenu({
    *  what the download actually contains, said before the click rather
    *  than discovered after. */
   recordCount?: number;
+  /** `records.total_capped`: `recordCount` is the cap, not the count, so
+   *  the menu says "32+" like the footer (review 4, ux F4). */
+  recordCountCapped?: boolean;
   /** `RecordsSettings.max_import_bytes`, as `views.py::record_list` sends
    *  it. A file over it is refused here (R9/M13) instead of being uploaded
    *  in full to be answered with a 413. */
@@ -86,7 +90,12 @@ export function RecordIoMenu({
   // result (`dry_run: false`), the run they described already happened.
   const canAdjustOptions = canEdit && file !== null && dryRunNow;
   const blockedReason = report ? importApplyBlockedReason(t, report, options.onError) : null;
-  const scope = exportScopeLabel(t, { trashed, filtered, count: recordCount });
+  const scope = exportScopeLabel(t, {
+    trashed,
+    filtered,
+    count: recordCount,
+    capped: recordCountCapped,
+  });
 
   return (
     <>

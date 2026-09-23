@@ -157,6 +157,7 @@ function RecordList({
             exportSearch={exportSearch}
             filtered={Boolean(currentFilter) && !filterRefused}
             recordCount={known}
+            recordCountCapped={records.total_capped}
             maxImportBytes={max_import_bytes}
             onToggleTrashed={toggleTrashed}
             columnsMenu={

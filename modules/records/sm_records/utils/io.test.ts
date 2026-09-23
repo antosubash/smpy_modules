@@ -219,4 +219,16 @@ describe('exportScopeLabel', () => {
       'all 181 records',
     );
   });
+
+  it('says "N+" under the count cap, as the footer does (review 4, ux F4)', () => {
+    // `total` is `max_count` when `total_capped`; the file holds every row.
+    const capped = (trashed: boolean, filtered: boolean) =>
+      exportScopeLabel(fakePluralT, { trashed, filtered, count: 32, capped: true });
+    expect(capped(false, true)).toBe('32+ filtered records');
+    expect(capped(true, false)).toBe('32+ trashed records');
+    expect(capped(false, false)).toBe('all 32+ records');
+    expect(
+      exportScopeLabel(fakePluralT, { trashed: false, filtered: true, count: 10000, capped: true }),
+    ).toBe(`${(10000).toLocaleString()}+ filtered records`);
+  });
 });
