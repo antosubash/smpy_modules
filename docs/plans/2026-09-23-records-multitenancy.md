@@ -822,6 +822,14 @@ marked so a later phase can find it.
   statement now filters on `tenant_id`, and an unanalysed `ix_*_tenant_id`
   looks maximally selective to SQLite's planner. The downgrade also repairs
   the `DESC` indexes, because its table rebuild flattens them too.
+* **Deviation: `install_guard` is idempotent through a class flag, not
+  `event.contains`.** The framework builds a new session class per `init_db`,
+  and SQLAlchemy's event registry keys listeners by `id()`. After an old class
+  is garbage-collected, a new class can reuse its id while the registry still
+  holds the dead entry. `event.contains` then reported the guard as installed
+  on a class that had no listener. This showed up as an order-dependent
+  Postgres failure. The guard now sets `_sm_records_tenant_guard` in the
+  class's own `__dict__`.
 * **Correction (§B): the record FK is never hash-truncated.**
   `fk_records_c_<name>_record_type_id_records_type` is 41 + len(name) bytes,
   which is exactly 63 at `MAX_COLLECTION_NAME_LEN` = 22. The revision still
