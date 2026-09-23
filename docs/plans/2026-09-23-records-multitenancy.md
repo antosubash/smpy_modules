@@ -778,3 +778,83 @@ Spike sources and captured output, all under the session scratchpad
   `create_app` with every installed module, on the scratch database
   `tenancy_spike_app`, run from the repo root because `create_app` resolves
   `host/templates` from the CWD.
+
+---
+
+## Implementation notes — Phases 1 and 2
+
+Where the code, once written, disagreed with the text above. Each item is
+marked so a later phase can find it.
+
+* **Deviation: the harness needs no request middleware.** §K's harness binds
+  `default` with a sync autouse fixture in `tests/conftest.py`
+  (`tenant_scope(DEFAULT_TENANT)`). pytest-asyncio runs every async fixture and
+  test in a copy of that context, and `httpx.ASGITransport` runs the app in the
+  test's own task, so every request a test makes is bound too. No temporary
+  test-only middleware was added. Tests about the unbound state opt out with
+  `@pytest.mark.unbound_tenant`. Phase 3's multi-mode tests will need the same
+  opt-out, or a scope of their own.
+* **Deviation: `tenant_id` is a reserved field key.** `RESERVED_FIELD_KEYS` is
+  derived from `Record.__table__.columns`, so the new column joined it, and
+  `components/typeeditor/rules.ts` mirrors it. Like `invalid` before it, an
+  install whose type already declares a `tenant_id` field has that type answer
+  422 after the upgrade. `docs/operations.md` has the pre-upgrade check.
+* **Deviation: the 403 carries a `code`.** `TenantRequired` lives in
+  `services/errors.py` and is re-exported by `tenancy.py`. Its body is
+  `{"detail", "code": "tenant_required"}`, and the OpenAPI 403 model became
+  `ForbiddenBody` (`detail` plus an optional `code`). A missing permission still
+  sends no `code`.
+* **Deviation: the admin resolver on an anonymous request.** In multi mode
+  `resolve_admin` raises the framework's 401 (`Not authenticated`) when there
+  is no user at all. It raises `tenant_required` only for a signed-in user whose
+  `tenant_id` is `None` or fails `TENANT_RE`. In production `AuthMiddleware`
+  answers first, so the 401 is reached only by harnesses.
+* **Deviation: the guard also refuses unbound deletes.** `before_flush` checks
+  `session.deleted`, as well as new and modified objects. It lives in
+  `sm_records/_tenant_guard.py`; `tenancy.install_guard` delegates to it.
+* **Deviation: `uuid_taken` is in `services/_uuids.py`, not `_claims.py`.**
+  `_claims.py` is at the file cap, and the uuid module is where the other uuid
+  claims already live. `flush_write` and `_import_rows` both use it.
+  `_import_rows` now says "uuid … is already in use" when the uuid key refused,
+  and keeps the combined sentence for the translation-group key.
+* **Deviation: the revision runs `ANALYZE` on SQLite.** It analyses every owned
+  table after the rebuild, for the reason `c4a17b9de0f2` gives. Every records
+  statement now filters on `tenant_id`, and an unanalysed `ix_*_tenant_id`
+  looks maximally selective to SQLite's planner. The downgrade also repairs
+  the `DESC` indexes, because its table rebuild flattens them too.
+* **Correction (§B): the record FK is never hash-truncated.**
+  `fk_records_c_<name>_record_type_id_records_type` is 41 + len(name) bytes,
+  which is exactly 63 at `MAX_COLLECTION_NAME_LEN` = 22. The revision still
+  reads the name off the model's constraint, which is correct either way.
+* **Correction (Phase 2 plan row): `test_collections_inert.py` needed no
+  change.** It compares table lists, not indexes. `test_collections_ddl.py`
+  passes unchanged, because the factory gives every generated class its own
+  mixin `Column`.
+* **One existing test changed.** `test_export_stream.py`'s fixture bulk-inserts
+  through `insert(Record.__table__)`, which is never stamped (FACT 1e), so it
+  now passes `tenant_id` itself. No other existing test changed.
+* **Not in the plan's file list.** `tests/perf/_schema.py` backfills
+  `tenant_id` with `'default'` when it upgrades a reused perf database. The
+  perf worker subprocess (`tests/perf/_collection_worker.py`) binds `default`
+  itself.
+* **K10 runs the real chain.** `tests/test_migration_tenant_id.py` builds the
+  schema by running the host's revisions to `8f3d223f8605` in an `alembic`
+  subprocess. On Postgres it uses a scratch schema selected with
+  `search_path`. It then upgrades, asserts, and also runs `alembic check`,
+  which is clean for records on both backends.
+* **Between Phase 2 and Phase 3 the real host cannot write records.** Nothing
+  binds a tenant outside the test suite yet. The demo host, the e2e suite and
+  the CLI (`seed`, `import`, `reindex`) hit `NOT NULL` on `tenant_id` until
+  Phases 3 and 4 land. Reads work, and on a single-tenant database they return
+  what they did before.
+* **Framework gaps found (add to §L):**
+  * **L14.** `HostSettings` (`simple_module_hosting/host_settings.py:14`) has no
+    `env_prefix`, and `_phase_helpers.py:193` registers it bare. So
+    `app.state.host.settings.multi_tenant` stays `False` on a host that set
+    `SM_MULTI_TENANT=true`, unless the DB row says otherwise. On such a host,
+    records' startup warning about the setting disagreeing with the stack
+    fires on every boot.
+  * **L15.** `simple_module_db.session.init_db` never turns on SQLite's
+    `PRAGMA foreign_keys`. On a SQLite host every foreign key is unenforced,
+    including the composite type key. K9 turns it on per session to prove the
+    constraint.
