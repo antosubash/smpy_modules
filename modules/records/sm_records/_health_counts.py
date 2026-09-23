@@ -73,10 +73,12 @@ async def count_invalid_records(session) -> dict[str, int]:
     """``{tenant: records}`` carrying a stored invalid mark, live only, across
     table sets and tenants.
 
-    The rule is :func:`sm_records.services._invalid.count_live`'s, with the
-    tenant added as a grouping column. Each statement is still an index range
-    over ``invalid_since IS NOT NULL``, so the cost is proportional to how
-    many records are marked, and that is what makes it affordable per check.
+    One statement per table set — a collection's records live in its own
+    document table (Phase 5 §6.3) — grouped by tenant. Each is an index range
+    rather than a scan: both backends answer ``invalid_since IS NOT NULL``
+    from the column's own index by reading only the entries that have a
+    value, so the cost is proportional to how many records are marked, and
+    that is what makes it affordable per check.
     """
     out: dict[str, int] = {}
     for tables in table_sets():

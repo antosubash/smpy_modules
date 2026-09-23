@@ -59,11 +59,11 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import attributes
 
-from sm_records.models import Record, RecordType, table_sets, tables_for
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.services._common import mark_written, utcnow
 from sm_records.tenancy import bound_tenant
 
-__all__ = ["Marker", "clear_on_write", "count_for_type", "count_live", "write_marks"]
+__all__ = ["Marker", "clear_on_write", "count_for_type", "write_marks"]
 
 _COLUMN = "invalid_since"
 
@@ -179,21 +179,3 @@ async def count_for_type(db: AsyncSession, rtype: RecordType) -> int:
         record.type_id == rtype.id, record.invalid_since.isnot(None)
     )
     return int((await db.execute(stmt)).scalar_one())
-
-
-async def count_live(db: AsyncSession) -> int:
-    """Marked live records across every type and every table set.
-
-    One statement per table set — a collection's records live in its own
-    document table (Phase 5 §6.3) — and each is an index range rather than a
-    scan: both backends can answer ``invalid_since IS NOT NULL`` from the
-    column's own index by reading only the entries that have a value, so the
-    cost is proportional to how many records are marked rather than to how
-    many exist. That is what makes this affordable from a health check.
-    """
-    total = 0
-    for tables in table_sets():
-        cls = tables.record
-        stmt = select(func.count(cls.id)).where(cls.invalid_since.isnot(None))
-        total += int((await db.execute(stmt)).scalar_one())
-    return total
