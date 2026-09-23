@@ -956,13 +956,22 @@ they are the only way to observe a write without polling.
 
 | Event | Published by | Carries |
 |---|---|---|
-| `RecordCreated` | `POST /records`, `POST …/translations`, each import row that created | `type_key`, `uuid`, `locale`, `translation_group`, `status` |
-| `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated, each record a bulk `publish`/`unpublish` changed | `type_key`, `uuid`, `version`, `status_before`, `status_after` |
-| `RecordTrashed` | `DELETE /records/{uuid}` and `POST …/records/bulk`, once per record the delete reached | `type_key`, `uuid`, `cascaded_from` |
-| `RecordRestored` | `POST …/restore`, `POST …/records/bulk` | `type_key`, `uuid` |
-| `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, and once per record of a deleted type | `type_key`, `uuid`, `locale`, `translation_group` |
-| `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `schema_version`, `kind`, `index_affecting_keys` |
-| `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `purged` |
+| `RecordCreated` | `POST /records`, `POST …/translations`, each import row that created | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group`, `status` |
+| `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated, each record a bulk `publish`/`unpublish` changed | `type_key`, `tenant_id`, `uuid`, `version`, `status_before`, `status_after` |
+| `RecordTrashed` | `DELETE /records/{uuid}` and `POST …/records/bulk`, once per record the delete reached | `type_key`, `tenant_id`, `uuid`, `cascaded_from` |
+| `RecordRestored` | `POST …/restore`, `POST …/records/bulk` | `type_key`, `tenant_id`, `uuid` |
+| `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, and once per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
+| `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
+| `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
+
+**`tenant_id` is on every event**, second after `type_key`. It was added to
+the contract with multi-tenancy. A type key and a record uuid are unique only
+within a tenant, so `(tenant_id, type_key, uuid)` is what names a record. On
+a single-tenant host it is always `"default"`. The event is published inside
+that tenant, so a handler finds it bound in
+`simple_module_db.current_tenant_id` and can read the record back through the
+ORM without binding a tenant itself. A subscriber that builds events itself,
+in a test say, has to pass it: the field has no default.
 
 Publishing is a status transition on `RecordUpdated` rather than an event of
 its own, so a create-as-published is one event and not two. `cascaded_from` is

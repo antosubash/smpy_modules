@@ -949,8 +949,8 @@ them:
 - the **admin** API is untouched: the records list, read, edit, export and
   delete exactly as before. An operator has to be able to reach them, which is
   the whole reason the save is not refused;
-- `/health/ready` degrades with an `orphaned_locales: {de: 12}` detail naming
-  each stranded language and how many records are in it.
+- `/health/ready` degrades with an `orphaned_locales: {default/de: 12}` detail
+  naming each stranded language, per tenant, and how many records are in it.
 
 The count is taken **once, at startup** (the framework's settings registry
 offers no post-hydration hook to recompute it from), so it appears after the
@@ -1272,13 +1272,18 @@ Results of the last full Postgres run are in
 The rebuild normally runs as a background task right after the schema change.
 If a worker was restarted mid-way, the field stays in `reindex_pending` and
 `/health/ready` degrades once an entry is older than
-`reindex_stale_after_seconds`, naming the type and fields. Run it yourself
-from the repo root:
+`reindex_stale_after_seconds`, naming the type (as `tenant/key`) and fields.
+Run it yourself from the repo root:
 
 ```
-python -m sm_records.cli reindex            # every type with pending keys
-python -m sm_records.cli reindex --type KEY # one type
+python -m sm_records.cli reindex                       # every tenant's types with pending keys
+python -m sm_records.cli reindex --type KEY            # one type, in tenant `default`
+python -m sm_records.cli reindex --type KEY --tenant T # one type, in tenant T
 ```
+
+Every subcommand takes `--tenant` (default `default`), and
+`python -m sm_records.cli tenants` lists the tenants that hold types — see
+[docs/operations.md § The CLI](docs/operations.md#the-cli).
 
 It is idempotent and resumable — index rows are derived from the stored
 payloads, so running it twice converges.
@@ -1299,7 +1304,8 @@ class MyModule(ModuleBase):
         bus.subscribe(RecordTypeChanged, self.on_type_changed)
 
     async def on_record_updated(self, event: RecordUpdated) -> None:
-        # event.type_key, event.uuid, event.version, event.status_before/after
+        # event.type_key, event.tenant_id, event.uuid, event.version,
+        # event.status_before/after — the handler runs bound to event.tenant_id
         ...
 ```
 
@@ -1307,9 +1313,13 @@ The set is `RecordCreated`, `RecordUpdated`, `RecordTrashed`,
 `RecordRestored`, `RecordPurged`, `RecordTypeChanged` and `RecordTypeDeleted`
 — see
 [docs/architecture.md § Extension points](docs/architecture.md#extension-points)
-for what each carries and why. Four properties are worth knowing before you
+for what each carries and why. Five properties are worth knowing before you
 rely on them:
 
+- **Every event carries `tenant_id`.** A key and a uuid are unique only
+  within a tenant, so `(tenant_id, type_key, uuid)` names a record. It is
+  `"default"` on a single-tenant host. The handler runs with that tenant
+  bound, so it can read the record back through the ORM as it is.
 - **They arrive after the commit.** The write is already visible to any
   session by the time a handler runs, and a request that rolled back publishes
   nothing.
@@ -1528,6 +1538,7 @@ relation checks a hand-built one would. Run it from the repo root:
 python -m sm_records.cli seed                         # 5000 records, seed 42
 python -m sm_records.cli seed --records 2000 --seed 7  # a smaller, different run
 python -m sm_records.cli seed --reset                  # purge the demo types first
+python -m sm_records.cli seed --tenant acme            # into tenant acme (default: default)
 python -m sm_records.cli seed --database-url sqlite+aiosqlite:///path/to.db
 ```
 

@@ -951,3 +951,82 @@ as in the Phase 1–2 notes.
     tenant, but other `MultiTenantMixin` adopters filter by it and stamp it.
     On Postgres a header longer than the 50-character column fails the write
     with a 500.
+---
+
+## Implementation notes — Phase 4
+
+The out-of-request paths of §A.5. Items are marked the same way as above.
+
+* **Deviation: `all_tenants` alone is not a cross-tenant read.** It only gets a
+  statement past the guard. The framework's filter
+  (`simple_module_db/listeners.py`, `_filter_select_statements`) attaches the
+  tenant criteria whenever `current_tenant_id` is set, and has no bypass. That
+  matters in practice: on a multi-tenant host `/health/ready` runs inside
+  `TenantMiddleware`, which binds whatever tenant a header names, and the test
+  suite binds `default` around everything. So the new
+  `sm_records/_cross_tenant.py::read_all` clears the contextvar for exactly one
+  `execute` (set and reset, FACT 1f) and tags the statement `all_tenants`.
+  Health, the CLI's enumeration, `records tenants` and the reindex runner's
+  type lookup all use it. Each one runs on a fresh session, and an autoflush
+  inside the unbound window would hit the guard's `before_flush`. This is
+  gap L2's `all_tenants=True` option, needed even when a tenant is bound.
+* **`defer()` raises `TenantUnbound` at enqueue** when nothing is bound. The
+  wrapper binds with `tenant_scope`, so a drain that is itself bound to a
+  *different* tenant refuses the job with `TenantIsolationError`, and does not
+  run it as the wrong tenant. The drain logs the refusal. It re-enters the same
+  tenant, which is what the single-mode harness does.
+* **The reindex runner refuses a mismatched binding instead of returning 0.**
+  It reads the type by id across tenants and then enters
+  `tenant_scope(rtype.tenant_id)`. A job bound to another tenant gets
+  `TenantIsolationError`, which `schedule` logs. The markers stay set, so the
+  health check surfaces them. §A.2 warned about the silent 0 this avoids.
+* **Events: `tenant_id` is the second field**, after `type_key`, with no
+  default. A forgotten tenant is a `TypeError` at construction, never a quiet
+  `"default"`. The builders read it off the type row. `type_deleted` reads the
+  bound tenant, because the row is gone by then. Positional construction of an
+  event changed; nothing in the repo constructs them positionally.
+* **Preview jobs: `preview_jobs.get_for_type(job_id, type_id)`** is the poll
+  lookup. The runner takes the tenant from the job in the registry, not from a
+  new argument, so `run_preview_job`'s signature is unchanged.
+* **Health details always name the tenant**, in single mode too:
+  `default/order (price)`, `orphaned_locales: {default/de: 12}`, and
+  `invalid_records: 12 (acme: 3, default: 9)`. One format in both modes
+  beats a format that changes when a second tenant appears.
+  `test_public_grammar_locales.py` changed to match.
+* **`tenants_outside_default` is computed on every check, not at startup.**
+  The tenants come from the type rows the stale check already reads (it now
+  selects `tenant_id` too). Records are counted only for tenants other than
+  `default`, over `ix_*_tenant_id`. So it adds no statement on a host with no
+  such rows. It makes the check DEGRADED, the only way a detail is shown.
+* **`count_invalid_records` no longer wraps `_invalid.count_live`.** It
+  groups by `tenant_id`, and `_invalid.py` is Phase 3's file. The rule (live
+  rows, `invalid_since IS NOT NULL`) is the same. `count_live` has no other
+  caller now.
+* **The mode reaches the health check and the sidebar through
+  `module.tenancy_mode`.** `health.on_startup(module, app, settings)` sets it,
+  with the orphaned-locale count. `module.py` swaps its four-line
+  orphaned-locale block for that call, so it stays at 298 lines. Both readers
+  default to single when the attribute is absent (a bare `SimpleNamespace`
+  in the tests).
+* **Multi mode, sidebar:** `menu.refresh` syncs an empty list and reads
+  nothing. It returns `False`, since no read happened. Any per-type items
+  already synced are removed. Single mode wraps `load_menu_types` in
+  `tenant_scope(DEFAULT_TENANT)` inside the `try`, so a scope that cannot
+  bind costs a log line.
+* **CLI shape.** `cli.py` was at 270 lines, so it is split.
+  `cli_common.py` has `open_db` (listeners plus `install_guard`),
+  `load_settings`, and the `--tenant` argument, whose argparse type validates
+  with `TENANT_RE` (exit 2). `cli_reindex.py` has `reindex`, `force_pending`
+  and `run_verify`. `cli.py` keeps dispatch, `seed` and the new `tenants`. The
+  old private names `_load_settings` and `_force_pending` are gone (no
+  callers). **Clarification of §A.5:** on `reindex` and `verify` the default
+  of `--tenant` is "every tenant" without `--type`, and `default` with one.
+  An explicit `--tenant` narrows the bare command to that tenant. `reindex`
+  and `tenants` gained `--database-url`, which the other subcommands already
+  had.
+* **The natural-key lookups in the CLI carry the explicit predicate**
+  (`RecordType.tenant_id == tenant`), as §E asks of every key lookup.
+* **K11 runs on the suite's backend.** The older CLI tests always use a SQLite
+  file. `test_tenancy_cli.py` uses the suite's Postgres database when
+  `SM_TEST_DATABASE_URL` names one. The commands that call `asyncio.run`
+  themselves run on a worker thread.

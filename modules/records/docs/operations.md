@@ -419,16 +419,62 @@ Run from the repo root, so the root `.env` is what `SM_DATABASE_URL` comes from.
 python -m sm_records.cli --help
 ```
 
-Four subcommands: `seed`, `reindex`, `export`, `import`. All of them read the
-module's **stored** settings, so `reindex_batch_size` as tuned on the Settings
-screen is what the CLI uses. A host whose settings tables are not there yet
-falls back to the declared defaults and says so.
+Five subcommands: `seed`, `reindex`, `export`, `import`, and `tenants`. All of
+them read the module's **stored** settings, so `reindex_batch_size` as tuned
+on the Settings screen is what the CLI uses. A host whose settings tables are
+not there yet falls back to the declared defaults and says so. Every one takes
+`--database-url` to override `SM_DATABASE_URL` for that run.
+
+### `--tenant`
+
+Every records row belongs to a tenant, and a CLI process has no request to
+take one from. So each subcommand takes **`--tenant T`** and works inside that
+tenant only:
+
+| Subcommand | Without `--tenant` | With `--tenant acme` |
+|---|---|---|
+| `export`, `import`, `seed` | `default` | `acme` |
+| `reindex --type K`, `reindex --verify --type K` | looks `K` up in `default` | looks `K` up in `acme` |
+| `reindex`, `reindex --verify` (no `--type`) | **every tenant**, each type in its own tenant | `acme` only |
+
+`default` is the tenant of a single-tenant host and of every row that predates
+tenancy. `T` must match `^[A-Za-z0-9][A-Za-z0-9_.:-]{0,49}$`. Anything else is
+a usage error (exit `2`), never a query. A key names a type only inside its
+tenant, so `--type order --tenant acme` and `--type order` are two different
+types. Output names each type as `tenant/key`.
+
+The CLI installs the module's tenancy guard on its own connection. A code path
+that reached the database with no tenant bound would fail with
+`TenantUnbound`, and would not read every tenant's rows. A command that visits
+several tenants opens a fresh session for each one.
+
+### `tenants`
+
+```bash
+python -m sm_records.cli tenants
+```
+
+```
+tenant   types    records    trashed
+acme         3        812          4
+default      5       5000          0
+```
+
+Read-only. It lists every tenant that holds at least one Record Type, with its
+live and trashed record counts. Records never creates a tenant: one exists
+once a user's `tenant_id`, an `X-Tenant-ID` header or `--tenant` names it and
+something is written there. So this command is the only list of tenants the
+module has. On a single-tenant host, a tenant other than `default` means rows
+the host cannot serve. The health check reports them too
+([§5 below](#5-tenants-outside-default-single-tenant-hosts)).
 
 ### `reindex`
 
 ```bash
-python -m sm_records.cli reindex              # every type with pending keys
-python -m sm_records.cli reindex --type order # one type, whether or not anything is pending
+python -m sm_records.cli reindex                            # every tenant's types with pending keys
+python -m sm_records.cli reindex --tenant acme              # acme's only
+python -m sm_records.cli reindex --type order               # default's order, pending or not
+python -m sm_records.cli reindex --type order --tenant acme # acme's order
 ```
 
 Idempotent and resumable: index rows are derived from the stored payloads, so
@@ -436,7 +482,7 @@ running it twice converges. `--type` on a type with no markers marks the whole
 type first and then runs the identical operation a schema change would trigger.
 
 ```
-records reindex: order — 9000 record(s)
+records reindex: default/order — 9000 record(s)
 records reindex: 9000 record(s) across 1 type(s)
 ```
 
@@ -445,13 +491,14 @@ With nothing pending and no `--type`: `records reindex: nothing pending`.
 ### `reindex --verify`
 
 ```bash
-python -m sm_records.cli reindex --verify
-python -m sm_records.cli reindex --verify --type order
+python -m sm_records.cli reindex --verify                    # every tenant
+python -m sm_records.cli reindex --verify --type order --tenant acme
 ```
 
 Writes nothing. Recomputes every registered reduce spec and reports each
-`(type, key, group)` whose stored row disagrees with the records. **Exit code
-`1` on drift, `0` clean**, so it works as a deploy gate or a cron check.
+`(type, key, group)` whose stored row disagrees with the records, as
+`DRIFT tenant/type/key group …`. **Exit code `1` on drift, `0` clean**, so it
+works as a deploy gate or a cron check.
 
 "Check it" and "fix it" are deliberately separate commands: a command that
 silently did both would make the drift it repaired impossible to report.
@@ -461,11 +508,12 @@ silently did both would make the drift it repaired impossible to report.
 ```bash
 python -m sm_records.cli export --type order --format json --out order.json
 python -m sm_records.cli export --type order --format csv          # to stdout
+python -m sm_records.cli export --type order --tenant acme --out acme-order.json
 ```
 
 Streams a chunk at a time; a 100k-record type is exported in constant memory.
-Writes `records export: order -> order.json (4821933 bytes)` when `--out` is
-given.
+Writes `records export: default/order -> order.json (4821933 bytes)` when
+`--out` is given.
 
 ### `import`
 
@@ -490,6 +538,13 @@ records import: order — 9000 row(s), 0 created, 0 updated, 9000 skipped, 0 fai
 
 Exits **non-zero** with the report printed when an `abort` run is refused.
 
+An import always writes into `--tenant` (default `default`). The file names no
+tenant that the importer reads. So exporting with `--tenant acme` and
+importing with `--tenant globex` copies acme's records of a type into
+globex's type of the same key. The uuids are kept. That is legal because a
+uuid is unique per tenant. The target type has to exist in the target tenant
+already: `POST /types/import` or the type editor, as the user in that tenant.
+
 This is the one place in the module that commits a session of its own — and only
 after a run that was asked to apply and came back without a refusal. It calls
 the same service code the HTTP endpoints do, so a file imported from the command
@@ -507,13 +562,16 @@ would.
 python -m sm_records.cli seed                          # 5000 records, seed 42
 python -m sm_records.cli seed --records 2000 --seed 7
 python -m sm_records.cli seed --reset                  # purge the demo types first
+python -m sm_records.cli seed --tenant acme --reset    # acme's demo types only
 python -m sm_records.cli seed --database-url sqlite+aiosqlite:///path/to.db
 ```
 
 `--records` is the *total* across all types (roughly 5% company / 25% contact /
 15% product / 45% order / 10% store, minimum one each). It is deterministic for
 a given `--seed`; re-running without `--reset` tops the dataset up. `--reset`
-hard-deletes the demo types and everything in them, trash included.
+hard-deletes the demo types and everything in them, trash included, **in
+`--tenant` only**. Another tenant's `company` is a different type that the
+reset never sees.
 
 On a host that declares the `events` collection the seeder adds a sixth type,
 `event`, in that collection, with a relation pointing at the **global** `store`
@@ -537,14 +595,19 @@ reset=…)` directly instead of shelling out.
 
 ## Health checks
 
-The module registers one health check, `records.reindex`. Four separate faults
+The module registers one health check, `records.reindex`. Five separate faults
 degrade `/health/ready` through it, and they are reported together rather than
 one hiding another.
+
+The check reads **every tenant**, whatever tenant the `/health/ready` request
+itself was bound to. Each row it names carries its tenant: `tenant/key` for a
+type and `tenant/locale` for a language, and the invalid count is broken down
+per tenant.
 
 ### 1. A stale reindex
 
 ```
-reindex pending for longer than 900s: order (placed_at, total) — run `python -m sm_records.cli reindex`
+reindex pending for longer than 900s: default/order (placed_at, total) — run `python -m sm_records.cli reindex`
 ```
 
 A `reindex_pending` entry older than `reindex_stale_after_seconds`. Usually a
@@ -577,9 +640,9 @@ instead. **Clear it** with a clean verify or a rebuild
 ### 3. Invalid records
 
 ```
-invalid_records: 12 — record(s) marked as not satisfying their type's schema,
-from a forced schema change; each one's next save clears the mark
-(filter=invalid:eq:true)
+invalid_records: 12 (acme: 3, default: 9) — record(s) marked as not satisfying
+their type's schema, from a forced schema change; each one's next save clears
+the mark (filter=invalid:eq:true)
 ```
 
 Counted from `invalid_since` on every check, which is affordable because both
@@ -600,9 +663,9 @@ now fits.
 ### 4. Orphaned locales
 
 ```
-orphaned_locales: {de: 12} — records in a language this install no longer
-publishes; they are hidden from the public API and still editable in the admin
-(filter=locale:eq:<tag>)
+orphaned_locales: {default/de: 12} — records in a language this install no
+longer publishes; they are hidden from the public API and still editable in the
+admin (filter=locale:eq:<tag>)
 ```
 
 **Counted once, at startup, and only there.** The framework's settings registry
@@ -610,6 +673,25 @@ offers no post-hydration hook to recompute it from, so an operator who drops a
 locale sees the count at the next restart — which the setting needs anyway.
 **Clear it** by translating those records into a language you do publish, by
 deleting them, or by putting the tag back.
+
+### 5. Tenants outside `default` (single-tenant hosts)
+
+```
+tenants_outside_default: {acme: 3 type(s), 816 record(s)} — this host is
+single-tenant and serves only 'default'; these rows are untouched but
+unreachable (`python -m sm_records.cli tenants`)
+```
+
+Reported only on a host whose middleware stack has no `TenantMiddleware`
+(`SM_MULTI_TENANT` unset or false). Such a host binds every request to
+`default`, so rows in any other tenant are invisible to every screen and
+endpoint. They get there in two ways: a CLI run with `--tenant`, or a host
+switched from multi-tenant back to single-tenant. Nothing is deleted. **Clear
+it** by switching the host to multi-tenant, by exporting those types with
+`--tenant` and importing them into `default`, or by deleting them with the
+CLI in that tenant. Each entry gives the tenant's types, then its records
+including the trash. It costs nothing on a host with no such rows: the tenants come from
+the type rows the stale check already reads.
 
 The check answers HEALTHY while the module has no database handle — during boot
 there is nothing to be stale yet, and a health check that fails because it ran
@@ -676,6 +758,14 @@ entry added by this module's own sync.
 - `0` re-reads on every page request — one query per page, for an install that
   would rather never show a stale sidebar.
 
+**Multi-tenant hosts get no per-type entries**, only "All record types". The
+registry is one list per process, and the sync runs before the request's
+tenant is known. Per-type entries would show each tenant's type labels to
+every other tenant, linking to keys that resolve differently per viewer. The
+hub page lists the viewer's own tenant's types, so nothing becomes
+unreachable. On a single-tenant host the sync reads `default`'s types, as
+before.
+
 Requests under `/api/`, `/static` and `/health` never trigger a re-read: none of
 them renders a sidebar.
 
@@ -723,6 +813,12 @@ the `PUT`. If that worker restarts before the rebuild finishes, the markers stay
 set, the affected fields keep refusing filters, and `/health/ready` degrades
 after `reindex_stale_after_seconds`. The fix is always the same:
 `python -m sm_records.cli reindex`.
+
+A deferred job also runs **in the tenant of the request that queued it**, both
+the rebuild and the event publication. The drain runs after the request's own
+tenant binding has been reset, so the module captures the tenant when the job
+is queued and binds it again around the job. The CLI without `--type` finishes
+every tenant's pending rebuilds.
 
 **Consequence:** make sure something watches `/health/ready`, and make sure an
 operator can run the CLI against production.
