@@ -596,29 +596,64 @@ are invisible in the framework's role editor.** An admin editing roles sees
 only the three coarse permissions above and has no way to discover, from that
 screen, that a given type is further restricted to specific roles.
 
-## Tenants
+## Multi-tenancy
 
 Every type, record and revision belongs to a tenant, and records decides which
-one a request runs in from the host's middleware stack:
+one a request runs in from the host's middleware stack — there is nothing to
+turn on inside this module itself.
 
-- **Single-tenant host** (no `SM_MULTI_TENANT`, the default): everything is in
-  the tenant `default`. A user's `tenant_id` and an `X-Tenant-ID` header are
-  ignored. Nothing to configure, and nothing changes for an existing install.
-- **Multi-tenant host** (`SM_MULTI_TENANT=true`): the admin API and screens run
-  in the signed-in user's own tenant. A user with none gets `403` with
-  `"code": "tenant_required"` — even with a tenant header, unless the
-  `admin_header_tenant` setting is on and they hold `admin`, in which case the
-  header's tenant is theirs. The public API runs in the tenant the framework
-  resolved (the header, or a signed-in reader's own) and answers its usual
-  `404` without one. Nothing ever falls back to `default`.
+**Single-tenant host (the default, and every existing install).** No
+`SM_MULTI_TENANT`, or `SM_MULTI_TENANT=false`. Nothing changes: every row is
+in the tenant `default`, a user's `tenant_id` and an `X-Tenant-ID` header are
+both ignored, and the module behaves exactly as it did before tenancy
+existed. The one thing to check before upgrading past the tenancy migration
+is below.
 
-Type keys and record uuids are unique per tenant. A keyset cursor is bound to
-the tenant it was minted in, a public answer names the tenant header in
-`Vary`, and a JSON export names its tenant (informational; an import always
-writes into the importer's tenant, which is how a tenant is cloned). The
-records screens receive
-the tenant they read as a read-only `tenant` prop, with `tenancy_mode`.
-Design: [docs/plans/2026-09-23-records-multitenancy.md](../../docs/plans/2026-09-23-records-multitenancy.md).
+**Multi-tenant host.** Set `SM_MULTI_TENANT=true`, and `SM_TENANT_HEADER` if
+anonymous readers or API clients need to name a tenant, then **restart** —
+the middleware stack is built once at boot, so an edit of the DB-hydrated
+setting alone does not install `TenantMiddleware`. From there:
+
+- **Assign every user a tenant by hand.** `UserCreate`/`UserUpdate` have no
+  `tenant_id` field and there is no UI for it yet — upstream
+  [#360](https://github.com/antosubash/simple_module_python/issues/360) — so
+  it is SQL: `UPDATE users_user SET tenant_id = 'acme' WHERE email = '...'`.
+  **Give legacy users `tenant_id = 'default'`** to keep them seeing the rows
+  that existed before the migration. A user's tenant travels in their session
+  cookie, so the change is invisible until they **log out and back in**
+  (upstream [#362](https://github.com/antosubash/simple_module_python/issues/362)).
+- A user with no tenant — the bootstrap admin included — gets `403` with
+  `"code": "tenant_required"` on every records admin screen, even with a
+  header sent: records never guesses. The `admin_header_tenant` setting
+  (default off) lets a user holding `admin` with no tenant of their own act
+  in the tenant their `X-Tenant-ID` header names, for an operator who
+  administers several tenants from one account.
+- Anonymous readers and headless clients name their tenant with that header;
+  with none, the public API answers its ordinary `404`, the same one an
+  unknown type gets. The pagebuilder `RecordsList` block's **Tenant** field
+  always sends the literal header `X-Tenant-ID`, whatever `SM_TENANT_HEADER`
+  is set to — so using the widget on a host that renamed the header needs
+  `SM_TENANT_HEADER=X-Tenant-ID` to match it, and a cross-origin embed
+  sending it triggers a CORS preflight.
+
+**`tenant_id` is now a reserved field key**, the same way `invalid` is: an
+install whose type already declares one answers `422` to every request that
+touches it once the upgrade lands. Check for it *before* upgrading — see
+[docs/operations.md](docs/operations.md#upgrading-past-4ecb931245dd-records-rows-gain-a-tenant).
+
+Type keys and record uuids are unique per tenant, not install-wide. A keyset
+cursor is bound to the tenant it was minted in; a public answer names the
+tenant header in `Vary` (or sends `Cache-Control: private` for a signed-in
+reader, whose tenant no request header can express); a JSON export names its
+tenant, informationally — an import always writes into the importer's tenant,
+which is how a tenant is cloned. The records screens receive the tenant they
+read as a read-only `tenant` prop, alongside `tenancy_mode`.
+
+The full runbook — upgrading a populated database, switching modes on a live
+install, the CLI's `--tenant` and `records tenants`, health details, and the
+upstream issues this module works around — is
+[docs/operations.md](docs/operations.md#multi-tenancy-operations). Design:
+[docs/plans/2026-09-23-records-multitenancy.md](../../docs/plans/2026-09-23-records-multitenancy.md).
 
 ## Data model notes worth knowing before you rely on them
 

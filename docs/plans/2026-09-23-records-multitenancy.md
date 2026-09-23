@@ -1,11 +1,24 @@
 # Records — multi-tenancy
 
+**Status: implemented**, across Phases 1–7 below (see "Implementation notes"
+after each phase's section for what changed on contact with the code). The
+module documentation this design produced is the contract to read for day to
+day use: [`modules/records/README.md`](../../modules/records/README.md#multi-tenancy)
+(what changes and what doesn't), [`docs/operations.md`](../../modules/records/docs/operations.md#multi-tenancy-operations)
+(the runbook — upgrading, switching modes, the CLI, health, upstream issues),
+[`docs/api-reference.md`](../../modules/records/docs/api-reference.md) (tenant
+resolution per surface, events, the error table), [`docs/architecture.md`](../../modules/records/docs/architecture.md)
+(owned vs. derived tables, the guard, the §E predicate rule), [`docs/user-guide.md`](../../modules/records/docs/user-guide.md#which-tenant-you-are-working-in)
+and [`docs/performance.md`](../../modules/records/docs/performance.md#multi-tenancy--what-the-tenant-column-costs-2026-09-23).
+
 *Addendum to [2026-09-19-records-module-design.md](2026-09-19-records-module-design.md)
 (§5, which left `MultiTenantMixin` off) and
 [2026-09-20-records-phase5-design.md](2026-09-20-records-phase5-design.md).
-Design only; nothing here is implemented. Every framework claim is backed by a
-spike run on Postgres — the `FACT` ids below point at captured output, see
-[Evidence](#evidence).*
+Design only when first written; every framework claim below is backed by a
+spike run on Postgres — the `FACT` ids point at captured output, see
+[Evidence](#evidence). What changed once the design met the code is recorded
+in the "Implementation notes" sections after each phase, not by editing the
+design text itself.*
 
 ## 0. The decision, and what this document decides
 
