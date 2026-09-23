@@ -48,6 +48,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     seed_record,
     seed_type,
 )
+from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
 
 

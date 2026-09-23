@@ -94,7 +94,8 @@ async def test_rows_outside_default_are_informational_and_do_not_degrade(db_stat
     result = await stale_reindex_check(_module(db_state, TenancyMode.SINGLE)).check()
 
     assert result.status is HealthStatus.HEALTHY
-    assert (result.detail or "").startswith("tenants_outside_default: {acme: 1 type(s), 0 record(s)}")
+    detail = result.detail or ""
+    assert detail.startswith("tenants_outside_default: {acme: 1 type(s), 0 record(s)}")
 
 
 async def test_single_mode_with_only_default_rows_says_nothing_about_tenants(db_state):
