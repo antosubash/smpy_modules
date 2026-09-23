@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeIndex
 from sm_records.models import RecordType, tables_for
+from sm_records.tenancy import bound_tenant
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
     from simple_module_db.listeners import SESSION_HAS_WRITES_KEY
@@ -134,9 +135,15 @@ async def guarded_bump(db: AsyncSession, model: Any, row_id: int, expected_versi
     values: dict[str, Any] = {"version": model.version + 1}
     if getattr(model, "updated_at", None) is not None:
         values["updated_at"] = utcnow()
+    # ``tenant_id`` because an ``UPDATE`` is filtered by nothing else (tenancy
+    # design §E); every model this bumps is tenant-owned.
     result = await db.execute(
         sa_update(model)
-        .where(model.id == row_id, model.version == expected_version)
+        .where(
+            model.id == row_id,
+            model.version == expected_version,
+            model.tenant_id == bound_tenant(),
+        )
         .values(**values)
     )
     if result.rowcount:

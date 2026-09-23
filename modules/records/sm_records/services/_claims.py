@@ -31,6 +31,7 @@ from sm_records.schema.fields import FieldDefinition
 from sm_records.services._lock import lock_type
 from sm_records.services._uuids import uuid_taken
 from sm_records.services.errors import Conflict, ValidationFailed
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type", "taken_by"]
 
@@ -104,7 +105,10 @@ async def ensure_slug_free(
         raise ValidationFailed(f"slug {NUL_PROBLEM}", [{"field": "slug", "message": NUL_PROBLEM}])
     record = tables_for(rtype).record
     stmt = select(record.id).where(
-        record.type_id == rtype.id, record.locale == locale, record.slug == slug
+        record.type_id == rtype.id,
+        record.locale == locale,
+        record.slug == slug,
+        record.tenant_id == bound_tenant(),  # a natural-key lookup: tenancy §E
     )
     if exclude_id is not None:
         stmt = stmt.where(record.id != exclude_id)

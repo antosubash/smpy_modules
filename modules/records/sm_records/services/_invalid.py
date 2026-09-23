@@ -61,6 +61,7 @@ from sqlalchemy.orm import attributes
 
 from sm_records.models import Record, RecordType, table_sets, tables_for
 from sm_records.services._common import mark_written, utcnow
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["Marker", "clear_on_write", "count_for_type", "count_live", "write_marks"]
 
@@ -105,7 +106,9 @@ async def write_marks(
         ids = [record.id for record in records if record.id is not None]
         if not ids:
             continue
-        await db.execute(sa_update(cls).where(cls.id.in_(ids)).values(invalid_since=value))
+        # The tenant explicitly: an ``UPDATE`` gets no tenant filter (tenancy §E).
+        owned = cls.id.in_(ids), cls.tenant_id == bound_tenant()
+        await db.execute(sa_update(cls).where(*owned).values(invalid_since=value))
         for record in records:
             attributes.set_committed_value(record, _COLUMN, value)
         touched += len(ids)

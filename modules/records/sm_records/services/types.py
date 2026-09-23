@@ -52,6 +52,7 @@ from sm_records.services.errors import (
 )
 from sm_records.services.records import purge_type_records
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 __all__ = [
     "create_type",
@@ -85,14 +86,26 @@ async def get_type(db: AsyncSession, key: str) -> RecordType:
     """
     if has_nul(key):
         raise NotFound(f"no record type with key {key!r}")
-    rtype = (await db.execute(select(RecordType).where(RecordType.key == key))).scalars().first()
+    rtype = (await db.execute(_owned_types().where(RecordType.key == key))).scalars().first()
     if rtype is None:
         raise NotFound(f"no record type with key {key!r}")
     return rtype
 
 
+def _owned_types():
+    """``select(RecordType)`` in the bound tenant, **said explicitly**.
+
+    The framework's loader criteria already add the same predicate to a
+    ``select(RecordType)``; a type key is where a caller's string becomes a
+    row, so this lookup does not rest on them alone (tenancy design §E). Two
+    tenants may both have ``post``, and with no tenant bound ``.first()``
+    would pick either (FACT 1b) — here it is ``TenantUnbound`` instead.
+    """
+    return select(RecordType).where(RecordType.tenant_id == bound_tenant())
+
+
 async def get_type_by_id(db: AsyncSession, type_id: int) -> RecordType:
-    rtype = (await db.execute(select(RecordType).where(RecordType.id == type_id))).scalars().first()
+    rtype = (await db.execute(_owned_types().where(RecordType.id == type_id))).scalars().first()
     if rtype is None:
         raise NotFound(f"no record type with id {type_id!r}")
     return rtype
@@ -149,7 +162,10 @@ async def create_type(
             f"key must match {TYPE_KEY_PATTERN} and be at most {MAX_KEY_LEN} characters",
             [{"field": "key", "message": f"{key!r} is not a valid type key"}],
         )
-    if (await db.execute(select(RecordType.id).where(RecordType.key == key))).scalars().first():
+    taken = select(RecordType.id).where(
+        RecordType.key == key, RecordType.tenant_id == bound_tenant()
+    )
+    if (await db.execute(taken)).scalars().first():
         raise Conflict(f"a record type with key {key!r} already exists")
 
     _check_collection(collection)
@@ -236,7 +252,13 @@ async def delete_type(
     # Explicit, not via the FK's ON DELETE CASCADE: SQLite leaves foreign keys
     # unenforced unless the pragma is on, so the cascade would clean up on
     # Postgres and orphan rows on the default dev backend.
-    await db.execute(sa_delete(RecordTypeRevision).where(RecordTypeRevision.type_id == rtype.id))
+    # Core DML: no tenant filter reaches it but this predicate (tenancy §E).
+    await db.execute(
+        sa_delete(RecordTypeRevision).where(
+            RecordTypeRevision.type_id == rtype.id,
+            RecordTypeRevision.tenant_id == bound_tenant(),
+        )
+    )
     await db.delete(rtype)
     await db.flush()
     return purged

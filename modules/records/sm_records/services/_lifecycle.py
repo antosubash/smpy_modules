@@ -34,6 +34,7 @@ from sm_records.services._delete_plan import apply_set_null, plan_delete
 from sm_records.services.errors import Conflict, ReferencedByOthers
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 
 async def _trash(
@@ -179,8 +180,13 @@ async def _purge(db: AsyncSession, tables: TableSet, records: list[Record]) -> N
     ids = [record.id for record in records if record.id is not None]
     if not ids:
         return
-    await db.execute(sa_delete(tables.revision).where(tables.revision.record_id.in_(ids)))
-    await db.execute(sa_delete(tables.record).where(tables.record.id.in_(ids)))
+    # Core DML carries no tenant filter but its own (tenancy design §E).
+    tenant = bound_tenant()
+    revision, document = tables.revision, tables.record
+    await db.execute(
+        sa_delete(revision).where(revision.record_id.in_(ids), revision.tenant_id == tenant)
+    )
+    await db.execute(sa_delete(document).where(document.id.in_(ids), document.tenant_id == tenant))
     await db.flush()
     for record in records:
         db.expunge(record)
@@ -253,12 +259,18 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Purged
     # ``_purge`` gives: SQLite leaves foreign keys unenforced unless the
     # pragma is on, so the cascade would clean up on Postgres and orphan rows
     # on the default dev backend.
+    #
+    # The tenant on both DELETEs *and* inside the ``IN`` subquery: DML and a
+    # mapper inside ``in_()`` are the shapes no tenant filter reaches
+    # (tenancy design §E, FACT 1d/1e).
+    tenant = bound_tenant()
+    owned = select(cls.id).where(cls.type_id == rtype.id, cls.tenant_id == tenant)
     await db.execute(
         sa_delete(tables.revision).where(
-            tables.revision.record_id.in_(select(cls.id).where(cls.type_id == rtype.id))
+            tables.revision.record_id.in_(owned), tables.revision.tenant_id == tenant
         )
     )
-    await db.execute(sa_delete(cls).where(cls.type_id == rtype.id))
+    await db.execute(sa_delete(cls).where(cls.type_id == rtype.id, cls.tenant_id == tenant))
     await db.flush()
     # Core DML does not fire ``after_flush``, so the request's session would
     # otherwise take ``get_db``'s read-only branch and never commit the purge.

@@ -42,6 +42,7 @@ from sqlalchemy.sql import Subquery
 
 from sm_records.models import Record, RecordType, TableSet, tables_of
 from sm_records.schema.types import IndexKind
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["pair_page", "pair_rows", "set_counts", "types_by_id"]
 
@@ -81,6 +82,13 @@ def pair_rows(tables: TableSet, record: Record) -> Subquery:
     records independently, so an id alone names two different rows (§6.4). A
     record holding a relation to itself would otherwise make its own
     ``restrict`` field refuse its own delete.
+
+    **The tenant is a predicate here, and nothing else would supply it.** Core
+    tables are exactly what keeps the soft-delete criteria off, and they keep
+    the tenant criteria off with them (tenancy design §E, FACT 1c/1d). The
+    target pair is tenant-bound by the composite foreign key, but a ref row
+    written out of band is not, so the referring rows are narrowed to the
+    bound tenant explicitly.
     """
     ref = tables.index[IndexKind.REF].__table__
     rows = tables.record.__table__
@@ -91,7 +99,11 @@ def pair_rows(tables: TableSet, record: Record) -> Subquery:
             ref.c.type_id.label("tid"),
         )
         .select_from(ref.join(rows, rows.c.id == ref.c.record_id))
-        .where(ref.c.target_uuid == record.uuid, ref.c.target_type_id == record.type_id)
+        .where(
+            ref.c.target_uuid == record.uuid,
+            ref.c.target_type_id == record.type_id,
+            rows.c.tenant_id == bound_tenant(),
+        )
     )
     if tables is tables_of(record):
         stmt = stmt.where(ref.c.record_id != record.id)

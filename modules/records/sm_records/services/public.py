@@ -63,6 +63,7 @@ from sm_records.services._listing import RecordListPage
 from sm_records.services._translations import published_siblings
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 __all__ = [
     "NOT_FOUND",
@@ -96,8 +97,13 @@ def _published_only(record: Any, stmt):
     """The one predicate this whole surface is defined by. Bound to a document
     class it becomes the shape ``bounded_count_query``'s ``narrow`` takes, so
     the page and both halves of its count cannot disagree about what "public"
-    means."""
-    return stmt.where(_published(record))
+    means.
+
+    **And in the bound tenant, said explicitly** (tenancy design §E): this is
+    the anonymous surface, where a row from the wrong tenant would be an
+    enumeration oracle, so it does not rest on the framework's loader criteria
+    alone."""
+    return stmt.where(_published(record), record.tenant_id == bound_tenant())
 
 
 def _narrow_for(record: Any, locale: str):
@@ -154,7 +160,8 @@ async def get_public_type(db: AsyncSession, key: str) -> RecordType:
         # this is the surface where that was a 500 to a caller with no session
         # at all. No stored key can contain one, so the shared 404 is exact.
         raise NotFound(NOT_FOUND)
-    rtype = (await db.execute(select(RecordType).where(RecordType.key == key))).scalars().first()
+    stmt = select(RecordType).where(RecordType.key == key, RecordType.tenant_id == bound_tenant())
+    rtype = (await db.execute(stmt)).scalars().first()
     if rtype is None or not rtype.is_public:
         raise NotFound(NOT_FOUND)
     return rtype
@@ -180,11 +187,13 @@ async def get_public_record(
     the other way: an operator has to be able to read, edit and re-home them.
     """
     cls = tables_for(rtype).record
-    stmt = select(cls).where(
-        cls.uuid == uuid,
-        cls.type_id == rtype.id,
-        _published(cls),
-        cls.locale.in_(locales.supported(settings)),
+    stmt = _published_only(
+        cls,
+        select(cls).where(
+            cls.uuid == uuid,
+            cls.type_id == rtype.id,
+            cls.locale.in_(locales.supported(settings)),
+        ),
     )
     record = (await db.execute(stmt)).scalars().first()
     if record is None:

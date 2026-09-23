@@ -30,6 +30,7 @@ from sm_records.services._common import utcnow
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 
 async def list_revisions(db: AsyncSession, record: Record) -> list[RecordRevision]:
@@ -134,7 +135,13 @@ async def _trim(db: AsyncSession, record: Record, limit: int) -> None:
         .all()
     )
     if stale:
-        await db.execute(delete(revision).where(revision.id.in_(list(stale))))
+        # The ids came from a tenant-filtered read; the ``DELETE`` still says
+        # its tenant, because DML is filtered by nothing else (tenancy §E).
+        await db.execute(
+            delete(revision).where(
+                revision.id.in_(list(stale)), revision.tenant_id == bound_tenant()
+            )
+        )
 
 
 def _split(rtype: RecordType, snapshot: dict) -> tuple[dict, dict]:

@@ -61,6 +61,7 @@ from sm_records.services._translations import create_translation, list_translati
 from sm_records.services.errors import Conflict, NotFound
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 __all__ = [
     "RecordListPage",
@@ -90,7 +91,12 @@ async def _by_uuid(db: AsyncSession, rtype: RecordType, uuid: str, *, trashed: b
     if has_nul(uuid):
         raise NotFound(f"no {rtype.key} record with uuid {uuid!r}")
     cls = tables_for(rtype).record
-    stmt = select(cls).where(cls.uuid == uuid, cls.type_id == rtype.id)
+    # The tenant said explicitly on a natural-key lookup (tenancy design §E):
+    # uuids are unique per tenant only, so the loader criteria are not what
+    # this one rests on.
+    stmt = select(cls).where(
+        cls.uuid == uuid, cls.type_id == rtype.id, cls.tenant_id == bound_tenant()
+    )
     if trashed:
         stmt = stmt.execution_options(include_deleted=True)
     record = (await db.execute(stmt)).scalars().first()
@@ -148,6 +154,11 @@ async def create_record(
     record = tables_for(rtype).record(
         uuid=uuid,
         type_id=rtype.id,
+        # The type's tenant, not left to the flush listener: a context bound to
+        # another tenant is then the framework's ``TenantIsolationError`` before
+        # it is the composite foreign key's refusal (tenancy design §F). Every
+        # create goes through here — translations, import and seed included.
+        tenant_id=rtype.tenant_id,
         data=stored,
         schema_version=rtype.schema_version,
         version=1,

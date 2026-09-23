@@ -30,6 +30,7 @@ from sm_records.services._import_parse import ImportRow
 from sm_records.services._import_rows import envelope_for
 from sm_records.services._payload import slugify
 from sm_records.services.errors import ValidationFailed
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["MATCH_SLUG", "MATCH_UUID", "match_field", "resolve_matches"]
 
@@ -138,7 +139,9 @@ async def _by_slug(
     found: dict[tuple[str, str], Record] = {}
     for start in range(0, len(slugs), _CHUNK):
         stmt = select(cls).where(
-            cls.type_id == rtype.id, cls.slug.in_(slugs[start : start + _CHUNK])
+            cls.type_id == rtype.id,
+            cls.slug.in_(slugs[start : start + _CHUNK]),
+            cls.tenant_id == bound_tenant(),  # a natural-key match: tenancy §E
         )
         matches = (await db.execute(stmt.execution_options(include_deleted=True))).scalars().all()
         for record in matches:
@@ -161,7 +164,10 @@ async def _by_column(
     found: dict[str, Record] = {}
     for start in range(0, len(keys), _CHUNK):
         chunk = keys[start : start + _CHUNK]
-        stmt = select(cls).where(column.in_(chunk))
+        # The tenant explicitly, and before ``scoped``: an unscoped uuid match
+        # spans every type of the table set, and uuids are unique per tenant
+        # only (tenancy design §C, §E).
+        stmt = select(cls).where(column.in_(chunk), cls.tenant_id == bound_tenant())
         if scoped:
             stmt = stmt.where(cls.type_id == rtype.id)
         rows_found = (

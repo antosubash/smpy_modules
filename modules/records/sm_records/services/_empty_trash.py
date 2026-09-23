@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.index.query import Filter, filtered, only_trashed
 from sm_records.models import RecordType, tables_for
 from sm_records.services._common import mark_written
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["Identity", "empty_trash"]
 
@@ -65,12 +66,21 @@ async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> Non
     below the truth.
     """
     tables = tables_for(rtype)
+    revision, document = tables.revision, tables.record
+    # The documents and revisions say their tenant: Core DML is filtered by
+    # nothing else (tenancy design §E). The index tables carry none — they
+    # are keyed by ``record_id``, whose record is its type's tenant's.
+    tenant = bound_tenant()
     for start in range(0, len(ids), _CHUNK):
         batch = ids[start : start + _CHUNK]
         for table in tables.index_tables:
             await db.execute(sa_delete(table).where(table.record_id.in_(batch)))
-        await db.execute(sa_delete(tables.revision).where(tables.revision.record_id.in_(batch)))
-        await db.execute(sa_delete(tables.record).where(tables.record.id.in_(batch)))
+        await db.execute(
+            sa_delete(revision).where(revision.record_id.in_(batch), revision.tenant_id == tenant)
+        )
+        await db.execute(
+            sa_delete(document).where(document.id.in_(batch), document.tenant_id == tenant)
+        )
     await db.flush()
     mark_written(db)
 

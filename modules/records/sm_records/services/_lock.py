@@ -18,6 +18,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import RecordType
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["lock_type"]
 
@@ -56,9 +57,11 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     check-then-act, and every type can have one.
     """
     if db.get_bind().dialect.name == "sqlite":
+        # The tenant said explicitly: this is DML, which no tenant filter
+        # reaches (tenancy design §E).
         await db.execute(
             sa_update(RecordType)
-            .where(RecordType.id == rtype.id)
+            .where(RecordType.id == rtype.id, RecordType.tenant_id == bound_tenant())
             .values(version=RecordType.version, updated_at=RecordType.updated_at)
         )
         return

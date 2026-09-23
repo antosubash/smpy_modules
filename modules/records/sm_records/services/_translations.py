@@ -29,6 +29,7 @@ from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.services import _claims
 from sm_records.services.errors import Conflict
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["create_translation", "list_translations", "published_siblings"]
 
@@ -114,6 +115,8 @@ async def published_siblings(
             cls.translation_group.in_(groups),
             cls.status == RecordStatus.PUBLISHED,
             cls.locale.in_(locales.supported(settings)),
+            # The anonymous surface says its tenant explicitly (tenancy §E).
+            cls.tenant_id == bound_tenant(),
         )
         .order_by(cls.locale)
     )
