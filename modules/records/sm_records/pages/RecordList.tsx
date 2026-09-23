@@ -242,9 +242,13 @@ function RecordList({
                 filtered={Boolean(currentFilter) || Boolean(filterErrorReason)}
                 errorMessage={filterErrorReason ? filterErrorMessage(t, filterErrorReason) : null}
                 canImport={canEdit}
-                cursor={after ? (cursorRefused ? 'refused' : 'ended') : null}
+                // Any refusal, not only the cursor's: nothing was queried.
+                cursor={after ? (filterErrorReason ? 'refused' : 'ended') : null}
+                cursorClears={filterRefused}
                 onClear={clearFilter}
-                onFirstPage={() => goTo({ page: 1 })}
+                onFirstPage={() =>
+                  goTo({ page: 1, ...(filterRefused && { filter: null, sort: null }) })
+                }
               />
             ) : (
               <MediaApiProvider value={media_api}>

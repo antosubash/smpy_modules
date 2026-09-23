@@ -90,6 +90,7 @@
     "filter_unknown_help": "This type has no filterable field by that name. Pick another.",
     "filter_apply": "Apply",
     "filter_clear": "Clear",
+    "clear_filter_sort": "Clear filter and sort",
     "position": "Position",
     "published_at": "Published on",
     "locale": "Language",

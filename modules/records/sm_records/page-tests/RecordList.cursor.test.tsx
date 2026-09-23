@@ -151,4 +151,20 @@ describe('RecordList — paging past the cap by cursor', () => {
     expect(lastParams()).toEqual({ sort: 'name', filter: 'name:eq:x' });
     await view.unmount();
   });
+
+  it('a refused sort or filter on a cursor link is not "no more records"', async () => {
+    // Review 4, code F2: the sort field is mid-reindex (or was removed) —
+    // nothing was queried, and page 1 would be refused the same way.
+    pageUrl = '/admin/records/book?sort=price&filter=name%3Aeq%3Ax&after=CURSOR-1';
+    pageErrors = { filter: 'reindexing' };
+    const view = await mount(<RecordList type={type} records={cursorPage('a', null, 0)} />);
+    expect(view.find('[data-testid="records-empty-cursor"]')?.textContent).toBe(
+      'Nothing to show — this link could not continue the list.',
+    );
+    const button = view.find('[data-testid="records-empty-state"]')?.querySelector('button');
+    expect(button?.textContent).toBe('Clear filter and sort');
+    await click(button);
+    expect(lastParams()).toEqual({});
+    await view.unmount();
+  });
 });

@@ -21,6 +21,7 @@ export function RecordListEmpty({
   errorMessage,
   canImport = false,
   cursor = null,
+  cursorClears = false,
   onClear,
   onFirstPage,
 }: {
@@ -48,11 +49,16 @@ export function RecordListEmpty({
   canImport?: boolean;
   /** The list is on a page reached by `?after=`, and it is empty because
    *  that page is past the last row (`'ended'` — a full final page still
-   *  hands out a cursor) or because the server refused the cursor
-   *  (`'refused'`, the notice above says why). Either way the type is not
-   *  empty and no filter is at fault, so this says so and offers the first
-   *  page rather than "Clear". Takes precedence over every other state. */
+   *  hands out a cursor) or because the server refused the link
+   *  (`'refused'`, the notice above says why): the cursor itself, or the
+   *  filter or sort it came with. Either way the type is not empty, so this
+   *  says so and offers the first page rather than "Clear". Takes precedence
+   *  over every other state. */
   cursor?: 'ended' | 'refused' | null;
+  /** The refusal was the filter or sort, not the cursor: page 1 would be
+   *  refused the same way, so the button clears both instead
+   *  (`onFirstPage` is then the caller's "page 1, no filter, no sort"). */
+  cursorClears?: boolean;
   onClear: () => void;
   onFirstPage?: () => void;
 }) {
@@ -74,7 +80,9 @@ export function RecordListEmpty({
                 })}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onFirstPage}>
-            {t('records.records.first_page', { defaultValue: 'First page' })}
+            {cursorClears
+              ? t('records.records.clear_filter_sort', { defaultValue: 'Clear filter and sort' })
+              : t('records.records.first_page', { defaultValue: 'First page' })}
           </Button>
         </>
       ) : trashed ? (
