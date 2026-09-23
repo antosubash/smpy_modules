@@ -12,7 +12,7 @@ this router is built.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from sm_records.endpoints.api import (
     aggregate,
@@ -27,8 +27,15 @@ from sm_records.endpoints.api import (
     translations,
     types,
 )
+from sm_records.tenancy import bind_admin
 
-router = APIRouter()
+# The tenant binding is the router's **first** dependency, and FastAPI puts a
+# parent router's dependencies ahead of every included route's, so it is first
+# for every route below (tenancy design §A.4). Not cosmetic: yield
+# dependencies exit in reverse, and ``get_db`` — opened by the permission check
+# — commits on its way out, which has to happen while the tenant is still
+# bound or an unflushed write reaches the database with none.
+router = APIRouter(dependencies=[Depends(bind_admin)])
 # Before ``types``: ``/types/{key}/schema/preview/{job}`` is a GET the types
 # router has no route for, but keeping the pair adjacent is what makes the
 # split between them visible at the mount point.

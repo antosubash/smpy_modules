@@ -1,9 +1,9 @@
 """Tenancy primitives — ``sm_records.tenancy`` (design 2026-09-23 §A.3, §A.4).
 
-Nothing here is wired onto the module's routers yet (that is Phase 3); these
-pin the pieces those routers will stand on: the scope's set/reset/refusal, the
-tenant-id grammar, mode detection on the stacks the framework actually builds,
-the two resolvers' table, and the bind dependencies over a real request.
+These pin the pieces the module's routers stand on: the scope's
+set/reset/refusal, the tenant-id grammar, mode detection on the stacks the
+framework actually builds, the two resolvers' table, and the bind dependencies
+over a real request. The routers themselves are ``test_tenancy_binding.py``.
 
 Every test runs **unbound** — the suite-wide ``default`` binding of
 ``conftest._default_tenant`` would make "nothing is bound" untestable.
@@ -122,22 +122,29 @@ def test_mode_is_read_off_the_stack_create_app_builds(monkeypatch, multi):
     assert detect_mode(app) is (TenancyMode.MULTI if multi else TenancyMode.SINGLE)
 
 
-def test_configure_stores_the_mode_and_warns_when_the_host_setting_disagrees(caplog):
-    app = FastAPI()
-    app.add_middleware(TenantMiddleware, header="X-Tenant-ID")
+def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(caplog):
+    """Only one disagreement is worth a warning: ``multi_tenant`` on in the
+    database with no ``TenantMiddleware`` in the stack (an admin-UI edit that
+    did nothing). A multi stack with the setting off is every host configured
+    through ``SM_MULTI_TENANT``, which ``HostSettings`` never reads (L14)."""
+    single = FastAPI()
     services = SimpleNamespace(tenancy=None)
-    setattr(app.state, constants.PACKAGE, services)
-    app.state.host = SimpleNamespace(settings=SimpleNamespace(multi_tenant=False))
+    setattr(single.state, constants.PACKAGE, services)
+    single.state.host = SimpleNamespace(settings=SimpleNamespace(multi_tenant=True))
     with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
-        assert configure(app) is TenancyMode.MULTI
-    assert services.tenancy is TenancyMode.MULTI
-    assert "multi_tenant" in caplog.text
+        assert configure(single) is TenancyMode.SINGLE
+    assert services.tenancy is TenancyMode.SINGLE
+    assert "multi_tenant is on" in caplog.text
 
-    caplog.clear()
-    app.state.host.settings.multi_tenant = True
-    with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
-        configure(app)
-    assert caplog.text == ""
+    multi = FastAPI()
+    multi.add_middleware(TenantMiddleware, header="X-Tenant-ID")
+    setattr(multi.state, constants.PACKAGE, SimpleNamespace(tenancy=None))
+    for wanted in (False, True):
+        caplog.clear()
+        multi.state.host = SimpleNamespace(settings=SimpleNamespace(multi_tenant=wanted))
+        with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
+            assert configure(multi) is TenancyMode.MULTI
+        assert caplog.text == ""
 
 
 def test_mode_of_prefers_the_stored_mode_and_detects_before_startup():

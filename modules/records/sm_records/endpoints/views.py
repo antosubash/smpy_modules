@@ -14,7 +14,7 @@ from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants, locales
+from sm_records import constants, locales, tenancy
 from sm_records.contracts.schemas import (
     record_list_read,
     record_read,
@@ -45,7 +45,11 @@ from sm_records.services import types as type_service
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
-router = APIRouter(route_class=RecordsViewErrorRoute, dependencies=[require_view])
+# ``bind_admin`` first, for the reason ``endpoints.api``'s router gives; it
+# covers ``views_types`` too, which is included below.
+router = APIRouter(
+    route_class=RecordsViewErrorRoute, dependencies=[Depends(tenancy.bind_admin), require_view]
+)
 # First, and that is not cosmetic: ``/types/new`` and ``/types/{key}`` must be
 # matched before the generic ``/{key}`` record list below, and Starlette
 # matches in registration order.
@@ -95,6 +99,7 @@ async def record_new(
             "translations": [],
             "media_api": media_props(request),
             **_locale_props(settings),
+            **tenancy.view_props(request),
         },
     )
 
@@ -169,6 +174,7 @@ async def record_edit(
             # or ``None`` for the plain text box. Also on the new-record screen.
             "media_api": media_props(request),
             **_locale_props(settings),
+            **tenancy.view_props(request),
         },
     )
 
@@ -267,6 +273,9 @@ async def record_list(
         # exists", not "what exists in English". The selector narrows it with
         # an ordinary ``?filter=locale:eq:de``.
         **_locale_props(settings),
+        # Which tenant this screen reads, and whether the host has several
+        # (tenancy design §J) — read-only; on every records screen.
+        **tenancy.view_props(request),
     }
     return await inertia.render(constants._PAGE_RECORD_LIST, props)
 

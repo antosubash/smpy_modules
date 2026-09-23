@@ -67,8 +67,16 @@ from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.media import public_file_url_template
 from sm_records.services import public as public_service
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import bind_public
 
-router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*PUBLIC_READ))
+# ``bind_public`` first, for the reason ``endpoints.api``'s router gives. In
+# multi mode a request whose tenant the framework could not resolve is the
+# shared 404 before any handler runs (tenancy design §A.3).
+router = APIRouter(
+    route_class=RecordsErrorRoute,
+    responses=responses(*PUBLIC_READ),
+    dependencies=[Depends(bind_public)],
+)
 
 _Handler = TypeVar("_Handler", bound=Callable[..., Any])
 

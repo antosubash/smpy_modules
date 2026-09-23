@@ -15,13 +15,12 @@ there so tests never need to know this module exists.
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any
 
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from inertia import InertiaConfig, inertia_dependency_factory
@@ -29,101 +28,33 @@ from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
-from simple_module_hosting.permissions import resolve_permissions
+from simple_module_hosting.middleware import (
+    TENANT_HEADER,
+    InertiaLayoutDataMiddleware,
+    TenantMiddleware,
+)
 from sm_records.models import Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
-from starlette.middleware.base import BaseHTTPMiddleware
+from sm_records.tenancy import configure, install_guard
 
+from tests.harness_auth import (  # noqa: F401 - re-exported: tests import them from here
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_EDITOR_TWO,
+    ROLE_MANAGER,
+    ROLE_NONE,
+    ROLE_VIEWER,
+    TEST_TENANT_HEADER,
+    _HeaderAuthMiddleware,
+    _register_roles,
+    roles,
+)
 from tests.pg_support import make_db_state
-
-try:
-    # Only present when the host also installs ``permissions`` — see
-    # ``sm_records.deps``'s fallback import for why ``records`` cannot
-    # require it. When it *is* installed (as in this repo's dev venv),
-    # ``deps.RequiresPermission`` resolves to ``permissions.deps``'s version,
-    # which (a) needs a real UUID for ``request.state.user.id`` rather than
-    # this harness's plain ``"test:<roles>"`` string, and (b) queries
-    # ``permissions_user_permission`` directly rather than falling back to
-    # the role map when ``request.state.resolved_permissions`` is unset — so
-    # both have to be provided here for the harness to behave like the real
-    # request pipeline (``AuthMiddleware`` sets ``resolved_permissions``;
-    # real user ids are UUIDs). Its table is created by
-    # ``tests.pg_support.make_db_state``.
-    import permissions.models  # noqa: F401
-
-    _PERMISSIONS_INSTALLED = True
-except ImportError:  # pragma: no cover - exercised only without `permissions`
-    _PERMISSIONS_INSTALLED = False
-
-#: Holds ``records.view`` + ``records.edit`` — the caller a ``allowed_roles``
-#: test uses as the one who *should* pass.
-ROLE_VIEWER = "records-viewer"
-ROLE_EDITOR = "records-editor"
-#: A second, distinct edit-capable role: holds the same static permission as
-#: ``ROLE_EDITOR`` but is never on a type's ``allowed_roles`` list unless a
-#: test puts it there — the caller who should be refused.
-ROLE_EDITOR_TWO = "records-editor-two"
-ROLE_MANAGER = "records-manager"
-#: Registered nowhere: resolves to an empty permission set, same as any
-#: role nobody mapped. Named for readability at call sites.
-ROLE_NONE = "records-nobody"
-
-ADMIN = "admin"
-"""Resolves to the wildcard via ``DEFAULT_ROLE_PERMISSIONS`` with no mapping
-of our own needed — the case a naive membership check over a literal
-permission list would miss."""
-
-
-def _register_roles(registry: PermissionRegistry) -> None:
-    from sm_records.constants import PERM_EDIT, PERM_MANAGE_TYPES, PERM_VIEW
-
-    registry.map_role(ROLE_VIEWER, [PERM_VIEW])
-    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT])
-    registry.map_role(ROLE_EDITOR_TWO, [PERM_VIEW, PERM_EDIT])
-    registry.map_role(ROLE_MANAGER, [PERM_VIEW, PERM_EDIT, PERM_MANAGE_TYPES])
-
-
-class _HeaderAuthMiddleware(BaseHTTPMiddleware):
-    """``X-Test-Roles: role-a,role-b`` becomes ``request.state.user.roles``.
-
-    No header at all leaves the request anonymous — the harness's stand-in
-    for an unauthenticated caller, which ``RequiresPermission`` turns into a
-    401 exactly as the framework's real auth middleware would.
-    """
-
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        raw = request.headers.get("X-Test-Roles")
-        if raw is not None:
-            roles_list = [role.strip() for role in raw.split(",") if role.strip()]
-            # A real UUID when ``permissions`` is installed — its checker
-            # casts ``user.id`` with ``uuid.UUID(str(...))`` before it ever
-            # gets to a role check that would otherwise short-circuit that;
-            # deterministic (not random) so the same header always maps to
-            # the same id within a test.
-            user_id = (
-                str(uuid.uuid5(uuid.NAMESPACE_DNS, raw))
-                if _PERMISSIONS_INSTALLED
-                else f"test:{raw}"
-            )
-            request.state.user = SimpleNamespace(
-                id=user_id, email="test@example.com", roles=roles_list
-            )
-            # Mirrors ``AuthMiddleware`` (``simple_module_hosting/middleware.py``),
-            # which runs ahead of every dependency in production. Without it,
-            # ``permissions.deps.RequiresPermission`` (unlike the framework's
-            # own, roles-only checker) has no role-map fallback of its own and
-            # treats every caller as holding nothing but direct grants.
-            registry = request.app.state.sm.permissions
-            request.state.resolved_permissions = resolve_permissions(
-                roles_list, role_map=registry.role_map
-            )
-        return await call_next(request)
 
 
 async def build_app(
-    tmp_path: Any, db_state: Any = None, *, menus: bool = False
+    tmp_path: Any, db_state: Any = None, *, menus: bool = False, tenancy: str = "single"
 ) -> tuple[FastAPI, Any]:
     """Every router mounted at its real prefix, exactly as
     ``wire_module_routes`` does in production.
@@ -140,6 +71,12 @@ async def build_app(
     shared prop of a view response. Off by default because that middleware
     adds ``auth``/``menus``/``i18n`` to *every* Inertia payload, and the view
     tests assert the exact set of props their pages produce.
+
+    ``tenancy="multi"`` installs the framework's ``TenantMiddleware`` reading
+    ``X-Tenant-ID``, where the host puts it — inside auth and inside the
+    module's middleware — so the harness has the production stack shape
+    (tenancy design §K). Either way the tenancy guard is on, as
+    ``on_startup`` leaves it in a host.
     """
     module = RecordsModule()
     # Pre-seeded so ``register_settings`` hands the services container this
@@ -212,8 +149,12 @@ async def build_app(
     # drain is what makes the reindex run *after* the request's session has
     # been committed and closed, and a harness without it would prove the
     # endpoints work under an ordering production does not have.
+    if tenancy == "multi":
+        app.add_middleware(TenantMiddleware, header=TENANT_HEADER)
     module.register_middleware(app)
     app.add_middleware(_HeaderAuthMiddleware)
+    configure(app)
+    install_guard(db_state.sync_session_class)
     # Parked so a test can run the lifespan hook the host would run — the
     # anonymous read API is mounted from ``on_startup`` (its prefix is a
     # settings value), so a test of it has to reach the module instance.
@@ -238,12 +179,6 @@ async def client(records_app) -> AsyncIterator[AsyncClient]:
         http_client.app = app  # type: ignore[attr-defined]
         http_client.db_state = db_state  # type: ignore[attr-defined]
         yield http_client
-
-
-def roles(*names: str) -> dict[str, str]:
-    """``client.get(url, headers=roles(ADMIN))`` — the one header the stub
-    auth middleware reads."""
-    return {"X-Test-Roles": ",".join(names)}
 
 
 async def seed_type(db_state: Any, key: str, fields: list[dict], **cols: Any) -> RecordType:

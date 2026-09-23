@@ -12,6 +12,10 @@ from tests.app_harness import ADMIN, ROLE_VIEWER, roles, seed_record, seed_type
 
 _INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
+_TENANCY_PROPS = ("tenant", "tenancy_mode")
+"""On every records screen: which tenant it reads and whether the host has
+several (tenancy design §J). ``test_tenancy_binding.py`` checks the values."""
+
 _NOW = "2026-09-19T10:00:00+00:00"
 """``reindex_pending`` maps a field key to when its rebuild was enqueued
 (design doc §8.5/§8.9); the instant only matters to the health check."""
@@ -46,7 +50,7 @@ async def test_type_list_view(client, records_app):
     # visits to a type start (UX-R13.1), so it needs the same
     # ``public_route_prefix`` the schema editor and the per-type list
     # already carry (design §11 — DB-backed, not derivable in the browser).
-    assert set(body["props"]) == {"types", "public_route_prefix"}
+    assert set(body["props"]) == {"types", "public_route_prefix", *_TENANCY_PROPS}
     assert [item["key"] for item in body["props"]["types"]] == ["product"]
     assert body["props"]["public_route_prefix"] == "/api/records/public"
 
@@ -65,6 +69,7 @@ async def test_record_list_view(client, records_app):
     # Note what is *not* here: any default locale filter. The admin list shows
     # every language, because an editor's question is "what exists" (§4.4).
     assert set(body["props"]) == {
+        *_TENANCY_PROPS,
         "type",
         "records",
         "errors",
@@ -102,6 +107,7 @@ async def test_record_new_view(client, records_app):
     body = resp.json()
     assert body["component"] == "Records/RecordEditor"
     assert set(body["props"]) == {
+        *_TENANCY_PROPS,
         "type",
         "record",
         "translations",
@@ -209,6 +215,7 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
     assert body["component"] == "Records/TypeEditor"
     assert body["props"]["type"]["key"] == "person"
     assert set(body["props"]) == {
+        *_TENANCY_PROPS,
         "type",
         "target_types",
         "roles",

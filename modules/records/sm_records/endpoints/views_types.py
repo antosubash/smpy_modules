@@ -19,7 +19,7 @@ from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants, locales
+from sm_records import constants, locales, tenancy
 from sm_records.collections import collections
 from sm_records.contracts.schemas import type_read
 from sm_records.deps import (
@@ -65,7 +65,11 @@ async def type_list(
     ]
     return await inertia.render(
         constants._PAGE_TYPES,
-        {"types": types, "public_route_prefix": settings.public_route_prefix},
+        {
+            "types": types,
+            "public_route_prefix": settings.public_route_prefix,
+            **tenancy.view_props(request),
+        },
     )
 
 
@@ -99,6 +103,7 @@ def _editor_context(
         "content_locales": list(locales.supported(settings)),
         "default_locale": locales.default(settings),
         "collections": list(collections()),
+        **tenancy.view_props(request),
     }
 
 

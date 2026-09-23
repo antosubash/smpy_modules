@@ -245,6 +245,8 @@ class RecordsModule(ModuleBase):
         from sm_records import tenancy
 
         tenancy.configure(app)  # single or multi, from the built stack (tenancy §A.3)
+        if (session_class := getattr(self.db, "sync_session_class", None)) is not None:
+            tenancy.install_guard(session_class)  # before any read below (tenancy §A.4)
         services = getattr(app.state, constants.PACKAGE, None)
         if services is not None and getattr(services, "settings", None) is not None:
             self.settings = services.settings

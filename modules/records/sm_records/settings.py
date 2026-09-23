@@ -221,6 +221,17 @@ class RecordsSettings(BootSettings):
     owned it — from a support ticket into an alert.
     """
 
+    admin_header_tenant: bool = False
+    """Multi-tenant hosts only: let a user holding ``admin`` who has **no tenant
+    of their own** work in the tenant their ``X-Tenant-ID`` header names.
+
+    Off, such a user gets a 403 ``tenant_required`` on every records screen,
+    header or not: the framework lets any tenant-less user pick a tenant by
+    header, and records refuses to follow it by default. Turn it on for an
+    operator account that administers several tenants. Ignored on a
+    single-tenant host, where everything is the ``default`` tenant.
+    """
+
     def clamp_page_size(self, requested: int | None) -> int:
         """See :func:`~sm_records.settings_checks.clamp_page_size`."""
         return clamp_page_size(self, requested)
