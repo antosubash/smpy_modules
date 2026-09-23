@@ -122,6 +122,30 @@ describe('the media cell', () => {
     await view.unmount();
   });
 
+  it('clips a long URL or a missing id to one line in its column, whole in the title', async () => {
+    // Review 4, ux F7: the table's `whitespace-nowrap` beat `break-all`, and
+    // the value ran on under the next column.
+    const url = `https://example.com/${'long/'.repeat(20)}photo.jpg`;
+    const linked = await mount(cell(url, true));
+    const link = linked.find('[data-testid="records-media-url"]');
+    expect(link?.className.split(' ')).toEqual(expect.arrayContaining(['block', 'truncate']));
+    expect(link?.getAttribute('title')).toBe(url);
+    expect(link?.textContent).toBe(url);
+    await linked.unmount();
+
+    stubLibrary([]);
+    const missing = await mount(cell(PHOTO.id, true));
+    await flush();
+    const code = missing.find('[data-testid="records-media-missing"] code');
+    expect(code?.className.split(' ')).toEqual(expect.arrayContaining(['block', 'truncate']));
+    expect(code?.getAttribute('title')).toBe(PHOTO.id);
+    await missing.unmount();
+
+    const raw = await mount(cell(PHOTO.id, false));
+    expect(raw.find('[data-testid="records-media-raw"]')?.className).toContain('truncate');
+    await raw.unmount();
+  });
+
   it('shows the empty dash for no value', async () => {
     const view = await mount(cell(null, true));
     expect(view.host.textContent).toBe('—');

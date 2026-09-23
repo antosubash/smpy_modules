@@ -1,7 +1,7 @@
 import { isUrlValue } from '../../utils/media-api';
 import { EMPTY_CELL } from '../../utils/values';
 import { useMediaApi } from './MediaApiContext';
-import { MediaPreview, MediaUrlLink } from './MediaPreview';
+import { CELL_CLIP, MediaPreview, MediaUrlLink } from './MediaPreview';
 
 const MAX_RAW = 24;
 
@@ -26,7 +26,11 @@ function MediaCellValue({ value }: { value: unknown }) {
     // A legacy URL is a link with or without a library; an id is only text.
     if (isUrlValue(text)) return <MediaUrlLink url={text} full={false} />;
     return (
-      <span className="font-mono text-xs" title={text} data-testid="records-media-raw">
+      <span
+        className={`${CELL_CLIP} font-mono text-xs`}
+        title={text}
+        data-testid="records-media-raw"
+      >
         {text.length > MAX_RAW ? `${text.slice(0, MAX_RAW)}…` : text}
       </span>
     );

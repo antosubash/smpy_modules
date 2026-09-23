@@ -120,6 +120,8 @@ describe('MediaField with a media library', () => {
     const link = view.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
     expect(link?.getAttribute('href')).toBe('https://cdn.example.com/a.png');
     expect(link?.getAttribute('rel')).toContain('noopener');
+    // The editor has the room: it wraps rather than clipping like a cell.
+    expect(link?.className).toContain('break-all');
     expect(fetchMock).not.toHaveBeenCalled();
     await view.unmount();
   });

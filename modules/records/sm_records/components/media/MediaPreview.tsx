@@ -57,20 +57,27 @@ function Thumbnail({
   );
 }
 
+/** How a list cell shows a long value: one line, clipped with an ellipsis
+ *  inside the column's `max-w-48`, the whole value in the `title`. The
+ *  table's cells are `whitespace-nowrap`, which beat `break-all`, so a long
+ *  URL or a missing file's id ran on under the next column (review 4, ux
+ *  F7). The editor's chip (`field`) still wraps: it has the room. */
+export const CELL_CLIP = 'block truncate';
+
 /** A value saved before the picker existed — a plain `http(s)` URL — as a
  *  link, whether or not the host has a media library to ask about ids.
- *  `full` is the editor's; a cell shortens it (the `title` has it all). */
+ *  `full` is the editor's; a cell clips it (the `title` has it all). */
 export function MediaUrlLink({ url, full }: { url: string; full: boolean }) {
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="break-all text-sm underline"
+      className={`${full ? 'break-all' : CELL_CLIP} text-sm underline`}
       title={url}
       data-testid="records-media-url"
     >
-      {full || url.length <= 40 ? url : `${url.slice(0, 40)}…`}
+      {url}
     </a>
   );
 }
@@ -135,11 +142,16 @@ export function MediaPreview({
       );
     case 'missing':
       return (
-        <span className="grid gap-0.5" data-testid="records-media-missing">
+        <span className="grid min-w-0 gap-0.5" data-testid="records-media-missing">
           <span className="text-sm font-medium text-destructive">
             {t('records.media.file_missing', { defaultValue: 'File missing' })}
           </span>
-          <code className="break-all text-xs text-muted-foreground">{value}</code>
+          <code
+            className={`${field ? 'break-all' : CELL_CLIP} text-xs text-muted-foreground`}
+            title={value}
+          >
+            {value}
+          </code>
           {field && (
             <span className="text-xs text-muted-foreground">
               {t('records.media.file_missing_help', {
@@ -152,8 +164,10 @@ export function MediaPreview({
       );
     case 'error':
       return (
-        <span className="grid gap-0.5" data-testid="records-media-error">
-          <code className="break-all text-xs">{value}</code>
+        <span className="grid min-w-0 gap-0.5" data-testid="records-media-error">
+          <code className={`${field ? 'break-all' : CELL_CLIP} text-xs`} title={value}>
+            {value}
+          </code>
           <span className="text-xs text-muted-foreground" title={state.message}>
             {t('records.media.details_failed', {
               defaultValue: "Couldn't load this file's details.",
