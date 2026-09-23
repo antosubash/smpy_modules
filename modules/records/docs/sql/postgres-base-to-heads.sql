@@ -1002,5 +1002,67 @@ CREATE INDEX ix_records_record_invalid_since ON records_record (invalid_since);
 
 UPDATE alembic_version SET version_num='8f3d223f8605' WHERE alembic_version.version_num = 'd2b7a1c4e905';
 
+-- Running upgrade 8f3d223f8605 -> 4ecb931245dd
+
+ALTER TABLE records_type ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_type_tenant_id ON records_type (tenant_id);
+
+ALTER TABLE records_type_revision ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_type_revision_tenant_id ON records_type_revision (tenant_id);
+
+ALTER TABLE records_record ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_record_tenant_id ON records_record (tenant_id);
+
+ALTER TABLE records_revision ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_revision_tenant_id ON records_revision (tenant_id);
+
+ALTER TABLE records_c_events_record ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_c_events_record_tenant_id ON records_c_events_record (tenant_id);
+
+ALTER TABLE records_c_events_revision ADD COLUMN tenant_id VARCHAR(50) DEFAULT 'default' NOT NULL;
+
+CREATE INDEX ix_records_c_events_revision_tenant_id ON records_c_events_revision (tenant_id);
+
+DROP INDEX ix_records_type_key;
+
+CREATE UNIQUE INDEX uq_records_type_tenant_key ON records_type (tenant_id, key);
+
+DROP INDEX ix_records_record_uuid;
+
+CREATE UNIQUE INDEX uq_records_record_tenant_uuid ON records_record (tenant_id, uuid);
+
+DROP INDEX ix_records_c_events_record_uuid;
+
+CREATE UNIQUE INDEX uq_records_c_events_record_tenant_uuid ON records_c_events_record (tenant_id, uuid);
+
+ALTER TABLE records_type ADD CONSTRAINT uq_records_type_id_tenant_id UNIQUE (id, tenant_id);
+
+ALTER TABLE records_record DROP CONSTRAINT fk_records_record_type_id_records_type;
+
+ALTER TABLE records_record ADD CONSTRAINT fk_records_record_type_id_records_type FOREIGN KEY(type_id, tenant_id) REFERENCES records_type (id, tenant_id) ON DELETE RESTRICT;
+
+ALTER TABLE records_c_events_record DROP CONSTRAINT fk_records_c_events_record_type_id_records_type;
+
+ALTER TABLE records_c_events_record ADD CONSTRAINT fk_records_c_events_record_type_id_records_type FOREIGN KEY(type_id, tenant_id) REFERENCES records_type (id, tenant_id) ON DELETE RESTRICT;
+
+ALTER TABLE records_type ALTER COLUMN tenant_id DROP DEFAULT;
+
+ALTER TABLE records_type_revision ALTER COLUMN tenant_id DROP DEFAULT;
+
+ALTER TABLE records_record ALTER COLUMN tenant_id DROP DEFAULT;
+
+ALTER TABLE records_revision ALTER COLUMN tenant_id DROP DEFAULT;
+
+ALTER TABLE records_c_events_record ALTER COLUMN tenant_id DROP DEFAULT;
+
+ALTER TABLE records_c_events_revision ALTER COLUMN tenant_id DROP DEFAULT;
+
+UPDATE alembic_version SET version_num='4ecb931245dd' WHERE alembic_version.version_num = '8f3d223f8605';
+
 COMMIT;
 

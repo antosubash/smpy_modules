@@ -85,7 +85,7 @@ make migrate
 module.** The module ships SQLModel tables; each consuming host autogenerates
 its own revisions against them.
 
-In this repo, ten revisions belong to records:
+In this repo, eleven revisions belong to records:
 
 | Revision | What it adds |
 |---|---|
@@ -99,6 +99,7 @@ In this repo, ten revisions belong to records:
 | `c4a17b9de0f2` | Descending indexes for the nullable sortable columns (a PostgreSQL planner fix) |
 | `b81c5f3a27d6` | `records_type.show_in_menu` — NOT NULL with `server_default=false()` |
 | `8f3d223f8605` | `<table set>_record.invalid_since` and its index — the stored "this record does not fit the schema" mark, on the global table **and on every collection's** |
+| `4ecb931245dd` | Tenancy: `tenant_id` on `records_type`, `records_type_revision` and every table set's `_record` and `_revision`, backfilled `'default'`; per-tenant type-key and uuid uniques; a composite `(type_id, tenant_id)` foreign key — see below |
 
 That is **eleven `records_*` tables** on a host with no collections, plus
 **eight `records_c_<name>_*` tables** per declared collection.
@@ -141,6 +142,45 @@ type editor, which is still a normal remove-and-add rename (the old key's
 values land under `_orphaned`, §8.2) — and re-point anything that filters or
 sorts on it. Renaming afterwards is the same operation but has to be done in
 SQL, because the editor cannot load a type it refuses to validate.
+
+### Upgrading past `4ecb931245dd`: records rows gain a tenant
+
+Every records row that exists is backfilled into tenant **`default`**, which is
+the tenant a single-tenant host runs in, so nothing a reader sees changes. What
+the revision does, per table set that exists in the database:
+
+- adds `tenant_id VARCHAR(50) NOT NULL` with a temporary `DEFAULT 'default'`,
+  and **drops the default again in the same revision** — a statement that
+  forgets the tenant afterwards fails instead of landing in `default`;
+- replaces `UNIQUE (key)` on `records_type` with `UNIQUE (tenant_id, key)`, and
+  each set's `UNIQUE (uuid)` with `UNIQUE (tenant_id, uuid)`;
+- adds `UNIQUE (id, tenant_id)` to `records_type` and turns each set's
+  `type_id` foreign key into `(type_id, tenant_id) → records_type (id,
+  tenant_id)`, under the same name, so a record can never be in a different
+  tenant from its type.
+
+**Lock profile (PostgreSQL).** The column and the default drop are catalog-only
+(about a millisecond on 200,000 records, no table rewrite). The two unique
+indexes block writes while they build — about half a second per 200,000
+records — and the new foreign key validates every row (about 60 ms per 200,000).
+Above roughly a million records, run the uniques as `CREATE UNIQUE INDEX
+CONCURRENTLY` in a separate non-transactional revision and add the key `NOT
+VALID` followed by `VALIDATE CONSTRAINT`, rather than applying this revision in
+one maintenance window.
+
+**SQLite** rebuilds each of the six kinds of table once (it cannot alter a
+constraint in place), re-creates the three `…_desc` indexes the rebuild would
+otherwise flatten to ascending, and runs `ANALYZE`. Budget it like a copy of the
+records tables.
+
+**`tenant_id` is now a reserved field key**, for the reason `invalid` became
+one above, and with the same consequence for a type that already declared it.
+Run the same check with `tenant_id` in place of `invalid` before upgrading.
+
+**Downgrading is lossy.** It restores the install-wide uniques, so it is
+refused outright once two tenants share a type key or a record uuid, and where
+it succeeds it merges every tenant's rows with no way to separate them again.
+Only a database whose rows are all `default` round-trips exactly.
 
 ### The `records@base` caveat
 
@@ -812,9 +852,11 @@ Facts worth relying on:
   a row matching a trashed record is refused.
 - **`version` does not travel**, so updating an existing record from an export
   needs `--force` (last write wins).
-- **uuids are unique across every table set**, so a global type's export cannot
-  be imported into a collection type that already holds those uuids — which is
-  why moving a type into a collection is purge-then-import in that order.
+- **uuids are unique across every table set of a tenant**, so a global type's
+  export cannot be imported into a collection type that already holds those
+  uuids — which is why moving a type into a collection is purge-then-import in
+  that order. Another tenant's copy of a uuid does not count: an export from one
+  tenant imports into another with its uuids intact.
 
 ---
 

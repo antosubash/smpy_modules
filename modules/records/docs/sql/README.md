@@ -7,8 +7,8 @@ SM_DATABASE_URL=postgresql+asyncpg://…/regen \
   .venv/bin/alembic -c host/alembic.ini upgrade base:heads --sql
 ```
 
-`postgres-base-to-heads.sql` is the whole history — 23 revisions, 43 tables,
-124 indexes, 8 enum types, 1,006 lines — as one transaction, for review or for an
+`postgres-base-to-heads.sql` is the whole history — 24 revisions, 43 tables,
+133 indexes, 8 enum types, 1,068 lines — as one transaction, for review or for an
 operator who applies DDL by hand. It is regenerated, not edited.
 
 Two assumptions are baked into it by `b1f4a72c9d30`, which backfills data and
