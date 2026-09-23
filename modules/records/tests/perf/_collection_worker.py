@@ -200,4 +200,9 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))
+    from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
+
+    # A single-tenant host's binding, as ``tests/conftest.py`` gives every
+    # in-process test: the records tables are tenant-owned (tenancy design §B).
+    with tenant_scope(DEFAULT_TENANT):
+        asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))

@@ -66,6 +66,9 @@ async def big_type():
                 {
                     "uuid": f"{index:032x}",
                     "type_id": rtype.id,
+                    # A Core bulk insert is never stamped from the bound
+                    # tenant (tenancy design FACT 1e), so it names its own.
+                    "tenant_id": rtype.tenant_id,
                     "data": {"name": f"row {index}", "body": PADDING},
                     "schema_version": 1,
                     "version": 1,

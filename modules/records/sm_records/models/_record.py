@@ -11,15 +11,14 @@ ones" a property of the code rather than of two definitions agreeing —
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from simple_module_db.mixins import AuditMixin, SoftDeleteMixin
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin, SoftDeleteMixin
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer
 from sqlalchemy import Enum as SAEnum
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from sm_records.constants import (
     DEFAULT_CONTENT_LOCALE,
@@ -28,9 +27,10 @@ from sm_records.constants import (
     MAX_SLUG_LEN,
     TRANSLATION_GROUP_LEN,
 )
-from sm_records.models._base import RECORD_SUFFIX, REVISION_SUFFIX, TYPE_TABLE, Base
+from sm_records.models._base import RECORD_SUFFIX, REVISION_SUFFIX, Base
 from sm_records.models._factory import table_class
 from sm_records.models._record_args import add_descending_indexes, record_args
+from sm_records.models._record_tables import RecordTables
 
 
 def new_uuid() -> str:
@@ -39,11 +39,13 @@ def new_uuid() -> str:
     values to be *the same* string (Phase 5 §4.1), which it cannot arrange by
     letting two ``default_factory`` calls fire independently.
 
-    It is a uuid4 hex, and that is what makes a uuid **globally unique across
-    collections** in practice (Phase 5 §6.4). Each record table carries its own
-    unique index, so nothing at the database level stops one uuid appearing in
-    two collections; nothing at the generator level makes it plausible, and the
-    importer generates uuids the same way. The README says so out loud, because
+    It is a uuid4 hex, and that is what makes a uuid **unique across
+    collections** in practice (Phase 5 §6.4) — per tenant, since the tenancy
+    design §C: each record table carries its own ``(tenant_id, uuid)`` unique
+    index, so nothing at the database level stops one uuid appearing in two
+    collections, or in two tenants (an export from one imported into another
+    keeps its uuids); nothing at the generator level makes it plausible within
+    one tenant, and the importer generates uuids the same way. The README says so out loud, because
     the cross-collection reads below (referrers, ``?expand=``) resolve a target
     by uuid and would otherwise be relying on it silently.
     """
@@ -72,57 +74,25 @@ against the index tables (``_index.py``) and joins back here by primary key.
 The fixed columns on this row are the projection every record has regardless of
 its type — the module's ``ContentItemIndex``.
 
-``SoftDeleteMixin`` and not ``MultiTenantMixin``: content deletion should be
-recoverable, and the framework's query filters already hide ``is_deleted`` rows
-— including on a **collection's** table, because that filter is attached per
-mapper by ``issubclass(cls, SoftDeleteMixin)`` (``simple_module_db.listeners``)
-and a generated class inherits the mixin like any other, with nothing to
-register. Tenancy is non-nullable at the DB and would force multi-tenancy on
-every host that installs the module."""
+``SoftDeleteMixin`` because content deletion should be recoverable, and the
+framework's query filters already hide ``is_deleted`` rows — including on a
+**collection's** table, because that filter is attached per mapper by
+``issubclass(cls, SoftDeleteMixin)`` (``simple_module_db.listeners``) and a
+generated class inherits the mixin like any other, with nothing to register.
+
+``MultiTenantMixin`` for the same reason, and by the same mechanism (tenancy
+design §B): the row is stamped from the bound tenant at flush and filtered by
+it on read. Its ``tenant_id`` is also half of a composite foreign key to
+``records_type (id, tenant_id)`` (``_record_args.record_args``), so a record's
+tenant is always its type's — which is what makes every ``type_id``-scoped
+index, unique constraint and index-table row per-tenant without a
+``tenant_id`` of its own. Records bind ``default`` on a single-tenant host
+(:mod:`sm_records.tenancy`), so the non-nullable column forces nothing on one."""
 
 _REVISION_DOC = """Append-only snapshot of a record's payload, one per write.
 
 Capped per record by ``revision_limit``; unbounded revisions on a busy type
 outgrow the document table itself."""
-
-
-@dataclass(frozen=True, slots=True)
-class RecordTables:
-    """One table set's document half, and the index names two layers read back.
-
-    The names travel with the classes rather than sitting at module scope
-    because a collection's indexes are named after *its* tables, and the 409
-    that :func:`sm_records.services._claims.flush_write` raises is recognised by
-    matching the database's own words. A signature left at the global spelling
-    would turn every lost slug race inside a collection back into a 500 —
-    which is the same failure the global signatures were added to fix.
-    """
-
-    record: type
-    revision: type
-    slug_index: str
-    group_locale_index: str
-    slug_signatures: tuple[str, ...]
-    """How each backend says "that slug is taken" in an ``IntegrityError``.
-
-    Two spellings because the two dialects report a different thing. Postgres
-    names the constraint (``duplicate key value violates unique constraint
-    "ix_records_record_type_slug"``); SQLite names the *columns*
-    (``UNIQUE constraint failed: records_record.type_id, records_record.locale,
-    records_record.slug``) and never mentions the index at all. The column list
-    is therefore part of this contract: anything matching neither is re-raised,
-    because an ``IntegrityError`` this module cannot explain is a bug rather
-    than a 409."""
-    group_locale_signatures: tuple[str, ...]
-    """The same two spellings for "that language is already taken in this
-    group".
-
-    Reached only by a writer that sets ``translation_group`` itself — an import
-    carrying the column, or a second ``POST /translations`` that lost the race
-    with the first. :func:`sm_records.services._translations.create_translation`
-    checks for the sibling first; this is what closes the window behind it, and
-    it costs the ordinary write path nothing because the string comparison
-    happens only after a flush has already failed."""
 
 
 def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
@@ -135,22 +105,20 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
     revision_table = f"{prefix}{REVISION_SUFFIX}"
     slug_index = f"ix_{record_table}_type_slug"
     group_locale_index = f"ix_{record_table}_group_locale"
+    uuid_index = f"uq_{record_table}_tenant_uuid"
 
-    class _Record(AuditMixin, SoftDeleteMixin):
+    class _Record(AuditMixin, SoftDeleteMixin, MultiTenantMixin):
         id: int | None = Field(default=None, primary_key=True)
-        uuid: str = Field(default_factory=_new_uuid, max_length=32, unique=True, index=True)
+        uuid: str = Field(default_factory=_new_uuid, max_length=32)
         """The identifier used in relations and the public API, so an export /
-        import round trip never depends on autoincrement."""
+        import round trip never depends on autoincrement. Unique per tenant,
+        by the ``uq_<table>_tenant_uuid`` index in ``record_args``."""
 
-        type_id: int = Field(
-            sa_column=Column(
-                ForeignKey(f"{TYPE_TABLE}.id", ondelete="RESTRICT"),
-                nullable=False,
-                index=True,
-            )
-        )
+        type_id: int = Field(sa_column=Column(Integer, nullable=False, index=True))
         """``records_type`` whichever set this is: the type tables stay global
-        (§6.4), and the type row is what *names* the collection."""
+        (§6.4), and the type row is what *names* the collection. The foreign
+        key is the composite ``(type_id, tenant_id)`` one in ``record_args`` —
+        a column-level ``ForeignKey`` cannot span two columns."""
 
         data: dict[str, Any] = Field(
             default_factory=dict,
@@ -239,7 +207,7 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         public read shape does not carry it at all.
         """
 
-    class _Revision(SQLModel):
+    class _Revision(MultiTenantMixin):
         id: int | None = Field(default=None, primary_key=True)
         record_id: int = Field(
             sa_column=Column(ForeignKey(f"{record_table}.id", ondelete="CASCADE"), nullable=False)
@@ -263,7 +231,7 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         f"Record{class_suffix}",
         (Base, _Record),
         tablename=record_table,
-        table_args=record_args(record_table, slug_index, group_locale_index),
+        table_args=record_args(record_table, slug_index, group_locale_index, uuid_index),
         doc=_RECORD_DOC,
     )
     # After the class, not inside ``record_args``: these three indexes are
@@ -284,6 +252,7 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         ),
         slug_index=slug_index,
         group_locale_index=group_locale_index,
+        uuid_signatures=(uuid_index, f"{record_table}.tenant_id, {record_table}.uuid"),
         slug_signatures=(
             slug_index,
             f"{record_table}.type_id, {record_table}.locale, {record_table}.slug",

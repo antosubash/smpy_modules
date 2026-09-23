@@ -17,6 +17,12 @@ and resolves the table set from the type
 cannot make a delete, a cascade or a relation check act on the wrong row. This
 module is what stops one being created.
 
+**Per tenant** since the tenancy design §C: the unique index is ``(tenant_id,
+uuid)``, so an export from one tenant imports into another with its uuids
+intact, and "unique across every table set" means across every set *of the
+bound tenant*. The lookups below needed no change for it — they are ORM selects
+on a record mapper, which the framework's tenant filter scopes (FACT 1c).
+
 Its own file rather than a few functions in :mod:`sm_records.services._claims`
 for the 300-line cap, and the seam is real: that module is what a write claims
 about *the rest of its type* — a slug, a ``unique`` value — held by a lock on
@@ -27,8 +33,10 @@ type lock covers that.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import RecordType, table_sets, tables_for
@@ -36,6 +44,7 @@ from sm_records.models import RecordType, table_sets, tables_for
 __all__ = [
     "uuid_claim_message",
     "uuid_match_message",
+    "uuid_taken",
     "uuids_claimed_elsewhere",
     "uuids_claimed_here",
 ]
@@ -128,3 +137,15 @@ async def uuids_claimed_elsewhere(
         for found in (await db.execute(stmt)).scalars().all():
             out.setdefault(str(found), tables.name)
     return out
+
+
+def uuid_taken(tables: Any, exc: IntegrityError) -> bool:
+    """Is ``exc`` the ``(tenant_id, uuid)`` unique index refusing a uuid?
+
+    Per tenant since the tenancy design §C, so the same uuid in two tenants is
+    legal and only a collision *inside* one reaches here — an import that keeps
+    a file's uuid and lost a race for it. ``tables`` is the record's
+    :class:`~sm_records.models.TableSet`, whose ``uuid_signatures`` hold both
+    backends' wording, as for the slug."""
+    message = str(exc.orig or exc)
+    return any(sig in message for sig in tables.uuid_signatures)

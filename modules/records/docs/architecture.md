@@ -42,11 +42,20 @@ layer Orchard Core builds on it. **No table is ever created at runtime.**
 - `records_index_reduce` — the one *fold* table, keyed by `(type_id, key,
   group)`. Global, never per-collection: a reduce row has no `record_id`.
 
-**Index rows carry no record state** — no `status`, no `is_deleted`. Every query
-selects the `Record` entity and joins index rows by primary key, and that join
-applies `status`, the framework's soft-delete filter and any future tenant
-filter for free. Mirroring the flags would mean an `UPDATE` across N rows on
-every publish, trash and restore.
+**Index rows carry no record state** — no `status`, no `is_deleted`, no
+`tenant_id`. Every query selects the `Record` entity and joins index rows by
+primary key, and that join applies `status`, the framework's soft-delete filter
+and its tenant filter for free. Mirroring the flags would mean an `UPDATE`
+across N rows on every publish, trash and restore.
+
+**Tenancy lives on the owned rows only** (design
+`docs/plans/2026-09-23-records-multitenancy.md` §B): `records_type`,
+`records_type_revision` and each table set's `_record` and `_revision` carry the
+framework's `MultiTenantMixin`; the index and reduce tables do not. A record's
+`(type_id, tenant_id)` is a foreign key to `records_type (id, tenant_id)`, so
+its tenant is always its type's — which makes every `type_id`-led index, unique
+constraint and index row per-tenant without a column of its own. Type keys are
+unique per tenant, and so are record uuids.
 
 Two consequences of the text split (§7.4) are easy to get wrong. An `eq` must
 match `value` **and** re-check `value_full` — `value_full IS NULL` is itself the

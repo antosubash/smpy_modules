@@ -8,7 +8,7 @@ document table carries exactly these indexes under exactly these names with
 its own prefix — which is what ``tests/test_collections_ddl.py`` compares.
 
 The names are derived from the table rather than written out because two of
-them are read back by name elsewhere (:class:`~sm_records.models._record.RecordTables`)
+them are read back by name elsewhere (:class:`~sm_records.models._record_tables.RecordTables`)
 and because index names are schema-global on Postgres:
 ``ix_records_record_type_slug`` can exist exactly once, so a collection's copy
 has to be spelled from its own prefix or the second ``CREATE INDEX`` fails.
@@ -31,10 +31,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Index, Table, text
+from sqlalchemy import ForeignKeyConstraint, Index, Table, text
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.elements import UnaryExpression
+
+from sm_records.models._base import TYPE_TABLE
 
 __all__ = [
     "DESCENDING_SORT_COLUMNS",
@@ -152,9 +154,25 @@ def add_descending_indexes(table: Table) -> None:
         Index(name, table.c.type_id, _DescNullsLast(table.c[source]), table.c.id.desc())
 
 
-def record_args(table: str, slug_index: str, group_locale_index: str) -> tuple:
+def record_args(table: str, slug_index: str, group_locale_index: str, uuid_index: str) -> tuple:
     """``__table_args__`` for one table set's document table."""
     return (
+        # Tenancy design §B/§C. The type's foreign key spans the tenant, so a
+        # record can never belong to a different tenant from its type, and
+        # every ``type_id``-led index and unique below is per-tenant by
+        # construction. Unnamed on purpose: the naming convention keys on
+        # ``column_0`` and so keeps the single-column key's name,
+        # ``fk_<table>_type_id_records_type`` — hash-truncated past 63 bytes
+        # for a long collection name, which is why the migration reads the
+        # name off this constraint rather than spelling it.
+        ForeignKeyConstraint(
+            ["type_id", "tenant_id"],
+            [f"{TYPE_TABLE}.id", f"{TYPE_TABLE}.tenant_id"],
+            ondelete="RESTRICT",
+        ),
+        # The uuid is unique per tenant, not per install: an export from one
+        # tenant imported into another keeps its uuids (§C).
+        Index(uuid_index, "tenant_id", "uuid", unique=True),
         Index(f"ix_{table}_type_status_position", "type_id", "status", "position"),
         # One composite per sortable fixed column, all shaped
         # ``(type_id, <column>, id)``. A list page is always narrowed to one

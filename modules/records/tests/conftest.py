@@ -25,6 +25,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from sm_records.models import Record, RecordType
+from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # ``app_harness`` is the HTTP test harness — app + client fixtures,
@@ -48,6 +49,30 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     seed_type,
 )
 from tests.pg_support import arm_reset, make_db_state
+
+
+@pytest.fixture(autouse=True)
+def _default_tenant(request):
+    """Every test runs inside ``tenant_scope(DEFAULT_TENANT)`` — what a
+    single-tenant host binds (tenancy design §A.3, §K "Harness").
+
+    Every records table the ORM writes carries ``MultiTenantMixin``, whose
+    column is ``NOT NULL`` and stamped from the bound tenant at flush, so a
+    fixture that inserts a type or a record needs one. Synchronous and autouse
+    so it is set up before any async fixture: pytest-asyncio runs each async
+    fixture and test in a *copy* of this context, so the binding reaches all of
+    them — and, through ``httpx.ASGITransport``, which runs the app in the
+    test's own task, every request the test makes. That is also why the
+    harness needs no request middleware for it.
+
+    ``@pytest.mark.unbound_tenant`` opts a test out, for the ones that are
+    about what happens with no tenant bound.
+    """
+    if request.node.get_closest_marker("unbound_tenant") is not None:
+        yield None
+        return
+    with tenant_scope(DEFAULT_TENANT) as tenant:
+        yield tenant
 
 
 @pytest.fixture(autouse=True)

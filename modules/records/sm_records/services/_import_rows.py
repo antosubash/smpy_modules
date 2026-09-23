@@ -29,9 +29,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportMode
-from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.services._import_parse import ImportRow
 from sm_records.services._payload import slug_for
+from sm_records.services._uuids import uuid_taken
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
@@ -254,6 +255,8 @@ async def write_row(
             try:
                 await db.flush()
             except IntegrityError as exc:
+                if uuid_taken(tables_for(rtype), exc):
+                    raise Conflict(f"uuid {row.uuid} is already in use by another record") from exc
                 raise Conflict(
                     f"uuid {row.uuid} is already in use by another record, or its "
                     "translation group already has a record in this language"

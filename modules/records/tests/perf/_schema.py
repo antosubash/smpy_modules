@@ -88,12 +88,20 @@ def create_missing_columns(conn: Any) -> None:
                 continue
             ddl = column.type.compile(dialect=conn.dialect)
             if not column.nullable:
-                literal = _default_literal(column)
+                literal = (
+                    _TENANT_BACKFILL if column.name == "tenant_id" else _default_literal(column)
+                )
                 if literal is None:
                     continue
                 ddl = f"{ddl} NOT NULL DEFAULT {literal}"
             conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {ddl}')
 
+
+_TENANT_BACKFILL = "'default'"
+"""What revision ``4ecb931245dd`` backfills ``tenant_id`` with — the tenancy
+design's ``DEFAULT_TENANT``. The model declares no default on purpose (a
+forgotten tenant must fail), so the generic rule above would skip the column
+and leave a file seeded before tenancy unreadable."""
 
 _LITERALS = {
     bool: lambda value: "1" if value else "0",

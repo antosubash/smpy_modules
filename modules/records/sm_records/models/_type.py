@@ -5,15 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, false
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, UniqueConstraint, false
 from sqlmodel import Field
 
 from sm_records.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
 from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
 
+TYPE_KEY_INDEX = "uq_records_type_tenant_key"
+TYPE_ID_TENANT_UNIQUE = "uq_records_type_id_tenant_id"
 
-class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+
+class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """A user-defined content type.
 
     ``fields`` is the whole schema, as JSON. Changing it is an ``UPDATE`` of
@@ -22,15 +25,26 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     here: ``schema_version``, stamped onto every record write so a row knows
     which shape it was written in, and ``reindex_pending``, the operational
     marker for fields whose index rows are mid-rebuild.
+
+    **Tenant-owned** (``MultiTenantMixin``, tenancy design §B): the type is the
+    tenant root. Its key is unique *per tenant* — two tenants may both have a
+    ``post`` — and ``(id, tenant_id)`` is unique so every table set's document
+    table can reference it with a composite foreign key, which is what makes a
+    record's tenant always its type's.
     """
 
     __tablename__ = TYPE_TABLE
+    __table_args__ = (
+        Index(TYPE_KEY_INDEX, "tenant_id", "key", unique=True),
+        UniqueConstraint("id", "tenant_id", name=TYPE_ID_TENANT_UNIQUE),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
 
-    key: str = Field(max_length=MAX_KEY_LEN, unique=True, index=True)
+    key: str = Field(max_length=MAX_KEY_LEN)
     """Stable identifier used in URLs, the API and relation targets.
-    Immutable after creation — a rename would strand all three."""
+    Immutable after creation — a rename would strand all three. Unique within
+    its tenant (:data:`TYPE_KEY_INDEX`), not across the install."""
 
     label: str = Field(max_length=MAX_LABEL_LEN)
     label_plural: str = Field(max_length=MAX_LABEL_LEN)
@@ -151,12 +165,13 @@ class RecordType(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """
 
 
-class RecordTypeRevision(Base, table=True):  # ty: ignore[unsupported-base]
+class RecordTypeRevision(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Append-only snapshot of a type's schema, one row per change.
 
     Tiny by construction — types are few and schema edits are rare — and never
     capped: it is what makes a bad schema edit reversible, and a bad schema
-    edit damages every row of the type at once.
+    edit damages every row of the type at once. Tenant-owned like its type:
+    the ORM adds it and reads it as a top-level entity (tenancy design §B).
     """
 
     __tablename__ = TYPE_REVISION_TABLE

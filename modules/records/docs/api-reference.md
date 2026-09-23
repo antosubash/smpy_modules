@@ -65,7 +65,8 @@ row under `current`, so a client can diff rather than merely retry.
 ### Identifiers
 
 A record is addressed by its `uuid`: 32 lowercase hex characters, no dashes,
-unique across every table set on the install.
+unique across every table set of its tenant. A type is addressed by its `key`,
+unique within its tenant.
 
 ---
 

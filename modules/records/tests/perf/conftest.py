@@ -1,5 +1,9 @@
 """Fixtures for the perf suite: one seeded, file-backed SQLite database.
 
+Every measurement runs inside ``tenant_scope(DEFAULT_TENANT)``, bound by
+``tests/conftest.py``'s autouse fixture — the records tables are tenant-owned
+(tenancy design §B), and a single-tenant host binds ``default``.
+
 File-backed and not ``:memory:`` on purpose — the numbers are supposed to
 include the I/O a real install pays, and an in-memory database makes every
 page read look like a hash lookup.

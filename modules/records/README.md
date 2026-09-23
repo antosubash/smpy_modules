@@ -607,7 +607,7 @@ screen, that a given type is further restricted to specific roles.
   `schema_version`, `version`, `status`, `slug`, `locale`,
   `translation_group`, `display_title`, `position`,
   `published_at`, `created_at`, `updated_at`, `created_by`, `updated_by`,
-  `is_deleted`, `deleted_at`, `deleted_by`. The query layer resolves those
+  `is_deleted`, `deleted_at`, `deleted_by`, `tenant_id`. The query layer resolves those
   names against the record row before the type's own fields, so such a field
   would index correctly and then be filtered and sorted from the wrong data.
   The list is derived from the model, so it cannot drift.
@@ -766,11 +766,12 @@ Two consequences are worth knowing:
 
 ### `uuid` across collections
 
-**A record's `uuid` is unique across every table set**, and both halves of that
-are enforced rather than assumed.
+**A record's `uuid` is unique across every table set of its tenant**, and both
+halves of that are enforced rather than assumed.
 
-The database enforces uniqueness only *within* a table — each record table
-carries its own unique index, and no constraint spans them — so the rule is
+The database enforces uniqueness only *within* a table and a tenant — each
+record table carries its own `(tenant_id, uuid)` unique index, and no
+constraint spans tables — so the rule is
 held by the write path: `uuid4` for everything the writer and the seeder
 create, and an explicit check for the one writer that keeps an identifier from
 outside. **The importer preserves a file's `uuid` verbatim** (that is what

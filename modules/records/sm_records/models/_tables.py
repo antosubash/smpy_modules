@@ -24,7 +24,8 @@ from dataclasses import dataclass, field
 from sm_records import constants
 from sm_records.models._base import GLOBAL_PREFIX, collection_prefix
 from sm_records.models._index import make_index_tables
-from sm_records.models._record import RecordTables, make_record_tables
+from sm_records.models._record import make_record_tables
+from sm_records.models._record_tables import RecordTables
 from sm_records.schema.types import IndexKind
 
 __all__ = [
@@ -65,6 +66,7 @@ class TableSet:
     index: dict[IndexKind, type] = field(repr=False)
     slug_index: str
     group_locale_index: str
+    uuid_signatures: tuple[str, ...]
     slug_signatures: tuple[str, ...]
     group_locale_signatures: tuple[str, ...]
 
@@ -87,6 +89,7 @@ def _build(name: str | None) -> TableSet:
         index=make_index_tables(prefix, class_suffix=suffix),
         slug_index=doc.slug_index,
         group_locale_index=doc.group_locale_index,
+        uuid_signatures=doc.uuid_signatures,
         slug_signatures=doc.slug_signatures,
         group_locale_signatures=doc.group_locale_signatures,
     )

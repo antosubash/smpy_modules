@@ -29,6 +29,7 @@ from sm_records.index.query import Filter, FilterOp, QueryError, exists_query
 from sm_records.models import RecordType, tables_for
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._lock import lock_type
+from sm_records.services._uuids import uuid_taken
 from sm_records.services.errors import Conflict, ValidationFailed
 
 __all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type", "taken_by"]
@@ -142,6 +143,8 @@ async def flush_write(db: AsyncSession, rtype: RecordType, slug: str | None, loc
         await db.flush()
     except IntegrityError as exc:
         message = str(exc.orig or exc)
+        if uuid_taken(tables, exc):
+            raise Conflict(f"another {type_key} record already uses that uuid") from exc
         if any(sig in message for sig in tables.group_locale_signatures):
             raise _group_locale_taken(type_key, locale) from exc
         if slug is None or not any(sig in message for sig in tables.slug_signatures):

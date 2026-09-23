@@ -66,6 +66,7 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   'is_deleted',
   'deleted_at',
   'deleted_by',
+  'tenant_id',
 ]);
 
 /** Field types `display_field` may point at — mirrors

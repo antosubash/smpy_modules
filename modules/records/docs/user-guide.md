@@ -187,7 +187,7 @@ approximate. If you need more precision, use `text` or `json`.
 that name: `_orphaned`, `id`, `uuid`, `type_id`, `data`, `schema_version`,
 `version`, `status`, `slug`, `locale`, `translation_group`, `display_title`,
 `position`, `published_at`, `created_at`, `updated_at`, `created_by`,
-`updated_by`, `is_deleted`, `deleted_at`, `deleted_by`. The editor refuses them
+`updated_by`, `is_deleted`, `deleted_at`, `deleted_by`, `tenant_id`. The editor refuses them
 with *""{key}" is reserved by the module: it names a column every record already
 has."*
 
