@@ -108,7 +108,8 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ErrorRow(
         403,
         "*Multi-tenant hosts* — the signed-in account has no tenant of its own",
-        '`{"detail", "code": "tenant_required"}` — even when a tenant header was sent',
+        '`{"detail", "code": "tenant_required"}` — even when a tenant header was sent, '
+        "unless `admin_header_tenant` is on and the account holds `admin`",
     ),
     ErrorRow(
         404,
@@ -117,7 +118,8 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         404,
-        "*Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid",
+        "*Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid; "
+        "on a multi-tenant host, no tenant resolved (no or malformed `X-Tenant-ID`)",
         '`{"detail": "not found"}`',
     ),
     ErrorRow(

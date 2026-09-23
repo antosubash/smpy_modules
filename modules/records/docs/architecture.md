@@ -57,6 +57,21 @@ its tenant is always its type's — which makes every `type_id`-led index, uniqu
 constraint and index row per-tenant without a column of its own. Type keys are
 unique per tenant, and so are record uuids.
 
+**Which tenant a request runs in is bound by the routers, not the framework**
+(`sm_records/tenancy.py`). The admin API, the views and the public API each
+carry a yield dependency — `bind_admin` or `bind_public` — as their *first*
+dependency, so it is entered before `get_db` and still bound when `get_db`
+commits on the way out. A single-tenant host (no `TenantMiddleware`) binds
+`default`; a multi-tenant one binds the user's own tenant or refuses with
+`tenant_required`, and the public API binds the framework-resolved tenant or
+answers its `404`. A guard installed on the host's session class at startup
+turns any records ORM statement or flush with no tenant bound into
+`TenantUnbound`, because the framework's own answer to that is every tenant's
+rows. It sees ORM statements only, so every Core statement, `UPDATE`/`DELETE`
+and `IN`-subquery over an owned table carries an explicit `tenant_id`
+predicate, and so does every natural-key lookup (type key, uuid, slug, the
+public reads, an import's match) — design §E.
+
 Two consequences of the text split (§7.4) are easy to get wrong. An `eq` must
 match `value` **and** re-check `value_full` — `value_full IS NULL` is itself the
 assertion that the column holds the whole string, so two values differing only

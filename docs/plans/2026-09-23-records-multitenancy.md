@@ -866,3 +866,88 @@ marked so a later phase can find it.
     `PRAGMA foreign_keys`. On a SQLite host every foreign key is unenforced,
     including the composite type key. K9 turns it on per session to prove the
     constraint.
+
+---
+
+## Implementation notes — Phase 3
+
+Request binding, the explicit predicates and the create stamp. Items are marked
+as in the Phase 1–2 notes.
+
+* **Wired as designed.** `Depends(bind_admin)` is the first dependency of
+  `endpoints/api/__init__.py`'s router and of `endpoints/views.py`'s (which
+  includes `views_types`); `Depends(bind_public)` is the first of
+  `endpoints/api/public.py`'s. FastAPI 0.141 wraps an included router in an
+  `_IncludedRouter`, and it still enters a parent router's dependencies before
+  an included one's (checked). The response is sent inside FastAPI's request
+  exit stack, so the binding is also still live when anything commits at
+  `http.response.start`. `tests/test_tenancy_binding.py` pins the order
+  with the routers' real dependency lists, using an unflushed `add()` stamped
+  at `get_db`'s commit. A control that puts the binding after `require_view`
+  is refused by the guard with `TenantUnbound`.
+* **Deviation: `admin_header_tenant` landed here, not in Phase 7.** It is a
+  DB-backed records setting, default `False`, read per request. In multi mode
+  it lets a user whose `tenant_id` is `None` and who holds the `admin` role act
+  in `request.state.tenant_id`, the tenant the framework resolved from the
+  header. Some cases are still refused with `tenant_required`: a non-admin, a
+  missing header, a header failing `TENANT_RE`, and a user whose own tenant is
+  set but malformed. A user with a valid tenant of their own always gets that
+  tenant, whatever the header says.
+* **Deviation: the startup warning fires in one direction only.** It fires
+  when `HostSettings.multi_tenant` is on and the stack has no
+  `TenantMiddleware`, which is an admin-UI edit that changed nothing. It does
+  not fire for a multi stack with the setting off. That is every host
+  configured through `SM_MULTI_TENANT`, because of L14.
+* **Explicit predicates (§E), as listed**, plus a few sites the table left
+  implicit:
+  * `get_type_by_id` goes through the same `_owned_types()` as `get_type`.
+  * The public list narrows by tenant inside `_published_only`, so the page
+    and both halves of the bounded count carry it.
+  * `_translations.published_siblings` (a public read) carries it.
+  * `_import_match._by_column` carries it before `scoped`. The uuid match
+    spans every type in the table set, so the tenant is its only boundary.
+  * `purge_type_records` carries it on both `DELETE`s and inside the `IN`
+    subquery.
+  * `_translations` `_sibling`/`_free_slug`/`list_translations` stay (a),
+    as the table says.
+* **§F done in one place.** `records.create_record` sets
+  `tenant_id=rtype.tenant_id`, and translations, import and seed all create
+  through it. `seed/` needed no edit.
+* **View props.** `tenancy.view_props(request)` adds a read-only `tenant` and
+  a `tenancy_mode` (`"single"`/`"multi"`) to all six records screens.
+  **Deviation from K6's "unmodified":** `test_views.py`'s four exact prop-set
+  assertions gained the two keys. No other pre-existing test changed except
+  `test_tenancy_primitives.py`'s warning test, for the item above.
+* **Harness.** `build_app(..., tenancy="single"|"multi")`. Multi installs the
+  framework's `TenantMiddleware(header="X-Tenant-ID")` inside auth and inside
+  the module's middleware. `X-Test-Tenant` sets the stub user's `tenant_id`.
+  Either mode now calls `tenancy.configure` and `install_guard` the way
+  `on_startup` does, so every HTTP test runs under the guard. The stub-auth
+  half moved to `tests/harness_auth.py` for the file cap and is re-exported
+  from `app_harness`.
+* **Census helper, not K12.** `tests/tenancy_support.statements` records the
+  SQL one service call sends. `unscoped_writes` then lists any
+  `UPDATE`/`DELETE` of an owned table whose `WHERE` lacks `tenant_id`. It
+  exempts the unit of work's own `WHERE <t>.id = :p` writes, which are
+  objects loaded under the tenant and covered by the guard's `before_flush`.
+  It is used where the effect cannot be observed: the type lock, the
+  hard-delete purge (`_purge` expunges its records, so it cannot be handed
+  another tenant's) and the revision prune. The suite-wide Postgres census of
+  K12 stays with Phase 5. Every predicate test in `test_tenancy_predicates.py`
+  failed with the service changes reverted, and passed with them.
+* **Interim state, until Phase 4 is merged.** The guard is installed at the
+  top of `on_startup`. That is what the design asks, and it proves Phase 4's
+  startup reads are bound. But until Phase 4 lands, the real host **fails to
+  boot**: `health.count_orphaned_locales` reads unbound and raises
+  `TenantUnbound`. This was verified by booting `host/main.py` on a migrated
+  scratch copy of `host/app.db`. With those two reads bound (simulated), the
+  host boots and the public API answers. `/health/ready` still reports the
+  unbound `stale_reindex_check`, and deferred jobs (reindex, events, preview)
+  log `TenantUnbound` until Phase 4 captures the tenant in `defer()`.
+* **Framework gap found (add to §L):**
+  * **L16.** `TenantMiddleware` (`simple_module_hosting/middleware.py:191-196`)
+    binds `current_tenant_id` to the raw header value with no validation, of
+    any length or characters. Records treats a value failing `TENANT_RE` as no
+    tenant, but other `MultiTenantMixin` adopters filter by it and stamp it.
+    On Postgres a header longer than the 50-character column fails the write
+    with a 500.

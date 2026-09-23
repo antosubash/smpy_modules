@@ -370,6 +370,7 @@ variables are read. Configure on the Settings screen or with
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
 | `menu_refresh_seconds` | 5 | no |
+| `admin_header_tenant` | `false` | no |
 
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
@@ -592,6 +593,26 @@ somewhere they are not.
 are invisible in the framework's role editor.** An admin editing roles sees
 only the three coarse permissions above and has no way to discover, from that
 screen, that a given type is further restricted to specific roles.
+
+## Tenants
+
+Every type, record and revision belongs to a tenant, and records decides which
+one a request runs in from the host's middleware stack:
+
+- **Single-tenant host** (no `SM_MULTI_TENANT`, the default): everything is in
+  the tenant `default`. A user's `tenant_id` and an `X-Tenant-ID` header are
+  ignored. Nothing to configure, and nothing changes for an existing install.
+- **Multi-tenant host** (`SM_MULTI_TENANT=true`): the admin API and screens run
+  in the signed-in user's own tenant. A user with none gets `403` with
+  `"code": "tenant_required"` — even with a tenant header, unless the
+  `admin_header_tenant` setting is on and they hold `admin`, in which case the
+  header's tenant is theirs. The public API runs in the tenant the framework
+  resolved (the header, or a signed-in reader's own) and answers its usual
+  `404` without one. Nothing ever falls back to `default`.
+
+Type keys and record uuids are unique per tenant. The records screens receive
+the tenant they read as a read-only `tenant` prop, with `tenancy_mode`.
+Design: [docs/plans/2026-09-23-records-multitenancy.md](../../docs/plans/2026-09-23-records-multitenancy.md).
 
 ## Data model notes worth knowing before you rely on them
 

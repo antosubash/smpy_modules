@@ -62,6 +62,14 @@ not listed and then refused when you open it.
 
 ---
 
+### Which tenant you are working in
+
+On a host that serves several tenants, every records screen shows the types
+and records of **your account's tenant** and nothing else, and everything you
+create lands there. An account with no tenant sees a "tenant required" refusal
+on every records screen until an administrator assigns one. On an ordinary
+single-tenant host there is nothing to choose and nothing to see.
+
 ## 2. Creating a Record Type
 
 **New type** opens a form in three sections: **Details**, **Fields** and

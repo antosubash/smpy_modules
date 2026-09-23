@@ -289,6 +289,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `reindex_batch_size` | `500` | no | Records per batch in a rebuild, and the export's page size |
 | `reindex_stale_after_seconds` | `900` (15 min) | no | How old a `reindex_pending` entry may get before `/health/ready` degrades |
 | `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry may get. `0` re-reads on every page request |
+| `admin_header_tenant` | `false` | no | Multi-tenant hosts: let an `admin` with no tenant of their own work in the tenant their `X-Tenant-ID` header names. Off, they get `403 tenant_required` |
 
 Everything not marked *restart* is read per request and takes effect on save.
 
