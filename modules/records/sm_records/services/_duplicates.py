@@ -47,6 +47,7 @@ from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import INDEX_KIND
 from sm_records.services import _claims
 from sm_records.services._payload import field_defs
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["Collector", "DuplicateReport", "conflicts_for", "newly_unique", "scan"]
 
@@ -107,11 +108,18 @@ async def _scan_one(
     group_cols = [table.value]
     if hasattr(table, "value_full"):
         group_cols.append(table.value_full)
+    # ``record`` is only a join target here, which the framework's tenant
+    # filter never reaches (tenancy design FACT 1d): the explicit predicate is
+    # §E's rule, redundant with ``type_id`` only while the composite key holds.
     scoped = (
         select(*group_cols, func.count().label("n"))
         .select_from(table)
         .join(record, record.id == table.record_id)
-        .where(table.type_id == rtype.id, table.field_key == old.key)
+        .where(
+            table.type_id == rtype.id,
+            table.field_key == old.key,
+            record.tenant_id == bound_tenant(),
+        )
         .group_by(*group_cols)
         .having(func.count(distinct(record.translation_group)) > 1)
         .limit(GROUP_LIMIT)

@@ -70,7 +70,13 @@ turns any records ORM statement or flush with no tenant bound into
 rows. It sees ORM statements only, so every Core statement, `UPDATE`/`DELETE`
 and `IN`-subquery over an owned table carries an explicit `tenant_id`
 predicate, and so does every natural-key lookup (type key, uuid, slug, the
-public reads, an import's match) — design §E.
+public reads, an import's match) — design §E. Two tests keep that true: the
+**statement census** (`tests/census.py`, on by default when the suite runs on
+Postgres) fails any test in which `sm_records` sent a statement naming an owned
+table without `tenant_id`, and the **isolation matrix**
+(`tests/test_tenancy_isolation*.py`) proves, route by route, that a caller in
+one tenant gets exactly an unknown key's answer for another tenant's rows. A
+new route fails the matrix until it has a case.
 
 Two consequences of the text split (§7.4) are easy to get wrong. An `eq` must
 match `value` **and** re-check `value_full` — `value_full IS NULL` is itself the

@@ -19,7 +19,7 @@ query here and the tests that prove otherwise pass for the wrong reason.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 import pytest
@@ -48,6 +48,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     seed_record,
     seed_type,
 )
+from tests.census import Census, census_enabled
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
 
@@ -74,6 +75,30 @@ def _default_tenant(request):
         return
     with tenant_scope(DEFAULT_TENANT) as tenant:
         yield tenant
+
+
+@pytest.fixture(scope="session")
+def _census() -> Iterator[Census | None]:
+    if not census_enabled():
+        yield None
+        return
+    census = Census()
+    census.install()
+    yield census
+    census.remove()
+
+
+@pytest.fixture(autouse=True)
+def _statement_census(request, _census):
+    """Tenancy design K12: fail a test in which ``sm_records`` sent a statement
+    naming a tenant-owned table without ``tenant_id`` (``tests/census.py``).
+    On by default on Postgres only."""
+    yield
+    if _census is not None:
+        caught = _census.take(request.node.nodeid)
+        assert not caught, "records statement(s) with no tenant_id:\n" + "\n".join(
+            f"{where}: {sql[:300]}" for where, sql in caught
+        )
 
 
 @pytest.fixture(autouse=True)
