@@ -17,7 +17,22 @@ import { RecordIoMenu } from './RecordIoMenu';
  * 390px document and took the whole page's horizontal scroll with them
  * (UX-R4). Below `sm` that row is a full-width column item, so a wrapping
  * flex row inside it is the fix from this side of the boundary.
+ *
+ * From `sm` up the row sits *beside* the title, and `flex-shrink-0` sizes
+ * the wrapper to its content's max-content width, so `flex-wrap` alone
+ * never wraps: six buttons pushed a 720px document to 745px (review 4, ux
+ * F1 — WCAG 1.4.10 reflow at 200% zoom). `TOOLBAR_CLASS` caps the group's
+ * own width against the viewport instead, which is the one width a
+ * content-sized parent cannot hide: the page's padding (3rem; plus the 16rem
+ * sidebar from `lg`) and about 12rem for the title are left over, and the
+ * buttons wrap into what remains. At 1280px and wider nothing wraps.
  */
+/** Exported for the test that pins it: layout is not measurable in the
+ *  unit tests' DOM, so the classes are the contract (the e2e checks the
+ *  document width at 720 and 390px). */
+export const TOOLBAR_CLASS =
+  'flex min-w-0 flex-wrap items-center gap-2 sm:max-w-[calc(100vw-15rem)] sm:justify-end lg:max-w-[calc(100vw-32rem)]';
+
 export function RecordListActions({
   typeKey,
   fields,
@@ -53,7 +68,7 @@ export function RecordListActions({
 }) {
   const { t } = useT();
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+    <div className={TOOLBAR_CLASS} data-testid="records-list-actions">
       <Button variant="outline" onClick={() => router.visit('/admin/records')}>
         {t('records.types.title', { defaultValue: 'Record Types' })}
       </Button>

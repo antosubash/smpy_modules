@@ -158,4 +158,29 @@ test.describe('Records — the column chooser', () => {
     await expect(page).not.toHaveURL(/sort=/);
     await expect(page).toHaveURL(/columns=(&|$)/);
   });
+
+  // Review 4, ux F1: the sixth toolbar button (Columns) pushed a 720px
+  // document to 745px — PageShell sizes its actions box to its content, so
+  // the group has to cap its own width to wrap (RecordListActions).
+  for (const [width, height] of [
+    [720, 450],
+    [390, 844],
+  ] as const) {
+    test(`the list toolbar wraps instead of scrolling the page at ${width}×${height}`, async ({
+      page,
+    }) => {
+      await login(page);
+      const key = await seedColumnsType(page);
+      await page.setViewportSize({ width, height });
+      await page.goto(`/admin/records/${key}`);
+      const toolbar = page.getByTestId('records-list-actions');
+      await expect(toolbar.getByRole('link', { name: 'New record' })).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      const box = await toolbar.getByRole('link', { name: 'New record' }).boundingBox();
+      expect(box && box.x >= 0 && box.x + box.width <= width).toBeTruthy();
+    });
+  }
 });
