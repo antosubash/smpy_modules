@@ -326,7 +326,8 @@ library serves files to anonymous visitors, which `file_storage` does not: its
 routes are not exempt from authentication and its download also requires
 `file_storage.download`. The anonymous API says which case it is in
 (`media_url_template`, [Public read API](#public-read-api)); when it is set,
-the field renders as an image.
+the field renders as an image. The block's **Fields to show** says so under
+every `media` field, so a ticked field that shows nothing is not a surprise.
 
 **The public API never expands a relation** (see [Relations](#relations)), so
 a `relation` field shown in the widget renders as its stored `type:uuid`, not

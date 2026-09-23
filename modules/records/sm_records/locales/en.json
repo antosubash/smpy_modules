@@ -689,6 +689,7 @@
     "title_column": "Title",
     "type_not_public": "{label} (not public)",
     "fields_picker_empty": "Pick a record type above to choose its fields.",
+    "media_not_public": "Not shown on public pages unless the media library lets visitors download files.",
     "field_type_key": "Record type",
     "field_fields": "Fields to show (beyond the title)",
     "field_filter": "Filter (e.g. status:eq:paid — one term, indexed fields only)",

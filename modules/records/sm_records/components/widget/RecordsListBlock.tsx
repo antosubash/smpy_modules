@@ -238,6 +238,7 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
     const availableFields = (selected?.fields ?? []).map((field) => ({
       value: field.key,
       label: field.label,
+      type: field.type,
     }));
     return {
       ...fields,

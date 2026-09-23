@@ -16,7 +16,9 @@
 import type { CustomField } from '@puckeditor/core';
 import { useT } from '@simple-module-py/i18n';
 
-export type FieldOption = { value: string; label: string };
+/** `type` is the field's declared type — the picker notes the one kind it
+ *  cannot show to visitors (`media`). */
+export type FieldOption = { value: string; label: string; type?: string };
 
 export type FieldsPickerField = CustomField<string[]> & {
   availableFields?: FieldOption[];
@@ -51,19 +53,44 @@ export function FieldsPicker({
     onChange(checked ? [...selected, key] : selected.filter((k) => k !== key));
   }
 
+  // A `media` value renders on a public page only through the listing's
+  // `media_url_template`, which is null unless the host lets visitors
+  // download files — on a stock host it renders nothing, and a ticked option
+  // that silently shows nothing read as a bug in the editor (review 4, ux F8).
+  const mediaNote = t('records.widget.media_not_public', {
+    defaultValue:
+      'Not shown on public pages unless the media library lets visitors download files.',
+  });
+
   return (
     <div className="space-y-1">
-      {options.map((option) => (
-        <label key={option.value} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={selected.includes(option.value)}
-            disabled={readOnly}
-            onChange={(event) => toggle(option.value, event.target.checked)}
-          />
-          {option.label}
-        </label>
-      ))}
+      {options.map((option) => {
+        const noteId = `records-widget-field-note-${option.value}`;
+        const media = option.type === 'media';
+        return (
+          <div key={option.value}>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={selected.includes(option.value)}
+                disabled={readOnly}
+                aria-describedby={media ? noteId : undefined}
+                onChange={(event) => toggle(option.value, event.target.checked)}
+              />
+              {option.label}
+            </label>
+            {media && (
+              <p
+                id={noteId}
+                className="ml-6 text-xs text-gray-500"
+                data-testid="records-widget-media-note"
+              >
+                {mediaNote}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
