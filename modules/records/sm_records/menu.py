@@ -28,6 +28,19 @@ So this module keeps the registry's contents honest itself:
 A read that fails (a boot before the migration, a transient error) leaves the
 previous items in place and logs; a sidebar one refresh out of date is a much
 smaller problem than a request that 500s to rebuild it.
+
+**Tenancy** (design §I). The registry is one list per process, and the sync
+runs before auth and tenant resolution. So a per-type entry cannot be
+per-tenant. :func:`refresh` therefore depends on the mode that
+``on_startup`` parks on the module as ``tenancy_mode``:
+
+* single: the read runs inside ``tenant_scope(DEFAULT_TENANT)``, the only
+  tenant such a host serves;
+* multi: no per-type items at all, and no read. Only the "All record types"
+  hub entry remains, and the hub page lists the viewer's own tenant's types.
+  Syncing every tenant's ``show_in_menu`` types would show each tenant's type
+  labels to all the others, linking to keys that resolve differently for each
+  viewer. The real fix is upstream (#340, a per-request menu provider).
 """
 
 from __future__ import annotations
@@ -43,6 +56,7 @@ from sqlalchemy import select
 
 from sm_records import constants
 from sm_records.models import RecordType
+from sm_records.tenancy import DEFAULT_TENANT, TenancyMode, tenant_scope
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only
     from fastapi import FastAPI
@@ -223,12 +237,18 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
     or a boot that got here before the migration did — costs one query per
     window rather than one per request. The dirty flag is cleared with it for
     the same reason; the window will re-read anyway.
+
+    In multi-tenant mode it never reads, and it keeps the registry free of
+    per-type items. See the module docstring.
     """
     registry = module.menu_registry
     db_state = module.db
     if registry is None or db_state is None:
         # No ``register_menu_items`` (a harness that mounts the routers by
         # hand) or no database yet (a request that raced the lifespan).
+        return False
+    if getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.MULTI:
+        module._type_menu_items = sync_type_menu(registry, [], previous=module._type_menu_items)
         return False
     now = time.monotonic()
     if not force and not module._menu_dirty:
@@ -238,7 +258,10 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
     module._menu_synced_at = now
     module._menu_dirty = False
     try:
-        types = await load_menu_types(db_state)
+        # Inside the ``try``: a scope that cannot bind is a sidebar problem and
+        # must not become a request that fails.
+        with tenant_scope(DEFAULT_TENANT):
+            types = await load_menu_types(db_state)
     except Exception:
         logger.warning(
             "records: could not read the sidebar types; keeping the previous entries",

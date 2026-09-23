@@ -162,7 +162,9 @@ async def test_the_health_check_counts_orphaned_locales(bilingual):
     settings = _use_locales(client, "en")
 
     counts = await count_orphaned_locales(module.db, settings)
-    assert counts == {"de": 1}
+    # Keyed ``tenant/locale`` (tenancy design §A.5): the setting is install-wide,
+    # the records it strands belong to a tenant.
+    assert counts == {"default/de": 1}
 
     module.orphaned_locales = counts
     module.settings = settings
@@ -170,7 +172,7 @@ async def test_the_health_check_counts_orphaned_locales(bilingual):
     assert check.name == CHECK_NAME
     result = await check.check()
     assert result.status == "degraded"
-    assert "orphaned_locales: {de: 1}" in result.detail
+    assert "orphaned_locales: {default/de: 1}" in result.detail
 
 
 async def test_a_public_cursor_does_not_cross_locales(bilingual):

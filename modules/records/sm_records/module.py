@@ -270,10 +270,10 @@ class RecordsModule(ModuleBase):
         # says why), so this is what makes the records left behind visible. Once
         # per boot: the framework offers no hook to re-run it when an operator
         # hydrates new settings, which the health check's docstring records.
-        if self.db is not None:
-            from sm_records.health import count_orphaned_locales
+        # Also parks the tenancy mode the check and the sidebar read (§A.5, §I).
+        from sm_records import health
 
-            self.orphaned_locales = await count_orphaned_locales(self.db, settings)
+        await health.on_startup(self, app, settings)
 
         # The first sidebar read: ``register_menu_items`` ran before there was
         # a database, so until now the registry holds the hub entry and none

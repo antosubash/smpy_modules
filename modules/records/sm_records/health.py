@@ -38,6 +38,22 @@ framework's settings registry has no post-hydration hook to re-run it from
 who drops a locale sees the count at the next restart. The README says so, and
 says how to list them meanwhile.
 
+**Every read here is across tenants** (tenancy design §A.5), through
+:func:`sm_records._cross_tenant.read_all`. The detail names each type as
+``tenant/key``, each orphaned locale as ``tenant/locale``, and gives the
+invalid count per tenant. Otherwise a multi-tenant operator would see a count
+with no way to find the rows behind it. On a multi-tenant host the check runs
+inside ``TenantMiddleware``, which binds whatever tenant a header names, and
+that binding must not narrow what the check reports.
+
+A fifth detail exists on a **single-tenant** host only: ``tenants_outside_default``.
+Such a host serves only ``default``. Rows in any other tenant were written by
+the CLI's ``--tenant``, or are left over from a switch back from multi-tenant
+mode. They are untouched but unreachable, and this detail keeps that from
+being silent (§J "Switching modes"). It costs nothing on a host that has no
+such rows. The tenants come from the type rows the stale check already reads,
+and records are counted only for the tenants that turned up.
+
 The check reads the database, which a ``register_health_checks`` hook cannot:
 it runs before the lifespan opens one. So it reads what
 :meth:`~sm_records.module.RecordsModule.on_startup` parked on the module
@@ -52,17 +68,33 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from simple_module_core.health import HealthCheck, HealthCheckResult, HealthStatus
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from sm_records import locales
+from sm_records._cross_tenant import read_all
+from sm_records._health_counts import (
+    count_invalid_records,
+    count_orphaned_locales,
+    invalid_detail,
+    orphaned_detail,
+    outside_default,
+)
 from sm_records.constants import REINDEX_ALL
 from sm_records.index._drift import drift_detail
-from sm_records.models import RecordType, table_sets
+from sm_records.models import RecordType
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import TenancyMode, mode_of
 
 if TYPE_CHECKING:
     from sm_records.module import RecordsModule
+
+__all__ = [
+    "CHECK_NAME",
+    "count_invalid_records",
+    "count_orphaned_locales",
+    "on_startup",
+    "stale_reindex_check",
+]
 
 CHECK_NAME = "records.reindex"
 
@@ -115,7 +147,7 @@ def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
     """``(descriptions, any unique field affected)``."""
     out: list[str] = []
     blocked = False
-    for key, pending, fields in rows:
+    for tenant, key, pending, fields in rows:
         late = [
             field
             for field, at in _entries(pending).items()
@@ -125,51 +157,8 @@ def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
             if _unique_keys(fields) & set(late):
                 blocked = True
             names = ", ".join("whole type" if f == REINDEX_ALL else f for f in sorted(late))
-            out.append(f"{key} ({names})")
+            out.append(f"{tenant}/{key} ({names})")
     return out, blocked
-
-
-async def count_orphaned_locales(db_state, settings: RecordsSettings) -> dict[str, int]:
-    """``{locale: records}`` for every locale outside ``content_locales``.
-
-    One ``GROUP BY locale`` per table set (Phase 5 §6.3) — a collection's
-    records live in its own document table — over live rows only: a trashed
-    record is not reachable anywhere, so counting it would report work an
-    operator cannot see. Run once, at startup; see the module docstring.
-    """
-    known = {locale.lower() for locale in locales.supported(settings)}
-    out: dict[str, int] = {}
-    async with db_state.session_factory() as session:
-        for tables in table_sets():
-            cls = tables.record
-            rows = (
-                await session.execute(select(cls.locale, func.count(cls.id)).group_by(cls.locale))
-            ).all()
-            for locale, count in rows:
-                if str(locale).lower() not in known:
-                    out[str(locale)] = out.get(str(locale), 0) + int(count)
-    return dict(sorted(out.items()))
-
-
-def _orphaned_detail(counts: dict[str, int]) -> str:
-    listed = ", ".join(f"{locale}: {count}" for locale, count in counts.items())
-    return (
-        f"orphaned_locales: {{{listed}}} — records in a language this install no longer "
-        "publishes; they are hidden from the public API and still editable in the admin "
-        "(filter=locale:eq:<tag>)"
-    )
-
-
-async def count_invalid_records(session) -> int:
-    """How many live records carry a stored invalid mark, across table sets.
-
-    A thin wrapper over :func:`sm_records.services._invalid.count_live` so the
-    check reads like its other two details; the counting rule, and why it is
-    affordable per check, live with the column.
-    """
-    from sm_records.services import _invalid
-
-    return await _invalid.count_live(session)
 
 
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
@@ -181,14 +170,16 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         limit = settings.reindex_stale_after_seconds
         now = utcnow()
         async with db_state.session_factory() as session:
-            rows = (
-                await session.execute(
-                    select(RecordType.key, RecordType.reindex_pending, RecordType.fields)
-                )
-            ).all()
+            stmt = select(
+                RecordType.tenant_id, RecordType.key, RecordType.reindex_pending, RecordType.fields
+            ).order_by(RecordType.tenant_id, RecordType.key)
+            rows = (await read_all(session, stmt)).all()
             # On the same session as the rows above: one connection checked
             # out per health poll, not two.
             invalid = await count_invalid_records(session)
+            outside = None
+            if getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.SINGLE:
+                outside = await outside_default(session, {str(row[0]) for row in rows})
         stale, blocked = _stale(rows, limit, now)
         details: list[str] = []
         if stale:
@@ -210,18 +201,26 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         if drift is not None:
             details.append(drift)
         if invalid:
-            details.append(
-                f"invalid_records: {invalid} — record(s) marked as not satisfying their "
-                "type's schema, from a forced schema change; each one's next save clears "
-                "the mark (filter=invalid:eq:true)"
-            )
+            details.append(invalid_detail(invalid))
         # Counted at startup and parked on the instance: see the module
         # docstring for why it is not recounted on a settings edit.
         orphaned = getattr(module, "orphaned_locales", None)
         if orphaned:
-            details.append(_orphaned_detail(orphaned))
+            details.append(orphaned_detail(orphaned))
+        if outside is not None:
+            details.append(outside)
         if not details:
             return HealthCheckResult(status=HealthStatus.HEALTHY)
         return HealthCheckResult(status=HealthStatus.DEGRADED, detail="; ".join(details))
 
     return HealthCheck(name=CHECK_NAME, check=check)
+
+
+async def on_startup(module: RecordsModule, app, settings: RecordsSettings) -> None:
+    """What ``RecordsModule.on_startup`` parks on the module for this check and
+    for :func:`sm_records.menu.refresh`: the tenancy mode (tenancy design
+    §A.5, §I), and the orphaned-locale count, which is taken once per boot
+    (see the module docstring)."""
+    module.tenancy_mode = mode_of(app)
+    if module.db is not None:
+        module.orphaned_locales = await count_orphaned_locales(module.db, settings)
