@@ -18,6 +18,12 @@ a run that was asked to apply and came back without a refusal.
 ``--apply`` rather than ``--dry-run``: the default has to be the harmless one,
 and a flag whose absence writes to every record of a type is the wrong
 default to have typed twice.
+
+**One tenant per run** (tenancy design §A.5, §H). ``--tenant`` (default
+``default``) is bound around the whole command. Export reads that tenant's
+type. Import writes into that tenant, and ignores any tenant a file claims.
+That is what makes export from one tenant and import into another a way to
+clone a type's records between tenants.
 """
 
 from __future__ import annotations
@@ -27,70 +33,67 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-
+from sm_records.cli_common import add_tenant_argument, load_settings, open_db
 from sm_records.contracts.io import ImportFormat, ImportMode, ImportReport, OnError
 from sm_records.services import export as export_service
 from sm_records.services import import_ as import_service
 from sm_records.services.errors import ImportRefused, RecordsError
 from sm_records.services.types import get_type
+from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
 
 __all__ = ["add_parsers", "export_command", "import_command"]
 
 _FORMATS = tuple(item.value for item in ImportFormat)
 
 
-def _settings(db_state: Any) -> Any:
-    """``sm_records.cli._load_settings``, imported at call time.
-
-    Lazily, because ``cli`` imports *this* module to register its
-    subcommands: at import time the dependency runs the other way.
-    """
-    from sm_records.cli import _load_settings
-
-    return _load_settings(db_state)
-
-
-async def export_command(database_url: str, type_key: str, fmt: str, out: str | None) -> int:
+async def export_command(
+    database_url: str,
+    type_key: str,
+    fmt: str,
+    out: str | None,
+    tenant: str = DEFAULT_TENANT,
+) -> int:
     """Stream one type to a file or to stdout, and return the byte count.
 
     Written a chunk at a time, never joined: the service streams precisely so
     a 100k-record type does not have to fit in memory, and ``"".join(...)``
     here would put it back.
     """
-    db_state = init_db(database_url)
-    register_listeners(db_state)
+    db_state = open_db(database_url)
     try:
-        settings = await _settings(db_state)
-        async with db_state.session_factory() as session:
-            rtype = await get_type(session, type_key)
-            type_id = int(rtype.id or 0)
-        chosen = ImportFormat(fmt)
-        stream = (
-            export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
-        )
-        # ``newline=""``: the CSV writer already emits RFC 4180's ``\r\n``,
-        # and letting Python translate line endings on top of that produces
-        # ``\r\r\n`` on a platform that translates.
-        handle = (
-            Path(out).open("w", encoding="utf-8", newline="")  # noqa: SIM115
-            if out
-            else sys.stdout
-        )
-        written = 0
-        try:
-            async for chunk in stream(db_state.session_factory, type_id, settings=settings):
-                handle.write(chunk)
-                written += len(chunk)
-        finally:
-            if out:
-                handle.close()
-        if out:
-            print(f"records export: {type_key} -> {out} ({written} bytes)")
-        return written
+        with tenant_scope(tenant):
+            return await _export(db_state, type_key, fmt, out, tenant)
     finally:
         await db_state.engine.dispose()
+
+
+async def _export(db_state: Any, type_key: str, fmt: str, out: str | None, tenant: str) -> int:
+    """:func:`export_command`'s work, inside the tenant's scope."""
+    settings = await load_settings(db_state)
+    async with db_state.session_factory() as session:
+        rtype = await get_type(session, type_key)
+        type_id = int(rtype.id or 0)
+    chosen = ImportFormat(fmt)
+    stream = export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
+    # ``newline=""``: the CSV writer already emits RFC 4180's ``\r\n``,
+    # and letting Python translate line endings on top of that produces
+    # ``\r\r\n`` on a platform that translates.
+    handle = (
+        Path(out).open("w", encoding="utf-8", newline="")  # noqa: SIM115
+        if out
+        else sys.stdout
+    )
+    written = 0
+    try:
+        async for chunk in stream(db_state.session_factory, type_id, settings=settings):
+            handle.write(chunk)
+            written += len(chunk)
+    finally:
+        if out:
+            handle.close()
+    if out:
+        print(f"records export: {tenant}/{type_key} -> {out} ({written} bytes)")
+    return written
 
 
 def _print_report(type_key: str, report: ImportReport) -> None:
@@ -117,8 +120,9 @@ async def import_command(
     match_by: str,
     force: bool,
     apply: bool,
+    tenant: str = DEFAULT_TENANT,
 ) -> ImportReport:
-    """Import one file. Writes nothing unless ``apply``."""
+    """Import one file into ``tenant``. Writes nothing unless ``apply``."""
     text = Path(path).read_text(encoding="utf-8-sig")
     fmt = ImportFormat.CSV if path.lower().endswith(".csv") else ImportFormat.JSON
     options = import_service.ImportOptions(
@@ -128,32 +132,39 @@ async def import_command(
         match_by=match_by,
         force=force,
     )
-    db_state = init_db(database_url)
-    register_listeners(db_state)
+    db_state = open_db(database_url)
     try:
-        async with db_state.session_factory() as session:
-            settings = await _settings(db_state)
-            rtype = await get_type(session, type_key)
-            try:
-                report = await import_service.import_records(
-                    session, rtype, text, fmt=fmt, options=options, settings=settings
-                )
-            except ImportRefused as exc:
-                await session.rollback()
-                _print_report(type_key, exc.report)
-                raise SystemExit(1) from exc
-            if apply:
-                # The one commit in this module — see the docstring. A dry run
-                # rolls back instead, because the validation pass reads and a
-                # session left open on a read transaction is a lock held for
-                # no reason.
-                await session.commit()
-            else:
-                await session.rollback()
-        _print_report(type_key, report)
-        return report
+        with tenant_scope(tenant):
+            return await _import(db_state, type_key, text, fmt, options, apply=apply)
     finally:
         await db_state.engine.dispose()
+
+
+async def _import(
+    db_state: Any, type_key: str, text: str, fmt: ImportFormat, options: Any, *, apply: bool
+) -> ImportReport:
+    """:func:`import_command`'s work, inside the tenant's scope."""
+    async with db_state.session_factory() as session:
+        settings = await load_settings(db_state)
+        rtype = await get_type(session, type_key)
+        try:
+            report = await import_service.import_records(
+                session, rtype, text, fmt=fmt, options=options, settings=settings
+            )
+        except ImportRefused as exc:
+            await session.rollback()
+            _print_report(type_key, exc.report)
+            raise SystemExit(1) from exc
+        if apply:
+            # The one commit in this module — see the docstring. A dry run
+            # rolls back instead, because the validation pass reads and a
+            # session left open on a read transaction is a lock held for
+            # no reason.
+            await session.commit()
+        else:
+            await session.rollback()
+    _print_report(type_key, report)
+    return report
 
 
 def add_parsers(sub: Any) -> None:
@@ -163,6 +174,7 @@ def add_parsers(sub: Any) -> None:
     export.add_argument("--format", dest="fmt", choices=_FORMATS, default=ImportFormat.JSON.value)
     export.add_argument("--out", default=None, help="write here instead of stdout")
     export.add_argument("--database-url", dest="database_url", default=None)
+    add_tenant_argument(export)
 
     imp = sub.add_parser("import", help="import a JSON or CSV file of records (dry run by default)")
     imp.add_argument("--type", dest="type_key", required=True, help="the record type's key")
@@ -182,13 +194,16 @@ def add_parsers(sub: Any) -> None:
     )
     imp.add_argument("--apply", action="store_true", help="actually write; omit for a dry run")
     imp.add_argument("--database-url", dest="database_url", default=None)
+    add_tenant_argument(imp)
 
 
 def run(args: Any, database_url: str) -> int:
     """Dispatch for ``cli.main``; returns the process exit code."""
     try:
         if args.command == "export":
-            asyncio.run(export_command(database_url, args.type_key, args.fmt, args.out))
+            asyncio.run(
+                export_command(database_url, args.type_key, args.fmt, args.out, args.tenant)
+            )
             return 0
         asyncio.run(
             import_command(
@@ -200,6 +215,7 @@ def run(args: Any, database_url: str) -> int:
                 match_by=args.match_by,
                 force=args.force,
                 apply=args.apply,
+                tenant=args.tenant,
             )
         )
     except RecordsError as exc:

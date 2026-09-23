@@ -1,6 +1,6 @@
 """``python -m sm_records.cli reindex [--type KEY]`` / ``seed`` / ``export`` /
-``import`` — design doc §7.7, §8.9, the demo-data seeder in
-``sm_records/seed/``, and §16's file import-export.
+``import`` / ``tenants`` — design doc §7.7, §8.9, the demo-data seeder in
+``sm_records/seed/``, §16's file import-export, and the tenancy design's §J.
 
 The recovery path for an index that is wrong, and the other half of "deferred"
 in a repo with no queue: a background task that died with its worker leaves
@@ -8,10 +8,13 @@ in a repo with no queue: a background task that died with its worker leaves
 safe to run twice — the rebuild deletes and rewrites each record's rows from
 ``data``, which is the source of truth (§7.7).
 
-``reindex --verify`` is the odd one out: it writes nothing and exits ``1`` if a
-maintained aggregate disagrees with the records (Phase 5 §5.2). It lives in
-:mod:`sm_records.cli_verify`, for the same reason ``export``/``import`` live in
-:mod:`sm_records.cli_io` — this file parses and dispatches.
+This file parses and dispatches. The work lives next to it:
+:mod:`sm_records.cli_reindex` (``reindex``), :mod:`sm_records.cli_verify`
+(``reindex --verify``, which writes nothing and exits ``1`` on drift),
+:mod:`sm_records.cli_io` (``export``/``import``), and
+:mod:`sm_records.cli_common` for the connection and ``--tenant``, which every
+subcommand takes. ``tenants`` is read-only and lives here, because it is only
+a query and a table.
 
 ``argparse`` rather than typer: this ships in a published module, and a CLI
 that is two flags wide does not justify a dependency a host would have to
@@ -26,164 +29,78 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sqlalchemy import select
-
 from sm_records import cli_io
-from sm_records.constants import PACKAGE
-from sm_records.models import RecordType
+from sm_records._cross_tenant import TenantCounts, tenant_counts
+from sm_records.cli_common import add_tenant_argument, load_settings, open_db
+from sm_records.cli_reindex import force_pending, reindex, run_verify
 from sm_records.seed.runner import SeedSummary
-from sm_records.services.reindex_runner import pending_type_ids, run_pending
-from sm_records.settings import RecordsSettings
+from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
+
+__all__ = ["main", "reindex", "run_verify", "seed", "tenants"]
 
 
-async def _load_settings(db_state) -> RecordsSettings:
-    """The module's settings as the running host would see them.
-
-    They live in the database (``CLAUDE.md``: no ``SM_RECORDS_*`` env var
-    exists), so the CLI reads the same overrides the Settings screen writes —
-    ``reindex_batch_size`` in particular, which an operator will have tuned for
-    exactly this command. A host whose settings tables are not there yet, or a
-    module never registered, falls back to the declared defaults rather than
-    refusing to reindex.
-    """
-    try:
-        from settings.hydrate import hydrate_settings
-        from settings.service import SettingService
-        from settings.store import SettingsStore
-
-        async with db_state.session_factory() as session:
-            store = SettingsStore(SettingService(session))
-            return await hydrate_settings(RecordsSettings, store, PACKAGE)
-    except Exception as exc:  # pragma: no cover - depends on the host's install
-        print(f"warning: using default settings ({exc.__class__.__name__}: {exc})")
-        return RecordsSettings()
-
-
-async def _types_to_run(db_state, type_key: str | None) -> list[tuple[int, str]]:
-    async with db_state.session_factory() as session:
-        if type_key is not None:
-            row = (
-                (await session.execute(select(RecordType).where(RecordType.key == type_key)))
-                .scalars()
-                .first()
-            )
-            if row is None:
-                raise SystemExit(f"no record type with key {type_key!r}")
-            return [(int(row.id), row.key)]
-        ids = await pending_type_ids(session)
-        rows = (await session.execute(select(RecordType.id, RecordType.key))).all()
-        keys = {int(i): k for i, k in rows if i is not None}
-        return [(type_id, keys.get(type_id, "?")) for type_id in ids]
-
-
-async def reindex(database_url: str, type_key: str | None) -> int:
-    """Run every pending rebuild (or one named type's) and print a summary.
-
-    A type named explicitly is run even if nothing is pending: that is the
-    "the index is wrong, rebuild it" case of §7.7, which is not driven by a
-    marker. Without ``--type`` only the types carrying markers are visited,
-    because walking every record of every type is not what an operator
-    recovering one stuck field asked for.
-    """
-    db_state = init_db(database_url)
-    register_listeners(db_state)
-    try:
-        settings = await _load_settings(db_state)
-        targets = await _types_to_run(db_state, type_key)
-        if not targets:
-            print("records reindex: nothing pending")
-            return 0
-        total = 0
-        for type_id, key in targets:
-            count = await run_pending(db_state, type_id, settings=settings)
-            total += count
-            print(f"records reindex: {key} — {count} record(s)")
-        print(f"records reindex: {total} record(s) across {len(targets)} type(s)")
-        return total
-    finally:
-        await db_state.engine.dispose()
-
-
-def _force_pending(database_url: str, type_key: str) -> None:
-    """``--type`` on a type with no markers: mark the whole type, then run.
-
-    Written as a marker rather than as a second code path through the runner,
-    so the rebuild an operator triggers by hand is the identical operation a
-    schema change triggers — including being resumable if this process dies
-    halfway through it.
-    """
-    from sm_records.constants import REINDEX_ALL
-    from sm_records.services._common import mark_written, utcnow
-
-    async def run() -> None:
-        db_state = init_db(database_url)
-        register_listeners(db_state)
-        try:
-            async with db_state.session_factory() as session:
-                rtype = (
-                    (await session.execute(select(RecordType).where(RecordType.key == type_key)))
-                    .scalars()
-                    .first()
-                )
-                if rtype is None:
-                    raise SystemExit(f"no record type with key {type_key!r}")
-                pending = dict(rtype.reindex_pending or {})
-                pending.setdefault(REINDEX_ALL, utcnow().isoformat())
-                for raw in rtype.fields or []:
-                    if raw.get("indexed"):
-                        pending.setdefault(str(raw.get("key")), utcnow().isoformat())
-                rtype.reindex_pending = pending
-                session.add(rtype)
-                mark_written(session)
-                await session.commit()
-        finally:
-            await db_state.engine.dispose()
-
-    asyncio.run(run())
-
-
-async def run_verify(database_url: str, type_key: str | None) -> int:
-    """``reindex --verify``: the connection, and :mod:`sm_records.cli_verify`
-    for the work — the same division of labour :func:`reindex` has."""
-    from sm_records import cli_verify
-
-    db_state = init_db(database_url)
-    register_listeners(db_state)
-    try:
-        return await cli_verify.verify(db_state, type_key, settings=await _load_settings(db_state))
-    finally:
-        await db_state.engine.dispose()
-
-
-async def seed(database_url: str, *, records: int, seed_value: int, reset: bool) -> SeedSummary:
+async def seed(
+    database_url: str,
+    *,
+    records: int,
+    seed_value: int,
+    reset: bool,
+    tenant: str = DEFAULT_TENANT,
+) -> SeedSummary:
     """Create the demo types (if missing) and write ``records`` records.
 
     Delegates entirely to :mod:`sm_records.seed` — this wrapper only owns the
-    database connection, the same division of labour as :func:`reindex`
-    above, so :func:`sm_records.seed.seed_database` stays callable in-process
-    (a test, a perf harness) without a subprocess or a settings-from-env
-    detour.
+    database connection and the tenant, the same division of labour as
+    :func:`reindex`, so :func:`sm_records.seed.seed_database` stays callable
+    in-process (a test, a perf harness) without a subprocess or a
+    settings-from-env detour.
+
+    Everything runs inside ``tenant_scope(tenant)``. So ``--reset`` sees, and
+    deletes, only that tenant's demo types: another tenant's ``company`` is a
+    different row that the type lookup under this scope never returns.
     """
     from sm_records.seed import seed_database
 
-    db_state = init_db(database_url)
-    register_listeners(db_state)
+    db_state = open_db(database_url)
     try:
-        settings = await _load_settings(db_state)
-        summary = await seed_database(
-            db_state, settings, records=records, seed=seed_value, reset=reset
-        )
+        settings = await load_settings(db_state)
+        with tenant_scope(tenant):
+            summary = await seed_database(
+                db_state, settings, records=records, seed=seed_value, reset=reset
+            )
         print(
-            f"records seed: {summary.total} record(s) in "
+            f"records seed: {summary.total} record(s) in tenant {tenant!r} in "
             f"{summary.elapsed_seconds:.1f}s ({summary.records_per_second:.0f}/s)"
         )
         for key, count in summary.created.items():
-            print(f"records seed: {key} — {count}")
+            print(f"records seed: {tenant}/{key} — {count}")
         return summary
     finally:
         await db_state.engine.dispose()
+
+
+async def tenants(database_url: str) -> dict[str, TenantCounts]:
+    """``records tenants``: every tenant that holds a type, with its counts.
+
+    Read-only, and across tenants by construction
+    (:mod:`sm_records._cross_tenant`). Records never creates a tenant. A
+    tenant exists when a user, a header or ``--tenant`` names it and something
+    is written, so this is the only list of tenants there is (§J).
+    """
+    db_state = open_db(database_url)
+    try:
+        async with db_state.session_factory() as session:
+            counts = await tenant_counts(session)
+    finally:
+        await db_state.engine.dispose()
+    if not counts:
+        print("records tenants: no record types in any tenant")
+        return counts
+    width = max(len("tenant"), *(len(tenant) for tenant in counts))
+    print(f"{'tenant':<{width}}  {'types':>6}  {'records':>9}  {'trashed':>9}")
+    for tenant, c in counts.items():
+        print(f"{tenant:<{width}}  {c.types:>6}  {c.records:>9}  {c.trashed:>9}")
+    return counts
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -205,6 +122,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="one record type's key; omit to finish every pending rebuild",
     )
+    add_tenant_argument(reindex_parser, every_tenant=True)
+    reindex_parser.add_argument("--database-url", dest="database_url", default=None)
     reindex_parser.add_argument(
         "--verify",
         action="store_true",
@@ -240,29 +159,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="override SM_DATABASE_URL / .env for this run",
     )
+    add_tenant_argument(seed_parser)
+    tenants_parser = sub.add_parser(
+        "tenants", help="list the tenants holding record types, with counts (read-only)"
+    )
+    tenants_parser.add_argument("--database-url", dest="database_url", default=None)
     args = parser.parse_args(argv)
 
     from simple_module_hosting.settings import Settings
 
+    database_url = args.database_url or Settings().database_url
     if args.command in ("export", "import"):
-        return cli_io.run(args, args.database_url or Settings().database_url)
+        return cli_io.run(args, database_url)
 
     if args.command == "seed":
-        database_url = args.database_url or Settings().database_url
         asyncio.run(
-            seed(database_url, records=args.records, seed_value=args.seed_value, reset=args.reset)
+            seed(
+                database_url,
+                records=args.records,
+                seed_value=args.seed_value,
+                reset=args.reset,
+                tenant=args.tenant,
+            )
         )
         return 0
 
-    database_url = Settings().database_url
+    if args.command == "tenants":
+        asyncio.run(tenants(database_url))
+        return 0
+
     if args.verify:
         # Read-only, and never combined with the rebuild: "check it" and "fix
         # it" are different intentions, and a command that silently did both
         # would make the drift it repaired impossible to report.
-        return 1 if asyncio.run(run_verify(database_url, args.type_key)) else 0
+        return 1 if asyncio.run(run_verify(database_url, args.type_key, args.tenant)) else 0
     if args.type_key is not None:
-        _force_pending(database_url, args.type_key)
-    asyncio.run(reindex(database_url, args.type_key))
+        force_pending(database_url, args.type_key, args.tenant or DEFAULT_TENANT)
+    asyncio.run(reindex(database_url, args.type_key, args.tenant))
     return 0
 
 
