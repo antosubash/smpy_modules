@@ -1,6 +1,6 @@
 /**
  * Which columns the record list shows: the default rule (`listColumns`, the
- * first indexed fields) and the column chooser's resolution of `?columns=`,
+ * first indexed fields, plus the first media field) and the column chooser's resolution of `?columns=`,
  * a saved choice or that default (`resolveListColumns`).
  *
  * Split out of `listing.ts` for the 300-line cap when the chooser landed on
@@ -9,7 +9,8 @@
  *
  * See `docs/plans/2026-09-19-records-module-design.md` §7.2 — only indexed
  * fields are queryable, which is why sorting and the *default* columns only
- * ever look at `indexed: true` fields plus the server's fixed columns. The
+ * ever look at `indexed: true` fields plus the server's fixed columns — and
+ * the first `media` field, whose thumbnail is shown but never sorted. The
  * chooser may show any declared field, since every list row carries its full
  * `data`; only its header's sort differs.
  */
@@ -89,10 +90,25 @@ export function availableColumns(type: ColumnType, showLocale: boolean): ListCol
   ];
 }
 
-/** The pre-chooser table, as a key list: Status, Language, `listColumns`,
- *  Position, Published on, Updated — "Reset to default" returns here. */
+/**
+ * The type's first `media` field, or `null` when it has none. The default
+ * view adds it after the indexed fields, so a list of products shows its
+ * thumbnails without anyone opening the chooser; beyond that it is an
+ * ordinary chooser column (unsortable, like every non-indexed field) that
+ * can be hidden or moved. One, not all: a row of thumbnails per record is a
+ * different screen.
+ */
+export function firstMediaField(type: Pick<TypeRead, 'fields'>): FieldDef | null {
+  return type.fields.find((field) => field.type === 'media') ?? null;
+}
+
+/** The default view, as a key list: Status, Language, `listColumns`, the
+ *  first media field, Position, Published on, Updated — "Reset to default"
+ *  returns here. */
 export function defaultColumnKeys(type: ColumnType, showLocale: boolean): string[] {
   const fields = listColumns(type).map((field) => field.key);
+  const media = firstMediaField(type);
+  if (media) fields.push(media.key);
   const locale = showLocale ? ['locale'] : [];
   return ['status', ...locale, ...fields, 'position', 'published_at', 'updated_at'];
 }

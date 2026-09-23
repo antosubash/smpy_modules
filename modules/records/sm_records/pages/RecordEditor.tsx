@@ -8,6 +8,7 @@ import type React from 'react';
 import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
+import { MediaApiProvider } from '../components/media/MediaApiContext';
 import { RecordEditorActionsRow } from '../components/RecordEditorActionsRow';
 import { RecordEditorTypeLink } from '../components/RecordEditorTypeLink';
 import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
@@ -19,6 +20,7 @@ import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTranslations } from '../components/RecordTranslations';
 import { useRecordEditor } from '../hooks/useRecordEditor';
 import { displayFieldKey } from '../utils/errors-display';
+import type { MediaApi } from '../utils/media-api';
 import { withCurrentPatched } from '../utils/record-types';
 import type { RecordRead, TranslationRead, TypeRead } from '../utils/types';
 
@@ -34,6 +36,9 @@ type Props = {
    *  degrades to "no language UI", as `news`' list screen treats it. */
   content_locales?: string[];
   default_locale?: string;
+  /** Where the `media` picker lists and uploads (`sm_records.media`); `null`
+   *  or absent leaves a `media` field the plain text box. */
+  media_api?: MediaApi | null;
 };
 
 const DATA_ID = 'record-data';
@@ -58,6 +63,7 @@ function RecordEditor({
   translations,
   content_locales,
   default_locale,
+  media_api,
 }: Props) {
   const { t } = useT();
   const contentLocales = content_locales ?? [];
@@ -213,14 +219,16 @@ function RecordEditor({
               error={form.rawError}
             />
           ) : (
-            <RecordForm
-              fields={type.fields}
-              values={form.values}
-              errors={form.fieldErrors}
-              disabled={pending}
-              onChange={form.setValue}
-              expanded={current?.expanded ?? undefined}
-            />
+            <MediaApiProvider value={media_api}>
+              <RecordForm
+                fields={type.fields}
+                values={form.values}
+                errors={form.fieldErrors}
+                disabled={pending}
+                onChange={form.setValue}
+                expanded={current?.expanded ?? undefined}
+              />
+            </MediaApiProvider>
           )}
 
           <RecordAdvancedFields

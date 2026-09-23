@@ -219,10 +219,11 @@ describe('RecordCell', () => {
     expect(out).not.toContain('[object Object]');
   });
 
-  it('shows a media value as its id behind a placeholder glyph', () => {
+  it('shows a media value as its stored id when the page has no media library', () => {
     const out = html(field({ type: 'media', indexed: false }), 'media-42');
+    expect(out).toContain('records-media-cell');
+    expect(out).toContain('records-media-raw');
     expect(out).toContain('media-42');
-    expect(out).toContain('aria-hidden="true"');
     expect(out).not.toContain('<img');
   });
 });

@@ -15,6 +15,7 @@ export {
   defaultColumnKeys,
   ENVELOPE_COLUMNS,
   type EnvelopeColumnKey,
+  firstMediaField,
   type ListColumn,
   listColumns,
   MAX_CHOSEN_COLUMNS,

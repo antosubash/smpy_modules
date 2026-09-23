@@ -141,3 +141,24 @@ export function buildRecordHref(
   const href = trimmed.replaceAll('{slug}', record.slug ?? '').replaceAll('{uuid}', record.uuid);
   return safeHref(href) ? href : null;
 }
+
+/** The `src` for a `media` value on the public page, or `null` for "render
+ *  nothing".
+ *
+ *  Only ever built from `media_url_template`, which the anonymous read API
+ *  sends only when the host's media library serves files to a visitor with no
+ *  session (`sm_records.media.public_file_url_template`). The framework
+ *  `file_storage` module does not — it exempts no route from authentication
+ *  and its download also demands `file_storage.download` — so on a stock host
+ *  the template is `null` and a media field renders nothing: an `<img>` of a
+ *  URL that answers a visitor with a 401 is a broken-image icon, and printing
+ *  the stored id is noise. A legacy `https://` value is not rendered either:
+ *  it is whatever an editor pasted, and a public page is not the place to
+ *  find out what that was. */
+export function publicMediaSrc(value: unknown, template: string | null | undefined): string | null {
+  if (!template || typeof value !== 'string') return null;
+  const id = value.trim();
+  if (!id || /^[a-z][a-z0-9+.-]*:/i.test(id)) return null;
+  const src = template.split('{id}').join(encodeURIComponent(id));
+  return safeHref(src) ? src : null;
+}

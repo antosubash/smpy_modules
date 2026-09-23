@@ -561,7 +561,8 @@
     "boolean_no": "No",
     "boolean_unset": "Not set",
     "media_help": "The media library id or the full URL of an uploaded file.",
-    "media_placeholder": "media id or https://…"
+    "media_placeholder": "media id or https://…",
+    "media_picker_help": "Choose a file from the media library, or upload one."
   },
   "form": {
     "no_fields": "This type has no fields yet. Add some on its schema screen."
@@ -697,5 +698,38 @@
     "field_empty_text": "Text shown when there are no records",
     "field_link_template": "Link template ({slug} or {uuid}; blank = no link)",
     "field_api_prefix": "Public API prefix (advanced — only change if the Records settings screen shows a different one)"
+  },
+  "media": {
+    "cancel": "Cancel",
+    "choose": "Choose file…",
+    "current": "Current file",
+    "details_failed": "Couldn't load this file's details.",
+    "dialog_description": "Pick a file from the media library, or upload a new one.",
+    "dialog_title": "Choose a file",
+    "empty": "The media library is empty. Upload a file to use it here.",
+    "file_missing": "File missing",
+    "file_missing_help": "This file is no longer in the media library. The record keeps its id until you choose another file or remove it.",
+    "grid_label": "Files",
+    "item_label": "{name}, {type}, {size}, uploaded {date}",
+    "load_failed": "Couldn't load the media library: {message}",
+    "loading": "Loading files…",
+    "loading_file": "Loading file details…",
+    "next": "Next",
+    "no_matches": "No files match that name.",
+    "no_matches_page": "No files on this page match that name.",
+    "none": "No file chosen.",
+    "page_info": "Page {page} of {pages}",
+    "pagination": "Media library pages",
+    "previous": "Previous",
+    "remove": "Remove",
+    "replace": "Replace…",
+    "retry": "Try again",
+    "search_label": "Search files",
+    "search_page_only": "The media library can't search, so this only filters the files on the current page.",
+    "search_placeholder": "File name",
+    "upload": "Upload a file",
+    "upload_failed": "Couldn't upload the file: {message}",
+    "upload_progress_label": "Upload progress",
+    "uploading": "Uploading {name}… {percent}"
   }
 }

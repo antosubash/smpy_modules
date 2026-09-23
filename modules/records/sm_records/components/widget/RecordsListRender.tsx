@@ -23,13 +23,14 @@ import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 
 import { fetchPublicRecords, type PublicRecordItem } from '../../utils/public-api';
-import { buildRecordHref, formatPublicValue } from './format';
+import { FieldValues, publicValue } from './FieldValues';
+import { buildRecordHref } from './format';
 import type { RecordsListProps } from './types';
 
 type FetchState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; items: PublicRecordItem[] };
+  | { status: 'ready'; items: PublicRecordItem[]; media: string | null };
 
 export type RecordsListRenderProps = RecordsListProps & {
   puck: { isEditing: boolean };
@@ -85,28 +86,17 @@ function RecordTitle({ item, linkTemplate }: { item: PublicRecordItem; linkTempl
   );
 }
 
-function FieldValues({ item, props }: { item: PublicRecordItem; props: RecordsListProps }) {
-  if (props.fieldMeta.length === 0) return null;
-  return (
-    <>
-      {props.fieldMeta.map((meta) => (
-        <span key={meta.key} className="text-sm" style={MUTED_STYLE}>
-          <span className="font-medium">{meta.label}:</span>{' '}
-          {formatPublicValue(meta, item.data[meta.key])}
-        </span>
-      ))}
-    </>
-  );
-}
+/** `media` is the page's `media_url_template` — see `FieldValues.tsx`. */
+type LayoutProps = { items: PublicRecordItem[]; props: RecordsListProps; media: string | null };
 
-function ListLayout({ items, props }: { items: PublicRecordItem[]; props: RecordsListProps }) {
+function ListLayout({ items, props, media }: LayoutProps) {
   return (
     <ul className="divide-y divide-[var(--pb-surface-muted)]">
       {items.map((item) => (
         <li key={item.uuid} className="flex flex-col gap-1 py-3">
           <RecordTitle item={item} linkTemplate={props.linkTemplate} />
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            <FieldValues item={item} props={props} />
+            <FieldValues item={item} props={props} mediaUrlTemplate={media} />
           </div>
         </li>
       ))}
@@ -114,7 +104,7 @@ function ListLayout({ items, props }: { items: PublicRecordItem[]; props: Record
   );
 }
 
-function CardsLayout({ items, props }: { items: PublicRecordItem[]; props: RecordsListProps }) {
+function CardsLayout({ items, props, media }: LayoutProps) {
   return (
     <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
@@ -124,7 +114,7 @@ function CardsLayout({ items, props }: { items: PublicRecordItem[]; props: Recor
         >
           <RecordTitle item={item} linkTemplate={props.linkTemplate} />
           <div className="flex flex-col gap-1">
-            <FieldValues item={item} props={props} />
+            <FieldValues item={item} props={props} mediaUrlTemplate={media} />
           </div>
         </div>
       ))}
@@ -132,7 +122,7 @@ function CardsLayout({ items, props }: { items: PublicRecordItem[]; props: Recor
   );
 }
 
-function TableLayout({ items, props }: { items: PublicRecordItem[]; props: RecordsListProps }) {
+function TableLayout({ items, props, media }: LayoutProps) {
   const { t } = useT();
   return (
     <table className="w-full text-left text-sm">
@@ -160,7 +150,7 @@ function TableLayout({ items, props }: { items: PublicRecordItem[]; props: Recor
             </td>
             {props.fieldMeta.map((meta) => (
               <td key={meta.key} className="py-2 pr-4" style={BODY_STYLE}>
-                {formatPublicValue(meta, item.data[meta.key])}
+                {publicValue(meta, item, media)}
               </td>
             ))}
           </tr>
@@ -185,7 +175,7 @@ export function RecordsListRender(props: RecordsListRenderProps) {
 
   useEffect(() => {
     if (!props.typeKey || skipFetch) {
-      setState({ status: 'ready', items: [] });
+      setState({ status: 'ready', items: [], media: null });
       return;
     }
     const controller = new AbortController();
@@ -201,7 +191,9 @@ export function RecordsListRender(props: RecordsListRenderProps) {
       },
       controller.signal,
     )
-      .then((page) => setState({ status: 'ready', items: page.items }))
+      .then((page) =>
+        setState({ status: 'ready', items: page.items, media: page.media_url_template ?? null }),
+      )
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         setState({ status: 'error' });
@@ -255,11 +247,11 @@ export function RecordsListRender(props: RecordsListRenderProps) {
       {state.status === 'ready' &&
         state.items.length > 0 &&
         (props.layout === 'cards' ? (
-          <CardsLayout items={state.items} props={props} />
+          <CardsLayout items={state.items} props={props} media={state.media} />
         ) : props.layout === 'table' ? (
-          <TableLayout items={state.items} props={props} />
+          <TableLayout items={state.items} props={props} media={state.media} />
         ) : (
-          <ListLayout items={state.items} props={props} />
+          <ListLayout items={state.items} props={props} media={state.media} />
         ))}
     </Section>
   );

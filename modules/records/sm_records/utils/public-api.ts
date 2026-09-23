@@ -36,6 +36,10 @@ export type PublicRecordPage = {
   total: number;
   page: number;
   page_size: number;
+  /** How to show a `media` value to a visitor: a URL with `{id}` in it, or
+   *  `null` when the media library does not serve files anonymously — which
+   *  the framework `file_storage` module does not (`format.ts::publicMediaSrc`). */
+  media_url_template?: string | null;
 };
 
 export const DEFAULT_PUBLIC_PREFIX = '/api/records/public';

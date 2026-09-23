@@ -44,17 +44,17 @@ export function UrlField(props: FieldComponentProps) {
   return <StringField {...props} inputType="url" />;
 }
 
-/** Phase 2 edits a media value as the opaque id or URL the server stores.
- *  Browsing a `file_storage` library is a later phase; the field type and the
- *  500-character cap it validates against do not change when that lands.
+/** The `media` field on a host with no media library (`MediaField.tsx`
+ *  picks between this and the picker): the opaque id or URL the server
+ *  stores, typed by hand. The field type and the 500-character cap it
+ *  validates against are the same either way.
  *
- *  U18: until that picker exists, this is a bare text box in a host that has
- *  a Media library — nothing said what to type into it. A built-in help
- *  fallback and placeholder name the two shapes the server actually accepts
- *  (`_payload.py`'s media validator: an id or a URL), so an operator who has
- *  never read the schema docs still knows what to paste. A schema author's
- *  own `help` still wins over the fallback (`FieldShell`). */
-export function MediaField(props: FieldComponentProps) {
+ *  U18: a bare text box said nothing about what to type into it. A built-in
+ *  help fallback and placeholder name the two shapes the server actually
+ *  accepts (`_payload.py`'s media validator: an id or a URL), so an operator
+ *  who has never read the schema docs still knows what to paste. A schema
+ *  author's own `help` still wins over the fallback (`FieldShell`). */
+export function MediaTextField(props: FieldComponentProps) {
   const { t } = useT();
   return (
     <StringField

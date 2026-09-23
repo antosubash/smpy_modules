@@ -62,6 +62,38 @@ describe('resolveListColumns — the default rule', () => {
     expect(defaultColumnKeys(type, true).slice(0, 2)).toEqual(['status', 'locale']);
     expect(defaultColumnKeys(type, false)).not.toContain('locale');
   });
+
+  it('adds the first media field after the indexed fields, and only the first', () => {
+    const withMedia = {
+      ...type,
+      fields: [field('photo', { type: 'media' }), ...type.fields, field('back', { type: 'media' })],
+    };
+    const resolved = resolveListColumns({
+      type: withMedia,
+      showLocale: false,
+      raw: null,
+      saved: null,
+    });
+    expect(keys(resolved)).toEqual([
+      'status',
+      'i1',
+      'i2',
+      'i3',
+      'i4',
+      'photo',
+      'position',
+      'published_at',
+      'updated_at',
+    ]);
+    // Still an ordinary column: a view can leave it out.
+    const chosen = resolveListColumns({
+      type: withMedia,
+      showLocale: false,
+      raw: 'i1',
+      saved: null,
+    });
+    expect(keys(chosen)).toEqual(['i1']);
+  });
 });
 
 describe('resolveListColumns — ?columns= in the link', () => {

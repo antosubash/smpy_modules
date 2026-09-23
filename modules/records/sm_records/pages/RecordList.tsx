@@ -7,6 +7,7 @@ import type React from 'react';
 
 import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
 import { FilterBar } from '../components/FilterBar';
+import { MediaApiProvider } from '../components/media/MediaApiContext';
 import { displayedColumns } from '../components/RecordColumnCells';
 import { RecordListActions } from '../components/RecordListActions';
 import { RecordListBulk } from '../components/RecordListBulk';
@@ -27,6 +28,7 @@ import {
   parseSort,
   parseTrashedParam,
 } from '../utils/listing';
+import type { MediaApi } from '../utils/media-api';
 import type { RecordListPage, TypeRead } from '../utils/types';
 
 type Props = {
@@ -44,6 +46,8 @@ type Props = {
    *  Absent falls back to the same default the type editor's own
    *  `PublicField` uses. */
   public_route_prefix?: string;
+  /** Where a `media` column resolves its thumbnails; `null` shows the id. */
+  media_api?: MediaApi | null;
 };
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
@@ -58,6 +62,7 @@ function RecordList({
   content_locales,
   max_import_bytes,
   public_route_prefix,
+  media_api,
 }: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
@@ -243,19 +248,21 @@ function RecordList({
                 onFirstPage={() => goTo({ page: 1 })}
               />
             ) : (
-              <RecordTable
-                type={type}
-                records={records.items}
-                sort={currentSort}
-                trashed={trashed}
-                selection={canEdit ? selection : undefined}
-                showLocale={showLocaleUI}
-                columns={columns.resolved}
-                onSort={handleSort}
-                onDelete={handleDelete}
-                onRestore={handleRestore}
-                onPurge={handlePurge}
-              />
+              <MediaApiProvider value={media_api}>
+                <RecordTable
+                  type={type}
+                  records={records.items}
+                  sort={currentSort}
+                  trashed={trashed}
+                  selection={canEdit ? selection : undefined}
+                  showLocale={showLocaleUI}
+                  columns={columns.resolved}
+                  onSort={handleSort}
+                  onDelete={handleDelete}
+                  onRestore={handleRestore}
+                  onPurge={handlePurge}
+                />
+              </MediaApiProvider>
             )}
           </div>
 

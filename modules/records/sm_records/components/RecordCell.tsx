@@ -1,9 +1,9 @@
 import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
-import { ImageIcon } from 'lucide-react';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import { EMPTY_CELL as DASH, formatDateTime } from '../utils/values';
+import { MediaCell } from './media/MediaCell';
 
 type Choice = { value: string; label: string };
 
@@ -83,12 +83,14 @@ function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
  * uuid's first eight characters when there is none (no `?expand=` was asked,
  * or this is an older payload with nothing to look it up in).
  *
- * `json`, `media` and `longtext` are not indexable (design doc §7.3), so the
- * default columns never hold them — but the column chooser may, since every
- * list row carries its full `data`: `longtext` prints its first line's worth
- * with whitespace collapsed, `json` a compact one-line serialisation, and
- * `media` its stored id or URL behind a placeholder glyph (no thumbnail is
- * fetched: the value is opaque to this module).
+ * `json`, `media` and `longtext` are not indexable (design doc §7.3), so
+ * they never sort — but the column chooser may show them, since every list
+ * row carries its full `data`: `longtext` prints its first line's worth with
+ * whitespace collapsed, `json` a compact one-line serialisation, and `media`
+ * goes through `MediaCell` — a thumbnail or an icon and the file's name when
+ * the page has a media library (`media_api`), the stored id when it has
+ * none. The default view includes a type's first `media` field
+ * (`defaultColumnKeys`): a thumbnail is how a list of products is scanned.
  */
 export function RecordCell({
   field,
@@ -169,6 +171,9 @@ export function RecordCell({
     case 'select':
       return <span>{choiceLabel(field, value)}</span>;
 
+    case 'media':
+      return <MediaCell value={value} />;
+
     case 'multiselect': {
       const values = Array.isArray(value) ? value : [value];
       if (values.length === 0) return <span className="text-muted-foreground">{DASH}</span>;
@@ -222,16 +227,6 @@ export function RecordCell({
         <code className="font-mono text-xs" title={text} data-testid="records-cell-json">
           {truncate(text)}
         </code>
-      );
-    }
-
-    case 'media': {
-      const text = String(value);
-      return (
-        <span className="inline-flex min-w-0 items-center gap-1" title={text}>
-          <ImageIcon className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate font-mono text-xs">{truncate(text)}</span>
-        </span>
       );
     }
 

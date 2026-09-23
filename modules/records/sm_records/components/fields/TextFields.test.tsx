@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { mount } from '../../test-dom';
 import type { FieldDef } from '../../utils/types';
-import { MediaField } from './TextFields';
+import { MediaField } from './MediaField';
 
 function field(overrides: Partial<FieldDef> = {}): FieldDef {
   return {
