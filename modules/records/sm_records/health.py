@@ -79,7 +79,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from simple_module_core.health import HealthCheck, HealthCheckResult, HealthStatus
 from sqlalchemy import select
@@ -215,13 +215,13 @@ def _details(limit, stale, blocked, invalid, orphaned, *, named: bool) -> list[s
     return details
 
 
-def _log_named(module: object, named: list[str]) -> None:
+def _log_named(module: Any, named: list[str]) -> None:
     """The multi-mode names, for the operator: logged when the wording changes,
     so a degraded host polled every few seconds does not log it every time."""
     text = "; ".join(named)
     if text and text != getattr(module, "health_logged", None):
         logger.info("records health (named, multi-tenant): %s", text)
-    module.health_logged = text  # type: ignore[attr-defined]
+    module.health_logged = text
 
 
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
