@@ -1648,3 +1648,49 @@ predicting:
   Postgres takes a `Seq Scan` stopped early by the `LIMIT` and is *faster* for
   it (1.49 ms vs 2.57 ms). The property F4 actually cares about — the
   soft-delete filter staying inside the `Limit` — holds.
+
+### Multi-tenancy — what the tenant column costs (2026-09-23)
+
+Tenancy design [2026-09-23-records-multitenancy.md](../../../docs/plans/2026-09-23-records-multitenancy.md)
+predicted "the binding adds no statement, the explicit predicates add no
+statement, and the write path gains one btree insert per record and per
+revision". Measured on PostgreSQL 16.13, `RECORDS_PERF_N=2000`, `REPS=3`,
+against `ten_p5perf` over TCP — all 49 measurements pass their statement-count
+assertions unchanged. "Before" is the same measurement at `162513f`, the last
+commit before any tenancy code, on a fresh database in the same session:
+
+| what | before tenancy | with tenancy |
+|---|---|---|
+| `create_record(company)` / `(product)` statements | 10 / 10 | **10 / 10** |
+| `update_record`, no indexed change / `price` | 15 / 16 | **15 / 16** |
+| create, statement count flat over 50 creates | yes | **yes** |
+| list page, filter, sort (global and collection) | 1 statement each | **1 each** |
+
+The per-tenant listing still runs on the existing `(type_id, …)` indexes,
+with `tenant_id = 'default'` as a residual `Filter` on the heap row that
+removes nothing — the `EXPLAIN` lines the suite prints show it, as the design's
+E-plan fact did. One plan moved: the sort-by-name listing (N=200, one rep)
+now drives from `ix_records_record_type_updated_desc` where it used
+`ix_records_record_type_id`, still one statement and within a millisecond
+(2.24 → 3.37 ms global, 2.29 → 2.80 ms collection, single samples); it is
+the planner's choice between two equally narrowed `type_id` indexes.
+
+**The btree.** `ix_records_record_tenant_id` and `ix_records_revision_tenant_id`
+are the only new write-path indexes (§B). Two template copies of the seeded
+database, one with both indexes dropped, 840 timed `create_record(company)`
+calls each, alternating blocks of 150:
+
+| | p50 | mean |
+|---|---|---|
+| with the two tenant indexes | 8.12 ms | 8.40 ms |
+| without | 8.03 ms | 8.32 ms |
+| **cost** | **+0.09 ms (+1.1 %)** | +0.08 ms |
+
+Within the noise of the run. The indexes are small because every key on a
+single-tenant install is the same string and Postgres 13+ deduplicates btree
+entries: 32 KB for the records' and 40 KB for the revisions' at ~2,000 rows,
+against 136 KB for `ix_records_record_type_updated_desc` over the same rows
+and 192 KB for `uq_records_record_tenant_uuid`, which replaced the old uuid
+unique one for one. A multi-tenant install with many distinct tenants loses
+some of the deduplication; the entry is still a 50-byte-bounded varchar and a
+row pointer.
