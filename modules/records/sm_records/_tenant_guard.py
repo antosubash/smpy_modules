@@ -74,13 +74,27 @@ def _on_flush(session: Session, _context: Any, _instances: Any) -> None:
             )
 
 
+_FLAG = "_sm_records_tenant_guard"
+
+
 def is_guarded(sync_session_class: Any) -> bool:
-    return event.contains(sync_session_class, "do_orm_execute", _on_execute)
+    """Read off the class itself, **not** ``event.contains``.
+
+    The framework builds a fresh session class per ``init_db``, and
+    SQLAlchemy's event registry keys a listener by ``id()`` of its target. Once
+    an old class is garbage-collected a new one can be handed its id while the
+    registry still holds the dead entry, so ``event.contains`` answered True
+    for a class that had no listener — and the guard silently skipped
+    installing itself (seen on the Postgres suite, where engines churn). A flag
+    in the class's own ``__dict__`` dies with the class and is never inherited.
+    """
+    return bool(vars(sync_session_class).get(_FLAG, False))
 
 
 def install(sync_session_class: Any) -> None:
     """Register both listeners once per session class."""
-    if not is_guarded(sync_session_class):
-        event.listen(sync_session_class, "do_orm_execute", _on_execute)
-    if not event.contains(sync_session_class, "before_flush", _on_flush):
-        event.listen(sync_session_class, "before_flush", _on_flush)
+    if is_guarded(sync_session_class):
+        return
+    event.listen(sync_session_class, "do_orm_execute", _on_execute)
+    event.listen(sync_session_class, "before_flush", _on_flush)
+    setattr(sync_session_class, _FLAG, True)
