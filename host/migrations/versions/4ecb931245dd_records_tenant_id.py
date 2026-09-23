@@ -53,7 +53,9 @@ INDEX CONCURRENTLY`` in a separate non-transactional revision and add the key
 ``NOT VALID`` + ``VALIDATE CONSTRAINT`` — ``docs/operations.md``.
 
 **Downgrading is lossy, and refusable.** It restores the global uniques, so it
-fails outright once two tenants share a type key or a record uuid, and where it
+is refused outright once two tenants share a type key or a record uuid — checked
+up front, before any DDL, because SQLite's DDL is not transactional and a unique
+failing half way would strand the schema between revisions — and where it
 succeeds it merges every tenant's rows into one install with no way to tell them
 apart again. Only a single-tenant database — every row ``default`` — round-trips.
 """
@@ -139,7 +141,10 @@ def _rebuild_sqlite(sets: Sequence[TableSet], *, tenant: bool) -> None:
         with op.batch_alter_table(table, recreate="always") as batch:
             if tenant:
                 batch.alter_column(
-                    COLUMN, server_default=None, existing_type=sa.String(50), existing_nullable=False
+                    COLUMN,
+                    server_default=None,
+                    existing_type=sa.String(50),
+                    existing_nullable=False,
                 )
             if table == TYPE_TABLE:
                 if tenant:
@@ -196,9 +201,43 @@ def upgrade() -> None:
     _repair_sqlite(bind, sets)
 
 
+def _shared_natural_keys(bind, sets: Sequence[TableSet]) -> list[str]:
+    """Every type key, and every record uuid within a set, that more than one
+    tenant holds — the rows the restored global uniques cannot take."""
+    probes = [(TYPE_TABLE, "key")] + [(t.record.__tablename__, "uuid") for t in sets]
+    found = []
+    for table, column in probes:
+        rows = bind.execute(
+            sa.text(
+                f"SELECT {column}, count(DISTINCT {COLUMN}) FROM {table} "
+                f"GROUP BY {column} HAVING count(*) > 1 ORDER BY {column} LIMIT 20"
+            )
+        ).all()
+        found += [f"{table}.{column}={value!r} ({n} tenants)" for value, n in rows]
+    return found
+
+
+def _refuse_if_shared(bind, sets: Sequence[TableSet]) -> None:
+    """Refuse *before any DDL*: on SQLite the DDL is not transactional, so a
+    unique that fails half way would leave the schema half downgraded while
+    ``alembic_version`` still says head (review M1). Offline, nothing to read."""
+    if op.get_context().as_sql:
+        return
+    shared = _shared_natural_keys(bind, sets)
+    if shared:
+        raise RuntimeError(
+            "records: refusing to downgrade 4ecb931245dd — the global uniques it restores "
+            "cannot hold while tenants share these (first 20 per table): "
+            + "; ".join(shared)
+            + ". Rename or delete the duplicates in all but one tenant, then retry. "
+            "Nothing was changed."
+        )
+
+
 def downgrade() -> None:
     sets = _present_sets()
     bind = op.get_bind()
+    _refuse_if_shared(bind, sets)
     if bind.dialect.name != "sqlite":
         _swap_fks_pg(sets, tenant=False)
         op.drop_constraint(TYPE_ID_TENANT, TYPE_TABLE, type_="unique")

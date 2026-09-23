@@ -15,7 +15,9 @@ install is, and then migrated. What has to hold afterwards:
   one ``create_all`` builds from the models.
 
 Then the downgrade round-trips single-tenant data exactly, and refuses once two
-tenants share a type key — the lossy half its docstring owns up to.
+tenants share a type key or a record uuid — the lossy half its docstring owns
+up to — before any DDL, so the schema, the revision and the per-tenant uniques
+are exactly as they were and a retry after removing the duplicate succeeds.
 
 Runs on whichever backend the suite is pointed at (see ``migration_support``).
 """
@@ -167,20 +169,71 @@ def test_downgrade_round_trips_single_tenant_data(scratch):
         assert _type_fk(inspector, "records_record")["constrained_columns"] == ["type_id"]
 
 
-def test_downgrade_refuses_once_two_tenants_share_a_type_key(scratch):
+def _schema(engine) -> dict:
+    """Everything a half-applied downgrade could disturb, plus the revision."""
+    with engine.connect() as conn:
+        inspector = sa.inspect(conn)
+        return {
+            "indexes": index_definitions(conn),
+            "revision": conn.execute(sa.text("SELECT version_num FROM alembic_version")).all(),
+            **{
+                table: (
+                    [c["name"] for c in inspector.get_columns(table)],
+                    sorted(str(u["column_names"]) for u in inspector.get_unique_constraints(table)),
+                    sorted(
+                        str(f["constrained_columns"]) for f in inspector.get_foreign_keys(table)
+                    ),
+                )
+                for table in OWNED
+            },
+        }
+
+
+_TYPE = (
+    "INSERT INTO records_type (key, label, label_plural, fields, schema_version, version, "
+    "reindex_pending, allowed_roles, is_public, show_in_menu, translatable, created_at, "
+    "tenant_id) VALUES (:key, 'P', 'Ps', '[]', 1, 1, '{}', '[]', false, false, false, "
+    "CURRENT_TIMESTAMP, 'acme')"
+)
+_RECORD = (
+    "INSERT INTO records_record (uuid, type_id, data, schema_version, version, status, slug, "
+    "locale, translation_group, display_title, position, created_at, updated_at, is_deleted, "
+    "tenant_id) SELECT uuid, :type_id, data, schema_version, version, status, slug, locale, "
+    "translation_group, display_title, position, created_at, updated_at, is_deleted, 'acme' "
+    "FROM records_record WHERE id = 1"
+)
+
+
+@pytest.mark.parametrize("shared", ["type key", "record uuid"])
+def test_downgrade_refuses_before_any_ddl_once_two_tenants_share_a_natural_key(scratch, shared):
+    """Review M1: on SQLite the DDL is not transactional, so the refusal has to
+    come before the first ``DROP INDEX`` or the schema is left half downgraded
+    at a revision that still says head."""
     url, engine = scratch
     with engine.begin() as conn:
         populate(conn)
     must(alembic(url, "upgrade", THIS))
     with engine.begin() as conn:
-        conn.execute(
-            sa.text(
-                "INSERT INTO records_type (key, label, label_plural, fields, schema_version, "
-                "version, reindex_pending, allowed_roles, is_public, show_in_menu, translatable, "
-                "created_at, tenant_id) VALUES ('post', 'P', 'Ps', '[]', 1, 1, '{}', '[]', "
-                "false, false, false, CURRENT_TIMESTAMP, 'acme')"
-            )
-        )
+        conn.execute(sa.text(_TYPE), {"key": "post" if shared == "type key" else "acme_only"})
+        if shared == "record uuid":
+            type_id = conn.execute(sa.text("SELECT max(id) FROM records_type")).scalar_one()
+            conn.execute(sa.text(_RECORD), {"type_id": type_id})
+    before = _schema(engine)
+
     refused = alembic(url, "downgrade", BEFORE)
     assert refused.returncode != 0
-    assert "ix_records_type_key" in refused.stderr or "UNIQUE" in refused.stderr
+    assert "refusing to downgrade 4ecb931245dd" in refused.stderr, refused.stderr[-2000:]
+    expected = "records_type.key='post'" if shared == "type key" else "records_record.uuid="
+    assert expected in refused.stderr
+    assert _schema(engine) == before
+    assert before["revision"] == [(THIS,)]
+    assert "uq_records_type_tenant_key" in before["indexes"]
+    assert "uq_records_record_tenant_uuid" in before["indexes"]
+
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM records_record WHERE tenant_id = 'acme'"))
+        conn.execute(sa.text("DELETE FROM records_type WHERE tenant_id = 'acme'"))
+    must(alembic(url, "downgrade", BEFORE))
+    with engine.connect() as conn:
+        assert conn.execute(sa.text("SELECT version_num FROM alembic_version")).all() == [(BEFORE,)]
+        assert "ix_records_type_key" in index_definitions(conn)
