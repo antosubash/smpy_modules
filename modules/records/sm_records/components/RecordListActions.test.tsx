@@ -84,3 +84,46 @@ describe('RecordListActions — the export menu learns the count is capped', () 
     await view.unmount();
   });
 });
+
+describe('RecordListActions — the tenant badge (tenancy design §J)', () => {
+  it('shows nothing when tenancyMode is absent or single', async () => {
+    const view = await mount(
+      <RecordListActions
+        typeKey="book"
+        fields={[]}
+        canEdit={false}
+        trashed={false}
+        exportSearch=""
+        filtered={false}
+        recordCount={0}
+        tenant="acme"
+        onToggleTrashed={() => {}}
+      />,
+    );
+    expect(view.find('[data-testid="records-tenant-badge"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('shows the bound tenant once tenancyMode is multi', async () => {
+    const view = await mount(
+      <RecordListActions
+        typeKey="book"
+        fields={[]}
+        canEdit={false}
+        trashed={false}
+        exportSearch=""
+        filtered={false}
+        recordCount={0}
+        tenant="acme"
+        tenancyMode="multi"
+        onToggleTrashed={() => {}}
+      />,
+    );
+    // i18next is unconfigured under vitest, so `{tenant}` is not substituted
+    // (`RecordRowAction.test.tsx`'s own note) — the badge rendering at all,
+    // gated on `tenancyMode`, is what this test is actually pinning.
+    const badge = view.find('[data-testid="records-tenant-badge"]');
+    expect(badge?.textContent).toBe('Tenant: {tenant}');
+    await view.unmount();
+  });
+});

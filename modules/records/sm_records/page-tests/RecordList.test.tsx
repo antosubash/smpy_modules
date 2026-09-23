@@ -138,3 +138,21 @@ describe('RecordList — U30: nothing to filter on a brand-new, empty type', () 
     await view.unmount();
   });
 });
+
+describe('RecordList — the tenant badge (tenancy design §J)', () => {
+  it('shows nothing on a single-tenant host', async () => {
+    const view = await mount(
+      <RecordList type={type()} records={records()} tenant="default" tenancy_mode="single" />,
+    );
+    expect(view.find('[data-testid="records-tenant-badge"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('shows the working tenant once tenancy_mode is multi', async () => {
+    const view = await mount(
+      <RecordList type={type()} records={records()} tenant="acme" tenancy_mode="multi" />,
+    );
+    expect(view.find('[data-testid="records-tenant-badge"]')).not.toBeNull();
+    await view.unmount();
+  });
+});

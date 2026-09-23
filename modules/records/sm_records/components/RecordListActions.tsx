@@ -3,8 +3,9 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import type React from 'react';
 
-import type { FieldDef } from '../utils/types';
+import type { FieldDef, TenancyMode } from '../utils/types';
 import { RecordIoMenu } from './RecordIoMenu';
+import { TenantBadge } from './TenantBadge';
 
 /**
  * The record list's toolbar: back to the types, the column chooser, export
@@ -44,6 +45,8 @@ export function RecordListActions({
   recordCountCapped = false,
   maxImportBytes,
   columnsMenu,
+  tenant,
+  tenancyMode,
   onToggleTrashed,
 }: {
   typeKey: string;
@@ -67,11 +70,15 @@ export function RecordListActions({
   maxImportBytes?: number;
   /** The "Columns" menu, when the list has anything to show columns of. */
   columnsMenu?: React.ReactNode;
+  /** Tenancy design §J — read-only; renders `TenantBadge` in this toolbar. */
+  tenant?: string;
+  tenancyMode?: TenancyMode;
   onToggleTrashed: () => void;
 }) {
   const { t } = useT();
   return (
     <div className={TOOLBAR_CLASS} data-testid="records-list-actions">
+      <TenantBadge tenant={tenant} tenancyMode={tenancyMode} />
       <Button variant="outline" onClick={() => router.visit('/admin/records')}>
         {t('records.types.title', { defaultValue: 'Record Types' })}
       </Button>

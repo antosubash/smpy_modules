@@ -115,3 +115,24 @@ describe('Types — a public type shows its public URL on the hub too', () => {
     await view.unmount();
   });
 });
+
+describe('Types — the tenant badge (tenancy design §J)', () => {
+  afterEach(() => {
+    // @ts-expect-error — undo the stub between tests
+    window.matchMedia = undefined;
+  });
+
+  it('shows nothing on a single-tenant host', async () => {
+    setNarrow(false);
+    const view = await mount(<Types types={[type()]} tenant="default" tenancy_mode="single" />);
+    expect(view.find('[data-testid="records-tenant-badge"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('shows the working tenant once tenancy_mode is multi', async () => {
+    setNarrow(false);
+    const view = await mount(<Types types={[type()]} tenant="acme" tenancy_mode="multi" />);
+    expect(view.find('[data-testid="records-tenant-badge"]')).not.toBeNull();
+    await view.unmount();
+  });
+});

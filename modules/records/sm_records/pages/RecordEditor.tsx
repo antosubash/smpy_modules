@@ -18,11 +18,12 @@ import { RecordRevisions } from '../components/RecordRevisions';
 import { RecordEditorHeaderBadges } from '../components/RecordStatusBadge';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTranslations } from '../components/RecordTranslations';
+import { TenantBadge } from '../components/TenantBadge';
 import { useRecordEditor } from '../hooks/useRecordEditor';
 import { displayFieldKey } from '../utils/errors-display';
 import type { MediaApi } from '../utils/media-api';
 import { withCurrentPatched } from '../utils/record-types';
-import type { RecordRead, TranslationRead, TypeRead } from '../utils/types';
+import type { RecordRead, TenancyMode, TranslationRead, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
@@ -39,6 +40,11 @@ type Props = {
   /** Where the `media` picker lists and uploads (`sm_records.media`); `null`
    *  or absent leaves a `media` field the plain text box. */
   media_api?: MediaApi | null;
+  /** Which tenant this screen reads, and whether the host runs several
+   *  (`views.py::record_new`/`record_edit`, tenancy design §J) — read-only;
+   *  drives the `TenantBadge` next to Cancel. */
+  tenant?: string;
+  tenancy_mode?: TenancyMode;
 };
 
 const DATA_ID = 'record-data';
@@ -64,6 +70,8 @@ function RecordEditor({
   content_locales,
   default_locale,
   media_api,
+  tenant,
+  tenancy_mode,
 }: Props) {
   const { t } = useT();
   const contentLocales = content_locales ?? [];
@@ -124,6 +132,7 @@ function RecordEditor({
         // link below takes its place instead.
         actions={
           <>
+            <TenantBadge tenant={tenant} tenancyMode={tenancy_mode} />
             <RecordHeaderFields
               status={status}
               envelope={envelope}

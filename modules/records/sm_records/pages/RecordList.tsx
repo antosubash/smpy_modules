@@ -29,7 +29,7 @@ import {
   parseTrashedParam,
 } from '../utils/listing';
 import type { MediaApi } from '../utils/media-api';
-import type { RecordListPage, TypeRead } from '../utils/types';
+import type { RecordListPage, TenancyMode, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
@@ -48,6 +48,9 @@ type Props = {
   public_route_prefix?: string;
   /** Where a `media` column resolves its thumbnails; `null` shows the id. */
   media_api?: MediaApi | null;
+  /** Tenancy design §J — read-only; drives `TenantBadge` in `actions`. */
+  tenant?: string;
+  tenancy_mode?: TenancyMode;
 };
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
@@ -63,6 +66,8 @@ function RecordList({
   max_import_bytes,
   public_route_prefix,
   media_api,
+  tenant,
+  tenancy_mode,
 }: Props) {
   const { t } = useT();
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
@@ -159,6 +164,8 @@ function RecordList({
             recordCount={known}
             recordCountCapped={records.total_capped}
             maxImportBytes={max_import_bytes}
+            tenant={tenant}
+            tenancyMode={tenancy_mode}
             onToggleTrashed={toggleTrashed}
             columnsMenu={
               // `genuinelyEmpty` is false on a cursor page, so an empty or

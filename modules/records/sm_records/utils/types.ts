@@ -10,6 +10,14 @@
  * `TypeRead.show_in_menu` pushed this file over the 300-line cap.
  */
 
+/** Which tenancy shape the host runs (tenancy design §A.3, `sm_records.tenancy.
+ *  TenancyMode`) — carried on every admin screen's props by `tenancy.view_props`
+ *  alongside `tenant`. `'single'` is the only mode most hosts ever see, and
+ *  every screen that reads this treats an absent value the same way (no
+ *  multi-tenant UI), the same "inert when unused" rule `public_route_prefix`
+ *  and friends already follow here. */
+export type TenancyMode = 'single' | 'multi';
+
 /** One typed field on a Record Type. `constraints`/`options` are per-`type`
  *  (e.g. `min`/`max` for `number`, `choices` for `select`) — opaque here
  *  because Phase 1 edits them as raw JSON, not through per-kind UI. */

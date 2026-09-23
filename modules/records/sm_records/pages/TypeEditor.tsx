@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { RecordsToaster } from '../components/RecordsToaster';
+import { TenantBadge } from '../components/TenantBadge';
 import { groupErrors } from '../components/typeeditor/errors';
 import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
@@ -54,6 +55,8 @@ function TypeEditor({
   public_route_prefix,
   content_locales,
   collections,
+  tenant,
+  tenancy_mode,
 }: TypeEditorProps) {
   const { t } = useT();
   const isNew = type === null;
@@ -161,6 +164,7 @@ function TypeEditor({
         title={title}
         actions={
           <>
+            <TenantBadge tenant={tenant} tenancyMode={tenancy_mode} />
             <TypeIoMenu
               currentKey={current?.key ?? null}
               pending={pending || schemaApply.pending}
@@ -199,6 +203,7 @@ function TypeEditor({
                 contentLocales={content_locales}
                 collections={collections}
                 translatableError={translatableError}
+                tenancyMode={tenancy_mode}
               />
             </CardContent>
           </Card>

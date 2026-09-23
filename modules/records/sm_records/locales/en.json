@@ -1,7 +1,8 @@
 {
   "common": {
     "loading": "Loading…",
-    "unsaved_changes": "You have unsaved changes. Leave this page and lose them?"
+    "unsaved_changes": "You have unsaved changes. Leave this page and lose them?",
+    "tenant_badge": "Tenant: {tenant}"
   },
   "nav": {
     "types": "Record Types"

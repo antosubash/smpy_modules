@@ -5,7 +5,7 @@
  * props, not a shape any other screen renders.
  */
 
-import type { FieldDef, TypeRead } from '../../utils/types';
+import type { FieldDef, TenancyMode, TypeRead } from '../../utils/types';
 
 /** One entry of `props.target_types` — a candidate for `relation.options.
  *  target_type`, as `views.py::_editor_context` builds it. */
@@ -31,6 +31,13 @@ export type TypeEditorProps = {
    *  which collections exist is decided by the host's Python and is not
    *  derivable from anything the browser holds. */
   collections: string[];
+  /** Which tenant this screen reads, and whether the host runs several
+   *  (`views_types.py::_editor_context`, tenancy design §J/§I) — read-only.
+   *  `tenancy_mode` is also what `SidebarField` hides "Show in sidebar" on:
+   *  multi mode has no per-type sidebar entries at all (design §I), so the
+   *  toggle would promise something the host can't do. */
+  tenant?: string;
+  tenancy_mode?: TenancyMode;
 };
 
 /** A field row's local editing state: the wire `FieldDef` plus `uid`, a
