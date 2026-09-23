@@ -90,10 +90,11 @@ test.describe('Records — capped totals and cursor paging', () => {
     // Last numbered page, and a short one: there is nothing after it, so
     // `Next` has no cursor to follow and stays disabled.
     await expect(next).toBeDisabled();
-    // The range's end is what this page actually shows (33), which can run
-    // past the "+" number (32) — that is what "+" means (UX-2's fix: the old
-    // range end was `min(page*pageSize, total)`, one short of the real rows).
-    await expect(page.getByText(`Showing 26–${SEEDED} of ${MAX_COUNT}+`)).toBeVisible();
+    // The range's end is what this page actually shows (33), past the "+"
+    // number (32) (UX-2). A short page is the end, so the real count is
+    // known and replaces "32+" (review 4, ux F12).
+    await expect(page.getByText(`Showing 26–${SEEDED} of ${SEEDED}`)).toBeVisible();
+    await expect(page.getByTestId('records-page-position')).toHaveText('Page 2 of 2');
 
     await page.getByRole('button', { name: 'Previous' }).click();
     await expect(page.getByTestId('records-record-row')).toHaveCount(PAGE_SIZE);

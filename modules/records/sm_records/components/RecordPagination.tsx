@@ -192,13 +192,23 @@ function numberedPagerParts(t: Translate, props: PagerProps, page: number): Page
   // Past the cap's last page the rows go on; the count does not. The server
   // says whether there are more (`nextCursor`), and "Next" follows it.
   const continues = capped && onLast && nextCursor !== null && onContinue !== undefined;
+  // A capped page *without* a cursor is short, so it is the list's end (the
+  // server hands out a cursor for every full page, `_listing.py`): the real
+  // count is this page's last row, and "26–40 of 32+" would be a range
+  // running past its own total (review 4, ux F12). A full final page still
+  // says "32+" — nothing on it can tell it is the last.
+  const ended = capped && nextCursor === null && itemCount > 0;
+  const count = ended ? rangeEnd : total;
+  const inexact = capped && !ended;
   return {
     info: (
       <>
-        <span title={capped ? cappedHelp(t, total) : undefined}>
-          {pageInfo(t, rangeStart, rangeEnd, total, capped)}
+        <span title={inexact ? cappedHelp(t, total) : undefined}>
+          {pageInfo(t, rangeStart, rangeEnd, count, inexact)}
         </span>
-        <span data-testid="records-page-position">{pagePosition(t, page, lastPage, capped)}</span>
+        <span data-testid="records-page-position">
+          {pagePosition(t, page, ended ? page : lastPage, inexact)}
+        </span>
       </>
     ),
     actions: [

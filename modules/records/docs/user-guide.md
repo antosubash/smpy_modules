@@ -423,7 +423,11 @@ Every one of them writes into the URL, so Back walks back through them.
 
 On a large type the count stops at 10,000: the footer then reads **Showing
 1–25 of 10,000+** with the explanation *"More than 10,000 records match; the
-count stops at 10,000."* That ceiling is the `max_count` setting.
+count stops at 10,000."* That ceiling is the `max_count` setting. If the list
+then ends on the last numbered page — the page is not full, so nothing follows
+it — the real count is known and the footer says it: **Showing 10,001–10,012 of
+10,012**, **Page 401 of 401**. A page that is exactly full cannot tell, and
+keeps the **+**.
 
 **Past the count, the list keeps going.** The numbered pages end at the page
 that holds the 10,000th record, but the records do not. On that page **Next**
