@@ -1084,7 +1084,7 @@ statement census. Items are marked as above.
     (`register_routes`, `boot.mount_public_router`). FastAPI 0.141 wraps
     included routers in `_IncludedRouter`, so the table is read with
     `fastapi.routing.iter_route_contexts`. Each case marks its routes with
-    `@covers`. 42 routes (the public `HEAD`s count separately).
+    `@covers`. 40 routes (the public `HEAD`s count separately).
   * Tenant cloning is shown into a *third* tenant, in two passes: the
     importer resolves a relation against what is stored before it writes, so
     a row cannot point at a row created earlier in the same file. That is the
