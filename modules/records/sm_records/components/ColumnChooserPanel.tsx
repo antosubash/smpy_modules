@@ -2,10 +2,9 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef } from 'react';
 
-import { disambiguateLabels } from '../utils/filters';
 import { type ListColumn, MAX_CHOSEN_COLUMNS, type ResolvedColumns } from '../utils/listing';
 import { ColumnOptionRow, columnControlId } from './ColumnOptionRow';
-import { envelopeLabel } from './RecordColumnCells';
+import { columnLabels } from './RecordColumnCells';
 
 type Focus = { key: string; control: 'toggle' | 'up' | 'down' };
 
@@ -52,13 +51,12 @@ export function ColumnChooserPanel({
     (target && !target.disabled ? target : (other ?? target))?.focus();
   }, [order]);
 
-  const labels = new Map(
-    disambiguateLabels(
-      available.map((column) => ({
-        key: column.key,
-        label: column.kind === 'field' ? column.field.label : envelopeLabel(t, column.key),
-      })),
-    ).map((entry) => [entry.key, entry.label]),
+  // The table's and the cards' own labels (`columnLabels`), so a declared
+  // "Status" reads "Status (state)" in all three places.
+  const labels = columnLabels(
+    t,
+    available,
+    t('records.records.display_title', { defaultValue: 'Title' }),
   );
   const chosen = new Set(chosenKeys);
   const hidden = available.filter((column) => !chosen.has(column.key));

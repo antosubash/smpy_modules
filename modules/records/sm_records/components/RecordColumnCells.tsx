@@ -1,6 +1,7 @@
 import { useT } from '@simple-module-py/i18n';
 import { TableHead } from '@simple-module-py/ui/components/ui/table';
 
+import { disambiguateLabels } from '../utils/filters';
 import type { EnvelopeColumnKey, ListColumn, ResolvedColumns, SortState } from '../utils/listing';
 import type { RecordRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
@@ -32,6 +33,38 @@ export function envelopeLabel(t: Translate, key: EnvelopeColumnKey): string {
     default:
       return t('records.records.updated_at', { defaultValue: 'Updated' });
   }
+}
+
+/**
+ * Every column's header (and card) label, keyed by column key — the same
+ * strings the Columns panel and the filter bar show. A declared field
+ * labelled like one of the record's own columns ("Status", "Updated",
+ * "Position", "Language") used to be a second, identical header beside it,
+ * and "Status: Draft-ish" next to the status badge on a card (review 4, ux
+ * F3). `disambiguateLabels` appends the key to every label that occurs more
+ * than once among `columns` — pass every column the type *can* show, as the
+ * panel does, so a header reads the same whether or not its twin is shown.
+ * A field labelled like the Title column gets its key too (UX-12).
+ */
+export function columnLabels(
+  t: Translate,
+  columns: readonly ListColumn[],
+  titleLabel: string,
+): Map<string, string> {
+  const labels = new Map(
+    disambiguateLabels(
+      columns.map((column) => ({
+        key: column.key,
+        label: column.kind === 'field' ? column.field.label : envelopeLabel(t, column.key),
+      })),
+    ).map((entry) => [entry.key, entry.label]),
+  );
+  for (const column of columns) {
+    if (column.kind === 'field' && column.field.label === titleLabel) {
+      labels.set(column.key, `${column.field.label} (${column.key})`);
+    }
+  }
+  return labels;
 }
 
 /**
@@ -67,27 +100,19 @@ export function RecordFlagBadges({ record }: { record: RecordRead }) {
  */
 export function ColumnHeader({
   column,
+  label,
   sort,
   onSort,
-  titleLabel,
 }: {
   column: ListColumn;
+  /** From `columnLabels`: unambiguous among the type's columns. */
+  label: string;
   sort: SortState;
   onSort: (field: string) => void;
-  /** The Title column's own header — a field labelled the same gets its key
-   *  appended to its accessible name (UX-12). */
-  titleLabel: string;
 }) {
   const { t } = useT();
   if (column.kind === 'envelope') {
-    return (
-      <SortableHeader
-        field={column.key}
-        label={envelopeLabel(t, column.key)}
-        sort={sort}
-        onSort={onSort}
-      />
-    );
+    return <SortableHeader field={column.key} label={label} sort={sort} onSort={onSort} />;
   }
   const { field } = column;
   if (!field.indexed) {
@@ -99,20 +124,12 @@ export function ColumnHeader({
             defaultValue: "Not indexed, so this column can't be sorted or filtered.",
           })}
         >
-          {field.label}
+          {label}
         </span>
       </TableHead>
     );
   }
-  return (
-    <SortableHeader
-      field={field.key}
-      label={field.label}
-      sort={sort}
-      onSort={onSort}
-      ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
-    />
-  );
+  return <SortableHeader field={field.key} label={label} sort={sort} onSort={onSort} />;
 }
 
 /** One column's value for one record — shared by the table and the cards. */

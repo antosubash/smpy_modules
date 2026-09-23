@@ -288,6 +288,11 @@ install with no media library the column is not in the default view (the
 **Columns** menu still offers it): it shows the stored id as text, or the
 link for a URL.
 
+A field labelled like one of the record's own columns — a field called
+"Status" beside the record's **Status** — shows its key after the label in
+the header, on the phone cards, in the **Columns** menu and in the filter's
+field list alike: **Status (state)** and **Status (status)**.
+
 A relation column renders the target's title; a to-many relation renders the
 titles comma-separated. A boolean renders as a check or a dash. `select` and
 `multiselect` render through their configured labels. A long text shows its

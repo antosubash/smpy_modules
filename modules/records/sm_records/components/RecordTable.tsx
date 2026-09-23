@@ -10,11 +10,22 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { RecordSelection } from '../hooks/useRecordSelection';
-import { type ResolvedColumns, resolveListColumns, type SortState } from '../utils/listing';
+import {
+  availableColumns,
+  type ResolvedColumns,
+  resolveListColumns,
+  type SortState,
+} from '../utils/listing';
 import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
 import { RecordCardList } from './RecordCardList';
-import { ColumnHeader, ColumnValue, displayedColumns, RecordFlagBadges } from './RecordColumnCells';
+import {
+  ColumnHeader,
+  ColumnValue,
+  columnLabels,
+  displayedColumns,
+  RecordFlagBadges,
+} from './RecordColumnCells';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
 import { SortableHeader } from './SortableHeader';
@@ -103,9 +114,10 @@ export function RecordTable({
   const showStatus = shown.some((column) => column.key === 'status');
   const noIndexedNotice =
     resolved.source === 'default' && !shown.some((column) => column.kind === 'field');
-  // A field named "Title" would otherwise share the display-title column's
-  // accessible name (UX-12) — disambiguate only that collision.
   const titleLabel = t('records.records.display_title', { defaultValue: 'Title' });
+  // Over every column the type can show, as the Columns panel does, so a
+  // declared "Status" never reads as the record's own (review 4, ux F3).
+  const labels = columnLabels(t, availableColumns(type, showLocale), titleLabel);
 
   if (narrow) {
     return (
@@ -116,6 +128,7 @@ export function RecordTable({
           selection={selection}
           trashed={trashed}
           columns={shown}
+          labels={labels}
           onDelete={onDelete}
           onRestore={onRestore}
           onPurge={onPurge}
@@ -144,9 +157,9 @@ export function RecordTable({
               <ColumnHeader
                 key={column.key}
                 column={column}
+                label={labels.get(column.key) ?? column.key}
                 sort={sort}
                 onSort={onSort}
-                titleLabel={titleLabel}
               />
             ))}
             <TableHead className="text-right">

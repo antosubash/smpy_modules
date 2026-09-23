@@ -3,15 +3,10 @@ import { useT } from '@simple-module-py/i18n';
 import { Fragment } from 'react';
 
 import type { RecordSelection } from '../hooks/useRecordSelection';
-import { type ListColumn, resolveListColumns } from '../utils/listing';
+import { availableColumns, type ListColumn, resolveListColumns } from '../utils/listing';
 import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
-import {
-  ColumnValue,
-  displayedColumns,
-  envelopeLabel,
-  RecordFlagBadges,
-} from './RecordColumnCells';
+import { ColumnValue, columnLabels, displayedColumns, RecordFlagBadges } from './RecordColumnCells';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
 import { RecordLocaleBadge, RecordStatusBadge } from './RecordStatusBadge';
@@ -50,6 +45,7 @@ export function RecordCardList({
   records,
   trashed = false,
   columns,
+  labels: givenLabels,
   selection,
   onDelete,
   onRestore,
@@ -63,6 +59,9 @@ export function RecordCardList({
   /** The columns this page displays (`RecordTable` passes them already
    *  resolved and position-trimmed). Absent means the type's default. */
   columns?: ListColumn[];
+  /** `columnLabels` from the table, so a card's line reads like its header.
+   *  Absent means computed here. */
+  labels?: Map<string, string>;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
   onPurge: (record: RecordRead) => Promise<unknown>;
@@ -76,6 +75,13 @@ export function RecordCardList({
     );
   const showStatus = shown.some((column) => column.key === 'status');
   const showLocale = shown.some((column) => column.key === 'locale');
+  const labels =
+    givenLabels ??
+    columnLabels(
+      t,
+      availableColumns(type, showLocale),
+      t('records.records.display_title', { defaultValue: 'Title' }),
+    );
   const lines = shown
     .filter((column) => column.key !== 'status' && column.key !== 'locale')
     .slice(0, CARD_COLUMNS);
@@ -148,9 +154,7 @@ export function RecordCardList({
               <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {lines.map((column) => (
                   <Fragment key={column.key}>
-                    <dt className="font-medium">
-                      {column.kind === 'field' ? column.field.label : envelopeLabel(t, column.key)}
-                    </dt>
+                    <dt className="font-medium">{labels.get(column.key) ?? column.key}</dt>
                     <dd className="min-w-0 break-words" data-column={column.key}>
                       <ColumnValue column={column} record={record} />
                     </dd>

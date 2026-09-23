@@ -178,3 +178,68 @@ describe('RecordCardList — the first chosen columns, in order', () => {
     await without.unmount();
   });
 });
+
+describe('RecordTable — a field labelled like a record column (review 4, ux F3)', () => {
+  const clash = {
+    ...type,
+    fields: [
+      field('state', { type: 'select', label: 'Status' }),
+      field('changed', { type: 'date', label: 'Updated' }),
+      field('rank', { type: 'integer', label: 'Position' }),
+      field('title', { label: 'Title' }),
+    ],
+  } as unknown as TypeRead;
+  const shown = resolveListColumns({
+    type: clash,
+    showLocale: false,
+    raw: 'status,state,changed,updated_at,rank,position,title',
+    saved: null,
+  });
+  const row = record({ position: 3, data: { state: 'x', changed: null, rank: 1, title: 'T' } });
+
+  it('gives every header an unambiguous name, as the Columns panel does', async () => {
+    const view = await mount(
+      <RecordTable
+        type={clash}
+        records={[row]}
+        sort={null}
+        columns={shown}
+        onSort={() => {}}
+        onDelete={noop}
+        onRestore={noop}
+        onPurge={noop}
+      />,
+    );
+    expect(headers(view)).toEqual([
+      'Title',
+      'Status (status)',
+      'Status (state)',
+      'Updated (changed)',
+      'Updated (updated_at)',
+      'Position (rank)',
+      'Position (position)',
+      'Title (title)',
+      'Actions',
+    ]);
+    const names = view
+      .all('thead button')
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent);
+    expect(new Set(names).size).toBe(names.length);
+    await view.unmount();
+  });
+
+  it('labels a card line the same way, beside the status badge', async () => {
+    const view = await mount(
+      <RecordCardList
+        type={clash}
+        records={[row]}
+        columns={shown.columns.filter((c) => c.key === 'status' || c.key === 'state')}
+        onDelete={noop}
+        onRestore={noop}
+        onPurge={noop}
+      />,
+    );
+    expect(view.all('dt').map((dt) => dt.textContent)).toEqual(['Status (state)']);
+    await view.unmount();
+  });
+});

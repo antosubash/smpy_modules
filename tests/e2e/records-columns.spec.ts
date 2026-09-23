@@ -159,6 +159,35 @@ test.describe('Records — the column chooser', () => {
     await expect(page).toHaveURL(/columns=(&|$)/);
   });
 
+  test('a field labelled "Status" is told apart from the record Status', async ({ page }) => {
+    // Review 4, ux F3: two identical "Status" headers, and "Status: Open"
+    // beside the status badge on a phone card.
+    await login(page);
+    const key = uniqueTypeKey('colsclash');
+    await apiCreateType(page, {
+      key,
+      label: 'Clash thing',
+      label_plural: 'Clash things',
+      fields: [
+        { key: 'name', type: 'text', label: 'Name', indexed: true },
+        { key: 'state', type: 'text', label: 'Status', indexed: true },
+      ],
+      display_field: 'name',
+    });
+    await apiCreateRecord(page, key, { data: { name: 'Clash 1', state: 'Open' }, position: 0 });
+    await page.goto(`/admin/records/${key}`);
+    expect(await headers(page)).toEqual(
+      expect.arrayContaining(['Status (status)', 'Status (state)']),
+    );
+    expect(await headers(page)).not.toContain('Status');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId('records-record-card').locator('dt')).toHaveText([
+      'Status (state)',
+      'Published on',
+      'Updated',
+    ]);
+  });
+
   // Review 4, ux F1: the sixth toolbar button (Columns) pushed a 720px
   // document to 745px — PageShell sizes its actions box to its content, so
   // the group has to cap its own width to wrap (RecordListActions).
