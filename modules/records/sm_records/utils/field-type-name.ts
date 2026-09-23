@@ -3,7 +3,7 @@
  * type editor's type select and the record list's column chooser.
  */
 
-// See `utils/list-messages.ts` for why `t` is typed this loosely.
+// See `utils/list-errors.ts` for why `t` is typed this loosely.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
 type Translate = (...args: any[]) => string;
 
