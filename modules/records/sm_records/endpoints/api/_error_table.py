@@ -72,7 +72,7 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         400,
-        "A cursor that does not decode, or replayed under a different sort",
+        "A cursor that does not decode, or replayed under a different sort or in another tenant",
         '`{"detail"}`',
     ),
     ErrorRow(

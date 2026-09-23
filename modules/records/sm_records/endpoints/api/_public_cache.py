@@ -20,6 +20,16 @@ Two headers, one setting (:attr:`~sm_records.settings.RecordsSettings.public_cac
 that saves bandwidth; the digest itself still costs a page build, and cannot
 not, because the answer is what is being hashed.
 
+**On a multi-tenant host the answer depends on the tenant** (tenancy design
+§H), which the framework resolves from the caller's header — so every public
+response there names that header in ``Vary``, on the 304 too. Without it a
+cache keyed by URL would hand ``acme``'s list to a ``globex`` reader. The
+header's name is the one the host gave its ``TenantMiddleware``, captured by
+:func:`sm_records.tenancy.configure`. A signed-in caller's tenant comes from
+their account instead, which no request header names, so their response is
+``private``: a browser may keep it, a shared cache may not. The ETag stays a
+content digest: two tenants whose pages are equal share it, harmlessly.
+
 Nothing here is used on the admin API: those responses are per-caller and the
 framework's ``InertiaCache`` already forces them private.
 
@@ -46,7 +56,9 @@ from typing import Any
 
 from fastapi import Request, Response
 
+from sm_records import constants
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import TenancyMode, mode_of, tenant_header
 
 __all__ = ["NO_STORE", "apply"]
 
@@ -89,6 +101,24 @@ def _matches(header: str | None, tag: str) -> bool:
     return any(candidate.strip().removeprefix(_WEAK) == wanted for candidate in header.split(","))
 
 
+def _tenancy(request: Request) -> tuple[str | None, bool]:
+    """``(header to name in Vary, whether the answer is private)``.
+
+    Single mode: ``(None, False)`` — every read is ``default``, whoever asks.
+    """
+    if mode_of(request.app) is TenancyMode.SINGLE:
+        return None, False
+    services = getattr(request.app.state, constants.PACKAGE, None)
+    header = getattr(services, "tenant_header", None) or tenant_header(request.app)
+    return header, getattr(request.state, "user", None) is not None
+
+
+def _add_vary(headers: Any, name: str) -> None:
+    existing = [v.strip() for v in headers.get("Vary", "").split(",") if v.strip()]
+    if name.lower() not in {v.lower() for v in existing}:
+        headers["Vary"] = ", ".join([*existing, name])
+
+
 def apply(
     request: Request, response: Response, payload: Any, settings: RecordsSettings
 ) -> Response | None:
@@ -99,17 +129,23 @@ def apply(
     it is a response and not an error — nothing went wrong, and there is
     nothing for ``RecordsErrorRoute`` to roll back.
     """
+    vary, private = _tenancy(request)
+    if vary is not None:
+        _add_vary(response.headers, vary)
     seconds = settings.public_cache_seconds
     if seconds <= 0:
         response.headers["Cache-Control"] = NO_STORE
         return None
-    policy = f"public, max-age={seconds}"
+    policy = f"{'private' if private else 'public'}, max-age={seconds}"
     tag = _etag(payload)
     response.headers["ETag"] = tag
     response.headers["Cache-Control"] = policy
     if _matches(request.headers.get("if-none-match"), tag):
-        # The validator and the policy travel with the 304 too: a cache that
-        # is refreshing an entry has to learn the new freshness lifetime from
-        # somewhere, and this is the only response it is getting.
-        return Response(status_code=304, headers={"ETag": tag, "Cache-Control": policy})
+        # The validator, the policy and ``Vary`` travel with the 304 too: a
+        # cache that is refreshing an entry has to learn the new freshness
+        # lifetime from somewhere, and this is the only response it is getting.
+        not_modified = Response(status_code=304, headers={"ETag": tag, "Cache-Control": policy})
+        if vary is not None:
+            _add_vary(not_modified.headers, vary)
+        return not_modified
     return None

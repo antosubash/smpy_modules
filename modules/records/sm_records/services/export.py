@@ -156,7 +156,11 @@ async def iter_json(
     sorts: Sequence[Sort] = (),
     trashed: bool = False,
 ) -> AsyncIterator[str]:
-    """``{"type": {...}, "records": [ ... ]}``, written as a stream."""
+    """``{"type": {...}, "tenant": "…", "records": [ ... ]}``, written as a stream.
+
+    ``tenant`` is informational (tenancy design §H): the importer reads only
+    ``records`` and always writes into the tenant the import runs in, which
+    is what makes export-from-one / import-into-another a tenant clone."""
     async with session_factory() as db:
         rtype = await get_type_by_id(db, type_id)
         defs = field_defs(rtype)
@@ -165,7 +169,13 @@ async def iter_json(
             "schema_version": rtype.schema_version,
             "fields": list(rtype.fields or []),
         }
-        yield '{"type": ' + json.dumps(header) + ', "records": ['
+        yield (
+            '{"type": '
+            + json.dumps(header)
+            + ', "tenant": '
+            + json.dumps(rtype.tenant_id)
+            + ', "records": ['
+        )
         first = True
         async for batch in walk_records(
             db, rtype, settings=settings, filters=filters, sorts=sorts, trashed=trashed

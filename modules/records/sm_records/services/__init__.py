@@ -32,6 +32,10 @@ class RecordsServices:
     """Single- or multi-tenant, read off the built middleware stack in
     ``on_startup`` by :func:`sm_records.tenancy.configure`; ``None`` until then,
     when :func:`sm_records.tenancy.mode_of` detects it on demand."""
+    tenant_header: str | None = None
+    """The request header the host's ``TenantMiddleware`` resolves an anonymous
+    caller's tenant from, captured with :attr:`tenancy`; ``None`` in single
+    mode or when the host set none. The public API names it in ``Vary``."""
 
 
 __all__ = ["RecordsServices"]

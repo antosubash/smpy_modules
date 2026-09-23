@@ -63,6 +63,7 @@ __all__ = [
     "mode_of",
     "resolve_admin",
     "resolve_public",
+    "tenant_header",
     "tenant_scope",
     "valid_tenant",
     "view_props",
@@ -107,12 +108,25 @@ def valid_tenant(value: object) -> bool:
 # --- mode --------------------------------------------------------------------
 
 
-def detect_mode(app: Any) -> TenancyMode:
-    """``MULTI`` iff the framework's ``TenantMiddleware`` is in the built stack."""
+def _tenant_middleware(app: Any) -> Any:
+    """The ``TenantMiddleware`` entry of the built stack, or ``None``."""
     from simple_module_hosting.middleware import TenantMiddleware
 
-    classes = {getattr(entry, "cls", None) for entry in getattr(app, "user_middleware", ())}
-    return TenancyMode.MULTI if TenantMiddleware in classes else TenancyMode.SINGLE
+    entries = getattr(app, "user_middleware", ())
+    return next((e for e in entries if getattr(e, "cls", None) is TenantMiddleware), None)
+
+
+def detect_mode(app: Any) -> TenancyMode:
+    """``MULTI`` iff the framework's ``TenantMiddleware`` is in the built stack."""
+    return TenancyMode.SINGLE if _tenant_middleware(app) is None else TenancyMode.MULTI
+
+
+def tenant_header(app: Any) -> str | None:
+    """The header that middleware resolves a tenant from — its own ``header``
+    argument, as the host passed it — or ``None`` (single mode, or no header)."""
+    entry = _tenant_middleware(app)
+    header = (getattr(entry, "kwargs", None) or {}).get("header") if entry else None
+    return header or None
 
 
 def configure(app: Any) -> TenancyMode:
@@ -133,6 +147,7 @@ def configure(app: Any) -> TenancyMode:
     services = getattr(app.state, constants.PACKAGE, None)
     if services is not None:
         services.tenancy = mode
+        services.tenant_header = tenant_header(app)
     host = getattr(getattr(app.state, "host", None), "settings", None)
     if getattr(host, "multi_tenant", False) is True and mode is TenancyMode.SINGLE:
         logger.warning(

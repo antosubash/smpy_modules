@@ -538,8 +538,9 @@ records import: order — 9000 row(s), 0 created, 0 updated, 9000 skipped, 0 fai
 
 Exits **non-zero** with the report printed when an `abort` run is refused.
 
-An import always writes into `--tenant` (default `default`). The file names no
-tenant that the importer reads. So exporting with `--tenant acme` and
+An import always writes into `--tenant` (default `default`). A JSON export
+names the tenant it came from (`"tenant": "acme"`), but only as information:
+the importer never reads it. So exporting with `--tenant acme` and
 importing with `--tenant globex` copies acme's records of a type into
 globex's type of the same key. The uuids are kept. That is legal because a
 uuid is unique per tenant. The target type has to exist in the target tenant

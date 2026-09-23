@@ -21,7 +21,8 @@ timestamp against a decimal and skip an arbitrary part of the type; there is
 no correct answer to give, so it is refused. The signature covers everything
 that changes what the tuple means: the type key, the ordered ``(field,
 direction)`` list, whether the listing was the trash, **the sort fields'
-resolved index kinds** and **the locale the listing was taken under**.
+resolved index kinds**, **the locale the listing was taken under** and **the
+tenant it was taken in**.
 
 The last two were added after a QA pass found them missing. A field retyped
 from ``number`` to ``text`` between two pages of a walk leaves the same field
@@ -32,6 +33,13 @@ statement rather than a caller filter (``services.public._narrow_for``), so a
 cursor minted under ``?locale=en`` and replayed under ``?locale=de`` was
 accepted — no leak, since the predicate still applies, but "resume after this
 row" means nothing across two different listings.
+
+The tenant (tenancy design §H) is read from the binding, never passed in, so
+no caller can forget it. Two tenants may both have a type ``post``, so without
+it a cursor minted in ``acme`` would be accepted in ``globex``. That was never
+a leak — the listing's own tenant predicate still applies and the values
+compared against are the caller's own rows — but "resume after this row" names
+a row the caller cannot see, and the answer would be an arbitrary slice.
 
 Every decode failure is one :class:`CursorError` and one 400: a malformed
 cursor is a client bug, and distinguishing "not base64" from "wrong sort" for
@@ -53,6 +61,7 @@ from typing import Any
 from sm_records.index._sorting import SortTerm
 from sm_records.models import RecordStatus
 from sm_records.schema.types import IndexKind
+from sm_records.tenancy import bound_tenant
 
 __all__ = ["CursorError", "decode_cursor", "encode_cursor", "sort_signature"]
 
@@ -85,7 +94,9 @@ def sort_signature(
     ``terms`` is the resolved sort (:func:`sort_plan`), read only for each
     term's value kind, and ``locale`` is the language a public listing was
     narrowed to — ``None`` on the admin listing, where a locale is an ordinary
-    filter and filters are deliberately not part of a cursor.
+    filter and filters are deliberately not part of a cursor. The bound
+    tenant is always part of it; with none bound this raises
+    :class:`~sm_records.tenancy.TenantUnbound`, as any records read would.
 
     Truncated to 12 hex characters: it is a mismatch detector, not a MAC —
     nothing is authorised by it, and a forged one can only make the caller
@@ -98,6 +109,7 @@ def sort_signature(
             "x": bool(trashed),
             "k": _term_kinds(terms),
             "l": locale,
+            "n": bound_tenant(),
         },
         separators=(",", ":"),
         sort_keys=True,

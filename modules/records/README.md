@@ -200,9 +200,10 @@ covers everything that changes what the value tuple *means*: the type, the
 ordered `(field, direction)` list, whether the listing was the trash, **the
 index kind behind each sort field** (so a field retyped from `number` to `text`
 mid-walk invalidates the cursor instead of comparing a decimal against a
-string) and, on the public API, **the `?locale=` the listing was narrowed to**.
-Three things are a `400`: a cursor that does not decode, a cursor replayed
-under a different sort — in any of those senses — or against the trash, and
+string), on the public API **the `?locale=` the listing was narrowed to**, and
+**the tenant it was minted in**. Three things are a `400`: a cursor that does
+not decode, a cursor replayed under a different sort — in any of those senses
+— or against the trash or in another tenant, and
 `?page=` and `?after=` sent together, which are two ways of asking for a page
 and the server will not guess which one you meant. `?page=` stays for the admin
 UI, which shows numbered pages up to the capped count and follows the same
@@ -530,7 +531,8 @@ The rules worth knowing before you point a site at it:
   `public_cache_seconds` setting (60 by default). A conditional GET whose
   `If-None-Match` matches is a `304` with no body. Set it to `0` for
   `Cache-Control: no-store` and no validator, on an install whose "published"
-  means "visible the instant it is saved".
+  means "visible the instant it is saved". On a multi-tenant host both also
+  carry `Vary: <tenant header>`, and a signed-in reader's answer is `private`.
 
   > A *shared* cache still cannot store these on a stock host: every anonymous
   > response also carries `Vary: Cookie` and a fresh `Set-Cookie: session=…`,
@@ -610,7 +612,11 @@ one a request runs in from the host's middleware stack:
   resolved (the header, or a signed-in reader's own) and answers its usual
   `404` without one. Nothing ever falls back to `default`.
 
-Type keys and record uuids are unique per tenant. The records screens receive
+Type keys and record uuids are unique per tenant. A keyset cursor is bound to
+the tenant it was minted in, a public answer names the tenant header in
+`Vary`, and a JSON export names its tenant (informational; an import always
+writes into the importer's tenant, which is how a tenant is cloned). The
+records screens receive
 the tenant they read as a read-only `tenant` prop, with `tenancy_mode`.
 Design: [docs/plans/2026-09-23-records-multitenancy.md](../../docs/plans/2026-09-23-records-multitenancy.md).
 

@@ -186,9 +186,10 @@ end-of-data signal that survives a capped `total`.
 The cursor is opaque base64 (the row's sort values plus its id) but not secret.
 It carries a digest of the sort it was produced under — the type, the ordered
 `(field, direction)` list, whether the listing was the trash, the index kind
-behind each sort field, and on the public API the `?locale=` it was narrowed to.
-Replaying it under a different sort is a `400`, as is a cursor that does not
-decode.
+behind each sort field, on the public API the `?locale=` it was narrowed to,
+and the tenant it was minted in. Replaying it under a different sort, or in
+another tenant (where the same type key is a different type), is a `400`, as
+is a cursor that does not decode.
 
 **In the admin list screen.** `GET /admin/records/{key}` (the Inertia view)
 takes `after` too, beside `page`, `page_size`, `filter`, `sort` and `trashed`,
@@ -1020,6 +1021,7 @@ expanded. The reserved `_orphaned` key, the audit columns, `version` and
 ```json
 {
   "type": {"key": "article", "schema_version": 1, "fields": [ … ]},
+  "tenant": "default",
   "records": [
     {"uuid": "3bbded82dce443c8a8141f5de1ca889d", "slug": "hello-0",
      "locale": "en", "translation_group": "3bbded82dce443c8a8141f5de1ca889d",
@@ -1029,6 +1031,13 @@ expanded. The reserved `_orphaned` key, the audit columns, `version` and
   ]
 }
 ```
+
+`tenant` is the tenant the export was taken in, and it is **informational**:
+the importer reads only `records` and ignores every other top-level key. An
+import always writes into the tenant the import request (or the CLI's
+`--tenant`) runs in, so exporting from `acme` and importing into `globex` clones
+the records, uuids included — uuids are unique per tenant, not across them. The
+CSV export has no envelope, so it carries no tenant.
 
 #### CSV
 
@@ -1066,6 +1075,10 @@ winning.
 | `match_by` | `uuid` \| `slug` \| a `unique` field key | `uuid` | How a row finds the record it updates |
 | `force` | bool | `false` | Accept last-write-wins for a row carrying no `version` |
 | `format` | `json` \| `csv` | guessed | From the explicit value, then the filename, then the content type |
+
+A JSON import is the export document or a bare list of rows. Of the
+document, only `records` is read: `type` and `tenant` are ignored, and the
+records land in the type named by the URL, in the caller's tenant.
 
 Import is header-driven for CSV, so column order does not matter; a missing
 column means "leave it alone", an empty cell means null.
@@ -1276,6 +1289,14 @@ weak and `*` matches, per RFC 9110 §13.1.2. Setting `public_cache_seconds` to
 setting for an install whose "published" means "visible the instant it is
 saved".
 
+**On a multi-tenant host every anonymous answer carries `Vary: X-Tenant-ID`**
+(or whatever header the host's `TenantMiddleware` reads, `SM_TENANT_HEADER`),
+on the `304` too, because the tenant is what decides the answer and a cache
+keyed on the URL alone would hand one tenant's page to another. A reader who
+is **signed in** is resolved to their own account's tenant, which no request
+header names, so their answer is `Cache-Control: private, max-age=N` instead.
+A single-tenant host sends neither: every read there is `default`.
+
 The validator covers the *content*, so it changes when the answer does — a row
 edited, a row unpublished out of the page, a different `?filter=`, a different
 page of the same query — and not merely when some row somewhere was touched.
@@ -1311,7 +1332,7 @@ kind of route can produce, with the body schema
 | `400` | A malformed filter term, or `in` over `max_in_values` | `{"detail"}` |
 | `400` | More than `max_filter_terms` / `max_sort_terms` terms | `{"detail"}` |
 | `400` | `page` and `after` sent together | `{"detail"}` |
-| `400` | A cursor that does not decode, or replayed under a different sort | `{"detail"}` |
+| `400` | A cursor that does not decode, or replayed under a different sort or in another tenant | `{"detail"}` |
 | `400` | An import file that is not the format it claims, or a header naming an unknown column | `{"detail"}` |
 | `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
