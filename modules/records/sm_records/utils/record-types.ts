@@ -158,10 +158,15 @@ export type RecordPage = {
   page: number;
   page_size: number;
   /** The opaque `?after=` value for the page after this one, `null` on the
-   *  last page (F11). The admin UI pages by number and ignores it; an API
-   *  client walking the type should use it instead of `?page=`. */
+   *  last page (F11). An API client walking the type should use it instead
+   *  of `?page=`; the admin list follows it past the capped count. */
   next_cursor: string | null;
 };
+
+/** `RecordPage` as the list screen receives it (`endpoints/_list_view.py`'s
+ *  `RecordListViewPage`): `page` is `null` on a page reached by `?after=`,
+ *  which is past the numbered pages and has no number. */
+export type RecordListPage = Omit<RecordPage, 'page'> & { page: number | null };
 
 export type RecordRevision = {
   id: number;

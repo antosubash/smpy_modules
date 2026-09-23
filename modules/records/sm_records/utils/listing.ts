@@ -10,6 +10,14 @@
 
 import type { FieldDef, FilterOp, TypeRead } from './types';
 
+export {
+  type FilterErrorReason,
+  filterErrorMessage,
+  filterErrorReasonKey,
+  isCursorRefusal,
+  listStatus,
+} from './list-errors';
+
 export const MAX_LIST_COLUMNS = 4;
 
 /**
@@ -73,109 +81,64 @@ export function buildSortParam(sort: SortState): string | undefined {
   return sort.dir === 'desc' ? `-${sort.field}` : sort.field;
 }
 
-// ---- Filter errors ------------------------------------------------------
+// ---- The URL ------------------------------------------------------------
+
+/** The page sizes the footer offers. The first is the module's own default
+ *  (`RecordsSettings.default_page_size`), which is also what the URL leaves
+ *  out: a URL that carries only what differs from the default is the one
+ *  worth sharing, and the server clamps whatever does arrive. */
+export const PAGE_SIZES = [25, 50, 100] as const;
+
+/** Every param `record_list` (`endpoints/views.py`) reads — the list's whole
+ *  state, since the URL *is* the state. `page` is `1` on a cursor page. */
+export type ListUrlState = {
+  page: number;
+  after: string | null;
+  filter: string | null;
+  sort: string | null;
+  trashed: boolean;
+  pageSize: number;
+};
+
+/** One navigation: only what it changes. `filter`/`sort` take `null` to
+ *  clear; `after` is a `next_cursor` to continue from. */
+export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sort'>> & {
+  after?: string;
+  filter?: string | null;
+  sort?: string | null;
+};
 
 /**
- * The `reason` values `sm_records.index._predicates.QueryError` can carry —
- * see `index/query.py` and `index/_predicates.py` for every call site.
- * `record_list` (`endpoints/views.py`) attaches `{filter: exc.reason}` to the
- * Inertia `errors` bag whenever building the query fails, regardless of
- * whether the offending term came from `?filter=` or `?sort=`.
- */
-const FILTER_ERROR_REASONS = [
-  'reindexing',
-  'unsupported_op',
-  'not_indexed',
-  'unknown',
-  'bad_value',
-] as const;
-
-export type FilterErrorReason = (typeof FILTER_ERROR_REASONS)[number] | 'generic';
-
-/**
- * Normalises a `?filter=`/`?sort=` failure's `reason` to a translation-key
- * suffix, falling back to `'generic'` for anything not in the closed set
- * above — a reason this build doesn't recognise (a future server addition
- * this build predates) still needs a message, just not a wrong one for
- * something specific it isn't.
- */
-export function filterErrorReasonKey(reason: string | undefined): FilterErrorReason {
-  return reason && (FILTER_ERROR_REASONS as readonly string[]).includes(reason)
-    ? (reason as FilterErrorReason)
-    : 'generic';
-}
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up TS
-// with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
-
-/**
- * The sentence for a `?filter=`/`?sort=` term the index layer refused.
+ * The query params for the list after `next` is applied to `current`.
  *
- * Every branch keeps its own literal `t()` call (rather than a
- * `Record<FilterErrorReason, string>` built once) for the same reason
- * `FilterBar`'s `opLabel` does: an untranslated-string check can read a
- * `t()` call, not a string chosen out of a config object before one.
- *
- * Lives here rather than in `pages/RecordList.tsx` only because that page
- * is up against the 300-line cap.
+ * **Paging.** `?page=` and `?after=` are never both written: the server
+ * refuses the pair (`page_and_after`), exactly as the API does. A cursor is
+ * "the rows after this one *in this order*", so a change of filter, sort,
+ * trash view or page size drops it and lands on page 1 — the cursor would
+ * either be refused (another sort, the trash) or resume a list the reader is
+ * no longer looking at. A numbered page drops it too. Nothing but the URL
+ * ever holds the cursor, which is what makes a cursor page shareable and
+ * lets Back walk through the pages it came from.
  */
-export function filterErrorMessage(t: Translate, reason: string | undefined): string {
-  switch (filterErrorReasonKey(reason)) {
-    case 'reindexing':
-      return t('records.list.filter_error.reindexing', {
-        defaultValue:
-          'That field is being reindexed right now and cannot be filtered on yet. Try again shortly.',
-      });
-    case 'unsupported_op':
-      return t('records.list.filter_error.unsupported_op', {
-        defaultValue: "That condition isn't supported for this field.",
-      });
-    case 'not_indexed':
-      return t('records.list.filter_error.not_indexed', {
-        defaultValue: "That field isn't indexed, so it can't be filtered or sorted on.",
-      });
-    case 'unknown':
-      return t('records.list.filter_error.unknown', {
-        defaultValue: "That field doesn't exist on this record type.",
-      });
-    case 'bad_value':
-      return t('records.list.filter_error.bad_value', {
-        defaultValue: "That value isn't valid for this field.",
-      });
-    default:
-      return t('records.list.filter_error.generic', {
-        defaultValue: "That filter couldn't be applied.",
-      });
-  }
-}
-
-/** What the visually-hidden live region announces after a filter, a sort or
- *  a page (UX-R15): these navigations swap the table's rows through a
- *  partial Inertia reload with no focus move, so the page silently became a
- *  different page. The page count is dropped when `capped` — past the
- *  ceiling (F4) there is no last page to name. */
-export function listStatus(
-  t: Translate,
-  { count, page, pages, capped }: { count: number; page: number; pages: number; capped: boolean },
-): string {
-  if (capped) {
-    return t('records.records.list_status_uncounted', {
-      count,
-      page,
-      defaultValue: '{count} record, page {page}',
-      defaultValue_other: '{count} records, page {page}',
-    });
-  }
-  return t('records.records.list_status', {
-    count,
-    page,
-    pages,
-    defaultValue: '{count} record, page {page} of {pages}',
-    defaultValue_other: '{count} records, page {page} of {pages}',
-  });
+export function listParams(current: ListUrlState, next: ListUrlChange): Record<string, string> {
+  const reordered =
+    next.filter !== undefined ||
+    next.sort !== undefined ||
+    next.trashed !== undefined ||
+    next.pageSize !== undefined;
+  const params: Record<string, string> = {};
+  const after = next.after ?? (next.page !== undefined || reordered ? null : current.after);
+  const page = next.page ?? (reordered ? 1 : current.page);
+  if (after) params.after = after;
+  else if (page > 1) params.page = String(page);
+  const filter = next.filter === undefined ? current.filter : next.filter;
+  if (filter) params.filter = filter;
+  const sort = next.sort === undefined ? current.sort : next.sort;
+  if (sort) params.sort = sort;
+  if (next.trashed ?? current.trashed) params.trashed = 'true';
+  const size = next.pageSize ?? current.pageSize;
+  if (size && size !== PAGE_SIZES[0]) params.page_size = String(size);
+  return params;
 }
 
 // ---- Trashed toggle -----------------------------------------------------
@@ -224,7 +187,8 @@ export function parseFilterParam(raw: string | null): FilterValue {
  * a filter the server has already refused (`errors.filter` on the page):
  * carrying it makes the export the same refusal, as a raw JSON 400 in a new
  * tab with nothing around it to explain (polish note). Everything else the
- * screen is showing still goes.
+ * screen is showing still goes — the paging params `page` and `after` are
+ * `exportUrl`'s to drop (`utils/io.ts`).
  */
 export function exportSearchParams(search: string, filterFailed: boolean): string {
   if (!filterFailed) return search;

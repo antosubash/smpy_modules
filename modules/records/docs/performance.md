@@ -523,7 +523,8 @@ pruned by age, and a `404` from the poll simply means "preview again".
 sort values and its id, carrying a digest of the sort it was produced under;
 a cursor that does not decode, one replayed under a different sort or against
 the trash, and `?page=` and `?after=` sent together are each a `400`. `?page=`
-stays for the admin UI, which shows numbered pages.
+stays for the admin UI, which shows numbered pages up to `max_count` and
+continues by cursor past it.
 
 | page 200 of 9,000 orders, `sort=-placed_at` | before | after |
 |---|---|---|

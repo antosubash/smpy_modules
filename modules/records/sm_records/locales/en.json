@@ -65,6 +65,9 @@
     "previous": "Previous",
     "next": "Next",
     "last": "Last",
+    "first_page": "First page",
+    "next_page": "Next page",
+    "cursor_info": "The list continues in the same order from here, without page numbers.",
     "page_size": "Per page",
     "page_position": "Page {page} of {pages}",
     "page_position_capped": "Page {page}",
@@ -74,6 +77,9 @@
     "list_status_uncounted": "{count} record, page {page}",
     "list_status_uncounted_one": "{count} record, page {page}",
     "list_status_uncounted_other": "{count} records, page {page}",
+    "list_status_cursor": "{count} record, continuing in the same order",
+    "list_status_cursor_one": "{count} record, continuing in the same order",
+    "list_status_cursor_other": "{count} records, continuing in the same order",
     "page_info": "Showing {start}–{end} of {total}",
     "page_info_capped": "Showing {start}–{end} of {count}+",
     "page_info_capped_help": "More than {count} records match; the count stops at {count}.",
@@ -98,7 +104,9 @@
     "delete_set_null_other": "{count} records will have this reference cleared",
     "delete_cascade": "{count} record will be deleted too",
     "delete_cascade_one": "{count} record will be deleted too",
-    "delete_cascade_other": "{count} records will be deleted too"
+    "delete_cascade_other": "{count} records will be deleted too",
+    "empty_cursor_refused": "Nothing to show — this link could not continue the list.",
+    "empty_cursor_end": "There are no more records after the previous page."
   },
   "referrers": {
     "title": "Referenced by {count} record",
@@ -214,6 +222,8 @@
       "not_indexed": "That field isn't indexed, so it can't be filtered or sorted on.",
       "unknown": "That field doesn't exist on this record type.",
       "bad_value": "That value isn't valid for this field.",
+      "bad_cursor": "This link can't continue the list: it was made for a different sort or view, or it has been changed. Go back to the first page.",
+      "page_and_after": "This link asks for a page number and a place in the list at once. Go back to the first page.",
       "generic": "That filter couldn't be applied."
     }
   },

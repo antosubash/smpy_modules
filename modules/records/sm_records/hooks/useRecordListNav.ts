@@ -1,14 +1,13 @@
 import { router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 
-import { PAGE_SIZES } from '../components/RecordPagination';
-import type { SortState } from '../utils/listing';
-import { buildSortParam, nextSort } from '../utils/listing';
+import type { ListUrlChange, SortState } from '../utils/listing';
+import { buildSortParam, listParams, nextSort } from '../utils/listing';
 import type { FilterOp } from '../utils/types';
 
 /**
- * Every write `RecordList` makes to the URL — filter, sort, page, page
- * size, the trash toggle — funnelled through one `goTo()`, plus the U12
+ * Every write `RecordList` makes to the URL — filter, sort, page, cursor,
+ * page size, the trash toggle — funnelled through one `goTo()`, plus the U12
  * loading state that request now carries. Split out of the page component
  * for the 300-line cap; `RecordList` itself keeps only what it needs to
  * *render* (the parsed filter/sort/trashed state stays there, since
@@ -17,6 +16,7 @@ import type { FilterOp } from '../utils/types';
 export function useRecordListNav({
   typeKey,
   page,
+  after,
   rawFilter,
   rawSort,
   trashed,
@@ -24,7 +24,10 @@ export function useRecordListNav({
   currentSort,
 }: {
   typeKey: string;
-  page: number;
+  /** `null` on a page reached by cursor — `records.page`. */
+  page: number | null;
+  /** `?after=` as the URL carries it: the only place a cursor is ever kept. */
+  after: string | null;
   rawFilter: string | null;
   rawSort: string | null;
   trashed: boolean;
@@ -46,32 +49,26 @@ export function useRecordListNav({
     listTop.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
-  const goTo = (next: {
-    page?: number;
-    filter?: string | null;
-    sort?: string | null;
-    trashed?: boolean;
-    pageSize?: number;
-  }) => {
-    const params: Record<string, string> = {};
-    const targetPage = next.page ?? page;
-    if (targetPage > 1) params.page = String(targetPage);
-    const targetFilter = next.filter === undefined ? rawFilter : next.filter;
-    if (targetFilter) params.filter = targetFilter;
-    const targetSort = next.sort === undefined ? rawSort : next.sort;
-    if (targetSort) params.sort = targetSort;
-    const targetTrashed = next.trashed ?? trashed;
-    if (targetTrashed) params.trashed = 'true';
-    const targetSize = next.pageSize ?? rawPageSize;
-    // The default is the absence of the param, not `?page_size=25`: a URL
-    // that carries only what differs from the default is the one worth
-    // sharing, and the server clamps whatever does arrive.
-    if (targetSize && targetSize !== PAGE_SIZES[0]) params.page_size = String(targetSize);
+  const goTo = (next: ListUrlChange) => {
+    // `utils/listing.ts::listParams` owns the rules — which change drops the
+    // cursor, and that `page` and `after` are never written together.
+    const params = listParams(
+      {
+        page: page ?? 1,
+        after,
+        filter: rawFilter,
+        sort: rawSort,
+        trashed,
+        pageSize: rawPageSize,
+      },
+      next,
+    );
     // Toggling `trashed` swaps every prop (`records`, `errors` and, via
     // `parse_trashed`, what the server even lets through) — a partial reload
     // only makes sense for staying inside the same trashed/live view.
     const full = next.trashed !== undefined;
-    const paged = next.page !== undefined || next.pageSize !== undefined;
+    const paged =
+      next.page !== undefined || next.after !== undefined || next.pageSize !== undefined;
     router.get(`/admin/records/${typeKey}`, params, {
       only: full ? undefined : ['records', 'errors'],
       preserveState: true,

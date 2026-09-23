@@ -73,10 +73,13 @@ export function formatImportLimit(limit: number): string {
 
 /** The download URL for one type, carrying the list screen's own
  *  `filter`/`sort`/`trashed` so "Export" means "export what I am looking at"
- *  rather than "export everything, whatever the screen says". */
+ *  rather than "export everything, whatever the screen says". Never the
+ *  paging params: an export is the whole matching set, not the rows from
+ *  this page (`page`) or from this cursor (`after`) on. */
 export function exportUrl(typeKey: string, format: 'json' | 'csv', search?: string): string {
   const params = new URLSearchParams(search ?? '');
   params.delete('page');
+  params.delete('after');
   params.set('format', format);
   return `${BASE}/types/${encodeURIComponent(typeKey)}/records/export?${params.toString()}`;
 }

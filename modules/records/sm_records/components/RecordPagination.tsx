@@ -1,14 +1,15 @@
 import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { Label } from '@simple-module-py/ui/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 
-/** The page sizes the footer offers. The first is the module's own default
- *  (`RecordsSettings.default_page_size`), which is also what the footer
- *  treats as "unset": a type small enough to fit on one page renders no
- *  footer at all unless the URL asked for another size, and would otherwise
- *  strand a reader who picked 100 with no control to go back to 25. */
-export const PAGE_SIZES = [25, 50, 100] as const;
+import { PAGE_SIZES } from '../utils/listing';
+import { PageSizeSelect } from './PageSizeSelect';
+import { CursorPager } from './RecordCursorPager';
+
+// The footer treats the first size as "unset": a type small enough to fit on
+// one page renders no footer at all unless the URL asked for another size,
+// and would otherwise strand a reader who picked 100 with no control to go
+// back to 25. Re-exported for the callers that imported it from here.
+export { PAGE_SIZES };
 
 // See `pages/RecordList.tsx` for why `t` is typed this loosely.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
@@ -67,38 +68,10 @@ function pagePosition(t: Translate, page: number, pages: number, capped: boolean
   });
 }
 
-/**
- * The record list's footer: "Showing 1–25 of N", where in the run of pages
- * this one falls, the four page buttons and the page-size select.
- *
- * Extracted from `pages/RecordList.tsx` for the 300-line cap when the total
- * stopped being a plain number (F4). `total` is what the API reported — the
- * exact count, or `RecordsSettings.max_count` when `capped` — and every
- * calculation here reads that same value, so a capped listing pages to the
- * cap and no further. Walking past it is what `RecordPage.next_cursor` and
- * `?after=` are for (F11); the admin UI shows numbered pages and does not.
- *
- * "First"/"Last" and the size select are UX-R18: 180 records at 25 a page
- * put the last page seven clicks away, with no page number to say where you
- * were and no way to ask for a longer page. Both write the URL through the
- * caller, like every other list control (the URL is the state).
- *
- * Renders nothing when a single page holds everything *and* nobody asked for
- * a different page size — which is what the list did before, and keeps a
- * small type's screen free of chrome without stranding a reader who picked
- * 100 on a screen with no control to pick 25 again.
- */
-export function RecordPagination({
-  page,
-  pageSize,
-  total,
-  capped,
-  itemCount,
-  loading = false,
-  onGo,
-  onPageSize,
-}: {
-  page: number;
+export type PagerProps = {
+  /** `null` on a page reached by cursor (`?after=`), which has no number —
+   *  the footer's cursor mode. */
+  page: number | null;
   pageSize: number;
   total: number;
   capped: boolean;
@@ -108,17 +81,73 @@ export function RecordPagination({
    *  partial page by however far the real count ran past the cap (UX-2); the
    *  rows on screen are the one number that is always right. */
   itemCount: number;
+  /** `RecordPage.next_cursor`: where "Next" continues once the numbered
+   *  pages run out (a capped listing's last page) and on every cursor page.
+   *  `null` means this page was the end of the list. */
+  nextCursor?: string | null;
   /** U12: a page/size change is in flight — the buttons disable rather than
    *  stay clickable while the request is on the wire, which used to invite
    *  a second click that raced the first. */
   loading?: boolean;
   onGo: (page: number) => void;
+  /** Continues with `?after=<cursor>` — see `utils/listing.ts::listParams`. */
+  onContinue?: (cursor: string) => void;
   /** Writes `?page_size=` and returns to page 1 — the row the reader was
    *  looking at is on a different page under a different size anyway. */
   onPageSize: (size: number) => void;
-}) {
-  const { t } = useT();
+};
+
+/**
+ * The record list's footer: "Showing 1–25 of N", where in the run of pages
+ * this one falls, the page buttons and the page-size select.
+ *
+ * Extracted from `pages/RecordList.tsx` for the 300-line cap when the total
+ * stopped being a plain number (F4). `total` is what the API reported — the
+ * exact count, or `RecordsSettings.max_count` when `capped` — and the
+ * numbered pager reads that same value, so it pages to the cap and no
+ * further. **Past the cap, "Next" continues by cursor**: on the cap's last
+ * page, if the server says there is more (`nextCursor`), it writes
+ * `?after=` instead of a page number, and the footer switches to its cursor
+ * mode for every page after that.
+ *
+ * **Cursor mode** (`page === null`) has no numbers to show — no range, no
+ * "Page N", no Previous and no Last, because a keyset page knows only what
+ * follows it. It offers **First page** and **Next page**, and one sentence
+ * saying the list carries on in the same order without page numbers. Back
+ * is the browser's: every step is its own URL.
+ *
+ * "First"/"Last" and the size select are UX-R18: 180 records at 25 a page
+ * put the last page seven clicks away, with no page number to say where you
+ * were and no way to ask for a longer page. Both write the URL through the
+ * caller, like every other list control (the URL is the state).
+ *
+ * Renders nothing when a single page holds everything *and* nobody asked for
+ * a different page size — which is what the list did before, and keeps a
+ * small type's screen free of chrome without stranding a reader who picked
+ * 100 on a screen with no control to pick 25 again. Never in cursor mode,
+ * though: a cursor page past the end is empty, and it still needs "First
+ * page".
+ */
+export function RecordPagination(props: PagerProps) {
+  const { page, pageSize, total } = props;
+  if (page === null) return <CursorPager {...props} />;
   if (total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
+  return <NumberedPager {...props} page={page} />;
+}
+
+function NumberedPager({
+  page,
+  pageSize,
+  total,
+  capped,
+  itemCount,
+  nextCursor = null,
+  loading = false,
+  onGo,
+  onContinue,
+  onPageSize,
+}: PagerProps & { page: number }) {
+  const { t } = useT();
   const rangeStart = itemCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = itemCount === 0 ? 0 : rangeStart + itemCount - 1;
   // The last page the numbered pager reaches. On a capped listing that is
@@ -126,6 +155,10 @@ export function RecordPagination({
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   const onFirst = page <= 1;
   const onLast = page >= lastPage;
+  // Past the cap's last page the rows go on; the count does not. The server
+  // says whether there are more (`nextCursor`), and "Next" follows it.
+  const continues = capped && onLast && nextCursor !== null && onContinue !== undefined;
+  const next = () => (continues ? onContinue(nextCursor) : onGo(page + 1));
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -135,24 +168,7 @@ export function RecordPagination({
         <span data-testid="records-page-position">{pagePosition(t, page, lastPage, capped)}</span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="records-page-size" className="font-normal">
-            {t('records.records.page_size', { defaultValue: 'Per page' })}
-          </Label>
-          <NativeSelect
-            id="records-page-size"
-            className="w-auto"
-            value={String(pageSize)}
-            disabled={loading}
-            onChange={(e) => onPageSize(Number(e.target.value))}
-          >
-            {PAGE_SIZES.map((size) => (
-              <NativeSelectOption key={size} value={String(size)}>
-                {size}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
+        <PageSizeSelect pageSize={pageSize} loading={loading} onPageSize={onPageSize} />
         <div className="space-x-2">
           <Button
             type="button"
@@ -176,8 +192,8 @@ export function RecordPagination({
             type="button"
             variant="outline"
             size="sm"
-            disabled={onLast || loading}
-            onClick={() => onGo(page + 1)}
+            disabled={(onLast && !continues) || loading}
+            onClick={next}
           >
             {t('records.records.next', { defaultValue: 'Next' })}
           </Button>

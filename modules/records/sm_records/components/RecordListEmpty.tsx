@@ -20,7 +20,9 @@ export function RecordListEmpty({
   filtered,
   errorMessage,
   canImport = false,
+  cursor = null,
   onClear,
+  onFirstPage,
 }: {
   typeKey: string;
   trashed: boolean;
@@ -44,7 +46,15 @@ export function RecordListEmpty({
    *  is — `canEdit` — so a viewer is not pointed at a control they can't
    *  use. */
   canImport?: boolean;
+  /** The list is on a page reached by `?after=`, and it is empty because
+   *  that page is past the last row (`'ended'` — a full final page still
+   *  hands out a cursor) or because the server refused the cursor
+   *  (`'refused'`, the notice above says why). Either way the type is not
+   *  empty and no filter is at fault, so this says so and offers the first
+   *  page rather than "Clear". Takes precedence over every other state. */
+  cursor?: 'ended' | 'refused' | null;
   onClear: () => void;
+  onFirstPage?: () => void;
 }) {
   const { t } = useT();
   return (
@@ -52,7 +62,22 @@ export function RecordListEmpty({
       className="rounded-lg border border-dashed p-8 text-center text-muted-foreground"
       data-testid="records-empty-state"
     >
-      {trashed ? (
+      {cursor ? (
+        <>
+          <p data-testid="records-empty-cursor">
+            {cursor === 'refused'
+              ? t('records.records.empty_cursor_refused', {
+                  defaultValue: 'Nothing to show — this link could not continue the list.',
+                })
+              : t('records.records.empty_cursor_end', {
+                  defaultValue: 'There are no more records after the previous page.',
+                })}
+          </p>
+          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onFirstPage}>
+            {t('records.records.first_page', { defaultValue: 'First page' })}
+          </Button>
+        </>
+      ) : trashed ? (
         <p>{t('records.trash.empty', { defaultValue: 'No trashed records' })}</p>
       ) : filtered ? (
         <>

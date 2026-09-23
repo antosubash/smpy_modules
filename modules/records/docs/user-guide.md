@@ -361,6 +361,28 @@ On a large type the count stops at 10,000: the footer then reads **Showing
 1–25 of 10,000+** with the explanation *"More than 10,000 records match; the
 count stops at 10,000."* That ceiling is the `max_count` setting.
 
+**Past the count, the list keeps going.** The numbered pages end at the page
+that holds the 10,000th record, but the records do not. On that page **Next**
+stays enabled while there are more, and follows on from its last row. From
+there the footer has no page numbers — the count stopped, so there is no
+"page 401 of …" to show — and reads *"The list continues in the same order
+from here, without page numbers."* with two buttons: **First page** and **Next
+page**. There is no **Previous** or **Last**; use the browser's Back button to
+return to the page before, since every step is its own address. When there is
+nothing after the page you are on, **Next page** is disabled; if the last page
+was exactly full, the one after it says *"There are no more records after the
+previous page."*
+
+Each of those pages has its own link (the address carries `after=…`), so you
+can bookmark one or send it to someone with access to the type, and it opens on
+the same records in the same order. It is a position in *this* order, though:
+changing the sort, the filter, the language, the page size or switching to the
+Trash starts again from the first page. A link that no longer fits — made for
+another sort, or edited by hand — opens on the notice *"This link can't
+continue the list: it was made for a different sort or view, or it has been
+changed. Go back to the first page."* with a **First page** button, rather than
+an error.
+
 ### Trash
 
 **Trash** switches the list to the type's soft-deleted records; **Back to live
@@ -413,8 +435,8 @@ Selecting with the keyboard: Tab to a row's box and press Space. Shift+click a
 second box to take everything between it and the last one you clicked — a
 range only ever adds, so nothing outside it is unticked.
 
-**The selection is what is on screen.** Changing the page, the sort or the
-filter clears it, and so does running an action, because the list reloads. It
+**The selection is what is on screen.** Changing the page (numbered or past
+the count), the sort or the filter clears it, and so does running an action, because the list reloads. It
 is never twelve rows you can no longer see.
 
 #### All or nothing

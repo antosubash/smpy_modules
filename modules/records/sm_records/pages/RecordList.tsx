@@ -10,8 +10,8 @@ import { FilterBar } from '../components/FilterBar';
 import { RecordIoMenu } from '../components/RecordIoMenu';
 import { RecordListBulk } from '../components/RecordListBulk';
 import { RecordListEmpty } from '../components/RecordListEmpty';
+import { RecordListFooter } from '../components/RecordListFooter';
 import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
-import { RecordPagination } from '../components/RecordPagination';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
@@ -20,16 +20,16 @@ import { useRecordSelection } from '../hooks/useRecordSelection';
 import {
   exportSearchParams,
   filterErrorMessage,
-  listStatus,
+  isCursorRefusal,
   parseFilterParam,
   parseSort,
   parseTrashedParam,
 } from '../utils/listing';
-import type { RecordPage, TypeRead } from '../utils/types';
+import type { RecordListPage, TypeRead } from '../utils/types';
 
 type Props = {
   type: TypeRead;
-  records: RecordPage;
+  records: RecordListPage;
   /** Every content locale the module runs (`views.py::record_list`); absent
    *  degrades to "no language UI", same as the editor's own prop. */
   content_locales?: string[];
@@ -47,8 +47,8 @@ type Props = {
 const EDIT_PERMISSION = 'records.edit';
 
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
- *  type's records, driven entirely by the URL (`?page=&filter=&sort=`) so it
- *  can be bookmarked or shared. */
+ *  type's records, driven entirely by the URL (`?page=` or `?after=`, and
+ *  `filter=`/`sort=`) so it can be bookmarked or shared. */
 function RecordList({
   type,
   records,
@@ -61,6 +61,8 @@ function RecordList({
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
   const rawSort = search.get('sort');
+  // A cursor lives in the URL and nowhere else (`utils/listing.ts::listParams`).
+  const after = search.get('after');
   const trashed = parseTrashedParam(search.get('trashed'));
   const canEdit = page.props.auth?.permissions?.includes(EDIT_PERMISSION) ?? false;
   const rawPageSize = Number(search.get('page_size')) || records.page_size;
@@ -86,12 +88,17 @@ function RecordList({
   // as well, but `SortableHeader` never offers one, so that branch shouldn't
   // be reachable from this UI short of a hand-edited URL.
   const filterErrorReason = page.props.errors?.filter;
-  const exportSearch = exportSearchParams(search.toString(), Boolean(filterErrorReason));
+  // A refused *cursor* arrives on the same channel, but the filter was fine:
+  // Export and the bulk toolbar keep it, and the empty box offers page 1.
+  const cursorRefused = isCursorRefusal(filterErrorReason);
+  const filterRefused = Boolean(filterErrorReason) && !cursorRefused;
+  const exportSearch = exportSearchParams(search.toString(), filterRefused);
 
   const { listTop, loading, goTo, applyFilter, clearFilter, handleSort, toggleTrashed } =
     useRecordListNav({
       typeKey: type.key,
       page: records.page,
+      after,
       rawFilter,
       rawSort,
       trashed,
@@ -105,17 +112,15 @@ function RecordList({
 
   // `total` is exact only up to `RecordsSettings.max_count` (F4): beyond it
   // the API reports the cap with `total_capped`, and the footer says
-  // "10,000+" rather than a number that is not the number. Everything that
-  // uses it for arithmetic — the range, and whether there is a next page —
-  // reads the same capped value, so a capped listing simply pages to the cap
-  // and the cursor contract (`next_cursor`) is what an API client walks past
-  // it with.
+  // "10,000+" rather than a number that is not the number. The numbered
+  // pager reads the same capped value, so it pages to the cap; past it the
+  // footer follows `next_cursor` (`RecordPagination`).
   const known = records.total ?? 0;
-  // U30: nothing to filter — no filter active, not viewing the trash, and
-  // this render's own result is empty, which with no filter in force means
-  // the type has no records at all (not merely none matching a query).
+  // U30: nothing to filter — no filter active, not viewing the trash, not
+  // past the numbered pages, and this render's own result is empty, which
+  // then means the type has no records at all (not merely none here).
   const genuinelyEmpty =
-    records.items.length === 0 && !trashed && !currentFilter && !filterErrorReason;
+    records.items.length === 0 && !trashed && !currentFilter && !filterErrorReason && !after;
 
   return (
     <>
@@ -150,7 +155,7 @@ function RecordList({
               // says so — `exportSearch` (above) drops the filter on a
               // refused one, so this mirrors it rather than claiming
               // "filtered" for an export that will not actually be one.
-              filtered={Boolean(currentFilter) && !filterErrorReason}
+              filtered={Boolean(currentFilter) && !filterRefused}
               recordCount={known}
               {...(max_import_bytes ? { maxImportBytes: max_import_bytes } : {})}
             />
@@ -226,7 +231,7 @@ function RecordList({
                 trashed={trashed}
                 records={records.items}
                 selection={selection}
-                filters={filterErrorReason ? [] : search.getAll('filter')}
+                filters={filterRefused ? [] : search.getAll('filter')}
                 total={known}
                 capped={records.total_capped}
               />
@@ -238,7 +243,9 @@ function RecordList({
                 filtered={Boolean(currentFilter) || Boolean(filterErrorReason)}
                 errorMessage={filterErrorReason ? filterErrorMessage(t, filterErrorReason) : null}
                 canImport={canEdit}
+                cursor={after ? (cursorRefused ? 'refused' : 'ended') : null}
                 onClear={clearFilter}
+                onFirstPage={() => goTo({ page: 1 })}
               />
             ) : (
               <RecordTable
@@ -256,33 +263,12 @@ function RecordList({
             )}
           </div>
 
-          {/* A filter, a sort or a page swaps the rows through a partial
-            reload with no focus move, so a screen reader was never told the
-            page had become a different page (UX-R15). U10: a refused filter
-            used to announce "0 records, page 1 of 1" here — an assertion
-            about data that was never queried — while a sighted user read the
-            real reason in the amber banner above. Announce that reason
-            instead when it's set, so both surfaces agree. */}
-          <p className="sr-only" role="status" aria-live="polite" data-testid="records-list-status">
-            {filterErrorReason
-              ? filterErrorMessage(t, filterErrorReason)
-              : listStatus(t, {
-                  count: records.items.length,
-                  page: records.page,
-                  pages: Math.max(1, Math.ceil(known / records.page_size)),
-                  capped: records.total_capped,
-                })}
-          </p>
-
-          <RecordPagination
-            page={records.page}
-            pageSize={records.page_size}
+          <RecordListFooter
+            records={records}
             total={known}
-            capped={records.total_capped}
-            itemCount={records.items.length}
+            errorReason={filterErrorReason}
             loading={loading}
-            onGo={(next) => goTo({ page: next })}
-            onPageSize={(size) => goTo({ page: 1, pageSize: size })}
+            goTo={goTo}
           />
         </div>
       </PageShell>

@@ -190,7 +190,8 @@ Three things are a `400`: a cursor that does not decode, a cursor replayed
 under a different sort — in any of those senses — or against the trash, and
 `?page=` and `?after=` sent together, which are two ways of asking for a page
 and the server will not guess which one you meant. `?page=` stays for the admin
-UI, which shows numbered pages.
+UI, which shows numbered pages up to the capped count and follows the same
+cursor past it (`?after=` on `/admin/records/{key}`).
 
 A full final page still returns a `next_cursor`; the request after it comes
 back empty with `next_cursor: null`. That is one extra round trip at the end
