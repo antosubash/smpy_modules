@@ -1212,3 +1212,53 @@ and `tenancy_mode` were already on all six admin renders as of Phase 3's
   expand" parenthetical anticipated more than one anonymous fetch function;
   `fetchPublicRecords` in `utils/public-api.ts` is the only one in this
   module, so it is the only one that gained the `tenant` option.
+
+## Implementation notes — fix round
+
+The adversarial review of the finished work (Postgres, a live multi-tenant host)
+found no blocker and no cross-tenant read or write. Two majors and three minors
+were fixed on this branch, each as its own commit:
+
+* **M1 — the downgrade of `4ecb931245dd` is refused before any DDL.** It used
+  to drop `uq_records_type_tenant_key` and then create the global
+  `ix_records_type_key`; on SQLite the DDL is not transactional, so when two
+  tenants shared a key the create failed after the drop had happened, leaving
+  the per-tenant unique gone, duplicate keys accepted, `alembic_version` still at
+  head and a retry failing on the missing index. `downgrade()` now first looks
+  for any `records_type.key`, and any record `uuid` in each present set, held by
+  more than one tenant, and raises a `RuntimeError` naming them (first 20 per
+  table) with nothing changed. Postgres rolled back cleanly before and still
+  does; the pre-check makes SQLite equally safe. §D's "lossy and refusable"
+  stands, with the refusal now up front. `tests/test_migration_tenant_id.py`
+  pins it on both backends for a shared type key and a shared record uuid:
+  refused, schema (indexes, columns, uniques, FKs) and revision identical, and a
+  retry after deleting the duplicate succeeds.
+* **M2 — `/health/ready` in multi mode gives counts only.** §A.5's table and the
+  Phase 4 note "health details always name the tenant" made the anonymous
+  readiness route name every tenant, its type keys, field keys and language
+  tags. **Deviation from §A.5:** in multi mode the stale-reindex, reduce-drift,
+  `invalid_records` and `orphaned_locales` details now say how many types,
+  records and tenants ("reindex pending for longer than 900s: 2 type(s) across 2
+  tenant(s)", "invalid_records: 1 across 1 tenant(s)"), never which. The named
+  sentence — exactly the single-mode one — is logged at INFO by
+  `sm_records.health`, once per change of wording rather than on every poll.
+  Single mode is unchanged. `test_tenancy_health.py` covers both modes.
+* **m1 — public errors in multi mode carry `Vary` and `no-store`.** The public
+  router's route class is now `PublicErrorRoute`, which sends every error
+  response (404, 400, 422, 500) through `_public_cache.error_headers`. Errors
+  the host renders (`HTTPException`, `RequestValidationError`) are rendered by
+  the host's own registered handler inside the route — the framework's
+  `http_exception_handler` drops `HTTPException.headers`, so letting them
+  propagate would lose the headers. Bodies are unchanged; single mode is
+  unchanged.
+* **m2 — `services._invalid.count_live` removed.** Dead since Phase 4 (see the
+  note there); its rationale moved onto `count_invalid_records`.
+* **m3 — `admin_header_tenant` is documented as API/headless only.** The browser
+  admin screens never send the tenant header, so a tenant-less admin stays 403
+  in the browser with the setting on; README, operations.md and the setting's
+  docstring say so, and that the fix is assigning the user a tenant.
+
+Not changed: **m4** (any tenant's `admin` can change records' install-wide
+settings — the framework's settings are system-scoped and its `admin` role is
+global; upstream, next to #360), **i1** (the default-bound suite would mask a
+lost router binding; `test_tenancy_binding.py`, which runs unbound, catches it).
