@@ -532,7 +532,10 @@ The rules worth knowing before you point a site at it:
   `If-None-Match` matches is a `304` with no body. Set it to `0` for
   `Cache-Control: no-store` and no validator, on an install whose "published"
   means "visible the instant it is saved". On a multi-tenant host both also
-  carry `Vary: <tenant header>`, and a signed-in reader's answer is `private`.
+  carry `Vary: <tenant header>`, and a signed-in reader's answer is `private`;
+  every public *error* there (`404`, `400`, `422`, `500`) carries the same
+  `Vary` and `Cache-Control: no-store`, since one URL can be a `200` for one
+  tenant and a `404` for another.
 
   > A *shared* cache still cannot store these on a stock host: every anonymous
   > response also carries `Vary: Cookie` and a fresh `Set-Cookie: session=…`,
@@ -648,7 +651,8 @@ touches it once the upgrade lands. Check for it *before* upgrading — see
 Type keys and record uuids are unique per tenant, not install-wide. A keyset
 cursor is bound to the tenant it was minted in; a public answer names the
 tenant header in `Vary` (or sends `Cache-Control: private` for a signed-in
-reader, whose tenant no request header can express); a JSON export names its
+reader, whose tenant no request header can express), and a public error is
+`no-store` with the same `Vary`; a JSON export names its
 tenant, informationally — an import always writes into the importer's tenant,
 which is how a tenant is cloned. The records screens receive the tenant they
 read as a read-only `tenant` prop, alongside `tenancy_mode`.

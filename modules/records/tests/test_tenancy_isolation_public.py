@@ -88,6 +88,31 @@ async def test_no_tenant_is_the_public_404_on_a_multi_tenant_host(two_tenants):
         assert (missing.status_code, missing.json()) == (404, unknown.json())
 
 
+async def test_every_public_error_names_the_header_and_is_not_stored(two_tenants):
+    """Review m1: ``secret`` is a 200 for acme and a 404 for globex at the same
+    URL, so a cache that kept globex's 404 under the bare URL would serve it to
+    acme. Every error — mapped here or rendered by the host — carries ``Vary``
+    and ``no-store``."""
+    cases = (
+        (404, f"{PUBLIC}/{SECRET}", reader(GLOBEX)),
+        (404, f"{PUBLIC}/{SECRET}/{NO_UUID}", reader(ACME)),
+        (404, f"{PUBLIC}/{POST}", {}),
+        (400, f"{PUBLIC}/{POST}?filter=nosuch:eq:1", reader(GLOBEX)),
+        (422, f"{PUBLIC}/{POST}?page=0", reader(GLOBEX)),
+    )
+    for status, url, headers in cases:
+        for method in ("GET", "HEAD"):
+            answer = await two_tenants.request(method, url, headers=headers)
+            assert answer.status_code == status, (method, url, answer.text)
+            assert TENANT_HEADER.lower() in _vary(answer), (method, url)
+            assert answer.headers.get("cache-control") == "no-store", (method, url)
+    refused = await two_tenants.get(f"{PUBLIC}/{POST}?filter=nosuch:eq:1", headers=reader(GLOBEX))
+    assert refused.json() == {"detail": "cannot filter or sort by 'nosuch'"}, "body unchanged"
+    served = await two_tenants.get(f"{PUBLIC}/{SECRET}", headers=reader(ACME))
+    assert served.status_code == 200
+    assert served.headers["cache-control"].startswith("public, "), "a 200 keeps its policy"
+
+
 async def test_the_widgets_request_is_scoped_by_its_header(two_tenants):
     """What ``utils/public-api.fetchPublicRecords`` sends: no cookie, an
     ``Accept`` header, one filter, one sort, the page size — plus the tenant
@@ -138,6 +163,10 @@ async def test_a_single_tenant_host_reads_default_and_ignores_the_header(tmp_pat
             assert [i["uuid"] for i in listed.json()["items"]] == [made.json()["uuid"]]
             assert TENANT_HEADER.lower() not in _vary(listed)
             assert listed.headers["cache-control"].startswith("public, ")
+            missing = await client.get(f"{PUBLIC}/nosuch", headers=headers)
+            assert missing.status_code == 404
+            assert TENANT_HEADER.lower() not in _vary(missing), "single mode: errors as before"
+            assert "cache-control" not in missing.headers
     await db_state.engine.dispose()
 
 

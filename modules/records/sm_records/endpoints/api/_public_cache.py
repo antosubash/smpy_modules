@@ -30,6 +30,16 @@ their account instead, which no request header names, so their response is
 ``private``: a browser may keep it, a shared cache may not. The ETag stays a
 content digest: two tenants whose pages are equal share it, harmlessly.
 
+**Errors too, in multi mode** (review m1). The same URL can be a 200 for one
+tenant and a 404 for another, and HTTP lets a cache store a 404 heuristically
+when nothing says otherwise — so a cache holding ``globex``'s 404 under the
+bare URL would answer ``acme``'s readers with it. :func:`error_headers` gives
+every public error response the tenant header in ``Vary`` and
+``Cache-Control: no-store``; :class:`~sm_records.endpoints.api._errors.PublicErrorRoute`
+applies it to every error the public router produces, the host-rendered ones
+(a 400 for a refused filter, a 422 for a bad parameter) included. Single mode
+is left as it was: there the answer does not depend on who asks.
+
 Nothing here is used on the admin API: those responses are per-caller and the
 framework's ``InertiaCache`` already forces them private.
 
@@ -60,7 +70,7 @@ from sm_records import constants
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import TenancyMode, mode_of, tenant_header
 
-__all__ = ["NO_STORE", "apply"]
+__all__ = ["NO_STORE", "apply", "error_headers"]
 
 NO_STORE = "no-store"
 """What ``public_cache_seconds = 0`` sends instead of a ``max-age``. Not
@@ -149,3 +159,17 @@ def apply(
             _add_vary(not_modified.headers, vary)
         return not_modified
     return None
+
+
+def error_headers(request: Request, response: Response) -> Response:
+    """Mark a public error answer as per-tenant and not storable, in multi mode.
+
+    Anything below 400 is left alone — :func:`apply` owns the 200 and the 304.
+    """
+    if response.status_code < 400:
+        return response
+    vary, _ = _tenancy(request)
+    if vary is not None:
+        _add_vary(response.headers, vary)
+        response.headers["Cache-Control"] = NO_STORE
+    return response

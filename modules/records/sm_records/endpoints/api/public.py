@@ -14,7 +14,7 @@ Two rules the handlers exist to enforce, beyond what the services do:
 
 * **Every refusal is the same 404.** ``services.public`` raises ``NotFound``
   with one body for a missing type, a private type, a draft and a trashed row
-  alike, and ``RecordsErrorRoute`` renders it — so the endpoint adds no
+  alike, and ``PublicErrorRoute`` renders it — so the endpoint adds no
   message of its own that could tell them apart.
 * **Every bad filter or sort is a 400 naming the field.** The admin API
   answers 409 while a field is mid-reindex (§8.5); §10 refuses to reuse that
@@ -61,7 +61,7 @@ from sm_records.deps import (
     request_db,
 )
 from sm_records.endpoints.api import _public_cache
-from sm_records.endpoints.api._errors import RecordsErrorRoute
+from sm_records.endpoints.api._errors import PublicErrorRoute
 from sm_records.endpoints.api._responses import PUBLIC_READ, responses
 from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.media import public_file_url_template
@@ -73,7 +73,7 @@ from sm_records.tenancy import bind_public
 # multi mode a request whose tenant the framework could not resolve is the
 # shared 404 before any handler runs (tenancy design §A.3).
 router = APIRouter(
-    route_class=RecordsErrorRoute,
+    route_class=PublicErrorRoute,
     responses=responses(*PUBLIC_READ),
     dependencies=[Depends(bind_public)],
 )

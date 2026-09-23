@@ -30,6 +30,14 @@ be the host's error *page*: a stale bookmark, a renamed type or a record
 purged in another tab dumped a JSON blob into the browser window, while a
 FastAPI validation error on the very same screen rendered HTML.
 
+:class:`PublicErrorRoute` serves the anonymous public router. It answers the
+host-handled exceptions itself — through the host's own registered handler, so
+the body is unchanged — because the response has to carry the tenant header in
+``Vary`` and ``no-store`` in multi mode (:func:`~sm_records.endpoints.api.
+_public_cache.error_headers`), and an exception left to propagate is rendered
+where nothing here can add a header: the framework's handler drops
+``HTTPException.headers``.
+
 What each mapped exception's body looks like lives next door in
 :mod:`sm_records.endpoints.api._error_bodies`, split off for the file cap.
 """
@@ -48,11 +56,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sm_records.deps import request_session
 from sm_records.endpoints.api._error_bodies import response_for
+from sm_records.endpoints.api._public_cache import error_headers
 from sm_records.index.query import QueryError
 from sm_records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.services.errors import RecordsError
 
-__all__ = ["RecordsErrorRoute", "RecordsViewErrorRoute"]
+__all__ = ["PublicErrorRoute", "RecordsErrorRoute", "RecordsViewErrorRoute"]
 
 logger = logging.getLogger(__name__)
 
@@ -207,3 +216,33 @@ class RecordsViewErrorRoute(RecordsErrorRoute):
     """
 
     views = True
+
+
+def _host_handler(request: Request, exc: Exception) -> Callable[..., Any] | None:
+    """The handler the app registered for ``exc``'s nearest class, as
+    Starlette's ``ExceptionMiddleware`` would pick it — ``Exception`` aside."""
+    handlers = getattr(request.app, "exception_handlers", None) or {}
+    for cls in type(exc).__mro__:
+        if cls is not Exception and cls in handlers:
+            return handlers[cls]
+    return None
+
+
+class PublicErrorRoute(RecordsErrorRoute):
+    """The public router's route class: every error answer, the host-rendered
+    ones included, leaves through :func:`error_headers` (review m1)."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def wrapped(request: Request) -> Response:
+            try:
+                response = await handler(request)
+            except Exception as exc:
+                host = _host_handler(request, exc) if _host_handles(request, exc) else None
+                if host is None:
+                    raise
+                response = await host(request, exc)
+            return error_headers(request, response)
+
+        return wrapped
