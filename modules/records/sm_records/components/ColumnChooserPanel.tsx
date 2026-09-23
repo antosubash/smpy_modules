@@ -2,7 +2,12 @@ import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef } from 'react';
 
-import { type ListColumn, MAX_CHOSEN_COLUMNS, type ResolvedColumns } from '../utils/listing';
+import {
+  type ListColumn,
+  MAX_CHOSEN_COLUMNS,
+  type ResolvedColumns,
+  withColumn,
+} from '../utils/listing';
 import { ColumnOptionRow, columnControlId } from './ColumnOptionRow';
 import { columnLabels } from './RecordColumnCells';
 
@@ -36,6 +41,7 @@ export function ColumnChooserPanel({
 }) {
   const { t } = useT();
   const pendingFocus = useRef<Focus | null>(null);
+  const heading = useRef<HTMLParagraphElement>(null);
   const chosenKeys = resolved.columns.map((column) => column.key);
   const order = chosenKeys.join(',');
 
@@ -68,7 +74,7 @@ export function ColumnChooserPanel({
     onChange(
       chosen.has(column.key)
         ? chosenKeys.filter((key) => key !== column.key)
-        : [...chosenKeys, column.key],
+        : withColumn(resolved.columns, column),
     );
   };
   const move = (index: number, delta: -1 | 1) => {
@@ -82,7 +88,9 @@ export function ColumnChooserPanel({
   return (
     <div className="grid gap-3 text-sm" data-testid="records-columns-panel">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-medium">{t('records.columns.title', { defaultValue: 'Columns' })}</p>
+        <p ref={heading} tabIndex={-1} className="font-medium outline-none">
+          {t('records.columns.title', { defaultValue: 'Columns' })}
+        </p>
         <p className="text-xs text-muted-foreground" data-testid="records-columns-count">
           {t('records.columns.count', {
             count: fieldCount,
@@ -169,6 +177,10 @@ export function ColumnChooserPanel({
         data-testid="records-columns-reset"
         onClick={() => {
           pendingFocus.current = null;
+          // Reset disables itself (the list is now the default), and a
+          // focused button that disables drops focus to <body>; the panel's
+          // heading keeps it inside the popover (review 4, ux F10).
+          heading.current?.focus();
           onReset();
         }}
       >

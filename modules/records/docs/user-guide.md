@@ -322,7 +322,8 @@ list can show:
 
 Shown columns are listed first, in their order, each with **Move up** / **Move
 down** buttons (these work from the keyboard; focus stays on the column you
-moved). The count at the top reads *"N of 8 field columns"*: at most **eight**
+moved). A field you tick joins the other shown fields, before **Position**,
+**Published on** and **Updated**; a record column you tick goes at the end. The count at the top reads *"N of 8 field columns"*: at most **eight**
 declared fields can be shown at once, and the others are disabled until one is
 hidden. The record's own columns do not count towards the eight. **Title**,
 the tick box and **Actions** are always shown and are not in the panel.

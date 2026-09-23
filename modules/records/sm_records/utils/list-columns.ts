@@ -191,6 +191,28 @@ export function resolveListColumns({
   return { columns, source: 'default', unknown: [], truncated: 0 };
 }
 
+/** The record's own columns that close a row — the default view's tail. */
+const TRAILING_COLUMNS = new Set<string>(['position', 'published_at', 'updated_at']);
+
+/**
+ * The key list after the chooser ticks `column`. A field lands right after
+ * the last field already shown — or, with none shown, before the trailing
+ * record columns (Position, Published on, Updated) — so it joins the
+ * fields instead of trailing behind the dates (review 4, ux F11). A record
+ * column is appended.
+ */
+export function withColumn(shown: readonly ListColumn[], column: ListColumn): string[] {
+  const keys = shown.map((c) => c.key);
+  if (column.kind !== 'field') return [...keys, column.key];
+  let at = -1;
+  shown.forEach((c, index) => {
+    if (c.kind === 'field') at = index + 1;
+  });
+  if (at < 0) at = shown.findIndex((c) => TRAILING_COLUMNS.has(c.key));
+  keys.splice(at < 0 ? keys.length : at, 0, column.key);
+  return keys;
+}
+
 /** Whether a column change hides the column the list is sorted by — the
  *  sort is then dropped. A sort on anything that is not a choosable column
  *  (Title, `created_at` from a hand-written link) is never touched. */

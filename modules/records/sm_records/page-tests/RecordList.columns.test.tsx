@@ -197,7 +197,7 @@ describe('RecordList — changing columns', () => {
     expect(position?.getAttribute('data-chosen')).toBe('false');
     await click(document.body.querySelector('#records-column-toggle-blurb'));
     expect(replace.mock.calls[0][0].url).toBe(
-      '/admin/records/book?columns=status,price,author,published_at,updated_at,blurb',
+      '/admin/records/book?columns=status,price,author,blurb,published_at,updated_at',
     );
     await view.unmount();
   });

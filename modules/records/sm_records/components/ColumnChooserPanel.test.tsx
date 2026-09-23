@@ -131,6 +131,23 @@ describe('ColumnChooserPanel — what it offers', () => {
 });
 
 describe('ColumnChooserPanel — toggling', () => {
+  it("adds a field after the other fields, before the record's trailing columns", async () => {
+    // Review 4, ux F11: a ticked field used to land after Published on/Updated.
+    const onKeys = vi.fn();
+    const view = await mount(<Harness initial="status,price,updated_at" onKeys={onKeys} />);
+    await click(toggle(view, 'blurb'));
+    expect(onKeys).toHaveBeenLastCalledWith(['status', 'price', 'blurb', 'updated_at']);
+    await click(toggle(view, 'price'));
+    await click(toggle(view, 'blurb'));
+    // No field shown: before the first trailing record column.
+    await click(toggle(view, 'author'));
+    expect(onKeys).toHaveBeenLastCalledWith(['status', 'author', 'updated_at']);
+    // A record column is appended.
+    await click(toggle(view, 'position'));
+    expect(onKeys).toHaveBeenLastCalledWith(['status', 'author', 'updated_at', 'position']);
+    await view.unmount();
+  });
+
   it('appends a column when ticked and removes it when unticked', async () => {
     const onKeys = vi.fn();
     const view = await mount(<Harness initial="author" onKeys={onKeys} />);
@@ -204,8 +221,15 @@ describe('ColumnChooserPanel — reset', () => {
   it('restores the default rule — the first four indexed fields', async () => {
     const onReset = vi.fn();
     const view = await mount(<Harness initial="blurb" onReset={onReset} />);
-    await click(view.find('[data-testid="records-columns-reset"]'));
+    const reset = view.find<HTMLButtonElement>('[data-testid="records-columns-reset"]');
+    reset?.focus();
+    await click(reset);
     expect(onReset).toHaveBeenCalledOnce();
+    // Reset is now disabled; focus stays in the panel, on its heading
+    // (review 4, ux F10), rather than falling to <body>.
+    expect(reset?.disabled).toBe(true);
+    expect(document.activeElement?.textContent).toBe('Columns');
+    expect(view.host.contains(document.activeElement)).toBe(true);
     expect(rows(view, 'true')).toEqual([
       'status',
       'price',

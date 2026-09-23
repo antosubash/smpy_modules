@@ -23,6 +23,7 @@ export {
   type ResolvedColumns,
   resolveListColumns,
   sortHiddenBy,
+  withColumn,
 } from './list-columns';
 export {
   type FilterErrorReason,

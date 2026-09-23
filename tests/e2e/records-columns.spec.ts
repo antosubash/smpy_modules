@@ -75,23 +75,24 @@ test.describe('Records — the column chooser', () => {
     const blurbRow = panel.locator('[data-column="blurb"]');
     await expect(blurbRow.getByTestId('records-column-not-indexed')).toBeVisible();
     await panel.getByRole('checkbox', { name: 'Blurb' }).click();
-    await expect(page).toHaveURL(/columns=status,price,city,published_at,updated_at,blurb(&|$)/);
+    // A ticked field joins the other fields, before the dates (review 4 F11).
+    await expect(page).toHaveURL(/columns=status,price,city,blurb,published_at,updated_at(&|$)/);
 
     // Reorder from the keyboard: focus stays on the moved column's button.
     const moveUp = panel.getByRole('button', { name: 'Move Blurb up' });
     await moveUp.focus();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/columns=status,price,city,published_at,blurb,updated_at(&|$)/);
+    await expect(page).toHaveURL(/columns=status,price,blurb,city,published_at,updated_at(&|$)/);
     await expect(moveUp).toBeFocused();
 
     // Hide Status with the keyboard too.
     await panel.getByRole('checkbox', { name: 'Status' }).focus();
     await page.keyboard.press('Space');
-    await expect(page).toHaveURL(/columns=price,city,published_at,blurb,updated_at(&|$)/);
+    await expect(page).toHaveURL(/columns=price,blurb,city,published_at,updated_at(&|$)/);
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
 
-    const chosen = ['Title', 'Price', 'City', 'Published on', 'Blurb', 'Updated', 'Actions'];
+    const chosen = ['Title', 'Price', 'Blurb', 'City', 'Published on', 'Updated', 'Actions'];
     expect(await headers(page)).toEqual(chosen);
     // The non-indexed column has no sort control.
     const blurbHeader = page.getByTestId('records-column-unsortable');
@@ -128,6 +129,8 @@ test.describe('Records — the column chooser', () => {
     const again = await openColumns(page);
     await again.getByTestId('records-columns-reset').click();
     await expect(page).not.toHaveURL(/columns=/);
+    // Reset disables itself; focus moves to the panel's heading (F10).
+    await expect(again.getByText('Columns', { exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     expect(await headers(page)).toEqual(DEFAULT_HEADERS);
     await page.goto(listPath);
