@@ -361,7 +361,10 @@ From there:
   shared `FieldComponentProps`. With `null`, `MediaField` is the old
   id-or-URL text box.
 - `utils/media-api.ts` is the browser client: list, metadata, upload (XHR, for
-  progress), and one metadata cache shared by the list and the editor. It
+  progress), and one metadata cache shared by the list and the editor for one
+  page visit — every Inertia navigation empties it, and a thumbnail that fails
+  to load drops its file, so a file deleted in the library reads as "File
+  missing" without a reload. It
   reuses `api-net.ts` for the connection failures — a 401 redirects to sign-in
   and a dropped connection is the same `ApiError` it is everywhere — and
   unwraps `file_storage`'s `{detail: {code, message}}` refusals.

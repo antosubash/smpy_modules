@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mount, settle } from '../../test-dom';
+import { act, mount, settle } from '../../test-dom';
 import { defaultColumnKeys, firstMediaField } from '../../utils/listing';
 import { clearMediaCache } from '../../utils/media-api';
 import {
@@ -87,6 +87,24 @@ describe('the media cell', () => {
       'File missing',
     );
     await view.unmount();
+  });
+
+  it('a thumbnail that fails to load forgets the file, so the next render re-asks', async () => {
+    stubLibrary([PHOTO]);
+    const view = await mount(cell(PHOTO.id, true));
+    await flush();
+    const img = view.find<HTMLImageElement>('img');
+    await act(async () => {
+      img?.dispatchEvent(new Event('error'));
+    });
+    expect(view.find('[data-testid="records-media-icon"]')).not.toBeNull();
+    await view.unmount();
+    // Deleted in the library since it was cached: the next render finds out.
+    stubLibrary([]);
+    const again = await mount(cell(PHOTO.id, true));
+    await flush();
+    expect(again.find('[data-testid="records-media-missing"]')).not.toBeNull();
+    await again.unmount();
   });
 
   it('shows the empty dash for no value', async () => {

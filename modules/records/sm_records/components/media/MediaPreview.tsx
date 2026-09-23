@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useMediaFile } from '../../hooks/useMediaFile';
 import {
   fileUrl,
+  forgetMediaFile,
   formatBytes,
   isImage,
   type MediaApi,
@@ -16,7 +17,9 @@ export type MediaPreviewVariant = 'field' | 'cell';
 
 /** An `<img>` of the file, falling back to the file icon if the download
  *  does not load — a backend that 500s on one object should cost that one
- *  thumbnail its picture, not the chip its name. */
+ *  thumbnail its picture, not the chip its name. The cached metadata is
+ *  dropped too: the likeliest cause is a file deleted since it was looked
+ *  up, and the next render should find that out ("File missing"). */
 function Thumbnail({
   api,
   file,
@@ -46,7 +49,10 @@ function Thumbnail({
       loading="lazy"
       className={`${className} shrink-0 object-cover`}
       data-testid="records-media-thumbnail"
-      onError={() => setBroken(true)}
+      onError={() => {
+        forgetMediaFile(api, file.id);
+        setBroken(true);
+      }}
     />
   );
 }

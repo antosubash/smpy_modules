@@ -157,11 +157,22 @@ async function fetchMediaFile(
 // ---- Metadata cache -------------------------------------------------------
 //
 // A list page of 25 records with an image column asks for up to 25 files,
-// and the editor asks again for the one it opens. One promise per id, shared,
-// for the life of the page: a file's metadata never changes under its id.
-// Only failures are dropped, so a retry after a transient error re-fetches.
+// and the editor asks again for the one it opens. One promise per id, shared
+// — but only for one Inertia page visit. A file's metadata never changes
+// under its id, but the file can be *deleted*, and in an Inertia app this
+// module outlives every client-side visit: a file deleted on the media
+// library's own page went on showing as present here until a hard reload
+// (review 4, code F3). So every `inertia:navigate` (the DOM event behind
+// `router.on('navigate')`, heard here rather than through a component that
+// the library's page would unmount) forgets everything. Failures are dropped
+// at once, so a retry after a transient error re-fetches, and so is a file
+// whose thumbnail fails to load (`forgetMediaFile`).
 
 const cache = new Map<string, Promise<MediaFile | null>>();
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('inertia:navigate', () => cache.clear());
+}
 
 function cacheKey(api: MediaApi, id: string): string {
   return `${api.meta_url_template}\u0000${id}`;
@@ -181,6 +192,12 @@ export function getMediaFile(api: MediaApi, id: string): Promise<MediaFile | nul
   });
   cache.set(key, pending);
   return pending;
+}
+
+/** Drop one file, so the next lookup asks the library again — a thumbnail
+ *  that failed to load is most often a file deleted since it was cached. */
+export function forgetMediaFile(api: MediaApi, id: string): void {
+  cache.delete(cacheKey(api, id));
 }
 
 /** For tests: every test starts from an empty cache. */
