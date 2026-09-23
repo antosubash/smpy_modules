@@ -70,6 +70,31 @@ create lands there. An account with no tenant sees a "tenant required" refusal
 on every records screen until an administrator assigns one. On an ordinary
 single-tenant host there is nothing to choose and nothing to see.
 
+**A `Tenant: <name>` badge** appears next to the actions on every records
+admin screen — the hub, a type's record list, the record editor and the
+schema editor — so it is never a guess which tenant a save will land in. The
+badge only appears on a multi-tenant host; a single-tenant install shows
+nothing new here at all.
+
+**"Show in sidebar" is replaced by a note on a multi-tenant host.** Per-type
+sidebar entries are one process-wide list, decided before your tenant is known
+(see [§1 The sidebar](#the-sidebar)), so a multi-tenant host cannot show a
+per-tenant sidebar without leaking another tenant's type labels to everyone.
+The type editor's **Details** section shows *"Sidebar entries are per-install,
+not per-tenant, so this host shows only the 'Records' hub. Every type stays
+reachable from there."* in place of the toggle. The underlying setting is
+untouched — a type saved with it on before the host became multi-tenant, or
+saved through the API directly, keeps its stored value, and picks the sidebar
+entry back up if the host later returns to single-tenant mode.
+
+**The `RecordsList` pagebuilder block has an optional Tenant field.** A page
+built with the block renders for anonymous visitors, who carry no session and
+so no tenant of their own — on a multi-tenant host, an anonymous request with
+no tenant is a 404, the same as an unknown type. Filling in **Tenant** on the
+block sends it as the `X-Tenant-ID` header on the block's own request, so a
+page can be pinned to one tenant's published records regardless of who
+requests it. Leave it blank on a single-tenant host; it does nothing there.
+
 ## 2. Creating a Record Type
 
 **New type** opens a form in three sections: **Details**, **Fields** and
@@ -220,7 +245,7 @@ and both disabled with *"Add a field first."* until there is one.
 |---|---|
 | **Public** | *"Exposes a read-only public API for this type's published records."* Anonymous callers can list and read the type's published records. The editor shows the URL with a **Copy** button and the note *"Published records only, filterable only on indexed fields, and never expanded."* Off by default. See [api-reference.md § Public read API](api-reference.md#public-read-api). |
 | **Translatable** | *"Records can exist in several languages ({locales}); each translation is its own record with its own slug."* Only meaningful when the install is configured with more than one content language. |
-| **Show in sidebar** | Adds the type's own entry to the admin sidebar. Off by default. Not a schema change: no classification, no dry run, no revision. |
+| **Show in sidebar** | Adds the type's own entry to the admin sidebar. Off by default. Not a schema change: no classification, no dry run, no revision. **On a multi-tenant host this control is replaced by a note** — see [Which tenant you are working in](#which-tenant-you-are-working-in). |
 | **Allowed roles** | Narrows who may use this type's records. See below. |
 | **Collection** | Which table set holds this type's records. **Chosen once** — *"A type can't be moved between collections once it is created."* The default is **Shared tables**. Only collections the host declared in code appear here. |
 

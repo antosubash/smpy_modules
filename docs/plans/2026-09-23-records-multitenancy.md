@@ -1030,3 +1030,68 @@ The out-of-request paths of §A.5. Items are marked the same way as above.
   file. `test_tenancy_cli.py` uses the suite's Postgres database when
   `SM_TEST_DATABASE_URL` names one. The commands that call `asyncio.run`
   themselves run on a worker thread.
+
+---
+
+## Implementation notes — Phase 6
+
+The sidebar + UI of §I/§J item 4. No Python was touched, other than the
+`_public_cache.py` `Vary` header, which is Phase 5's (see below) — `tenant`
+and `tenancy_mode` were already on all six admin renders as of Phase 3's
+`tenancy.view_props`, so this phase only had to consume them.
+
+* **Scope note, not a deviation.** The `Vary: <tenant header>` item (§H
+  "Public responses") was reassigned to Phase 5 by the coordinator's amendment
+  to PHASE6_BRIEF before this phase started (Phase 5 owns every Python change
+  under `sm_records/` except what is strictly needed to pass a view prop).
+  This phase touched no Python at all: the two props it needed
+  (`tenant`/`tenancy_mode`) were already present on every render.
+* **The tenant badge lives inside each screen's toolbar component**
+  (`RecordListActions`, and directly in `actions` on `Types`, `TypeEditor`,
+  `RecordEditor`), not wrapped around it in a `<>` fragment in the page itself.
+  The fragment form was tried first and pushed `RecordList.tsx` over the
+  300-line cap; folding `TenantBadge` into the existing toolbar component (one
+  more optional prop) cost two fewer lines than wrapping the page's `actions`
+  in a fragment, for the same rendered result. `TenantBadge` itself
+  (`components/TenantBadge.tsx`) is shared by all four screens and renders
+  `null` outside `tenancy_mode === 'multi'` or without a `tenant`, so an older
+  fixture or a page-tests mount that never passes these props renders exactly
+  as it did before this phase.
+* **`SidebarField`'s hidden-toggle behaviour has a component test, not a new
+  `TypeEditor` page-test.** No `page-tests/TypeEditor.test.tsx` exists yet —
+  the schema editor's page-level behaviour is currently covered through its
+  hooks (`useTypeEditorSave.test.tsx` and friends) rather than a full page
+  mount, and standing up one from scratch (mocking `useTypeSync`,
+  `useSchemaApply`, `useTypeImport`, `useUnsavedGuard`, `router`, …) was out of
+  proportion for a one-component change. `components/typeeditor/
+  SidebarField.test.tsx` mounts the component directly and pins: the toggle
+  renders in `'single'` mode and when `tenancyMode` is absent (an older
+  fixture); it is replaced by the note in `'multi'` mode; `onChange` is never
+  called while the note is showing. The tenant *badge* is covered at the page
+  level instead, in `page-tests/Types.test.tsx`, `page-tests/RecordList.
+  test.tsx` and the new `page-tests/RecordEditor.tenancy.test.tsx` (split out
+  the same way `RecordEditor.duplicate.test.tsx` and `RecordEditor.
+  invalid.test.tsx` already are — `RecordEditor.test.tsx` was already at the
+  300-line cap).
+* **The API still accepts and stores `show_in_menu` in multi mode.**
+  `SidebarField` still receives `showInMenu`/`onChange` even while it renders
+  no controls for them — nothing in this phase clears or forces the value,
+  matching the design's "the API accepts and stores the flag but documents it
+  as inert" (§I).
+* **The widget's `Tenant` field never reaches the URL.** `RecordsListProps.
+  tenant` flows into `fetchPublicRecords`'s `tenant` option, which sets
+  `X-Tenant-ID` on the request and is never read by `buildPublicListUrl` — so
+  the same type/filter/sort/locale combination still builds the one cacheable
+  path regardless of which tenant's header rides along, which is what makes
+  the Phase 5 `Vary` header (rather than a distinct URL per tenant) the
+  correct fix for the CDN leak in §H. `TENANT_HEADER` (`'X-Tenant-ID'`) is now
+  exported from `utils/public-api.ts` as the one place that name is spelled
+  for the anonymous surface; Phase 5's `Vary` value should read the same name
+  off the framework's configured header (which may differ from this literal
+  on a host that renamed it) rather than importing this constant, since this
+  one is deliberately the anonymous client's own hardcoded default per §J
+  item 4, not a read of host configuration.
+* **No other public fetch helper existed to extend.** The brief's "preview/
+  expand" parenthetical anticipated more than one anonymous fetch function;
+  `fetchPublicRecords` in `utils/public-api.ts` is the only one in this
+  module, so it is the only one that gained the `tenant` option.
