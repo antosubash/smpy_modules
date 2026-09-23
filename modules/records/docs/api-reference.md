@@ -227,6 +227,19 @@ Lists only the type's soft-deleted records. Costs `records.edit`, not merely
 Lists the record's translation siblings on `GET …/records/{uuid}`. Never
 honored on the list endpoint, where it would be one query per row.
 
+### `?columns=` — the admin list screen only, not an API parameter
+
+`/admin/records/{key}?columns=price,status,blurb` chooses which columns the
+record-list *screen* shows, in that order (see the user guide's
+[Columns](user-guide.md#columns)). It is read and written by the browser
+alone: the view route ignores it, it changes nothing about which records
+are returned, and **no JSON endpoint takes it** — the admin and public list
+endpoints always return each record's full `data`, and `…/records/export`
+always writes the full row. Keys are declared field keys or the record
+columns `status`, `locale`, `position`, `published_at` and `updated_at`
+(reserved field keys, so the two cannot collide); unknown keys are dropped
+by the screen with a notice.
+
 ---
 
 ## Type endpoints

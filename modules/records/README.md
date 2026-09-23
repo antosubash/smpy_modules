@@ -105,6 +105,21 @@ on its next page request, and the others within the window (5 seconds by
 default, `0` to re-read on every page request). Nothing about the record data
 is affected — only which links the sidebar is showing.
 
+### Choosing the list's columns
+
+The record list shows, by default, Status, the type's first four indexed
+fields (the display field is not repeated), Position, Published on and
+Updated. Its **Columns** menu picks any other set, up to eight declared fields
+plus the record's own columns, in any order. A non-indexed field can be shown
+too — every list row already carries its full `data` — but its header does
+not sort, since only an indexed field is queryable.
+
+The choice is written into the link as `?columns=key1,key2,...` (so a view is
+shareable) and remembered per type in the browser's `localStorage` as that
+viewer's default; a link that names its own columns wins, and **Reset to
+default** clears both. `columns` is read by the list screen only — no JSON
+endpoint takes it, and an export is always the full row.
+
 ### Acting on many records at once
 
 `POST /api/records/types/{key}/records/bulk` takes

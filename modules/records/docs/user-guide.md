@@ -122,8 +122,10 @@ Indexing a field means:
 
 - it can be a filter and a sort key on the record list, the export, the
   aggregate endpoint and the public API;
-- it can be one of the record list's columns (the first four indexed fields
-  other than the display field become columns);
+- it can be one of the record list's *default* columns (the first four indexed
+  fields other than the display field), and its column header sorts. Any
+  field, indexed or not, can still be shown through the list's **Columns**
+  menu — see [Choosing columns](#choosing-columns);
 - every save writes one extra index row per value. A type with 80 indexed
   fields turns one save into 81 inserts, which is why there is a ceiling of 25
   indexed fields per type (and 100 fields in total).
@@ -268,23 +270,68 @@ first: *"Other types still have a relation field pointing at this one:"*.
 
 ### Columns
 
-In order: **Title** (the display field), **Status**, **Language** (only when the
-type is **Translatable** *and* the install runs more than one content
-language), then up to **four** indexed fields
-in the type's own field order (the display field is not repeated), then
-**Position** (only when at least one record on the page has a non-zero
-position), **Published on**, **Updated** and **Actions**.
+By default, in order: **Title** (the display field), **Status**, **Language**
+(only when the type is **Translatable** *and* the install runs more than one
+content language), then up to **four** indexed fields in the type's own field
+order (the display field is not repeated), then **Position** (only when at
+least one record on the page has a non-zero position), **Published on**,
+**Updated** and **Actions**.
 
 A relation column renders the target's title; a to-many relation renders the
 titles comma-separated. A boolean renders as a check or a dash. `select` and
-`multiselect` render through their configured labels.
+`multiselect` render through their configured labels. A long text shows its
+first sixty characters on one line, a JSON field a compact one-line form, and
+a media field its stored id — hover any of them for the full value.
 
-At phone width the table is replaced by one card per record, with the same
-fields as meta lines and the row action visible.
+At phone width the table is replaced by one card per record: Status and
+Language (when shown) sit as badges beside the title, and the first **three**
+of the other shown columns are the card's lines, with the row action visible.
 
 Clicking a column header cycles its sort: none → ascending → descending → none.
 Clicking a different column starts it ascending. The UI keeps one sort key; the
 URL grammar allows several.
+
+#### Choosing columns
+
+The **Columns** button in the toolbar opens a panel listing everything the
+list can show:
+
+- every declared field of the type, with its type and an **Indexed** badge. A
+  field that is not indexed can be shown too, but its header cannot be
+  sorted — the panel says so under it ("Not indexed: shown, but it can't be
+  sorted or filtered."), and its header carries the same note on hover;
+- the record's own columns — **Status**, **Language** (under the same
+  condition as above), **Position**, **Published on** and **Updated** — as
+  toggles.
+
+Shown columns are listed first, in their order, each with **Move up** / **Move
+down** buttons (these work from the keyboard; focus stays on the column you
+moved). The count at the top reads *"N of 8 field columns"*: at most **eight**
+declared fields can be shown at once, and the others are disabled until one is
+hidden. The record's own columns do not count towards the eight. **Title**,
+the tick box and **Actions** are always shown and are not in the panel.
+
+If you hide the column the list is sorted by, the sort is dropped (and the
+list goes back to page 1); hiding any other column keeps it. When **Status** is
+hidden, a record's **Invalid** or schema-stale marker moves next to its title.
+
+**Where the choice lives.** Every change is written into the page's link as
+`?columns=key1,key2,...` — field keys and `status`, `locale`, `position`,
+`published_at`, `updated_at` — so copying the link shares the view, and a
+filter, sort or page change keeps it, including a step past the count. A
+column change itself stays on the page you are on. This browser also remembers the choice
+as *your* default for that type: open the list with no `columns` in the link
+and your saved columns apply, without anything being added to the URL. A link
+that names its own columns always wins over the saved default. **Reset to
+default** returns to the default columns above and clears both the link's
+`columns` and the saved choice. The saved default is per browser (it lives in
+the browser's local storage); another browser or a private window starts from
+the default.
+
+A `columns` key the type does not have — a field since renamed, or a typo in a
+hand-edited link — is dropped with a small notice naming it; the rest of the
+link still applies. **Export is unaffected**: it always contains every field,
+whatever the list is showing.
 
 ### Filtering
 
@@ -377,7 +424,8 @@ Each of those pages has its own link (the address carries `after=…`), so you
 can bookmark one or send it to someone with access to the type, and it opens on
 the same records in the same order. It is a position in *this* order, though:
 changing the sort, the filter, the language, the page size or switching to the
-Trash starts again from the first page. A link that no longer fits — made for
+Trash starts again from the first page (choosing columns does not, unless it
+hides the sorted column). A link that no longer fits — made for
 another sort, or edited by hand — opens on the notice *"This link can't
 continue the list: it was made for a different sort or view, or it has been
 changed. Go back to the first page."* with a **First page** button, rather than
@@ -481,7 +529,8 @@ and **Download CSV**.
 
 1. Set up the list you want first — the export takes the *current*
    `filter` and `sort` from the URL. A filter the list refuses is refused before
-   any download starts.
+   any download starts. The chosen **Columns** do not travel: an export is
+   always every field of every record it includes.
 2. Pick a format. The file is named `<key>-<date>.json` or `.csv`.
 
 Exporting while the Trash is showing exports the trashed records, and the menu
