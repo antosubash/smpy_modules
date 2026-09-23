@@ -15,6 +15,13 @@ could act on a write the request then rolled back — and it would read the
 record back through a *different* session that cannot see it yet, which is the
 same GH #257 shape ``CommitBeforeResponseMiddleware`` fixes for clients.
 
+**In the tenant it describes.** :func:`~sm_records.deferred.defer` runs the job
+inside the tenant bound when it was queued, so a subscriber finds
+``current_tenant_id`` bound to the event's ``tenant_id``. Each builder below
+reads the tenant off the type row it was handed. The request is bound to that
+tenant, and the framework refuses any row that disagrees, so the two are the
+same value.
+
 A host with no subscribers pays one attribute lookup and one ``await`` that
 returns immediately: :meth:`EventBus.publish` returns before gathering
 anything when nothing is listening. That is what makes emitting one event per
@@ -42,6 +49,7 @@ from sm_records.deferred import defer
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.fields import validate_fields
 from sm_records.schema.types import ChangeClass
+from sm_records.tenancy import bound_tenant
 
 __all__ = [
     "created",
@@ -82,9 +90,16 @@ def publish(request: Request, *events: Any) -> None:
     defer(request, partial(_publish_all, bus, flat))
 
 
+def _tenant(rtype: Any) -> str:
+    """The tenant an event names: the type row's own. :func:`bound_tenant` is
+    the fallback for a caller that hands over something without the column."""
+    return getattr(rtype, "tenant_id", None) or bound_tenant()
+
+
 def created(rtype: Any, record: Any) -> RecordCreated:
     return RecordCreated(
         type_key=rtype.key,
+        tenant_id=_tenant(rtype),
         uuid=record.uuid,
         locale=record.locale,
         translation_group=record.translation_group,
@@ -98,6 +113,7 @@ def updated(rtype: Any, record: Any, *, status_before: str) -> RecordUpdated:
     is only one status left to read."""
     return RecordUpdated(
         type_key=rtype.key,
+        tenant_id=_tenant(rtype),
         uuid=record.uuid,
         version=record.version,
         status_before=status_before,
@@ -118,6 +134,7 @@ def trashed(rtype: Any, record: Any, cascade: Iterable[tuple[Any, Any]]) -> list
     return [
         RecordTrashed(
             type_key=doomed_type.key,
+            tenant_id=_tenant(doomed_type),
             uuid=doomed.uuid,
             cascaded_from=None if doomed.uuid == record.uuid else record.uuid,
         )
@@ -126,12 +143,13 @@ def trashed(rtype: Any, record: Any, cascade: Iterable[tuple[Any, Any]]) -> list
 
 
 def restored(rtype: Any, record: Any) -> RecordRestored:
-    return RecordRestored(type_key=rtype.key, uuid=record.uuid)
+    return RecordRestored(type_key=rtype.key, tenant_id=_tenant(rtype), uuid=record.uuid)
 
 
 def purged(rtype: Any, record: Any) -> RecordPurged:
     return RecordPurged(
         type_key=rtype.key,
+        tenant_id=_tenant(rtype),
         uuid=record.uuid,
         locale=record.locale,
         translation_group=record.translation_group,
@@ -172,6 +190,7 @@ def type_changed(rtype: Any, before: Sequence[dict[str, Any]]) -> RecordTypeChan
     diff = diff_fields(old_defs, new_defs)
     return RecordTypeChanged(
         type_key=rtype.key,
+        tenant_id=_tenant(rtype),
         schema_version=rtype.schema_version,
         kind=diff.kind.value,
         index_affecting_keys=tuple(diff.keys(ChangeClass.INDEX_AFFECTING)),
@@ -188,15 +207,20 @@ def type_deleted(type_key: str, records: Sequence[Any], collection: str | None =
     the table set a record lived in is not part of any event, since a
     subscriber addresses records by ``(type_key, uuid)`` exactly as the API
     does.
+
+    The tenant is the bound one. The type row is deleted by the time this is
+    called, and the request that deleted it was bound to the row's tenant.
     """
+    tenant = bound_tenant()
     events: list[Any] = [
         RecordPurged(
             type_key=type_key,
+            tenant_id=tenant,
             uuid=record.uuid,
             locale=record.locale,
             translation_group=record.translation_group,
         )
         for record in records
     ]
-    events.append(RecordTypeDeleted(type_key=type_key, purged=len(records)))
+    events.append(RecordTypeDeleted(type_key=type_key, tenant_id=tenant, purged=len(records)))
     return events

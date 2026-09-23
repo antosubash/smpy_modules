@@ -98,6 +98,8 @@ async def test_deleting_a_type_purges_every_record_and_then_says_the_type_is_gon
     assert {event.uuid for event in bus.only(RecordPurged)} == {first["uuid"], second["uuid"]}
     deleted = bus.only(RecordTypeDeleted)[0]
     assert (deleted.type_key, deleted.purged) == ("note", 2)
+    # The type row is gone by then; the tenant is the one the request was bound to.
+    assert {event.tenant_id for event in bus.seen} == {"default"}
     assert all(bus.committed)
 
 

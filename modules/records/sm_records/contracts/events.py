@@ -23,6 +23,15 @@ no subscriber ever sees an event for a write that rolled back. See
 
 Field order is ``type_key`` first everywhere, because every subscriber that
 filters filters on it.
+
+**Every event carries ``tenant_id``, second** (tenancy design §A.5). This was
+added to the published contract with multi-tenancy. On a multi-tenant host a
+``type_key`` and a ``uuid`` are only unique within a tenant, so
+``(tenant_id, type_key, uuid)`` is what names a record. A single-tenant host
+always sends ``"default"``. The event is published inside the tenant it
+describes, so a handler also finds that tenant bound in
+``simple_module_db.current_tenant_id``, and can read the record back through
+the ORM without binding one itself.
 """
 
 from __future__ import annotations
@@ -53,6 +62,7 @@ class RecordCreated(Event):
     """
 
     type_key: str
+    tenant_id: str
     uuid: str
     locale: str
     translation_group: str
@@ -76,6 +86,7 @@ class RecordUpdated(Event):
     """
 
     type_key: str
+    tenant_id: str
     uuid: str
     version: int
     status_before: str
@@ -96,6 +107,7 @@ class RecordTrashed(Event):
     """
 
     type_key: str
+    tenant_id: str
     uuid: str
     cascaded_from: str | None = None
 
@@ -106,6 +118,7 @@ class RecordRestored(Event):
     schema as it is now rather than as it was when it was trashed (§8.3)."""
 
     type_key: str
+    tenant_id: str
     uuid: str
 
 
@@ -120,6 +133,7 @@ class RecordPurged(Event):
     """
 
     type_key: str
+    tenant_id: str
     uuid: str
     locale: str
     translation_group: str
@@ -144,6 +158,7 @@ class RecordTypeChanged(Event):
     """
 
     type_key: str
+    tenant_id: str
     schema_version: int
     kind: str
     index_affecting_keys: tuple[str, ...] = field(default_factory=tuple)
@@ -160,4 +175,5 @@ class RecordTypeDeleted(Event):
     """
 
     type_key: str
+    tenant_id: str
     purged: int

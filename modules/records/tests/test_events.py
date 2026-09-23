@@ -49,6 +49,9 @@ async def test_record_created_carries_the_identity_and_lands_after_the_commit(cl
     assert [type(event) for event in bus.seen] == [RecordCreated]
     event = bus.seen[0]
     assert event.type_key == "note"
+    # A single-tenant host: every row, and so every event, is in ``default``
+    # (tenancy design §A.5). The two-tenant case is ``test_tenancy_deferred``.
+    assert event.tenant_id == "default"
     assert event.uuid == record["uuid"]
     assert event.locale == record["locale"]
     # A record alone in a group carries a group named after its own uuid
@@ -171,6 +174,7 @@ async def test_trash_names_the_record_and_distinguishes_a_cascade(client, bus):
     assert by_uuid[made.json()["uuid"]].cascaded_from is None
     cascaded = by_uuid[child.json()["uuid"]]
     assert cascaded.type_key == "product"
+    assert {event.tenant_id for event in trashed} == {"default"}
     assert cascaded.cascaded_from == made.json()["uuid"]
     assert all(bus.committed)
 
