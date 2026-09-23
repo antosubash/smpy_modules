@@ -629,8 +629,10 @@ setting alone does not install `TenantMiddleware`. From there:
   `"code": "tenant_required"` on every records admin screen, even with a
   header sent: records never guesses. The `admin_header_tenant` setting
   (default off) lets a user holding `admin` with no tenant of their own act
-  in the tenant their `X-Tenant-ID` header names, for an operator who
-  administers several tenants from one account.
+  in the tenant their `X-Tenant-ID` header names — **from an API or headless
+  client that can send that header, only**. The browser admin screens never
+  send it, so for such a user every screen stays `403` with the setting on;
+  the fix for a person working in the browser is to assign them a tenant.
 - Anonymous readers and headless clients name their tenant with that header;
   with none, the public API answers its ordinary `404`, the same one an
   unknown type gets. The pagebuilder `RecordsList` block's **Tenant** field

@@ -228,8 +228,11 @@ class RecordsSettings(BootSettings):
     Off, such a user gets a 403 ``tenant_required`` on every records screen,
     header or not: the framework lets any tenant-less user pick a tenant by
     header, and records refuses to follow it by default. Turn it on for an
-    operator account that administers several tenants. Ignored on a
-    single-tenant host, where everything is the ``default`` tenant.
+    operator's API or headless client that administers several tenants.
+    **It does nothing for a browser:** the admin screens never send the header,
+    so a tenant-less user there stays 403 whatever this says — assign the user
+    a tenant instead. Ignored on a single-tenant host, where everything is the
+    ``default`` tenant.
     """
 
     def clamp_page_size(self, requested: int | None) -> int:

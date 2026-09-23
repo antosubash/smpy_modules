@@ -313,6 +313,15 @@ request's `X-Tenant-ID` header names, instead of being refused — the
 user who *does* have a tenant always gets that one; the header never
 overrides it.
 
+**The setting serves API and headless clients only** — a script, `curl`, an
+integration that sends `X-Tenant-ID` on every request. The browser admin
+screens never send the header (neither Inertia visits nor the pages' own
+`fetch` calls do; only the public widget does), so a tenant-less user who
+opens `/admin/records` in a browser gets `403 tenant_required` on every
+screen **with the setting on or off**. There is no tenant switcher. For a
+person working in the browser the fix is to **assign the user a tenant**
+(above), and log them out and back in.
+
 ### Anonymous and headless reads
 
 The public API and the pagebuilder `RecordsList` block resolve their tenant
@@ -404,7 +413,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `reindex_batch_size` | `500` | no | Records per batch in a rebuild, and the export's page size |
 | `reindex_stale_after_seconds` | `900` (15 min) | no | How old a `reindex_pending` entry may get before `/health/ready` degrades |
 | `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry may get. `0` re-reads on every page request |
-| `admin_header_tenant` | `false` | no | Multi-tenant hosts: let an `admin` with no tenant of their own work in the tenant their `X-Tenant-ID` header names. Off, they get `403 tenant_required` |
+| `admin_header_tenant` | `false` | no | Multi-tenant hosts: let an `admin` with no tenant of their own work in the tenant their `X-Tenant-ID` header names — API and headless clients only; the browser screens never send the header and stay `403`. Off, they get `403 tenant_required` |
 
 Everything not marked *restart* is read per request and takes effect on save.
 
