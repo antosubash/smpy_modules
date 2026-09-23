@@ -67,8 +67,10 @@ function cursorPage(prefix: string, next: string | null, count = 25): RecordList
   };
 }
 
-/** The params of the last `router.get` — the URL the page asked for. */
-const lastParams = () => get.mock.calls.at(-1)?.[1] as Record<string, string>;
+/** The URL of the last `router.get` — the page passes the whole URL, since a
+ *  `data` object cannot repeat a key — and its params. */
+const lastUrl = () => new URL(String(get.mock.calls.at(-1)?.[0]), 'http://x');
+const lastParams = () => Object.fromEntries(lastUrl().searchParams);
 
 describe('RecordList — paging past the cap by cursor', () => {
   beforeEach(() => {
@@ -81,7 +83,7 @@ describe('RecordList — paging past the cap by cursor', () => {
     const view = await mount(<RecordList type={type} records={cursorPage('a', 'CURSOR-2')} />);
     expect(view.find('[data-testid="records-cursor-pager"]')).not.toBeNull();
     await click(view.button('Next page'));
-    expect(get.mock.calls.at(-1)?.[0]).toBe('/admin/records/book');
+    expect(lastUrl().pathname).toBe('/admin/records/book');
     expect(lastParams()).toEqual({ after: 'CURSOR-2', sort: 'name' });
     await view.unmount();
   });

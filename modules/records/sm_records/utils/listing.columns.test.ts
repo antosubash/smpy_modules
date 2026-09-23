@@ -225,11 +225,12 @@ describe('sortHiddenBy', () => {
 });
 
 describe('listParams — ?columns= rides along', () => {
+  const lp = (...args: Parameters<typeof listParams>) => Object.fromEntries(listParams(...args));
   const offset: ListUrlState = {
     page: 3,
     after: null,
-    filter: 'a:eq:x',
-    sort: 'i1',
+    filter: ['a:eq:x'],
+    sort: ['i1'],
     trashed: false,
     pageSize: 25,
     columns: 'i1,status',
@@ -245,14 +246,14 @@ describe('listParams — ?columns= rides along', () => {
       { trashed: true },
       { pageSize: 50 },
     ]) {
-      expect(listParams(cursor, next).columns).toBe('i1,status');
+      expect(lp(cursor, next).columns).toBe('i1,status');
     }
   });
 
   it('changing it alone keeps the page or the cursor; only null drops it', () => {
-    expect(listParams(offset, { columns: 'i2' })).toMatchObject({ page: '3', columns: 'i2' });
-    expect(listParams(cursor, { columns: '' })).toMatchObject({ after: 'CUR', columns: '' });
-    expect(listParams(cursor, { columns: null })).toEqual({
+    expect(lp(offset, { columns: 'i2' })).toMatchObject({ page: '3', columns: 'i2' });
+    expect(lp(cursor, { columns: '' })).toMatchObject({ after: 'CUR', columns: '' });
+    expect(lp(cursor, { columns: null })).toEqual({
       after: 'CUR',
       filter: 'a:eq:x',
       sort: 'i1',

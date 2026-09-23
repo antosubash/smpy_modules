@@ -68,7 +68,6 @@ function RecordList({
   const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
-  const rawSort = search.get('sort');
   // A cursor lives in the URL and nowhere else (`utils/listing.ts::listParams`).
   const after = search.get('after');
   const trashed = parseTrashedParam(search.get('trashed'));
@@ -111,8 +110,8 @@ function RecordList({
       typeKey: type.key,
       page: records.page,
       after,
-      rawFilter,
-      rawSort,
+      filters: search.getAll('filter'),
+      sorts: search.getAll('sort'),
       trashed,
       rawPageSize,
       currentSort,

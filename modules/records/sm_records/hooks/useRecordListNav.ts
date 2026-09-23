@@ -2,7 +2,7 @@ import { router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 
 import type { ListUrlChange, ListUrlState, SortState } from '../utils/listing';
-import { buildSortParam, listParams, nextSort } from '../utils/listing';
+import { buildSortParam, listParams, listSearch, nextSort } from '../utils/listing';
 import type { FilterOp } from '../utils/types';
 
 /**
@@ -17,8 +17,8 @@ export function useRecordListNav({
   typeKey,
   page,
   after,
-  rawFilter,
-  rawSort,
+  filters,
+  sorts,
   trashed,
   rawPageSize,
   currentSort,
@@ -29,8 +29,11 @@ export function useRecordListNav({
   page: number | null;
   /** `?after=` as the URL carries it: the only place a cursor is ever kept. */
   after: string | null;
-  rawFilter: string | null;
-  rawSort: string | null;
+  /** Every `?filter=` / `?sort=` term, in the URL's order — the grammar
+   *  repeats both, and a step that kept only the first would change the
+   *  query under the reader (`listParams`). */
+  filters: readonly string[];
+  sorts: readonly string[];
   trashed: boolean;
   rawPageSize: number;
   currentSort: SortState;
@@ -61,8 +64,8 @@ export function useRecordListNav({
   const current: ListUrlState = {
     page: page ?? 1,
     after,
-    filter: rawFilter,
-    sort: rawSort,
+    filter: filters,
+    sort: sorts,
     trashed,
     pageSize: rawPageSize,
     columns: rawColumns,
@@ -79,19 +82,26 @@ export function useRecordListNav({
     const full = next.trashed !== undefined;
     const paged =
       next.page !== undefined || next.after !== undefined || next.pageSize !== undefined;
-    router.get(`/admin/records/${typeKey}`, params, {
-      only: full ? undefined : ['records', 'errors'],
-      preserveState: true,
-      preserveScroll: true,
-      // No `replace: true` (UX-R3). Every one of these is a change the user
-      // asked for, and collapsing them all into a single history entry meant
-      // Back left the list entirely instead of undoing the last filter, sort
-      // or page — the universal undo, and the one path `FilterBar`'s
-      // remount-on-`key` was written for.
-      onSuccess: paged ? scrollListIntoView : undefined,
-      onStart: () => setLoading(true),
-      onFinish: () => setLoading(false),
-    });
+    // The whole URL, no `data`: Inertia would serialize a repeated key as
+    // `filter[]=`, which the server does not read.
+    const url = `/admin/records/${typeKey}${listSearch(params)}`;
+    router.get(
+      url,
+      {},
+      {
+        only: full ? undefined : ['records', 'errors'],
+        preserveState: true,
+        preserveScroll: true,
+        // No `replace: true` (UX-R3). Every one of these is a change the user
+        // asked for, and collapsing them all into a single history entry meant
+        // Back left the list entirely instead of undoing the last filter, sort
+        // or page — the universal undo, and the one path `FilterBar`'s
+        // remount-on-`key` was written for.
+        onSuccess: paged ? scrollListIntoView : undefined,
+        onStart: () => setLoading(true),
+        onFinish: () => setLoading(false),
+      },
+    );
   };
 
   const applyFilter = (field: string, op: FilterOp, value: string) =>

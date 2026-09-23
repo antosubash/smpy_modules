@@ -8,20 +8,13 @@ import {
   type ListUrlChange,
   type ListUrlState,
   listParams,
+  listSearch,
   type ResolvedColumns,
   resolveListColumns,
   type SortState,
   sortHiddenBy,
 } from '../utils/listing';
 import type { TypeRead } from '../utils/types';
-
-/** A search string with its commas left literal — `?columns=a,b` is the form
- *  the docs promise and a person can read. A decoded `%2C` and `,` are the
- *  same character to every query parser, the server's included. */
-function readableSearch(params: Record<string, string>): string {
-  const search = new URLSearchParams(params).toString().replace(/%2C/gi, ',');
-  return search ? `?${search}` : '';
-}
 
 /**
  * The record list's column choice: resolved from `?columns=`, else this
@@ -35,7 +28,9 @@ function readableSearch(params: Record<string, string>): string {
  * a change that hides the column the list is sorted by: the sort is then
  * dropped, which does need the server, through the list's usual `goTo`.
  * Either way the URL comes from `listParams`, so a column change keeps the
- * page or cursor the list is on and only a reset drops `columns`.
+ * page or cursor the list is on, every `filter`/`sort` term the link holds
+ * (the rows on screen still answer all of them, and "Empty trash" and
+ * Export read them back from this URL), and only a reset drops `columns`.
  */
 export function useListColumns({
   type,
@@ -79,7 +74,7 @@ export function useListColumns({
     }
     const params = listParams(current, { columns: param });
     router.replace({
-      url: `/admin/records/${type.key}${readableSearch(params)}`,
+      url: `/admin/records/${type.key}${listSearch(params)}`,
       preserveScroll: true,
       preserveState: true,
     });

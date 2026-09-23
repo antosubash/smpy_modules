@@ -83,26 +83,38 @@ export const PAGE_SIZES = [25, 50, 100] as const;
 
 /** Every param `record_list` (`endpoints/views.py`) reads — the list's whole
  *  state, since the URL *is* the state. `page` is `1` on a cursor page.
+ *  `filter` and `sort` are every term the URL carries, in its order: the
+ *  grammar repeats both (`?filter=a&filter=b` is ANDed), so a link built
+ *  outside this UI can hold several, and a URL rebuilt from only the first
+ *  would silently widen the query the screen was rendered for.
  *  `columns` is the one client-only param (`resolveListColumns`): the server
  *  ignores it, absent means the link names no columns, `''` is Title only. */
 export type ListUrlState = {
   page: number;
   after: string | null;
-  filter: string | null;
-  sort: string | null;
+  filter: readonly string[];
+  sort: readonly string[];
   trashed: boolean;
   pageSize: number;
   columns?: string | null;
 };
 
-/** One navigation: only what it changes. `filter`/`sort`/`columns` take
- *  `null` to clear; `after` is a `next_cursor` to continue from. */
+/** One navigation: only what it changes. `filter`/`sort` replace *every*
+ *  term with the one given (the filter bar and a header click each write a
+ *  single term), `null` clears them; `columns` takes `null` to clear; `after`
+ *  is a `next_cursor` to continue from. */
 export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sort' | 'columns'>> & {
   after?: string;
   filter?: string | null;
   sort?: string | null;
   columns?: string | null;
 };
+
+/** The terms after a change: untouched ones kept as they were, all of them. */
+function terms(current: readonly string[], next: string | null | undefined): readonly string[] {
+  if (next === undefined) return current;
+  return next ? [next] : [];
+}
 
 /**
  * The query params for the list after `next` is applied to `current`.
@@ -116,32 +128,45 @@ export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sor
  * ever holds the cursor, which is what makes a cursor page shareable and
  * lets Back walk through the pages it came from.
  *
+ * **Repeated terms.** Every `filter`/`sort` term a change does not name is
+ * written back, in order — a page, a cursor step or a column change never
+ * narrows the query to its first term. A `URLSearchParams`, because a plain
+ * object cannot hold a key twice; `listSearch` turns it into the URL.
+ *
  * **Columns.** `?columns=` is a display choice, not a query: every change
  * keeps it — a page, a cursor step, a filter, sort, trash or page-size
  * change — and only an explicit `columns: null` (the chooser's reset) drops
  * it. Changing it alone reorders nothing, so it keeps the page or cursor.
  */
-export function listParams(current: ListUrlState, next: ListUrlChange): Record<string, string> {
+export function listParams(current: ListUrlState, next: ListUrlChange): URLSearchParams {
   const reordered =
     next.filter !== undefined ||
     next.sort !== undefined ||
     next.trashed !== undefined ||
     next.pageSize !== undefined;
-  const params: Record<string, string> = {};
+  const params = new URLSearchParams();
   const after = next.after ?? (next.page !== undefined || reordered ? null : current.after);
   const page = next.page ?? (reordered ? 1 : current.page);
-  if (after) params.after = after;
-  else if (page > 1) params.page = String(page);
-  const filter = next.filter === undefined ? current.filter : next.filter;
-  if (filter) params.filter = filter;
-  const sort = next.sort === undefined ? current.sort : next.sort;
-  if (sort) params.sort = sort;
-  if (next.trashed ?? current.trashed) params.trashed = 'true';
+  if (after) params.set('after', after);
+  else if (page > 1) params.set('page', String(page));
+  for (const term of terms(current.filter, next.filter)) if (term) params.append('filter', term);
+  for (const term of terms(current.sort, next.sort)) if (term) params.append('sort', term);
+  if (next.trashed ?? current.trashed) params.set('trashed', 'true');
   const size = next.pageSize ?? current.pageSize;
-  if (size && size !== PAGE_SIZES[0]) params.page_size = String(size);
+  if (size && size !== PAGE_SIZES[0]) params.set('page_size', String(size));
   const columns = next.columns === undefined ? current.columns : next.columns;
-  if (typeof columns === 'string') params.columns = columns;
+  if (typeof columns === 'string') params.set('columns', columns);
   return params;
+}
+
+/** `listParams` as the list's URL search, `''` when empty — with its commas
+ *  left literal: `?columns=a,b` is the form the docs promise and a person can
+ *  read, and a decoded `%2C` and `,` are the same character to every query
+ *  parser, the server's included (a literal `%2C` a user typed encodes as
+ *  `%252C`, so nothing is corrupted). */
+export function listSearch(params: URLSearchParams): string {
+  const search = params.toString().replace(/%2C/gi, ',');
+  return search ? `?${search}` : '';
 }
 
 // ---- Trashed toggle -----------------------------------------------------

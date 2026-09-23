@@ -88,6 +88,10 @@ function records(): RecordPage {
   };
 }
 
+/** The params of a `router.get` — the page passes the whole URL. */
+const getParams = (call = 0) =>
+  Object.fromEntries(new URL(String(get.mock.calls[call][0]), 'http://x').searchParams);
+
 type View = Awaited<ReturnType<typeof mount>>;
 const headers = (view: View) =>
   view.all('thead th').map((th) => th.textContent?.replace(/[▲▼]/g, '').trim());
@@ -128,7 +132,7 @@ describe('RecordList — ?columns= decides the table', () => {
     pageUrl = '/admin/records/book?columns=price,author';
     const view = await mount(<RecordList type={type} records={records()} />);
     await click(view.button('Next'));
-    expect(get.mock.calls[0][1]).toMatchObject({ page: '2', columns: 'price,author' });
+    expect(getParams()).toMatchObject({ page: '2', columns: 'price,author' });
     expect(ioSearch).toBe('');
     await view.unmount();
   });
@@ -205,7 +209,7 @@ describe('RecordList — changing columns', () => {
     await click(document.body.querySelector('#records-column-toggle-price'));
     expect(replace).not.toHaveBeenCalled();
     expect(get).toHaveBeenCalledOnce();
-    const params = get.mock.calls[0][1] as Record<string, string>;
+    const params = getParams();
     expect(params.sort).toBeUndefined();
     expect(params.columns).toBe('author');
     await view.unmount();
@@ -246,7 +250,7 @@ describe('RecordList — columns on a page reached by cursor', () => {
     pageUrl = '/admin/records/book?after=CUR&sort=author&columns=price,author';
     const view = await mount(<RecordList type={type} records={cursorPage(records().items)} />);
     await click(view.button('Next page'));
-    expect(get.mock.calls[0][1]).toEqual({ after: 'NEXT', sort: 'author', columns: 'price,author' });
+    expect(getParams()).toEqual({ after: 'NEXT', sort: 'author', columns: 'price,author' });
     await openPanel(view);
     await click(document.body.querySelector('#records-column-toggle-blurb'));
     expect(replace.mock.calls[0][0].url).toBe(
