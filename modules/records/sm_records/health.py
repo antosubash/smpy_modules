@@ -1,6 +1,6 @@
 """Health checks the module contributes. Design doc §8.9.
 
-Three things degrade ``/health/ready`` here, and they are different failures.
+Four things degrade ``/health/ready`` here, and they are different failures.
 
 A reindex orphaned by a worker restart is *recoverable* — the CLI finishes it —
 but recoverable is not visible. A field that refuses filters with a 409 forever
@@ -50,9 +50,13 @@ A fifth detail exists on a **single-tenant** host only: ``tenants_outside_defaul
 Such a host serves only ``default``. Rows in any other tenant were written by
 the CLI's ``--tenant``, or are left over from a switch back from multi-tenant
 mode. They are untouched but unreachable, and this detail keeps that from
-being silent (§J "Switching modes"). It costs nothing on a host that has no
-such rows. The tenants come from the type rows the stale check already reads,
-and records are counted only for the tenants that turned up.
+being silent (§J "Switching modes"). It is **informational**: it never
+degrades the check on its own, because an operator may keep those rows on
+purpose. The framework's readiness route renders a result's ``detail``
+whatever its status (``simple_module_hosting/health.py``), so a HEALTHY result
+still carries it. It costs nothing on a host that has no such rows. The
+tenants come from the type rows the stale check already reads, and records are
+counted only for the tenants that turned up.
 
 The check reads the database, which a ``register_health_checks`` hook cannot:
 it runs before the lifespan opens one. So it reads what
@@ -207,11 +211,13 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         orphaned = getattr(module, "orphaned_locales", None)
         if orphaned:
             details.append(orphaned_detail(orphaned))
+        # Informational, never a degradation: rows an operator keeps in another
+        # tenant on purpose must not leave the check degraded for good. The
+        # framework's readiness route shows ``detail`` whatever the status.
+        status = HealthStatus.DEGRADED if details else HealthStatus.HEALTHY
         if outside is not None:
             details.append(outside)
-        if not details:
-            return HealthCheckResult(status=HealthStatus.HEALTHY)
-        return HealthCheckResult(status=HealthStatus.DEGRADED, detail="; ".join(details))
+        return HealthCheckResult(status=status, detail="; ".join(details) or None)
 
     return HealthCheck(name=CHECK_NAME, check=check)
 

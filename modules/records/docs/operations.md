@@ -595,9 +595,10 @@ reset=…)` directly instead of shelling out.
 
 ## Health checks
 
-The module registers one health check, `records.reindex`. Five separate faults
+The module registers one health check, `records.reindex`. Four separate faults
 degrade `/health/ready` through it, and they are reported together rather than
-one hiding another.
+one hiding another. A fifth detail, on single-tenant hosts only, is
+informational and never degrades the check on its own (§5).
 
 The check reads **every tenant**, whatever tenant the `/health/ready` request
 itself was bound to. Each row it names carries its tenant: `tenant/key` for a
@@ -681,6 +682,12 @@ tenants_outside_default: {acme: 3 type(s), 816 record(s)} — this host is
 single-tenant and serves only 'default'; these rows are untouched but
 unreachable (`python -m sm_records.cli tenants`)
 ```
+
+**Informational: it never degrades the check.** An operator may keep another
+tenant's rows on a single-tenant host on purpose, and a check that stayed
+DEGRADED for that would teach everyone to ignore it. The detail rides on
+whatever status the other findings give — on a HEALTHY result when it is the
+only one (`/health/ready` shows a check's `detail` whatever its status).
 
 Reported only on a host whose middleware stack has no `TenantMiddleware`
 (`SM_MULTI_TENANT` unset or false). Such a host binds every request to
