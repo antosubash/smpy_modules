@@ -4,6 +4,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 
+import { fieldTypeName } from '../../utils/field-type-name';
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
@@ -16,7 +17,7 @@ import {
   MAX_LABEL_LEN,
   uniqueAllowed,
 } from './rules';
-import { type EditableField, FIELD_TYPES, type FieldTypeName, type TargetType } from './types';
+import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
 // See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
 // against `useT()`'s real, key-union-overloaded signature either blows up
@@ -38,31 +39,6 @@ function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
     max: MAX_KEY_LEN,
     defaultValue: defaults[code],
   });
-}
-
-/** The field-type select used to show the wire value itself — `longtext`,
- *  `multiselect`, `datetime` (R11). These are the names of the closed set in
- *  `schema/types.py`, written for the person choosing one. A `t()` call per
- *  type rather than a module-scope map, so the strings stay reachable by the
- *  untranslated-string check — a config object is exactly its blind spot. */
-function fieldTypeName(t: Translate, type: FieldTypeName): string {
-  const defaults: Record<FieldTypeName, string> = {
-    text: 'Text',
-    longtext: 'Long text',
-    number: 'Number',
-    integer: 'Whole number',
-    boolean: 'Yes / no',
-    date: 'Date',
-    datetime: 'Date and time',
-    select: 'Choice',
-    multiselect: 'Several choices',
-    email: 'Email address',
-    url: 'URL',
-    json: 'JSON',
-    media: 'Media',
-    relation: 'Link to a record',
-  };
-  return t(`records.type_editor.field_type_name.${type}`, { defaultValue: defaults[type] });
 }
 
 /**
@@ -213,13 +189,13 @@ export function FieldRowBody({
       {/* U6: the hint the header once carried was moved off this checkbox
           entirely (R23) and lost its referent in the process — this is that
           consequence, back where the decision is actually made, one field
-          at a time. `utils/listing.ts::listColumns` is what makes the last
-          clause literally true: only an indexed field can be a list column,
-          and only the first four of those show. */}
+          at a time. `utils/listing.ts::listColumns` is what makes the default-
+          columns clause literally true; the list's Columns menu can show
+          any field, but only an indexed one sorts. */}
       <p id={`${idBase}-indexed-hint`} className="-mt-1 text-xs text-muted-foreground">
         {t('records.type_editor.field_indexed_row_hint', {
           defaultValue:
-            "Indexed fields can be filtered, sorted and shown as list columns; the first four indexed fields are the list's columns.",
+            "Indexed fields can be filtered and sorted; the first four indexed fields are the list's default columns. Any field can be shown through the list's Columns menu.",
         })}
       </p>
 

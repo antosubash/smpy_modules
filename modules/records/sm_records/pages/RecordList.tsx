@@ -1,19 +1,20 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
 import type React from 'react';
 
+import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
 import { FilterBar } from '../components/FilterBar';
-import { RecordIoMenu } from '../components/RecordIoMenu';
+import { RecordListActions } from '../components/RecordListActions';
 import { RecordListBulk } from '../components/RecordListBulk';
 import { RecordListEmpty } from '../components/RecordListEmpty';
 import { RecordListFooter } from '../components/RecordListFooter';
 import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { RecordTable } from '../components/RecordTable';
+import { useListColumns } from '../hooks/useListColumns';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
 import { useRecordListNav } from '../hooks/useRecordListNav';
 import { useRecordSelection } from '../hooks/useRecordSelection';
@@ -47,8 +48,9 @@ type Props = {
 const EDIT_PERMISSION = 'records.edit';
 
 /** `Records/RecordList` — `/admin/records/{key}`. A generic table over one
- *  type's records, driven entirely by the URL (`?page=` or `?after=`, and
- *  `filter=`/`sort=`) so it can be bookmarked or shared. */
+ *  type's records, driven entirely by the URL (`?page=` or `?after=`,
+ *  `filter=`/`sort=`, and the client-only `?columns=`) so it can be
+ *  bookmarked or shared. */
 function RecordList({
   type,
   records,
@@ -92,9 +94,13 @@ function RecordList({
   // Export and the bulk toolbar keep it, and the empty box offers page 1.
   const cursorRefused = isCursorRefusal(filterErrorReason);
   const filterRefused = Boolean(filterErrorReason) && !cursorRefused;
-  const exportSearch = exportSearchParams(search.toString(), filterRefused);
+  // `columns` is the list's own display choice, not a query the export
+  // understands: an export is always the full row.
+  const exportParams = new URLSearchParams(search);
+  exportParams.delete('columns');
+  const exportSearch = exportSearchParams(exportParams.toString(), filterRefused);
 
-  const { listTop, loading, goTo, applyFilter, clearFilter, handleSort, toggleTrashed } =
+  const { listTop, loading, current, goTo, applyFilter, clearFilter, handleSort, toggleTrashed } =
     useRecordListNav({
       typeKey: type.key,
       page: records.page,
@@ -104,7 +110,15 @@ function RecordList({
       trashed,
       rawPageSize,
       currentSort,
+      rawColumns: search.get('columns'),
     });
+  const columns = useListColumns({
+    type,
+    showLocale: showLocaleUI,
+    current,
+    currentSort,
+    goTo,
+  });
 
   const { handleDelete, handleRestore, handlePurge } = useRecordListMutations(type.key, t);
   // Only the rows this page is showing — see `useRecordSelection`.
@@ -129,56 +143,29 @@ function RecordList({
         title={type.label_plural}
         description={type.description ?? undefined}
         actions={
-          // `PageShell` lays its own `actions` row out `flex-shrink-0` with
-          // no wrapping (it lives in the framework's `@simple-module-py/ui`
-          // package, which this module cannot change), so four buttons ran
-          // straight off a 390px document and took the whole page's
-          // horizontal scroll with them (UX-R4). Below `sm` that row is a
-          // full-width column item, so a wrapping flex row inside it is the
-          // fix from this side of the boundary.
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => router.visit('/admin/records')}>
-              {t('records.types.title', { defaultValue: 'Record Types' })}
-            </Button>
-            {/* `search` and not `''`: "Export" means "export what this screen
-                is showing", so the current `filter`/`sort`/`trashed` travel
-                with it — `exportUrl` drops only `page`, and `exportSearch`
-                drops a `filter` the list is already showing an error for
-                (polish note: that download is a raw JSON 400 in a new tab). */}
-            <RecordIoMenu
-              typeKey={type.key}
-              search={exportSearch}
-              canEdit={canEdit}
-              fields={type.fields}
-              trashed={trashed}
-              // U16: export honours the list's current filter, so the menu
-              // says so — `exportSearch` (above) drops the filter on a
-              // refused one, so this mirrors it rather than claiming
-              // "filtered" for an export that will not actually be one.
-              filtered={Boolean(currentFilter) && !filterRefused}
-              recordCount={known}
-              {...(max_import_bytes ? { maxImportBytes: max_import_bytes } : {})}
-            />
-            {canEdit && (
-              <Button
-                type="button"
-                variant={trashed ? 'default' : 'outline'}
-                data-testid="records-trash-toggle"
-                onClick={toggleTrashed}
-              >
-                {trashed
-                  ? t('records.trash.view_live', { defaultValue: 'Back to live records' })
-                  : t('records.trash.view', { defaultValue: 'Trash' })}
-              </Button>
-            )}
-            {!trashed && (
-              <Button asChild>
-                <Link href={`/admin/records/${type.key}/new`}>
-                  {t('records.records.new', { defaultValue: 'New record' })}
-                </Link>
-              </Button>
-            )}
-          </div>
+          <RecordListActions
+            typeKey={type.key}
+            fields={type.fields}
+            canEdit={canEdit}
+            trashed={trashed}
+            exportSearch={exportSearch}
+            filtered={Boolean(currentFilter) && !filterRefused}
+            recordCount={known}
+            maxImportBytes={max_import_bytes}
+            onToggleTrashed={toggleTrashed}
+            columnsMenu={
+              // `genuinelyEmpty` is false on a cursor page, so an empty or
+              // refused cursor page keeps the chooser (and the filter bar).
+              !genuinelyEmpty && (
+                <ColumnChooser
+                  available={columns.available}
+                  resolved={columns.resolved}
+                  onChange={columns.change}
+                  onReset={columns.reset}
+                />
+              )
+            }
+          />
         }
       >
         {type.is_public && (
@@ -205,6 +192,8 @@ function RecordList({
               />
             </div>
           )}
+
+          <ColumnsNotice resolved={columns.resolved} />
 
           {filterErrorReason && (
             <div
@@ -255,6 +244,7 @@ function RecordList({
                 trashed={trashed}
                 selection={canEdit ? selection : undefined}
                 showLocale={showLocaleUI}
+                columns={columns.resolved}
                 onSort={handleSort}
                 onDelete={handleDelete}
                 onRestore={handleRestore}

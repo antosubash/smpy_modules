@@ -81,7 +81,9 @@ export function buildSortParam(sort: SortState): string | undefined {
 export const PAGE_SIZES = [25, 50, 100] as const;
 
 /** Every param `record_list` (`endpoints/views.py`) reads — the list's whole
- *  state, since the URL *is* the state. `page` is `1` on a cursor page. */
+ *  state, since the URL *is* the state. `page` is `1` on a cursor page.
+ *  `columns` is the one client-only param (`resolveListColumns`): the server
+ *  ignores it, absent means the link names no columns, `''` is Title only. */
 export type ListUrlState = {
   page: number;
   after: string | null;
@@ -89,14 +91,16 @@ export type ListUrlState = {
   sort: string | null;
   trashed: boolean;
   pageSize: number;
+  columns?: string | null;
 };
 
-/** One navigation: only what it changes. `filter`/`sort` take `null` to
- *  clear; `after` is a `next_cursor` to continue from. */
-export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sort'>> & {
+/** One navigation: only what it changes. `filter`/`sort`/`columns` take
+ *  `null` to clear; `after` is a `next_cursor` to continue from. */
+export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sort' | 'columns'>> & {
   after?: string;
   filter?: string | null;
   sort?: string | null;
+  columns?: string | null;
 };
 
 /**
@@ -110,6 +114,11 @@ export type ListUrlChange = Partial<Omit<ListUrlState, 'after' | 'filter' | 'sor
  * no longer looking at. A numbered page drops it too. Nothing but the URL
  * ever holds the cursor, which is what makes a cursor page shareable and
  * lets Back walk through the pages it came from.
+ *
+ * **Columns.** `?columns=` is a display choice, not a query: every change
+ * keeps it — a page, a cursor step, a filter, sort, trash or page-size
+ * change — and only an explicit `columns: null` (the chooser's reset) drops
+ * it. Changing it alone reorders nothing, so it keeps the page or cursor.
  */
 export function listParams(current: ListUrlState, next: ListUrlChange): Record<string, string> {
   const reordered =
@@ -129,6 +138,8 @@ export function listParams(current: ListUrlState, next: ListUrlChange): Record<s
   if (next.trashed ?? current.trashed) params.trashed = 'true';
   const size = next.pageSize ?? current.pageSize;
   if (size && size !== PAGE_SIZES[0]) params.page_size = String(size);
+  const columns = next.columns === undefined ? current.columns : next.columns;
+  if (typeof columns === 'string') params.columns = columns;
   return params;
 }
 

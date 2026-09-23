@@ -228,7 +228,30 @@
     }
   },
   "columns": {
-    "not_sortable": "Not indexed, so this column can't be sorted or filtered."
+    "button": "Columns",
+    "title": "Columns",
+    "count": "{count} of {max} field column",
+    "count_one": "{count} of {max} field column",
+    "count_other": "{count} of {max} field columns",
+    "shown": "Shown",
+    "hidden": "Hidden",
+    "indexed": "Indexed",
+    "record_column": "Record column",
+    "not_indexed_help": "Not indexed: shown, but it can't be sorted or filtered.",
+    "not_sortable": "Not indexed, so this column can't be sorted or filtered.",
+    "move_up": "Move {label} up",
+    "move_down": "Move {label} down",
+    "cap_reached": "At most {max} field columns — hide one to show another.",
+    "help_link": "Your choice is written into this page’s link (?columns=), so sharing the link shares these columns.",
+    "help_saved": "This browser also remembers it as your default for this type. A link that names its own columns wins over that default.",
+    "help_export": "Export always contains every field, whatever is shown here.",
+    "reset": "Reset to default",
+    "unknown": "Ignored a column this type doesn’t have: {keys}.",
+    "unknown_one": "Ignored a column this type doesn’t have: {keys}.",
+    "unknown_other": "Ignored {count} columns this type doesn’t have: {keys}.",
+    "truncated": "Only {max} field columns can be shown; {count} more was left out.",
+    "truncated_one": "Only {max} field columns can be shown; {count} more was left out.",
+    "truncated_other": "Only {max} field columns can be shown; {count} more were left out."
   },
   "filters": {
     "op": {
@@ -383,7 +406,7 @@
     "field_unique_hint": "Unique across every record of this type — except between translations of the same record, which may share this value.",
     "field_indexed": "Indexed",
     "field_indexed_hint": "Tick \"Indexed\" on the fields worth filtering, sorting or showing as list columns — each one costs a write per save.",
-    "field_indexed_row_hint": "Indexed fields can be filtered, sorted and shown as list columns; the first four indexed fields are the list's columns.",
+    "field_indexed_row_hint": "Indexed fields can be filtered and sorted; the first four indexed fields are the list's default columns. Any field can be shown through the list's Columns menu.",
     "field_unnamed": "New field",
     "field_has_error": "Needs attention",
     "field_help": "Help text",

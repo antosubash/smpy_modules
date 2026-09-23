@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   availableColumns,
   defaultColumnKeys,
+  type ListUrlState,
+  listParams,
   MAX_CHOSEN_COLUMNS,
   MAX_LIST_COLUMNS,
   resolveListColumns,
@@ -187,5 +189,41 @@ describe('sortHiddenBy', () => {
     expect(sortHiddenBy({ field: 'display_title', dir: 'asc' }, [], available)).toBe(false);
     expect(sortHiddenBy({ field: 'created_at', dir: 'asc' }, [], available)).toBe(false);
     expect(sortHiddenBy(null, [], available)).toBe(false);
+  });
+});
+
+describe('listParams — ?columns= rides along', () => {
+  const offset: ListUrlState = {
+    page: 3,
+    after: null,
+    filter: 'a:eq:x',
+    sort: 'i1',
+    trashed: false,
+    pageSize: 25,
+    columns: 'i1,status',
+  };
+  const cursor: ListUrlState = { ...offset, page: 1, after: 'CUR' };
+
+  it('keeps it across a page, a cursor step, a filter, sort, trash or page-size change', () => {
+    for (const next of [
+      { page: 4 },
+      { after: 'NEXT' },
+      { filter: null },
+      { sort: '-i2' },
+      { trashed: true },
+      { pageSize: 50 },
+    ]) {
+      expect(listParams(cursor, next).columns).toBe('i1,status');
+    }
+  });
+
+  it('changing it alone keeps the page or the cursor; only null drops it', () => {
+    expect(listParams(offset, { columns: 'i2' })).toMatchObject({ page: '3', columns: 'i2' });
+    expect(listParams(cursor, { columns: '' })).toMatchObject({ after: 'CUR', columns: '' });
+    expect(listParams(cursor, { columns: null })).toEqual({
+      after: 'CUR',
+      filter: 'a:eq:x',
+      sort: 'i1',
+    });
   });
 });

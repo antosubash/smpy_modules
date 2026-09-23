@@ -64,7 +64,8 @@ describe('FieldRowBody — U6: the Indexed checkbox names its own consequence', 
     const out = html();
     expect(out).toContain('id="field-row-0-indexed-hint"');
     expect(out).toContain('aria-describedby="field-row-0-indexed-hint"');
-    expect(out).toContain('filtered, sorted and shown as list columns');
+    expect(out).toContain('Indexed fields can be filtered and sorted');
+    expect(out).toContain('Columns menu');
     expect(out).toContain('first four indexed fields');
   });
 });

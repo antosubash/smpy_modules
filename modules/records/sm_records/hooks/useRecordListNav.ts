@@ -1,7 +1,7 @@
 import { router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 
-import type { ListUrlChange, SortState } from '../utils/listing';
+import type { ListUrlChange, ListUrlState, SortState } from '../utils/listing';
 import { buildSortParam, listParams, nextSort } from '../utils/listing';
 import type { FilterOp } from '../utils/types';
 
@@ -22,6 +22,7 @@ export function useRecordListNav({
   trashed,
   rawPageSize,
   currentSort,
+  rawColumns = null,
 }: {
   typeKey: string;
   /** `null` on a page reached by cursor — `records.page`. */
@@ -33,6 +34,11 @@ export function useRecordListNav({
   trashed: boolean;
   rawPageSize: number;
   currentSort: SortState;
+  /** `?columns=` as the URL has it — carried through every navigation so a
+   *  filter, sort, page or cursor step never loses the view's chosen
+   *  columns. `null` (absent) stays absent: the per-browser default then
+   *  applies. */
+  rawColumns?: string | null;
 }) {
   const listTop = useRef<HTMLDivElement>(null);
   // U12: filter/sort/page/trash-toggle all go through goTo(), and on this
@@ -49,20 +55,24 @@ export function useRecordListNav({
     listTop.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
+  // The URL as it stands. `useListColumns` builds its client-side
+  // `?columns=` rewrite from this too, so `listParams` is the only thing
+  // that ever writes the list's URL.
+  const current: ListUrlState = {
+    page: page ?? 1,
+    after,
+    filter: rawFilter,
+    sort: rawSort,
+    trashed,
+    pageSize: rawPageSize,
+    columns: rawColumns,
+  };
+
   const goTo = (next: ListUrlChange) => {
     // `utils/listing.ts::listParams` owns the rules — which change drops the
-    // cursor, and that `page` and `after` are never written together.
-    const params = listParams(
-      {
-        page: page ?? 1,
-        after,
-        filter: rawFilter,
-        sort: rawSort,
-        trashed,
-        pageSize: rawPageSize,
-      },
-      next,
-    );
+    // cursor, that `page` and `after` are never written together, and that
+    // `columns` survives everything but the chooser's reset.
+    const params = listParams(current, next);
     // Toggling `trashed` swaps every prop (`records`, `errors` and, via
     // `parse_trashed`, what the server even lets through) — a partial reload
     // only makes sense for staying inside the same trashed/live view.
@@ -91,5 +101,14 @@ export function useRecordListNav({
     goTo({ page: 1, sort: buildSortParam(nextSort(currentSort, field)) ?? null });
   const toggleTrashed = () => goTo({ page: 1, trashed: !trashed });
 
-  return { listTop, loading, goTo, applyFilter, clearFilter, handleSort, toggleTrashed };
+  return {
+    listTop,
+    loading,
+    current,
+    goTo,
+    applyFilter,
+    clearFilter,
+    handleSort,
+    toggleTrashed,
+  };
 }
