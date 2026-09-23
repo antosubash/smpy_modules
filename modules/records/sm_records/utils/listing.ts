@@ -1,15 +1,28 @@
 /**
- * List-screen helpers that don't belong in a component: which columns a
- * type's schema earns, and the single-key sort state the record list keeps
- * in the URL.
+ * List-screen helpers that don't belong in a component: the single-key sort
+ * state the record list keeps in the URL, and the URL itself (`listParams`).
  *
- * See `docs/plans/2026-09-19-records-module-design.md` §7.2 — only indexed
- * fields are queryable, which is why both halves of this file only ever
- * look at `indexed: true` fields plus the server's fixed columns.
+ * Which columns the list shows lives in `list-columns.ts`, and what the list
+ * *says* in `list-errors.ts`; both are re-exported here, so every import
+ * site can keep importing from `listing`.
  */
 
-import type { FieldDef, FilterOp, TypeRead } from './types';
+import type { FilterOp } from './types';
 
+export {
+  availableColumns,
+  type ColumnSource,
+  defaultColumnKeys,
+  ENVELOPE_COLUMNS,
+  type EnvelopeColumnKey,
+  type ListColumn,
+  listColumns,
+  MAX_CHOSEN_COLUMNS,
+  MAX_LIST_COLUMNS,
+  type ResolvedColumns,
+  resolveListColumns,
+  sortHiddenBy,
+} from './list-columns';
 export {
   type FilterErrorReason,
   filterErrorMessage,
@@ -17,28 +30,6 @@ export {
   isCursorRefusal,
   listStatus,
 } from './list-errors';
-
-export const MAX_LIST_COLUMNS = 4;
-
-/**
- * The indexed-field columns rendered after `display_title` on the record
- * list. Capped at four so the table doesn't outgrow a normal viewport, and
- * taken in the type's own field order (not re-sorted) so the columns match
- * the order fields appear in on the schema editor.
- *
- * The type's `display_field` is skipped (UX-R5): the Title column already
- * prints exactly that field's value on every row, so a column for it spends
- * a quarter of the table's horizontal budget repeating the first column —
- * and, since the four-column cap bites before a type's later fields do, it
- * spends it instead of showing a field the user cannot otherwise see.
- */
-export function listColumns(
-  type: Pick<TypeRead, 'fields'> & Partial<Pick<TypeRead, 'display_field'>>,
-): FieldDef[] {
-  return type.fields
-    .filter((field) => field.indexed && field.key !== type.display_field)
-    .slice(0, MAX_LIST_COLUMNS);
-}
 
 // ---- Sorting ----------------------------------------------------------
 
