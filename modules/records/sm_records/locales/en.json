@@ -227,6 +227,9 @@
       "generic": "That filter couldn't be applied."
     }
   },
+  "columns": {
+    "not_sortable": "Not indexed, so this column can't be sorted or filtered."
+  },
   "filters": {
     "op": {
       "eq": "is",

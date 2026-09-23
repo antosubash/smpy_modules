@@ -203,4 +203,26 @@ describe('RecordCell', () => {
     expect(out).toContain(`title="${long}"`);
     expect(out).toContain('…');
   });
+
+  it('collapses a longtext value to one truncated line, full text in the title', () => {
+    const body = `First paragraph.\n\n${'word '.repeat(30)}`;
+    const out = html(field({ type: 'longtext', indexed: false }), body);
+    expect(out).toContain('First paragraph. word');
+    expect(out).toContain('…');
+    expect(out).not.toContain('\n\n</span>');
+  });
+
+  it('summarises json as compact one-line JSON, never "[object Object]"', () => {
+    const out = html(field({ type: 'json', indexed: false }), { a: 1, tags: ['x', 'y'] });
+    expect(out).toContain('records-cell-json');
+    expect(out).toContain('{&quot;a&quot;:1,&quot;tags&quot;:[&quot;x&quot;,&quot;y&quot;]}');
+    expect(out).not.toContain('[object Object]');
+  });
+
+  it('shows a media value as its id behind a placeholder glyph', () => {
+    const out = html(field({ type: 'media', indexed: false }), 'media-42');
+    expect(out).toContain('media-42');
+    expect(out).toContain('aria-hidden="true"');
+    expect(out).not.toContain('<img');
+  });
 });

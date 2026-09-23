@@ -1,10 +1,19 @@
 import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
+import { ImageIcon } from 'lucide-react';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import { EMPTY_CELL as DASH, formatDateTime } from '../utils/values';
 
 type Choice = { value: string; label: string };
+
+/** How many characters of a text-ish value a cell prints before an ellipsis;
+ *  the whole value stays in the cell's `title`. */
+const CELL_CHARS = 60;
+
+function truncate(text: string): string {
+  return text.length > CELL_CHARS ? `${text.slice(0, CELL_CHARS)}…` : text;
+}
 
 function choices(field: FieldDef): Choice[] {
   const raw = field.options?.choices;
@@ -74,8 +83,12 @@ function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
  * uuid's first eight characters when there is none (no `?expand=` was asked,
  * or this is an older payload with nothing to look it up in).
  *
- * `json`, `media` and `longtext` never reach this component: they are not
- * indexable (design doc §7.3), so `listColumns` never selects them.
+ * `json`, `media` and `longtext` are not indexable (design doc §7.3), so the
+ * default columns never hold them — but the column chooser may, since every
+ * list row carries its full `data`: `longtext` prints its first line's worth
+ * with whitespace collapsed, `json` a compact one-line serialisation, and
+ * `media` its stored id or URL behind a placeholder glyph (no thumbnail is
+ * fetched: the value is opaque to this module).
  */
 export function RecordCell({
   field,
@@ -198,12 +211,35 @@ export function RecordCell({
       );
     }
 
+    case 'longtext': {
+      const text = String(value);
+      return <span title={text}>{truncate(text.replace(/\s+/g, ' ').trim())}</span>;
+    }
+
+    case 'json': {
+      const text = JSON.stringify(value) ?? String(value);
+      return (
+        <code className="font-mono text-xs" title={text} data-testid="records-cell-json">
+          {truncate(text)}
+        </code>
+      );
+    }
+
+    case 'media': {
+      const text = String(value);
+      return (
+        <span className="inline-flex min-w-0 items-center gap-1" title={text}>
+          <ImageIcon className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate font-mono text-xs">{truncate(text)}</span>
+        </span>
+      );
+    }
+
     default: {
       // `text`, `email`, `url` and anything else text-indexed: truncate for
       // the table, keep the full value reachable via `title`.
       const text = String(value);
-      const truncated = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-      return <span title={text}>{truncated}</span>;
+      return <span title={text}>{truncate(text)}</span>;
     }
   }
 }

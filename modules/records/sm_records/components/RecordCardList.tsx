@@ -3,19 +3,23 @@ import { useT } from '@simple-module-py/i18n';
 import { Fragment } from 'react';
 
 import type { RecordSelection } from '../hooks/useRecordSelection';
-import { listColumns } from '../utils/listing';
+import { type ListColumn, resolveListColumns } from '../utils/listing';
 import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
-import { formatDateTime } from '../utils/values';
-import { RecordCell } from './RecordCell';
+import {
+  ColumnValue,
+  displayedColumns,
+  envelopeLabel,
+  RecordFlagBadges,
+} from './RecordColumnCells';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
-import {
-  InvalidBadge,
-  RecordLocaleBadge,
-  RecordStatusBadge,
-  SchemaStaleBadge,
-} from './RecordStatusBadge';
+import { RecordLocaleBadge, RecordStatusBadge } from './RecordStatusBadge';
+
+/** How many of the chosen columns a card lists under its title. A card is a
+ *  phone's whole width; eight label/value lines per record turned a page of
+ *  twenty-five into a scroll of two hundred lines. */
+export const CARD_COLUMNS = 3;
 
 /**
  * The record list below `md` (UX-R4, breakpoint raised from `sm` by U8): one
@@ -36,13 +40,16 @@ import {
  * `md`, or at 200% zoom, ticking twenty-five rows one at a time was the only
  * way in. A small header above the cards mirrors it, rendered only when a
  * `selection` was actually given (the same gate every tick box here uses).
+ *
+ * Columns: Status and Language are badges beside the title when chosen (the
+ * Invalid/stale markers always are); the first `CARD_COLUMNS` of the other
+ * chosen columns, in the chosen order, are the card's label/value lines.
  */
 export function RecordCardList({
   type,
   records,
   trashed = false,
-  showLocale = false,
-  showPosition = false,
+  columns,
   selection,
   onDelete,
   onRestore,
@@ -53,16 +60,25 @@ export function RecordCardList({
   /** Same contract as `RecordTable`'s: absent means no tick boxes at all. */
   selection?: RecordSelection;
   trashed?: boolean;
-  showLocale?: boolean;
-  /** Some row on this page has a non-zero `position` (UX-R25) — otherwise
-   *  the meta line spends a row on a zero every record shares. */
-  showPosition?: boolean;
+  /** The columns this page displays (`RecordTable` passes them already
+   *  resolved and position-trimmed). Absent means the type's default. */
+  columns?: ListColumn[];
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
   onPurge: (record: RecordRead) => Promise<unknown>;
 }) {
   const { t } = useT();
-  const columns = listColumns(type);
+  const shown =
+    columns ??
+    displayedColumns(
+      resolveListColumns({ type, showLocale: false, raw: null, saved: null }),
+      records,
+    );
+  const showStatus = shown.some((column) => column.key === 'status');
+  const showLocale = shown.some((column) => column.key === 'locale');
+  const lines = shown
+    .filter((column) => column.key !== 'status' && column.key !== 'locale')
+    .slice(0, CARD_COLUMNS);
   return (
     <>
       {selection && (
@@ -112,9 +128,8 @@ export function RecordCardList({
                     {title}
                   </Link>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <RecordStatusBadge status={record.status} />
-                    {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
-                    {record.schema_stale && <SchemaStaleBadge />}
+                    {showStatus && <RecordStatusBadge status={record.status} />}
+                    <RecordFlagBadges record={record} />
                     {showLocale && <RecordLocaleBadge locale={record.locale} />}
                   </div>
                 </div>
@@ -131,38 +146,16 @@ export function RecordCardList({
                 </div>
               </div>
               <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {columns.map((field) => (
-                  <Fragment key={field.key}>
-                    <dt className="font-medium">{field.label}</dt>
-                    <dd className="min-w-0 break-words">
-                      <RecordCell
-                        field={field}
-                        value={record.data[field.key]}
-                        expanded={record.expanded?.[field.key] ?? undefined}
-                      />
+                {lines.map((column) => (
+                  <Fragment key={column.key}>
+                    <dt className="font-medium">
+                      {column.kind === 'field' ? column.field.label : envelopeLabel(t, column.key)}
+                    </dt>
+                    <dd className="min-w-0 break-words" data-column={column.key}>
+                      <ColumnValue column={column} record={record} />
                     </dd>
                   </Fragment>
                 ))}
-                {showPosition && (
-                  <>
-                    <dt className="font-medium">
-                      {t('records.records.position', { defaultValue: 'Position' })}
-                    </dt>
-                    <dd>{record.position}</dd>
-                  </>
-                )}
-                {record.published_at && (
-                  <>
-                    <dt className="font-medium">
-                      {t('records.records.published_at', { defaultValue: 'Published on' })}
-                    </dt>
-                    <dd>{formatDateTime(record.published_at)}</dd>
-                  </>
-                )}
-                <dt className="font-medium">
-                  {t('records.records.updated_at', { defaultValue: 'Updated' })}
-                </dt>
-                <dd>{formatDateTime(record.updated_at ?? record.created_at)}</dd>
               </dl>
             </li>
           );

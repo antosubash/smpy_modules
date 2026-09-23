@@ -10,25 +10,19 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { RecordSelection } from '../hooks/useRecordSelection';
-import { listColumns, type SortState } from '../utils/listing';
+import { type ResolvedColumns, resolveListColumns, type SortState } from '../utils/listing';
 import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
-import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCardList } from './RecordCardList';
-import { RecordCell } from './RecordCell';
+import { ColumnHeader, ColumnValue, displayedColumns, RecordFlagBadges } from './RecordColumnCells';
 import { RecordRowAction } from './RecordRowAction';
 import { RecordSelectAllCell, RecordSelectCell } from './RecordSelectCell';
-import {
-  InvalidBadge,
-  RecordLocaleBadge,
-  RecordStatusBadge,
-  SchemaStaleBadge,
-} from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
 
-/** U6: `listColumns` is silent by design when a type has no indexed field —
- *  the table then shows only Title and Status, and nothing on the list
- *  screen said why until this. Rendered under the table/cards either way,
+/** U6: the default columns are silent by design when a type has no indexed
+ *  field — the table then shows only Title and Status, and nothing on the
+ *  list screen said why until this. Only for the default view: a view that
+ *  chose its own columns already knows what it asked for. Rendered under the table/cards either way,
  *  linking straight to the field editor rather than making the operator
  *  find their own way to "Indexed". */
 function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
@@ -48,11 +42,11 @@ function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
 }
 
 /**
- * The record list's table: `display_title`, the type's first four indexed
- * fields as columns (design doc §7.2 — only an indexed field is worth a
- * column, since only an indexed field can be sorted or filtered on),
- * `position`/`published_at`/`updated_at` and actions. Split out of
- * `RecordList` to keep that page under the 300-line cap.
+ * The record list's table: the tick box, `display_title`, the chosen
+ * `columns` in their chosen order (`resolveListColumns` — by default the
+ * pre-chooser table: Status, the first four indexed fields, Position,
+ * Published on, Updated) and Actions. Tick box, Title and Actions are fixed.
+ * Split out of `RecordList` to keep that page under the 300-line cap.
  *
  * Below `md` the same records render as stacked cards instead (UX-R4; the
  * breakpoint was `sm` until U8): a table of eight `whitespace-nowrap`
@@ -72,6 +66,7 @@ export function RecordTable({
   sort,
   trashed = false,
   showLocale = false,
+  columns,
   selection,
   onSort,
   onDelete,
@@ -93,6 +88,9 @@ export function RecordTable({
    *  locale — an editor's question is "what exists", not "what exists in
    *  English" (design §4.4), hence a column rather than a filtered default. */
   showLocale?: boolean;
+  /** The resolved column choice (`RecordList` owns the URL/saved state).
+   *  Absent means the default columns for `type`/`showLocale`. */
+  columns?: ResolvedColumns;
   onSort: (field: string) => void;
   onDelete: (record: RecordRead) => Promise<unknown>;
   onRestore: (record: RecordRead) => Promise<unknown>;
@@ -100,11 +98,11 @@ export function RecordTable({
 }) {
   const { t } = useT();
   const narrow = useIsNarrow();
-  const columns = listColumns(type);
-  // `position` is 0 on every record of every type that never set it, which
-  // is most of them — a column of zeroes on a table that is already too wide
-  // (UX-R25). Sorting by it stays reachable through the URL.
-  const showPosition = records.some((record) => record.position !== 0);
+  const resolved = columns ?? resolveListColumns({ type, showLocale, raw: null, saved: null });
+  const shown = displayedColumns(resolved, records);
+  const showStatus = shown.some((column) => column.key === 'status');
+  const noIndexedNotice =
+    resolved.source === 'default' && !shown.some((column) => column.kind === 'field');
   // A field named "Title" would otherwise share the display-title column's
   // accessible name (UX-12) — disambiguate only that collision.
   const titleLabel = t('records.records.display_title', { defaultValue: 'Title' });
@@ -117,13 +115,12 @@ export function RecordTable({
           records={records}
           selection={selection}
           trashed={trashed}
-          showLocale={showLocale}
-          showPosition={showPosition}
+          columns={shown}
           onDelete={onDelete}
           onRestore={onRestore}
           onPurge={onPurge}
         />
-        {columns.length === 0 && <NoIndexedColumnsNotice typeKey={type.key} />}
+        {noIndexedNotice && <NoIndexedColumnsNotice typeKey={type.key} />}
       </>
     );
   }
@@ -142,56 +139,16 @@ export function RecordTable({
                 />
               </TableHead>
             )}
-            <SortableHeader
-              field="display_title"
-              label={t('records.records.display_title', { defaultValue: 'Title' })}
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableHeader
-              field="status"
-              label={t('records.records.status', { defaultValue: 'Status' })}
-              sort={sort}
-              onSort={onSort}
-            />
-            {showLocale && (
-              <SortableHeader
-                field="locale"
-                label={t('records.records.locale', { defaultValue: 'Language' })}
+            <SortableHeader field="display_title" label={titleLabel} sort={sort} onSort={onSort} />
+            {shown.map((column) => (
+              <ColumnHeader
+                key={column.key}
+                column={column}
                 sort={sort}
                 onSort={onSort}
-              />
-            )}
-            {columns.map((field) => (
-              <SortableHeader
-                key={field.key}
-                field={field.key}
-                label={field.label}
-                sort={sort}
-                onSort={onSort}
-                ariaLabel={field.label === titleLabel ? `${field.label} (${field.key})` : undefined}
+                titleLabel={titleLabel}
               />
             ))}
-            {showPosition && (
-              <SortableHeader
-                field="position"
-                label={t('records.records.position', { defaultValue: 'Position' })}
-                sort={sort}
-                onSort={onSort}
-              />
-            )}
-            <SortableHeader
-              field="published_at"
-              label={t('records.records.published_at', { defaultValue: 'Published on' })}
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableHeader
-              field="updated_at"
-              label={t('records.records.updated_at', { defaultValue: 'Updated' })}
-              sort={sort}
-              onSort={onSort}
-            />
             <TableHead className="text-right">
               {t('records.records.actions', { defaultValue: 'Actions' })}
             </TableHead>
@@ -226,37 +183,20 @@ export function RecordTable({
                   >
                     {title}
                   </Link>
+                  {!showStatus && (record.invalid_since || record.schema_stale) && (
+                    <span className="ml-2 inline-flex flex-wrap items-center gap-1.5 align-middle">
+                      <RecordFlagBadges record={record} />
+                    </span>
+                  )}
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <RecordStatusBadge status={record.status} />
-                    {record.invalid_since && <InvalidBadge since={record.invalid_since} />}
-                    {record.schema_stale && <SchemaStaleBadge />}
-                  </div>
-                </TableCell>
-                {showLocale && (
-                  <TableCell>
-                    <RecordLocaleBadge locale={record.locale} />
-                  </TableCell>
-                )}
-                {columns.map((field) => (
-                  <TableCell key={field.key} className="text-muted-foreground">
-                    <RecordCell
-                      field={field}
-                      value={record.data[field.key]}
-                      expanded={record.expanded?.[field.key] ?? undefined}
-                    />
+                {shown.map((column) => (
+                  <TableCell
+                    key={column.key}
+                    className={column.key === 'status' ? undefined : 'text-muted-foreground'}
+                  >
+                    <ColumnValue column={column} record={record} />
                   </TableCell>
                 ))}
-                {showPosition && (
-                  <TableCell className="text-muted-foreground">{record.position}</TableCell>
-                )}
-                <TableCell className="text-muted-foreground">
-                  {record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDateTime(record.updated_at ?? record.created_at)}
-                </TableCell>
                 <TableCell className="text-right">
                   <RecordRowAction
                     typeKey={type.key}
@@ -273,7 +213,7 @@ export function RecordTable({
           })}
         </TableBody>
       </Table>
-      {columns.length === 0 && <NoIndexedColumnsNotice typeKey={type.key} />}
+      {noIndexedNotice && <NoIndexedColumnsNotice typeKey={type.key} />}
     </>
   );
 }
