@@ -64,9 +64,10 @@ function Thumbnail({
  *  F7). The editor's chip (`field`) still wraps: it has the room. */
 export const CELL_CLIP = 'block truncate';
 
-/** A value saved before the picker existed — a plain `http(s)` URL — as a
- *  link, whether or not the host has a media library to ask about ids.
- *  `full` is the editor's; a cell clips it (the `title` has it all). */
+/** A value that is already a usable address — a plain `http(s)` URL saved
+ *  before the picker existed, or a `/`-rooted path — as a link, whether or
+ *  not the host has a media library to ask about ids. `full` is the editor's;
+ *  a cell clips it (the `title` has it all). */
 export function MediaUrlLink({ url, full }: { url: string; full: boolean }) {
   return (
     <a
@@ -98,10 +99,12 @@ export function MediaFacts({ file }: { file: MediaFile }) {
 }
 
 /**
- * A stored `media` value, shown as what it names: a thumbnail for an image, a
- * file icon and name otherwise, a link for a legacy URL, and "File missing"
- * for an id the library no longer has — with the id still visible, because it
- * is still the stored value and nothing here changes it.
+ * A stored `media` value, shown as what `mediaValueKind` says it is: a
+ * thumbnail for an image or a file icon and name otherwise once the library
+ * confirms a `file_storage` id, a link for a legacy URL or a `/`-rooted path,
+ * plain text for anything else (never looked up), and "File missing" only for
+ * an id-shaped value the library no longer has — with the id still visible,
+ * because it is still the stored value and nothing here changes it.
  *
  * `field` is the editor's chip (name, size, type, date beside a 6rem
  * thumbnail); `cell` is the list's 2.5rem thumbnail, or an icon and the name.
@@ -124,6 +127,18 @@ export function MediaPreview({
       return null;
     case 'url':
       return <MediaUrlLink url={state.url} full={field} />;
+    case 'path':
+      return <MediaUrlLink url={state.path} full={field} />;
+    case 'text':
+      return (
+        <span
+          className={`${field ? 'break-all' : CELL_CLIP} font-mono text-xs`}
+          title={state.value}
+          data-testid="records-media-text"
+        >
+          {state.value}
+        </span>
+      );
     case 'loading':
       return (
         <span

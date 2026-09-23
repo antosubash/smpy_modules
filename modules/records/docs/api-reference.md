@@ -362,12 +362,20 @@ file's id**: with the framework's `file_storage` module installed, the id
 `"3f0c6f8e-1d9b-4a57-9d7e-2c1b0f1e6a42"`). The file's address is not stored;
 a client derives it from the id — `GET /api/file-storage/files/{id}/download`
 on a stock host, the `file_url_template` the admin screens are handed (see
-[operations.md](operations.md#media-library)). A **plain `http(s)://` URL**
-saved before the picker existed stays a valid value, and the UI renders it as
-a link rather than looking it up. Deleting the file in the media library does
-not change any record: the id stays, and the UI shows it as **File missing**.
-Import and export treat the value as the text it is, so an id round-trips
-unchanged.
+[operations.md](operations.md#media-library)).
+
+The admin UI never asks the library about a value that is not shaped like one
+of its ids (a UUID, with or without hyphens): only that shape is looked up. A
+**plain `http(s)://` URL** saved before the picker existed stays a valid
+value and renders as a link rather than being looked up. A **`/`-rooted
+path** renders as a link too (a relative one), used as-is. Anything else —
+free-form data from before the picker existed, or a seed/import that never
+went through it, such as `"media/products/sku.png"` — renders as plain text,
+also never looked up. Only an id-shaped value the library reports missing for
+shows **File missing**; deleting the file in the media library does not
+change any record, so the id stays and the UI shows that state instead.
+Import and export treat the value as the text it is either way, so any of the
+above round-trips unchanged.
 
 ### `PUT /api/records/types/{key}` → `TypeRead`
 

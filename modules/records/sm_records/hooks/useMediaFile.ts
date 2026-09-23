@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getMediaFile, isUrlValue, type MediaApi, type MediaFile } from '../utils/media-api';
+import { getMediaFile, type MediaApi, type MediaFile, mediaValueKind } from '../utils/media-api';
 
 /** What a stored `media` value turned out to be, once looked up. */
 export type MediaFileState =
@@ -8,17 +8,32 @@ export type MediaFileState =
   | { status: 'empty' }
   /** A plain `https://` URL saved before the picker existed — never looked up. */
   | { status: 'url'; url: string }
+  /** A `/`-rooted value — already a usable address, a relative link, never
+   *  looked up. */
+  | { status: 'path'; path: string }
+  /** Anything else: legacy or seeded data that was never a `file_storage`
+   *  id, shown as the plain text it is — never looked up, never "missing". */
+  | { status: 'text'; value: string }
   | { status: 'loading' }
   | { status: 'ready'; file: MediaFile }
-  /** The library has no such file: deleted since it was picked, or a value
-   *  that was never one of its ids. The value is kept as it is. */
+  /** The library has no such id: deleted since it was picked. Only an
+   *  id-shaped value ever reaches this state — see `mediaValueKind`. */
   | { status: 'missing' }
   | { status: 'error'; message: string };
 
 function initial(api: MediaApi | null, value: string): MediaFileState {
   if (!value) return { status: 'empty' };
-  if (isUrlValue(value)) return { status: 'url', url: value };
-  return api ? { status: 'loading' } : { status: 'empty' };
+  const trimmed = value.trim();
+  switch (mediaValueKind(trimmed)) {
+    case 'url':
+      return { status: 'url', url: trimmed };
+    case 'path':
+      return { status: 'path', path: trimmed };
+    case 'text':
+      return { status: 'text', value: trimmed };
+    case 'id':
+      return api ? { status: 'loading' } : { status: 'empty' };
+  }
 }
 
 /**

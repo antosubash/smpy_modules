@@ -146,6 +146,46 @@ describe('the media cell', () => {
     await raw.unmount();
   });
 
+  it('a legacy URL, a rooted path or free text is never looked up, only an id is — even with a library', async () => {
+    // Review: seeded/imported data (`sm_records.cli.seed`) writes path-like
+    // values such as `media/products/x.png`, which are neither an id nor a
+    // URL. Asking the library about one used to 404 and paint the whole
+    // column red with "File missing" for data that was simply never
+    // library-managed.
+    const fetchMock = stubLibrary([PHOTO]);
+
+    const url = await mount(cell('https://cdn.example.com/a.png', true));
+    await flush();
+    expect(url.find('[data-testid="records-media-url"]')?.getAttribute('href')).toBe(
+      'https://cdn.example.com/a.png',
+    );
+    await url.unmount();
+
+    const path = await mount(cell('/static/x.png', true));
+    await flush();
+    const pathLink = path.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
+    expect(pathLink?.getAttribute('href')).toBe('/static/x.png');
+    await path.unmount();
+
+    const text = await mount(cell('media/products/x.png', true));
+    await flush();
+    const raw = text.find('[data-testid="records-media-text"]');
+    expect(raw?.textContent).toBe('media/products/x.png');
+    expect(raw?.getAttribute('title')).toBe('media/products/x.png');
+    expect(text.find('[data-testid="records-media-missing"]')).toBeNull();
+    await text.unmount();
+
+    // Not one request went to the library for any of the three above.
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // A real id still resolves normally.
+    const id = await mount(cell(PHOTO.id, true));
+    await flush();
+    expect(id.find('[data-testid="records-media-thumbnail"]')).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await id.unmount();
+  });
+
   it('shows the empty dash for no value', async () => {
     const view = await mount(cell(null, true));
     expect(view.host.textContent).toBe('—');

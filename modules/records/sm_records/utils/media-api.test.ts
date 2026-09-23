@@ -8,6 +8,7 @@ import {
   getMediaFile,
   isUrlValue,
   listMediaFiles,
+  mediaValueKind,
   uploadMediaFile,
 } from './media-api';
 import { API, FakeXhr, json, MANUAL, PHOTO, stubLibrary, stubXhr } from './media-test-support';
@@ -26,6 +27,24 @@ describe('media values', () => {
     expect(isUrlValue('https://cdn.example.com/a.png')).toBe(true);
     expect(isUrlValue(PHOTO.id)).toBe(false);
     expect(isUrlValue('media/products/sku-000001.jpg')).toBe(false);
+  });
+
+  it('only calls a UUID an id — with or without hyphens — never anything else', () => {
+    // The four shapes a stored `media` value can take (docs/api-reference.md
+    // § media values): a UUID, an `https://` URL, a `/`-rooted path, and
+    // free-form legacy/seeded text that is none of those (the defect: this
+    // last one used to be treated as an id and 404 as "File missing").
+    expect(mediaValueKind(PHOTO.id)).toBe('id');
+    expect(mediaValueKind(PHOTO.id.replaceAll('-', ''))).toBe('id');
+    expect(mediaValueKind(PHOTO.id.toUpperCase())).toBe('id');
+    expect(mediaValueKind('  ' + PHOTO.id + '  ')).toBe('id');
+    expect(mediaValueKind('https://cdn.example.com/a.png')).toBe('url');
+    expect(mediaValueKind('/static/x.png')).toBe('path');
+    expect(mediaValueKind('media/products/sku-000001.jpg')).toBe('text');
+    // Not id-shaped: wrong length, and hyphens in the wrong places.
+    expect(mediaValueKind('11111111-1111-4111-8111-11111111111')).toBe('text');
+    expect(mediaValueKind('1111111-11111-4111-8111-111111111111')).toBe('text');
+    expect(mediaValueKind('')).toBe('text');
   });
 
   it('formats sizes with the viewer locale supplying the unit', () => {

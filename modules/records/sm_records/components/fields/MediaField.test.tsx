@@ -126,6 +126,31 @@ describe('MediaField with a media library', () => {
     await view.unmount();
   });
 
+  it('renders a rooted path as a relative link and never looks it up', async () => {
+    const fetchMock = stubLibrary([]);
+    const view = await mount(picker('/static/products/x.png'));
+    await flush();
+    const link = view.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
+    expect(link?.getAttribute('href')).toBe('/static/products/x.png');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it('shows a value that is neither an id, a URL nor a path as text — never looked up, never "missing" — with Replace/Remove still offered', async () => {
+    // Seeded/legacy data (`sm_records.cli.seed`) writes values like this.
+    const fetchMock = stubLibrary([]);
+    const view = await mount(picker('media/products/x.png'));
+    await flush();
+    const text = view.find('[data-testid="records-media-text"]');
+    expect(text?.textContent).toBe('media/products/x.png');
+    expect(text?.getAttribute('title')).toBe('media/products/x.png');
+    expect(view.find('[data-testid="records-media-missing"]')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(view.button('Replace…')).toBeTruthy();
+    expect(view.button('Remove')).toBeTruthy();
+    await view.unmount();
+  });
+
   it('Remove clears the value', async () => {
     stubLibrary([PHOTO]);
     const onChange = vi.fn();

@@ -17,6 +17,7 @@
  * reason to fork it.
  */
 
+import { mediaValueKind } from '../../utils/media-api';
 import type { FieldMetaEntry } from './types';
 
 const DASH = '—';
@@ -145,20 +146,28 @@ export function buildRecordHref(
 /** The `src` for a `media` value on the public page, or `null` for "render
  *  nothing".
  *
- *  Only ever built from `media_url_template`, which the anonymous read API
- *  sends only when the host's media library serves files to a visitor with no
- *  session (`sm_records.media.public_file_url_template`). The framework
+ *  Only a `file_storage`-id-shaped value (`mediaValueKind`) is ever built
+ *  from `media_url_template`, which the anonymous read API sends only when
+ *  the host's media library serves files to a visitor with no session
+ *  (`sm_records.media.public_file_url_template`). The framework
  *  `file_storage` module does not — it exempts no route from authentication
  *  and its download also demands `file_storage.download` — so on a stock host
- *  the template is `null` and a media field renders nothing: an `<img>` of a
- *  URL that answers a visitor with a 401 is a broken-image icon, and printing
- *  the stored id is noise. A legacy `https://` value is not rendered either:
- *  it is whatever an editor pasted, and a public page is not the place to
- *  find out what that was. */
+ *  the template is `null` and an id-shaped value renders nothing: an `<img>`
+ *  of a URL that answers a visitor with a 401 is a broken-image icon, and
+ *  printing the stored id is noise. A legacy `https://` value is not
+ *  rendered either: it is whatever an editor pasted, and a public page is not
+ *  the place to find out what that was. A `/`-rooted value is already a
+ *  usable address on this host, so it is used as the `src` directly, with no
+ *  template and no library needed. Anything else — free-form legacy or
+ *  seeded data that was never an id, a URL or a path — renders nothing rather
+ *  than guessing it is an id and asking a template to resolve it. */
 export function publicMediaSrc(value: unknown, template: string | null | undefined): string | null {
-  if (!template || typeof value !== 'string') return null;
-  const id = value.trim();
-  if (!id || /^[a-z][a-z0-9+.-]*:/i.test(id)) return null;
-  const src = template.split('{id}').join(encodeURIComponent(id));
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const kind = mediaValueKind(trimmed);
+  if (kind === 'path') return safeHref(trimmed) ? trimmed : null;
+  if (kind !== 'id' || !template) return null;
+  const src = template.split('{id}').join(encodeURIComponent(trimmed));
   return safeHref(src) ? src : null;
 }

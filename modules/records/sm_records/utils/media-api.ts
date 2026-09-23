@@ -15,6 +15,14 @@
  * library moved behind a new prefix does not strand every stored value. A
  * value saved before the picker existed may still be a plain `https://` URL,
  * and stays valid — it renders as a link (`isUrlValue`).
+ *
+ * **Only a value shaped like that id is ever looked up.** A `media` field
+ * accepts any string up to 500 characters (`_check_media` — "an opaque id or
+ * URL"), and older or seeded data (`cli.py`'s `seed`) can hold path-like
+ * values, neither an id nor a URL. Asking the library about one of those is a
+ * guaranteed 404/422 — "File missing" for a whole column of legitimate
+ * legacy data. `mediaValueKind` decides what a value is, so the cell, the
+ * editor's chip and the pagebuilder widget agree: only `'id'` is looked up.
  */
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
@@ -65,6 +73,37 @@ export function fileUrl(api: MediaApi, id: string): string {
  *  box. Rendered as a link, never looked up as an id. */
 export function isUrlValue(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
+}
+
+/** `file_storage`'s id (`models.py`'s `uuid.UUID` primary key), either in its
+ *  canonical hyphenated form (what the picker stores — `str(uuid.UUID(...))`)
+ *  or the bare 32 hex digits FastAPI's own `uuid.UUID` path converter also
+ *  accepts. Nothing else counts, even a string that merely contains hex
+ *  characters. */
+const UUID_RE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i;
+
+export type MediaValueKind = 'id' | 'url' | 'path' | 'text';
+
+/**
+ * What a stored `media` value names — the single rule every renderer of one
+ * (the list cell, the editor's chip, the pagebuilder widget) applies so only
+ * a real file-library id is ever asked about:
+ *
+ * - `'id'` — a `file_storage` UUID (`UUID_RE`): look it up.
+ * - `'url'` — a plain `http(s)://` address saved before the picker existed:
+ *   a link, never looked up.
+ * - `'path'` — a `/`-rooted value: already a usable address on this host, a
+ *   link (a relative one), never looked up.
+ * - `'text'` — anything else (an import row's `media/products/x.png`, or any
+ *   other free-form legacy value): plain text, never looked up, never a red
+ *   "File missing" for data that was simply never library-managed.
+ */
+export function mediaValueKind(value: string): MediaValueKind {
+  const trimmed = value.trim();
+  if (isUrlValue(trimmed)) return 'url';
+  if (UUID_RE.test(trimmed)) return 'id';
+  if (trimmed.startsWith('/')) return 'path';
+  return 'text';
 }
 
 export function isImage(file: Pick<MediaFile, 'content_type'>): boolean {

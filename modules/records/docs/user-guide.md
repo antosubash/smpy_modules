@@ -280,13 +280,17 @@ page has a non-zero position), **Published on**, **Updated** and **Actions**.
 The `media` column is there so a list of products or photos can be scanned by
 picture; otherwise it is a column like any other — the **Columns** menu can
 hide it, move it, or show a type's other `media` fields as well. Its header
-does not sort, since a `media` field cannot be indexed. It shows a small
-thumbnail for an image, a file icon and the file name for anything else,
-**File missing** for a file that has since been deleted from the media
-library, and a link for a full URL saved before the picker existed. On an
-install with no media library the column is not in the default view (the
-**Columns** menu still offers it): it shows the stored id as text, or the
-link for a URL.
+does not sort, since a `media` field cannot be indexed. Only a value shaped
+like a media library file id (a UUID) is ever looked up: it shows a small
+thumbnail for an image, a file icon and the file name for anything else, and
+**File missing** for an id-shaped value the library has since lost the file
+for. A full URL saved before the picker existed, or a `/`-rooted path, shows
+as a link (the latter a relative one) — neither is looked up. Anything
+else — data from before the picker existed, or a seed/import that never went
+through it — shows as plain text, also never looked up: it is simply not
+library-managed, not a broken file. On an install with no media library the
+column is not in the default view (the **Columns** menu still offers it): it
+shows the same text-or-link distinction, just without the lookup either way.
 
 A field labelled like one of the record's own columns — a field called
 "Status" beside the record's **Status** — shows its key after the label in
@@ -727,14 +731,23 @@ record.
 
 What the record stores is the file's **id**, not its address.
 
-**If the file is later deleted in the media library**, the record is not
-touched: the field shows **File missing** with the id underneath and *"This
-file is no longer in the media library. The record keeps its id until you
-choose another file or remove it."* The list shows **File missing** in the
-column too. Pick another file with **Replace…**, or **Remove** it.
+**Only a value shaped like that id (a UUID) is ever looked up in the media
+library** — the chip above, and the list's `media` column, apply the same
+rule:
 
-A value saved before the picker existed — a full `https://` address — still
-works and shows as a link.
+- A value that looks like a library id is asked about, and shown as above.
+- **If the file is later deleted in the media library**, the record is not
+  touched: the field shows **File missing** with the id underneath and *"This
+  file is no longer in the media library. The record keeps its id until you
+  choose another file or remove it."* The list shows **File missing** in the
+  column too. Pick another file with **Replace…**, or **Remove** it.
+- A value saved before the picker existed — a full `https://` address, or a
+  `/`-rooted path — is never looked up; it shows as a link (the path as a
+  relative one).
+- Anything else — a value from before the picker existed, or a record seeded
+  or imported without going through it (such as `media/products/sku.png`) —
+  is never looked up either, and shows as plain text. This is not an error:
+  **Replace…** and **Remove** still work on it, exactly as on a chosen file.
 
 On a site with **no media library**, a `media` field is a text box: paste the
 file's id or its full URL (*"The media library id or the full URL of an

@@ -35,18 +35,34 @@ describe('publicMediaSrc — only a URL a visitor can load', () => {
     expect(publicMediaSrc(ID, undefined)).toBeNull();
   });
 
-  it('never renders a legacy URL or a scheme, and escapes the id', () => {
+  it('never renders a legacy URL or a scheme', () => {
     expect(publicMediaSrc('https://cdn.example.com/a.png', TEMPLATE)).toBeNull();
     expect(publicMediaSrc('javascript:alert(1)', TEMPLATE)).toBeNull();
     expect(publicMediaSrc('', TEMPLATE)).toBeNull();
     expect(publicMediaSrc(42, TEMPLATE)).toBeNull();
-    expect(publicMediaSrc('a/../../admin', TEMPLATE)).toBe(
-      '/api/file-storage/files/a%2F..%2F..%2Fadmin/download',
-    );
   });
 
   it('refuses a template that would leave the site', () => {
     expect(publicMediaSrc(ID, '//evil.example/{id}')).toBeNull();
+  });
+
+  // Only an id-shaped value is ever templated (mediaValueKind): a value that
+  // merely *looks* path-traversal-y, like everything else that is not an id,
+  // a URL or a rooted path, is never looked up at all — review 4's escaping
+  // of `a/../../admin` into the template no longer applies because the value
+  // never reaches the template in the first place.
+  it("renders nothing for a value that isn't a file id, a URL or a rooted path", () => {
+    expect(publicMediaSrc('a/../../admin', TEMPLATE)).toBeNull();
+    expect(publicMediaSrc('media/products/sku-000001.jpg', TEMPLATE)).toBeNull();
+  });
+
+  it('uses a `/`-rooted value directly as the src, with no template needed', () => {
+    expect(publicMediaSrc('/static/products/sku-000001.jpg', TEMPLATE)).toBe(
+      '/static/products/sku-000001.jpg',
+    );
+    expect(publicMediaSrc('/static/x.png', null)).toBe('/static/x.png');
+    // Still subject to the same safe-address check as everything else here.
+    expect(publicMediaSrc('//evil.example/x.png', TEMPLATE)).toBeNull();
   });
 });
 
