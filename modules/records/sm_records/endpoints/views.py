@@ -36,6 +36,7 @@ from sm_records.endpoints import _list_view, views_types
 from sm_records.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import Filter, Sort
+from sm_records.media import media_props
 from sm_records.models import RecordType
 from sm_records.services import _relations
 from sm_records.services import expand as expand_service
@@ -72,6 +73,7 @@ def _locale_props(settings: RecordsSettings) -> dict[str, object]:
 
 @router.get("/{key}/new", response_model=None)
 async def record_new(
+    request: Request,
     inertia: InertiaDep,
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
@@ -91,6 +93,7 @@ async def record_new(
             "type": type_read(rtype, *counts).model_dump(mode="json"),
             "record": None,
             "translations": [],
+            "media_api": media_props(request),
             **_locale_props(settings),
         },
     )
@@ -162,6 +165,9 @@ async def record_edit(
             ).model_dump(mode="json"),
             "translations": [item.model_dump(mode="json") for item in translations],
             "referrer_count": await _relations.referrer_count(db, record),
+            # Where the ``media`` picker lists and uploads (:mod:`sm_records.media`),
+            # or ``None`` for the plain text box. Also on the new-record screen.
+            "media_api": media_props(request),
             **_locale_props(settings),
         },
     )
@@ -254,6 +260,8 @@ async def record_list(
         # schema". Same DB-backed setting, same reason the browser can't
         # derive it on its own.
         "public_route_prefix": settings.public_route_prefix,
+        # The ``media`` column's thumbnails resolve ids through it.
+        "media_api": media_props(request),
         # No default locale filter anywhere above: the admin list defaults to
         # **all** locales (§4.4), because an editor's question is "what
         # exists", not "what exists in English". The selector narrows it with

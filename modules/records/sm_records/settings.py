@@ -13,13 +13,18 @@ read routes it configures are mounted from ``on_startup`` — after hydration,
 the first point at which the prefix is known, and long after the router table
 would otherwise be built (see :mod:`sm_records.boot`).
 
-``content_locales`` and ``default_content_locale`` carry it too, and those
-three are the whole ``requires_restart`` set below — the README's settings
-table lists the same three. Both locale values *are* read per request, so
-screens follow an edit immediately; the flag is there because an edit changes
-what the install *publishes* rather than how a page renders. Records written
-in a dropped locale stay written, the public API stops serving them, and they
-are counted at startup and only there (:mod:`sm_records.health`).
+``content_locales`` and ``default_content_locale`` carry it too. Both locale
+values *are* read per request, so screens follow an edit immediately; the flag
+is there because an edit changes what the install *publishes* rather than how
+a page renders. Records written in a dropped locale stay written, the public
+API stops serving them, and they are counted at startup and only there
+(:mod:`sm_records.health`).
+
+``media_api_prefix`` is the fourth: the media backend the ``media`` field
+picker talks to is chosen once, from ``on_startup`` (:mod:`sm_records.media`).
+Those four are the whole ``requires_restart`` set, and they are declared on
+the base class :class:`~sm_records.settings_boot.BootSettings` — the README's
+settings table lists the same four.
 
 Everything else is read per request and takes effect on save. The cross-field
 checks, and the page-size clamp, live in :mod:`sm_records.settings_checks`.
@@ -27,84 +32,26 @@ checks, and the page-size clamp, live in :mod:`sm_records.settings_checks`.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
 
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from sm_records import constants
+from sm_records.settings_boot import BootSettings
 from sm_records.settings_checks import (
     DEFAULT_PUBLIC_ROUTE_PREFIX,
-    StoredSourcesOnly,
-    check_content_locales,
     check_limits,
     check_public_route_prefix,
     clamp_page_size,
 )
 
-_RESTART: Final[dict[str, Any]] = {"requires_restart": True}
-"""Marks a field the module reads once, while booting. See the module docstring."""
+__all__ = ["DEFAULT_PUBLIC_ROUTE_PREFIX", "RecordsSettings", "check_public_route_prefix"]
 
 
-class RecordsSettings(StoredSourcesOnly, BaseSettings):
+class RecordsSettings(BootSettings):
     # ``use_attribute_docstrings`` puts the prose under each field on the
     # Settings screen: the admin UI renders ``FieldInfo.description``, and
     # without this every field would arrive there unexplained while the
     # explanation sat in the source three lines below it.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
-
-    public_route_prefix: str = Field(
-        default=DEFAULT_PUBLIC_ROUTE_PREFIX, json_schema_extra=_RESTART
-    )
-    """URL prefix for the anonymous read API of public record types.
-
-    ``GET {prefix}/{type_key}`` and ``GET {prefix}/{type_key}/{uuid}`` serve the
-    published records of a type whose ``is_public`` is set, to callers with no
-    session at all (design §10). A type that is not public is a 404 on both,
-    indistinguishable from one that does not exist.
-
-    Read once, while booting: :mod:`sm_records.boot` mounts the router and
-    exempts the prefix from ``AuthMiddleware`` from ``on_startup``, so a new
-    value needs a restart — which is what ``requires_restart`` tells the
-    operator. The exemption is a prefix rule terminating in ``/``, so a value
-    sharing its first characters with the admin API (``/api/records``) is still
-    safe; a value that is a *parent* of it — or of ``/admin`` — is refused by
-    :func:`check_public_route_prefix`, as are ``/`` and a value with no leading
-    slash.
-    """
-
-    content_locales: tuple[str, ...] = Field(
-        default=(constants.DEFAULT_CONTENT_LOCALE,), json_schema_extra=_RESTART
-    )
-    """Languages a record may be authored in (Phase 5 §4.2).
-
-    Edited on the Settings screen as a JSON array — ``["en","de","fr"]``. A
-    single entry (the default) is what a monolingual install runs on and costs
-    it nothing: every record is in that locale, no type is translatable, and the
-    public API behaves as it did before there was such a thing as a language.
-
-    **Deliberately this module's own setting and not pagebuilder's.**
-    ``records`` must not depend on ``pagebuilder`` — it is published on its own
-    and a host may install either without the other — and the two may
-    legitimately publish in different language sets. A host that wants them
-    aligned sets both; the README says so. Distinct again from the host's
-    ``SM_I18N_SUPPORTED_LOCALES``, which decides what the *admin console*
-    speaks rather than what the content is published in.
-    """
-
-    default_content_locale: str = Field(
-        default=constants.DEFAULT_CONTENT_LOCALE, json_schema_extra=_RESTART
-    )
-    """The locale a record is in when the caller does not say.
-
-    Also the only locale a type that is not ``translatable`` accepts, and what
-    ``?locale=`` defaults to on the anonymous read API — absent means *this
-    language*, never "all", because an anonymous reader is asking for one site
-    (§4.4).
-
-    Must appear in :attr:`content_locales`; a mismatch is refused here rather
-    than 404ing every public read at the first request.
-    """
 
     default_page_size: int = 25
     """Page size for a list endpoint that receives no explicit ``limit``."""
@@ -277,20 +224,6 @@ class RecordsSettings(StoredSourcesOnly, BaseSettings):
     def clamp_page_size(self, requested: int | None) -> int:
         """See :func:`~sm_records.settings_checks.clamp_page_size`."""
         return clamp_page_size(self, requested)
-
-    @field_validator("public_route_prefix")
-    @classmethod
-    def _check_prefix(cls, value: str) -> str:
-        """Refuse a prefix that would exempt the admin surface — or the whole
-        host — from ``AuthMiddleware``. See :func:`check_public_route_prefix`."""
-        return check_public_route_prefix(value)
-
-    @model_validator(mode="after")
-    def _check_locales(self) -> RecordsSettings:
-        """The three rules :mod:`sm_records.locales` then takes for granted —
-        see :func:`~sm_records.settings_checks.check_content_locales`."""
-        check_content_locales(self.content_locales, self.default_content_locale)
-        return self
 
     @model_validator(mode="after")
     def _check_limits(self) -> RecordsSettings:

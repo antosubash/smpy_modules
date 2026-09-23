@@ -255,6 +255,11 @@ class RecordsModule(ModuleBase):
         settings = self.settings or RecordsSettings()
         boot.mount_public_router(app, settings)
         boot.exempt_public_routes(app, settings)
+        # The media library the ``media`` picker calls, found by route shape
+        # (never by importing it) — :mod:`sm_records.media`. Same reason as above.
+        from sm_records import media
+
+        media.configure(app, settings.media_api_prefix)
 
         # Dropping a content locale is not refused at save (``settings_checks``
         # says why), so this is what makes the records left behind visible. Once

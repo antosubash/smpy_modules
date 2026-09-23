@@ -64,6 +64,7 @@ from sm_records.endpoints.api import _public_cache
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.endpoints.api._responses import PUBLIC_READ, responses
 from sm_records.index.query import CursorError, Filter, QueryError, Sort
+from sm_records.media import public_file_url_template
 from sm_records.services import public as public_service
 from sm_records.settings import RecordsSettings
 
@@ -183,6 +184,7 @@ async def list_public_records(
         next_cursor=result.next_cursor,
         page=page,
         page_size=settings.clamp_page_size(page_size),
+        media_url_template=public_file_url_template(request),
     )
     return _public_cache.apply(request, response, payload, settings) or payload
 

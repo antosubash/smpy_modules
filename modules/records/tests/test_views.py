@@ -79,6 +79,9 @@ async def test_record_list_view(client, records_app):
         # nowhere but the type editor — an admin landing on the list first
         # (the more common path) had no way to verify it from there.
         "public_route_prefix",
+        # Where a ``media`` column resolves its thumbnails — ``None`` in this
+        # harness, which mounts no media library (``tests/test_media.py``).
+        "media_api",
     }
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
@@ -104,7 +107,9 @@ async def test_record_new_view(client, records_app):
         "translations",
         "content_locales",
         "default_locale",
+        "media_api",
     }
+    assert body["props"]["media_api"] is None
     # Empty rather than absent: the record does not exist yet, so it has no
     # group — but the Languages panel reads one prop shape on both editor
     # screens, and an absent key would leave the previous page's on screen.

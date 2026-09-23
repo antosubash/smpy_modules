@@ -62,6 +62,13 @@ class PublicRecordPage(SQLModel):
     page_size: int
     total_capped: bool = False
     next_cursor: str | None = None
+    media_url_template: str | None = None
+    """How to render a ``media`` value on a public page: a URL with ``{id}`` in
+    it when the host's media library serves files to anonymous callers, and
+    ``null`` otherwise — which, with the framework ``file_storage`` module, is
+    always: it exempts none of its routes from authentication
+    (:mod:`sm_records.media`). ``null`` means "do not try": a stored id is not
+    a URL a visitor can load."""
 
 
 def public_record_read(

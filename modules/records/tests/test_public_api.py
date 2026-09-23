@@ -122,7 +122,10 @@ async def test_the_shape_carries_no_audit_or_status_columns(public_client):
         "next_cursor",
         "page",
         "page_size",
+        # ``null`` unless files are anonymous — see ``tests/test_media.py``.
+        "media_url_template",
     }
+    assert listed.json()["media_url_template"] is None
     assert set(listed.json()["items"][0]) == _PUBLIC_SHAPE
     for absent in ("version", "created_by", "updated_at", "status", "invalid", "expanded"):
         assert absent not in listed.json()["items"][0]

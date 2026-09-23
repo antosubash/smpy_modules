@@ -24,6 +24,7 @@ __all__ = [
     "DEFAULT_PUBLIC_ROUTE_PREFIX",
     "check_content_locales",
     "check_limits",
+    "check_media_api_prefix",
     "check_public_route_prefix",
 ]
 
@@ -82,6 +83,37 @@ def check_public_route_prefix(value: str) -> str:
                 "authentication would expose the admin surface to anonymous callers"
             )
     return value
+
+
+_MEDIA_PREFIX_RE: Final = re.compile(r"^(?:/[A-Za-z0-9._~!$&'()*+,;=:@%-]+)+/?$")
+"""A root-relative path: one or more ``/segment`` parts of RFC 3986 path
+characters, nothing else — no scheme, no host, no query, no fragment, no
+whitespace or backslash."""
+
+
+def check_media_api_prefix(value: str | None) -> str | None:
+    """The rule :attr:`~sm_records.settings.RecordsSettings.media_api_prefix`
+    must satisfy, normalised to no trailing ``/``.
+
+    ``None`` (detect) and ``""`` (off) pass through — a whitespace-only value
+    is the empty one, because that is what a cleared text box means. Anything
+    else must be a path on this host: the picker calls it from the browser
+    with the session cookie, so an absolute URL would either lose the cookie
+    or hand it to another origin, and a scheme-relative ``//host`` is an
+    absolute URL in disguise. The admin screens' CSP is the second reason:
+    ``connect-src`` is ``'self'`` unless a module widens it.
+    """
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return ""
+    if stripped.startswith("//") or not _MEDIA_PREFIX_RE.match(stripped):
+        raise ValueError(
+            "must be a path on this host starting with '/', such as '/api/file-storage' "
+            "— or null to detect it, or an empty string to turn the media picker off"
+        )
+    return stripped.rstrip("/")
 
 
 def check_content_locales(locales: Sequence[str], default_locale: str) -> None:
