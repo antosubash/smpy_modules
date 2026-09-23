@@ -635,6 +635,10 @@ setting alone does not install `TenantMiddleware`. From there:
   is set to — so using the widget on a host that renamed the header needs
   `SM_TENANT_HEADER=X-Tenant-ID` to match it, and a cross-origin embed
   sending it triggers a CORS preflight.
+- `/health/ready` needs no login, so records' detail there gives **counts
+  only** — no tenant, type, field or language names. The named detail is
+  logged at INFO by `sm_records.health`
+  ([operations](docs/operations.md#health-checks)).
 
 **`tenant_id` is now a reserved field key**, the same way `invalid` is: an
 install whose type already declares one answers `422` to every request that
@@ -1313,7 +1317,9 @@ Results of the last full Postgres run are in
 The rebuild normally runs as a background task right after the schema change.
 If a worker was restarted mid-way, the field stays in `reindex_pending` and
 `/health/ready` degrades once an entry is older than
-`reindex_stale_after_seconds`, naming the type (as `tenant/key`) and fields.
+`reindex_stale_after_seconds`, naming the type (as `tenant/key`) and fields —
+on a multi-tenant host the detail gives counts only and the names go to the
+`sm_records.health` log at INFO ([operations](docs/operations.md#health-checks)).
 Run it yourself from the repo root:
 
 ```

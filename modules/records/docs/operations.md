@@ -717,9 +717,29 @@ one hiding another. A fifth detail, on single-tenant hosts only, is
 informational and never degrades the check on its own (§5).
 
 The check reads **every tenant**, whatever tenant the `/health/ready` request
-itself was bound to. Each row it names carries its tenant: `tenant/key` for a
-type and `tenant/locale` for a language, and the invalid count is broken down
-per tenant.
+itself was bound to.
+
+**What the detail names depends on the mode.** `/health/ready` needs no login.
+
+- **Single-tenant host:** each row the detail names carries its tenant —
+  `tenant/key` for a type, `tenant/locale` for a language — and the invalid
+  count is broken down per tenant. The examples below are this form.
+- **Multi-tenant host:** the detail gives **counts only**, because a named
+  detail would tell any anonymous caller which tenants exist and what their
+  types and fields are called:
+
+  ```
+  reindex pending for longer than 900s: 2 type(s) across 2 tenant(s) — run `python -m sm_records.cli reindex`
+  reduce index disagrees with the records for 1 type(s) — run …
+  invalid_records: 12 across 2 tenant(s) — …
+  orphaned_locales: 12 record(s) across 1 tenant(s) — …
+  ```
+
+  The named sentence — the single-tenant form — is logged at **INFO** by the
+  `sm_records.health` logger as `records health (named, multi-tenant): …`, once
+  each time its wording changes rather than on every poll. Read it there, or
+  per tenant with `python -m sm_records.cli tenants` and the admin filters each
+  section gives.
 
 ### 1. A stale reindex
 

@@ -39,12 +39,21 @@ who drops a locale sees the count at the next restart. The README says so, and
 says how to list them meanwhile.
 
 **Every read here is across tenants** (tenancy design §A.5), through
-:func:`sm_records._cross_tenant.read_all`. The detail names each type as
-``tenant/key``, each orphaned locale as ``tenant/locale``, and gives the
-invalid count per tenant. Otherwise a multi-tenant operator would see a count
-with no way to find the rows behind it. On a multi-tenant host the check runs
-inside ``TenantMiddleware``, which binds whatever tenant a header names, and
-that binding must not narrow what the check reports.
+:func:`sm_records._cross_tenant.read_all`. On a multi-tenant host the check
+runs inside ``TenantMiddleware``, which binds whatever tenant a header names,
+and that binding must not narrow what the check reports.
+
+**What the detail may say depends on the mode.** ``/health/ready`` is mounted
+without auth. On a **single-tenant** host the detail names each type as
+``tenant/key`` with its fields, each orphaned locale as ``tenant/locale``, and
+the invalid count per tenant — there is one organisation, and the names are
+what an operator needs to find the rows. On a **multi-tenant** host that same
+sentence would tell any anonymous caller which tenants exist and what their
+types and fields are called — the cross-tenant oracle the isolation rules out
+everywhere else (review M2). So there the detail carries **counts only**
+("2 type(s) across 2 tenant(s)", "invalid_records: 1"), and the named sentence
+goes to this module's logger at INFO, once per change of wording rather than
+on every poll, where only an operator reads it.
 
 A fifth detail exists on a **single-tenant** host only: ``tenants_outside_default``.
 Such a host serves only ``default``. Rows in any other tenant were written by
@@ -68,6 +77,7 @@ worse than no check at all.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -101,6 +111,8 @@ __all__ = [
 ]
 
 CHECK_NAME = "records.reindex"
+
+logger = logging.getLogger(__name__)
 
 
 def _age_seconds(raw: object, now: datetime) -> float | None:
@@ -147,9 +159,9 @@ def _unique_keys(fields: object) -> set[str]:
     }
 
 
-def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
-    """``(descriptions, any unique field affected)``."""
-    out: list[str] = []
+def _stale(rows, limit: int, now: datetime) -> tuple[list[tuple[str, str]], bool]:
+    """``([(tenant, description)], any unique field affected)``."""
+    out: list[tuple[str, str]] = []
     blocked = False
     for tenant, key, pending, fields in rows:
         late = [
@@ -161,8 +173,55 @@ def _stale(rows, limit: int, now: datetime) -> tuple[list[str], bool]:
             if _unique_keys(fields) & set(late):
                 blocked = True
             names = ", ".join("whole type" if f == REINDEX_ALL else f for f in sorted(late))
-            out.append(f"{tenant}/{key} ({names})")
+            out.append((str(tenant), f"{tenant}/{key} ({names})"))
     return out, blocked
+
+
+def _stale_detail(limit: int, stale: list[tuple[str, str]], blocked: bool, named: bool) -> str:
+    if named:
+        what = "; ".join(description for _, description in stale)
+    else:
+        what = f"{len(stale)} type(s) across {len({t for t, _ in stale})} tenant(s)"
+    detail = (
+        f"reindex pending for longer than {limit}s: {what} — run `python -m sm_records.cli reindex`"
+    )
+    if blocked:
+        detail += (
+            "; a unique field is among them, so writes to this type are refused "
+            "until the rebuild completes"
+        )
+    return detail
+
+
+def _details(limit, stale, blocked, invalid, orphaned, *, named: bool) -> list[str]:
+    """The degrading details, named (single mode, the log) or counts only
+    (the multi-mode response) — see the module docstring."""
+    details: list[str] = []
+    if stale:
+        details.append(_stale_detail(limit, stale, blocked, named))
+    # Reported alongside rather than instead: a stale rebuild and a drifted
+    # aggregate are different faults with different fixes, and a check that
+    # showed only the first would hide the second for as long as any type
+    # had a marker set.
+    drift = drift_detail(named=named)
+    if drift is not None:
+        details.append(drift)
+    if invalid:
+        details.append(invalid_detail(invalid, named=named))
+    # Counted at startup and parked on the instance: see the module docstring
+    # for why it is not recounted on a settings edit.
+    if orphaned:
+        details.append(orphaned_detail(orphaned, named=named))
+    return details
+
+
+def _log_named(module: object, named: list[str]) -> None:
+    """The multi-mode names, for the operator: logged when the wording changes,
+    so a degraded host polled every few seconds does not log it every time."""
+    text = "; ".join(named)
+    if text and text != getattr(module, "health_logged", None):
+        logger.info("records health (named, multi-tenant): %s", text)
+    module.health_logged = text  # type: ignore[attr-defined]
 
 
 def stale_reindex_check(module: RecordsModule) -> HealthCheck:
@@ -181,36 +240,17 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
             # On the same session as the rows above: one connection checked
             # out per health poll, not two.
             invalid = await count_invalid_records(session)
+            multi = getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.MULTI
             outside = None
-            if getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.SINGLE:
+            if not multi:
                 outside = await outside_default(session, {str(row[0]) for row in rows})
         stale, blocked = _stale(rows, limit, now)
-        details: list[str] = []
-        if stale:
-            detail = (
-                f"reindex pending for longer than {limit}s: {'; '.join(stale)} — "
-                "run `python -m sm_records.cli reindex`"
-            )
-            if blocked:
-                detail += (
-                    "; a unique field is among them, so writes to this type are refused "
-                    "until the rebuild completes"
-                )
-            details.append(detail)
-        # Reported alongside rather than instead: a stale rebuild and a drifted
-        # aggregate are different faults with different fixes, and a check that
-        # showed only the first would hide the second for as long as any type
-        # had a marker set.
-        drift = drift_detail()
-        if drift is not None:
-            details.append(drift)
-        if invalid:
-            details.append(invalid_detail(invalid))
-        # Counted at startup and parked on the instance: see the module
-        # docstring for why it is not recounted on a settings edit.
         orphaned = getattr(module, "orphaned_locales", None)
-        if orphaned:
-            details.append(orphaned_detail(orphaned))
+        named = _details(limit, stale, blocked, invalid, orphaned, named=True)
+        details = named
+        if multi:
+            details = _details(limit, stale, blocked, invalid, orphaned, named=False)
+            _log_named(module, named)
         # Informational, never a degradation: rows an operator keeps in another
         # tenant on purpose must not leave the check degraded for good. The
         # framework's readiness route shows ``detail`` whatever the status.

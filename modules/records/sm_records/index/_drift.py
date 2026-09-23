@@ -57,19 +57,22 @@ def current_drift() -> dict[int, dict[str, int]]:
     return {type_id: dict(keys) for type_id, keys in _drift.items()}
 
 
-def drift_detail() -> str | None:
+def drift_detail(*, named: bool = True) -> str | None:
     """The health check's sentence, or ``None`` when nothing is known to have
     drifted. Type *ids* and not keys: this module never holds a session, and a
     detail that had to read the database to name a type would be a health
-    check that fails when the database is down for an unrelated reason."""
+    check that fails when the database is down for an unrelated reason.
+    ``named=False`` is the multi-mode form — a count, not the ids and reduce
+    keys of other tenants' types (:mod:`sm_records.health`)."""
     if not _drift:
         return None
     parts = [
         f"type {type_id} ({', '.join(f'{key}: {n} group(s)' for key, n in sorted(keys.items()))})"
         for type_id, keys in sorted(_drift.items())
     ]
+    what = "; ".join(parts) if named else f"{len(_drift)} type(s)"
     return (
-        "reduce index disagrees with the records for " + "; ".join(parts) + " — run "
+        "reduce index disagrees with the records for " + what + " — run "
         "`python -m sm_records.cli reindex --type KEY` to rebuild, then "
         "`reindex --verify` to confirm"
     )

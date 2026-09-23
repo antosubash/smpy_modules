@@ -4,7 +4,8 @@ Both run outside any records request. The health check runs from
 ``/health/ready``, which on a multi-tenant host sits inside ``TenantMiddleware``
 and so may be bound to whatever tenant a header named. The sidebar sync runs
 before auth and tenant resolution. The first must report every tenant whatever
-is bound around it, and name each row it reports as ``tenant/…``. The second
+is bound around it: in single mode naming each row as ``tenant/…``, in multi
+mode as counts only, the names going to the log (review M2). The second
 must read only ``default`` on a single-tenant host, and nothing at all on a
 multi-tenant one.
 
@@ -13,6 +14,7 @@ Every test opts out of the suite's ``default`` binding and binds for itself.
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from typing import Any
 
@@ -21,6 +23,7 @@ from simple_module_core.health import HealthStatus
 from simple_module_core.menu import MenuRegistry
 from sm_records import menu
 from sm_records.health import count_orphaned_locales, stale_reindex_check
+from sm_records.index._drift import clear_drift, record_drift
 from sm_records.module import RecordsModule
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
@@ -75,13 +78,48 @@ async def test_single_mode_names_every_tenant_and_reports_rows_outside_default(s
     assert "tenants_outside_default: {acme: 2 type(s), 3 record(s)}" in detail
 
 
-async def test_multi_mode_reports_the_same_faults_and_no_foreign_tenants(spread):
-    result = await stale_reindex_check(_module(spread, TenancyMode.MULTI)).check()
+async def test_multi_mode_reports_the_same_faults_as_counts_naming_nobody(spread, caplog):
+    """Review M2: ``/health/ready`` is anonymous, so on a multi-tenant host the
+    detail must not say which tenants exist or what their types, fields and
+    languages are called. The names go to the log, for the operator."""
+    record_drift(987, [SimpleNamespace(key="revenue")])
+    module = _module(spread, TenancyMode.MULTI)
+    module.orphaned_locales = {"acme/xx": 1}
+    try:
+        with caplog.at_level(logging.INFO, logger="sm_records.health"):
+            result = await stale_reindex_check(module).check()
+            again = await stale_reindex_check(module).check()
+    finally:
+        clear_drift(987)
+
+    assert result.status is HealthStatus.DEGRADED
+    detail = result.detail or ""
+    assert "reindex pending for longer than 900s: 1 type(s) across 1 tenant(s)" in detail
+    assert "reduce index disagrees with the records for 1 type(s)" in detail
+    assert "invalid_records: 1 across 1 tenant(s)" in detail
+    assert "orphaned_locales: 1 record(s) across 1 tenant(s)" in detail
+    for name in ("acme", "default", "product", "secret", "price", "xx", "987", "revenue"):
+        assert name not in detail, name
+    assert "tenants_outside_default" not in detail, "other tenants are normal here"
+    assert again.detail == result.detail
+
+    logged = [r.getMessage() for r in caplog.records if r.name == "sm_records.health"]
+    assert len(logged) == 1, "logged when the wording changes, not on every poll"
+    for named in ("acme/product (price)", "type 987 (revenue: 1 group(s))", "(acme: 1)", "acme/xx"):
+        assert named in logged[0], named
+    assert logged[0].startswith("records health (named, multi-tenant):")
+
+
+async def test_single_mode_keeps_the_names_in_the_detail_and_logs_nothing(spread, caplog):
+    module = _module(spread, TenancyMode.SINGLE)
+    module.orphaned_locales = {"acme/xx": 1}
+    with caplog.at_level(logging.INFO, logger="sm_records.health"):
+        result = await stale_reindex_check(module).check()
 
     detail = result.detail or ""
+    assert "orphaned_locales: {acme/xx: 1}" in detail
     assert "acme/product (price)" in detail
-    assert "invalid_records: 1 (acme: 1)" in detail
-    assert "tenants_outside_default" not in detail, "other tenants are normal here"
+    assert not [r for r in caplog.records if r.name == "sm_records.health"]
 
 
 async def test_rows_outside_default_are_informational_and_do_not_degrade(db_state):

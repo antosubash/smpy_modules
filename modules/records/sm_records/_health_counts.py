@@ -51,10 +51,19 @@ async def count_orphaned_locales(db_state, settings: RecordsSettings) -> dict[st
     return dict(sorted(out.items()))
 
 
-def orphaned_detail(counts: dict[str, int]) -> str:
-    listed = ", ".join(f"{locale}: {count}" for locale, count in counts.items())
+def _tenants(keys) -> int:
+    return len({key.split("/", 1)[0] for key in keys})
+
+
+def orphaned_detail(counts: dict[str, int], *, named: bool = True) -> str:
+    """``named=False`` is the multi-mode form: counts only, no tenant and no
+    language tag (:mod:`sm_records.health`, review M2)."""
+    if named:
+        listed = "{" + ", ".join(f"{locale}: {count}" for locale, count in counts.items()) + "}"
+    else:
+        listed = f"{sum(counts.values())} record(s) across {_tenants(counts)} tenant(s)"
     return (
-        f"orphaned_locales: {{{listed}}} — records in a language this install no longer "
+        f"orphaned_locales: {listed} — records in a language this install no longer "
         "publishes; they are hidden from the public API and still editable in the admin "
         "(filter=locale:eq:<tag>)"
     )
@@ -82,10 +91,15 @@ async def count_invalid_records(session) -> dict[str, int]:
     return dict(sorted(out.items()))
 
 
-def invalid_detail(counts: dict[str, int]) -> str:
-    per_tenant = ", ".join(f"{tenant}: {count}" for tenant, count in counts.items())
+def invalid_detail(counts: dict[str, int], *, named: bool = True) -> str:
+    """``named=False`` is the multi-mode form: the total and how many tenants,
+    never which (:mod:`sm_records.health`, review M2)."""
+    if named:
+        per_tenant = "(" + ", ".join(f"{t}: {count}" for t, count in counts.items()) + ")"
+    else:
+        per_tenant = f"across {len(counts)} tenant(s)"
     return (
-        f"invalid_records: {sum(counts.values())} ({per_tenant}) — record(s) marked as not "
+        f"invalid_records: {sum(counts.values())} {per_tenant} — record(s) marked as not "
         "satisfying their type's schema, from a forced schema change; each one's next save "
         "clears the mark (filter=invalid:eq:true)"
     )
