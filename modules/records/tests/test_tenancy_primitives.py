@@ -39,6 +39,7 @@ from sm_records.tenancy import (
     mode_of,
     resolve_admin,
     resolve_public,
+    tenant_header,
     tenant_scope,
 )
 from sqlalchemy import select
@@ -120,6 +121,9 @@ def _real_app(monkeypatch, *, multi: bool):
 def test_mode_is_read_off_the_stack_create_app_builds(monkeypatch, multi):
     app = _real_app(monkeypatch, multi=multi)
     assert detect_mode(app) is (TenancyMode.MULTI if multi else TenancyMode.SINGLE)
+    # The header the public API names in ``Vary`` (§H) is the one the host gave
+    # its ``TenantMiddleware`` — read off the same stack entry.
+    assert tenant_header(app) == ("X-Tenant-ID" if multi else None)
 
 
 def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(caplog):
