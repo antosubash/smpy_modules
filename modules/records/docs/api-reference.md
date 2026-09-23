@@ -354,6 +354,21 @@ Each entry of `fields`:
 
 Ceilings: `max_fields_per_type` (100) and `max_indexed_fields_per_type` (25).
 
+**`media` values.** A `media` value is a string of at most 500 characters —
+an opaque id or a URL; the API checks the length and nothing else, and never
+looks the value up. What the admin UI stores in it is **the media library
+file's id**: with the framework's `file_storage` module installed, the id
+`POST /api/file-storage/upload` returns (a UUID, e.g.
+`"3f0c6f8e-1d9b-4a57-9d7e-2c1b0f1e6a42"`). The file's address is not stored;
+a client derives it from the id — `GET /api/file-storage/files/{id}/download`
+on a stock host, the `file_url_template` the admin screens are handed (see
+[operations.md](operations.md#media-library)). A **plain `http(s)://` URL**
+saved before the picker existed stays a valid value, and the UI renders it as
+a link rather than looking it up. Deleting the file in the media library does
+not change any record: the id stays, and the UI shows it as **File missing**.
+Import and export treat the value as the text it is, so an id round-trips
+unchanged.
+
 ### `PUT /api/records/types/{key}` → `TypeRead`
 
 Body is `TypeUpdate`. `expected_version` is **required**; every other key is
@@ -1163,9 +1178,19 @@ curl -s 'http://localhost:8000/api/records/public/product?page_size=2&sort=-publ
                       "slug": "sku-000059"}]
   }],
   "total": 60, "page": 1, "page_size": 2, "total_capped": false,
-  "next_cursor": "eyJoIjoiZWU2ZWRkODlhODY4IiwidiI6WyIyMDI2LTA5LTIxVDA3OjIxOjEzLjkyMzQ1NyIsMTgxXX0"
+  "next_cursor": "eyJoIjoiZWU2ZWRkODlhODY4IiwidiI6WyIyMDI2LTA5LTIxVDA3OjIxOjEzLjkyMzQ1NyIsMTgxXX0",
+  "media_url_template": null
 }
 ```
+
+`media_url_template` (listing only) is how a site shows a `media` value: a
+path with `{id}` in it when the host's media library serves files to
+anonymous callers, and `null` when it does not. With `file_storage` it is
+**always `null`**: that module exempts none of its routes from authentication,
+and its download route also requires `file_storage.download`, so there is no
+address an anonymous visitor could load a file from. The value is decided once
+at startup, from the host's public-route registry
+([architecture.md](architecture.md#media-library-detection)).
 
 `translations` lists the record's **published, live** siblings — `locale`,
 `uuid` and `slug` each — so a site can render a language switcher without

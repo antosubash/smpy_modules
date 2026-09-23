@@ -70,6 +70,12 @@ make migrate
 - **`simple_module_pagebuilder`** — when present, records contributes a
   **Records list** block to the Puck palette. Records knows about pagebuilder;
   pagebuilder does not know about records.
+- **`file_storage`** (the framework's media library) — when present, a
+  `media` field is edited with a picker that lists, uploads and previews files
+  through that module's API, and the record list shows the first `media`
+  field as a thumbnail column by default.
+  Found at startup by the shape of its routes, never imported — see
+  [Media library](#media-library).
 
 ---
 
@@ -222,6 +228,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `public_route_prefix` | `/api/records/public` | **yes** | Where the anonymous read API is mounted |
 | `content_locales` | `["en"]` | **yes** | The languages records may be authored in |
 | `default_content_locale` | `en` | **yes** | The language a record is in when nobody says; what `?locale=` defaults to on the public API; the only language a non-translatable type accepts |
+| `media_api_prefix` | `null` | **yes** | Where the `media` field picker finds the media library: `null` detects it, `""` turns the picker off, `"/api/file-storage"` names one. JSON on the Settings screen — see [Media library](#media-library) |
 | `default_page_size` | `25` | no | `page_size` when the caller sends none |
 | `max_page_size` | `200` | no | Largest `page_size` — clamped, not refused. At least `default_page_size` |
 | `revision_limit` | `50` | no | Record revisions kept, per record. At least 1 |
@@ -245,7 +252,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 
 Everything not marked *restart* is read per request and takes effect on save.
 
-### Why three need a restart
+### Why four need a restart
 
 `public_route_prefix` because its routes are **mounted** — and exempted from
 `AuthMiddleware` — from `on_startup`, which is the first point at which the
@@ -257,6 +264,10 @@ in either hook would read the pydantic default.
 follow an edit immediately. The flag is there because an edit changes what the
 install *publishes*: records already written in a dropped locale stay written,
 the public API stops serving them, and they are counted **at startup only**.
+
+`media_api_prefix` because the media library is **resolved once**, from
+`on_startup`, and parked on the module's state; every screen reads that
+result, not the setting.
 
 ### `public_route_prefix` is validated
 
@@ -275,6 +286,65 @@ that could fix it lives in the app that would not start. Watch for:
 records: stored public_route_prefix '/api' is invalid (…); falling back to
 '/api/records/public'. Fix it on the Settings screen …
 ```
+
+### Media library
+
+A `media` field stores a media library file's **id**. Whether the admin
+screens offer a picker for it depends on whether this install has a media
+library, which is decided at startup:
+
+| `media_api_prefix` | What happens at startup |
+|---|---|
+| `null` (default) | Detect it: a prefix under which `POST {p}/upload`, `GET {p}/files`, `GET {p}/files/{id}` and `GET {p}/files/{id}/download` are all mounted. On a stock host that is the framework's `file_storage` module, at `/api/file-storage`. |
+| `"/some/path"` | Use it, without looking. If nothing matching is mounted there, a warning is logged (`does not match a media API mounted on this app`) and the picker calls it anyway — it may be a proxied API. |
+| `""` | No picker, even with a media library installed: a `media` field is the id-or-URL text box. |
+
+```bash
+python scripts/set_setting.py sm_records media_api_prefix '"/api/file-storage"'
+python scripts/set_setting.py sm_records media_api_prefix '""'     # off
+python scripts/set_setting.py sm_records media_api_prefix null     # detect
+```
+
+The value is JSON because it has three states. It must be a path on this host
+(`/…`, no scheme, no `//host`, no query): the browser calls it directly with
+the admin's session cookie, and the admin screens' CSP allows `'self'`. A
+stored value that fails that rule is logged as an error at boot and detection
+is used instead, the same way a bad `public_route_prefix` falls back.
+
+When detection finds **two** media APIs and none is the host's registered
+`FileStorage` module, it picks neither and logs
+`several media APIs are mounted (…); the media field picker is off until
+media_api_prefix names one` — set the prefix to choose.
+
+**Permissions are the media library's, not records'.** The picker lists files
+with `GET {p}/files` (`file_storage.download`) and uploads with
+`POST {p}/upload` (`file_storage.upload`); a user with `records.edit` but not
+those sees the library's own refusal in the picker. `file_storage` maps both
+to the `user` role by default. The list is every file in the library, not
+only the caller's — that is how `file_storage` answers it.
+
+**What the stock `file_storage` API cannot do**, and what the picker does
+instead (to be filed upstream):
+
+- *No search.* `GET /files` takes only `page` and `per_page`
+  (`file_storage/endpoints/api.py:72`–`83`, `service.py:143`–`164`). The
+  picker's search box filters the page it has loaded and says so. A media API
+  whose list route declares a `q` or `search` parameter is detected and
+  searched server-side instead.
+- *No content-type filter and no thumbnails.* A list of files is every kind of
+  file, and an image thumbnail is the full file (`GET /files/{id}/download`,
+  `endpoints/api.py:121`–`155`) loaded lazily — fine for a page of 24 photos,
+  wasteful for camera originals.
+- *No anonymous download.* `file_storage` registers no public route
+  (`module.py` overrides no `register_public_routes`) and its download
+  requires `file_storage.download` (`endpoints/api.py:121`–`125`). So the
+  **Records list** page block renders nothing for a `media` field, and the
+  anonymous read API's `media_url_template` is always `null`.
+
+The stable identifier is fine: `StoredFileOut.id` is a UUID primary key
+(`contracts/schemas.py:17`, `models.py:28`), and a deleted file is a
+soft-delete that makes `GET /files/{id}` answer `404`, which the editor shows
+as **File missing** without changing the record.
 
 ### Dropping a content language
 

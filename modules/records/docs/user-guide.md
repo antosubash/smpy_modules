@@ -153,7 +153,7 @@ would accept `restrict` and enforce nothing. It counts against the ceiling.
 | `email` | An email address | text | — | Minimum length, Maximum length, Pattern (regex) |
 | `url` | An `http(s)` URL with a host | text | — | Minimum length, Maximum length, Pattern (regex) |
 | `json` | Any JSON object or array | *not indexable* | — | — |
-| `media` | A media reference | *not indexable* | — | — |
+| `media` | One file from the media library (its id), or a URL | *not indexable* | — | — |
 | `relation` | A link to another record | ref | **Target type**, **Many**, **When the target is deleted** | — |
 
 **Choices** (on `select` and `multiselect`) are a list of value/label pairs.
@@ -273,15 +273,23 @@ first: *"Other types still have a relation field pointing at this one:"*.
 By default, in order: **Title** (the display field), **Status**, **Language**
 (only when the type is **Translatable** *and* the install runs more than one
 content language), then up to **four** indexed fields in the type's own field
-order (the display field is not repeated), then **Position** (only when at
-least one record on the page has a non-zero position), **Published on**,
-**Updated** and **Actions**.
+order (the display field is not repeated), plus the type's first `media`
+field if it has one, then **Position** (only when at least one record on the
+page has a non-zero position), **Published on**, **Updated** and **Actions**.
+
+The `media` column is there so a list of products or photos can be scanned by
+picture; otherwise it is a column like any other — the **Columns** menu can
+hide it, move it, or show a type's other `media` fields as well. Its header
+does not sort, since a `media` field cannot be indexed. It shows a small
+thumbnail for an image, a file icon and the file name for anything else,
+**File missing** for a file that has since been deleted from the media
+library, and the stored id as text on an install with no media library.
 
 A relation column renders the target's title; a to-many relation renders the
 titles comma-separated. A boolean renders as a check or a dash. `select` and
 `multiselect` render through their configured labels. A long text shows its
-first sixty characters on one line, a JSON field a compact one-line form, and
-a media field its stored id — hover any of them for the full value.
+first sixty characters on one line and a JSON field a compact one-line form —
+hover either for the full value.
 
 At phone width the table is replaced by one card per record: Status and
 Language (when shown) sit as badges beside the title, and the first **three**
@@ -657,6 +665,61 @@ If the connection drops you get *"Couldn't reach the server. Your changes are
 still on this page; try again."* and your typing survives. If your session has
 expired: *"Your session has expired. Taking you to the sign-in page — your
 changes are still on this page until you leave it."*
+
+### Media fields and the file picker
+
+When the site has a media library (the **Files** screen, from the
+`file_storage` module), a `media` field shows the file it holds instead of a
+text box:
+
+- an **image** as a thumbnail, with its name, size, type and upload date
+  beside it; **any other file** as a file icon with the same details. The name
+  is a link that opens the file.
+- **Choose file…** when the field is empty, **Replace…** when it is not, and
+  **Remove**, which clears the field (the file stays in the library).
+
+**Choose file…** opens **Choose a file**: the media library, newest first, 24
+files a page with **Previous**/**Next**. Each file shows a thumbnail (images)
+or an icon, its name, size and date; the one the field already holds is
+marked **Current file**. Click a file — or Tab to it (arrow keys, Home and End
+also move between files) and press Enter — to put it in the field. Escape or
+**Cancel** closes the dialog without changing anything.
+
+- **Search files** filters by name. The media library cannot search, so this
+  only filters the files on the page you are looking at, and the dialog says
+  so: *"The media library can't search, so this only filters the files on the
+  current page."*
+- **Upload a file** opens your computer's file chooser and sends the file
+  straight to the media library, with a progress bar (*"Uploading {name}…
+  {percent}"*). As soon as it has uploaded, it is put in the field and the
+  dialog closes. If the media library refuses it — too large, a type it does
+  not accept, no permission — the reason is shown in the dialog (*"Couldn't
+  upload the file: {message}"*) and nothing changes. A dropped connection or
+  an expired session says the same thing it does everywhere else on these
+  screens.
+
+Remember to **Save**: choosing or removing a file changes the form, not the
+record.
+
+What the record stores is the file's **id**, not its address.
+
+**If the file is later deleted in the media library**, the record is not
+touched: the field shows **File missing** with the id underneath and *"This
+file is no longer in the media library. The record keeps its id until you
+choose another file or remove it."* The list shows **File missing** in the
+column too. Pick another file with **Replace…**, or **Remove** it.
+
+A value saved before the picker existed — a full `https://` address — still
+works and shows as a link.
+
+On a site with **no media library**, a `media` field is a text box: paste the
+file's id or its full URL (*"The media library id or the full URL of an
+uploaded file."*).
+
+Who may list and upload files is decided by the media library's own
+permissions (**Files** → `file_storage.download` to list, `file_storage.upload`
+to upload), not by the Records ones. If you can edit records but not use the
+library, the dialog shows the library's refusal.
 
 ### Relations and the picker
 

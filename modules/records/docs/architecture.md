@@ -316,6 +316,67 @@ afterwards" caveat automatable: `index_affecting_keys` names the fields whose
 stored shape just moved, so a provider knows its projection is stale without
 diffing anything itself.
 
+## Media library detection
+
+A `media` field is edited with a picker over the host's media library — the
+framework's `file_storage` module on a stock host — and **records neither
+imports nor proxies it**. A published module must not depend on another plugin
+(the same rule `deps.py` follows for `permissions`), and the picker does not
+need one: the browser calls the library's JSON API itself, with the session
+cookie, under that module's own permissions. Records only has to tell the
+browser *where* the API is.
+
+`sm_records/media.py` decides that once, from `on_startup`:
+
+1. `media_api_prefix` (a `BootSettings` field, so `requires_restart`) is read
+   as hydrated. `""` means no picker; a path is used as given (a warning if
+   nothing matching is mounted there, since it may be a proxy); `null` means
+   detect.
+2. **Detection is by route shape.** Every endpoint on the app is walked
+   through `fastapi.routing.iter_route_contexts` — FastAPI 0.14x includes
+   routers lazily, so `app.routes` holds one opaque `_IncludedRouter` per
+   module and none of its routes (the sibling modules' tests read the OpenAPI
+   schema for the same reason, which is not an option here: building the
+   schema at startup caches it before later hooks mount theirs). A prefix
+   qualifies when `POST {p}/upload`, `GET {p}/files`, `GET {p}/files/{x}` and
+   `GET {p}/files/{x}/download` are all mounted under it. The host's module
+   registry (`app.state.sm.modules`) is consulted only to break a tie: a
+   module whose `meta.name` is `FileStorage` wins. Two unexplained matches mean
+   *off* and a warning, not a guess.
+3. Two facts are read off what was found: whether the list route declares a
+   `q`/`search` query parameter (file_storage's does not — the picker then
+   filters the loaded page and says so), and whether the host's public-route
+   registry exempts `GET {p}/files/{id}/download` from `AuthMiddleware`.
+4. The result, a frozen `MediaApi`, is parked on the services container
+   (`app.state.sm_records.media_api`).
+
+From there:
+
+- `endpoints/views.py` hands the record editor (new and edit) and the record
+  list a `media_api` prop — `{prefix, list_path, upload_path,
+  file_url_template, meta_url_template, search_param}`, or `null`.
+- `pages/RecordEditor.tsx` and `pages/RecordList.tsx` put it in a React
+  context (`components/media/MediaApiContext.tsx`), so `fields/MediaField.tsx`
+  and `media/MediaCell.tsx` read it without threading a prop through the
+  shared `FieldComponentProps`. With `null`, `MediaField` is the old
+  id-or-URL text box.
+- `utils/media-api.ts` is the browser client: list, metadata, upload (XHR, for
+  progress), and one metadata cache shared by the list and the editor. It
+  reuses `api-net.ts` for the connection failures — a 401 redirects to sign-in
+  and a dropped connection is the same `ApiError` it is everywhere — and
+  unwraps `file_storage`'s `{detail: {code, message}}` refusals.
+- The anonymous read API's list response carries `media_url_template`: the
+  download template when step 3 found the download exempt, `null` otherwise.
+  The Records list page block renders a `media` value only through it, so on a
+  stock host (no exemption, and a download that also requires
+  `file_storage.download`) it renders nothing.
+
+**The stored value never changes shape.** `_check_media` still accepts any
+string up to 500 characters; the picker stores the file id `file_storage`
+returns and derives every URL from it at render time. A legacy `https://`
+value renders as a link; an id the library answers `404`/`422` for is shown as
+**File missing** and kept.
+
 ## The wire contracts
 
 `contracts/` is the only thing endpoints serialize, split by subject: `schemas`
@@ -374,8 +435,10 @@ own seams.
 sm_records/
 ├── module.py        RecordsModule and its register_* hooks
 ├── boot.py          mounts + exempts the public router, from on_startup
+├── media.py         finds the media library the media picker calls, from on_startup
 ├── constants.py     every route, permission and limit as a named constant
-├── settings.py      RecordsSettings (DB-backed) + settings_checks.py
+├── settings.py      RecordsSettings (DB-backed) on settings_boot.py's
+│                    restart-marked BootSettings, + settings_checks.py
 ├── deps.py          permissions, allowed_roles narrowing, request session
 ├── _grammar.py      ?filter= / ?sort= / ?expand= / ?after= parsing
 ├── menu.py          per-type sidebar entries (+ _menu_middleware.py)

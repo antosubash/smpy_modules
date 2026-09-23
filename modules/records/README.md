@@ -108,8 +108,8 @@ is affected — only which links the sidebar is showing.
 ### Choosing the list's columns
 
 The record list shows, by default, Status, the type's first four indexed
-fields (the display field is not repeated), Position, Published on and
-Updated. Its **Columns** menu picks any other set, up to eight declared fields
+fields (the display field is not repeated) plus the first media field,
+Position, Published on and Updated. Its **Columns** menu picks any other set, up to eight declared fields
 plus the record's own columns, in any order. A non-indexed field can be shown
 too — every list row already carries its full `data` — but its header does
 not sort, since only an indexed field is queryable.
@@ -261,6 +261,36 @@ Worth knowing:
   time. `records.view` plus the type's `allowed_roles` gate it exactly as they
   gate the record list.
 
+### Media fields
+
+A `media` field stores one file. When the host also installs the framework's
+`file_storage` module, the editor shows it as a **picker**: the chosen file as
+a thumbnail (images) or a file chip (name, size, type), **Replace…** and
+**Remove**, and a **Choose file…** dialog that browses the media library page
+by page, filters the page by name, and uploads a new file in place (with a
+progress bar; the upload is picked as soon as it lands). The record list shows
+the type's first `media` field as a thumbnail column by default — an ordinary
+column the **Columns** menu can hide or move.
+
+What is stored is the file's **id**, the one `file_storage` returns — never a
+URL; the picture's address is derived from it each time it is shown, so the
+library can move without stranding a record. A value saved before the picker
+existed (a pasted `https://` URL) stays valid and renders as a link. Deleting
+a file in the media library does not touch the records that use it: the
+editor and the list then say **File missing** and keep the id until someone
+picks another file or removes it.
+
+The browser talks to the media library's own API with the editor's session;
+that module's permissions (`file_storage.upload`, `file_storage.download`)
+decide what a person may list and upload. Records finds the API at startup by
+the shape of its routes — it never imports `file_storage` — or takes it from
+`media_api_prefix` (below). With no media library the field is the plain text
+box it always was: paste an id or a URL.
+
+On a public page the **Records list** block shows nothing for a `media` field:
+`file_storage` does not serve files to anonymous visitors, so there is no
+picture a visitor could load — see [Showing records on a page](#showing-records-on-a-page).
+
 ### Showing records on a page
 
 When `simple_module_pagebuilder` is also installed, this module contributes a
@@ -291,6 +321,13 @@ every type on purpose: it is what lets an author build the block ahead of
 flipping the type public, and see the hint rather than a confusing blank
 result.
 
+**A `media` field renders nothing on the site** unless the host's media
+library serves files to anonymous visitors, which `file_storage` does not: its
+routes are not exempt from authentication and its download also requires
+`file_storage.download`. The anonymous API says which case it is in
+(`media_url_template`, [Public read API](#public-read-api)); when it is set,
+the field renders as an image.
+
 **The public API never expands a relation** (see [Relations](#relations)), so
 a `relation` field shown in the widget renders as its stored `type:uuid`, not
 a linked title — the block's own field help says so. Everything else formats
@@ -312,6 +349,7 @@ variables are read. Configure on the Settings screen or with
 | `public_route_prefix` | `/api/records/public` | yes |
 | `content_locales` | `["en"]` | yes |
 | `default_content_locale` | `en` | yes |
+| `media_api_prefix` | `null` (detect) | yes |
 | `default_page_size` | 25 | no |
 | `max_page_size` | 200 | no |
 | `revision_limit` | 50 per record | no |
@@ -335,6 +373,12 @@ variables are read. Configure on the Settings screen or with
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
 
+`media_api_prefix` is where the `media` field picker finds the media library
+— see [Media fields](#media-fields). `null` detects `file_storage` at startup,
+`""` turns the picker off, and a path such as `"/api/file-storage"` uses that
+one; it is edited as JSON because of those three states, and must be a path on
+this host.
+
 `menu_refresh_seconds` is the sidebar's refresh window — see
 [Sidebar entries](#sidebar-entries).
 
@@ -347,8 +391,8 @@ largest type a schema preview will dry-run inside the request, and
 reusable by the save that follows it — see
 [Changing a schema that already holds records](#changing-a-schema-that-already-holds-records).
 
-`public_route_prefix` is one of the three settings above a change to needs a
-restart, and the only one whose reason is about routes. The routes it
+`public_route_prefix` is one of the four settings above a change to needs a
+restart, and the only one whose reason is about routes it mounts. The routes it
 configures are mounted — and exempted from authentication — while
 the app boots, because the prefix only exists as the operator set it once the
 host has hydrated these settings from the database.
@@ -428,7 +472,7 @@ published records anonymously at two routes, under `public_route_prefix`
 
 | route | answers |
 |---|---|
-| `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, total_capped, page, page_size, next_cursor}` |
+| `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, total_capped, page, page_size, next_cursor, media_url_template}` |
 | `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
 
 A record reads back as `uuid`, `slug`, `locale`, `translations`,
@@ -470,6 +514,11 @@ The rules worth knowing before you point a site at it:
   `expand` and `trashed` are simply not parameters here; unknown ones are
   ignored.
 - `page_size` is clamped to `max_page_size` rather than refused.
+- **`media_url_template`** is how a site shows a `media` value: a URL with
+  `{id}` in it, when the host's media library lets anonymous visitors download
+  files — and `null` otherwise, which with `file_storage` is always. A `media`
+  value itself is the file's id; `null` means there is no address a visitor
+  could load it from.
 - **`?after=`, `?total=false` and the `max_count` bound apply here too** — see
   [Paging a large type](#paging-a-large-type). A client walking a large public
   type is precisely the caller that should not be paying for an `OFFSET` and a
