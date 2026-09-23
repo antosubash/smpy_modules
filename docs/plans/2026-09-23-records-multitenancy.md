@@ -1033,6 +1033,110 @@ The out-of-request paths of §A.5. Items are marked the same way as above.
 
 ---
 
+## Implementation notes — Phase 5
+
+The isolation matrix, the cursor tenant, `Vary`, the export tenant and the
+statement census. Items are marked as above.
+
+* **Deviation (Phase 4 behaviour): `tenants_outside_default` no longer
+  degrades the health check.** The framework's readiness route renders a
+  result's `detail` whatever its status (`simple_module_hosting/health.py:79`),
+  so the detail rides on a HEALTHY result when it is the only finding. An
+  operator who keeps another tenant's rows on a single-tenant host on purpose
+  no longer gets a permanently degraded check. Stale reindex, reduce drift,
+  invalid records and orphaned locales still degrade as before.
+* **Cursor (§H), as designed**, with one refinement: `sort_signature` reads
+  `bound_tenant()` itself rather than taking the tenant as an argument, so no
+  caller can forget it. Unbound, it raises `TenantUnbound` like any records
+  read. A cursor minted in `acme` is a 400 in `globex` on the admin and public
+  APIs, and the list screen's `bad_cursor` notice.
+* **`Vary` (§H).** The header name is read off the built stack —
+  `TenantMiddleware`'s `header` keyword in `app.user_middleware`
+  (`tenancy.tenant_header`) — and stored by `configure` on the services
+  container as `tenant_header`, beside the mode. `Vary` names it on every
+  public 200 and on the 304 in multi mode, and never in single mode.
+  **Deviation (addition):** a *signed-in* reader of the public API gets
+  `Cache-Control: private`. `TenantMiddleware` resolves the user's own tenant
+  before the header, so their answer depends on the session, which no request
+  header names; `Vary` alone would let a shared cache hand it to an anonymous
+  reader. See gap L17.
+* **Export (§H), as designed.** The JSON envelope is
+  `{"type": …, "tenant": …, "records": […]}`. The importer already read only
+  `records`, so it needed no change; the docs say the key is informational.
+  CSV is unchanged.
+* **Isolation matrix (K1).** Four files, not three: `test_tenancy_isolation.py`
+  (type keys, screens, the route-table check), `…_records.py` (one record by
+  uuid), `…_io.py` (lists, aggregates, export, import, bulk, trash) and
+  `…_public.py` (K2, K3). The shared `two_tenants` fixture and helpers are in
+  `tests/isolation_support.py`. The fixture seeds over the real API and
+  import: `post` in both tenants with the same uuid, slug and translation
+  group, plus `acme`-only rows (a second record referencing the shared uuid, a
+  trashed record, a German sibling, a whole `secret` type). **On teardown it
+  asserts that none of `acme`'s rows changed** (owned tables and index rows,
+  compared column by column), which makes every case a write-isolation case
+  too.
+  * "The response an unknown key gets" is checked as the status and the body
+    after each probe string is replaced by its name (`same_as_unknown`),
+    because the 404 bodies name the key or uuid that was sent. The import
+    report's `duration_ms` is normalised too.
+  * `test_every_route_has_an_isolation_case` is parametrised over the routes
+    the module mounts, built through the same hooks the host calls
+    (`register_routes`, `boot.mount_public_router`). FastAPI 0.141 wraps
+    included routers in `_IncludedRouter`, so the table is read with
+    `fastapi.routing.iter_route_contexts`. Each case marks its routes with
+    `@covers`. 42 routes (the public `HEAD`s count separately).
+  * Tenant cloning is shown into a *third* tenant, in two passes: the
+    importer resolves a relation against what is stored before it writes, so
+    a row cannot point at a row created earlier in the same file. That is the
+    importer's existing rule, not a tenancy one.
+* **The widget (K2).** The pagebuilder block has no server-side path: it
+  calls the public list from the browser (`utils/public-api.ts`, with
+  `credentials: 'omit'`), so it is always anonymous and needs the header. The
+  server half is the public list, tested with the widget's exact request
+  shape. The field and the header on the `fetch` are Phase 6.
+* **Census (K12).** `tests/census.py`, wired in `conftest.py`. It listens on
+  the `Engine` class's `before_cursor_execute` for the whole session. On by
+  default when the suite runs on Postgres; `RECORDS_CENSUS=1` turns it on for
+  SQLite and `=0` turns it off. `RECORDS_CENSUS_LOG` appends every catch.
+  Beyond the design's `ALL_TENANTS` exemption:
+  * **The origin decides.** Only statements `sm_records` sent fail a test.
+    Statements sent by test code — forged rows, migration fixtures, the
+    database reset — are logged and not failed. The origin is the innermost
+    frame in `sm_records/` or `tests/`, walked across SQLAlchemy's greenlet
+    into the awaiting coroutines (`greenlet.getcurrent().parent.gr_frame`),
+    because the greenlet's own stack stops at `Session.execute`.
+  * **The unit of work's by-primary-key writes and refreshes are exempt**
+    (`WHERE <t>.id = :p`, optionally `AND <t>.version = :p`), only when sent
+    from SQLAlchemy's `orm/persistence.py` or `orm/loading.py`. A by-id
+    statement a service builds is not exempt.
+  * **What it caught** over the full Postgres suite: one site.
+    `services/_duplicates.py` `_scan_one` joins the record table as a join
+    target only (FACT 1d). **Correction to the §E table**, which listed this
+    site as "none" because `type_id` scopes it: it now carries
+    `record.tenant_id == bound_tenant()`. It was not a leak while the
+    composite key holds; it was a site the rule says must carry the
+    predicate. Everything else the census logged was test-side: the migration
+    fixtures, `test_collision_uuid_sets`' forged uuid, the relation helpers'
+    raw delete, and count assertions.
+  * Cost: the listener does a substring test and a regex per statement, and
+    the stack walk only on a statement that fails both.
+* **Perf.** On Postgres every statement count is what it was before tenancy
+  (`create_record` 10, `update_record` 15 / 16, list pages 1), measured
+  against the pre-tenancy commit in the same session. The two `tenant_id`
+  btrees cost +0.09 ms (+1.1 %) at the p50 of a create. See
+  `modules/records/docs/performance.md`.
+* **Framework gap found (add to §L):**
+  * **L17.** `TenantMiddleware` (`simple_module_hosting/middleware.py:185-196`)
+    resolves a signed-in user's own tenant before the header and says so to
+    nobody: no `Vary`, no marker on the request that the tenant came from the
+    session. Any module serving a cacheable anonymous read on a multi-tenant
+    host has to work out for itself that the answer depends on the session.
+    Records marks those answers `private`; a framework answer would be a
+    `request.state.tenant_source` (`"user"`/`"header"`), or `Vary` handled by
+    the middleware.
+
+---
+
 ## Implementation notes — Phase 6
 
 The sidebar + UI of §I/§J item 4. No Python was touched, other than the
