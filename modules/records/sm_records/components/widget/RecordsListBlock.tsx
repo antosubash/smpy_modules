@@ -81,6 +81,12 @@ function buildBaseFields() {
         defaultValue: 'Locale (blank = default content locale)',
       }),
     },
+    tenant: {
+      type: 'text',
+      label: t('records.widget.field_tenant', {
+        defaultValue: 'Tenant (multi-tenant hosts only — blank uses the host default)',
+      }),
+    },
     limit: {
       type: 'number',
       label: t('records.widget.field_limit', { defaultValue: 'How many' }),
@@ -152,6 +158,10 @@ const BASE_FIELDS = {
     type: 'text',
     label: 'Locale (blank = default content locale)',
   },
+  tenant: {
+    type: 'text',
+    label: 'Tenant (multi-tenant hosts only — blank uses the host default)',
+  },
   limit: { type: 'number', label: 'How many', min: 1, max: 50 },
   layout: {
     type: 'select',
@@ -212,6 +222,7 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
     filter: '',
     sort: '',
     locale: '',
+    tenant: '',
     limit: 10,
     layout: 'list',
     title: '',

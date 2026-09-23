@@ -41,6 +41,11 @@ export type RecordsListProps = {
    *  content locale, never "every locale" (design §4.4, mirroring the public
    *  API's own rule for an anonymous reader with no `?locale=` at all). */
   locale: string;
+  /** Sent as the `X-Tenant-ID` header (tenancy design §J item 4) — blank on
+   *  a single-tenant host does nothing (the header is simply not sent); on a
+   *  multi-tenant host it picks the tenant this block reads, and a blank
+   *  value there is a 404 the same way no header is (design §H). */
+  tenant: string;
   limit: number;
   layout: RecordsListLayout;
   title: string;

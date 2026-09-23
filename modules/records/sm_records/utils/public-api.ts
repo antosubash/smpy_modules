@@ -44,6 +44,16 @@ export type PublicRecordPage = {
 
 export const DEFAULT_PUBLIC_PREFIX = '/api/records/public';
 
+/** The header a multi-tenant host's `TenantMiddleware` reads (tenancy design
+ *  §J item 4). Named literally here, the same way the design doc names it
+ *  for "anonymous readers and headless clients" — unlike the *admin* surface,
+ *  the public one has no shared prop carrying the framework's configured
+ *  header name onto an arbitrary pagebuilder page, so this widget sends the
+ *  one name the design commits to. A single-tenant host, or an install that
+ *  renamed the header, simply reads a request with no matching header —
+ *  never a 500 (`tenancy.resolve_public`, `TENANT_RE`). */
+export const TENANT_HEADER = 'X-Tenant-ID';
+
 export const MIN_LIMIT = 1;
 export const MAX_LIMIT = 50;
 export const DEFAULT_LIMIT = 10;
@@ -109,6 +119,12 @@ export type BuildPublicListUrlOptions = {
    *  answers with the default content locale, never "every locale" (design
    *  §4.4). */
   locale?: string;
+  /** Sent as `X-Tenant-ID`, not a query param (tenancy design §J item 4) —
+   *  blank or absent omits the header entirely, same as every other blank
+   *  option here. Read only by `fetchPublicRecords`; `buildPublicListUrl`
+   *  never puts it in the URL, so two tenants' requests for the same type
+   *  share one cacheable path and differ only by header (§H). */
+  tenant?: string;
 };
 
 /** `{prefix}/{typeKey}?page_size=&filter=&sort=` — the one anonymous list
@@ -139,12 +155,15 @@ export async function fetchPublicRecords(
   signal?: AbortSignal,
 ): Promise<PublicRecordPage> {
   const url = buildPublicListUrl(options);
+  const tenant = (options.tenant ?? '').trim();
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (tenant) headers[TENANT_HEADER] = tenant;
   const response = await fetch(url, {
     // 'omit', not 'same-origin': this client is the anonymous one the header
     // comment describes, and sending a session cookie to a surface that reads
     // no user contradicts it — the widget renders for a visitor who has none.
     credentials: 'omit',
-    headers: { Accept: 'application/json' },
+    headers,
     signal,
   });
   if (!response.ok) {

@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildPublicListUrl,
   clampLimit,
   DEFAULT_PUBLIC_PREFIX,
+  fetchPublicRecords,
   isValidFilterTerm,
   isValidSortTerm,
   normalizePublicPrefix,
+  TENANT_HEADER,
 } from './public-api';
 
 describe('normalizePublicPrefix', () => {
@@ -164,5 +166,57 @@ describe('buildPublicListUrl', () => {
   it('omits locale when blank or whitespace-only', () => {
     const url = buildPublicListUrl({ typeKey: 'products', limit: 10, locale: '  ' });
     expect(url).toBe(`${DEFAULT_PUBLIC_PREFIX}/products?page_size=10`);
+  });
+});
+
+/** `fetchPublicRecords`'s `X-Tenant-ID` header (tenancy design §J item 4) —
+ *  never in the URL (`buildPublicListUrl` above never reads `options.tenant`,
+ *  so two tenants' requests for the same type still share one cacheable
+ *  path, per §H), only the request's headers. */
+describe('fetchPublicRecords — the tenant header', () => {
+  const page = { items: [], total: 0, page: 1, page_size: 10 };
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => new Response(JSON.stringify(page), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends X-Tenant-ID when a tenant is given', async () => {
+    await fetchPublicRecords({ typeKey: 'products', limit: 5, tenant: 'acme' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers[TENANT_HEADER]).toBe('acme');
+  });
+
+  it('omits the header entirely when tenant is unset, empty or whitespace-only', async () => {
+    await fetchPublicRecords({ typeKey: 'products', limit: 5 });
+    await fetchPublicRecords({ typeKey: 'products', limit: 5, tenant: '' });
+    await fetchPublicRecords({ typeKey: 'products', limit: 5, tenant: '   ' });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const call of fetchMock.mock.calls) {
+      const [, init] = call as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      expect(headers[TENANT_HEADER]).toBeUndefined();
+    }
+  });
+
+  it('never puts the tenant in the URL — same path for every tenant', async () => {
+    await fetchPublicRecords({ typeKey: 'products', limit: 5, tenant: 'acme' });
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_PUBLIC_PREFIX}/products?page_size=5`);
+  });
+
+  it('still sends credentials: omit and Accept alongside the tenant header', async () => {
+    await fetchPublicRecords({ typeKey: 'products', limit: 5, tenant: 'acme' });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.credentials).toBe('omit');
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Accept).toBe('application/json');
   });
 });

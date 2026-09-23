@@ -698,6 +698,7 @@
     "field_filter": "Filter (e.g. status:eq:paid — one term, indexed fields only)",
     "field_sort": "Sort (e.g. -published_at for newest first)",
     "field_locale": "Locale (blank = default content locale)",
+    "field_tenant": "Tenant (multi-tenant hosts only — blank uses the host default)",
     "field_limit": "How many",
     "field_layout": "Layout",
     "layout_list": "List",

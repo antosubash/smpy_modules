@@ -188,6 +188,7 @@ export function RecordsListRender(props: RecordsListRenderProps) {
         filter: props.filter,
         sort: props.sort,
         locale: props.locale,
+        tenant: props.tenant,
       },
       controller.signal,
     )
@@ -206,6 +207,7 @@ export function RecordsListRender(props: RecordsListRenderProps) {
     props.filter,
     props.sort,
     props.locale,
+    props.tenant,
     skipFetch,
   ]);
 
