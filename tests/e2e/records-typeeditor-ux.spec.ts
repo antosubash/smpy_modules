@@ -64,13 +64,13 @@ test.describe('Records — type editor UX', () => {
     await expect(first.getByLabel('Help text', { exact: true })).toHaveCount(0);
     // U6: the "Indexed" hint is in the card header once, unrepeated.
     await expect(page.getByText(/Tick "Indexed" on the fields worth filtering/)).toHaveCount(1);
-    await expect(page.getByText(/Indexed fields can be filtered, sorted/)).toHaveCount(0);
+    await expect(page.getByText(/Indexed fields can be filtered and sorted/)).toHaveCount(0);
 
     await summary.click();
     await expect(first).toHaveAttribute('data-field-expanded', 'true');
     await expect(first.getByLabel('Help text', { exact: true })).toBeVisible();
     // Expanding brings back the checkbox's own consequence, wired to it.
-    await expect(first.getByText(/Indexed fields can be filtered, sorted/)).toHaveCount(1);
+    await expect(first.getByText(/Indexed fields can be filtered and sorted/)).toHaveCount(1);
     const box = first.getByRole('checkbox', { name: 'Indexed' });
     await expect(box).toHaveAttribute('aria-describedby', /-indexed-hint$/);
     // The other row is untouched — expanding is per row.
