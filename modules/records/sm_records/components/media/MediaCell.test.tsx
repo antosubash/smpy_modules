@@ -2,7 +2,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, mount, settle } from '../../test-dom';
-import { defaultColumnKeys, firstMediaField } from '../../utils/listing';
+import {
+  availableColumns,
+  defaultColumnKeys,
+  firstMediaField,
+  resolveListColumns,
+} from '../../utils/listing';
 import { clearMediaCache } from '../../utils/media-api';
 import {
   API,
@@ -107,6 +112,16 @@ describe('the media cell', () => {
     await again.unmount();
   });
 
+  it('a legacy URL is a link even without a media library', async () => {
+    const url = 'https://example.com/legacy/photo.jpg';
+    const view = await mount(cell(url, false));
+    const link = view.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
+    expect(link?.getAttribute('href')).toBe(url);
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(view.find('[data-testid="records-media-raw"]')).toBeNull();
+    await view.unmount();
+  });
+
   it('shows the empty dash for no value', async () => {
     const view = await mount(cell(null, true));
     expect(view.host.textContent).toBe('—');
@@ -137,6 +152,19 @@ describe('the media column', () => {
       'published_at',
       'updated_at',
     ]);
+  });
+
+  it('is left out of the default without a media library, and stays choosable', () => {
+    expect(defaultColumnKeys(type, false, false)).not.toContain('image');
+    const resolved = resolveListColumns({
+      type,
+      showLocale: false,
+      raw: null,
+      saved: null,
+      withMedia: false,
+    });
+    expect(resolved.columns.map((c) => c.key)).not.toContain('image');
+    expect(availableColumns(type, false).map((c) => c.key)).toContain('image');
   });
 
   it('renders a plain header and a thumbnail cell in the default table', async () => {

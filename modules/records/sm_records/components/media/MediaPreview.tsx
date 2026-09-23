@@ -57,6 +57,24 @@ function Thumbnail({
   );
 }
 
+/** A value saved before the picker existed — a plain `http(s)` URL — as a
+ *  link, whether or not the host has a media library to ask about ids.
+ *  `full` is the editor's; a cell shortens it (the `title` has it all). */
+export function MediaUrlLink({ url, full }: { url: string; full: boolean }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="break-all text-sm underline"
+      title={url}
+      data-testid="records-media-url"
+    >
+      {full || url.length <= 40 ? url : `${url.slice(0, 40)}…`}
+    </a>
+  );
+}
+
 /** Size · type · upload date — the facts the chip and the picker grid show. */
 export function MediaFacts({ file }: { file: MediaFile }) {
   return (
@@ -98,18 +116,7 @@ export function MediaPreview({
     case 'empty':
       return null;
     case 'url':
-      return (
-        <a
-          href={state.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="break-all text-sm underline"
-          title={state.url}
-          data-testid="records-media-url"
-        >
-          {field || state.url.length <= 40 ? state.url : `${state.url.slice(0, 40)}…`}
-        </a>
-      );
+      return <MediaUrlLink url={state.url} full={field} />;
     case 'loading':
       return (
         <span

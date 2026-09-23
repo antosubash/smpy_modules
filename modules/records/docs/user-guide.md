@@ -274,7 +274,7 @@ By default, in order: **Title** (the display field), **Status**, **Language**
 (only when the type is **Translatable** *and* the install runs more than one
 content language), then up to **four** indexed fields in the type's own field
 order (the display field is not repeated), plus the type's first `media`
-field if it has one, then **Position** (only when at least one record on the
+field if it has one and the install has a media library, then **Position** (only when at least one record on the
 page has a non-zero position), **Published on**, **Updated** and **Actions**.
 
 The `media` column is there so a list of products or photos can be scanned by
@@ -283,7 +283,10 @@ hide it, move it, or show a type's other `media` fields as well. Its header
 does not sort, since a `media` field cannot be indexed. It shows a small
 thumbnail for an image, a file icon and the file name for anything else,
 **File missing** for a file that has since been deleted from the media
-library, and the stored id as text on an install with no media library.
+library, and a link for a full URL saved before the picker existed. On an
+install with no media library the column is not in the default view (the
+**Columns** menu still offers it): it shows the stored id as text, or the
+link for a URL.
 
 A relation column renders the target's title; a to-many relation renders the
 titles comma-separated. A boolean renders as a check or a dash. `select` and

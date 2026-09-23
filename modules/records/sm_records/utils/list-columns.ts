@@ -1,7 +1,8 @@
 /**
  * Which columns the record list shows: the default rule (`listColumns`, the
- * first indexed fields, plus the first media field) and the column chooser's resolution of `?columns=`,
- * a saved choice or that default (`resolveListColumns`).
+ * first indexed fields, plus the first media field) and the column chooser's
+ * resolution of `?columns=`, a saved choice or that default
+ * (`resolveListColumns`).
  *
  * Split out of `listing.ts` for the 300-line cap when the chooser landed on
  * top of cursor paging; `listing.ts` re-exports every name here, so every
@@ -104,10 +105,16 @@ export function firstMediaField(type: Pick<TypeRead, 'fields'>): FieldDef | null
 
 /** The default view, as a key list: Status, Language, `listColumns`, the
  *  first media field, Position, Published on, Updated — "Reset to default"
- *  returns here. */
-export function defaultColumnKeys(type: ColumnType, showLocale: boolean): string[] {
+ *  returns here. The media field only when the host has a media library
+ *  (`withMedia`): without one a cell can show nothing but the stored id, so
+ *  the default would gain a column of id stubs. It stays choosable. */
+export function defaultColumnKeys(
+  type: ColumnType,
+  showLocale: boolean,
+  withMedia = true,
+): string[] {
   const fields = listColumns(type).map((field) => field.key);
-  const media = firstMediaField(type);
+  const media = withMedia ? firstMediaField(type) : null;
   if (media) fields.push(media.key);
   const locale = showLocale ? ['locale'] : [];
   return ['status', ...locale, ...fields, 'position', 'published_at', 'updated_at'];
@@ -148,18 +155,21 @@ export function resolveListColumns({
   showLocale,
   raw,
   saved,
+  withMedia = true,
 }: {
   type: ColumnType;
   showLocale: boolean;
   raw: string | null;
   saved: readonly string[] | null;
+  /** The page has a media library — see `defaultColumnKeys`. */
+  withMedia?: boolean;
 }): ResolvedColumns {
   const byKey = new Map(availableColumns(type, showLocale).map((c) => [c.key, c]));
   if (raw !== null) {
     const tokens = raw.split(',').filter((token) => token.trim());
     const picked = pickColumns(tokens, byKey);
     if (picked.columns.length > 0 || tokens.length === 0) return { ...picked, source: 'url' };
-    const fallback = resolveListColumns({ type, showLocale, raw: null, saved });
+    const fallback = resolveListColumns({ type, showLocale, raw: null, saved, withMedia });
     return { ...fallback, unknown: picked.unknown };
   }
   if (saved) {
@@ -168,7 +178,7 @@ export function resolveListColumns({
       return { columns: picked.columns, source: 'saved', unknown: [], truncated: 0 };
     }
   }
-  const columns = pickColumns(defaultColumnKeys(type, showLocale), byKey).columns;
+  const columns = pickColumns(defaultColumnKeys(type, showLocale, withMedia), byKey).columns;
   return { columns, source: 'default', unknown: [], truncated: 0 };
 }
 

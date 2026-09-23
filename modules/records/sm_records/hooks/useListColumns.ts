@@ -35,12 +35,16 @@ import type { TypeRead } from '../utils/types';
 export function useListColumns({
   type,
   showLocale,
+  withMedia = true,
   current,
   currentSort,
   goTo,
 }: {
   type: Pick<TypeRead, 'key' | 'fields' | 'display_field'>;
   showLocale: boolean;
+  /** The page has a media library (`media_api`): only then does the
+   *  default view add the first media field's thumbnails. */
+  withMedia?: boolean;
   /** The list's URL state, from `useRecordListNav`. */
   current: ListUrlState;
   currentSort: SortState;
@@ -60,6 +64,7 @@ export function useListColumns({
     showLocale,
     raw,
     saved: savedKeys,
+    withMedia,
   });
   const available: ListColumn[] = availableColumns(type, showLocale);
 
@@ -67,7 +72,13 @@ export function useListColumns({
     writeSavedColumns(type.key, keys);
     setSaved({ typeKey: type.key, keys });
     const param = keys === null ? null : keys.join(',');
-    const next = resolveListColumns({ type, showLocale, raw: param, saved: null }).columns;
+    const next = resolveListColumns({
+      type,
+      showLocale,
+      raw: param,
+      saved: null,
+      withMedia,
+    }).columns;
     if (sortHiddenBy(currentSort, next, available)) {
       goTo({ page: 1, sort: null, columns: param });
       return;

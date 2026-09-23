@@ -120,6 +120,7 @@ function RecordList({
   const columns = useListColumns({
     type,
     showLocale: showLocaleUI,
+    withMedia: Boolean(media_api),
     current,
     currentSort,
     goTo,
