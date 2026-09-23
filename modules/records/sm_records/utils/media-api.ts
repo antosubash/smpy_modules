@@ -20,6 +20,9 @@
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
 import type { ApiErrorBody } from './types';
 
+// Split out for the 300-line cap; every `media-api` import keeps working.
+export { formatBytes } from './format-bytes';
+
 /** The `media_api` view prop — `sm_records.media.MediaApi.props()`. */
 export type MediaApi = {
   prefix: string;
@@ -254,25 +257,4 @@ export function uploadMediaFile(
     xhr.send(form);
   });
   return { promise, abort: () => xhr.abort() };
-}
-
-// ---- Display ---------------------------------------------------------------
-
-const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
-
-/** `1.5 MB` in the viewer's locale — `Intl` supplies the unit words, so
- *  there is nothing here to translate. */
-export function formatBytes(bytes: number): string {
-  let value = Math.max(0, bytes);
-  let unit = 0;
-  while (value >= 1024 && unit < UNITS.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return new Intl.NumberFormat(undefined, {
-    style: 'unit',
-    unit: UNITS[unit],
-    unitDisplay: 'short',
-    maximumFractionDigits: unit === 0 ? 0 : 1,
-  }).format(value);
 }

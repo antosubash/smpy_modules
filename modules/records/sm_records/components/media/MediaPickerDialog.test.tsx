@@ -65,6 +65,22 @@ describe('MediaPickerDialog — the list', () => {
     await view.unmount();
   });
 
+  it("gives every tile the same square picture box, whatever the image's shape", async () => {
+    // Review 4, ux F13: a portrait image's height beat `aspect-square` and
+    // made its tile taller. Layout is not measured here (happy-dom); the
+    // image is out of the flow and the box is square, capped and clipped.
+    stubLibrary([PHOTO, MANUAL]);
+    const { view } = await open();
+    const [photo] = items();
+    const box = photo.querySelector('img')?.parentElement;
+    expect(box?.className.split(' ')).toEqual(
+      expect.arrayContaining(['relative', 'aspect-square', 'max-h-32', 'overflow-hidden']),
+    );
+    expect(photo.querySelector('img')?.className).toContain('absolute inset-0');
+    expect(photo.className.split(' ')).toContain('h-full');
+    await view.unmount();
+  });
+
   it('moves focus into the dialog when it opens', async () => {
     stubLibrary([PHOTO]);
     const { view } = await open();

@@ -87,17 +87,22 @@ export function MediaGrid({
                 date,
               })}
               onClick={() => onPick(file)}
-              className={`flex w-full flex-col overflow-hidden rounded-md border text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`flex h-full w-full flex-col overflow-hidden rounded-md border text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${
                 current ? 'ring-2 ring-primary' : ''
               }`}
             >
-              <span className="flex aspect-square w-full items-center justify-center bg-muted">
+              {/* The picture is positioned out of the flow: in it, a portrait
+                  image's own height beat `aspect-square` and made its tile
+                  taller than its neighbours; `max-h-32` keeps three tiles
+                  from filling a 450px-high (zoomed) dialog (review 4, ux
+                  F13). The button is `h-full`, so a row's tiles match. */}
+              <span className="relative flex aspect-square max-h-32 w-full items-center justify-center overflow-hidden bg-muted">
                 {isImage(file) ? (
                   <img
                     src={fileUrl(api, file.id)}
                     alt=""
                     loading="lazy"
-                    className="size-full object-cover"
+                    className="absolute inset-0 size-full object-cover"
                   />
                 ) : (
                   <FileIcon className="size-8 text-muted-foreground" aria-hidden="true" />

@@ -33,6 +33,19 @@ describe('media values', () => {
     expect(formatBytes(2048)).toMatch(/2/);
     expect(formatBytes(3 * 1024 * 1024)).toMatch(/3/);
   });
+
+  it('says "217 B", not "217 byte", in the layout of the locale\'s kB', () => {
+    // Review 4, ux F13: CLDR's short English byte is the word.
+    const kb = new Intl.NumberFormat(undefined, {
+      style: 'unit',
+      unit: 'kilobyte',
+      unitDisplay: 'short',
+    }).format(2);
+    expect(formatBytes(2048)).toBe(kb);
+    if (kb === '2 kB') expect(formatBytes(217)).toBe('217 B');
+    expect(formatBytes(217)).not.toMatch(/byte/i);
+    expect(formatBytes(0)).toMatch(/^0\s?\S+$/);
+  });
 });
 
 describe('listMediaFiles', () => {
