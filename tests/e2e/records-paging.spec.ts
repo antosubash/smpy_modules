@@ -112,8 +112,12 @@ test.describe('Records — capped totals and cursor paging', () => {
     await expect(page.getByText(`Showing 26–50 of ${MAX_COUNT}+`)).toBeVisible();
     await expect(page.getByTestId('records-page-position')).toHaveText('Page 2');
     // The cap's last page, but the server says there is more: Next follows it.
+    // From the keyboard: the pressed button keeps focus through the request
+    // and becomes the cursor page's "Next page" (review 4, ux F2 — it used to
+    // be disabled in flight, which threw focus to <body>).
     await expect(next).toBeEnabled();
-    await next.click();
+    await next.focus();
+    await page.keyboard.press('Enter');
 
     // The cursor page: `after` in the URL instead of a page number…
     await expect(page).toHaveURL(/[?&]after=/);
@@ -133,7 +137,9 @@ test.describe('Records — capped totals and cursor paging', () => {
     await expect(page.getByText(/^Showing /)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Previous', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Last', exact: true })).toHaveCount(0);
-    // A short page is the end of the list.
+    await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeFocused();
+    // A short page is the end of the list (`aria-disabled` while it still
+    // holds focus, `disabled` once focus moves on — both read as disabled).
     await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeDisabled();
 
     // Every step is its own history entry: Back walks to the numbered page

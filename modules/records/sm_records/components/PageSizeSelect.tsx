@@ -24,8 +24,12 @@ export function PageSizeSelect({
         id="records-page-size"
         className="w-auto"
         value={String(pageSize)}
-        disabled={loading}
-        onChange={(e) => onPageSize(Number(e.target.value))}
+        // Not `disabled` while loading: a focused control that disables
+        // itself drops keyboard focus to <body> (see `PagerButton`).
+        aria-disabled={loading || undefined}
+        onChange={(e) => {
+          if (!loading) onPageSize(Number(e.target.value));
+        }}
       >
         {PAGE_SIZES.map((size) => (
           <NativeSelectOption key={size} value={String(size)}>

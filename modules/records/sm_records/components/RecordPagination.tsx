@@ -1,9 +1,10 @@
 import { useT } from '@simple-module-py/i18n';
-import { Button } from '@simple-module-py/ui/components/ui/button';
+import type { ReactNode } from 'react';
 
 import { PAGE_SIZES } from '../utils/listing';
+import { PagerButton } from './PagerButton';
 import { PageSizeSelect } from './PageSizeSelect';
-import { CursorPager } from './RecordCursorPager';
+import { cursorPagerParts } from './RecordCursorPager';
 
 // The footer treats the first size as "unset": a type small enough to fit on
 // one page renders no footer at all unless the URL asked for another size,
@@ -11,9 +12,9 @@ import { CursorPager } from './RecordCursorPager';
 // back to 25. Re-exported for the callers that imported it from here.
 export { PAGE_SIZES };
 
-// See `pages/RecordList.tsx` for why `t` is typed this loosely.
+// See `utils/list-errors.ts` for why `t` is typed this loosely.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+export type Translate = (...args: any[]) => string;
 
 /** The footer's "Showing 1–25 of N" — or "of 10,000+" when the API capped
  *  the count (F4, `RecordsSettings.max_count`). Two calls and not one
@@ -85,9 +86,9 @@ export type PagerProps = {
    *  pages run out (a capped listing's last page) and on every cursor page.
    *  `null` means this page was the end of the list. */
   nextCursor?: string | null;
-  /** U12: a page/size change is in flight — the buttons disable rather than
-   *  stay clickable while the request is on the wire, which used to invite
-   *  a second click that raced the first. */
+  /** U12: a page/size change is in flight — the controls ignore presses
+   *  rather than invite a second click that races the first. They stay
+   *  enabled (`aria-disabled`), so keyboard focus stays put (`PagerButton`). */
   loading?: boolean;
   onGo: (page: number) => void;
   /** Continues with `?after=<cursor>` — see `utils/listing.ts::listParams`. */
@@ -129,25 +130,52 @@ export type PagerProps = {
  * page".
  */
 export function RecordPagination(props: PagerProps) {
-  const { page, pageSize, total } = props;
-  if (page === null) return <CursorPager {...props} />;
-  if (total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
-  return <NumberedPager {...props} page={page} />;
+  const { t } = useT();
+  const { page, pageSize, total, loading = false, onPageSize } = props;
+  if (page !== null && total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
+  const parts = page === null ? cursorPagerParts(t, props) : numberedPagerParts(t, props, page);
+  return (
+    <div
+      className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground"
+      data-testid={parts.testId}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{parts.info}</div>
+      <div className="flex flex-wrap items-center gap-3">
+        <PageSizeSelect pageSize={pageSize} loading={loading} onPageSize={onPageSize} />
+        <div className="space-x-2">
+          {/* Keyed by role, in one tree for both modes: "Next" on the cap's
+              last page and "Next page" on the cursor page it leads to are
+              the same DOM node, so keyboard focus survives the switch
+              (review 4, ux F2) — two pager components would remount it. */}
+          {parts.actions.map((action) => (
+            <PagerButton
+              key={action.key}
+              unavailable={action.unavailable}
+              busy={loading}
+              onPress={action.onPress}
+            >
+              {action.label}
+            </PagerButton>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function NumberedPager({
-  page,
-  pageSize,
-  total,
-  capped,
-  itemCount,
-  nextCursor = null,
-  loading = false,
-  onGo,
-  onContinue,
-  onPageSize,
-}: PagerProps & { page: number }) {
-  const { t } = useT();
+/** One footer button: `key` is its role, shared by both modes. */
+export type PagerAction = {
+  key: 'first' | 'previous' | 'next' | 'last';
+  label: string;
+  unavailable?: boolean;
+  onPress: () => void;
+};
+
+/** What a mode puts in the shared footer frame. */
+export type PagerParts = { info: ReactNode; actions: PagerAction[]; testId?: string };
+
+function numberedPagerParts(t: Translate, props: PagerProps, page: number): PagerParts {
+  const { pageSize, total, capped, itemCount, nextCursor = null, onGo, onContinue } = props;
   const rangeStart = itemCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = itemCount === 0 ? 0 : rangeStart + itemCount - 1;
   // The last page the numbered pager reaches. On a capped listing that is
@@ -158,56 +186,40 @@ function NumberedPager({
   // Past the cap's last page the rows go on; the count does not. The server
   // says whether there are more (`nextCursor`), and "Next" follows it.
   const continues = capped && onLast && nextCursor !== null && onContinue !== undefined;
-  const next = () => (continues ? onContinue(nextCursor) : onGo(page + 1));
-  return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+  return {
+    info: (
+      <>
         <span title={capped ? cappedHelp(t, total) : undefined}>
           {pageInfo(t, rangeStart, rangeEnd, total, capped)}
         </span>
         <span data-testid="records-page-position">{pagePosition(t, page, lastPage, capped)}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <PageSizeSelect pageSize={pageSize} loading={loading} onPageSize={onPageSize} />
-        <div className="space-x-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={onFirst || loading}
-            onClick={() => onGo(1)}
-          >
-            {t('records.records.first', { defaultValue: 'First' })}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={onFirst || loading}
-            onClick={() => onGo(page - 1)}
-          >
-            {t('records.records.previous', { defaultValue: 'Previous' })}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={(onLast && !continues) || loading}
-            onClick={next}
-          >
-            {t('records.records.next', { defaultValue: 'Next' })}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={onLast || loading}
-            onClick={() => onGo(lastPage)}
-          >
-            {t('records.records.last', { defaultValue: 'Last' })}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+      </>
+    ),
+    actions: [
+      {
+        key: 'first',
+        label: t('records.records.first', { defaultValue: 'First' }),
+        unavailable: onFirst,
+        onPress: () => onGo(1),
+      },
+      {
+        key: 'previous',
+        label: t('records.records.previous', { defaultValue: 'Previous' }),
+        unavailable: onFirst,
+        onPress: () => onGo(page - 1),
+      },
+      {
+        key: 'next',
+        label: t('records.records.next', { defaultValue: 'Next' }),
+        unavailable: onLast && !continues,
+        onPress: () => (continues ? onContinue(nextCursor) : onGo(page + 1)),
+      },
+      {
+        key: 'last',
+        label: t('records.records.last', { defaultValue: 'Last' }),
+        unavailable: onLast,
+        onPress: () => onGo(lastPage),
+      },
+    ],
+  };
 }

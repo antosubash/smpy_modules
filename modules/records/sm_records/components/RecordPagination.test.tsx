@@ -19,22 +19,43 @@ function pagination(loading: boolean) {
   );
 }
 
-describe('RecordPagination — U12: the pager disables itself while a page change is in flight', () => {
+describe('RecordPagination — U12: the pager ignores presses while a page change is in flight', () => {
   it('leaves First/Previous/Next/Last and the page-size select enabled when idle', async () => {
     const view = await mount(pagination(false));
     for (const label of ['First', 'Previous', 'Next', 'Last']) {
       expect((view.button(label) as HTMLButtonElement).disabled).toBe(false);
+      expect(view.button(label)?.getAttribute('aria-disabled')).toBeNull();
     }
     expect(view.find<HTMLSelectElement>('#records-page-size')?.disabled).toBe(false);
     await view.unmount();
   });
 
-  it('disables every control while loading, on top of whatever First/Last already disable', async () => {
-    const view = await mount(pagination(true));
+  it('marks every control aria-disabled while loading, without disabling it', async () => {
+    // Not `disabled`: a focused control that disables itself throws keyboard
+    // focus to <body> (review 4, ux F2) — see PagerButton.test.tsx.
+    const onGo = vi.fn();
+    const view = await mount(
+      <RecordPagination
+        page={2}
+        pageSize={25}
+        total={100}
+        capped={false}
+        itemCount={25}
+        loading
+        onGo={onGo}
+        onPageSize={vi.fn()}
+      />,
+    );
     for (const label of ['First', 'Previous', 'Next', 'Last']) {
-      expect((view.button(label) as HTMLButtonElement).disabled).toBe(true);
+      const button = view.button(label) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+      await click(button);
     }
-    expect(view.find<HTMLSelectElement>('#records-page-size')?.disabled).toBe(true);
+    expect(onGo).not.toHaveBeenCalled();
+    const select = view.find<HTMLSelectElement>('#records-page-size');
+    expect(select?.disabled).toBe(false);
+    expect(select?.getAttribute('aria-disabled')).toBe('true');
     await view.unmount();
   });
 });
@@ -57,7 +78,10 @@ function pager(overrides: Overrides = {}) {
   return { props, element: <RecordPagination {...props} /> };
 }
 
-const disabled = (el: HTMLElement | undefined) => (el as HTMLButtonElement).disabled;
+/** Unavailable either way a pager button can say so: natively `disabled`
+ *  at a boundary, `aria-disabled` while in flight (`PagerButton`). */
+const disabled = (el: HTMLElement | undefined) =>
+  (el as HTMLButtonElement).disabled || el?.getAttribute('aria-disabled') === 'true';
 
 describe('RecordPagination — past the cap, Next continues by cursor', () => {
   it('on the capped last page, Next follows next_cursor instead of a page number', async () => {
@@ -128,10 +152,15 @@ describe('RecordPagination — cursor mode (a page reached by ?after=)', () => {
     await view.unmount();
   });
 
-  it('disables both while a request is in flight', async () => {
-    const view = await mount(pager({ page: null, loading: true }).element);
+  it('marks both unavailable while a request is in flight, and ignores them', async () => {
+    const { props, element } = pager({ page: null, loading: true });
+    const view = await mount(element);
     expect(disabled(view.button('First page'))).toBe(true);
     expect(disabled(view.button('Next page'))).toBe(true);
+    await click(view.button('First page'));
+    await click(view.button('Next page'));
+    expect(props.onGo).not.toHaveBeenCalled();
+    expect(props.onContinue).not.toHaveBeenCalled();
     await view.unmount();
   });
 });
