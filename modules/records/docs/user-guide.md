@@ -315,7 +315,8 @@ list can show:
 - every declared field of the type, with its type and an **Indexed** badge. A
   field that is not indexed can be shown too, but its header cannot be
   sorted — the panel says so under it ("Not indexed: shown, but it can't be
-  sorted or filtered."), and its header carries the same note on hover;
+  sorted or filtered."), and its header says *not sortable* beside the
+  label, with the full sentence on hover;
 - the record's own columns — **Status**, **Language** (under the same
   condition as above), **Position**, **Published on** and **Updated** — as
   toggles.

@@ -95,8 +95,9 @@ export function RecordFlagBadges({ record }: { record: RecordRead }) {
 /**
  * One column header. The record's own columns and indexed fields sort; a
  * non-indexed field cannot (the server sorts through the index only), so
- * its header is plain text with the reason in a tooltip rather than a
- * button that would answer with a `not_indexed` error.
+ * its header is plain text with a muted "not sortable" beside it (the full
+ * reason in a tooltip) rather than a button that would answer with a
+ * `not_indexed` error.
  */
 export function ColumnHeader({
   column,
@@ -125,6 +126,14 @@ export function ColumnHeader({
           })}
         >
           {label}
+        </span>{' '}
+        {/* Said on the page, not only in the hover title, which keyboard and
+            screen-reader users never get (review 4, ux F14). */}
+        <span
+          className="text-xs font-normal text-muted-foreground"
+          data-testid="records-column-note"
+        >
+          {t('records.columns.not_sortable_short', { defaultValue: 'not sortable' })}
         </span>
       </TableHead>
     );

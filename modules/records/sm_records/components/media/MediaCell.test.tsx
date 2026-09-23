@@ -219,7 +219,14 @@ describe('the media column', () => {
       </MediaApiProvider>,
     );
     await flush();
-    const headers = view.all('th').map((th) => th.textContent);
+    // Minus the muted "not sortable" a non-indexed header carries.
+    const headers = view
+      .all('th')
+      .map((th) =>
+        th.textContent
+          ?.replace(th.querySelector('[data-testid="records-column-note"]')?.textContent ?? '', '')
+          .trim(),
+      );
     expect(headers).toContain('Photo');
     expect(headers).not.toContain('Back');
     const mediaCell = view.find('[data-testid="records-media-cell"]');
@@ -228,7 +235,7 @@ describe('the media column', () => {
     expect(
       view
         .all('th')
-        .find((th) => th.textContent === 'Photo')
+        .find((th) => th.textContent?.startsWith('Photo'))
         ?.querySelector('button'),
     ).toBeNull();
     await view.unmount();

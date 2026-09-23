@@ -241,6 +241,7 @@
     "record_column": "Record column",
     "not_indexed_help": "Not indexed: shown, but it can't be sorted or filtered.",
     "not_sortable": "Not indexed, so this column can't be sorted or filtered.",
+    "not_sortable_short": "not sortable",
     "move_up": "Move {label} up",
     "move_down": "Move {label} down",
     "cap_reached": "At most {max} field columns — hide one to show another.",

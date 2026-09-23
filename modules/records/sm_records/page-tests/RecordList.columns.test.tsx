@@ -94,7 +94,12 @@ const getParams = (call = 0) =>
 
 type View = Awaited<ReturnType<typeof mount>>;
 const headers = (view: View) =>
-  view.all('thead th').map((th) => th.textContent?.replace(/[▲▼]/g, '').trim());
+  view.all('thead th').map((th) => {
+    // The header's text without a non-indexed column's "not sortable" note.
+    const copy = th.cloneNode(true) as HTMLElement;
+    copy.querySelector('[data-testid="records-column-note"]')?.remove();
+    return copy.textContent?.replace(/[▲▼]/g, '').trim();
+  });
 const saved = () => window.localStorage.getItem(columnStorageKey('book'));
 
 async function openPanel(view: View) {

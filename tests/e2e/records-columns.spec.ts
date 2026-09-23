@@ -50,7 +50,14 @@ async function seedColumnsType(page: Page): Promise<string> {
  *  arrow a sorted header carries. */
 async function headers(page: Page): Promise<string[]> {
   await expect(page.getByTestId('records-record-row').first()).toBeVisible();
-  const texts = await page.locator('thead th').allTextContents();
+  // Without a non-indexed column's muted "not sortable" note.
+  const texts = await page.locator('thead th').evaluateAll((cells) =>
+    cells.map((th) => {
+      const copy = th.cloneNode(true) as HTMLElement;
+      copy.querySelector('[data-testid="records-column-note"]')?.remove();
+      return copy.textContent ?? '';
+    }),
+  );
   return texts.map((text) => text.replace(/[▲▼]/g, '').trim()).filter(Boolean);
 }
 
@@ -96,7 +103,8 @@ test.describe('Records — the column chooser', () => {
     expect(await headers(page)).toEqual(chosen);
     // The non-indexed column has no sort control.
     const blurbHeader = page.getByTestId('records-column-unsortable');
-    await expect(blurbHeader).toHaveText('Blurb');
+    // Its note is on the page, not only on hover (review 4, ux F14).
+    await expect(blurbHeader).toHaveText('Blurb not sortable');
     await expect(blurbHeader.getByRole('button')).toHaveCount(0);
 
     // The link is the view: a reload keeps it.

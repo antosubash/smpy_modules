@@ -78,7 +78,12 @@ async function table(raw: string | null, records = [record()], sort = null, onSo
 }
 
 const headers = (view: Awaited<ReturnType<typeof mount>>) =>
-  view.all('thead th').map((th) => th.textContent?.replace(/[▲▼]/g, '').trim());
+  view.all('thead th').map((th) => {
+    // The header's text without a non-indexed column's "not sortable" note.
+    const copy = th.cloneNode(true) as HTMLElement;
+    copy.querySelector('[data-testid="records-column-note"]')?.remove();
+    return copy.textContent?.replace(/[▲▼]/g, '').trim();
+  });
 
 describe('RecordTable — renders the chosen columns, in the chosen order', () => {
   it('puts Title first and Actions last around exactly the chosen set', async () => {
@@ -97,6 +102,10 @@ describe('RecordTable — renders the chosen columns, in the chosen order', () =
     expect(plain?.getAttribute('data-column')).toBe('meta');
     expect(plain?.querySelector('button')).toBeNull();
     expect(plain?.querySelector('[title]')?.getAttribute('title')).toContain('Not indexed');
+    // …and says so on the page, not only on hover (review 4, ux F14).
+    expect(plain?.querySelector('[data-testid="records-column-note"]')?.textContent).toBe(
+      'not sortable',
+    );
     await click(view.all('thead button').find((b) => b.textContent?.includes('Price')));
     expect(onSort).toHaveBeenCalledWith('price');
     await view.unmount();
