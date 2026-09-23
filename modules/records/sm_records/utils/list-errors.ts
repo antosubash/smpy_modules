@@ -105,7 +105,8 @@ export function filterErrorMessage(t: Translate, reason: string | undefined): st
  *  partial Inertia reload with no focus move, so the page silently became a
  *  different page. The page count is dropped when `capped` — past the
  *  ceiling (F4) there is no last page to name — and the page number too on
- *  a page reached by cursor (`page: null`), which has none. */
+ *  a page reached by cursor (`page: null`), which has none. An empty cursor
+ *  page is the end of the list, not "0 records, continuing". */
 export function listStatus(
   t: Translate,
   {
@@ -115,6 +116,12 @@ export function listStatus(
     capped,
   }: { count: number; page: number | null; pages: number; capped: boolean },
 ): string {
+  if (page === null && count === 0) {
+    // Past the last row: nothing continues (review 4, ux F5).
+    return t('records.records.list_status_cursor_end', {
+      defaultValue: 'No more records after the previous page',
+    });
+  }
   if (page === null) {
     return t('records.records.list_status_cursor', {
       count,

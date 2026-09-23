@@ -80,6 +80,7 @@
     "list_status_cursor": "{count} record, continuing in the same order",
     "list_status_cursor_one": "{count} record, continuing in the same order",
     "list_status_cursor_other": "{count} records, continuing in the same order",
+    "list_status_cursor_end": "No more records after the previous page",
     "page_info": "Showing {start}–{end} of {total}",
     "page_info_capped": "Showing {start}–{end} of {count}+",
     "page_info_capped_help": "More than {count} records match; the count stops at {count}.",

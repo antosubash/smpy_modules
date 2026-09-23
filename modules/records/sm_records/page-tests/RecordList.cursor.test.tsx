@@ -131,7 +131,27 @@ describe('RecordList — paging past the cap by cursor', () => {
     expect(view.host.textContent).not.toContain('No records yet');
     // The filter bar stays: the type is not empty, only this page is.
     expect(view.find('[data-testid="records-filter-bar"]')).not.toBeNull();
-    expect((view.button('Next page') as HTMLButtonElement).disabled).toBe(true);
+    // Review 4, ux F5: nothing continues from here, so the footer says
+    // nothing about continuing and leaves "First page" to the box.
+    expect(view.find('[data-testid="records-page-cursor"]')).toBeNull();
+    expect(view.button('Next page')).toBeUndefined();
+    expect(view.all('button').filter((b) => b.textContent === 'First page')).toHaveLength(1);
+    expect(view.find('#records-page-size')).not.toBeNull();
+    expect(view.find('[data-testid="records-list-status"]')?.textContent).toBe(
+      'No more records after the previous page',
+    );
+    await view.unmount();
+  });
+
+  it('a refused link keeps the footer quiet too: no "continues", one First page', async () => {
+    pageUrl = '/admin/records/book?sort=name&after=TAMPERED';
+    pageErrors = { filter: 'bad_cursor' };
+    const view = await mount(<RecordList type={type} records={cursorPage('a', null, 0)} />);
+    expect(view.find('[data-testid="records-page-cursor"]')).toBeNull();
+    expect(view.all('button').filter((b) => b.textContent === 'First page')).toHaveLength(1);
+    const status = view.find('[data-testid="records-list-status"]')?.textContent;
+    expect(status).toMatch(/^This link can't continue the list/);
+    expect(status).not.toMatch(/continuing/);
     await view.unmount();
   });
 

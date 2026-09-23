@@ -26,6 +26,8 @@ export function RecordListFooter({
   goTo: (next: ListUrlChange) => void;
 }) {
   const { t } = useT();
+  // A cursor page with nothing to continue from — see `PagerProps.stopped`.
+  const stopped = records.page === null && (Boolean(errorReason) || records.items.length === 0);
   return (
     <>
       {/* A filter, a sort or a page swaps the rows through a partial reload
@@ -53,6 +55,7 @@ export function RecordListFooter({
         capped={records.total_capped}
         itemCount={records.items.length}
         nextCursor={records.next_cursor}
+        stopped={stopped}
         loading={loading}
         onGo={(next) => goTo({ page: next })}
         onContinue={(cursor) => goTo({ after: cursor })}

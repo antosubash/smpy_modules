@@ -160,6 +160,12 @@ describe('listStatus on a cursor page', () => {
     );
   });
 
+  it('says the list ended on an empty cursor page, not "0 records, continuing"', () => {
+    expect(listStatus(t, { count: 0, page: null, pages: 1, capped: false })).toBe(
+      'records.records.list_status_cursor_end',
+    );
+  });
+
   it('is unchanged on a numbered page', () => {
     expect(listStatus(t, { count: 25, page: 2, pages: 2, capped: true })).toBe(
       'records.records.list_status_uncounted#25',

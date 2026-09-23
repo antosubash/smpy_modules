@@ -14,8 +14,9 @@ import type { PagerParts, PagerProps, Translate } from './RecordPagination';
  */
 export function cursorPagerParts(
   t: Translate,
-  { nextCursor = null, onGo, onContinue }: PagerProps,
+  { nextCursor = null, stopped = false, onGo, onContinue }: PagerProps,
 ): PagerParts {
+  if (stopped) return { testId: 'records-cursor-pager', info: null, actions: [] };
   return {
     testId: 'records-cursor-pager',
     info: (

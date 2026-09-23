@@ -91,6 +91,12 @@ export type PagerProps = {
    *  enabled (`aria-disabled`), so keyboard focus stays put (`PagerButton`). */
   loading?: boolean;
   onGo: (page: number) => void;
+  /** A cursor page that shows nothing to continue from: refused, or past
+   *  the last row. The empty box above says which and offers the way back,
+   *  so the footer keeps only the page-size select — no "continues from
+   *  here" sentence under a notice that says it can't, and no second
+   *  "First page" (review 4, ux F5). */
+  stopped?: boolean;
   /** Continues with `?after=<cursor>` — see `utils/listing.ts::listParams`. */
   onContinue?: (cursor: string) => void;
   /** Writes `?page_size=` and returns to page 1 — the row the reader was

@@ -200,6 +200,10 @@ test.describe('Records — capped totals and cursor paging', () => {
       "This link can't continue the list",
     );
     await expect(page.getByTestId('records-empty-cursor')).toBeVisible();
+    // The footer neither says the list continues nor offers a second First
+    // page under a notice that says it can't (review 4, ux F5).
+    await expect(page.getByTestId('records-page-cursor')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'First page', exact: true })).toHaveCount(1);
     await page
       .getByTestId('records-empty-state')
       .getByRole('button', { name: 'First page' })
