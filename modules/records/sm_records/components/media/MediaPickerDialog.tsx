@@ -87,6 +87,25 @@ function PickerBody({
         : list.page.items.filter((file) => file.filename.toLowerCase().includes(needle));
   const pages =
     list.status === 'ready' ? Math.max(1, Math.ceil(list.page.total / list.page.perPage)) : 1;
+  // Decided by the files that arrived, not `total`: `file_storage` counts
+  // soft-deleted files in `total` (framework #332), so an empty library
+  // said "No files on this page match that name" with nothing typed
+  // (review 4, ux F9).
+  const loaded = list.status === 'ready' ? list.page.items.length : 0;
+  const emptyMessage =
+    list.status !== 'ready' || files.length > 0
+      ? null
+      : loaded > 0
+        ? t('records.media.no_matches_page', {
+            defaultValue: 'No files on this page match that name.',
+          })
+        : serverQuery
+          ? t('records.media.no_matches', { defaultValue: 'No files match that name.' })
+          : page > 1
+            ? t('records.media.no_more_files', { defaultValue: 'There are no more files.' })
+            : t('records.media.empty', {
+                defaultValue: 'The media library is empty. Upload a file to use it here.',
+              });
 
   return (
     <>
@@ -141,26 +160,12 @@ function PickerBody({
             </Button>
           </div>
         )}
-        {list.status === 'ready' && list.page.total === 0 && (
+        {emptyMessage && (
           <p
             className="py-6 text-center text-sm text-muted-foreground"
             data-testid="records-media-empty"
           >
-            {serverQuery
-              ? t('records.media.no_matches', { defaultValue: 'No files match that name.' })
-              : t('records.media.empty', {
-                  defaultValue: 'The media library is empty. Upload a file to use it here.',
-                })}
-          </p>
-        )}
-        {list.status === 'ready' && list.page.total > 0 && files.length === 0 && (
-          <p
-            className="py-6 text-center text-sm text-muted-foreground"
-            data-testid="records-media-empty"
-          >
-            {t('records.media.no_matches_page', {
-              defaultValue: 'No files on this page match that name.',
-            })}
+            {emptyMessage}
           </p>
         )}
         {files.length > 0 && (

@@ -82,6 +82,18 @@ describe('MediaPickerDialog — the list', () => {
     await view.unmount();
   });
 
+  it('says the library is empty even when its total counts deleted files', async () => {
+    // Review 4, ux F9: `file_storage` answered `{items: [], total: 3}` (three
+    // soft-deleted files), and the dialog said "No files on this page match
+    // that name." with nothing typed.
+    stubLibrary([], { total: 3 });
+    const { view } = await open();
+    expect($('[data-testid="records-media-empty"]')?.textContent).toBe(
+      'The media library is empty. Upload a file to use it here.',
+    );
+    await view.unmount();
+  });
+
   it('shows a load failure with a retry that asks again', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     const { view } = await open();

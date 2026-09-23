@@ -723,6 +723,7 @@
     "next": "Next",
     "no_matches": "No files match that name.",
     "no_matches_page": "No files on this page match that name.",
+    "no_more_files": "There are no more files.",
     "none": "No file chosen.",
     "page_info": "Page {page} of {pages}",
     "pagination": "Media library pages",
