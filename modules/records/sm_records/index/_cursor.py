@@ -4,9 +4,9 @@
 rows before the ones it wants; the cost is linear in the rows skipped and is
 paid again on every page. ``?after=<cursor>`` asks for "the rows the order
 puts after this one" instead, which the same index that answers the ordering
-answers directly. The three *internal* walks in this module
-(``reindex_type``, ``_dry_run._batches``, ``_orphaned._records``) have always
-paged this way; this is the same technique made available to a caller.
+answers directly. The module's *internal* batched walks
+(``services._common.walk_type``) have always paged this way; this is the
+same technique made available to a caller.
 
 A cursor is **opaque but not secret**: base64 of a small JSON object, so a
 client cannot read anything into its parts and a server can decode it without

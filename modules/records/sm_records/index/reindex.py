@@ -28,6 +28,7 @@ from sm_records.index.providers import TypeResolver
 from sm_records.index.reduce_rebuild import rebuild_type
 from sm_records.index.writer import project, row_values, write_index
 from sm_records.models import RecordType, tables_for
+from sm_records.services._common import walk_type
 
 
 async def reindex_record(
@@ -155,31 +156,11 @@ async def reindex_type(
     passes ``session.commit``, so a rebuild of a large type holds SQLite's
     single write lock for one batch at a time rather than for the whole walk.
     """
-    record_cls = tables_for(rtype).record
     total = 0
-    last_id = 0
-    while True:
-        batch = (
-            (
-                await db.execute(
-                    select(record_cls)
-                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
-                    .order_by(record_cls.id)
-                    .limit(batch_size)
-                    # Keyset, not OFFSET: the rebuild writes as it reads, and an
-                    # offset walk over a table being written to skips rows.
-                    .execution_options(include_deleted=True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not batch:
-            break
+    # Keyset, not OFFSET: the rebuild writes as it reads (``walk_type``).
+    async for batch in walk_type(db, rtype, batch_size):
         await reindex_batch(db, batch, rtype, resolve_type_id=resolve_type_id, touched=touched)
-        for record in batch:
-            last_id = record.id or last_id
-            total += 1
+        total += len(batch)
         if after_batch is not None:
             await after_batch()
     # After the map rows, never interleaved with them: a reduce row is a fold

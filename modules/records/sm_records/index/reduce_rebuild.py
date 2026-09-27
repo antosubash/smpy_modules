@@ -31,14 +31,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import insert, select
+from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._drift import clear_drift, record_drift
 from sm_records.index._reduce_write import drop_type_rows, stored_rows
 from sm_records.index.reduce import ReduceSpec, contribution, reduce_specs
-from sm_records.models import IndexReduce, RecordType, tables_for
-from sm_records.services._common import utcnow
+from sm_records.models import IndexReduce, RecordType
+from sm_records.services._common import utcnow, walk_type
 
 __all__ = ["Drift", "rebuild_type", "recompute", "verify_type"]
 
@@ -70,35 +70,17 @@ async def recompute(
 ) -> dict[str, tuple[int, Decimal | None]]:
     """Fold every **live** record of ``rtype`` through ``spec``.
 
-    Keyset by ``id`` and not ``OFFSET``, for the reason
-    :func:`sm_records.index.reindex.reindex_type` gives: the walk may run
-    while the type is being written to, and an offset walk over a table being
-    written to skips rows.
+    Keyset by ``id`` and not ``OFFSET`` (``services._common.walk_type``): the
+    walk may run while the type is being written to, and an offset walk over a
+    table being written to skips rows.
 
     The walk reads ``rtype``'s own table set (Phase 5 §6.3); the reduce rows it
     produces go in the **global** reduce table either way, which is keyed by
     ``type_id`` and stays shared (§6.4).
     """
-    record_cls = tables_for(rtype).record
     totals: dict[str, tuple[int, Decimal | None]] = {}
-    last_id = 0
-    while True:
-        batch = (
-            (
-                await db.execute(
-                    select(record_cls)
-                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
-                    .order_by(record_cls.id)
-                    .limit(batch_size)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not batch:
-            return totals
+    async for batch in walk_type(db, rtype, batch_size, include_deleted=False):
         for record in batch:
-            last_id = record.id or last_id
             found = contribution(spec, record, rtype)
             if found is None:
                 continue
@@ -108,6 +90,7 @@ async def recompute(
                 count + 1,
                 None if spec.value is None else (total or Decimal(0)) + amount,
             )
+    return totals
 
 
 async def rebuild_type(
