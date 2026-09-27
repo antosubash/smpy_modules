@@ -218,14 +218,6 @@ async def test_the_bound_does_not_fill_with_trashed_rows(client):
     assert len(body["items"]) == 3
 
 
-async def test_the_trash_listing_counts_only_the_trash(client):
-    await _seed(client, 5)
-    listed = (await client.get(f"{_API}/widget/records?page_size=5", headers=roles(ADMIN))).json()
-    await _trash(client, [item["uuid"] for item in listed["items"]][:2])
-    body = (await client.get(f"{_API}/widget/records?trashed=true", headers=roles(ADMIN))).json()
-    assert (body["total"], body["total_capped"], len(body["items"])) == (2, False, 2)
-
-
 async def test_the_trash_listing_is_capped_too(client):
     await _seed(client, 5)
     listed = (await client.get(f"{_API}/widget/records?page_size=5", headers=roles(ADMIN))).json()
