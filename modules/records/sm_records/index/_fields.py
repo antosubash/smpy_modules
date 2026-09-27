@@ -24,7 +24,6 @@ class IndexedField:
     """A field definition reduced to what the writer and the query builder use."""
 
     key: str
-    type: FieldType
     kind: IndexKind
     many: bool
     """One value, several index rows — a ``multiselect``, or a to-many
@@ -58,7 +57,7 @@ def read_field(raw: dict[str, Any]) -> IndexedField | None:
         return None
     options = raw.get("options") or {}
     many = field_type in MULTI_VALUED or bool(options.get("many"))
-    return IndexedField(key=str(raw.get("key")), type=field_type, kind=kind, many=many)
+    return IndexedField(key=str(raw.get("key")), kind=kind, many=many)
 
 
 def indexed_fields(fields: list[dict[str, Any]]) -> list[IndexedField]:
@@ -81,22 +80,6 @@ def relation_target(raw: dict[str, Any]) -> str | None:
     return (raw.get("options") or {}).get("target_type")
 
 
-_VIRTUAL_TYPE: dict[IndexKind, FieldType] = {
-    IndexKind.TEXT: FieldType.TEXT,
-    IndexKind.NUMBER: FieldType.NUMBER,
-    IndexKind.BOOL: FieldType.BOOLEAN,
-    IndexKind.DATE: FieldType.DATE,
-    IndexKind.DATETIME: FieldType.DATETIME,
-    IndexKind.REF: FieldType.RELATION,
-}
-"""The field type a virtual field borrows, per kind. A provider declares a
-*kind* — which index table it writes — and no field type, because no type
-declares the key; ``IndexedField`` carries one because every other field has
-one. Nothing reads it, and mapping it here rather than widening
-``IndexedField`` keeps declared and virtual fields the same shape for the
-query builder."""
-
-
 def virtual_field(key: str, kind: IndexKind, many: bool) -> IndexedField:
     """A provider-projected key (design doc §7.6) as an ``IndexedField``.
 
@@ -104,4 +87,4 @@ def virtual_field(key: str, kind: IndexKind, many: bool) -> IndexedField:
     :class:`~sm_records.index.providers.VirtualField` so this module keeps
     importing nothing from ``providers`` — ``providers`` imports *it*.
     """
-    return IndexedField(key=key, type=_VIRTUAL_TYPE[kind], kind=kind, many=many)
+    return IndexedField(key=key, kind=kind, many=many)
