@@ -24,7 +24,6 @@ from sm_records.deps import (
     MAX_PAGE,
     caller_roles,
     get_settings,
-    has_edit_permission,
     load_allowed_type,
     parse_sorts,
     parse_trashed,
@@ -34,15 +33,14 @@ from sm_records.deps import (
 )
 from sm_records.endpoints import _list_view, views_types
 from sm_records.endpoints.api._errors import RecordsViewErrorRoute
+from sm_records.endpoints.api.referrers import record_or_trash
 from sm_records.endpoints.api.translations import translations_of
 from sm_records.index.query import Filter, Sort
 from sm_records.media import media_props
 from sm_records.models import RecordType
 from sm_records.services import _relations
 from sm_records.services import expand as expand_service
-from sm_records.services import records as record_service
 from sm_records.services import types as type_service
-from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives; it
@@ -141,16 +139,7 @@ async def record_edit(
     this screen shows, and the panel is its own endpoint.
     """
     counts = await type_service.record_counts(db, rtype)
-    try:
-        record = await record_service.get_record(db, rtype, uuid)
-    except NotFound:
-        # A soft-deleted record 404s from ``get_record`` — the framework's
-        # filter hides it. Restore/purge are only reachable from this screen
-        # (FAIL-3), so a caller who can edit gets the trashed row instead of
-        # a dead end; anyone else still sees the same 404 as before.
-        if not await has_edit_permission(request, db):
-            raise
-        record = await record_service.get_deleted_record(db, rtype, uuid)
+    record = await record_or_trash(request, db, rtype, uuid)
     expanded = await expand_service.expand(
         db,
         rtype,

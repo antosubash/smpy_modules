@@ -123,6 +123,25 @@ async def test_record_edit_view(client, records_app):
     assert body["props"]["type"]["key"] == "product"
 
 
+async def test_record_edit_view_opens_a_trashed_record_for_an_editor_only(client, records_app):
+    """Restore and purge live on this screen, so an editor reaches a trashed
+    record here; a viewer gets the same 404 as for any hidden record."""
+    _, db_state = records_app
+    rtype = await seed_type(db_state, "product", [_field("price", "number")])
+    record = await seed_record(db_state, rtype, {"price": "1"})
+    url = f"/admin/records/product/{record.uuid}"
+    trashed = await client.delete(
+        f"/api/records/types/product/records/{record.uuid}", headers=roles(ADMIN)
+    )
+    assert trashed.status_code == 204, trashed.text
+
+    resp = await client.get(url, headers={**roles(ADMIN), **_INERTIA_HEADERS})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["props"]["record"]["is_deleted"] is True
+    resp = await client.get(url, headers={**roles(ROLE_VIEWER), **_INERTIA_HEADERS})
+    assert resp.status_code == 404
+
+
 async def test_new_route_is_not_shadowed_by_uuid_route(client, records_app):
     """Route order: ``/{key}/new`` must win over ``/{key}/{uuid}`` — a type
     with no record literally named ``new`` still has to reach the editor's

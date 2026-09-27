@@ -76,7 +76,7 @@ async def list_referrers(
     ``records.view`` holder, who cannot reach the trash at all, still gets
     the same 404 they always did.
     """
-    record = await _target_record(request, db, rtype, uuid)
+    record = await record_or_trash(request, db, rtype, uuid)
     refs, total, hidden = await _relations.paged_referrers(
         db,
         record,
@@ -100,12 +100,13 @@ async def list_referrers(
     )
 
 
-async def _target_record(request: Request, db: AsyncSession, rtype: RecordType, uuid: str):
-    """The record the panel is about, trash included for an editor.
+async def record_or_trash(request: Request, db: AsyncSession, rtype: RecordType, uuid: str):
+    """The record by uuid, trash included for an editor.
 
-    The same fallback ``views.record_edit`` makes, and for the same reason:
-    the badge that opens this panel is rendered on the trashed record's own
-    editor screen, so a 404 here is a dead end behind a number the UI just
+    A soft-deleted record 404s from ``get_record`` — the framework's filter
+    hides it. Restore/purge are only reachable from its editor screen
+    (``views.record_edit``, FAIL-3), and the badge that opens this panel is
+    rendered there, so a 404 would be a dead end behind a number the UI just
     showed. ``NotFound`` is re-raised untouched for anyone without
     ``records.edit``.
     """
