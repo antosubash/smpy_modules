@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from sm_records.cli_common import add_tenant_argument, load_settings, open_db
+from sm_records.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.contracts.io import ImportFormat, ImportMode, ImportReport, OnError
 from sm_records.services import export as export_service
 from sm_records.services import import_ as import_service
@@ -59,41 +59,35 @@ async def export_command(
     a 100k-record type does not have to fit in memory, and ``"".join(...)``
     here would put it back.
     """
-    db_state = open_db(database_url)
-    try:
+    async with connected(database_url) as db_state:
         with tenant_scope(tenant):
-            return await _export(db_state, type_key, fmt, out, tenant)
-    finally:
-        await db_state.engine.dispose()
-
-
-async def _export(db_state: Any, type_key: str, fmt: str, out: str | None, tenant: str) -> int:
-    """:func:`export_command`'s work, inside the tenant's scope."""
-    settings = await load_settings(db_state)
-    async with db_state.session_factory() as session:
-        rtype = await get_type(session, type_key)
-        type_id = int(rtype.id or 0)
-    chosen = ImportFormat(fmt)
-    stream = export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
-    # ``newline=""``: the CSV writer already emits RFC 4180's ``\r\n``,
-    # and letting Python translate line endings on top of that produces
-    # ``\r\r\n`` on a platform that translates.
-    handle = (
-        Path(out).open("w", encoding="utf-8", newline="")  # noqa: SIM115
-        if out
-        else sys.stdout
-    )
-    written = 0
-    try:
-        async for chunk in stream(db_state.session_factory, type_id, settings=settings):
-            handle.write(chunk)
-            written += len(chunk)
-    finally:
-        if out:
-            handle.close()
-    if out:
-        print(f"records export: {tenant}/{type_key} -> {out} ({written} bytes)")
-    return written
+            settings = await load_settings(db_state)
+            async with db_state.session_factory() as session:
+                rtype = await get_type(session, type_key)
+                type_id = int(rtype.id or 0)
+            chosen = ImportFormat(fmt)
+            stream = (
+                export_service.iter_json if chosen is ImportFormat.JSON else export_service.iter_csv
+            )
+            # ``newline=""``: the CSV writer already emits RFC 4180's ``\r\n``,
+            # and letting Python translate line endings on top of that produces
+            # ``\r\r\n`` on a platform that translates.
+            handle = (
+                Path(out).open("w", encoding="utf-8", newline="")  # noqa: SIM115
+                if out
+                else sys.stdout
+            )
+            written = 0
+            try:
+                async for chunk in stream(db_state.session_factory, type_id, settings=settings):
+                    handle.write(chunk)
+                    written += len(chunk)
+            finally:
+                if out:
+                    handle.close()
+            if out:
+                print(f"records export: {tenant}/{type_key} -> {out} ({written} bytes)")
+            return written
 
 
 def _print_report(type_key: str, report: ImportReport) -> None:
@@ -132,39 +126,29 @@ async def import_command(
         match_by=match_by,
         force=force,
     )
-    db_state = open_db(database_url)
-    try:
+    async with connected(database_url) as db_state:
         with tenant_scope(tenant):
-            return await _import(db_state, type_key, text, fmt, options, apply=apply)
-    finally:
-        await db_state.engine.dispose()
-
-
-async def _import(
-    db_state: Any, type_key: str, text: str, fmt: ImportFormat, options: Any, *, apply: bool
-) -> ImportReport:
-    """:func:`import_command`'s work, inside the tenant's scope."""
-    async with db_state.session_factory() as session:
-        settings = await load_settings(db_state)
-        rtype = await get_type(session, type_key)
-        try:
-            report = await import_service.import_records(
-                session, rtype, text, fmt=fmt, options=options, settings=settings
-            )
-        except ImportRefused as exc:
-            await session.rollback()
-            _print_report(type_key, exc.report)
-            raise SystemExit(1) from exc
-        if apply:
-            # The one commit in this module — see the docstring. A dry run
-            # rolls back instead, because the validation pass reads and a
-            # session left open on a read transaction is a lock held for
-            # no reason.
-            await session.commit()
-        else:
-            await session.rollback()
-    _print_report(type_key, report)
-    return report
+            async with db_state.session_factory() as session:
+                settings = await load_settings(db_state)
+                rtype = await get_type(session, type_key)
+                try:
+                    report = await import_service.import_records(
+                        session, rtype, text, fmt=fmt, options=options, settings=settings
+                    )
+                except ImportRefused as exc:
+                    await session.rollback()
+                    _print_report(type_key, exc.report)
+                    raise SystemExit(1) from exc
+                if apply:
+                    # The one commit in this module — see the docstring. A dry
+                    # run rolls back instead, because the validation pass reads
+                    # and a session left open on a read transaction is a lock
+                    # held for no reason.
+                    await session.commit()
+                else:
+                    await session.rollback()
+            _print_report(type_key, report)
+            return report
 
 
 def add_parsers(sub: Any) -> None:

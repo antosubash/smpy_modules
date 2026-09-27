@@ -20,6 +20,8 @@ one session serving two tenants is how the identity map leaks (FACT 1e).
 from __future__ import annotations
 
 import argparse
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from simple_module_db.listeners import register_listeners
@@ -29,19 +31,29 @@ from sm_records.constants import PACKAGE
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import DEFAULT_TENANT, install_guard, valid_tenant
 
-__all__ = ["add_tenant_argument", "load_settings", "open_db", "tenant_type"]
+__all__ = ["add_tenant_argument", "connected", "load_settings", "open_db", "tenant_type"]
 
 
 def open_db(database_url: str) -> Any:
     """A ``DatabaseState`` with the framework's listeners and records' guard.
 
-    The caller disposes of the engine. Every command already does, in a
-    ``finally``.
+    The caller disposes of the engine; every command opens it through
+    :func:`connected`, which does.
     """
     db_state = init_db(database_url)
     register_listeners(db_state)
     install_guard(db_state.sync_session_class)
     return db_state
+
+
+@asynccontextmanager
+async def connected(database_url: str) -> AsyncIterator[Any]:
+    """:func:`open_db` for the length of a ``with`` block, disposed on the way out."""
+    db_state = open_db(database_url)
+    try:
+        yield db_state
+    finally:
+        await db_state.engine.dispose()
 
 
 async def load_settings(db_state: Any) -> RecordsSettings:

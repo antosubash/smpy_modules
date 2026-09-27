@@ -23,7 +23,7 @@ import asyncio
 from sqlalchemy import select
 
 from sm_records._cross_tenant import read_all
-from sm_records.cli_common import load_settings, open_db
+from sm_records.cli_common import connected, load_settings
 from sm_records.models import RecordType
 from sm_records.services.reindex_runner import run_pending
 from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
@@ -67,8 +67,7 @@ async def reindex(database_url: str, type_key: str | None, tenant: str | None = 
     because walking every record of every type is not what an operator
     recovering one stuck field asked for.
     """
-    db_state = open_db(database_url)
-    try:
+    async with connected(database_url) as db_state:
         settings = await load_settings(db_state)
         if type_key is not None:
             targets = [await _named_type(db_state, type_key, tenant or DEFAULT_TENANT)]
@@ -84,8 +83,6 @@ async def reindex(database_url: str, type_key: str | None, tenant: str | None = 
             print(f"records reindex: {owner}/{key} — {count} record(s)")
         print(f"records reindex: {total} record(s) across {len(targets)} type(s)")
         return total
-    finally:
-        await db_state.engine.dispose()
 
 
 def force_pending(database_url: str, type_key: str, tenant: str = DEFAULT_TENANT) -> None:
@@ -100,8 +97,7 @@ def force_pending(database_url: str, type_key: str, tenant: str = DEFAULT_TENANT
     from sm_records.services._common import mark_written, utcnow
 
     async def run() -> None:
-        db_state = open_db(database_url)
-        try:
+        async with connected(database_url) as db_state:
             with tenant_scope(tenant):
                 async with db_state.session_factory() as session:
                     stmt = select(RecordType).where(
@@ -121,8 +117,6 @@ def force_pending(database_url: str, type_key: str, tenant: str = DEFAULT_TENANT
                     session.add(rtype)
                     mark_written(session)
                     await session.commit()
-        finally:
-            await db_state.engine.dispose()
 
     asyncio.run(run())
 
@@ -132,9 +126,6 @@ async def run_verify(database_url: str, type_key: str | None, tenant: str | None
     for the work — the same division of labour :func:`reindex` has."""
     from sm_records import cli_verify
 
-    db_state = open_db(database_url)
-    try:
+    async with connected(database_url) as db_state:
         settings = await load_settings(db_state)
         return await cli_verify.verify(db_state, type_key, settings=settings, tenant=tenant)
-    finally:
-        await db_state.engine.dispose()

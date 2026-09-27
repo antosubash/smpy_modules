@@ -31,7 +31,7 @@ from collections.abc import Sequence
 
 from sm_records import cli_io
 from sm_records._cross_tenant import TenantCounts, tenant_counts
-from sm_records.cli_common import add_tenant_argument, load_settings, open_db
+from sm_records.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.cli_reindex import force_pending, reindex, run_verify
 from sm_records.seed.runner import SeedSummary
 from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
@@ -61,8 +61,7 @@ async def seed(
     """
     from sm_records.seed import seed_database
 
-    db_state = open_db(database_url)
-    try:
+    async with connected(database_url) as db_state:
         settings = await load_settings(db_state)
         with tenant_scope(tenant):
             summary = await seed_database(
@@ -75,8 +74,6 @@ async def seed(
         for key, count in summary.created.items():
             print(f"records seed: {tenant}/{key} — {count}")
         return summary
-    finally:
-        await db_state.engine.dispose()
 
 
 async def tenants(database_url: str) -> dict[str, TenantCounts]:
@@ -87,12 +84,8 @@ async def tenants(database_url: str) -> dict[str, TenantCounts]:
     tenant exists when a user, a header or ``--tenant`` names it and something
     is written, so this is the only list of tenants there is (§J).
     """
-    db_state = open_db(database_url)
-    try:
-        async with db_state.session_factory() as session:
-            counts = await tenant_counts(session)
-    finally:
-        await db_state.engine.dispose()
+    async with connected(database_url) as db_state, db_state.session_factory() as session:
+        counts = await tenant_counts(session)
     if not counts:
         print("records tenants: no record types in any tenant")
         return counts
