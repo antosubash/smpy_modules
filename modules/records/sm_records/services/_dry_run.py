@@ -23,11 +23,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
-from sm_records.models import Record, RecordType, tables_for
+from sm_records.models import Record, RecordType
 from sm_records.schema.changes import DRY_RUN_SAMPLE, DryRunReport, FailingRecord, SchemaDiff
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -38,39 +37,9 @@ from sm_records.schema.compile import (
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _duplicates, _invalid
-from sm_records.services._common import record_count
+from sm_records.services._common import record_count, walk_type
 from sm_records.services._payload import field_defs
 from sm_records.settings import RecordsSettings
-
-
-async def _batches(db: AsyncSession, rtype: RecordType, batch_size: int):
-    """Every record of the type in ``id`` order, in batches.
-
-    Keyset rather than ``OFFSET``: the apply path runs this inside the same
-    transaction that will write, and an offset walk over a table being written
-    to skips rows — the same reason :func:`sm_records.index.reindex.reindex_type`
-    pages this way.
-    """
-    cls = tables_for(rtype).record
-    last_id = 0
-    while True:
-        rows = (
-            (
-                await db.execute(
-                    select(cls)
-                    .where(cls.type_id == rtype.id, cls.id > last_id)
-                    .order_by(cls.id)
-                    .limit(batch_size)
-                    .execution_options(include_deleted=True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not rows:
-            return
-        yield rows
-        last_id = rows[-1].id or last_id
 
 
 def _errors_for(model: type, view: dict[str, Any]) -> list[dict[str, str]]:
@@ -146,7 +115,7 @@ async def dry_run(
     sample: list[FailingRecord] = []
     collector = _duplicates.Collector([old for old, _new in unique_pairs if not old.indexed])
     marker = _invalid.Marker(db, rtype, enabled=mark)
-    async for batch in _batches(db, rtype, batch_size):
+    async for batch in walk_type(db, rtype, batch_size):
         for record in batch:
             checked += 1
             view = from_stored(new_defs, _payload_of(record, drop_keys))

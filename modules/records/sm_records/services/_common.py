@@ -16,7 +16,7 @@ map does not go stale behind the caller's back.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -167,6 +167,35 @@ async def reload[T](db: AsyncSession, model: type[T], row_id: int) -> T | None:
         .execution_options(include_deleted=True, populate_existing=True)
     )
     return (await db.execute(stmt)).scalars().first()
+
+
+async def walk_type(
+    db: AsyncSession, rtype: RecordType, batch_size: int, *, include_deleted: bool = True
+) -> AsyncIterator[list[Any]]:
+    """Every record of the type in ``id`` order, in batches of ``batch_size``.
+
+    Keyset rather than ``OFFSET``: the batched maintenance walks run while the
+    table is being written to — often by the walk itself — and an offset walk
+    over a table being written to skips rows. The next batch starts after the
+    last ``id`` yielded, so a caller may commit between batches
+    (``expire_on_commit=False`` keeps that ``id`` readable).
+    """
+    cls = tables_for(rtype).record
+    last_id = 0
+    while True:
+        stmt = (
+            select(cls)
+            .where(cls.type_id == rtype.id, cls.id > last_id)
+            .order_by(cls.id)
+            .limit(batch_size)
+        )
+        if include_deleted:
+            stmt = stmt.execution_options(include_deleted=True)
+        rows = list((await db.execute(stmt)).scalars().all())
+        if not rows:
+            return
+        yield rows
+        last_id = rows[-1].id or last_id
 
 
 async def record_count(

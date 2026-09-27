@@ -8,12 +8,12 @@ this one is a single batched walk it calls.
 
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._batch import current_batch
-from sm_records.models import RecordType, tables_for
+from sm_records.models import RecordType
 from sm_records.schema.compile import from_stored
+from sm_records.services._common import walk_type
 from sm_records.services._payload import display_title, field_defs
 
 __all__ = ["recompute_titles"]
@@ -43,27 +43,9 @@ async def recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int)
     walk reached them and their titles are correct when it ends.
     """
     defs = field_defs(rtype)
-    record_cls = tables_for(rtype).record
-    last_id, total = 0, 0
-    while True:
-        batch = (
-            (
-                await db.execute(
-                    select(record_cls)
-                    .where(record_cls.type_id == rtype.id, record_cls.id > last_id)
-                    .order_by(record_cls.id)
-                    .limit(batch_size)
-                    .execution_options(include_deleted=True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not batch:
-            return total
-        for record in batch:
-            last_id = record.id or last_id
-            total += 1
+    total = 0
+    async for batch in walk_type(db, rtype, batch_size):
+        total += len(batch)
         for record in await current_batch(db, batch, rtype):
             values = from_stored(defs, dict(record.data or {}))
             record.display_title = display_title(rtype, values)
@@ -72,3 +54,4 @@ async def recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int)
         # ``reindex_type``'s ``after_batch``: one batch of the write lock at a
         # time, and a half-finished title pass is repeated by the next run.
         await db.commit()
+    return total

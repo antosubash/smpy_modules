@@ -21,13 +21,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.index.reduce_rebuild import rebuild_type
-from sm_records.models import RecordType, tables_for
-from sm_records.services._common import mark_written
+from sm_records.models import RecordType
+from sm_records.services._common import mark_written, walk_type
 
 RESTORE = "restore"
 DISCARD = "discard"
@@ -47,29 +46,6 @@ def _payload_holds(data: dict[str, Any], key: str) -> bool:
     return isinstance(orphaned, dict) and key in orphaned
 
 
-async def _records(db: AsyncSession, rtype: RecordType, batch_size: int):
-    cls = tables_for(rtype).record
-    last_id = 0
-    while True:
-        rows = (
-            (
-                await db.execute(
-                    select(cls)
-                    .where(cls.type_id == rtype.id, cls.id > last_id)
-                    .order_by(cls.id)
-                    .limit(batch_size)
-                    .execution_options(include_deleted=True)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not rows:
-            return
-        yield rows
-        last_id = rows[-1].id or last_id
-
-
 async def count_conflicts(
     db: AsyncSession, rtype: RecordType, keys: list[str], *, batch_size: int
 ) -> dict[str, int]:
@@ -78,7 +54,7 @@ async def count_conflicts(
     if not keys:
         return {}
     counts: dict[str, int] = {}
-    async for batch in _records(db, rtype, batch_size):
+    async for batch in walk_type(db, rtype, batch_size):
         for record in batch:
             data = dict(record.data or {})
             for key in keys:
@@ -110,7 +86,7 @@ async def discard(db: AsyncSession, rtype: RecordType, keys: list[str], *, batch
     if not keys:
         return 0
     touched = 0
-    async for batch in _records(db, rtype, batch_size):
+    async for batch in walk_type(db, rtype, batch_size):
         for record in batch:
             data = dict(record.data or {})
             orphaned = dict(data.get(ORPHANED_KEY) or {})
