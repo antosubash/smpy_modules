@@ -18,7 +18,6 @@ rewriting the English records.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,7 +80,6 @@ async def resolve_matches(
     see it would try to *create* a duplicate and be refused by the unique
     index with a message naming nothing the operator can see.
     """
-    cls = tables_for(rtype).record
     if match_by == MATCH_UUID:
         # Unscoped **by type**, and scoped to this type's table set: ``uuid`` is
         # unique within a record table, so a file naming one that belongs to
@@ -91,7 +89,7 @@ async def resolve_matches(
         # *different* collection is simply not found, and a create carrying it
         # succeeds: the two tables have separate unique indexes and uuid4s do
         # not collide in practice (Phase 5 §6.4).
-        return await _by_column(db, rtype, rows, cls.uuid, lambda row: row.uuid, scoped=False)
+        return await _by_uuid(db, rtype, rows)
     if match_by == MATCH_SLUG:
         return await _by_slug(db, rtype, rows)
     field = match_field(rtype, defs, match_by)
@@ -149,30 +147,21 @@ async def _by_slug(
     return {number: found[key] for number, key in wanted.items() if key in found}
 
 
-async def _by_column(
-    db: AsyncSession,
-    rtype: RecordType,
-    rows: Sequence[ImportRow],
-    column: Any,
-    key_of: Any,
-    *,
-    scoped: bool = True,
+async def _by_uuid(
+    db: AsyncSession, rtype: RecordType, rows: Sequence[ImportRow]
 ) -> dict[int, Record]:
     cls = tables_for(rtype).record
-    wanted = {row.number: key_of(row) for row in rows}
+    wanted = {row.number: row.uuid for row in rows}
     keys = sorted({value for value in wanted.values() if value})
     found: dict[str, Record] = {}
     for start in range(0, len(keys), _CHUNK):
         chunk = keys[start : start + _CHUNK]
-        # The tenant explicitly, and before ``scoped``: an unscoped uuid match
-        # spans every type of the table set, and uuids are unique per tenant
-        # only (tenancy design §C, §E).
-        stmt = select(cls).where(column.in_(chunk), cls.tenant_id == bound_tenant())
-        if scoped:
-            stmt = stmt.where(cls.type_id == rtype.id)
+        # The tenant explicitly: this match spans every type of the table set,
+        # and uuids are unique per tenant only (tenancy design §C, §E).
+        stmt = select(cls).where(cls.uuid.in_(chunk), cls.tenant_id == bound_tenant())
         rows_found = (
             (await db.execute(stmt.execution_options(include_deleted=True))).scalars().all()
         )
         for record in rows_found:
-            found[str(getattr(record, column.key))] = record
+            found[str(record.uuid)] = record
     return {number: found[value] for number, value in wanted.items() if value in found}
