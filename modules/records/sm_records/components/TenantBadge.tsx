@@ -27,7 +27,7 @@ export function TenantBadge({
   if (tenancyMode !== 'multi' || !tenant) return null;
   return (
     <Badge variant="secondary" data-testid="records-tenant-badge">
-      {t('common.tenant_badge', { tenant, defaultValue: 'Tenant: {tenant}' })}
+      {t('records.common.tenant_badge', { tenant, defaultValue: 'Tenant: {tenant}' })}
     </Badge>
   );
 }
