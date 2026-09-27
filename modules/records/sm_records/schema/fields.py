@@ -109,15 +109,19 @@ def _validate_relation(key: str, options: dict[str, Any]) -> None:
     )
 
 
-def _validate_options(key: str, field_type: FieldType, options: dict[str, Any]) -> None:
-    allowed = _ALLOWED_OPTIONS.get(field_type, frozenset())
-    unknown = sorted(set(options) - allowed)
+def _only(key: str, what: str, field_type: FieldType, given: dict, allowed: frozenset) -> None:
+    """Refuse any ``what`` (option, constraint) the field type does not take."""
+    unknown = sorted(set(given) - allowed)
     _require(
         not unknown,
         key,
-        f"unknown option(s) {unknown} for a {field_type.value} field"
+        f"unknown {what}(s) {unknown} for a {field_type.value} field"
         + (f"; allowed: {sorted(allowed)}" if allowed else " (it takes none)"),
     )
+
+
+def _validate_options(key: str, field_type: FieldType, options: dict[str, Any]) -> None:
+    _only(key, "option", field_type, options, _ALLOWED_OPTIONS.get(field_type, frozenset()))
     if field_type in _CHOICE_TYPES:
         _validate_choices(key, options)
     elif field_type is FieldType.RELATION:
@@ -126,13 +130,7 @@ def _validate_options(key: str, field_type: FieldType, options: dict[str, Any]) 
 
 def _validate_constraints(key: str, field_type: FieldType, constraints: dict[str, Any]) -> None:
     allowed = _ALLOWED_CONSTRAINTS.get(field_type, frozenset())
-    unknown = sorted(set(constraints) - allowed)
-    _require(
-        not unknown,
-        key,
-        f"unknown constraint(s) {unknown} for a {field_type.value} field"
-        + (f"; allowed: {sorted(allowed)}" if allowed else " (it takes none)"),
-    )
+    _only(key, "constraint", field_type, constraints, allowed)
     for name in ("min_length", "max_length"):
         value = constraints.get(name)
         if value is not None:
