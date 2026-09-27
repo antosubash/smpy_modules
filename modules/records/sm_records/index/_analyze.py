@@ -29,7 +29,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import TableSet, table_set, table_sets
+from sm_records.models import TableSet, table_sets
 from sm_records.models._base import TYPE_TABLE
 
 logger = logging.getLogger(__name__)
@@ -37,16 +37,15 @@ logger = logging.getLogger(__name__)
 __all__ = ["analyze_tables", "index_table_names", "owned_table_names"]
 
 
-def index_table_names(tables: TableSet | None = None) -> frozenset[str]:
+def index_table_names(tables: TableSet) -> frozenset[str]:
     """The six kind tables of one table set — what a reindex rewrites.
 
     A function of the set rather than a module constant since Phase 5 §6: a
     rebuild of a collection type rewrites that collection's tables, and
     ``ANALYZE``-ing the global ones instead would refresh statistics for rows
-    nothing touched while leaving the stale ones stale. ``None`` is the global
-    set, for a caller with no type in hand.
+    nothing touched while leaving the stale ones stale.
     """
-    return frozenset(str(table.__tablename__) for table in (tables or table_set(None)).index_tables)
+    return frozenset(str(table.__tablename__) for table in tables.index_tables)
 
 
 def owned_table_names() -> frozenset[str]:

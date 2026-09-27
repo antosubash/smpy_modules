@@ -138,10 +138,7 @@ async def apply_delta(
     common edit does not touch the group it is in and the database is not told
     about it.
     """
-    specs = reduce_specs()
-    if not specs:
-        return
-    for spec in specs:
+    for spec in reduce_specs():
         old = contribution(spec, before, rtype) if before is not None else None
         new = contribution(spec, after, rtype) if after is not None else None
         if old == new:

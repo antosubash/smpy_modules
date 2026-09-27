@@ -111,9 +111,7 @@ def build_query(
     """The record list for one type, filtered and ordered through the index."""
     record = tables_for(rtype).record
     stmt = filtered(select(record).where(record.type_id == rtype.id), rtype, fields, filters)
-    return ordered(
-        record, stmt, sort_terms(rtype, indexed_map(fields), declared_keys(fields), sorts)
-    )
+    return ordered(record, stmt, sort_plan(rtype, fields, sorts))
 
 
 def page_query(
@@ -138,7 +136,7 @@ def page_query(
     """
     record = tables_for(rtype).record
     stmt = filtered(select(record).where(record.type_id == rtype.id), rtype, fields, filters)
-    terms = sort_terms(rtype, indexed_map(fields), declared_keys(fields), sorts)
+    terms = sort_plan(rtype, fields, sorts)
     if after is not None:
         stmt = stmt.where(keyset_clause(record, terms, after))
     stmt = ordered(record, stmt, terms)

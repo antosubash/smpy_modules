@@ -13,7 +13,6 @@ import pytest
 from sm_records.constants import MAX_KEY_LEN, ORPHANED_KEY
 from sm_records.schema.fields import (
     FieldSchemaError,
-    fields_by_key,
     validate_fields,
 )
 from sm_records.schema.types import FieldType
@@ -205,7 +204,7 @@ class TestDefaults:
 
 def test_fields_by_key_indexes_the_list():
     fields = validate_fields([text(), text("body", type="longtext", label="Body")])
-    by_key = fields_by_key(fields)
+    by_key = {field.key: field for field in fields}
     assert set(by_key) == {"title", "body"}
     assert by_key["body"].type is FieldType.LONGTEXT
 

@@ -272,7 +272,3 @@ def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list
         _validate_default(field)
         out.append(field)
     return out
-
-
-def fields_by_key(fields: list[FieldDefinition]) -> dict[str, FieldDefinition]:
-    return {field.key: field for field in fields}

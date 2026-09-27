@@ -27,7 +27,7 @@ all. Dumps therefore always pass ``by_alias=True``.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -221,9 +221,7 @@ def to_jsonable(data: Any) -> Any:
     """
     if isinstance(data, Decimal):
         return str(data)
-    if isinstance(data, datetime):
-        return data.isoformat()
-    if isinstance(data, date):
+    if isinstance(data, date):  # ``datetime`` included: it is a ``date``
         return data.isoformat()
     if isinstance(data, dict):
         return {key: to_jsonable(value) for key, value in data.items()}
