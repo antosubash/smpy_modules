@@ -221,7 +221,7 @@ ORDER = TypeDef(
         _f("placed_at", "datetime", "Placed at", indexed=True),
         _f(
             # Not ``status``: that is a column of every record, so it is a
-            # reserved field key (``constants._reserved_field_keys``) — the
+            # reserved field key (``index._fixed.RESERVED_FIELD_KEYS``) — the
             # query layer would answer ``filter=status:...`` from
             # ``records_record`` rather than from this field.
             "order_status",

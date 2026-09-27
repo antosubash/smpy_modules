@@ -1,6 +1,6 @@
 """The schema editor's mirrors of the API's key rules must equal the API's.
 
-``constants.RESERVED_FIELD_KEYS`` derives itself from the ``Record`` model so
+``index._fixed.RESERVED_FIELD_KEYS`` derives itself from the ``Record`` model so
 it cannot drift when a column is added; the TypeScript mirror in
 ``components/typeeditor/rules.ts`` is hand-typed and can. This test reads that
 file and compares the two sets, so the next column added to ``Record`` fails
@@ -21,6 +21,7 @@ import re
 from pathlib import Path
 
 from sm_records import constants
+from sm_records.index._fixed import RESERVED_FIELD_KEYS
 
 _RULES = (
     Path(__file__).resolve().parents[1] / "sm_records" / "components" / "typeeditor" / "rules.ts"
@@ -42,7 +43,7 @@ def _ts_reserved_keys() -> frozenset[str]:
 
 
 def test_editor_reserved_keys_match_api() -> None:
-    ts, py = _ts_reserved_keys(), constants.RESERVED_FIELD_KEYS
+    ts, py = _ts_reserved_keys(), RESERVED_FIELD_KEYS
     assert ts == py, f"only in rules.ts: {sorted(ts - py)}; only in constants: {sorted(py - ts)}"
 
 

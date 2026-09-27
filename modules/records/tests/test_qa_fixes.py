@@ -18,8 +18,8 @@ in the same change.
 from __future__ import annotations
 
 import pytest
-from sm_records.constants import RESERVED_FIELD_KEYS
 from sm_records.index._fields import read_field
+from sm_records.index._fixed import RESERVED_FIELD_KEYS
 from sm_records.index.query import FIXED_COLUMNS
 from sm_records.models import Record
 from sm_records.schema.fields import FieldSchemaError, validate_fields

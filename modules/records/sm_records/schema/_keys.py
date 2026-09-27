@@ -18,7 +18,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sm_records.constants import MAX_KEY_LEN, RESERVED_FIELD_KEYS, TYPE_KEY_PATTERN
+from sm_records.constants import MAX_KEY_LEN, TYPE_KEY_PATTERN
+from sm_records.index._fixed import RESERVED_FIELD_KEYS
 from sm_records.index._registry import reduce_keys
 from sm_records.index.providers import virtual_fields
 
@@ -65,7 +66,7 @@ def validate_key(raw: dict[str, Any], seen: set[str], *, on_save: bool = False) 
     # Reserved first: `_orphaned` also fails the pattern, and "reserved by the
     # module" tells the author why far better than a regex does. The rest is
     # every ``Record`` column plus the fixed filter/sort columns
-    # (``constants._reserved_field_keys``), which the query layer resolves
+    # (``index._fixed.RESERVED_FIELD_KEYS``), which the query layer resolves
     # ahead of the type's own fields — so such a field indexed correctly and
     # was then filtered and sorted from the wrong data, with a 200.
     reserved = "key is reserved: it names a column every record already has, "

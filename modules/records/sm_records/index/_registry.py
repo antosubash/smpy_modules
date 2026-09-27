@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sm_records import constants
-from sm_records.index._fixed import FIXED_COLUMNS
+from sm_records.index._fixed import RESERVED_FIELD_KEYS
 from sm_records.schema.types import IndexKind
 
 _Provider = Callable[..., Any]
@@ -99,8 +99,7 @@ def _check_key(key: str, *, virtual: bool = True) -> None:
             f"{'reduce spec' if virtual else 'virtual field'}: one key, one owner, whichever "
             "kind of provider claimed it first"
         )
-    reserved = frozenset(constants.RESERVED_FIELD_KEYS) | FIXED_COLUMNS
-    if key in reserved:
+    if key in RESERVED_FIELD_KEYS:
         raise ValueError(
             f"{kind} {key!r} is a reserved key: it names a column every record "
             "already has, which the query grammar resolves first — the rows would be "

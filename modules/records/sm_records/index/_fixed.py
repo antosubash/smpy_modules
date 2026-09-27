@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.sql import ColumnElement
 
+from sm_records.constants import ORPHANED_KEY
 from sm_records.index._coerce import coerce_bool, coerce_datetime, coerce_text
 from sm_records.index._predicates import (
     LIKE_ESCAPE_CHAR,
@@ -36,6 +37,7 @@ __all__ = [
     "FIXED_COLUMNS",
     "NOT_NULL_FIXED_COLUMNS",
     "PUBLIC_FIXED_COLUMNS",
+    "RESERVED_FIELD_KEYS",
     "SORT_INDEXED_FIXED_COLUMNS",
     "fixed_clause",
     "fixed_column",
@@ -73,7 +75,7 @@ informative within it.
 a property of the *document*, like its status: the ``records_index_*`` tables
 are untouched by content i18n, and ``filter=locale:eq:de`` is an ordinary
 column predicate (Phase 5 §4.1). Membership here is also what reserves the key
-— ``constants.RESERVED_FIELD_KEYS`` derives from this set plus the ``Record``
+— :data:`RESERVED_FIELD_KEYS` derives from this set plus the ``Record``
 columns — so no type can declare a field called ``locale`` and have it answered
 from the wrong place."""
 
@@ -92,6 +94,21 @@ caller binary-search an audit timestamp to arbitrary precision and read the
 internal ``position`` ordering of content it is only supposed to be able to
 list. They are refused by name, the same 400 an unindexed field gets, rather
 than answered.
+"""
+
+RESERVED_FIELD_KEYS: frozenset[str] = frozenset(
+    {ORPHANED_KEY, *FIXED_COLUMNS, *(str(column.key) for column in Record.__table__.columns)}
+)
+"""Field keys a Record Type may never declare.
+
+Derived, never hand-typed: every column of the ``Record`` row plus
+:data:`FIXED_COLUMNS` (the filterable/sortable projection of §7.2) plus
+``_orphaned``. ``index.query._term`` resolves a fixed column *before* the
+type's own fields, so a field keyed ``status`` or ``position`` was legal,
+indexable, and then answered from ``records_record`` — a 200 with the
+wrong rows. Refusing the key at schema-save time is the fix; deriving the
+set from the model is what stops it drifting the next time a column is
+added to ``Record``.
 """
 
 _FIXED_ALIAS: dict[str, str] = {"invalid": "invalid_since"}

@@ -6,10 +6,7 @@ bare literal — see scripts/check_hardcoded_strings.py.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
-
-if TYPE_CHECKING:  # pragma: no cover - see ``__getattr__`` at the bottom
-    RESERVED_FIELD_KEYS: Final[frozenset[str]]
+from typing import Final
 
 PACKAGE: Final = "sm_records"
 """The import package, and the attribute on ``app.state`` the services
@@ -172,25 +169,6 @@ ORPHANED_KEY: Final = "_orphaned"
 """Reserved payload key holding values of deleted fields. Design doc §8.2."""
 
 
-def _reserved_field_keys() -> frozenset[str]:
-    """Field keys a Record Type may never declare — see ``RESERVED_FIELD_KEYS``.
-
-    Derived, never hand-typed: every column of the ``Record`` row plus
-    ``FIXED_COLUMNS`` (the filterable/sortable projection of §7.2) plus
-    ``_orphaned``. ``index.query._term`` resolves a fixed column *before* the
-    type's own fields, so a field keyed ``status`` or ``position`` was legal,
-    indexable, and then answered from ``records_record`` — a 200 with the
-    wrong rows. Refusing the key at schema-save time is the fix; deriving the
-    set from the model is what stops it drifting the next time a column is
-    added to ``Record``.
-    """
-    from sm_records.index.query import FIXED_COLUMNS
-    from sm_records.models import Record
-
-    columns = {str(column.key) for column in Record.__table__.columns}
-    return frozenset({ORPHANED_KEY, *FIXED_COLUMNS, *columns})
-
-
 REINDEX_ALL: Final = "*"
 """The ``reindex_pending`` entry meaning "rebuild the whole type", enqueued by
 a ``display_field`` change — every record's ``display_title`` is denormalised
@@ -241,20 +219,3 @@ RESERVED_TYPE_KEYS: Final = frozenset({"types", "new"})
 """Type keys that would shadow a view route: ``/admin/records/types/...`` is
 the schema editor and ``/admin/records/{key}/new`` the record editor, and a
 type keyed ``types`` would put its record list at the editor's address."""
-
-
-def __getattr__(name: str) -> Any:
-    """Resolve ``RESERVED_FIELD_KEYS`` on first use (PEP 562).
-
-    It is derived from ``Record.__table__`` and ``index.query.FIXED_COLUMNS``,
-    and both of those modules import *this* one — so the set cannot be built
-    while this module is still executing. Computing it on the first attribute
-    read breaks the cycle and then caches into ``globals()``, so every later
-    lookup is an ordinary module attribute. ``TYPE_CHECKING`` at the top of
-    the file declares the name for type checkers, which do not run this.
-    """
-    if name == "RESERVED_FIELD_KEYS":
-        value = _reserved_field_keys()
-        globals()[name] = value
-        return value
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

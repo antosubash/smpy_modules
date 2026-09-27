@@ -116,7 +116,7 @@ marked; the derived badge is unaffected and a later check re-derives the list.
 ### Before upgrading past `8f3d223f8605`: `invalid` is now a reserved field key
 
 The same change made `invalid` a fixed filter/sort column, and
-`constants.RESERVED_FIELD_KEYS` derives itself from that set — so `invalid`
+`index._fixed.RESERVED_FIELD_KEYS` derives itself from that set — so `invalid`
 and `invalid_since` join `status`, `slug`, `locale` and the rest as keys a
 type may not declare. **There is no migration guard for an install that
 already declared one**, and the consequence is not only a refused schema save:
