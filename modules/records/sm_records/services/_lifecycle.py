@@ -18,8 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._reduce_write import apply_delta, drop_type_rows
 from sm_records.index.reindex import reindex_record
-from sm_records.index.writer import delete_index
-from sm_records.models import Record, RecordType, RevisionEvent, TableSet, tables_for
+from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.services._common import (
     PurgedRecord,
     mark_written,
@@ -31,6 +30,7 @@ from sm_records.services._common import (
 # it, and rewriting the records that point at the one being deleted — lives
 # there, and everything about a record's own existence lives here.
 from sm_records.services._delete_plan import apply_set_null, plan_delete
+from sm_records.services._empty_trash import _purge_ids
 from sm_records.services.errors import Conflict, ReferencedByOthers
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
@@ -159,40 +159,6 @@ async def restore_record(
     return record
 
 
-async def _purge(db: AsyncSession, tables: TableSet, records: list[Record]) -> None:
-    """Really delete rows of one table set, by core statement, and detach what
-    is left holding them.
-
-    ``session.delete()`` cannot do this: the framework's ``before_flush``
-    listener intercepts the delete of any ``SoftDeleteMixin`` row, expunges it
-    and re-adds it with ``is_deleted = True`` (``simple_module_db.listeners``).
-    That is the right default and it makes a hard delete unexpressible through
-    the ORM — so a purge is a core ``DELETE``, the identity map is cleared by
-    hand because a core statement does not touch it, and the session is marked
-    written because core DML does not fire ``after_flush``.
-
-    Revisions are deleted explicitly although the FK says ``ON DELETE
-    CASCADE``: SQLite does not enforce foreign keys unless
-    ``PRAGMA foreign_keys`` is on, and it is not here, so relying on the
-    cascade would leave orphaned revision rows on the default dev backend and
-    not on Postgres.
-    """
-    ids = [record.id for record in records if record.id is not None]
-    if not ids:
-        return
-    # Core DML carries no tenant filter but its own (tenancy design §E).
-    tenant = bound_tenant()
-    revision, document = tables.revision, tables.record
-    await db.execute(
-        sa_delete(revision).where(revision.record_id.in_(ids), revision.tenant_id == tenant)
-    )
-    await db.execute(sa_delete(document).where(document.id.in_(ids), document.tenant_id == tenant))
-    await db.flush()
-    for record in records:
-        db.expunge(record)
-    mark_written(db)
-
-
 async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record) -> None:
     """Purge a trashed record, index rows and all.
 
@@ -205,9 +171,10 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     # **No reduce delta**: the record was decremented when it was trashed, and
     # the refusal above guarantees only a trashed record reaches here, so a
     # second decrement would take the group below the truth (Phase 5 §5.2).
-    tables = tables_for(rtype)
-    await delete_index(db, tables, record.id)
-    await _purge(db, tables, [record])
+    await _purge_ids(db, rtype, [record.id])
+    # A core statement does not touch the identity map, so the instance still
+    # holding the deleted row is detached by hand.
+    db.expunge(record)
 
 
 async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[PurgedRecord]:
@@ -256,7 +223,7 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Purged
     # no foreign key to cascade through, so this is what removes them.
     await drop_type_rows(db, rtype.id)
     # Explicit rather than via the FK's ON DELETE CASCADE, for the reason
-    # ``_purge`` gives: SQLite leaves foreign keys unenforced unless the
+    # ``_empty_trash._purge_ids`` gives: SQLite leaves foreign keys unenforced unless the
     # pragma is on, so the cascade would clean up on Postgres and orphan rows
     # on the default dev backend.
     #

@@ -54,6 +54,21 @@ class Identity:
 async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> None:
     """Really delete these rows, and their index and revision rows.
 
+    By core statement: ``session.delete()`` cannot do this, because the
+    framework's ``before_flush`` listener intercepts the delete of any
+    ``SoftDeleteMixin`` row, expunges it and re-adds it with
+    ``is_deleted = True`` (``simple_module_db.listeners``). That is the right
+    default and it makes a hard delete unexpressible through the ORM — so the
+    session is marked written by hand, because core DML does not fire
+    ``after_flush``, and a caller holding an instance expunges it itself.
+    ``_lifecycle.hard_delete_record`` is this for one id.
+
+    Revisions are deleted explicitly although the FK says ``ON DELETE
+    CASCADE``: SQLite does not enforce foreign keys unless
+    ``PRAGMA foreign_keys`` is on, and it is not here, so relying on the
+    cascade would leave orphaned revision rows on the default dev backend and
+    not on Postgres.
+
     By id and in chunks rather than by the filter that selected them: the
     filter compiles to a semi-join over the index tables, and this deletes
     those first, so a second evaluation would match nothing. Index rows go
