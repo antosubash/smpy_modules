@@ -1,8 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
-import { NavIcon } from '@simple-module-py/ui/components/NavIcon';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import {
@@ -17,11 +15,9 @@ import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 
-import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
 import { RecordsToaster } from '../components/RecordsToaster';
 import { TenantBadge } from '../components/TenantBadge';
-import { TypesCardList } from '../components/TypesCardList';
-import { navIconName } from '../components/typeeditor/navIcons';
+import { TypeCounts, TypeIdentity, TypeKey, TypesCardList } from '../components/TypesCardList';
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { TenancyMode, TypeRead } from '../utils/types';
 
@@ -129,97 +125,13 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
                 {visible.map((type) => (
                   <TableRow key={type.key} data-testid="records-type-row" data-type-key={type.key}>
                     <TableCell className="font-medium">
-                      <div className="flex items-start gap-2">
-                        {type.icon && (
-                          <span
-                            className="mt-0.5 shrink-0 text-muted-foreground"
-                            data-testid="records-type-icon"
-                            data-icon={navIconName(type.icon)}
-                          >
-                            {/* `NavIcon` draws from an allowlist, not from
-                                all of lucide-react, and answers a name
-                                outside it with an empty span — so an icon
-                                this row can't draw falls back to the
-                                module's own rather than to a hole. */}
-                            <NavIcon name={navIconName(type.icon)} />
-                          </span>
-                        )}
-                        <div className="min-w-0">
-                          <Link
-                            href={`/admin/records/${type.key}`}
-                            className="hover:underline"
-                            data-testid="records-type-link"
-                          >
-                            {type.label}
-                          </Link>
-                          {type.show_in_menu && (
-                            <span
-                              className="ml-2 text-xs font-normal text-muted-foreground"
-                              data-testid="records-type-in-sidebar"
-                            >
-                              {t('records.types.in_sidebar', { defaultValue: 'In sidebar' })}
-                            </span>
-                          )}
-                          {type.description && (
-                            <p
-                              className="text-sm font-normal text-muted-foreground"
-                              data-testid="records-type-description"
-                            >
-                              {type.description}
-                            </p>
-                          )}
-                          {type.is_public && (
-                            <RecordListPublicUrl
-                              typeKey={type.key}
-                              publicRoutePrefix={public_route_prefix}
-                            />
-                          )}
-                        </div>
-                      </div>
+                      <TypeIdentity type={type} publicRoutePrefix={public_route_prefix} />
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground align-top">
-                      {type.key}
-                      {type.collection && (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 font-sans"
-                          data-testid="records-type-collection-badge"
-                        >
-                          {type.collection}
-                        </Badge>
-                      )}
+                      <TypeKey type={type} />
                     </TableCell>
                     <TableCell className="align-top">
-                      {t('records.types.record_count', {
-                        count: type.record_count,
-                        defaultValue: '{count} record',
-                        defaultValue_other: '{count} records',
-                      })}
-                      {type.trashed_record_count > 0 && (
-                        <span className="ml-1 text-muted-foreground">
-                          {t('records.types.trashed_record_count', {
-                            count: type.trashed_record_count,
-                            defaultValue: '({count} trashed)',
-                            defaultValue_other: '({count} trashed)',
-                          })}
-                        </span>
-                      )}
-                      {/* A link and not a count: the number is only useful if
-                          it is one click from the records it counts, which is
-                          the list filtered by the same flag. */}
-                      {type.invalid_record_count > 0 && (
-                        <Link
-                          href={`/admin/records/${type.key}?filter=invalid:eq:true`}
-                          className="ml-1 text-destructive hover:underline"
-                          data-testid="records-type-invalid-count"
-                        >
-                          {t('records.types.invalid_record_count', {
-                            count: type.invalid_record_count,
-                            defaultValue: '({count} invalid)',
-                            defaultValue_other: '({count} invalid)',
-                          })}
-                        </Link>
-                      )}
+                      <TypeCounts type={type} />
                     </TableCell>
                     <TableCell className="text-right align-top">
                       <Link
