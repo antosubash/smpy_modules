@@ -253,3 +253,19 @@ async def test_renaming_the_plural_relabels_the_entry(menu_client):
 
     labels = [item["label"] for item in await _sidebar(menu_client, ADMIN)]
     assert labels == ["All record types", "Firms"]
+
+
+async def test_a_type_imported_with_the_switch_on_shows_up_on_the_next_page_request(menu_client):
+    """``POST /types/import`` in create mode marks the sidebar dirty, as ``POST /types`` does."""
+    imported = await menu_client.post(
+        f"{_TYPES}/import",
+        json={
+            "key": "company",
+            "label": "Company",
+            "label_plural": "Companies",
+            "show_in_menu": True,
+        },
+        headers=roles(ADMIN),
+    )
+    assert imported.status_code == 200, imported.text
+    assert "Companies" in [item["label"] for item in await _sidebar(menu_client, ADMIN)]

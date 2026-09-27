@@ -9,11 +9,13 @@ implementation plan exactly.
 from __future__ import annotations
 
 from functools import partial
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
+from sm_records.contracts.io import TypeImportRequest
 from sm_records.contracts.schemas import (
     TypeCreate,
     TypeListResponse,
@@ -89,6 +91,83 @@ def _check_roles_for_discard(request: Request, rtype: RecordType, orphaned: str 
         check_type_roles(request, rtype)
 
 
+async def create_from(
+    request: Request,
+    db: AsyncSession,
+    body: TypeCreate | TypeImportRequest,
+    settings: RecordsSettings,
+    who: str | None,
+) -> TypeRead:
+    """Create a type from a body — ``POST /types``, and an import's create mode."""
+    rtype = await type_service.create_type(
+        db,
+        key=body.key,
+        label=body.label,
+        settings=settings,
+        label_plural=body.label_plural,
+        description=body.description,
+        icon=body.icon,
+        fields_raw=body.fields,
+        display_field=body.display_field,
+        slug_field=body.slug_field,
+        is_public=body.is_public,
+        show_in_menu=body.show_in_menu,
+        translatable=body.translatable,
+        allowed_roles=body.allowed_roles,
+        collection=body.collection,
+        actor=who,
+    )
+    if body.show_in_menu:
+        mark_dirty(request.app)
+    # A freshly created type holds no records, trashed or otherwise — skip
+    # the queries rather than count a table it cannot yet appear in.
+    return type_read(rtype, 0, 0, 0)
+
+
+async def type_written(
+    request: Request,
+    db: AsyncSession,
+    updated: RecordType,
+    before: list,
+    settings: RecordsSettings,
+) -> TypeRead:
+    """What every edit of a type row does last: the event, the deferred
+    reindex if one is pending, and the fresh ``TypeRead``."""
+    events.publish(request, events.type_changed(updated, before))
+    _schedule_reindex_if_pending(request, updated, settings)
+    return type_read(updated, *await type_service.record_counts(db, updated))
+
+
+async def apply_update(
+    request: Request,
+    db: AsyncSession,
+    rtype: RecordType,
+    body: TypeUpdate | TypeImportRequest,
+    changes: dict[str, Any],
+    settings: RecordsSettings,
+    who: str | None,
+) -> TypeRead:
+    """``update_type`` with ``changes`` — ``PUT /types/{key}``, and an
+    import's update mode."""
+    before = list(rtype.fields or [])
+    updated = await type_service.update_type(
+        db,
+        rtype,
+        expected_version=body.expected_version,
+        settings=settings,
+        actor=who,
+        force=body.force,
+        orphaned=body.orphaned,
+        **changes,
+    )
+    # Only for a change that can move the sidebar — the marking is cheap, but
+    # the read it schedules is a query, and ``fields`` edits are the common
+    # case on this route and never touch navigation.
+    if affects_menu(changes):
+        mark_dirty(request.app)
+    return await type_written(request, db, updated, before, settings)
+
+
 @router.get("/types", response_model=TypeListResponse, dependencies=[require_view])
 async def list_types(request: Request, db: AsyncSession = Depends(request_db)) -> TypeListResponse:
     """Every type this caller may read records of. One whose ``allowed_roles``
@@ -114,29 +193,7 @@ async def create_type(
     settings=Depends(get_settings),
     who: str | None = Depends(actor),
 ) -> TypeRead:
-    rtype = await type_service.create_type(
-        db,
-        key=body.key,
-        label=body.label,
-        settings=settings,
-        label_plural=body.label_plural,
-        description=body.description,
-        icon=body.icon,
-        fields_raw=body.fields,
-        display_field=body.display_field,
-        slug_field=body.slug_field,
-        is_public=body.is_public,
-        show_in_menu=body.show_in_menu,
-        translatable=body.translatable,
-        allowed_roles=body.allowed_roles,
-        collection=body.collection,
-        actor=who,
-    )
-    if body.show_in_menu:
-        mark_dirty(request.app)
-    # A freshly created type holds no records, trashed or otherwise — skip
-    # the queries rather than count a table it cannot yet appear in.
-    return type_read(rtype, 0, 0, 0)
+    return await create_from(request, db, body, settings, who)
 
 
 @router.get("/types/{key}", response_model=TypeRead, dependencies=[require_view])
@@ -181,25 +238,7 @@ async def update_type(
         raise ValidationFailed(problem, [{"field": "key", "message": problem}])
     if "fields" in changes:
         changes["fields_raw"] = changes.pop("fields")
-    before = list(rtype.fields or [])
-    updated = await type_service.update_type(
-        db,
-        rtype,
-        expected_version=body.expected_version,
-        settings=settings,
-        actor=who,
-        force=body.force,
-        orphaned=body.orphaned,
-        **changes,
-    )
-    # Only for a change that can move the sidebar — the marking is cheap, but
-    # the read it schedules is a query, and ``fields`` edits are the common
-    # case on this route and never touch navigation.
-    if affects_menu(changes):
-        mark_dirty(request.app)
-    events.publish(request, events.type_changed(updated, before))
-    _schedule_reindex_if_pending(request, updated, settings)
-    return type_read(updated, *await type_service.record_counts(db, updated))
+    return await apply_update(request, db, rtype, body, changes, settings, who)
 
 
 @router.delete("/types/{key}", status_code=204, dependencies=[require_manage_types])

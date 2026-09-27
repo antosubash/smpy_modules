@@ -17,9 +17,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.io import TypeExport, TypeImportRequest, type_export
-from sm_records.contracts.schemas import TypeRead, type_read
+from sm_records.contracts.schemas import TypeRead
 from sm_records.deps import (
     actor,
     check_type_roles,
@@ -31,8 +30,7 @@ from sm_records.deps import (
 )
 from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.endpoints.api._responses import IMPORT, responses
-from sm_records.endpoints.api.types import _check_roles_for_discard, _schedule_reindex_if_pending
-from sm_records.menu import affects_menu, mark_dirty
+from sm_records.endpoints.api.types import _check_roles_for_discard, apply_update, create_from
 from sm_records.models import RecordType
 from sm_records.services import types as type_service
 from sm_records.services.errors import ValidationFailed
@@ -116,27 +114,7 @@ async def import_type(
     behind it, which is the data loss §8 exists for.
     """
     if body.mode != _UPDATE:
-        rtype = await type_service.create_type(
-            db,
-            key=body.key,
-            label=body.label,
-            settings=settings,
-            label_plural=body.label_plural,
-            description=body.description,
-            icon=body.icon,
-            fields_raw=body.fields,
-            display_field=body.display_field,
-            slug_field=body.slug_field,
-            is_public=body.is_public,
-            translatable=body.translatable,
-            show_in_menu=body.show_in_menu,
-            allowed_roles=body.allowed_roles,
-            collection=body.collection,
-            actor=who,
-        )
-        if body.show_in_menu:
-            mark_dirty(request.app)
-        return type_read(rtype, 0, 0, 0)
+        return await create_from(request, db, body, settings, who)
 
     if body.expected_version is None:
         raise ValidationFailed(
@@ -146,22 +124,7 @@ async def import_type(
     rtype = await type_service.get_type(db, body.key)
     _check_roles_for_discard(request, rtype, body.orphaned)
     changes = _update_changes(request, rtype, body)
-    before = list(rtype.fields or [])
-    updated = await type_service.update_type(
-        db,
-        rtype,
-        expected_version=body.expected_version,
-        settings=settings,
-        actor=who,
-        force=body.force,
-        orphaned=body.orphaned,
-        **changes,
-    )
-    # Same rule as ``PUT /types/{key}``: an imported definition that renames a
+    # ``PUT /types/{key}``'s own tail: an imported definition that renames a
     # type, re-icons it, narrows its roles or flips ``show_in_menu`` has moved
     # the sidebar, and nothing else here has.
-    if affects_menu(changes):
-        mark_dirty(request.app)
-    events.publish(request, events.type_changed(updated, before))
-    _schedule_reindex_if_pending(request, updated, settings)
-    return type_read(updated, *await type_service.record_counts(db, updated))
+    return await apply_update(request, db, rtype, body, changes, settings, who)

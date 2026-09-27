@@ -35,7 +35,6 @@ from sm_records.contracts.schemas import (
     record_read,
     record_revision_detail_read,
     revision_read,
-    type_read,
 )
 from sm_records.deps import (
     MAX_PAGE,
@@ -54,15 +53,14 @@ from sm_records.endpoints.api._errors import RecordsErrorRoute
 from sm_records.endpoints.api._responses import WRITE, responses
 
 # The two helpers a schema rollback shares with every other type write — the
-# ``orphaned="discard"`` role check and the deferred reindex. Imported rather
-# than copied, because a second opinion about either is a permission hole or
-# a stuck rebuild.
-from sm_records.endpoints.api.types import _check_roles_for_discard, _schedule_reindex_if_pending
+# ``orphaned="discard"`` role check and the post-write tail (event, deferred
+# reindex, fresh read). Imported rather than copied, because a second opinion
+# about either is a permission hole or a stuck rebuild.
+from sm_records.endpoints.api.types import _check_roles_for_discard, type_written
 from sm_records.models import RecordType, tables_of
 from sm_records.services import records as record_service
 from sm_records.services import revisions as revision_service
 from sm_records.services import schema_change
-from sm_records.services import types as type_service
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
 
@@ -220,6 +218,4 @@ async def restore_type_revision(
         force=body.force,
         orphaned=body.orphaned,
     )
-    events.publish(request, events.type_changed(updated, before))
-    _schedule_reindex_if_pending(request, updated, settings)
-    return type_read(updated, *await type_service.record_counts(db, updated))
+    return await type_written(request, db, updated, before, settings)
