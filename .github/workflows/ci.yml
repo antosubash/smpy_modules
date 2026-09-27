@@ -168,13 +168,9 @@ jobs:
           SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
         run: uv run --project host alembic -c host/alembic.ini check
 
-      # Both RECORDS_TEST_URL (tests/pg_support.py, today) and
-      # SM_TEST_DATABASE_URL (the name it and pagebuilder/news are being
-      # generalised to — RECORDS_TEST_URL stays as an alias) point at the
-      # same database, so this step works before and after that rename lands.
+      # SM_TEST_DATABASE_URL is the name tests/pg_support.py reads first.
       - name: Run pytest (records, Postgres)
         env:
-          RECORDS_TEST_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
           SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
         run: cd modules/records && uv run pytest -q -p no:cacheprovider
 
