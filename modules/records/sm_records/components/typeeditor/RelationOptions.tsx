@@ -2,14 +2,8 @@ import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
-
+import type { Translate } from '../../utils/translate';
 import { RELATION_ON_DELETE, type RelationOnDelete, type TargetType } from './types';
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up
-// TS with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 function onDeleteLabel(t: Translate, choice: RelationOnDelete): string {
   const defaults: Record<RelationOnDelete, string> = {

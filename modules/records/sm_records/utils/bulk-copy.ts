@@ -11,10 +11,7 @@
  */
 
 import type { BulkAction } from './api-records';
-
-// The same loose typing the components use for `useT()`'s `t`.
-// biome-ignore lint/suspicious/noExplicitAny: matches the hook's own signature
-type Translate = (...args: any[]) => string;
+import type { Translate } from './translate';
 
 export type BulkActionCopy = {
   action: BulkAction;

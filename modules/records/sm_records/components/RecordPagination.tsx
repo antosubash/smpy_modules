@@ -2,6 +2,7 @@ import { useT } from '@simple-module-py/i18n';
 import type { ReactNode } from 'react';
 
 import { PAGE_SIZES } from '../utils/listing';
+import type { Translate } from '../utils/translate';
 import { PagerButton } from './PagerButton';
 import { PageSizeSelect } from './PageSizeSelect';
 import { cursorPagerParts } from './RecordCursorPager';
@@ -11,10 +12,6 @@ import { cursorPagerParts } from './RecordCursorPager';
 // and would otherwise strand a reader who picked 100 with no control to go
 // back to 25. Re-exported for the callers that imported it from here.
 export { PAGE_SIZES };
-
-// See `utils/list-errors.ts` for why `t` is typed this loosely.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-export type Translate = (...args: any[]) => string;
 
 /** The footer's "Showing 1–25 of N" — or "of 10,000+" when the API capped
  *  the count (F4, `RecordsSettings.max_count`). Two calls and not one

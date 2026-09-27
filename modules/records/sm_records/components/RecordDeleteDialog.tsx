@@ -3,6 +3,7 @@ import { useT } from '@simple-module-py/i18n';
 import { type ReactNode, useState } from 'react';
 
 import { listReferrers } from '../utils/api-history';
+import type { Translate } from '../utils/translate';
 import type { ReferrerRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -20,10 +21,6 @@ function ReferrerLink({ item }: { item: ReferrerRead }) {
     </Link>
   );
 }
-
-// See `RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /** Exported only for `RecordDeleteDialog.test.tsx`: the dialog's own text is
  *  pure given `loading`/`loadError`/`referrers`, so it is tested directly

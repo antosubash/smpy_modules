@@ -5,6 +5,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 
 import { fieldTypeName } from '../../utils/field-type-name';
+import type { Translate } from '../../utils/translate';
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
@@ -18,12 +19,6 @@ import {
   uniqueAllowed,
 } from './rules';
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up
-// TS with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
   const defaults = {

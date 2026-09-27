@@ -4,10 +4,7 @@ import { toast } from 'sonner';
 
 import { ApiError } from '../utils/api';
 import { type BulkAction, type BulkReport, bulkRecords, emptyTrash } from '../utils/api-records';
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+import type { Translate } from '../utils/translate';
 
 /** What each action says when it worked. One key per action rather than a
  *  built string: a sentence assembled from a verb and a count is a sentence

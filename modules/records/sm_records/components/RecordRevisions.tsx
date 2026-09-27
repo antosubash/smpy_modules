@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { ApiError } from '../utils/api';
 import { getRecordRevision, listRevisions, restoreRecordRevision } from '../utils/api-history';
+import type { Translate } from '../utils/translate';
 import type {
   RecordRead,
   RecordRevision,
@@ -231,12 +232,6 @@ export function RecordRevisions({
     </Card>
   );
 }
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up TS
-// with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /** The old data no longer fits the current schema — summarise the 422 list
  *  rather than showing nothing, since "restore failed" alone doesn't say

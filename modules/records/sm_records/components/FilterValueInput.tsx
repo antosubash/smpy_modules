@@ -5,6 +5,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 
 import type { FilterKind } from '../utils/filters';
 import { localeLabel } from '../utils/locale';
+import type { Translate } from '../utils/translate';
 import type { FieldDef } from '../utils/types';
 import {
   choicesOf,
@@ -17,10 +18,6 @@ import { RelationPicker } from './RelationPicker';
 
 const VALUE_ID = 'records-filter-value';
 const LABEL_ID = `${VALUE_ID}-label`;
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /**
  * The filter bar's value control, chosen by the kind of thing being

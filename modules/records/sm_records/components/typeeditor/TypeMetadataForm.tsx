@@ -4,6 +4,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useRef } from 'react';
+import type { Translate } from '../../utils/translate';
 import type { TenancyMode, ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
@@ -14,12 +15,6 @@ import { RolesMultiSelect } from './RolesMultiSelect';
 import { type KeyError as KeyErrorCode, keyValid, MAX_KEY_LEN, MAX_LABEL_LEN } from './rules';
 import { SidebarField } from './SidebarField';
 import type { TypeMetadataValues } from './types';
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up
-// TS with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 const ID = {
   key: 'type-editor-key',

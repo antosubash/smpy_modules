@@ -5,6 +5,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useState } from 'react';
 
 import { emptyTrashDescription } from '../utils/bulk-copy';
+import type { Translate } from '../utils/translate';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /**
@@ -117,9 +118,6 @@ export function EmptyTrashButton({
     />
   );
 }
-
-// biome-ignore lint/suspicious/noExplicitAny: matches `useT()`'s own signature
-type Translate = (...args: any[]) => string;
 
 /** The line under the box: what to type, or that what was typed is not it.
  *  Four sentences rather than two with a substituted noun — "Type product"

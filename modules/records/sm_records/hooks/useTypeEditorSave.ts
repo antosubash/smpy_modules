@@ -5,13 +5,10 @@ import { toast } from 'sonner';
 import { buildChanges, extraCreateFields, stripUids } from '../components/typeeditor/formHelpers';
 import type { EditableField, TypeMetadataValues } from '../components/typeeditor/types';
 import { ApiError, createType } from '../utils/api';
+import type { Translate } from '../utils/translate';
 import type { TypeRead, ValidationError } from '../utils/types';
 import type { SchemaApplyBody, useSchemaApply } from './useSchemaApply';
 import type { useUnsavedGuard } from './useUnsavedGuard';
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /**
  * `TypeEditor`'s Save button: create-a-type or update-the-schema, split out

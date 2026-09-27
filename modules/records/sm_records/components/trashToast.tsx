@@ -1,9 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { toast } from 'sonner';
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+import type { Translate } from '../utils/translate';
 
 /**
  * The confirmation a soft delete owes the person who confirmed it (UX-R8).

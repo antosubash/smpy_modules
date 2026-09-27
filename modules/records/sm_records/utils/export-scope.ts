@@ -3,9 +3,7 @@
  * cap when it learned about capped counts; `io.ts` re-exports it.
  */
 
-// See `utils/list-errors.ts` for why `t` is typed this loosely.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+import type { Translate } from './translate';
 
 /**
  * U16: "Download CSV"/"Download JSON" disclosed nothing about *how much* —

@@ -1,4 +1,5 @@
-import type { PagerParts, PagerProps, Translate } from './RecordPagination';
+import type { Translate } from '../utils/translate';
+import type { PagerParts, PagerProps } from './RecordPagination';
 
 /**
  * The footer's cursor mode — what `RecordPagination` shows for a page

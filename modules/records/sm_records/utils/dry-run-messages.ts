@@ -26,9 +26,7 @@
  * recognise is returned unchanged rather than guessed at.
  */
 
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+import type { Translate } from './translate';
 
 /** pydantic v2's exact wording for a field with no value at all
  *  (`type: 'missing'`), and for `None` reaching a type-specific validator —

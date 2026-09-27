@@ -7,12 +7,8 @@ import {
   DialogTitle,
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
-
+import type { Translate } from '../../utils/translate';
 import type { ParseFailure, TypeDefinition } from '../../utils/type-io';
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 function failureMessage(t: Translate, reason: ParseFailure): string {
   const defaults: Record<ParseFailure, string> = {

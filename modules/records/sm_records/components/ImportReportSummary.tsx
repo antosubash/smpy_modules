@@ -1,16 +1,13 @@
 import { useT } from '@simple-module-py/i18n';
 
 import type { ImportReport, ImportRowError } from '../utils/io';
+import type { Translate } from '../utils/translate';
 import { EMPTY_CELL } from '../utils/values';
 
 /** A version refusal is worded by `services/_import_rows.py` and always
  *  names the escape hatch by its wire name, since that is the one thing a
  *  file-editing operator cannot see in `RecordIoMenu` otherwise. */
 const FORCE_HINT_PATTERN = /force=true/;
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /** Whether any row error is the "no version" refusal `force` answers
  *  (`services/_import_rows.py`) — FAIL-1's UI half points the operator at the

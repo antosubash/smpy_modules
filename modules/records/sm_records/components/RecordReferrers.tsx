@@ -6,13 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/c
 import { useState } from 'react';
 
 import { listReferrers } from '../utils/api-history';
+import type { Translate } from '../utils/translate';
 import type { ReferrerRead } from '../utils/types';
 
 const PAGE_SIZE = 20;
-
-// See `RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 function onDeleteLabel(t: Translate, onDelete: string): string {
   switch (onDelete) {

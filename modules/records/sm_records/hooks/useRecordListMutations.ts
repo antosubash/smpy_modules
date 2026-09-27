@@ -1,11 +1,8 @@
 import { router } from '@inertiajs/react';
 import { purgedToast, restoredToast, trashToast } from '../components/trashToast';
 import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api-records';
+import type { Translate } from '../utils/translate';
 import type { RecordRead } from '../utils/types';
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely here.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /**
  * The three row mutations `RecordList` hands down to `RecordTable` — split

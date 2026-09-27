@@ -3,6 +3,7 @@ import { TableHead } from '@simple-module-py/ui/components/ui/table';
 
 import { disambiguateLabels } from '../utils/filters';
 import type { EnvelopeColumnKey, ListColumn, ResolvedColumns, SortState } from '../utils/listing';
+import type { Translate } from '../utils/translate';
 import type { RecordRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
@@ -13,10 +14,6 @@ import {
   SchemaStaleBadge,
 } from './RecordStatusBadge';
 import { SortableHeader } from './SortableHeader';
-
-// See `utils/list-errors.ts` for why `t` is typed this loosely.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /** The header text of one of the record's own columns. One literal `t()`
  *  per key, so the untranslated-string check can read every one. */

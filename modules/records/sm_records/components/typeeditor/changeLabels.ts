@@ -8,13 +8,8 @@
  * every member of the closed `what` set without a component to render.
  */
 
+import type { Translate } from '../../utils/translate';
 import type { ChangeClass } from '../../utils/types';
-
-// See `FilterBar.tsx` for why `t` is typed this loosely here: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up TS
-// with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /** Mirrors the server's closed `SchemaChange.what` set (design §8.2) — every
  *  member the preview endpoint can send, enumerated so the fallback text

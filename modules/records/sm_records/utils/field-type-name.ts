@@ -3,9 +3,7 @@
  * type editor's type select and the record list's column chooser.
  */
 
-// See `utils/list-errors.ts` for why `t` is typed this loosely.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
+import type { Translate } from './translate';
 
 const DEFAULTS: Record<string, string> = {
   text: 'Text',

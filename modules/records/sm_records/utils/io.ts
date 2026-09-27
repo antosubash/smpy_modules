@@ -21,14 +21,10 @@
  */
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
+import type { Translate } from './translate';
 import type { FieldDef } from './types';
 
 export { exportScopeLabel } from './export-scope';
-
-// The rest of this module types `t` loosely for the same reason
-// `pages/RecordList.tsx` does — see that file's comment.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 export type ImportRowError = {
   row: number;

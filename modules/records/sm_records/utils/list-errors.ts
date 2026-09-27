@@ -5,6 +5,8 @@
  * re-exports every name here, so no import site had to move.
  */
 
+import type { Translate } from './translate';
+
 /**
  * The `reason` values `record_list` (`endpoints/views.py`, via
  * `endpoints/_list_view.py`) can put in the Inertia `errors` bag as
@@ -45,12 +47,6 @@ export function isCursorRefusal(reason: string | undefined): boolean {
   const key = filterErrorReasonKey(reason);
   return key === 'bad_cursor' || key === 'page_and_after';
 }
-
-// See `pages/RecordList.tsx` for why `t` is typed this loosely: typing it
-// against `useT()`'s real, key-union-overloaded signature either blows up TS
-// with an "excessively deep" instantiation or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 /**
  * The sentence for a `?filter=`/`?sort=`/`?after=` term the server refused.

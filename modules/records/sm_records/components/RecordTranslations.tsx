@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { createTranslation } from '../utils/api-history';
 import { localeLabel } from '../utils/locale';
+import type { Translate } from '../utils/translate';
 import type { RecordRead, TranslationRead } from '../utils/types';
 
 interface Props {
@@ -20,12 +21,6 @@ interface Props {
    *  component makes itself: the editor already pays one query for it. */
   translations: TranslationRead[];
 }
-
-// See `FilterBar.tsx`'s header comment for why `t` is typed this loosely:
-// `useT()`'s real signature either blows up TS with an "excessively deep"
-// instantiation here or fails to unify when called.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
-type Translate = (...args: any[]) => string;
 
 function siblingSubtitle(t: Translate, sibling: TranslationRead): string {
   const state =
