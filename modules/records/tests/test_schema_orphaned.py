@@ -19,13 +19,7 @@ from sm_records.services import schema_change
 from sm_records.services import types as type_service
 from sm_records.services._common import type_resolver
 from sm_records.services.errors import NotFound, OrphanedKeyConflict, ValidationFailed
-from sm_records.settings import RecordsSettings
 from sqlalchemy import select
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 @pytest.fixture

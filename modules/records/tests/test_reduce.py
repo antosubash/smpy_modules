@@ -15,12 +15,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
 from sm_records.index.reduce import ReduceSpec, register_reduce_provider
 from sm_records.index.reduce_rebuild import recompute, verify_type
 from sm_records.models import IndexReduce, RecordStatus
 from sm_records.services import records as record_service
-from sm_records.settings import RecordsSettings
 from sqlalchemy import select
 
 STATE = "orders_per_state"
@@ -38,20 +36,6 @@ def state_spec(with_value: bool = True) -> ReduceSpec:
         # reports: ``sum:total``, the same string the live reading gives for
         # ``metric=sum:total``. Without it the metric is the bare ``"sum"``.
         value_label="total",
-    )
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
-
-@pytest.fixture
-async def order_type(make_type, field_def):
-    return await make_type(
-        "order",
-        [field_def("state", "text"), field_def("total", "number"), field_def("name", "text")],
-        display_field="name",
     )
 
 

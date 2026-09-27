@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest_asyncio
 from sm_records.contracts.events import (
     RecordCreated,
     RecordPurged,
@@ -97,9 +98,10 @@ class Recorder:
 def recorder(client) -> Recorder:
     """Subscribe a fresh :class:`Recorder` to this app's bus.
 
-    A function rather than a fixture, and the fixtures live in each test file:
-    importing a fixture by name into two modules is what makes ruff read the
-    test signature that uses it as a redefinition.
+    A function as well as the :func:`bus` fixture: importing a fixture by
+    name into a test module is what makes ruff read the test signature that
+    uses it as a redefinition, so ``bus`` reaches tests through ``conftest.py``
+    and a test that needs a recorder mid-body calls this.
     """
     seen = Recorder(client.db_state)
     seen.subscribe(client.app.state.sm.event_bus)
@@ -126,3 +128,15 @@ async def _create(client, title: str = "One", **body: Any) -> dict:
     resp = await client.post(API, json={"data": {"title": title}, **body}, headers=roles(ADMIN))
     assert resp.status_code == 201, resp.text
     return resp.json()
+
+
+@pytest_asyncio.fixture
+async def bus(client) -> Recorder:
+    """A subscriber to every event this module publishes, attached to the
+    app's real bus — the same object ``events.publish`` reaches."""
+    return recorder(client)
+
+
+@pytest_asyncio.fixture
+async def note(client) -> dict:
+    return await make_note(client)

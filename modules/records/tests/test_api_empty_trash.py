@@ -9,24 +9,12 @@ one event per record that a subscriber cannot reconstruct afterwards).
 
 from __future__ import annotations
 
-import pytest_asyncio
 from sm_records.contracts.events import RecordPurged
 from sm_records.models import IndexText, Record, RecordRevision
 from sqlalchemy import func, select
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
 from tests.bulk_helpers import API, EMPTY, bulk, make_product, make_records, read, trash_listing
-from tests.events_harness import Recorder, recorder
-
-
-@pytest_asyncio.fixture
-async def product(client) -> dict:
-    return await make_product(client)
-
-
-@pytest_asyncio.fixture
-async def bus(client) -> Recorder:
-    return recorder(client)
 
 
 async def _empty(client, *, actor: str = ADMIN, params: str = ""):

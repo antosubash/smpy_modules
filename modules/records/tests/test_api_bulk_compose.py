@@ -11,12 +11,10 @@ have got wrong.
 
 from __future__ import annotations
 
-import pytest_asyncio
 from sm_records.contracts.events import RecordPurged, RecordRestored, RecordTrashed, RecordUpdated
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
 from tests.bulk_helpers import API, TYPES, bulk, field, make_product, make_records, read
-from tests.events_harness import Recorder, recorder
 
 
 async def _brands(client, *, on_delete: str, brand_roles: list[str] | None = None) -> None:
@@ -167,16 +165,6 @@ async def test_a_referrer_the_caller_may_not_write_blocks_the_batch(client):
 
 
 # --- events ----------------------------------------------------------------
-
-
-@pytest_asyncio.fixture
-async def bus(client) -> Recorder:
-    return recorder(client)
-
-
-@pytest_asyncio.fixture
-async def product(client) -> dict:
-    return await make_product(client)
 
 
 async def test_a_bulk_trash_publishes_one_event_per_record(client, product, bus):

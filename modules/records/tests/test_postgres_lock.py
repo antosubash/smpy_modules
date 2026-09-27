@@ -29,7 +29,6 @@ from collections import Counter
 from typing import Any
 
 import pytest
-import pytest_asyncio
 from sm_records.models import Record, RecordType
 from sm_records.schema.types import FieldType
 from sm_records.services._type_update import update_type
@@ -39,13 +38,17 @@ from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from tests.pg_support import USING_POSTGRES, make_db_state
+from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.skipif(
     not USING_POSTGRES,
     reason="the FOR UPDATE branch of lock_type only exists on Postgres; "
     "set RECORDS_TEST_URL=postgresql+asyncpg://…",
 )
+# The tests take ``conftest``'s ``db_state``: a truncated Postgres database on
+# the pooled engine. Not ``StaticPool`` and not a shared session, so
+# ``session_factory()`` inside a task gets a connection of its own and twenty
+# of them are twenty transactions.
 
 WRITERS = 20
 """Wide enough that a lock which does not hold loses visibly. Eight — the
@@ -59,19 +62,6 @@ def _field(key: str, **overrides: Any) -> dict[str, Any]:
     definition = {"key": key, "type": "text", "label": key.title(), "indexed": True}
     definition.update(overrides)
     return definition
-
-
-@pytest_asyncio.fixture
-async def pg_state() -> Any:
-    """A truncated Postgres database on the pooled engine.
-
-    Not ``StaticPool`` and not a shared session: ``make_db_state`` hands back
-    the ordinary pooled engine, so ``session_factory()`` inside a task gets a
-    connection of its own and twenty of them are twenty transactions.
-    """
-    state = await make_db_state()
-    yield state
-    await state.engine.dispose()
 
 
 async def _seed_type(state: Any, key: str, fields: list[dict], **cols: Any) -> int:
@@ -133,7 +123,7 @@ async def _stored(state: Any, type_id: int) -> int:
         return int(total.scalar_one())
 
 
-async def test_twenty_concurrent_creates_of_one_unique_value_store_exactly_one(pg_state):
+async def test_twenty_concurrent_creates_of_one_unique_value_store_exactly_one(db_state):
     """``FOR UPDATE`` closes the check-then-act window of design §7.8.
 
     ``email`` is ``unique`` and is *not* the ``slug_field``, so no database
@@ -142,21 +132,21 @@ async def test_twenty_concurrent_creates_of_one_unique_value_store_exactly_one(p
     Twenty writers pass ``ensure_unique`` only if the row lock did not hold.
     """
     type_id = await _seed_type(
-        pg_state,
+        db_state,
         "contact",
         [_field("name"), _field("email", unique=True)],
         display_field="name",
     )
 
-    outcomes = await _race(pg_state, type_id, {"name": "Ada", "email": "ada@example.com"})
+    outcomes = await _race(db_state, type_id, {"name": "Ada", "email": "ada@example.com"})
 
     assert outcomes["integrity-error"] == 0, f"an IntegrityError escaped: {dict(outcomes)}"
     assert outcomes["created"] == 1, f"expected one winner, got {dict(outcomes)}"
     assert outcomes["conflict"] == WRITERS - 1, dict(outcomes)
-    assert await _stored(pg_state, type_id) == 1
+    assert await _stored(db_state, type_id) == 1
 
 
-async def test_twenty_concurrent_slug_claims_leave_one_winner(pg_state):
+async def test_twenty_concurrent_slug_claims_leave_one_winner(db_state):
     """§5's slug claim, where a real constraint *does* back the check.
 
     ``ix_records_record_type_slug`` is a partial unique index, so the losers
@@ -166,27 +156,27 @@ async def test_twenty_concurrent_slug_claims_leave_one_winner(pg_state):
     on Postgres it would additionally poison the transaction.
     """
     type_id = await _seed_type(
-        pg_state,
+        db_state,
         "product",
         [_field("name"), _field("sku")],
         display_field="name",
         slug_field="sku",
     )
 
-    outcomes = await _race(pg_state, type_id, {"name": "Widget", "sku": "W-1"})
+    outcomes = await _race(db_state, type_id, {"name": "Widget", "sku": "W-1"})
 
     assert outcomes["integrity-error"] == 0, f"an IntegrityError escaped: {dict(outcomes)}"
     assert outcomes["created"] == 1, dict(outcomes)
     assert set(outcomes) <= {"created", "conflict"}, dict(outcomes)
-    assert await _stored(pg_state, type_id) == 1
+    assert await _stored(db_state, type_id) == 1
 
 
-async def test_twenty_distinct_values_all_succeed(pg_state):
+async def test_twenty_distinct_values_all_succeed(db_state):
     """The lock must cost throughput, not correctness — and it must not
     deadlock. Twenty writers take the same row lock in an order nobody
     controls; every one of them commits."""
     type_id = await _seed_type(
-        pg_state,
+        db_state,
         "contact",
         [_field("name"), _field("email", unique=True)],
         display_field="name",
@@ -197,7 +187,7 @@ async def test_twenty_distinct_values_all_succeed(pg_state):
             asyncio.gather(
                 *(
                     _one_create(
-                        pg_state,
+                        db_state,
                         type_id,
                         {"name": f"n{i}", "email": f"n{i}@example.com"},
                     )
@@ -209,7 +199,7 @@ async def test_twenty_distinct_values_all_succeed(pg_state):
     )
 
     assert outcomes == Counter({"created": WRITERS}), dict(outcomes)
-    assert await _stored(pg_state, type_id) == WRITERS
+    assert await _stored(db_state, type_id) == WRITERS
 
 
 async def _edit_schema(state: Any, type_id: int) -> str:
@@ -238,7 +228,7 @@ async def _edit_schema(state: Any, type_id: int) -> str:
         return "edited"
 
 
-async def test_a_schema_edit_racing_creates_leaves_every_record_consistent(pg_state):
+async def test_a_schema_edit_racing_creates_leaves_every_record_consistent(db_state):
     """A schema write while records land must not corrupt either side.
 
     ``update_type`` takes the same per-type lock (through
@@ -254,27 +244,27 @@ async def test_a_schema_edit_racing_creates_leaves_every_record_consistent(pg_st
     scheduler.
     """
     type_id = await _seed_type(
-        pg_state,
+        db_state,
         "contact",
         [_field("name"), _field("email", unique=True)],
         display_field="name",
     )
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         before = int((await session.get(RecordType, type_id)).schema_version)
 
     creates = [
-        _one_create(pg_state, type_id, {"name": f"n{i}", "email": f"n{i}@example.com"})
+        _one_create(db_state, type_id, {"name": f"n{i}", "email": f"n{i}@example.com"})
         for i in range(WRITERS)
     ]
     results = await asyncio.wait_for(
-        asyncio.gather(_edit_schema(pg_state, type_id), *creates), timeout=90
+        asyncio.gather(_edit_schema(db_state, type_id), *creates), timeout=90
     )
     edit_outcome, create_outcomes = results[0], Counter(results[1:])
 
     assert edit_outcome in {"edited", "conflict"}, edit_outcome
     assert create_outcomes["integrity-error"] == 0, dict(create_outcomes)
 
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         rtype = await session.get(RecordType, type_id)
         after = int(rtype.schema_version)
         rows = (

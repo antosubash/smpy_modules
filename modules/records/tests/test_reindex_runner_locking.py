@@ -26,15 +26,12 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sm_records.deps import require_edit, require_manage_types, require_view
-from sm_records.models import Base, IndexText
+from httpx import AsyncClient
+from sm_records.models import IndexText
 from sm_records.settings import RecordsSettings
 from sqlalchemy import select
 
-from tests.app_harness import build_app, seed_record, seed_type
+from tests.app_harness import seed_record, seed_type
 
 #: Small enough that the seeded records below span several batches, so the
 #: per-batch commit of ``run_pending`` is exercised rather than assumed.
@@ -49,38 +46,10 @@ def _field(key: str, **overrides: Any) -> dict[str, Any]:
 
 
 @pytest_asyncio.fixture
-async def file_db(tmp_path):
-    """A real SQLite *file* on the default pool.
-
-    Not ``:memory:``/``StaticPool``: one shared connection makes every session
-    in the process a single transaction, which is precisely the property that
-    made this defect invisible.
-    """
-    state = init_db(f"sqlite+aiosqlite:///{tmp_path / 'locking.db'}")
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield state
-    await state.engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def file_client(tmp_path, file_db):
-    """The module's real routers over :func:`file_db`, with the permission
-    dependencies overridden.
-
-    Authentication is not what is under test here and the checker the module
-    uses is host-dependent (``sm_records.deps``), so the three static
-    permissions are overridden rather than simulated — everything below the
-    route is the production wiring, including the middleware.
-    """
-    app, _ = await build_app(tmp_path, file_db)
-    app.state.sm_records.settings = RecordsSettings(reindex_batch_size=BATCH)
-    for dependency in (require_view, require_edit, require_manage_types):
-        app.dependency_overrides[dependency.dependency] = lambda: None
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+async def file_client(file_client):
+    """The shared :func:`file_client`, with the batch size these tests need."""
+    file_client.app.state.sm_records.settings = RecordsSettings(reindex_batch_size=BATCH)
+    return file_client
 
 
 async def _pending(client: AsyncClient) -> dict[str, str]:

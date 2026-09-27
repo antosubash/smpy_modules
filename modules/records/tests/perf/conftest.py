@@ -217,11 +217,6 @@ async def perf_client(perf_db, tmp_path) -> AsyncIterator[AsyncClient]:
         yield http_client
 
 
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
-
 async def load_type(session: Any, key: str) -> RecordType:
     return (
         (await session.execute(select(RecordType).where(RecordType.key == key))).scalars().first()

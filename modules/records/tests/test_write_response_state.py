@@ -24,10 +24,7 @@ below are the behaviour that depends on it.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-import pytest_asyncio
 from sm_records.models import Record, RecordType
 from sm_records.services._common import guarded_bump
 from sm_records.services.records import create_record
@@ -37,7 +34,7 @@ from sqlalchemy import select
 
 from tests.app_harness import ADMIN, roles
 from tests.app_harness import field as _field
-from tests.pg_support import USING_POSTGRES, make_db_state
+from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.skipif(
     not USING_POSTGRES,
@@ -48,18 +45,11 @@ pytestmark = pytest.mark.skipif(
 SETTINGS = RecordsSettings()
 
 
-@pytest_asyncio.fixture
-async def pg_state() -> Any:
-    state = await make_db_state()
-    yield state
-    await state.engine.dispose()
-
-
-async def test_the_version_bump_leaves_no_attribute_expired(pg_state):
+async def test_the_version_bump_leaves_no_attribute_expired(db_state):
     """The root cause, directly. Before the fix this reported
     ``unloaded: ['updated_at']`` — one lazy load away from a 500 in any code
     path that reads the column without awaiting."""
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         rtype = RecordType(
             key="gadget",
             label="Gadget",
@@ -73,7 +63,7 @@ async def test_the_version_bump_leaves_no_attribute_expired(pg_state):
         await session.commit()
         row_id = int(record.id)
 
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         record = (
             (await session.execute(select(Record).where(Record.id == row_id))).scalars().first()
         )

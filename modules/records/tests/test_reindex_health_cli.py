@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
 from simple_module_core.health import HealthStatus
 from sm_records.constants import REINDEX_ALL
 from sm_records.health import stale_reindex_check
@@ -22,12 +21,6 @@ from sm_records.services import schema_change
 from sm_records.services import types as type_service
 from sm_records.settings import RecordsSettings
 from sqlalchemy import select
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
 
 # --- the alarm (§8.9) -------------------------------------------------------
 

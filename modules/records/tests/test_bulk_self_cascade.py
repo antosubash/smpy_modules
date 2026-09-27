@@ -21,20 +21,13 @@ acting on a state they never read.
 from __future__ import annotations
 
 import pytest
-import pytest_asyncio
 from sm_records.contracts.events import RecordTrashed
 
 from tests.app_harness import ADMIN, roles
 from tests.bulk_helpers import TYPES, field
-from tests.events_harness import Recorder, recorder
 
 CAT = f"{TYPES}/category"
 RECORDS = f"{CAT}/records"
-
-
-@pytest_asyncio.fixture
-async def bus(client) -> Recorder:
-    return recorder(client)
 
 
 async def _tree_type(client) -> None:

@@ -18,11 +18,8 @@ import asyncio
 from decimal import Decimal
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
-from sm_records.deps import require_edit, require_manage_types, require_view
 from sm_records.health import stale_reindex_check
 from sm_records.index._drift import clear_drift, current_drift
 from sm_records.index.reduce import register_reduce_provider
@@ -32,27 +29,11 @@ from sm_records.models import Base, IndexReduce
 from sm_records.services._common import utcnow
 from sqlalchemy import delete, select, update
 
-from tests.app_harness import build_app, seed_type
+from tests.app_harness import seed_type
 from tests.test_reduce import STATE, make, state_spec, stored
 
 API = "/api/records/types"
 WRITERS = 8
-
-
-@pytest.fixture
-def settings():
-    from sm_records.settings import RecordsSettings
-
-    return RecordsSettings()
-
-
-@pytest.fixture
-async def order_type(make_type, field_def):
-    return await make_type(
-        "order",
-        [field_def("state", "text"), field_def("total", "number"), field_def("name", "text")],
-        display_field="name",
-    )
 
 
 @pytest.fixture(autouse=True)
@@ -173,28 +154,6 @@ class _Ctx:
 
     async def __aexit__(self, *_exc):
         return False
-
-
-@pytest_asyncio.fixture
-async def file_db(tmp_path):
-    """A real SQLite *file* on the default pool — one connection per session,
-    exactly as a server has. See ``test_unique_concurrency``'s docstring."""
-    state = init_db(f"sqlite+aiosqlite:///{tmp_path / 'reduce.db'}")
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield state
-    await state.engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def file_client(tmp_path, file_db):
-    app, _ = await build_app(tmp_path, file_db)
-    for dependency in (require_view, require_edit, require_manage_types):
-        app.dependency_overrides[dependency.dependency] = lambda: None
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
 
 
 async def test_concurrent_writers_into_one_group_lose_no_increment(file_client, file_db):

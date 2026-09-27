@@ -18,22 +18,10 @@ them has to be told rather than quietly agreed with.
 
 from __future__ import annotations
 
-import pytest_asyncio
 from sm_records.contracts.events import RecordUpdated
 
 from tests.app_harness import ADMIN, roles
-from tests.bulk_helpers import API, bulk, make_product, read
-from tests.events_harness import Recorder, recorder
-
-
-@pytest_asyncio.fixture
-async def bus(client) -> Recorder:
-    return recorder(client)
-
-
-@pytest_asyncio.fixture
-async def product(client) -> dict:
-    return await make_product(client)
+from tests.bulk_helpers import API, bulk, read
 
 
 async def _record(client, name: str, *, status: str) -> str:

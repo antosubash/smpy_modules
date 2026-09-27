@@ -11,15 +11,8 @@ re-proving their behaviour.
 
 from __future__ import annotations
 
-import pytest_asyncio
-
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
 from tests.bulk_helpers import API, BULK, bulk, make_product, make_records, read, trash_listing
-
-
-@pytest_asyncio.fixture
-async def product(client) -> dict:
-    return await make_product(client)
 
 
 async def test_bulk_trash_moves_every_named_record(client, product):

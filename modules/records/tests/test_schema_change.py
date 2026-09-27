@@ -19,12 +19,6 @@ from sm_records.services import records as record_service
 from sm_records.services import schema_change
 from sm_records.services import types as type_service
 from sm_records.services.errors import Conflict, NotFound, SchemaChangeRefused
-from sm_records.settings import RecordsSettings
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 @pytest.fixture

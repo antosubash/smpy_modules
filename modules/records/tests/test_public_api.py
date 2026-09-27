@@ -17,8 +17,6 @@ here at all.
 
 from __future__ import annotations
 
-import pytest_asyncio
-
 from tests.app_harness import ADMIN, roles
 
 _PREFIX = "/api/records/public"
@@ -32,19 +30,6 @@ _PUBLIC_SHAPE = {
     "data",
 }
 _UNKNOWN_UUID = "0" * 32
-
-
-@pytest_asyncio.fixture
-async def public_client(client):
-    """The harness client, with the module's own ``on_startup`` run.
-
-    Not a hand-rolled ``include_router``: mounting the public API from the
-    lifespan hook is the arrangement under test (:mod:`sm_records.boot`), and
-    a fixture that mounted the router itself would keep passing after
-    ``on_startup`` stopped doing it.
-    """
-    await client.app.state.records_module.on_startup(client.app)
-    return client
 
 
 def _field(key: str, type_: str, *, indexed: bool = True, **options) -> dict:

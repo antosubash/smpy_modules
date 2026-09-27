@@ -25,11 +25,6 @@ from sqlalchemy import select
 
 
 @pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
-
-@pytest.fixture
 def product_fields(field_def):
     return [field_def("title", "text"), field_def("price", "number", indexed=False)]
 

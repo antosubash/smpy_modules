@@ -25,11 +25,6 @@ from sm_records.settings import RecordsSettings
 from sqlalchemy import select
 
 
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
-
 async def fresh_type(db, type_id: int):
     """Re-read the type through the test's own session.
 

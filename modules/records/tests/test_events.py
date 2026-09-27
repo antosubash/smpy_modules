@@ -18,7 +18,6 @@ Type-level events and the bulk paths are in ``test_events_types.py``.
 
 from __future__ import annotations
 
-import pytest_asyncio
 from sm_records.contracts.events import (
     RecordCreated,
     RecordPurged,
@@ -28,19 +27,7 @@ from sm_records.contracts.events import (
 )
 
 from tests.app_harness import ADMIN, roles
-from tests.events_harness import API, TYPES, Recorder, _create, _field, make_note, recorder
-
-
-@pytest_asyncio.fixture
-async def bus(client) -> Recorder:
-    """A subscriber to every event this module publishes, attached to the
-    app's real bus — the same object ``events.publish`` reaches."""
-    return recorder(client)
-
-
-@pytest_asyncio.fixture
-async def note(client) -> dict:
-    return await make_note(client)
+from tests.events_harness import API, TYPES, _create, _field
 
 
 async def test_record_created_carries_the_identity_and_lands_after_the_commit(client, note, bus):

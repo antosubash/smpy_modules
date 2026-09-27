@@ -25,16 +25,12 @@ from collections import Counter
 from typing import Any
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sm_records.deps import require_edit, require_manage_types, require_view
-from sm_records.models import Base, Record
+from httpx import AsyncClient
+from sm_records.models import Record
 from sm_records.services import _claims
 from sqlalchemy import func, select
 
-from tests.app_harness import build_app, seed_type
+from tests.app_harness import seed_type
 
 API = "/api/records/types"
 
@@ -48,27 +44,6 @@ def _field(key: str, **overrides: Any) -> dict[str, Any]:
     definition = {"key": key, "type": "text", "label": key.title(), "indexed": True}
     definition.update(overrides)
     return definition
-
-
-@pytest_asyncio.fixture
-async def file_db(tmp_path):
-    """A real SQLite *file* on the default pool — see the module docstring."""
-    state = init_db(f"sqlite+aiosqlite:///{tmp_path / 'unique.db'}")
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield state
-    await state.engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def file_client(tmp_path, file_db):
-    app, _ = await build_app(tmp_path, file_db)
-    for dependency in (require_view, require_edit, require_manage_types):
-        app.dependency_overrides[dependency.dependency] = lambda: None
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
 
 
 async def _stored(file_db, type_id: int) -> int:

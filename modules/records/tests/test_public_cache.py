@@ -22,21 +22,11 @@ why it is not visible here.
 
 from __future__ import annotations
 
-import pytest_asyncio
-
 from tests.app_harness import ADMIN, api_record, api_type, roles
 
 _API = "/api/records/types"
 _PUBLIC = "/api/records/public"
 _FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
-
-
-@pytest_asyncio.fixture
-async def public_client(client):
-    """The harness client with the module's ``on_startup`` run — mounting the
-    anonymous router from the lifespan hook is the arrangement under test."""
-    await client.app.state.records_module.on_startup(client.app)
-    return client
 
 
 async def _type(client, key: str) -> dict:

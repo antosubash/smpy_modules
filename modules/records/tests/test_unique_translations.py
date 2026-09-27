@@ -21,11 +21,9 @@ import json
 from contextlib import contextmanager
 from typing import Any
 
-import pytest_asyncio
 from sqlalchemy import event
 
 from tests.app_harness import ADMIN, field, roles
-from tests.i18n_helpers import use_locales as _use_locales
 from tests.io_helpers import drop_type, export_text, post_import
 
 API = "/api/records/types"
@@ -93,12 +91,6 @@ async def edit(client, record: dict, **data: Any):
 async def trash(client, uuid: str) -> None:
     resp = await client.delete(f"{API}/{TYPE_KEY}/records/{uuid}", headers=roles(ADMIN))
     assert resp.status_code == 204, resp.text
-
-
-@pytest_asyncio.fixture
-async def bilingual(client):
-    _use_locales(client, "en", "de")
-    return client
 
 
 async def test_a_translation_may_copy_a_unique_value(bilingual):

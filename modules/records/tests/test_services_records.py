@@ -30,11 +30,6 @@ from sqlalchemy import select
 
 
 @pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
-
-@pytest.fixture
 async def article(db, settings, field_def):
     """A type with an indexed title, a unique sku and a slug source."""
     sku = field_def("sku", "text")

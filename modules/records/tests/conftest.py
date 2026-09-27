@@ -48,9 +48,21 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     seed_record,
     seed_type,
 )
+
+# Fixtures several suites share, each defined once beside what it builds on.
+from tests.bulk_helpers import product  # noqa: F401
 from tests.census import Census, census_enabled
+from tests.events_harness import bus, note  # noqa: F401
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
+from tests.shared_fixtures import (  # noqa: F401
+    bilingual,
+    file_client,
+    file_db,
+    order_type,
+    public_client,
+    settings,
+)
 
 
 @pytest.fixture(autouse=True)

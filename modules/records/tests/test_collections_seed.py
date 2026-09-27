@@ -21,15 +21,9 @@ import pytest
 from sm_records.models import GLOBAL, RecordType, tables_for
 from sm_records.seed import seed_database
 from sm_records.seed.plan import WEIGHTS, distribute, weights_for
-from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 
 from tests.collections_harness import EVENTS
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 async def _types(db) -> dict[str, RecordType]:

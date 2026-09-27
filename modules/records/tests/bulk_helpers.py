@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest_asyncio
+
 from tests.app_harness import ADMIN, field, roles
 
 TYPES = "/api/records/types"
@@ -63,3 +65,8 @@ async def trash_listing(client, *, actor: str = ADMIN, params: str = ""):
     resp = await client.get(f"{API}?trashed=true{params}", headers=roles(actor))
     assert resp.status_code == 200, resp.text
     return resp.json()
+
+
+@pytest_asyncio.fixture
+async def product(client) -> dict:
+    return await make_product(client)

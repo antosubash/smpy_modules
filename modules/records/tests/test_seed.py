@@ -19,18 +19,11 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from sm_records.models import RecordType, table_sets, tables_for
 from sm_records.seed import seed_database
 from sm_records.seed.types import active_type_defs
-from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 async def _types_by_key(db: AsyncSession) -> dict[str, RecordType]:

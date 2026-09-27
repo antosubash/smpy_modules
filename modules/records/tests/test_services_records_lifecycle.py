@@ -19,13 +19,7 @@ from sm_records.services import records as service
 from sm_records.services import types as type_service
 from sm_records.services.errors import Conflict, ReferencedByOthers, ValidationFailed
 from sm_records.services.revisions import list_revisions
-from sm_records.settings import RecordsSettings
 from sqlalchemy import select
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 @pytest.fixture

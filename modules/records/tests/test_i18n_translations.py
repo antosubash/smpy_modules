@@ -13,18 +13,10 @@ half of the contract and is checked in
 
 from __future__ import annotations
 
-import pytest_asyncio
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
 from tests.i18n_helpers import API, TYPE_KEY, make_record, make_type, publish, set_type, translate
-from tests.i18n_helpers import use_locales as _use_locales
-
-
-@pytest_asyncio.fixture
-async def bilingual(client):
-    _use_locales(client, "en", "de")
-    return client
 
 
 async def test_a_new_record_is_in_the_default_locale_and_alone_in_its_group(bilingual):

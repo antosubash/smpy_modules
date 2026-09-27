@@ -25,16 +25,10 @@ from sm_records.schema.types import IndexKind
 from sm_records.services import records as record_service
 from sm_records.services import reindex_runner
 from sm_records.services._titles import recompute_titles
-from sm_records.settings import RecordsSettings
 from sqlalchemy import func, select
 
 from tests.app_harness import ADMIN, roles, seed_type
 from tests.collections_harness import EVENTS, make_collection_record
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
 
 
 @pytest.fixture

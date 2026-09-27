@@ -26,15 +26,8 @@ from sm_records.services import types as type_service
 from sm_records.services.errors import ImportRefused
 from sm_records.services.expand import expand
 from sm_records.services.import_ import ImportOptions, import_records
-from sm_records.settings import RecordsSettings
 
 from tests.round5_helpers import rel, text
-
-
-@pytest.fixture
-def settings() -> RecordsSettings:
-    return RecordsSettings()
-
 
 # ---------------------------------------------------------------------------
 # 2 — a stale match key over an existing uuid is a row error, not a 500

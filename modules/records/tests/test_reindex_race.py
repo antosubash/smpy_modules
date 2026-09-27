@@ -34,7 +34,7 @@ from sm_records.services.records import create_record, update_record
 from sm_records.settings import RecordsSettings
 from sqlalchemy import select
 
-from tests.pg_support import USING_POSTGRES, make_db_state
+from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.skipif(
     not USING_POSTGRES,
@@ -47,16 +47,9 @@ SETTINGS = RecordsSettings()
 
 
 @pytest_asyncio.fixture
-async def pg_state() -> Any:
-    state = await make_db_state()
-    yield state
-    await state.engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def seeded(pg_state) -> Any:
+async def seeded(db_state) -> Any:
     """A type with one indexed text field and one record holding ``old``."""
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         rtype = RecordType(
             key="gadget",
             label="Gadget",
@@ -68,7 +61,7 @@ async def seeded(pg_state) -> Any:
         await session.flush()
         record = await create_record(session, rtype, data={"name": "old"}, settings=SETTINGS)
         await session.commit()
-        return pg_state, int(rtype.id), str(record.uuid)
+        return db_state, int(rtype.id), str(record.uuid)
 
 
 async def _indexed(state: Any, type_id: int) -> list[tuple[str, str]]:
@@ -167,7 +160,7 @@ async def test_an_edit_that_starts_mid_batch_waits_and_wins(seeded):
 
 
 async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was_read(
-    pg_state,
+    db_state,
 ):
     """``services._titles.recompute_titles`` has the same read-then-write
     shape and the same commit-per-batch, so it had the same hole.
@@ -183,7 +176,7 @@ async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was
     """
     from sm_records.services._titles import recompute_titles
 
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         rtype = RecordType(
             key="part",
             label="Part",
@@ -204,12 +197,12 @@ async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was
 
     # The schema change that makes every stored title stale, committed by
     # somebody else — this is the state ``REINDEX_ALL`` marks.
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         moved = await session.get(RecordType, type_id)
         moved.display_field = "code"
         await session.commit()
 
-    async with pg_state.session_factory() as session_a:
+    async with db_state.session_factory() as session_a:
         rtype = await session_a.get(RecordType, type_id)
         record_cls = tables_for(rtype).record
         # The walk's batch read, taken before the edit: exactly what a
@@ -223,11 +216,11 @@ async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was
         )
         assert [dict(row.data)["code"] for row in stale] == ["X"]
 
-        await _edit(pg_state, type_id, uuid, {"name": "new", "code": "Y"})
+        await _edit(db_state, type_id, uuid, {"name": "new", "code": "Y"})
 
         await recompute_titles(session_a, rtype, 10)
 
-    async with pg_state.session_factory() as session:
+    async with db_state.session_factory() as session:
         rtype = await session.get(RecordType, type_id)
         record_cls = tables_for(rtype).record
         row = (
