@@ -17,11 +17,6 @@ import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 import { FilterValueInput } from './FilterValueInput';
 import { choiceValues, type FilterableField, fixedFilterFields, opLabel } from './filterBarFields';
 
-// The shape lives in `utils/listing.ts` beside the parser that produces it
-// from the URL; re-exported here because every consumer of this component
-// already imports it from this module.
-export type { FilterValue };
-
 /**
  * One filter term — a field, an operator, and a value — that navigates via a
  * deep link (`?filter=field:op:value`) rather than filtering client-side.

@@ -27,8 +27,6 @@ import {
   UrlField,
 } from './TextFields';
 
-export type { FieldComponent, FieldComponentProps } from './FieldShell';
-export { FieldShell, fieldInputId } from './FieldShell';
 export { UnknownField } from './StructuredFields';
 
 export const FIELD_COMPONENTS: Record<string, FieldComponent> = {

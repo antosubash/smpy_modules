@@ -19,7 +19,7 @@ import { DEFAULT_PUBLIC_PREFIX } from '../../utils/public-api';
 import type { Translate } from '../../utils/translate';
 import { choicesOf } from '../../utils/values';
 import { FieldsPicker, type FieldsPickerField } from './FieldsPicker';
-import { RecordsListRender, type RecordsListRenderProps } from './RecordsListRender';
+import { RecordsListRender } from './RecordsListRender';
 import type { FieldMetaEntry, RecordsListProps } from './types';
 
 type BlockFields = NonNullable<ComponentConfig<RecordsListProps>['fields']>;
@@ -239,5 +239,3 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
   },
   render: RecordsListRender,
 };
-
-export type { RecordsListRenderProps };

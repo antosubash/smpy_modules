@@ -13,13 +13,11 @@ export function RolesMultiSelect({
   roles,
   selected,
   onChange,
-  disabled = false,
 }: {
   idPrefix: string;
   roles: string[];
   selected: string[];
   onChange: (next: string[]) => void;
-  disabled?: boolean;
 }) {
   const toggle = (role: string, checked: boolean) => {
     onChange(checked ? [...selected, role] : selected.filter((r) => r !== role));
@@ -36,7 +34,6 @@ export function RolesMultiSelect({
             <Checkbox
               id={id}
               checked={selected.includes(role)}
-              disabled={disabled}
               onCheckedChange={(checked) => toggle(role, checked === true)}
             />
             <Label htmlFor={id} className="font-normal">

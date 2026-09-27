@@ -7,12 +7,6 @@ import { PagerButton } from './PagerButton';
 import { PageSizeSelect } from './PageSizeSelect';
 import { cursorPagerParts } from './RecordCursorPager';
 
-// The footer treats the first size as "unset": a type small enough to fit on
-// one page renders no footer at all unless the URL asked for another size,
-// and would otherwise strand a reader who picked 100 with no control to go
-// back to 25. Re-exported for the callers that imported it from here.
-export { PAGE_SIZES };
-
 /** The footer's "Showing 1–25 of N" — or "of 10,000+" when the API capped
  *  the count (F4, `RecordsSettings.max_count`). Two calls and not one
  *  interpolation, for the reason `filterErrorMessage` above gives: the
@@ -135,6 +129,10 @@ export type PagerProps = {
 export function RecordPagination(props: PagerProps) {
   const { t } = useT();
   const { page, pageSize, total, loading = false, onPageSize } = props;
+  // The footer treats the first size as "unset": a type small enough to fit
+  // on one page renders no footer at all unless the URL asked for another
+  // size, and would otherwise strand a reader who picked 100 with no control
+  // to go back to 25.
   if (page !== null && total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
   const parts = page === null ? cursorPagerParts(t, props) : numberedPagerParts(t, props, page);
   return (

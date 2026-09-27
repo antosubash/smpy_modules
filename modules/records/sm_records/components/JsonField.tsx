@@ -17,8 +17,6 @@ export function JsonField({
   value,
   onChange,
   error,
-  rows = 12,
-  disabled = false,
 }: {
   id: string;
   label: string;
@@ -26,8 +24,6 @@ export function JsonField({
   value: string;
   onChange: (next: string) => void;
   error?: string | null;
-  rows?: number;
-  disabled?: boolean;
 }) {
   return (
     <div className="grid gap-2">
@@ -36,8 +32,7 @@ export function JsonField({
       <Textarea
         id={id}
         value={value}
-        rows={rows}
-        disabled={disabled}
+        rows={12}
         aria-invalid={!!error}
         className="font-mono text-sm"
         spellCheck={false}
