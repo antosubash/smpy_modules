@@ -70,7 +70,6 @@ from sm_records.settings import RecordsSettings
 router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*IMPORT))
 
 _MEDIA = {ImportFormat.JSON: "application/json", ImportFormat.CSV: "text/csv; charset=utf-8"}
-_UPDATE = "update"
 
 _EXPORT_200 = {
     200: {

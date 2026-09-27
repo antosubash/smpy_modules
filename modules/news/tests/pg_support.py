@@ -39,8 +39,6 @@ def _shared() -> Any:
 
 _pg = _shared()
 
-TEST_URL: str = _pg.TEST_URL
-USING_POSTGRES: bool = _pg.USING_POSTGRES
 arm_reset = _pg.arm_reset
 
 

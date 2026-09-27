@@ -239,7 +239,7 @@ class PublicErrorRoute(RecordsErrorRoute):
             try:
                 response = await handler(request)
             except Exception as exc:
-                host = _host_handler(request, exc) if _host_handles(request, exc) else None
+                host = _host_handler(request, exc)
                 if host is None:
                     raise
                 response = await host(request, exc)
