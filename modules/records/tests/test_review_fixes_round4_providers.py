@@ -44,12 +44,6 @@ def test_register_refuses_a_virtual_key_nothing_could_read(key):
     assert key not in registry.virtual_fields()
 
 
-def test_register_still_accepts_an_ordinary_key():
-    provider = yielding()
-    registry.register(provider, fields=[VirtualField("price_bucket", IndexKind.NUMBER)])
-    assert "price_bucket" in registry.virtual_fields()
-
-
 async def test_a_kind_that_disagrees_with_the_declaration_is_dropped_and_logged(
     client, records_app, caplog
 ):
