@@ -20,9 +20,6 @@
  * by editing that one field.
  */
 
-import type { FilterOp } from './types';
-import { FILTER_OPS } from './types';
-
 export type PublicRecordItem = {
   uuid: string;
   slug: string | null;
@@ -78,35 +75,6 @@ export function clampLimit(limit: unknown): number {
   const n = typeof limit === 'number' && Number.isFinite(limit) ? Math.trunc(limit) : Number.NaN;
   const base = Number.isNaN(n) ? DEFAULT_LIMIT : n;
   return Math.min(MAX_LIMIT, Math.max(MIN_LIMIT, base));
-}
-
-const FILTER_TERM = /^[a-z][a-z0-9_]*$/;
-
-/** Light client-side check of one `field:op:value` term — enough to catch a
- *  typo before it reaches the network, not a re-implementation of the
- *  server's grammar (`sm_records._grammar._parse_filter`). Splits on the
- *  first two colons only, so a value that itself carries a colon (a
- *  timestamp, a URL) is not truncated. An empty string is valid: it means
- *  "no filter". */
-export function isValidFilterTerm(raw: string): boolean {
-  const trimmed = raw.trim();
-  if (trimmed === '') return true;
-  const parts = trimmed.split(':');
-  if (parts.length < 3) return false;
-  const [field, op, ...rest] = parts;
-  if (!FILTER_TERM.test(field)) return false;
-  if (!(FILTER_OPS as readonly string[]).includes(op)) return false;
-  const value = rest.join(':');
-  return value.length > 0 || (op as FilterOp) === 'is_null';
-}
-
-/** Light client-side check of one `sort` term (`field` or `-field`). Empty
- *  is valid: it means "server default order". */
-export function isValidSortTerm(raw: string): boolean {
-  const trimmed = raw.trim();
-  if (trimmed === '') return true;
-  const field = trimmed.startsWith('-') ? trimmed.slice(1) : trimmed;
-  return FILTER_TERM.test(field);
 }
 
 export type BuildPublicListUrlOptions = {

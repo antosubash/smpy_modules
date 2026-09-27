@@ -5,8 +5,6 @@ import {
   clampLimit,
   DEFAULT_PUBLIC_PREFIX,
   fetchPublicRecords,
-  isValidFilterTerm,
-  isValidSortTerm,
   normalizePublicPrefix,
   TENANT_HEADER,
 } from './public-api';
@@ -52,58 +50,6 @@ describe('clampLimit', () => {
     // the default (which happens to also be 10, so this only proves the
     // point together with the assertion above).
     expect(clampLimit('25')).toBe(10);
-  });
-});
-
-describe('isValidFilterTerm', () => {
-  it('accepts empty (no filter)', () => {
-    expect(isValidFilterTerm('')).toBe(true);
-    expect(isValidFilterTerm('   ')).toBe(true);
-  });
-
-  it('accepts a well-formed term for every known op', () => {
-    expect(isValidFilterTerm('status:eq:paid')).toBe(true);
-    expect(isValidFilterTerm('price:gt:10')).toBe(true);
-    expect(isValidFilterTerm('tags:in:a,b,c')).toBe(true);
-  });
-
-  it('does not truncate a value carrying its own colon', () => {
-    expect(isValidFilterTerm('published_at:gte:2026-01-01T00:00:00+00:00')).toBe(true);
-  });
-
-  it('accepts is_null with an empty value (true/false lives after the op)', () => {
-    expect(isValidFilterTerm('archived:is_null:true')).toBe(true);
-  });
-
-  it('rejects a field name that is not a valid identifier', () => {
-    expect(isValidFilterTerm('Status:eq:paid')).toBe(false);
-    expect(isValidFilterTerm('1field:eq:paid')).toBe(false);
-  });
-
-  it('rejects an unknown operator', () => {
-    expect(isValidFilterTerm('status:matches:paid')).toBe(false);
-  });
-
-  it('rejects too few parts', () => {
-    expect(isValidFilterTerm('status:eq')).toBe(false);
-    expect(isValidFilterTerm('status')).toBe(false);
-  });
-
-  it('rejects an empty value for an op other than is_null', () => {
-    expect(isValidFilterTerm('status:eq:')).toBe(false);
-  });
-});
-
-describe('isValidSortTerm', () => {
-  it('accepts empty, a bare field, and a descending field', () => {
-    expect(isValidSortTerm('')).toBe(true);
-    expect(isValidSortTerm('published_at')).toBe(true);
-    expect(isValidSortTerm('-published_at')).toBe(true);
-  });
-
-  it('rejects a malformed field name', () => {
-    expect(isValidSortTerm('Published_At')).toBe(false);
-    expect(isValidSortTerm('-1x')).toBe(false);
   });
 });
 
