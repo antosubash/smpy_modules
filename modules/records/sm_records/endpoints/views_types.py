@@ -23,16 +23,15 @@ from sm_records import constants, locales, tenancy
 from sm_records.collections import collections
 from sm_records.contracts.schemas import type_read
 from sm_records.deps import (
-    caller_roles,
     get_settings,
     load_type,
     request_db,
     require_manage_types,
 )
 from sm_records.endpoints.api._errors import RecordsViewErrorRoute
+from sm_records.endpoints.api.types import visible_types
 from sm_records.models import RecordType
 from sm_records.services import types as type_service
-from sm_records.services._common import role_blocked
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsViewErrorRoute)
@@ -54,15 +53,7 @@ async def type_list(
     type's URL is otherwise verifiable nowhere but that editor, and the hub
     is where most visits to a type actually start (UX-R13.1's row-links-to-
     records design)."""
-    rtypes = [
-        rtype
-        for rtype in await type_service.list_types(db)
-        if not role_blocked(rtype, caller_roles(request))
-    ]
-    types = [
-        type_read(rtype, *await type_service.record_counts(db, rtype)).model_dump(mode="json")
-        for rtype in rtypes
-    ]
+    types = [item.model_dump(mode="json") for item in await visible_types(request, db)]
     return await inertia.render(
         constants._PAGE_TYPES,
         {

@@ -175,12 +175,17 @@ async def list_types(request: Request, db: AsyncSession = Depends(request_db)) -
     this feeds links straight to the type's record list, which
     ``deps.load_allowed_type`` refuses (§10). Reading one type by key is a
     different question — see :func:`read_type`."""
+    return TypeListResponse(items=await visible_types(request, db))
+
+
+async def visible_types(request: Request, db: AsyncSession) -> list[TypeRead]:
+    """Every type the caller's roles do not exclude, with its counts — this
+    listing and the hub screen (``views_types.type_list``)."""
     roles = caller_roles(request)
     rtypes = [
         rtype for rtype in await type_service.list_types(db) if not role_blocked(rtype, roles)
     ]
-    items = [type_read(rtype, *await type_service.record_counts(db, rtype)) for rtype in rtypes]
-    return TypeListResponse(items=items)
+    return [type_read(rtype, *await type_service.record_counts(db, rtype)) for rtype in rtypes]
 
 
 @router.post(
