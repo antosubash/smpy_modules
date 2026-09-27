@@ -114,22 +114,16 @@ async def response_for(request: Request, exc: Exception) -> JSONResponse:
         # (design §8.2), not a ``current`` row to reload.
         report = dry_run_report_read(exc.report).model_dump(mode="json")
         return JSONResponse({"detail": exc.detail, "report": report}, status_code=exc.status_code)
-    if isinstance(exc, BulkRefused):
-        # Checked ahead of the generic ``Conflict``, which it is one of, for
-        # the same reason as the two branches around it: the useful part of
-        # the refusal is the report riding with it — which uuid refused, and
-        # what the same action on it alone would have answered — and not a
-        # ``current`` row, of which a batch has as many as it has records.
-        return JSONResponse(
-            {"detail": exc.detail, "report": exc.report.model_dump(mode="json")},
-            status_code=exc.status_code,
-        )
-    if isinstance(exc, ImportRefused):
-        # An ``on_error=abort`` import that found a bad row. Like
-        # ``SchemaChangeRefused`` above, the useful part of the refusal is the
-        # report riding with it — the caller fixes the rows it names and
-        # re-posts the same file — and, like that one, the rollback below is
-        # what makes "nothing was imported" true rather than aspirational.
+    if isinstance(exc, (BulkRefused, ImportRefused)):
+        # ``BulkRefused`` is checked ahead of the generic ``Conflict``, which it
+        # is one of, for the same reason as the two branches around it. For
+        # both, the useful part of the refusal is the report riding with it:
+        # which uuid refused a batch and what the same action on it alone would
+        # have answered (not a ``current`` row, of which a batch has as many
+        # as it has records), or which rows an ``on_error=abort`` import found
+        # bad, so the caller fixes them and re-posts the same file. For an
+        # import, the rollback below is what makes "nothing was imported" true
+        # rather than aspirational.
         return JSONResponse(
             {"detail": exc.detail, "report": exc.report.model_dump(mode="json")},
             status_code=exc.status_code,
