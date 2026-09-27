@@ -50,7 +50,7 @@ export const MAX_CHOSEN_COLUMNS = 8;
 
 /** The record's own columns the chooser offers beside the declared fields.
  *  Title, the tick box and Actions are fixed and never offered. Every one of
- *  these keys is a reserved field key (`constants.RESERVED_FIELD_KEYS`), so
+ *  these keys is a reserved field key (`index._fixed.RESERVED_FIELD_KEYS`), so
  *  one `?columns=` list can name both kinds without ambiguity. */
 export const ENVELOPE_COLUMNS = [
   'status',

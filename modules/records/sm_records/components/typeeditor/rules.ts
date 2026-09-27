@@ -32,7 +32,7 @@ const NOT_UNIQUE_TYPES = new Set(['multiselect', 'longtext', 'json', 'media']);
 export const ORPHANED_KEY = '_orphaned';
 
 /**
- * Every field key the API refuses — `sm_records.constants.RESERVED_FIELD_KEYS`,
+ * Every field key the API refuses — `sm_records.index._fixed.RESERVED_FIELD_KEYS`,
  * which derives itself from `Record.__table__.columns` plus
  * `index.query.FIXED_COLUMNS`. Each name is a column every record already has,
  * and the query layer resolves those *before* the type's own fields: a field

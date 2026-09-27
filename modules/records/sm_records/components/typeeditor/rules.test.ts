@@ -168,7 +168,7 @@ describe('normaliseOnToggle', () => {
 });
 
 describe('reserved field keys', () => {
-  // Mirrors `sm_records.constants.RESERVED_FIELD_KEYS`, which derives itself
+  // Mirrors `sm_records.index._fixed.RESERVED_FIELD_KEYS`, which derives itself
   // from `Record.__table__.columns` + `index.query.FIXED_COLUMNS`. A key from
   // that set is answered by the query layer from `records_record`, not from
   // the field, so the save is refused on both sides.
