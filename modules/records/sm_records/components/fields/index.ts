@@ -12,13 +12,20 @@
 
 import { BooleanField } from './BooleanField';
 import { MultiSelectField, SelectField } from './ChoiceFields';
-import { DateField, DateTimeField } from './DateFields';
 import type { FieldComponent } from './FieldShell';
 import { MediaField } from './MediaField';
-import { IntegerField, NumberField } from './NumericFields';
 import { RelationField } from './RelationField';
 import { JsonValueField, UnknownField } from './StructuredFields';
-import { EmailField, LongTextField, TextField, UrlField } from './TextFields';
+import {
+  DateField,
+  DateTimeField,
+  EmailField,
+  IntegerField,
+  LongTextField,
+  NumberField,
+  TextField,
+  UrlField,
+} from './TextFields';
 
 export type { FieldComponent, FieldComponentProps } from './FieldShell';
 export { FieldShell, fieldInputId } from './FieldShell';

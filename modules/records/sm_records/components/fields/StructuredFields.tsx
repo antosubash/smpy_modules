@@ -1,27 +1,13 @@
 import { useT } from '@simple-module-py/i18n';
-import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 
-import { type FieldComponentProps, FieldShell, fieldInputId } from './FieldShell';
+import { type FieldComponentProps, FieldShell } from './FieldShell';
+import { TextAreaField } from './TextFields';
 
 /** The escape hatch of design §6.1: arbitrary JSON, held as *text* while it
  *  is being typed so a half-finished edit is never clobbered mid-keystroke.
  *  `utils/values.ts` parses it once, on the way out. */
-export function JsonValueField({ field, value, onChange, error, disabled }: FieldComponentProps) {
-  const id = fieldInputId(field);
-  return (
-    <FieldShell field={field} error={error} htmlFor={id}>
-      <Textarea
-        id={id}
-        rows={8}
-        value={typeof value === 'string' ? value : ''}
-        disabled={disabled}
-        aria-invalid={!!error}
-        className="font-mono text-sm"
-        spellCheck={false}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </FieldShell>
-  );
+export function JsonValueField(props: FieldComponentProps) {
+  return <TextAreaField {...props} mono />;
 }
 
 /**
