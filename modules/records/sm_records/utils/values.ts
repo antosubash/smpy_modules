@@ -132,6 +132,17 @@ export function formatDateTime(value: string): string {
   );
 }
 
+/** A bare calendar day ("YYYY-MM-DD", design §7.3) has no timezone of its
+ *  own: anchor it at UTC midnight and format in UTC, so the displayed day
+ *  cannot shift for a viewer west of UTC. Unparseable input comes back as is. */
+export function formatCalendarDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(
+    parsed,
+  );
+}
+
 function asText(raw: unknown): string {
   if (typeof raw === 'string') return raw;
   return raw === null || raw === undefined ? '' : String(raw);

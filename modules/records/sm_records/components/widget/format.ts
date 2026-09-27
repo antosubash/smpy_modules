@@ -11,57 +11,32 @@
  * datetime — from `components/RecordCell.tsx`, which is the admin list's
  * formatting and the thing the design doc's "same value formatting" means.
  *
- * `utils/values.ts`'s `choicesOf` *is* reused, by `RecordsListBlock.tsx`'s
- * `resolveData` when it bakes a field's choices into `FieldMetaEntry`: it is
- * a pure function with no React or admin-only dependency, so there is no
- * reason to fork it.
+ * `utils/values.ts`'s pure helpers *are* reused — the dash, the relation
+ * shape check and both date formatters here, and `choicesOf` by
+ * `RecordsListBlock.tsx`'s `resolveData` — since that module has no React or
+ * admin-only dependency, so there is no reason to fork them.
  */
 
 import { mediaValueKind } from '../../utils/media-api';
+import {
+  EMPTY_CELL as DASH,
+  formatCalendarDate,
+  formatDateTime,
+  isRelationValue,
+} from '../../utils/values';
 import type { FieldMetaEntry } from './types';
-
-const DASH = '—';
-
-function isRelationRef(value: unknown): value is { type: string; uuid: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { type?: unknown }).type === 'string' &&
-    typeof (value as { uuid?: unknown }).uuid === 'string'
-  );
-}
 
 /** `type:uuid` — the stored reference, verbatim. The public API never
  *  expands a relation (design §10), so there is no `display_title` to show
  *  in its place; the block's own prop help says as much. */
 function formatRelationRef(value: unknown): string {
-  if (isRelationRef(value)) return `${value.type}:${value.uuid}`;
+  if (isRelationValue(value)) return `${value.type}:${value.uuid}`;
   return DASH;
 }
 
 function choiceLabel(meta: FieldMetaEntry, raw: unknown): string {
   const match = meta.choices.find((c) => c.value === raw);
   return match ? match.label : String(raw);
-}
-
-function formatDate(raw: string): string {
-  // A bare calendar day has no timezone of its own (design §7.3) — anchor
-  // at UTC midnight and format in UTC so the displayed day cannot shift a
-  // day for a visitor west of UTC. Locale is the viewer's own (`undefined`).
-  const parsed = new Date(`${raw}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return raw;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    parsed,
-  );
-}
-
-function formatDatetime(raw: string): string {
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    parsed,
-  );
 }
 
 /** One column's display value, formatted the way the admin list's
@@ -83,9 +58,9 @@ export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unkno
       // value.
       return String(value);
     case 'date':
-      return typeof value === 'string' ? formatDate(value) : String(value);
+      return typeof value === 'string' ? formatCalendarDate(value) : String(value);
     case 'datetime':
-      return typeof value === 'string' ? formatDatetime(value) : String(value);
+      return typeof value === 'string' ? formatDateTime(value) : String(value);
     case 'select':
       return meta ? choiceLabel(meta, value) : String(value);
     case 'multiselect': {

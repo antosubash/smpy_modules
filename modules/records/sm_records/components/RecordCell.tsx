@@ -2,7 +2,7 @@ import { Link } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
-import { EMPTY_CELL as DASH, formatDateTime } from '../utils/values';
+import { EMPTY_CELL as DASH, formatCalendarDate, formatDateTime } from '../utils/values';
 import { MediaCell } from './media/MediaCell';
 
 type Choice = { value: string; label: string };
@@ -144,22 +144,10 @@ export function RecordCell({
       return <span>{Number.isFinite(n) ? n.toLocaleString() : String(value)}</span>;
     }
 
-    case 'date': {
-      // A bare calendar day ("YYYY-MM-DD", design doc §7.3) has no
-      // timezone of its own. Anchoring it at UTC midnight and formatting in
-      // UTC keeps the displayed day fixed regardless of the viewer's zone —
-      // formatting in the local zone could otherwise shift it a day for a
-      // negative UTC offset.
-      const parsed = typeof value === 'string' ? new Date(`${value}T00:00:00Z`) : null;
-      if (!parsed || Number.isNaN(parsed.getTime())) return <span>{String(value)}</span>;
-      return (
-        <span>
-          {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-            parsed,
-          )}
-        </span>
-      );
-    }
+    case 'date':
+      // A bare calendar day, fixed in UTC so it cannot shift a day for a
+      // viewer west of UTC — `formatCalendarDate` (utils/values.ts).
+      return <span>{typeof value === 'string' ? formatCalendarDate(value) : String(value)}</span>;
 
     case 'datetime':
       // ISO datetime (design doc §7.3), rendered in the viewer's own zone —
