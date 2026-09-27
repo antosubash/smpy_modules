@@ -153,6 +153,7 @@ _FIXED_DECODE: dict[str, Any] = {
     "updated_at": _as_datetime,
     "display_title": str,
     "slug": str,
+    "locale": str,
     # The grammar calls it ``invalid`` and the column is ``invalid_since``, a
     # timestamp — which is what a sort on it orders by, so that is what comes
     # back out of the row and has to go back in (``_fixed._FIXED_ALIAS``).

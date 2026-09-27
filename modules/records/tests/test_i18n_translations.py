@@ -231,6 +231,18 @@ async def test_the_list_filters_and_sorts_by_locale_and_defaults_to_all(bilingua
     sorted_ = await bilingual.get(f"{API}/{TYPE_KEY}/records?sort=locale", headers=roles(ADMIN))
     assert [item["locale"] for item in sorted_.json()["items"]] == ["de", "en"]
 
+    # And a cursor taken under that sort resumes from it: ``locale`` needs a
+    # cursor decoder like every other fixed column, or page two is a 500.
+    first = await bilingual.get(
+        f"{API}/{TYPE_KEY}/records?sort=locale&page_size=1", headers=roles(ADMIN)
+    )
+    second = await bilingual.get(
+        f"{API}/{TYPE_KEY}/records?sort=locale&page_size=1&after={first.json()['next_cursor']}",
+        headers=roles(ADMIN),
+    )
+    assert second.status_code == 200, second.text
+    assert [item["locale"] for item in second.json()["items"]] == ["en"]
+
 
 async def test_translatable_cannot_be_turned_off_while_foreign_records_exist(bilingual):
     rtype = await make_type(bilingual)

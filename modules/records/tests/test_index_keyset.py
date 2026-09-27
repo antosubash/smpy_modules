@@ -9,7 +9,14 @@ is a property of the two functions, not of the endpoint.
 from __future__ import annotations
 
 import pytest
-from sm_records.index._cursor import CursorError, decode_cursor, encode_cursor, sort_signature
+from sm_records.index._cursor import (
+    _FIXED_DECODE,
+    CursorError,
+    decode_cursor,
+    encode_cursor,
+    sort_signature,
+)
+from sm_records.index._fixed import FIXED_COLUMNS
 from sm_records.index.query import Sort, page_query, sort_plan
 from sm_records.index.writer import write_index
 from sm_records.models import Record
@@ -182,3 +189,9 @@ async def test_the_page_carries_the_record_first(db, make_type, make_record, fie
     row = (await db.execute(stmt.limit(1))).all()[0]
     assert isinstance(row[0], Record)
     assert len(row) == len(terms) + 1
+
+
+def test_every_fixed_column_has_a_cursor_decoder():
+    """A fixed column the grammar sorts by but the codec cannot decode is a
+    ``KeyError`` — a 500 — on the second page of that sort."""
+    assert set(_FIXED_DECODE) == FIXED_COLUMNS
