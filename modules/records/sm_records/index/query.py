@@ -35,10 +35,10 @@ from sqlalchemy.orm import aliased
 from sm_records.index._cursor import CursorError, decode_cursor, encode_cursor, sort_signature
 from sm_records.index._fields import declared_keys, indexed_map
 from sm_records.index._filters import Filter, filtered, resolve
-from sm_records.index._fixed import FIXED_COLUMNS, fixed_clause
+from sm_records.index._fixed import FIXED_COLUMNS
 from sm_records.index._predicates import FilterOp, QueryError
 from sm_records.index._sorting import SortTerm, fixed_term, indexed_term, keyset_clause, ordered
-from sm_records.models import RecordType, TableSet, tables_for
+from sm_records.models import RecordType, tables_for
 
 __all__ = [
     "FIXED_COLUMNS",
@@ -48,7 +48,6 @@ __all__ = [
     "QueryError",
     "Sort",
     "SortTerm",
-    "TableSet",
     "bounded_count_query",
     "build_query",
     "count_columns",
@@ -57,7 +56,6 @@ __all__ = [
     "encode_cursor",
     "exists_query",
     "filtered",
-    "fixed_clause",
     "only_trashed",
     "page_query",
     "sort_plan",

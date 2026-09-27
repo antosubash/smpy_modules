@@ -210,7 +210,7 @@ transaction, so check-then-act cannot be caught there at all.
   unhandled `IntegrityError`, i.e. HTTP 500. `_claims.flush_write` now wraps
   the record flush and raises the *same* `Conflict` (409)
   `_claims.ensure_slug_free` raises, recognised by
-  `models.SLUG_CONFLICT_SIGNATURES` — the index name (Postgres) or the column
+  `TableSet.slug_signatures` — the index name (Postgres) or the column
   pair (SQLite, which never names the index). Anything else is re-raised.
   `rtype.key` is read before the flush: a failed flush expires the session, so
   reading it afterwards turned the 409 into a `PendingRollbackError`.

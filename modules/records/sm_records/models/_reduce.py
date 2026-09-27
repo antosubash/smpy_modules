@@ -40,7 +40,7 @@ REDUCE_GROUP_INDEX_NAME = f"uq_{INDEX_REDUCE_TABLE}_group"
 Named here because two layers need the name: the table definition below and
 :func:`sm_records.index.reduce.bump`, which recognises the database's own
 refusal of a racing first insert and retries the increment instead — exactly
-the pattern :data:`sm_records.models.SLUG_CONFLICT_SIGNATURES` documents for
+the pattern :attr:`~sm_records.models.TableSet.slug_signatures` documents for
 the slug claim, and for the same reason.
 """
 

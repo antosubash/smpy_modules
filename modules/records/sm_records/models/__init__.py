@@ -41,32 +41,14 @@ IndexDate = GLOBAL.index[IndexKind.DATE]
 IndexDatetime = GLOBAL.index[IndexKind.DATETIME]
 IndexRef = GLOBAL.index[IndexKind.REF]
 
-SLUG_INDEX_NAME = GLOBAL.slug_index
-"""The global document table's partial unique index of §5, named here because
-two layers need it: the table definition, and
-:func:`sm_records.services._claims.flush_write`, which recognises the database's
-own refusal and raises the 409 the application check raises. A collection's is
-on its own :class:`TableSet` for the same reason."""
-
-GROUP_LOCALE_INDEX_NAME = GLOBAL.group_locale_index
-"""One record per language per translation group (Phase 5 §4.3), on the global
-document table."""
-
-SLUG_CONFLICT_SIGNATURES: tuple[str, ...] = GLOBAL.slug_signatures
-GROUP_LOCALE_CONFLICT_SIGNATURES: tuple[str, ...] = GLOBAL.group_locale_signatures
-
 INDEX_TABLES: tuple[type, ...] = GLOBAL.index_tables
 """Every index kind of the **global** set, for code that must touch all of them
 and has no type in hand. A collection's are ``tables_for(rtype).index_tables``."""
 
 __all__ = [
     "GLOBAL",
-    "GROUP_LOCALE_CONFLICT_SIGNATURES",
-    "GROUP_LOCALE_INDEX_NAME",
     "INDEX_TABLES",
     "REDUCE_GROUP_INDEX_NAME",
-    "SLUG_CONFLICT_SIGNATURES",
-    "SLUG_INDEX_NAME",
     "Base",
     "IndexBool",
     "IndexDate",
