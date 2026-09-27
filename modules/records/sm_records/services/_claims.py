@@ -53,7 +53,7 @@ def _slug_taken(type_key: str, slug: str, locale: str) -> Conflict:
 
 def _group_locale_taken(type_key: str, locale: str) -> Conflict:
     """The database's own refusal of a second record in one language of one
-    translation group — :data:`~sm_records.models.GROUP_LOCALE_CONFLICT_SIGNATURES`.
+    translation group — :attr:`~sm_records.models.TableSet.group_locale_signatures`.
 
     Reached by a writer that sets ``translation_group`` itself: an import
     carrying the column, or a second ``POST /translations`` that lost the race
