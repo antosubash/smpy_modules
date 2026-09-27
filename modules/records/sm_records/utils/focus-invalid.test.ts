@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bareFieldKey, firstErrorInDomOrder } from './focus-invalid';
+import { firstErrorInDomOrder } from './focus-invalid';
 
 const FIELDS = ['title', 'subtitle', 'body'];
 
@@ -30,12 +30,5 @@ describe('firstErrorInDomOrder — R17: a 422 lands where the client validator w
 
   it('answers null for an empty list', () => {
     expect(firstErrorInDomOrder([], FIELDS)).toBeNull();
-  });
-});
-
-describe('bareFieldKey', () => {
-  it('strips the envelope prefix only where there is one', () => {
-    expect(bareFieldKey('data.title')).toBe('title');
-    expect(bareFieldKey('slug')).toBe('slug');
   });
 });

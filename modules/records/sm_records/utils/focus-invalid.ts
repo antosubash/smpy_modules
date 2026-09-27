@@ -7,6 +7,7 @@
  */
 
 import { fieldIdForKey } from '../components/fields/FieldShell';
+import { displayFieldKey } from './errors-display';
 
 /** The envelope inputs a 422 or a collision 409 can name, and the ids
  *  `RecordEnvelopeFields` gives them — a schema field's id comes from
@@ -47,11 +48,6 @@ export function focusInvalidInput(key: string): void {
 const BEFORE_FIELDS = ['status'];
 const AFTER_FIELDS = ['slug', 'position'];
 
-/** `data.title` → `title`; a bare key is returned as it came. */
-export function bareFieldKey(field: string): string {
-  return field.startsWith('data.') ? field.slice(5) : field;
-}
-
 /**
  * Which refusal to take the person to, out of a 422 naming several (R17).
  *
@@ -73,7 +69,7 @@ export function firstErrorInDomOrder(
   const order = [...BEFORE_FIELDS, ...fieldKeys, ...AFTER_FIELDS];
   let best: { key: string; rank: number } | null = null;
   for (const entry of errors) {
-    const key = bareFieldKey(entry.field);
+    const key = displayFieldKey(entry.field);
     const index = order.indexOf(key);
     const rank = index === -1 ? Number.MAX_SAFE_INTEGER : index;
     if (best === null || rank < best.rank) best = { key, rank };

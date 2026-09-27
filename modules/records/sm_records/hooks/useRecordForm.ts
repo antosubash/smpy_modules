@@ -17,7 +17,7 @@ import { useT } from '@simple-module-py/i18n';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
-import { bareFieldKey } from '../utils/focus-invalid';
+import { displayFieldKey } from '../utils/errors-display';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator, type Translate } from '../utils/validation';
@@ -87,14 +87,14 @@ export function useRecordForm(
   const fieldErrors = useMemo(() => {
     const merged: Record<string, string> = {};
     for (const entry of invalidErrors) {
-      const key = entry.field.startsWith('data.') ? entry.field.slice(5) : entry.field;
+      const key = displayFieldKey(entry.field);
       if (fieldKeys.has(key)) merged[key] = humanizeDryRunMessage(t, entry.message);
     }
     Object.assign(merged, clientErrors);
     for (const entry of serverErrors) {
       // The API reports a bare field key; tolerate a `data.`-prefixed one so
       // a future change to the error envelope cannot silently hide messages.
-      const key = entry.field.startsWith('data.') ? entry.field.slice(5) : entry.field;
+      const key = displayFieldKey(entry.field);
       if (fieldKeys.has(key)) merged[key] = entry.message;
     }
     return merged;
@@ -105,7 +105,7 @@ export function useRecordForm(
   const envelopeErrors = useMemo(
     () =>
       serverErrors.filter((entry) => {
-        const key = entry.field.startsWith('data.') ? entry.field.slice(5) : entry.field;
+        const key = displayFieldKey(entry.field);
         return !fieldKeys.has(key);
       }),
     [serverErrors, fieldKeys],
@@ -255,7 +255,7 @@ export function useRecordForm(
     errorCount:
       Object.keys(clientErrors).length > 0
         ? Object.keys(clientErrors).length
-        : new Set(serverErrors.map((entry) => bareFieldKey(entry.field))).size,
+        : new Set(serverErrors.map((entry) => displayFieldKey(entry.field))).size,
     clearErrors,
     reset,
     raw,
