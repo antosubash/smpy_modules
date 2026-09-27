@@ -71,7 +71,7 @@ _shadowed: set[tuple[str, str]] = set()
 _dropped: set[tuple[str, str]] = set()
 
 
-def _name(provider: _Provider) -> str:
+def provider_name(provider: _Provider) -> str:
     return getattr(provider, "__qualname__", None) or repr(provider)
 
 
@@ -125,7 +125,9 @@ def claim(provider: _Provider, fields: Iterable[VirtualField]) -> None:
         _check_key(field.key)
         owner = _owners.get(field.key)
         if owner is not None and owner is not provider:
-            raise ValueError(f"virtual field {field.key!r} is already registered by {_name(owner)}")
+            raise ValueError(
+                f"virtual field {field.key!r} is already registered by {provider_name(owner)}"
+            )
     for field in claimed:
         _virtual[field.key] = field
         _owners[field.key] = provider
@@ -144,7 +146,7 @@ def claim_reduce(key: str, spec: _Provider) -> None:
     _check_key(key, virtual=False)
     owner = _reduce.get(key)
     if owner is not None and owner is not spec:
-        raise ValueError(f"reduce spec {key!r} is already registered by {_name(owner)}")
+        raise ValueError(f"reduce spec {key!r} is already registered by {provider_name(owner)}")
     _reduce[key] = spec
 
 
@@ -182,11 +184,7 @@ def note_dropped(provider_name: str, field_key: str) -> bool:
     disagrees with its own declaration is one log line rather than one per
     record saved. Cleared with the registry, exactly as :func:`note_shadowed`
     is and for the same reason."""
-    seen = (provider_name, field_key)
-    if seen in _dropped:
-        return False
-    _dropped.add(seen)
-    return True
+    return _first(_dropped, (provider_name, field_key))
 
 
 def note_shadowed(type_key: str, field_key: str) -> bool:
@@ -199,8 +197,12 @@ def note_shadowed(type_key: str, field_key: str) -> bool:
     providers gets a clean slate here too, instead of a memo from an earlier
     test silently swallowing the warning it asserts.
     """
-    seen = (type_key, field_key)
-    if seen in _shadowed:
+    return _first(_shadowed, (type_key, field_key))
+
+
+def _first(memo: set[tuple[str, str]], seen: tuple[str, str]) -> bool:
+    """Add ``seen`` to ``memo``, and say whether it was not there before."""
+    if seen in memo:
         return False
-    _shadowed.add(seen)
+    memo.add(seen)
     return True

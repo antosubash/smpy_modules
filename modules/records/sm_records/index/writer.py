@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import TEXT_INDEX_LEN
 from sm_records.index._reduce_write import apply_delta
+from sm_records.index._registry import provider_name
 from sm_records.index.providers import (
     IndexEntry,
     TypeResolver,
@@ -179,6 +180,7 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
                 # index rows — a wrong query result rather than a traceback.
                 entries.extend(provider(record, rtype))
                 continue
+            name = provider_name(provider)
             try:
                 produced = list(provider(record, rtype))
             except Exception:
@@ -188,7 +190,7 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
                 # a provider registered late leaves behind.
                 logger.exception(
                     "records: index provider %s failed on record %s; its rows are missing",
-                    getattr(provider, "__qualname__", None) or repr(provider),
+                    name,
                     record.uuid,
                 )
                 continue
@@ -196,7 +198,6 @@ def project(record: Record, rtype: RecordType, resolve_type_id: TypeResolver) ->
             # halfway would otherwise leave the entries it had already
             # yielded in the set, which is half a projection written as if
             # it were whole. Filtered on the way in — see :func:`_keep`.
-            name = getattr(provider, "__qualname__", None) or repr(provider)
             entries.extend(e for e in produced if _keep(e, name, declared, known_type_ids))
     return entries
 
