@@ -13,26 +13,18 @@ import { request } from './api';
 import type { RecordPage, RecordRead, RecordStatus } from './types';
 
 export type ListRecordsParams = {
-  page?: number;
   page_size?: number;
-  sort?: string;
   filter?: string;
-  /** `?after=<cursor>` — keyset pagination (F11). Mutually exclusive with
-   *  `page`; sending both is a 400. */
-  after?: string;
   /** `?total=false` drops the count statement, so `RecordPage.total` comes
-   *  back `null` (F4). For a caller that pages with `after` and never renders
-   *  the number, this is the cheaper request. */
+   *  back `null` (F4). For a caller that never renders the number, this is
+   *  the cheaper request. */
   total?: boolean;
 };
 
 export function listRecords(typeKey: string, params: ListRecordsParams = {}): Promise<RecordPage> {
   const qs = new URLSearchParams();
-  if (params.page !== undefined) qs.set('page', String(params.page));
   if (params.page_size !== undefined) qs.set('page_size', String(params.page_size));
-  if (params.sort) qs.set('sort', params.sort);
   if (params.filter) qs.set('filter', params.filter);
-  if (params.after) qs.set('after', params.after);
   if (params.total === false) qs.set('total', 'false');
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return request(`/types/${encodeURIComponent(typeKey)}/records${suffix}`);
@@ -137,15 +129,10 @@ export function bulkRecords(
   typeKey: string,
   action: BulkAction,
   uuids: string[],
-  expectedVersions?: Record<string, number>,
 ): Promise<BulkResult> {
   return request(`/types/${encodeURIComponent(typeKey)}/records/bulk`, {
     method: 'POST',
-    body: JSON.stringify({
-      action,
-      uuids,
-      ...(expectedVersions ? { expected_versions: expectedVersions } : {}),
-    }),
+    body: JSON.stringify({ action, uuids }),
   });
 }
 

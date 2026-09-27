@@ -30,20 +30,6 @@ describe('bulkRecords', () => {
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ action: 'trash', uuids: ['a', 'b'] });
   });
-
-  it('omits expected_versions entirely rather than sending null', async () => {
-    // A fresh Response per call: one is consumed by each `request()`.
-    const fetchMock = vi.fn().mockImplementation(async () => ok({}));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await bulkRecords('article', 'publish', ['a']);
-    expect(JSON.parse(String(lastCall(fetchMock).init.body))).not.toHaveProperty(
-      'expected_versions',
-    );
-
-    await bulkRecords('article', 'publish', ['a'], { a: 3 });
-    expect(JSON.parse(String(lastCall(fetchMock).init.body)).expected_versions).toEqual({ a: 3 });
-  });
 });
 
 describe('emptyTrash', () => {

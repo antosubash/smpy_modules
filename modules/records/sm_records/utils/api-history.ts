@@ -12,7 +12,6 @@ import type {
   RecordRevision,
   RecordRevisionDetail,
   ReferrersResponse,
-  TranslationRead,
   TypeRead,
   TypeRevisionPage,
 } from './types';
@@ -87,14 +86,6 @@ export function listReferrers(
 }
 
 // ---- Translations -------------------------------------------------------
-
-/** `GET .../records/{uuid}/translations` — the record's siblings, for the
- *  editor's Languages panel (design §4.4). */
-export function listTranslations(typeKey: string, uuid: string): Promise<TranslationRead[]> {
-  return request(
-    `/types/${encodeURIComponent(typeKey)}/records/${encodeURIComponent(uuid)}/translations`,
-  );
-}
 
 export type CreateTranslationPayload = { locale: string; slug?: string };
 

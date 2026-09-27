@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, buildFilterParam, getType, OFFLINE_STATUS, previewSchema } from './api';
+import { ApiError, buildFilterParam, listTypes, OFFLINE_STATUS, previewSchema } from './api';
 import type { ApiErrorBody } from './types';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -43,7 +43,7 @@ describe('request() error shaping', () => {
       vi.fn().mockResolvedValue(jsonResponse(409, { detail: 'stale', current: { key: 'faq' } })),
     );
 
-    await expect(getType('faq')).rejects.toMatchObject({
+    await expect(listTypes()).rejects.toMatchObject({
       status: 409,
       message: 'stale',
       body: { detail: 'stale', current: { key: 'faq' } },
@@ -61,7 +61,7 @@ describe('request() error shaping', () => {
       ),
     );
 
-    await expect(getType('faq')).rejects.toMatchObject({
+    await expect(listTypes()).rejects.toMatchObject({
       status: 422,
       message: 'label: is required',
     });
@@ -73,7 +73,7 @@ describe('request() error shaping', () => {
   it('rethrows a dropped connection as an offline ApiError', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
-    const err = await getType('faq').catch((caught: unknown) => caught);
+    const err = await listTypes().catch((caught: unknown) => caught);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: OFFLINE_STATUS, body: null });
     expect((err as ApiError).message).toContain("Couldn't reach the server");
@@ -87,7 +87,7 @@ describe('request() error shaping', () => {
       vi.fn().mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' })),
     );
 
-    const err = await getType('faq').catch((caught: unknown) => caught);
+    const err = await listTypes().catch((caught: unknown) => caught);
     expect(err).toMatchObject({ status: 401 });
     expect((err as ApiError).message).toContain('session has expired');
   });
@@ -102,7 +102,7 @@ describe('request() error shaping', () => {
         ),
     );
 
-    await expect(getType('faq')).rejects.toMatchObject({
+    await expect(listTypes()).rejects.toMatchObject({
       status: 418,
       message: "Request failed (418 I'm a teapot)",
       body: null,
@@ -119,7 +119,7 @@ describe('request() error shaping', () => {
         ),
     );
 
-    const err = await getType('faq').catch((caught: unknown) => caught);
+    const err = await listTypes().catch((caught: unknown) => caught);
     expect(err).toMatchObject({ status: 500, body: null });
     expect((err as ApiError).message).not.toContain('Request failed');
     expect((err as ApiError).message).toContain('went wrong on the server');

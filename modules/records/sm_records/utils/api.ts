@@ -114,10 +114,6 @@ export function createType(payload: CreateTypePayload): Promise<TypeRead> {
   return request('/types', { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function getType(key: string): Promise<TypeRead> {
-  return request(`/types/${encodeURIComponent(key)}`);
-}
-
 /** `PUT`'s body beyond the changed top-level keys — Phase 3's two retry
  *  paths for the two 409 shapes §8.2/§8.8 define: `force` applies a
  *  restrictive change anyway and marks failing records invalid, `orphaned`
