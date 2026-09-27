@@ -23,8 +23,6 @@ import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator, type Translate } from '../utils/validation';
 import { buildPayload, type FormValues, toFormValues } from '../utils/values';
 
-export type RecordFormState = ReturnType<typeof useRecordForm>;
-
 export function useRecordForm(
   type: TypeRead,
   record: RecordRead | null,

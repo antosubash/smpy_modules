@@ -4,9 +4,6 @@
     "unsaved_changes": "You have unsaved changes. Leave this page and lose them?",
     "tenant_badge": "Tenant: {tenant}"
   },
-  "nav": {
-    "types": "Record Types"
-  },
   "types": {
     "title": "Record Types",
     "empty": "No record types yet",

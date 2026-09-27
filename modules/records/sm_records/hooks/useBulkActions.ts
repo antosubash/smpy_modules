@@ -70,23 +70,10 @@ export function useBulkActions(
     previousResetKey.current = resetKey;
     setReport(null);
     // The refusal sentence is the only thing that still writes here (see
-    // `announceDone` below) — goes with the report it was about, same
-    // trigger.
+    // the U11 note in `run` below) — goes with the report it was about,
+    // same trigger.
     setAnnouncement('');
   }, [resetKey]);
-
-  // U11: a *successful* action already has an accessible announcement —
-  // sonner's own toast region — the same one every single-row action in
-  // this module relies on alone (`trashToast`/`restoredToast`/`purgedToast`,
-  // none of which write to a live region of their own). Writing the same
-  // text into `announcement` too doubled it for a screen-reader user (the
-  // module's own `role="status"` region and sonner's, back to back). The
-  // *refusal* case below is different and keeps using `announcement`
-  // directly: it has no toast, so the live region is the only announcement
-  // it gets.
-  const announceDone = (message: string) => {
-    toast.success(message);
-  };
 
   const run = async (action: BulkAction) => {
     setPending(true);
@@ -118,7 +105,16 @@ export function useBulkActions(
       }
       router.reload({ only: ['records'] });
       onDone();
-      announceDone(message);
+      // U11: a *successful* action already has an accessible announcement —
+      // sonner's own toast region — the same one every single-row action in
+      // this module relies on alone (`trashToast`/`restoredToast`/
+      // `purgedToast`, none of which write to a live region of their own).
+      // Writing the same text into `announcement` too doubled it for a
+      // screen-reader user (the module's own `role="status"` region and
+      // sonner's, back to back). The *refusal* case below is different and
+      // keeps using `announcement` directly: it has no toast, so the live
+      // region is the only announcement it gets.
+      toast.success(message);
     } catch (err) {
       const body = err instanceof ApiError && err.status === 409 ? err.body?.report : undefined;
       // `report` carries a schema dry run on one route and this on another;
@@ -152,7 +148,7 @@ export function useBulkActions(
       const result = await emptyTrash(typeKey, filtered ? filters : []);
       router.reload({ only: ['records'] });
       onDone();
-      announceDone(
+      toast.success(
         t('records.bulk.done_empty_trash', {
           count: result.purged,
           defaultValue: '{count} records deleted permanently',

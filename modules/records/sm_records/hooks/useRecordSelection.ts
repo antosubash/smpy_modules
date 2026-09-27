@@ -57,7 +57,7 @@ export function useRecordSelection(uuids: readonly string[]) {
 
   /** Drop what a refused batch named, keeping the rest ticked. */
   const deselect = useCallback((failing: readonly string[]) => {
-    setSelected((current) => model.without(current, failing));
+    setSelected((current) => model.deselectAll(current, failing));
   }, []);
 
   return {

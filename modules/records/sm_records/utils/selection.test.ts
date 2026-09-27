@@ -8,7 +8,6 @@ import {
   someSelected,
   toggle,
   visible,
-  without,
 } from './selection';
 
 const PAGE = ['a', 'b', 'c', 'd', 'e'];
@@ -73,9 +72,5 @@ describe('select all, on this page only', () => {
 describe('what an action actually sends', () => {
   it('is the selection narrowed to this page, in page order', () => {
     expect(visible(new Set(['e', 'zz', 'a']), PAGE)).toEqual(['a', 'e']);
-  });
-
-  it('drops exactly the uuids a refusal named — "deselect failing"', () => {
-    expect([...without(new Set(PAGE), ['b', 'd'])]).toEqual(['a', 'c', 'e']);
   });
 });

@@ -31,7 +31,6 @@ import { createRoot, type Root } from 'react-dom/client';
 
 export type Mounted = {
   host: HTMLElement;
-  root: Root;
   /** Render again — for a parent that owns the component's state. */
   render: (next: React.ReactElement) => Promise<void>;
   /** Inside `act`, so effect cleanups (a window listener, an interval) have
@@ -55,7 +54,6 @@ export async function mount(element: React.ReactElement): Promise<Mounted> {
   await render(element);
   return {
     host,
-    root,
     render,
     unmount: async () => {
       await act(async () => {

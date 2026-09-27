@@ -14,15 +14,10 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { ApiError } from '../utils/api';
+import { ApiError, type UpdateTypeChanges } from '../utils/api';
 import type { DryRunReport, TypeRead, ValidationError } from '../utils/types';
 
-export type SchemaApplyBody = {
-  expected_version: number;
-  force?: boolean;
-  orphaned?: 'restore' | 'discard';
-  [key: string]: unknown;
-};
+export type SchemaApplyBody = UpdateTypeChanges & { expected_version: number };
 
 export type SchemaApplyState = {
   pending: boolean;

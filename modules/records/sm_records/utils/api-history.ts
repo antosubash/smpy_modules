@@ -6,7 +6,7 @@
  * API surface: "what did this used to look like" and "what points at this".
  */
 
-import { request } from './api';
+import { request, type UpdateTypeChanges } from './api';
 import type {
   RecordRead,
   RecordRevision,
@@ -26,7 +26,7 @@ export function listTypeRevisions(key: string, page = 1): Promise<TypeRevisionPa
 export function restoreTypeRevision(
   key: string,
   version: number,
-  body: { expected_version: number; force?: boolean; orphaned?: 'restore' | 'discard' },
+  body: UpdateTypeChanges & { expected_version: number },
 ): Promise<TypeRead> {
   return request(`/types/${encodeURIComponent(key)}/revisions/${version}/restore`, {
     method: 'POST',

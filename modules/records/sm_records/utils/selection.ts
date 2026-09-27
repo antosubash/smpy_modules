@@ -59,11 +59,6 @@ export function deselectAll(selection: Selection, uuids: readonly string[]): Set
   return next;
 }
 
-/** Drop the uuids a refused bulk action named — "deselect failing". */
-export function without(selection: Selection, uuids: readonly string[]): Set<string> {
-  return deselectAll(selection, uuids);
-}
-
 /** Is every row of this page selected? An empty page is not: "select all" on
  *  nothing would otherwise render as already done. */
 export function allSelected(selection: Selection, uuids: readonly string[]): boolean {
