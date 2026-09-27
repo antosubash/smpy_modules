@@ -31,14 +31,7 @@ from typing import Any
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.index import _registry
-from sm_records.index._coerce import (
-    coerce_bool,
-    coerce_date,
-    coerce_datetime,
-    coerce_number,
-    coerce_ref,
-    coerce_text,
-)
+from sm_records.index._coerce import COERCE, coerce_ref
 from sm_records.index._fields import read_field, relation_target
 from sm_records.index._registry import VirtualField, note_dropped, note_shadowed, virtual_fields
 from sm_records.models import Record, RecordType
@@ -139,16 +132,7 @@ def current_type_resolver() -> TypeResolver:
 
 
 def _entry(kind: IndexKind, key: str, value: object) -> IndexEntry | None:
-    if kind is IndexKind.TEXT:
-        coerced: object | None = coerce_text(value)
-    elif kind is IndexKind.NUMBER:
-        coerced = coerce_number(value)
-    elif kind is IndexKind.BOOL:
-        coerced = coerce_bool(value)
-    elif kind is IndexKind.DATE:
-        coerced = coerce_date(value)
-    else:
-        coerced = coerce_datetime(value)
+    coerced = COERCE[kind](value)
     return None if coerced is None else IndexEntry(kind=kind, field_key=key, value=coerced)
 
 

@@ -17,11 +17,13 @@ reached us rather than on anything about the field.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from sm_records._text import has_nul
 from sm_records.constants import NUMBER_SCALE
+from sm_records.schema.types import IndexKind
 
 _QUANTUM = Decimal(1).scaleb(-NUMBER_SCALE)
 """``Numeric(19, 5)`` is the column, so five places is the contract. The
@@ -133,3 +135,16 @@ def coerce_ref(value: object) -> str | tuple[str, str] | None:
             return None
         return (target, uuid) if isinstance(target, str) and target else uuid
     return None
+
+
+COERCE: dict[IndexKind, Callable[[object], object | None]] = {
+    IndexKind.TEXT: coerce_text,
+    IndexKind.NUMBER: coerce_number,
+    IndexKind.BOOL: coerce_bool,
+    IndexKind.DATE: coerce_date,
+    IndexKind.DATETIME: coerce_datetime,
+}
+"""The coercer per scalar index kind — one table, read by the writer
+(``providers._entry``) and the query builder (``_predicates._coerce``), so the
+two cannot pick different functions for the same kind. ``REF`` is absent: both
+sides handle a relation through :func:`coerce_ref` on a path of its own."""

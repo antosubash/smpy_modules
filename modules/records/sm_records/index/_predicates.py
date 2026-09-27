@@ -19,14 +19,7 @@ from sqlalchemy import and_, false, or_
 from sqlalchemy.sql import ColumnElement
 
 from sm_records.constants import TEXT_INDEX_LEN
-from sm_records.index._coerce import (
-    coerce_bool,
-    coerce_date,
-    coerce_datetime,
-    coerce_number,
-    coerce_ref,
-    coerce_text,
-)
+from sm_records.index._coerce import COERCE, coerce_ref
 from sm_records.index._prefix import starts_with_clause
 from sm_records.schema.types import IndexKind
 
@@ -121,14 +114,6 @@ _ALLOWED: dict[IndexKind, frozenset[FilterOp]] = {
     IndexKind.REF: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN}),
 }
 
-_COERCE = {
-    IndexKind.TEXT: coerce_text,
-    IndexKind.NUMBER: coerce_number,
-    IndexKind.BOOL: coerce_bool,
-    IndexKind.DATE: coerce_date,
-    IndexKind.DATETIME: coerce_datetime,
-}
-
 
 def _coerce(kind: IndexKind, value: Any, field: str) -> Any:
     """Coerce a *filter* value exactly as the provider coerced the stored one.
@@ -141,7 +126,7 @@ def _coerce(kind: IndexKind, value: Any, field: str) -> Any:
         parsed = coerce_ref(value)
         out: Any = parsed[1] if isinstance(parsed, tuple) else parsed
     else:
-        out = _COERCE[kind](value)
+        out = COERCE[kind](value)
     if out is None:
         raise QueryError(field, "bad_value", f"{field!r}: {value!r} is not a valid value")
     return out
