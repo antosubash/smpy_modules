@@ -181,23 +181,14 @@ export function toApiValue(field: FieldDef, value: unknown, original?: unknown):
   switch (field.type) {
     case 'boolean':
       return typeof value === 'boolean' ? value : undefined;
-    case 'number': {
-      // Deliberately still a string: see this module's header.
-      const text = asText(value).trim();
-      return text === '' ? undefined : text;
-    }
-    case 'integer': {
-      // Also a string on the wire, and for the same reason as `number`:
-      // `to_int` in `schema/_builders.py` parses the string itself
-      // (`int(value.strip())`), so routing it through `Number()` first — as
-      // this used to — silently rounds anything past 2**53 (§ header,
-      // `"99999999999999999"` becoming `"100000000000000000"`) before the
-      // server ever sees it. Non-integer text still goes out untouched so
-      // the server's own message ("must be a whole number") is what shows.
-      const text = asText(value).trim();
-      return text === '' ? undefined : text;
-    }
+    case 'number':
+    case 'integer':
     case 'date': {
+      // Deliberately still a string: see this module's header. `integer` too:
+      // `to_int` in `schema/_builders.py` parses the string itself, so a
+      // `Number()` here would round anything past 2**53 before the server
+      // ever sees it, and non-integer text goes out untouched so the server's
+      // own "must be a whole number" is what shows.
       const text = asText(value).trim();
       return text === '' ? undefined : text;
     }
