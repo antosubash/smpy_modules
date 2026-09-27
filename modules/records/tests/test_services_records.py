@@ -235,6 +235,13 @@ async def test_list_records_clamps_the_page_size(db, settings, article):
     assert (len(rows), total) == (2, 3)
 
 
+def test_settings_refuse_a_ceiling_below_its_default():
+    with pytest.raises(ValueError, match=r"default_page_size \(3\) must not exceed max_page_size"):
+        RecordsSettings(default_page_size=3, max_page_size=2)
+    with pytest.raises(ValueError, match=r"max_indexed_fields_per_type \(5\) must not exceed"):
+        RecordsSettings(max_indexed_fields_per_type=5, max_fields_per_type=4)
+
+
 async def test_revisions_are_capped(db, article):
     settings = RecordsSettings(revision_limit=2)
     record = await service.create_record(db, article, data={"title": "v1"}, settings=settings)

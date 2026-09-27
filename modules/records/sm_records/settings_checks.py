@@ -1,7 +1,7 @@
 """The rules :class:`~sm_records.settings.RecordsSettings` enforces, as plain
 functions.
 
-Functions rather than validator bodies because two of the three callers are not
+Functions rather than validator bodies because some of their callers are not
 pydantic. :mod:`sm_records.boot` needs the same answer about a
 ``public_route_prefix`` that reached it anyway — a row stored before the rule
 existed — without an exception and without taking the host down at
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Any, Final
+from typing import Final
 
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
@@ -23,7 +23,6 @@ from sm_records import constants
 __all__ = [
     "DEFAULT_PUBLIC_ROUTE_PREFIX",
     "check_content_locales",
-    "check_limits",
     "check_media_api_prefix",
     "check_public_route_prefix",
 ]
@@ -147,46 +146,6 @@ def check_content_locales(locales: Sequence[str], default_locale: str) -> None:
         raise ValueError(
             f"default_content_locale {default_locale!r} is not in content_locales {list(locales)}"
         )
-
-
-def check_limits(settings: Any) -> None:
-    """The two cross-field ceilings ``RecordsSettings`` has to hold together.
-
-    A default page size above the maximum would be clamped away on every
-    request by :meth:`~sm_records.settings.RecordsSettings.clamp_page_size`,
-    which is a setting that silently does not mean what it says; an indexed
-    field ceiling above the field ceiling is a limit that can never bind.
-    Both are refused where the operator can see the field they just typed.
-    Takes the settings object rather than four integers: it is called from a
-    model validator that has one, and the names below are then the names the
-    error messages use.
-    """
-    if settings.default_page_size > settings.max_page_size:
-        raise ValueError(
-            f"default_page_size ({settings.default_page_size}) must not exceed "
-            f"max_page_size ({settings.max_page_size})"
-        )
-    if settings.max_indexed_fields_per_type > settings.max_fields_per_type:
-        raise ValueError(
-            f"max_indexed_fields_per_type ({settings.max_indexed_fields_per_type}) "
-            f"must not exceed max_fields_per_type ({settings.max_fields_per_type})"
-        )
-
-
-def clamp_page_size(settings: Any, requested: int | None) -> int:
-    """The page size a list endpoint actually uses.
-
-    One owner for the rule, because four call sites must agree on it: the
-    admin list, the referrers panel, the anonymous read API and the record-list
-    view. ``None`` means "the caller did not ask" and gets
-    ``default_page_size``; anything above ``max_page_size`` is clamped rather
-    than refused, so an anonymous caller probing the ceiling learns nothing and
-    gets a usable page either way.
-
-    A function here rather than the body of ``RecordsSettings.clamp_page_size``
-    only for that module's file cap; the method remains the call site.
-    """
-    return max(min(requested or settings.default_page_size, settings.max_page_size), 1)
 
 
 class StoredSourcesOnly:

@@ -26,8 +26,8 @@ Those four are the whole ``requires_restart`` set, and they are declared on
 the base class :class:`~sm_records.settings_boot.BootSettings` — the README's
 settings table lists the same four.
 
-Everything else is read per request and takes effect on save. The cross-field
-checks, and the page-size clamp, live in :mod:`sm_records.settings_checks`.
+Everything else is read per request and takes effect on save. The per-field
+checks live in :mod:`sm_records.settings_checks`.
 """
 
 from __future__ import annotations
@@ -36,12 +36,7 @@ from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from sm_records.settings_boot import BootSettings
-from sm_records.settings_checks import (
-    DEFAULT_PUBLIC_ROUTE_PREFIX,
-    check_limits,
-    check_public_route_prefix,
-    clamp_page_size,
-)
+from sm_records.settings_checks import DEFAULT_PUBLIC_ROUTE_PREFIX, check_public_route_prefix
 
 __all__ = ["DEFAULT_PUBLIC_ROUTE_PREFIX", "RecordsSettings", "check_public_route_prefix"]
 
@@ -236,12 +231,35 @@ class RecordsSettings(BootSettings):
     """
 
     def clamp_page_size(self, requested: int | None) -> int:
-        """See :func:`~sm_records.settings_checks.clamp_page_size`."""
-        return clamp_page_size(self, requested)
+        """The page size a list endpoint actually uses.
+
+        One owner for the rule, because four call sites must agree on it: the
+        admin list, the referrers panel, the anonymous read API and the
+        record-list view. ``None`` means "the caller did not ask" and gets
+        ``default_page_size``; anything above ``max_page_size`` is clamped
+        rather than refused, so an anonymous caller probing the ceiling learns
+        nothing and gets a usable page either way.
+        """
+        return max(min(requested or self.default_page_size, self.max_page_size), 1)
 
     @model_validator(mode="after")
     def _check_limits(self) -> RecordsSettings:
-        """The two cross-field ceilings — see
-        :func:`~sm_records.settings_checks.check_limits`."""
-        check_limits(self)
+        """The two cross-field ceilings the settings have to hold together.
+
+        A default page size above the maximum would be clamped away on every
+        request by :meth:`clamp_page_size`, which is a setting that silently
+        does not mean what it says; an indexed field ceiling above the field
+        ceiling is a limit that can never bind. Both are refused where the
+        operator can see the field they just typed.
+        """
+        if self.default_page_size > self.max_page_size:
+            raise ValueError(
+                f"default_page_size ({self.default_page_size}) must not exceed "
+                f"max_page_size ({self.max_page_size})"
+            )
+        if self.max_indexed_fields_per_type > self.max_fields_per_type:
+            raise ValueError(
+                f"max_indexed_fields_per_type ({self.max_indexed_fields_per_type}) "
+                f"must not exceed max_fields_per_type ({self.max_fields_per_type})"
+            )
         return self
