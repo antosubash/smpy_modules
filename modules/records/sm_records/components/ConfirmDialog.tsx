@@ -1,3 +1,4 @@
+import { useT } from '@simple-module-py/i18n';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,8 +49,9 @@ export function ConfirmDialog({
    *  or hold a focusable control without nesting inside that `<p>` (L6). */
   body?: ReactNode;
   confirmLabel: string;
-  cancelLabel: string;
-  pendingLabel: string;
+  /** Default "Cancel" / "Saving…" — what every caller in this module says. */
+  cancelLabel?: string;
+  pendingLabel?: string;
   destructive?: boolean;
   /** Disables the confirm button without hiding it — for a caller (the
    *  referrer-aware delete dialog) that still wants the reason visible in
@@ -70,6 +72,7 @@ export function ConfirmDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onConfirm: () => Promise<unknown>;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +120,9 @@ export function ConfirmDialog({
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            {cancelLabel ?? t('records.editor.cancel', { defaultValue: 'Cancel' })}
+          </AlertDialogCancel>
           <AlertDialogAction
             disabled={pending || confirmDisabled}
             variant={destructive ? 'destructive' : 'default'}
@@ -126,7 +131,9 @@ export function ConfirmDialog({
               void confirm();
             }}
           >
-            {pending ? pendingLabel : confirmLabel}
+            {pending
+              ? (pendingLabel ?? t('records.editor.saving', { defaultValue: 'Saving…' }))
+              : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

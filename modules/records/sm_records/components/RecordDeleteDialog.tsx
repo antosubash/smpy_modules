@@ -204,8 +204,6 @@ export function RecordDeleteDialog({
       description={<DialogDescription t={t} loading={loading} loadError={loadError} />}
       body={<DialogDetails t={t} loading={loading} loadError={loadError} referrers={referrers} />}
       confirmLabel={moveToTrash}
-      cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-      pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
       destructive
       confirmDisabled={loading || blocked}
       onOpenChange={(next) => {

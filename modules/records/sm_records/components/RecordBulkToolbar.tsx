@@ -59,8 +59,6 @@ export function RecordBulkToolbar({
           title={item.label}
           description={item.description}
           confirmLabel={item.label}
-          cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
           destructive={item.destructive}
           onConfirm={() => onRun(item.action)}
         />

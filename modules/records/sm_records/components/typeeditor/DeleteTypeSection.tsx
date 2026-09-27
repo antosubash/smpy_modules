@@ -132,8 +132,6 @@ export function DeleteTypeSection({ type, onDeleted }: { type: TypeRead; onDelet
             if (!open) setTyped('');
           }}
           confirmLabel={t('records.records.delete', { defaultValue: 'Delete' })}
-          cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
           destructive
           confirmDisabled={!countMatches}
           onConfirm={confirm}

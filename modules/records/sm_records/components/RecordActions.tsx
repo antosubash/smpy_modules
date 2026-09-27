@@ -37,8 +37,6 @@ export function RecordActions({
     allowNavigation?.();
     onGone();
   };
-  const cancelLabel = t('records.editor.cancel', { defaultValue: 'Cancel' });
-  const pendingLabel = t('records.editor.saving', { defaultValue: 'Saving…' });
 
   if (!record.is_deleted) {
     const label = t('records.records.delete', { defaultValue: 'Delete' });
@@ -86,8 +84,6 @@ export function RecordActions({
           defaultValue: 'Restore this record?',
         })}
         confirmLabel={restoreLabel}
-        cancelLabel={cancelLabel}
-        pendingLabel={pendingLabel}
         onConfirm={async () => {
           onRestored(await restoreRecord(typeKey, record.uuid));
           restoredToast(t);
@@ -104,8 +100,6 @@ export function RecordActions({
           defaultValue: 'This cannot be undone. Delete this record permanently?',
         })}
         confirmLabel={purgeLabel}
-        cancelLabel={cancelLabel}
-        pendingLabel={pendingLabel}
         destructive
         onConfirm={async () => {
           await purgeRecord(typeKey, record.uuid);

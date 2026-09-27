@@ -105,8 +105,6 @@ export function EmptyTrashButton({
         </div>
       }
       confirmLabel={label}
-      cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-      pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
       destructive
       confirmDisabled={!matches}
       // Reopening used to show the previous attempt's digits, which reads as

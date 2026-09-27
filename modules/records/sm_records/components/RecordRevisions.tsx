@@ -212,8 +212,6 @@ export function RecordRevisions({
                         confirmLabel={t('records.editor.revisions.restore', {
                           defaultValue: 'Restore this version',
                         })}
-                        cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                        pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
                         onConfirm={() => restore(selected)}
                       />
                     </div>

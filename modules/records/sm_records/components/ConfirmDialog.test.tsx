@@ -94,3 +94,28 @@ describe('ConfirmDialog — U8: initial focus can be redirected off Cancel', () 
     await view.unmount();
   });
 });
+
+describe('ConfirmDialog — Cancel and Saving… are the defaults every caller relies on', () => {
+  it('labels Cancel, and the confirm button while pending, without being told to', async () => {
+    let finish: () => void = () => {};
+    const view = await mount(
+      <ConfirmDialog
+        trigger={<button type="button">Open</button>}
+        title="Restore"
+        description="Restore this record?"
+        confirmLabel="Restore"
+        onConfirm={() =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          })
+        }
+      />,
+    );
+    await click(view.button('Open'));
+    expect(document.querySelector('[data-slot="alert-dialog-cancel"]')?.textContent).toBe('Cancel');
+    await click(confirmButton());
+    expect(confirmButton()?.textContent).toBe('Saving…');
+    finish();
+    await view.unmount();
+  });
+});

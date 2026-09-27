@@ -83,8 +83,6 @@ export function SchemaConflictPanel({
             confirmLabel={t('records.type_editor.preview.apply_anyway_confirm', {
               defaultValue: 'Apply anyway',
             })}
-            cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-            pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
             destructive
             onConfirm={onForce}
           />

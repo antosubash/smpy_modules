@@ -72,8 +72,6 @@ export function RecordRowAction({
             defaultValue: 'Restore this record?',
           })}
           confirmLabel={restoreLabel}
-          cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
           onConfirm={() => onRestore(record)}
         />
         <ConfirmDialog
@@ -96,8 +94,6 @@ export function RecordRowAction({
             defaultValue: 'This cannot be undone. Delete this record permanently?',
           })}
           confirmLabel={purgeLabel}
-          cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-          pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
           destructive
           onConfirm={() => onPurge(record)}
         />

@@ -165,8 +165,6 @@ export function TypeRevisions({
                     confirmLabel={t('records.type_editor.revisions.restore', {
                       defaultValue: 'Restore this schema',
                     })}
-                    cancelLabel={t('records.editor.cancel', { defaultValue: 'Cancel' })}
-                    pendingLabel={t('records.editor.saving', { defaultValue: 'Saving…' })}
                     onConfirm={() => restore(rev.version)}
                   />
                 </li>
