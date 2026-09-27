@@ -87,7 +87,7 @@ uv run python scripts/set_setting.py sm_records \
 # visible in the UI on the far side of the ceiling: the list footer renders a
 # capped total as "N+", and "Preview changes" becomes a polled job with a
 # progress label. The values sit *above* every other spec's fixtures —
-# `records-list.spec.ts` pages through 30 records and asserts an exact total,
+# `records-list-ux.spec.ts` pages through 30 records and asserts an exact total,
 # `records-schema-change.spec.ts` previews a type holding two — and low enough
 # that `records-paging.spec.ts` / `records-preview.spec.ts` can seed past them
 # over the API in seconds.

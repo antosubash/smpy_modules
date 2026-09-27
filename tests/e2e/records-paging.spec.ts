@@ -18,7 +18,7 @@ import {
  * with `scripts/set_setting.py`, exactly the way it sets the two content
  * locales — the module reads its settings from the database, so this is the
  * only way to reach the ceiling at all. The value sits above every other
- * spec's fixtures (`records-list.spec.ts` pages through 30 records and
+ * spec's fixtures (`records-list-ux.spec.ts` pages through 30 records and
  * asserts an exact total), so lowering it changes nothing for them.
  *
  * Above the ceiling the API reports `total: max_count` with

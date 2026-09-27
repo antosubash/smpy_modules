@@ -12,8 +12,9 @@ import {
 /**
  * The generic record list (design §12's `RecordList.tsx`): the filter bar,
  * which only ever offers indexed fields plus the three fixed columns (§7.2),
- * the sortable headers, the refusal notice for a filter the index layer
- * won't build, and paging.
+ * the sortable headers and the refusal notice for a filter the index layer
+ * won't build. Paging is `records-list-ux.spec.ts` (First/Last, page size)
+ * and `records-paging.spec.ts` (Next/Previous, the capped total).
  */
 
 const FIELDS = [
@@ -196,43 +197,5 @@ test.describe('Records — list, filter, sort, page', () => {
     await expect(page).not.toHaveURL(/sort=/);
     await expect(header).toHaveAttribute('aria-sort', 'none');
     await expect.poll(() => rowTitles(page)).toHaveLength(4);
-  });
-
-  test('pages through more records than fit on one page', async ({ page }) => {
-    test.setTimeout(180_000);
-    await login(page);
-    const key = uniqueTypeKey('paged');
-    await apiCreateType(page, {
-      key,
-      label: 'Paged',
-      label_plural: 'Paged things',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
-    // Seeded over the API rather than the form: 30 records is about paging,
-    // not about the editor, which `records-crud.spec.ts` already covers.
-    const total = 30;
-    for (let i = 0; i < total; i += 1) {
-      await apiCreateRecord(page, key, {
-        data: { name: `row-${String(i).padStart(2, '0')}` },
-        position: i,
-      });
-    }
-
-    await page.goto(`/admin/records/${key}?sort=name`);
-    await expect(page.getByTestId('records-record-row')).toHaveCount(25);
-    await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
-
-    const next = page.getByRole('button', { name: 'Next' });
-    await expect(next).toBeEnabled();
-    await next.click();
-    await expect(page).toHaveURL(/page=2/);
-    await expect(page.getByTestId('records-record-row')).toHaveCount(total - 25);
-    await expect(next).toBeDisabled();
-    await expect((await rowTitles(page))[0]).toBe('row-25');
-
-    await page.getByRole('button', { name: 'Previous' }).click();
-    await expect(page.getByTestId('records-record-row')).toHaveCount(25);
-    await expect((await rowTitles(page))[0]).toBe('row-00');
   });
 });
