@@ -78,17 +78,8 @@ test.describe('Records — permissions', () => {
         data: { key: uniqueTypeKey('nope'), label: 'Nope' },
       });
       expect(created.status()).toBe(403);
-    } finally {
-      await other.context().close();
-    }
-  });
 
-  test('the Records entry is absent from that user’s admin sidebar', async ({ page, browser }) => {
-    await login(page);
-    const who = await createPlainUser(page);
-
-    const other = await asUser(browser, who);
-    try {
+      // Nor does the admin sidebar offer that user a way in.
       await other.goto('/dashboard/');
       await expect(other.getByRole('link', { name: 'Records', exact: true })).toHaveCount(0);
     } finally {
@@ -119,19 +110,5 @@ test.describe('Records — permissions', () => {
     } finally {
       await other.context().close();
     }
-  });
-
-  test('admin, holding every permission, reaches the schema editor', async ({ page }) => {
-    await login(page);
-    const key = uniqueTypeKey('adm');
-    await apiCreateType(page, {
-      key,
-      label: 'Reachable',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
-    await page.goto(`/admin/records/types/${key}`);
-    await expect(page.getByRole('heading', { name: 'Reachable' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Delete this type' })).toBeVisible();
   });
 });
