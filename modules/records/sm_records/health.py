@@ -97,7 +97,7 @@ from sm_records.index._drift import drift_detail
 from sm_records.models import RecordType
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
-from sm_records.tenancy import TenancyMode, mode_of
+from sm_records.tenancy import TenancyMode
 
 if TYPE_CHECKING:
     from sm_records.module import RecordsModule
@@ -106,7 +106,6 @@ __all__ = [
     "CHECK_NAME",
     "count_invalid_records",
     "count_orphaned_locales",
-    "on_startup",
     "stale_reindex_check",
 ]
 
@@ -260,13 +259,3 @@ def stale_reindex_check(module: RecordsModule) -> HealthCheck:
         return HealthCheckResult(status=status, detail="; ".join(details) or None)
 
     return HealthCheck(name=CHECK_NAME, check=check)
-
-
-async def on_startup(module: RecordsModule, app, settings: RecordsSettings) -> None:
-    """What ``RecordsModule.on_startup`` parks on the module for this check and
-    for :func:`sm_records.menu.refresh`: the tenancy mode (tenancy design
-    §A.5, §I), and the orphaned-locale count, which is taken once per boot
-    (see the module docstring)."""
-    module.tenancy_mode = mode_of(app)
-    if module.db is not None:
-        module.orphaned_locales = await count_orphaned_locales(module.db, settings)

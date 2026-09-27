@@ -65,22 +65,6 @@ class RecordsModule(ModuleBase):
         self._menu_dirty = False
         self._menu_synced_at = 0.0
 
-    @property
-    def reduce_drift(self) -> dict[int, dict[str, int]]:
-        """What the last in-process verify found, by type id (Phase 5 §5.2).
-
-        Exposed on the module instance because that is where a host looks for
-        this module's runtime state, and because the health check already
-        closes over ``self`` — the state itself lives in
-        :mod:`sm_records.index._drift`, which is process-global for the same
-        reason the provider registry is: the writer has no module instance to
-        report to. Empty means the last verify was clean, or that none has run
-        in this process.
-        """
-        from sm_records.index._drift import current_drift
-
-        return current_drift()
-
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
 
@@ -244,7 +228,9 @@ class RecordsModule(ModuleBase):
         self.db = getattr(app.state, "sm", None) and app.state.sm.db
         from sm_records import tenancy
 
-        tenancy.configure(app)  # single or multi, from the built stack (tenancy §A.3)
+        # Single or multi, from the built stack (tenancy §A.3); the health check
+        # and the sidebar read it from here (§A.5, §I).
+        self.tenancy_mode = tenancy.configure(app)
         if (session_class := getattr(self.db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)  # before any read below (tenancy §A.4)
         services = getattr(app.state, constants.PACKAGE, None)
@@ -270,10 +256,10 @@ class RecordsModule(ModuleBase):
         # says why), so this is what makes the records left behind visible. Once
         # per boot: the framework offers no hook to re-run it when an operator
         # hydrates new settings, which the health check's docstring records.
-        # Also parks the tenancy mode the check and the sidebar read (§A.5, §I).
         from sm_records import health
 
-        await health.on_startup(self, app, settings)
+        if self.db is not None:
+            self.orphaned_locales = await health.count_orphaned_locales(self.db, settings)
 
         # The first sidebar read: ``register_menu_items`` ran before there was
         # a database, so until now the registry holds the hub entry and none
