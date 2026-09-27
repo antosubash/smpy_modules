@@ -7,8 +7,6 @@ and "which record a row is about" there.
 
 from __future__ import annotations
 
-import json
-
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, roles
@@ -20,21 +18,15 @@ from tests.io_helpers import (
     field,
     make_record,
     make_type,
+    parse_rows,
     post_import,
+    to_document,
 )
-
-
-def _rows(document: str) -> list[dict]:
-    return json.loads(document)["records"]
-
-
-def _document(rows: list[dict]) -> str:
-    return json.dumps({"records": rows})
 
 
 async def test_dry_run_is_the_default_and_writes_nothing(client):
     await catalogue(client, products=2)
-    rows = _rows(await export_text(client, PRODUCT))
+    rows = parse_rows(await export_text(client, PRODUCT))
     rows.append(
         {
             **rows[0],
@@ -45,7 +37,7 @@ async def test_dry_run_is_the_default_and_writes_nothing(client):
     )
 
     before = await data_by_uuid(client, PRODUCT)
-    resp = await post_import(client, PRODUCT, _document(rows))
+    resp = await post_import(client, PRODUCT, to_document(rows))
     assert resp.status_code == 200, resp.text
     report = resp.json()
     assert report["dry_run"] is True
@@ -82,7 +74,7 @@ async def test_abort_is_all_or_nothing(client):
     rows = [{"data": {"name": f"Widget {index}"}} for index in range(500)]
     rows.append({"data": {"name": None}})
 
-    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    resp = await post_import(client, PRODUCT, to_document(rows), dry_run="false")
     assert resp.status_code == 422, resp.text
     body = resp.json()
     assert body["report"]["failed"] == 1
@@ -112,7 +104,7 @@ async def test_abort_stops_at_the_first_bad_row(client):
         {"data": {"name": None}},
     ]
 
-    refused = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    refused = await post_import(client, PRODUCT, to_document(rows), dry_run="false")
     assert refused.status_code == 422, refused.text
     report = refused.json()["report"]
     assert report["failed"] == 1, "abort should stop at the row that settles it"
@@ -120,7 +112,7 @@ async def test_abort_stops_at_the_first_bad_row(client):
     assert report["total"] == 4, "the file's size is still what it is"
     assert await data_by_uuid(client, PRODUCT) == {}
 
-    preview = await post_import(client, PRODUCT, _document(rows))
+    preview = await post_import(client, PRODUCT, to_document(rows))
     assert preview.status_code == 200, preview.text
     assert preview.json()["failed"] == 3, "a dry run still reports every bad row"
 
@@ -134,7 +126,7 @@ async def test_skip_still_reports_every_bad_row(client):
         {"data": {"name": "Good"}},
         {"data": {"name": None}},
     ]
-    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false", on_error="skip")
+    resp = await post_import(client, PRODUCT, to_document(rows), dry_run="false", on_error="skip")
     assert resp.status_code == 200, resp.text
     assert resp.json()["failed"] == 2
     assert resp.json()["created"] == 1
@@ -148,7 +140,7 @@ async def test_skip_writes_the_valid_rows(client):
         {"data": {"name": "Good two"}},
     ]
 
-    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false", on_error="skip")
+    resp = await post_import(client, PRODUCT, to_document(rows), dry_run="false", on_error="skip")
     assert resp.status_code == 200, resp.text
     report = resp.json()
     assert (report["created"], report["failed"], report["total"]) == (2, 1, 3)
@@ -158,14 +150,14 @@ async def test_skip_writes_the_valid_rows(client):
 
 async def test_update_without_a_version_is_refused_unless_forced(client):
     await catalogue(client, products=1)
-    rows = _rows(await export_text(client, PRODUCT))
+    rows = parse_rows(await export_text(client, PRODUCT))
     rows[0]["data"]["name"] = "Renamed"
 
-    refused = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    refused = await post_import(client, PRODUCT, to_document(rows), dry_run="false")
     assert refused.status_code == 422, refused.text
     assert "version" in refused.json()["report"]["errors"][0]["message"]
 
-    forced = await post_import(client, PRODUCT, _document(rows), dry_run="false", force="true")
+    forced = await post_import(client, PRODUCT, to_document(rows), dry_run="false", force="true")
     assert forced.status_code == 200, forced.text
     assert forced.json()["updated"] == 1
     assert next(iter((await data_by_uuid(client, PRODUCT)).values()))["data"]["name"] == "Renamed"
@@ -173,21 +165,21 @@ async def test_update_without_a_version_is_refused_unless_forced(client):
 
 async def test_a_stale_version_loses_the_race(client):
     await catalogue(client, products=1)
-    rows = _rows(await export_text(client, PRODUCT))
+    rows = parse_rows(await export_text(client, PRODUCT))
     rows[0]["version"] = 99
     rows[0]["data"]["name"] = "Renamed"
 
-    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    resp = await post_import(client, PRODUCT, to_document(rows), dry_run="false")
     assert resp.status_code == 422, resp.text
     assert "has changed since it was read" in resp.json()["report"]["errors"][0]["message"]
 
 
 async def test_orphaned_is_refused(client):
     await catalogue(client, products=1)
-    rows = _rows(await export_text(client, PRODUCT))
+    rows = parse_rows(await export_text(client, PRODUCT))
     rows[0]["data"]["_orphaned"] = {"gone": "value"}
 
-    resp = await post_import(client, PRODUCT, _document(rows))
+    resp = await post_import(client, PRODUCT, to_document(rows))
     assert resp.status_code == 200, resp.text
     errors = resp.json()["errors"]
     assert errors[0]["field"] == "_orphaned"
@@ -196,10 +188,10 @@ async def test_orphaned_is_refused(client):
 
 async def test_unknown_field_is_refused(client):
     await catalogue(client, products=1)
-    rows = _rows(await export_text(client, PRODUCT))
+    rows = parse_rows(await export_text(client, PRODUCT))
     rows[0]["data"]["nonsense"] = 1
 
-    resp = await post_import(client, PRODUCT, _document(rows))
+    resp = await post_import(client, PRODUCT, to_document(rows))
     assert resp.json()["failed"] == 1
     assert resp.json()["errors"][0]["field"] == "nonsense"
 
@@ -215,7 +207,7 @@ async def test_a_file_over_the_ceiling_is_413(client):
     client.app.state.sm_records.settings = RecordsSettings(max_import_bytes=64)
     rows = [{"data": {"name": "x" * 50}} for _ in range(20)]
 
-    resp = await post_import(client, PRODUCT, _document(rows), dry_run="false")
+    resp = await post_import(client, PRODUCT, to_document(rows), dry_run="false")
     assert resp.status_code == 413, resp.text
     assert "over the 64-byte limit" in resp.json()["detail"]
 
@@ -243,7 +235,7 @@ async def test_multipart_upload_carries_its_own_options(client):
     resp = await client.post(
         f"/api/records/types/{PRODUCT}/records/import",
         files={
-            "file": ("rows.json", _document([{"data": {"name": "Uploaded"}}]), "application/json")
+            "file": ("rows.json", to_document([{"data": {"name": "Uploaded"}}]), "application/json")
         },
         data={"dry_run": "false", "mode": "create"},
         headers=roles(ADMIN),
@@ -260,7 +252,7 @@ async def test_the_error_list_is_capped_but_the_count_is_not(client):
     await make_type(client, PRODUCT, [field("name", "text", required=True, indexed=True)])
     rows = [{"data": {"name": None}} for _ in range(250)]
 
-    resp = await post_import(client, PRODUCT, _document(rows))
+    resp = await post_import(client, PRODUCT, to_document(rows))
     report = resp.json()
     assert report["total"] == 250
     assert report["failed"] == 250

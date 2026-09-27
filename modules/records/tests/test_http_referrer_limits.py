@@ -13,42 +13,10 @@ import json
 
 from sqlalchemy import event
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
+from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, api_record, api_type, roles
+from tests.relation_helpers import rel_field, text_field
 
 _API = "/api/records/types"
-_FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
-
-
-def _text(key: str) -> dict:
-    return {"key": key, "type": "text", "label": key.title(), "indexed": True}
-
-
-def _rel(key: str, target: str, on_delete: str) -> dict:
-    return {
-        "key": key,
-        "type": "relation",
-        "label": key.title(),
-        "indexed": True,
-        "options": {"target_type": target, "on_delete": on_delete},
-    }
-
-
-async def _type(client, key: str, fields: list[dict], *, actor: str = ADMIN, **cols) -> dict:
-    resp = await client.post(
-        f"{_API}",
-        json={"key": key, "label": key.title(), "fields": fields, **cols},
-        headers=roles(actor),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _record(client, key: str, data: dict, *, actor: str = ADMIN) -> dict:
-    resp = await client.post(f"{_API}/{key}/records", json={"data": data}, headers=roles(actor))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
 # --- MINOR 2 / NOTE 1: what a ``restrict`` refusal may say ----------------
 
 
@@ -57,27 +25,27 @@ async def test_a_restrict_refusal_counts_hidden_blockers_and_names_visible_ones(
     the rule ``contracts.relations`` states for the panel. A blocker they
     *can* read is named, in the same body, so the refusal stays actionable.
     """
-    await _type(client, "author", [_text("name")], display_field="name")
-    await _type(
+    await api_type(client, "author", [text_field("name")], display_field="name")
+    await api_type(
         client,
         "public_book",
-        [_text("title"), _rel("author", "author", "restrict")],
+        [text_field("title"), rel_field("author", "author", "restrict")],
         display_field="title",
     )
-    await _type(
+    await api_type(
         client,
         "secret_book",
-        [_text("title"), _rel("author", "author", "restrict")],
+        [text_field("title"), rel_field("author", "author", "restrict")],
         actor=f"{ADMIN},{ROLE_EDITOR}",
         allowed_roles=[ROLE_EDITOR],
         display_field="title",
     )
-    author = await _record(client, "author", {"name": "A"}, actor=ROLE_EDITOR_TWO)
+    author = await api_record(client, "author", {"name": "A"}, actor=ROLE_EDITOR_TWO)
     ref = {"type": "author", "uuid": author["uuid"]}
-    visible = await _record(
+    visible = await api_record(
         client, "public_book", {"title": "open", "author": ref}, actor=ROLE_EDITOR_TWO
     )
-    hidden = await _record(
+    hidden = await api_record(
         client, "secret_book", {"title": "classified", "author": ref}, actor=ROLE_EDITOR
     )
 
@@ -105,14 +73,14 @@ async def test_the_blocker_list_is_capped_and_says_how_many_more(client):
     ``ImportReport`` caps its errors: the graph can be built in bulk."""
     from sm_records.services._delete_plan import BLOCKER_CAP
 
-    await _type(client, "target", [_text("name")], display_title=None, display_field="name")
-    await _type(
+    await api_type(client, "target", [text_field("name")], display_title=None, display_field="name")
+    await api_type(
         client,
         "blocker",
-        [_text("title"), _rel("target", "target", "restrict")],
+        [text_field("title"), rel_field("target", "target", "restrict")],
         display_field="title",
     )
-    target = await _record(client, "target", {"name": "T"})
+    target = await api_record(client, "target", {"name": "T"})
     rows = [
         {
             "data": {
@@ -161,11 +129,14 @@ async def test_a_referrers_page_costs_the_same_at_any_scale(client):
     the editor's badge did it again for a number. Both are counted and
     windowed in SQL now — so the page, and the statements behind it, do not
     grow with the graph."""
-    await _type(client, "star", [_text("name")], display_field="name")
-    await _type(
-        client, "planet", [_text("title"), _rel("star", "star", "set_null")], display_field="title"
+    await api_type(client, "star", [text_field("name")], display_field="name")
+    await api_type(
+        client,
+        "planet",
+        [text_field("title"), rel_field("star", "star", "set_null")],
+        display_field="title",
     )
-    star = await _record(client, "star", {"name": "Sol"})
+    star = await api_record(client, "star", {"name": "Sol"})
     panel = f"{_API}/star/records/{star['uuid']}/referrers?page_size=1"
 
     costs = []

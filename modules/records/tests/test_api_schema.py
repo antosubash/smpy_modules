@@ -11,20 +11,13 @@ finishing within the harness's in-process ASGI call.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, roles, seed_type
+from tests.app_harness import ADMIN, ROLE_EDITOR, api_type, roles, seed_type
 from tests.app_harness import field as _field
 
 
 async def _make_product_type(client, **type_cols) -> dict:
-    body = {
-        "key": "product",
-        "label": "Product",
-        "fields": [_field("name", "text", required=True), _field("sku", "text")],
-        **type_cols,
-    }
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 201
-    return resp.json()
+    default = [_field("name", "text", required=True), _field("sku", "text")]
+    return await api_type(client, "product", type_cols.pop("fields", default), **type_cols)
 
 
 async def test_preview_returns_the_classification_and_report_and_writes_nothing(client):

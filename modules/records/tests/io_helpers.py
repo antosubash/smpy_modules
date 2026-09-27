@@ -15,9 +15,12 @@ and the types that are not here share a spelling with one that is.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import api_record as make_record
+from tests.app_harness import api_type as make_type
 
 PRODUCT = "product"
 BRAND = "brand"
@@ -60,22 +63,14 @@ def product_fields() -> list[dict]:
     ]
 
 
-async def make_type(client, key: str, fields: list[dict], **cols: Any) -> dict:
-    resp = await client.post(
-        "/api/records/types",
-        json={"key": key, "label": key.title(), "fields": fields, **cols},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+def parse_rows(document: str) -> list[dict]:
+    return json.loads(document)["records"]
 
 
-async def make_record(client, key: str, data: dict, *, actor: str = ADMIN, **cols: Any) -> dict:
-    resp = await client.post(
-        f"/api/records/types/{key}/records", json={"data": data, **cols}, headers=roles(actor)
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+def to_document(rows: list[dict]) -> str:
+    """The JSON import shape: an object with a ``records`` list, each row an
+    envelope around ``data``."""
+    return json.dumps({"records": rows})
 
 
 async def catalogue(client, *, products: int = 3) -> tuple[dict, list[dict]]:

@@ -229,3 +229,25 @@ def field(key: str, type_: str = "text", **options: Any) -> dict:
         "constraints": {},
         "options": options,
     }
+
+
+async def api_type(
+    client, key: str, fields: list[dict], *, actor: str = ADMIN, **cols: Any
+) -> dict:
+    """Create a type through ``POST /api/records/types`` and assert the 201."""
+    resp = await client.post(
+        "/api/records/types",
+        json={"key": key, "label": key.title(), "fields": fields, **cols},
+        headers=roles(actor),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def api_record(client, key: str, data: dict, *, actor: str = ADMIN, **cols: Any) -> dict:
+    """Create a record through ``POST …/types/{key}/records`` and assert the 201."""
+    resp = await client.post(
+        f"/api/records/types/{key}/records", json={"data": data, **cols}, headers=roles(actor)
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()

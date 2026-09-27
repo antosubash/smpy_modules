@@ -17,7 +17,7 @@ stay saveable for any write that leaves the contested value alone.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_record, api_type, roles
 from tests.app_harness import field as _field
 from tests.i18n_helpers import use_locales
 
@@ -25,24 +25,12 @@ API = "/api/records/types/product"
 
 
 async def _type(client, *, sku_indexed: bool = True, **cols) -> dict:
-    body = {
-        "key": "product",
-        "label": "Product",
-        "fields": [_field("name", "text"), _field("sku", "text", indexed=sku_indexed)],
-        "display_field": "name",
-        **cols,
-    }
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 201
-    return resp.json()
+    fields = [_field("name", "text"), _field("sku", "text", indexed=sku_indexed)]
+    return await api_type(client, "product", fields, display_field="name", **cols)
 
 
 async def _record(client, name: str, sku: str) -> dict:
-    resp = await client.post(
-        f"{API}/records", json={"data": {"name": name, "sku": sku}}, headers=roles(ADMIN)
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_record(client, "product", {"name": name, "sku": sku})
 
 
 def _unique_sku(rtype: dict) -> list[dict]:

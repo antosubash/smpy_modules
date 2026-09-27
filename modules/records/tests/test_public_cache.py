@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest_asyncio
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_record, api_type, roles
 
 _API = "/api/records/types"
 _PUBLIC = "/api/records/public"
@@ -40,29 +40,11 @@ async def public_client(client):
 
 
 async def _type(client, key: str) -> dict:
-    resp = await client.post(
-        _API,
-        json={
-            "key": key,
-            "label": key.title(),
-            "fields": _FIELDS,
-            "display_field": "name",
-            "is_public": True,
-        },
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, _FIELDS, display_field="name", is_public=True)
 
 
 async def _record(client, key: str, name: str) -> dict:
-    resp = await client.post(
-        f"{_API}/{key}/records",
-        json={"data": {"name": name}, "status": "published"},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_record(client, key, {"name": name}, status="published")
 
 
 async def test_a_public_listing_carries_an_etag_and_a_cache_policy(public_client):

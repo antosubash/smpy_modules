@@ -18,7 +18,7 @@ collection is assigned at creation and never after.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_type, roles
 from tests.collections_harness import EVENTS  # noqa: F401 - declares the collections
 
 _API = "/api/records/types"
@@ -26,13 +26,7 @@ _FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
 
 
 async def _type(client, key: str, **cols) -> dict:
-    resp = await client.post(
-        _API,
-        json={"key": key, "label": key.title(), "fields": _FIELDS, "display_field": "name", **cols},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, _FIELDS, display_field="name", **cols)
 
 
 async def _export(client, key: str) -> dict:

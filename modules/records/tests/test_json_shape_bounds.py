@@ -19,7 +19,7 @@ import json
 
 from sm_records.schema._scalars import MAX_JSON_DEPTH, MAX_JSON_NODES
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_type, roles
 
 _API = "/api/records/types"
 _FIELDS = [
@@ -38,13 +38,7 @@ def _nested(depth: int) -> list:
 
 
 async def _type(client, key: str) -> dict:
-    resp = await client.post(
-        _API,
-        json={"key": key, "label": key.title(), "fields": _FIELDS, "display_field": "name"},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, _FIELDS, display_field="name")
 
 
 async def _listings_are_healthy(client, key: str) -> None:

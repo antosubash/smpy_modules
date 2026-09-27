@@ -20,7 +20,7 @@ import json
 from sm_records._body_limit import ENVELOPE_HEADROOM, body_ceiling
 from sm_records.settings import RecordsSettings
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_type, roles
 
 _API = "/api/records/types"
 _FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
@@ -29,13 +29,7 @@ _CEILING = body_ceiling(RecordsSettings())
 
 
 async def _type(client, key: str) -> dict:
-    resp = await client.post(
-        _API,
-        json={"key": key, "label": key.title(), "fields": _FIELDS, "display_field": "name"},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, _FIELDS, display_field="name")
 
 
 def _tripwire(monkeypatch, module, name: str) -> list[int]:

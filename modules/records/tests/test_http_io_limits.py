@@ -10,53 +10,21 @@ whole and *then* refused.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_record, api_type, roles
+from tests.relation_helpers import text_field
 
 _API = "/api/records/types"
-_FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
-
-
-def _text(key: str) -> dict:
-    return {"key": key, "type": "text", "label": key.title(), "indexed": True}
-
-
-def _rel(key: str, target: str, on_delete: str) -> dict:
-    return {
-        "key": key,
-        "type": "relation",
-        "label": key.title(),
-        "indexed": True,
-        "options": {"target_type": target, "on_delete": on_delete},
-    }
-
-
-async def _type(client, key: str, fields: list[dict], *, actor: str = ADMIN, **cols) -> dict:
-    resp = await client.post(
-        f"{_API}",
-        json={"key": key, "label": key.title(), "fields": fields, **cols},
-        headers=roles(actor),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _record(client, key: str, data: dict, *, actor: str = ADMIN) -> dict:
-    resp = await client.post(f"{_API}/{key}/records", json={"data": data}, headers=roles(actor))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
 # --- MINOR 3: the export refuses before it is a download -------------------
 
 
 async def test_a_refused_filter_on_the_export_is_a_400_with_a_body(client):
-    await _type(
+    await api_type(
         client,
         "post",
-        [_text("title"), {"key": "body", "type": "text", "label": "Body", "indexed": False}],
+        [text_field("title"), {"key": "body", "type": "text", "label": "Body", "indexed": False}],
         display_field="title",
     )
-    await _record(client, "post", {"title": "t"})
+    await api_record(client, "post", {"title": "t"})
     for query in ("filter=nope:eq:1", "filter=body:eq:x", "sort=nope"):
         resp = await client.get(f"{_API}/post/records/export?{query}", headers=roles(ADMIN))
         assert resp.status_code == 400, (query, resp.status_code, resp.text[:200])
@@ -72,7 +40,7 @@ async def test_a_body_with_no_content_length_stops_at_the_ceiling(client):
     """A chunked upload declares no length, so the ceiling can only be the
     count of what actually arrived — and it has to stop the read, not report
     on it afterwards."""
-    await _type(client, "post", [_text("title")], display_field="title")
+    await api_type(client, "post", [text_field("title")], display_field="title")
     client.app.state.sm_records.settings.max_import_bytes = 1024
     sent = {"bytes": 0}
     chunk = b"x" * (64 * 1024)
@@ -92,7 +60,7 @@ async def test_a_body_with_no_content_length_stops_at_the_ceiling(client):
 
 
 async def test_a_chunked_multipart_upload_stops_at_the_ceiling(client):
-    await _type(client, "post", [_text("title")], display_field="title")
+    await api_type(client, "post", [text_field("title")], display_field="title")
     client.app.state.sm_records.settings.max_import_bytes = 1024
     boundary = "----probe"
     head = (

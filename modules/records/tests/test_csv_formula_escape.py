@@ -15,7 +15,7 @@ genuinely starts with an apostrophe, which is the case the objection was about.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_record, api_type, roles
 
 _API = "/api/records/types"
 _FIELDS = [
@@ -40,19 +40,7 @@ figures into a column of ``'-5``."""
 
 
 async def _type(client, key: str) -> dict:
-    resp = await client.post(
-        _API,
-        json={"key": key, "label": key.title(), "fields": _FIELDS, "display_field": "name"},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _create(client, key: str, data: dict) -> dict:
-    resp = await client.post(f"{_API}/{key}/records", json={"data": data}, headers=roles(ADMIN))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, _FIELDS, display_field="name")
 
 
 async def _export_csv(client, key: str) -> str:
@@ -74,7 +62,7 @@ def _cells(csv_text: str, column: str) -> list[str]:
 async def test_a_dangerous_cell_is_written_with_a_leading_apostrophe(client):
     await _type(client, "csvesc")
     for position, value in enumerate(_DANGEROUS):
-        await _create(client, "csvesc", {"name": f"row{position}", "note": value})
+        await api_record(client, "csvesc", {"name": f"row{position}", "note": value})
     exported = sorted(_cells(await _export_csv(client, "csvesc"), "note"))
     assert exported == sorted("'" + value for value in _DANGEROUS)
 
@@ -84,7 +72,7 @@ async def test_a_plain_negative_number_is_written_bare(client):
     apostrophe was showing up in every column of figures."""
     await _type(client, "csvneg")
     for position, value in enumerate(_NEGATIVE_NUMBERS):
-        await _create(client, "csvneg", {"name": f"row{position}", "note": value})
+        await api_record(client, "csvneg", {"name": f"row{position}", "note": value})
     exported = sorted(_cells(await _export_csv(client, "csvneg"), "note"))
     assert exported == sorted(_NEGATIVE_NUMBERS)
 
@@ -95,7 +83,7 @@ async def test_a_hyphen_cell_that_is_not_a_number_is_still_escaped(client):
     await _type(client, "csvhyph")
     values = ["-1+1", "-cmd", "-1e5", "-.5", "-5 apples", "-"]
     for position, value in enumerate(values):
-        await _create(client, "csvhyph", {"name": f"row{position}", "note": value})
+        await api_record(client, "csvhyph", {"name": f"row{position}", "note": value})
     exported = sorted(_cells(await _export_csv(client, "csvhyph"), "note"))
     assert exported == sorted("'" + value for value in values)
 
@@ -103,7 +91,7 @@ async def test_a_hyphen_cell_that_is_not_a_number_is_still_escaped(client):
 async def test_a_harmless_cell_is_written_verbatim(client):
     await _type(client, "csvplain")
     for position, value in enumerate(_HARMLESS):
-        await _create(client, "csvplain", {"name": f"row{position}", "note": value})
+        await api_record(client, "csvplain", {"name": f"row{position}", "note": value})
     exported = sorted(_cells(await _export_csv(client, "csvplain"), "note"))
     assert exported == sorted(_HARMLESS)
 
@@ -111,7 +99,7 @@ async def test_a_harmless_cell_is_written_verbatim(client):
 async def test_a_value_that_genuinely_starts_with_an_apostrophe_is_doubled(client):
     """The case the old "the prefix is not lossless" objection was about."""
     await _type(client, "csvapos")
-    await _create(client, "csvapos", {"name": "quoted", "note": "'tis a quote"})
+    await api_record(client, "csvapos", {"name": "quoted", "note": "'tis a quote"})
     assert _cells(await _export_csv(client, "csvapos"), "note") == ["''tis a quote"]
 
 
@@ -137,7 +125,7 @@ async def test_export_then_import_round_trips_every_shape(client):
         "''already doubled",
     ]
     for position, value in enumerate(values):
-        await _create(client, "csvout", {"name": f"row{position}", "note": value})
+        await api_record(client, "csvout", {"name": f"row{position}", "note": value})
 
     exported = await _export_csv(client, "csvout")
     resp = await client.post(

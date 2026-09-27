@@ -23,12 +23,11 @@ from tests.events_harness import (
     TYPES,
     Recorder,
     _create,
-    _document,
     _field,
     make_note,
     recorder,
 )
-from tests.io_helpers import post_import
+from tests.io_helpers import post_import, to_document
 
 
 @pytest_asyncio.fixture
@@ -115,7 +114,7 @@ async def test_an_import_emits_one_event_per_row_that_wrote(client, note, bus):
         },
         {"data": {"title": "Fresh"}},
     ]
-    resp = await post_import(client, "note", _document(rows), dry_run="false")
+    resp = await post_import(client, "note", to_document(rows), dry_run="false")
     assert resp.status_code == 200, resp.text
     assert (resp.json()["created"], resp.json()["updated"]) == (1, 1)
 
@@ -129,7 +128,7 @@ async def test_a_dry_run_import_publishes_nothing(client, note, bus):
     await _create(client, "One")
     bus.seen.clear()
 
-    resp = await post_import(client, "note", _document([{"data": {"title": "Fresh"}}]))
+    resp = await post_import(client, "note", to_document([{"data": {"title": "Fresh"}}]))
     assert resp.status_code == 200, resp.text
     assert bus.seen == []
 

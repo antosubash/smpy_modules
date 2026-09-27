@@ -13,7 +13,8 @@ from sm_records.models import Record
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import api_record as make_record  # noqa: F401 - re-exported
+from tests.app_harness import api_type
 
 INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 """Headers that make an Inertia view answer with its props as JSON."""
@@ -32,21 +33,22 @@ def field(key: str, type_: str, **options) -> dict:
 
 
 async def make_type(client, key: str, fields: list[dict], **cols) -> dict:
-    resp = await client.post(
-        "/api/records/types",
-        json={"key": key, "label": key.title(), "fields": fields, "display_field": "name", **cols},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return await api_type(client, key, fields, **{"display_field": "name", **cols})
 
 
-async def make_record(client, key: str, data: dict, *, actor: str = ADMIN) -> dict:
-    resp = await client.post(
-        f"/api/records/types/{key}/records", json={"data": data}, headers=roles(actor)
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+def text_field(key: str) -> dict:
+    """The short indexed ``text`` definition the ``test_http_*`` suites use."""
+    return {"key": key, "type": "text", "label": key.title(), "indexed": True}
+
+
+def rel_field(key: str, target: str, on_delete: str) -> dict:
+    return {
+        "key": key,
+        "type": "relation",
+        "label": key.title(),
+        "indexed": True,
+        "options": {"target_type": target, "on_delete": on_delete},
+    }
 
 
 async def library(client, *, author_roles: list[str] | None = None, many: bool = False):

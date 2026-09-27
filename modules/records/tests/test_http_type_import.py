@@ -11,47 +11,25 @@ where the editor over the same object asks for ``records.manage_types``.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_MANAGER, ROLE_VIEWER, roles
+from tests.app_harness import (
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_MANAGER,
+    ROLE_VIEWER,
+    api_record,
+    api_type,
+    roles,
+)
 
 _API = "/api/records/types"
 _FIELDS = [{"key": "name", "type": "text", "label": "Name", "indexed": True}]
-
-
-def _text(key: str) -> dict:
-    return {"key": key, "type": "text", "label": key.title(), "indexed": True}
-
-
-def _rel(key: str, target: str, on_delete: str) -> dict:
-    return {
-        "key": key,
-        "type": "relation",
-        "label": key.title(),
-        "indexed": True,
-        "options": {"target_type": target, "on_delete": on_delete},
-    }
-
-
-async def _type(client, key: str, fields: list[dict], *, actor: str = ADMIN, **cols) -> dict:
-    resp = await client.post(
-        f"{_API}",
-        json={"key": key, "label": key.title(), "fields": fields, **cols},
-        headers=roles(actor),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _record(client, key: str, data: dict, *, actor: str = ADMIN) -> dict:
-    resp = await client.post(f"{_API}/{key}/records", json={"data": data}, headers=roles(actor))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
 
 
 # --- MAJOR 1: mode=update writes what was sent, and nothing else -----------
 
 
 async def _narrow(client, key: str = "narrow") -> dict:
-    return await _type(
+    return await api_type(
         client,
         key,
         _FIELDS,
@@ -135,7 +113,7 @@ async def test_changing_allowed_roles_by_import_costs_the_narrowing(client):
 async def test_the_schema_reads_apply_allowed_roles(client):
     await _narrow(client, "secret")
     for i in range(3):
-        await _record(client, "secret", {"name": f"r{i}"}, actor=ROLE_EDITOR)
+        await api_record(client, "secret", {"name": f"r{i}"}, actor=ROLE_EDITOR)
 
     for path in ("", "/revisions", "/export"):
         refused = await client.get(f"{_API}/secret{path}", headers=roles(ROLE_VIEWER))
@@ -146,7 +124,7 @@ async def test_manage_types_still_reads_a_type_it_is_excluded_from(client):
     """The one exception, and the same one ``views_types`` makes: the manager
     locked out of the screen that edits ``allowed_roles`` is a one-way door.
     ``records-manager`` is not on this type's list."""
-    await _type(
+    await api_type(
         client,
         "walled",
         _FIELDS,

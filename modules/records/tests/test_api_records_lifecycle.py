@@ -8,20 +8,13 @@ purge, revisions, and the unauthenticated/unpermitted cases.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
+from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, api_type, roles
 from tests.app_harness import field as _field
 
 
 async def _make_product_type(client, **type_cols):
-    body = {
-        "key": "product",
-        "label": "Product",
-        "fields": [_field("name", "text", required=True), _field("price", "number")],
-        **type_cols,
-    }
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 201
-    return resp.json()
+    fields = [_field("name", "text", required=True), _field("price", "number")]
+    return await api_type(client, "product", fields, **type_cols)
 
 
 async def test_allowed_roles_narrows_write_access(client):

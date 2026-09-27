@@ -9,7 +9,6 @@ not a paraphrase of one.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from sm_records.contracts.events import (
@@ -93,12 +92,6 @@ class Recorder:
 
     def only(self, event_type: type) -> list[Any]:
         return [event for event in self.seen if isinstance(event, event_type)]
-
-
-def _document(rows: list[dict]) -> str:
-    """The JSON import shape: an object with a ``records`` list, each row an
-    envelope around ``data``."""
-    return json.dumps({"records": rows})
 
 
 def recorder(client) -> Recorder:

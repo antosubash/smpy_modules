@@ -14,7 +14,7 @@ more than one test.
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, roles, seed_type
+from tests.app_harness import ADMIN, api_type, roles, seed_type
 from tests.app_harness import field as _field
 
 _NOW = "2026-09-19T10:00:00+00:00"
@@ -23,15 +23,8 @@ _NOW = "2026-09-19T10:00:00+00:00"
 
 
 async def _make_product_type(client, **type_cols):
-    body = {
-        "key": "product",
-        "label": "Product",
-        "fields": [_field("name", "text", required=True), _field("price", "number")],
-        **type_cols,
-    }
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 201
-    return resp.json()
+    fields = [_field("name", "text", required=True), _field("price", "number")]
+    return await api_type(client, "product", fields, **type_cols)
 
 
 async def test_create_get_update_round_trip(client):

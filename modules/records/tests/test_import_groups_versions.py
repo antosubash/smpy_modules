@@ -23,7 +23,7 @@ import json
 
 import pytest_asyncio
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, api_record, api_type, roles
 from tests.i18n_helpers import field
 from tests.i18n_helpers import use_locales as _use_locales
 
@@ -31,29 +31,10 @@ API = "/api/records/types"
 
 
 async def _type(client, key: str, **cols):
-    resp = await client.post(
-        API,
-        json={
-            "key": key,
-            "label": key.title(),
-            "fields": [field("title", "text"), {**field("sku", "text"), "unique": True}],
-            "display_field": "title",
-            "slug_field": "title",
-            "translatable": True,
-            **cols,
-        },
-        headers=roles(ADMIN),
+    fields = [field("title", "text"), {**field("sku", "text"), "unique": True}]
+    return await api_type(
+        client, key, fields, display_field="title", slug_field="title", translatable=True, **cols
     )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _record(client, key: str, data: dict, **body):
-    resp = await client.post(
-        f"{API}/{key}/records", json={"data": data, **body}, headers=roles(ADMIN)
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
 
 
 async def _import(client, key: str, rows: list[dict], **params):
@@ -75,7 +56,7 @@ async def test_a_forged_group_cannot_buy_the_unique_exemption(site):
     """The finding, in its original shape: an unrelated German record claiming
     the English record's group so it may repeat its ``unique`` SKU."""
     await _type(site, "art")
-    original = await _record(site, "art", {"title": "One", "sku": "SKU1"})
+    original = await api_record(site, "art", {"title": "One", "sku": "SKU1"})
 
     refused = await _import(
         site,
@@ -100,7 +81,7 @@ async def test_a_forged_group_cannot_buy_the_unique_exemption(site):
 
 async def test_the_dry_run_predicts_the_group_refusal(site):
     await _type(site, "art")
-    original = await _record(site, "art", {"title": "One", "sku": "SKU1"})
+    original = await api_record(site, "art", {"title": "One", "sku": "SKU1"})
     preview = await _import(
         site,
         "art",
@@ -160,7 +141,7 @@ async def test_a_translated_pair_travelling_together_is_accepted(site):
 async def test_a_round_trip_of_a_translated_pair_is_still_a_no_op(site):
     """The whole group is in the file, so re-importing an export converges."""
     await _type(site, "art")
-    english = await _record(site, "art", {"title": "One", "sku": "SKU1"})
+    english = await api_record(site, "art", {"title": "One", "sku": "SKU1"})
     german = await site.post(
         f"{API}/art/records/{english['uuid']}/translations",
         json={"locale": "de"},
@@ -182,7 +163,7 @@ async def test_another_types_group_is_simply_a_group_this_type_lacks(site):
     the other type is gone."""
     await _type(site, "art")
     await _type(site, "memo")
-    original = await _record(site, "art", {"title": "One", "sku": "S1"})
+    original = await api_record(site, "art", {"title": "One", "sku": "S1"})
 
     made = await _import(
         site,
@@ -203,7 +184,7 @@ async def test_the_dry_run_predicts_a_missing_version(site):
     """Export, change one value, preview: the row is reported as failed with
     the version message rather than promised as an update."""
     await _type(site, "art")
-    await _record(site, "art", {"title": "One", "sku": "S1"})
+    await api_record(site, "art", {"title": "One", "sku": "S1"})
     export = await site.get(f"{API}/art/records/export?format=json", headers=roles(ADMIN))
     rows = json.loads(export.text)["records"]
     rows[0]["data"]["title"] = "Changed"
@@ -224,7 +205,7 @@ async def test_the_dry_run_predicts_a_missing_version(site):
 
 async def test_force_plans_it_as_an_update_and_applies_it(site):
     await _type(site, "art")
-    made = await _record(site, "art", {"title": "One", "sku": "S1"})
+    made = await api_record(site, "art", {"title": "One", "sku": "S1"})
     export = await site.get(f"{API}/art/records/export?format=json", headers=roles(ADMIN))
     rows = json.loads(export.text)["records"]
     rows[0]["data"]["title"] = "Changed"

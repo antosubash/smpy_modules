@@ -8,28 +8,10 @@ was committed anyway. Type keys are unique across the whole suite on purpose
 
 from __future__ import annotations
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
+from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, api_record, api_type, roles
 from tests.app_harness import field as _field
 
 API = "/api/records"
-
-
-async def _type(client, key: str, fields: list[dict], **cols) -> dict:
-    resp = await client.post(
-        f"{API}/types",
-        json={"key": key, "label": key.title(), "fields": fields, **cols},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-async def _record(client, key: str, data: dict, *, as_role: str = ADMIN) -> dict:
-    resp = await client.post(
-        f"{API}/types/{key}/records", json={"data": data}, headers=roles(as_role)
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
 
 
 def _ref(type_key: str, uuid: str) -> dict:
@@ -42,16 +24,16 @@ def _ref(type_key: str, uuid: str) -> dict:
 async def test_cascade_into_a_restricted_type_is_refused_for_a_caller_without_its_roles(client):
     """``check_type_roles`` only ever sees the type in the URL, so a cascade
     used to trash records of a type the caller may not write at all."""
-    await _type(client, "f1open", [_field("name", "text")])
-    await _type(
+    await api_type(client, "f1open", [_field("name", "text")])
+    await api_type(
         client,
         "f1secret",
         [_field("owner", "relation", target_type="f1open", on_delete="cascade")],
         allowed_roles=[ROLE_EDITOR_TWO],
     )
-    target = await _record(client, "f1open", {"name": "Public"})
-    secret = await _record(
-        client, "f1secret", {"owner": _ref("f1open", target["uuid"])}, as_role=ROLE_EDITOR_TWO
+    target = await api_record(client, "f1open", {"name": "Public"})
+    secret = await api_record(
+        client, "f1secret", {"owner": _ref("f1open", target["uuid"])}, actor=ROLE_EDITOR_TWO
     )
 
     refused = await client.delete(
@@ -92,27 +74,27 @@ async def test_a_delete_refused_deeper_down_leaves_the_set_null_referrer_alone(c
     one: the old code nulled it, then cascaded, then met the ``restrict`` and
     raised — and the 409 response committed the nulled payload.
     """
-    await _type(client, "f2target", [_field("name", "text")])
-    await _type(
+    await api_type(client, "f2target", [_field("name", "text")])
+    await api_type(
         client,
         "f2loose",
         [_field("link", "relation", target_type="f2target", on_delete="set_null")],
     )
-    await _type(
+    await api_type(
         client,
         "f2chain",
         [_field("link", "relation", target_type="f2target", on_delete="cascade")],
     )
-    await _type(
+    await api_type(
         client,
         "f2holder",
         [_field("link", "relation", target_type="f2chain", on_delete="restrict")],
     )
 
-    target = await _record(client, "f2target", {"name": "Target"})
-    loose = await _record(client, "f2loose", {"link": _ref("f2target", target["uuid"])})
-    chain = await _record(client, "f2chain", {"link": _ref("f2target", target["uuid"])})
-    await _record(client, "f2holder", {"link": _ref("f2chain", chain["uuid"])})
+    target = await api_record(client, "f2target", {"name": "Target"})
+    loose = await api_record(client, "f2loose", {"link": _ref("f2target", target["uuid"])})
+    chain = await api_record(client, "f2chain", {"link": _ref("f2target", target["uuid"])})
+    await api_record(client, "f2holder", {"link": _ref("f2chain", chain["uuid"])})
 
     refused = await client.delete(
         f"{API}/types/f2target/records/{target['uuid']}", headers=roles(ADMIN)
@@ -132,13 +114,13 @@ async def test_a_delete_refused_deeper_down_leaves_the_set_null_referrer_alone(c
 
 
 async def test_a_relation_payload_naming_another_type_is_refused_and_still_indexes(client):
-    await _type(client, "f3person", [_field("name", "text")])
-    await _type(
+    await api_type(client, "f3person", [_field("name", "text")])
+    await api_type(
         client,
         "f3doc",
         [_field("author", "relation", target_type="f3person", on_delete="restrict")],
     )
-    person = await _record(client, "f3person", {"name": "Ada"})
+    person = await api_record(client, "f3person", {"name": "Ada"})
 
     ghost = await client.post(
         f"{API}/types/f3doc/records",
@@ -148,7 +130,7 @@ async def test_a_relation_payload_naming_another_type_is_refused_and_still_index
     assert ghost.status_code == 422
     assert [item["field"] for item in ghost.json()["errors"]] == ["author"]
 
-    await _record(client, "f3doc", {"author": _ref("f3person", person["uuid"])})
+    await api_record(client, "f3doc", {"author": _ref("f3person", person["uuid"])})
     blocked = await client.delete(
         f"{API}/types/f3person/records/{person['uuid']}", headers=roles(ADMIN)
     )
@@ -159,8 +141,8 @@ async def test_a_relation_payload_naming_another_type_is_refused_and_still_index
 
 
 async def _one_trashed(client, key: str) -> dict:
-    await _type(client, key, [_field("name", "text"), _field("alt", "text")])
-    record = await _record(client, key, {"name": "Trashed"})
+    await api_type(client, key, [_field("name", "text"), _field("alt", "text")])
+    record = await api_record(client, key, {"name": "Trashed"})
     assert (
         await client.delete(f"{API}/types/{key}/records/{record['uuid']}", headers=roles(ADMIN))
     ).status_code == 204
@@ -215,8 +197,8 @@ async def test_display_and_slug_field_are_editable_on_a_populated_type(client):
     does: a ``display_field`` change enqueues a whole-type rebuild (``"*"`` in
     ``reindex_pending``, design §18 Q2), and ``slug_field`` deliberately
     changes nothing already stored — a slug is an address."""
-    await _type(client, "f6thing", [_field("name", "text"), _field("alt", "text")])
-    record = await _record(client, "f6thing", {"name": "One", "alt": "Other"})
+    await api_type(client, "f6thing", [_field("name", "text"), _field("alt", "text")])
+    record = await api_record(client, "f6thing", {"name": "One", "alt": "Other"})
     version = (await client.get(f"{API}/types/f6thing", headers=roles(ADMIN))).json()["version"]
 
     for pointer in ("display_field", "slug_field"):
