@@ -48,7 +48,7 @@ Nothing here commits, like everything else in this layer.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,23 +70,6 @@ from sm_records.services.errors import BulkRefused, RecordsError, ReferencedByOt
 from sm_records.settings import RecordsSettings
 
 __all__ = ["Change", "Identity", "apply_bulk", "empty_trash"]
-
-
-def _distinct(uuids: Iterable[str]) -> list[str]:
-    """``uuids`` with repeats collapsed, first occurrence winning.
-
-    A selection model that sends the same record twice means it once. Left in,
-    the second turn would refuse ("already in the trash") and take the whole
-    batch down with it — a refusal about the request's shape wearing the
-    clothes of one about the data.
-    """
-    seen: set[str] = set()
-    out: list[str] = []
-    for uuid in uuids:
-        if uuid not in seen:
-            seen.add(uuid)
-            out.append(uuid)
-    return out
 
 
 def _failure(uuid: str, exc: RecordsError) -> BulkFailure:
@@ -133,7 +116,10 @@ async def apply_bulk(
     type the caller may not write refuse this batch rather than rewrite data
     the request never mentioned.
     """
-    wanted = _distinct(uuids)
+    # Repeats collapsed, first occurrence winning: a selection that sends the
+    # same record twice means it once, and a second turn would refuse
+    # ("already in the trash") and take the whole batch down with it.
+    wanted = list(dict.fromkeys(uuids))
     versions = expected_versions or {}
     changes: list[Change] = []
     failures: list[BulkFailure] = []
