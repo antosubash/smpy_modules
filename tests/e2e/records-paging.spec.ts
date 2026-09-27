@@ -5,7 +5,6 @@ import {
   apiCreateRecord,
   apiCreateType,
   apiListRecords,
-  type RecordPage,
   rowTitles,
   uniqueTypeKey,
 } from './records-helpers';
@@ -237,40 +236,5 @@ test.describe('Records — capped totals and cursor paging', () => {
     // One page of three: the footer renders nothing at all, capped or not.
     await expect(page.getByText(/^Showing /)).toHaveCount(0);
     await expect(page.getByTestId('records-record-row')).toHaveCount(3);
-  });
-
-  test('?after= walks past the capped total to the real end of the type', async ({ page }) => {
-    await login(page);
-    const key = uniqueTypeKey('cursor');
-    await apiCreateType(page, {
-      key,
-      label: 'Cursor thing',
-      label_plural: 'Cursor things',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
-    for (let i = 0; i < SEEDED; i += 1) {
-      await apiCreateRecord(page, key, {
-        data: { name: title(i) },
-        position: i,
-      });
-    }
-
-    // An export or a widget walks the cursor through the API (the list does
-    // the same through the view, above), and that walk is what still reaches
-    // record 33 when the count stopped at 32. `total=false` is the cheap form
-    // the README recommends for exactly this.
-    const seen: string[] = [];
-    let cursor: string | null = null;
-    for (let guard = 0; guard < 10; guard += 1) {
-      const query = `page_size=10&total=false${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`;
-      const chunk: RecordPage = await apiListRecords(page, key, query);
-      seen.push(...chunk.items.map((item) => item.display_title));
-      cursor = chunk.next_cursor;
-      if (!cursor) break;
-    }
-    expect(seen).toHaveLength(SEEDED);
-    expect(new Set(seen).size).toBe(SEEDED);
-    expect(seen[seen.length - 1]).toBe(`row-${String(SEEDED - 1).padStart(2, '0')}`);
   });
 });

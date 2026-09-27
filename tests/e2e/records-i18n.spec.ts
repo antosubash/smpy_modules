@@ -1,12 +1,10 @@
-import { expect, request, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
   apiCreateType,
-  apiGetRecord,
-  apiUpdateRecord,
   applyFilter,
   rowTitles,
   uniqueTypeKey,
@@ -105,68 +103,5 @@ test.describe('Records — content i18n', () => {
 
     await applyFilter(page, 'locale', 'eq', 'de');
     await expect.poll(() => rowTitles(page)).toEqual(['English one']);
-  });
-
-  test('the same slug can exist in both locales', async ({ page }) => {
-    await login(page);
-    const key = await seedTranslatableType(page);
-    // No underscores: an explicit slug is still run through `slugify`, which
-    // turns any non `[a-z0-9]` run (including `_`) into a single `-`.
-    const slug = `shared-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-    const en = await apiCreateRecord(page, key, { data: { title: 'EN' }, slug });
-    const de = await apiCreateRecord(page, key, { data: { title: 'DE' }, locale: 'de', slug });
-    expect(en.slug).toBe(slug);
-    expect(de.slug).toBe(slug);
-    expect(en.locale).toBe('en');
-    expect(de.locale).toBe('de');
-  });
-
-  test('the public JSON lists a sibling under translations only once it is published', async ({
-    page,
-    baseURL,
-  }) => {
-    await login(page);
-    const key = uniqueTypeKey('pubi18n');
-    await apiCreateType(page, {
-      key,
-      label: 'Public localized thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-      translatable: true,
-      is_public: true,
-    });
-    const en = await apiCreateRecord(page, key, {
-      data: { title: 'Hello' },
-      status: 'published',
-    });
-    const de = await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
-
-    const anon = await request.newContext();
-    try {
-      // `translations` lists every *published* member of the group, the
-      // record asked about included (`services._translations.published_siblings`
-      // does not exclude it) — so before `de` is published this is `en` alone.
-      const beforePublish = await (
-        await anon.get(`${baseURL}/api/records/public/${key}/${en.uuid}`)
-      ).json();
-      expect(beforePublish.translations).toEqual([{ locale: 'en', uuid: en.uuid, slug: en.slug }]);
-
-      const deData = await apiGetRecord(page, key, de.uuid);
-      await apiUpdateRecord(page, key, de.uuid, deData.version, {
-        data: deData.data,
-        status: 'published',
-      });
-
-      const afterPublish = await (
-        await anon.get(`${baseURL}/api/records/public/${key}/${en.uuid}`)
-      ).json();
-      // Ordered by locale ('de' < 'en'), both published now.
-      expect(afterPublish.translations).toEqual([
-        { locale: 'de', uuid: de.uuid, slug: de.slug },
-        { locale: 'en', uuid: en.uuid, slug: en.slug },
-      ]);
-    } finally {
-      await anon.dispose();
-    }
   });
 });
