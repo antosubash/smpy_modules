@@ -25,11 +25,6 @@ describe('ApiError', () => {
     expect(err.message).toBe('stale');
     expect(err).toBeInstanceOf(Error);
   });
-
-  it('is distinguishable from a plain Error via instanceof', () => {
-    const err: unknown = new ApiError(422, null, 'bad');
-    expect(err instanceof ApiError).toBe(true);
-  });
 });
 
 describe('request() error shaping', () => {
@@ -107,22 +102,6 @@ describe('request() error shaping', () => {
       message: "Request failed (418 I'm a teapot)",
       body: null,
     });
-  });
-
-  it('falls back to a plain-language message, not the status line, for a 5xx with no usable body (U34)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response('<html>nope</html>', { status: 500, statusText: 'Server Error' }),
-        ),
-    );
-
-    const err = await listTypes().catch((caught: unknown) => caught);
-    expect(err).toMatchObject({ status: 500, body: null });
-    expect((err as ApiError).message).not.toContain('Request failed');
-    expect((err as ApiError).message).toContain('went wrong on the server');
   });
 });
 

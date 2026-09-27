@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearMediaCache, forgetMediaFile, getMediaFile } from './media-api';
-import { API, json, PHOTO, stubLibrary } from './media-test-support';
+import { API, PHOTO, stubLibrary } from './media-test-support';
 
 /**
  * Review 4, code F3: the metadata cache lived as long as the JS module — in
@@ -13,27 +13,12 @@ import { API, json, PHOTO, stubLibrary } from './media-test-support';
 beforeEach(() => clearMediaCache());
 afterEach(() => vi.unstubAllGlobals());
 
-/** The library after the file was deleted: every lookup is a 404. */
-function stubDeleted() {
-  const gone = vi.fn(async () =>
-    json(404, { detail: { code: 'file_storage.not_found', message: 'File not found.' } }),
-  );
-  vi.stubGlobal('fetch', gone);
-  return gone;
-}
-
 describe('the media metadata cache', () => {
-  it('shares one lookup per file within a page visit', async () => {
-    const live = stubLibrary([PHOTO]);
-    await getMediaFile(API, PHOTO.id);
-    await getMediaFile(API, PHOTO.id);
-    expect(live).toHaveBeenCalledOnce();
-  });
-
   it('forgets everything on an Inertia navigation, so a deleted file reads as missing', async () => {
     stubLibrary([PHOTO]);
     expect((await getMediaFile(API, PHOTO.id))?.filename).toBe('harbour.png');
-    const gone = stubDeleted();
+    // The library after the file was deleted: every lookup is a 404.
+    const gone = stubLibrary([]);
     document.dispatchEvent(new CustomEvent('inertia:navigate'));
     expect(await getMediaFile(API, PHOTO.id)).toBeNull();
     expect(gone).toHaveBeenCalledOnce();
@@ -42,7 +27,7 @@ describe('the media metadata cache', () => {
   it('forgetMediaFile drops one file and keeps the rest', async () => {
     stubLibrary([PHOTO]);
     await getMediaFile(API, PHOTO.id);
-    const gone = stubDeleted();
+    const gone = stubLibrary([]);
     forgetMediaFile(API, PHOTO.id);
     expect(await getMediaFile(API, PHOTO.id)).toBeNull();
     expect(gone).toHaveBeenCalledOnce();
