@@ -75,49 +75,25 @@ async def run_preview_job(
         return
     try:
         with tenant_scope(job.tenant_id):
-            await _scan(
-                db_state,
-                job_id,
-                type_id,
-                fields,
-                display_field=display_field,
-                slug_field=slug_field,
-                rescan=rescan,
-                settings=settings,
-            )
+            async with db_state.session_factory() as session:
+                rtype = await session.get(RecordType, type_id)
+                if rtype is None:  # pragma: no cover - the type was deleted mid-preview
+                    preview_jobs.fail(job_id, "the type no longer exists")
+                    return
+                diff, report = await schema_change.preview(
+                    session,
+                    rtype,
+                    fields,
+                    settings,
+                    display_field=display_field,
+                    slug_field=slug_field,
+                    rescan=rescan,
+                    on_progress=partial(preview_jobs.progress, job_id),
+                )
+                # See the module docstring: a rescan's marks have no other way
+                # of being committed, and a draft preview's commit is a no-op.
+                await session.commit()
+            preview_jobs.finish(job_id, diff, report)
     except Exception as exc:  # pragma: no cover - defensive; preview is tested directly
         logger.exception("records: deferred schema preview %s failed", job_id)
         preview_jobs.fail(job_id, str(exc))
-
-
-async def _scan(
-    db_state: Any,
-    job_id: str,
-    type_id: int,
-    fields: list[dict[str, Any]],
-    *,
-    display_field: Any,
-    slug_field: Any,
-    rescan: bool,
-    settings: RecordsSettings,
-) -> None:
-    """:func:`run_preview_job`'s work, inside the job's tenant."""
-    async with db_state.session_factory() as session:
-        rtype = await session.get(RecordType, type_id)
-        if rtype is None:  # pragma: no cover - the type was deleted mid-preview
-            preview_jobs.fail(job_id, "the type no longer exists")
-            return
-        diff, report = await schema_change.preview(
-            session,
-            rtype,
-            fields,
-            settings,
-            display_field=display_field,
-            slug_field=slug_field,
-            rescan=rescan,
-            on_progress=partial(preview_jobs.progress, job_id),
-        )
-        # See the module docstring: a rescan's marks have no other way of
-        # being committed, and a draft preview's commit is a no-op.
-        await session.commit()
-    preview_jobs.finish(job_id, diff, report)
