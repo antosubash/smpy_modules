@@ -57,9 +57,7 @@ def _on_delete(rtype: RecordType, field_key: str) -> str:
     return ON_DELETE_DEFAULT
 
 
-async def referrers(
-    db: AsyncSession, record: Record, *, include_deleted: bool = False
-) -> list[Referrer]:
+async def referrers(db: AsyncSession, record: Record) -> list[Referrer]:
     """Who points at ``record``, and with what delete behaviour.
 
     Self-references are dropped: a record holding a relation to itself would
@@ -83,13 +81,6 @@ async def referrers(
     ``restrict`` delete nor is followed by a ``cascade`` — it is not content
     anyone can currently reach, and cascading into the trash would rewrite
     rows a restore is supposed to bring back whole.
-
-    ``include_deleted=True`` lifts that filter, and **only the read API passes
-    it** (:func:`paged_referrers`): "what references this record" is a question
-    about the whole graph, and ``ReferrerRead.is_deleted`` is in the contract
-    precisely so the panel can show a trashed referrer greyed out rather than
-    pretend it is not there. The delete path keeps the default, because
-    including the trash there would change delete semantics — see above.
     """
     own = tables_of(record)
     out: list[Referrer] = []
@@ -121,9 +112,7 @@ async def referrers(
         }
         if not pairs:
             continue
-        records = await _by_id(
-            db, tables.record, {rid for rid, _ in pairs}, include_deleted=include_deleted
-        )
+        records = await _by_id(db, tables.record, {rid for rid, _ in pairs})
         types = await _by_id(db, RecordType, {r.type_id for r in records.values()})
         for record_id, field_key in sorted(pairs):
             referring = records.get(record_id)
