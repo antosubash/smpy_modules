@@ -14,7 +14,7 @@ from typing import Any
 from sqlmodel import SQLModel
 
 from sm_records.models import RecordTypeRevision
-from sm_records.schema.changes import DryRunReport, SchemaChange, SchemaDiff
+from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.types import ChangeClass
 
 __all__ = [
@@ -153,16 +153,7 @@ class TypeRestoreRequest(SQLModel):
 
 
 def type_revision_read(revision: RecordTypeRevision) -> TypeRevisionRead:
-    return TypeRevisionRead(
-        id=revision.id,
-        version=revision.version,
-        schema_version=revision.schema_version,
-        fields=list(revision.fields or []),
-        display_field=revision.display_field,
-        slug_field=revision.slug_field,
-        created_at=revision.created_at,
-        created_by=revision.created_by,
-    )
+    return TypeRevisionRead.model_validate(revision)
 
 
 def dry_run_report_read(report: DryRunReport) -> DryRunReportRead:
@@ -185,20 +176,10 @@ def dry_run_report_read(report: DryRunReport) -> DryRunReportRead:
     )
 
 
-def _schema_change_read(change: SchemaChange) -> SchemaChangeRead:
-    return SchemaChangeRead(
-        kind=change.kind,
-        field_key=change.field_key,
-        what=change.what,
-        before=change.before,
-        after=change.after,
-    )
-
-
 def schema_preview_read(diff: SchemaDiff, report: DryRunReport) -> SchemaPreviewRead:
     return SchemaPreviewRead(
         kind=diff.kind,
-        changes=[_schema_change_read(c) for c in diff.changes],
+        changes=[SchemaChangeRead.model_validate(c) for c in diff.changes],
         report=dry_run_report_read(report),
     )
 

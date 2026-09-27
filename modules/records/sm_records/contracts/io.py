@@ -169,18 +169,4 @@ class TypeImportRequest(TypeExport):
 
 
 def type_export(rtype: RecordType) -> TypeExport:
-    return TypeExport(
-        key=rtype.key,
-        label=rtype.label,
-        label_plural=rtype.label_plural,
-        description=rtype.description,
-        icon=rtype.icon,
-        fields=list(rtype.fields or []),
-        display_field=rtype.display_field,
-        slug_field=rtype.slug_field,
-        is_public=rtype.is_public,
-        show_in_menu=rtype.show_in_menu,
-        translatable=rtype.translatable,
-        allowed_roles=list(rtype.allowed_roles or []),
-        collection=rtype.collection,
-    )
+    return TypeExport.model_validate(rtype)

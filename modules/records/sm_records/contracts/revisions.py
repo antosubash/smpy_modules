@@ -64,12 +64,5 @@ def revision_read(revision: RecordRevision) -> RevisionRead:
 
 def record_revision_detail_read(revision: RecordRevision) -> RecordRevisionDetailRead:
     return RecordRevisionDetailRead(
-        id=revision.id,
-        version=revision.version,
-        schema_version=revision.schema_version,
-        event=revision.event.value,
-        display_title=revision.display_title,
-        created_at=revision.created_at,
-        created_by=revision.created_by,
-        data=dict(revision.data or {}),
+        **revision_read(revision).model_dump(), data=dict(revision.data or {})
     )
