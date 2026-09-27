@@ -17,24 +17,11 @@ from datetime import datetime as _datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sm_records._text import check_no_nul, has_nul
+from sm_records._text import has_nul
 from sm_records.constants import NUMBER_PRECISION, NUMBER_SCALE
 
 MAX_INT_DIGITS = NUMBER_PRECISION - NUMBER_SCALE
 """Digits left of the point that ``Numeric(19, 5)`` can hold."""
-
-
-def to_text(value: Any) -> Any:
-    """The identity, minus the one character a text column cannot hold.
-
-    Every text-like field type routes through here (:mod:`_builders`), so the
-    NUL rule is one refusal with one wording rather than seven copies — and it
-    is a *coercion* step rather than a constraint check because it must run
-    before anything downstream sees the string, including the length and
-    pattern checks whose messages would otherwise be the first thing a caller
-    heard about a value that was never storable.
-    """
-    return check_no_nul(value)
 
 
 def to_decimal(value: Any) -> Any:

@@ -36,7 +36,6 @@ from sm_records.schema._scalars import (
     to_datetime,
     to_decimal,
     to_int,
-    to_text,
 )
 from sm_records.schema.types import FieldType
 
@@ -200,7 +199,7 @@ def _check_ref_list(value: Any) -> Any:
     return out
 
 
-_NO_NUL = BeforeValidator(to_text)
+_NO_NUL = BeforeValidator(check_no_nul)
 """Applied to every field type whose value reaches a text column — before
 anything else, so a value the column could never hold is refused as that
 rather than as a failed length or pattern check. ``multiselect`` gets it per
