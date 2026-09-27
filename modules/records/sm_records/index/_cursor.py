@@ -124,8 +124,6 @@ def _jsonable(value: Any) -> Any:
         return value.value
     if isinstance(value, datetime | date):
         return value.isoformat()
-    if isinstance(value, Decimal | float):
-        return str(value)
     return str(value)
 
 
