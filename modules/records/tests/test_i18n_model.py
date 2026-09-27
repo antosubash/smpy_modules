@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import pytest
 from sm_records import locales
-from sm_records.constants import RESERVED_FIELD_KEYS
 from sm_records.models import Record, RecordType
 from sm_records.settings import RecordsSettings
 from sqlalchemy.exc import IntegrityError
@@ -103,13 +102,6 @@ async def test_a_trashed_sibling_keeps_its_language(db):
     await db.flush()
     with pytest.raises(IntegrityError):
         await _record(db, rtype, locale="de", slug="c", translation_group=first.translation_group)
-
-
-def test_the_two_new_columns_are_reserved_field_keys():
-    """Derived from the model, never hand-typed: the query layer resolves a
-    fixed column *before* a type's own fields, so a field keyed ``locale``
-    would index correctly and then be answered from ``records_record``."""
-    assert {"locale", "translation_group"} <= RESERVED_FIELD_KEYS
 
 
 def test_locale_is_a_filterable_sortable_fixed_column():

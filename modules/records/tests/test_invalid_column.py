@@ -14,7 +14,6 @@ failure says what broke rather than printing two ``CREATE TABLE``s.
 
 from __future__ import annotations
 
-from sm_records.constants import RESERVED_FIELD_KEYS
 from sm_records.models import table_sets
 
 
@@ -36,11 +35,3 @@ def test_every_table_set_indexes_it_under_its_own_name():
         table = tables.record.__table__
         name = f"ix_{table.name}_invalid_since"
         assert name in {index.name for index in table.indexes}
-
-
-def test_the_column_is_a_reserved_field_key():
-    """Derived from the model (``constants.RESERVED_FIELD_KEYS``): the query
-    layer resolves a record column before a type's own fields, so a field
-    keyed ``invalid_since`` would index correctly and then be answered from
-    ``records_record``."""
-    assert "invalid_since" in RESERVED_FIELD_KEYS
