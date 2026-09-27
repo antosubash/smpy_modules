@@ -16,7 +16,7 @@ from __future__ import annotations
 from sm_records.models import Record
 from sqlalchemy import select
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, field, roles
 
 # Imported for its import-time ``declare_collection`` calls: a collection has
 # to be declared before the app is built (Phase 5 §6.1), and one test here
@@ -26,21 +26,6 @@ from tests.collections_harness import COLLECTION_NAMES
 assert "events" in COLLECTION_NAMES
 
 TYPES = "/api/records/types"
-
-
-def field(key: str, type_: str, *, required: bool = False) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": required,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": {},
-    }
 
 
 async def type_with(client, *records: dict) -> dict:

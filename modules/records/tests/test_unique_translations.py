@@ -24,28 +24,12 @@ from typing import Any
 import pytest_asyncio
 from sqlalchemy import event
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, field, roles
 from tests.i18n_helpers import use_locales as _use_locales
 from tests.io_helpers import drop_type, export_text, post_import
 
 API = "/api/records/types"
 TYPE_KEY = "product"
-
-
-def field(key: str, **over: Any) -> dict:
-    """A plain indexed ``text`` field; ``unique=True`` is the whole subject."""
-    return {
-        "key": key,
-        "type": "text",
-        "label": key.title(),
-        "required": False,
-        "unique": over.pop("unique", False),
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": {},
-    }
 
 
 def type_fields() -> list[dict]:

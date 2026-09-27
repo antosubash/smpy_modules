@@ -10,23 +10,9 @@ from __future__ import annotations
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 
 _API = "/api/records/types"
-
-
-def _field(key: str, type_: str, **options) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def _seed(client, count: int, *, key: str = "widget") -> None:

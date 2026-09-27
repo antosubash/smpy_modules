@@ -15,7 +15,7 @@ from typing import Any
 
 from sm_records.settings import RecordsSettings
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, field, roles
 
 TYPE_KEY = "article"
 API = "/api/records/types"
@@ -28,21 +28,6 @@ def use_locales(client, *tags: str, default: str | None = None) -> RecordsSettin
     )
     client.app.state.sm_records.settings = settings
     return settings
-
-
-def field(key: str, type_: str, *, indexed: bool = True, **options: Any) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": indexed,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def make_type(client, *, translatable: bool = True, **cols: Any) -> dict:

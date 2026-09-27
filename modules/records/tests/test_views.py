@@ -9,6 +9,7 @@ what a page component actually keys on.
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, ROLE_VIEWER, roles, seed_record, seed_type
+from tests.app_harness import field as _field
 
 _INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
@@ -19,23 +20,6 @@ several (tenancy design §J). ``test_tenancy_binding.py`` checks the values."""
 _NOW = "2026-09-19T10:00:00+00:00"
 """``reindex_pending`` maps a field key to when its rebuild was enqueued
 (design doc §8.5/§8.9); the instant only matters to the health check."""
-
-
-def _field(key: str, type_: str, **overrides) -> dict:
-    base = {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": {},
-    }
-    base.update(overrides)
-    return base
 
 
 async def test_type_list_view(client, records_app):

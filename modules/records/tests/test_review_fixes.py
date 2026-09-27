@@ -9,23 +9,9 @@ was committed anyway. Type keys are unique across the whole suite on purpose
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
+from tests.app_harness import field as _field
 
 API = "/api/records"
-
-
-def _field(key: str, type_: str, *, indexed: bool = True, **options) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": indexed,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def _type(client, key: str, fields: list[dict], **cols) -> dict:

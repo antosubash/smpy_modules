@@ -211,3 +211,21 @@ async def seed_record(db_state: Any, rtype: RecordType, data: dict, **cols: Any)
         await session.commit()
         await session.refresh(record)
         return record
+
+
+def field(key: str, type_: str = "text", **options: Any) -> dict:
+    """A full API field definition. ``required``/``unique``/``indexed`` are
+    flags; every other keyword (``target_type``, ``on_delete``, ``choices``)
+    lands in ``options``."""
+    return {
+        "key": key,
+        "type": type_,
+        "label": key.title(),
+        "required": options.pop("required", False),
+        "unique": options.pop("unique", False),
+        "indexed": options.pop("indexed", True),
+        "default": None,
+        "help": None,
+        "constraints": {},
+        "options": options,
+    }

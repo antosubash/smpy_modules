@@ -25,6 +25,7 @@ from sm_records.models import Record, RecordType
 from sqlalchemy import select
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 
 TYPES = "/api/records/types"
 API = f"{TYPES}/note/records"
@@ -98,21 +99,6 @@ def _document(rows: list[dict]) -> str:
     """The JSON import shape: an object with a ``records`` list, each row an
     envelope around ``data``."""
     return json.dumps({"records": rows})
-
-
-def _field(key: str, type_: str, **kw: Any) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": kw.pop("required", False),
-        "unique": False,
-        "indexed": kw.pop("indexed", True),
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": kw,
-    }
 
 
 def recorder(client) -> Recorder:

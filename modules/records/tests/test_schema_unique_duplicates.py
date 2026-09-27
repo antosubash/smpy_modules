@@ -18,24 +18,10 @@ stay saveable for any write that leaves the contested value alone.
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 from tests.i18n_helpers import use_locales
 
 API = "/api/records/types/product"
-
-
-def _field(key: str, type_: str, *, unique: bool = False, indexed: bool = True, **options) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": unique,
-        "indexed": indexed,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def _type(client, *, sku_indexed: bool = True, **cols) -> dict:

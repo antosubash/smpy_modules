@@ -15,27 +15,11 @@ more than one test.
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, roles, seed_type
+from tests.app_harness import field as _field
 
 _NOW = "2026-09-19T10:00:00+00:00"
 """``reindex_pending`` maps a field key to when its rebuild was enqueued
 (design doc §8.5/§8.9); the instant only matters to the health check."""
-
-
-def _field(
-    key: str, type_: str, *, required: bool = False, indexed: bool = True, **options
-) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": required,
-        "unique": False,
-        "indexed": indexed,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def _make_product_type(client, **type_cols):

@@ -9,23 +9,7 @@ purge, revisions, and the unauthenticated/unpermitted cases.
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
-
-
-def _field(
-    key: str, type_: str, *, required: bool = False, indexed: bool = True, **options
-) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": required,
-        "unique": False,
-        "indexed": indexed,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
+from tests.app_harness import field as _field
 
 
 async def _make_product_type(client, **type_cols):

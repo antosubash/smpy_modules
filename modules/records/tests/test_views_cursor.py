@@ -14,27 +14,13 @@ import pytest
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 
 _API = "/api/records/types"
 _VIEW = "/admin/records/widget"
 _HEADERS = {**roles(ADMIN), "X-Inertia": "true", "X-Inertia-Version": "1.0"}
 _ROWS = 11
 _CAP = 4
-
-
-def _field(key: str) -> dict:
-    return {
-        "key": key,
-        "type": "text",
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": {},
-    }
 
 
 async def _seed(client, count: int = _ROWS) -> list[str]:

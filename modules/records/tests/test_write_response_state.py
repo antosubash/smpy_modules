@@ -36,6 +36,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 from tests.pg_support import USING_POSTGRES, make_db_state
 
 pytestmark = pytest.mark.skipif(
@@ -45,21 +46,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 SETTINGS = RecordsSettings()
-
-
-def _field(key: str, type_: str, **kw: Any) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": kw.pop("unique", False),
-        "indexed": kw.pop("indexed", True),
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": kw,
-    }
 
 
 @pytest_asyncio.fixture

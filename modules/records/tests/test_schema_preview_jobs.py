@@ -16,6 +16,7 @@ from sm_records.settings import RecordsSettings
 from sm_records.tenancy import DEFAULT_TENANT
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 
 _API = "/api/records/types"
 
@@ -28,21 +29,6 @@ def _empty_registry():
     preview_jobs._jobs.clear()
     yield
     preview_jobs._jobs.clear()
-
-
-def _field(key: str, type_: str, *, required: bool = False) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": required,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": {},
-    }
 
 
 async def _seed(client, count: int) -> dict:

@@ -15,24 +15,10 @@ from sm_records.models import IndexNumber, IndexText
 from sqlalchemy import select
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 from tests.test_index_providers import BUCKET, TAGS_UPPER, VIRTUAL_FIELDS, sample_provider
 
 _CHOICES = [{"value": tag, "label": tag.title()} for tag in ("red", "blue")]
-
-
-def _field(key: str, type_: str, **options) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": False,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 @pytest.fixture

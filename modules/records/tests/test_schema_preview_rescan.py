@@ -13,24 +13,10 @@ checked". ``SchemaPreviewPanel.tsx`` shipped an apology in place of the answer.
 from __future__ import annotations
 
 from tests.app_harness import ADMIN, roles
+from tests.app_harness import field as _field
 from tests.invalid_support import clear_mark
 
 TYPES = "/api/records/types"
-
-
-def _field(key: str, type_: str, *, required: bool = False, **options) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": required,
-        "unique": False,
-        "indexed": True,
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def _forced_break(client) -> dict:

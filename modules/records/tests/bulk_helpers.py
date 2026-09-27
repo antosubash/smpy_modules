@@ -9,27 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, field, roles
 
 TYPES = "/api/records/types"
 API = f"{TYPES}/product/records"
 BULK = f"{API}/bulk"
 EMPTY = f"{API}/trash/empty"
-
-
-def field(key: str, type_: str, **options: Any) -> dict:
-    return {
-        "key": key,
-        "type": type_,
-        "label": key.title(),
-        "required": options.pop("required", False),
-        "unique": options.pop("unique", False),
-        "indexed": options.pop("indexed", True),
-        "default": None,
-        "help": None,
-        "constraints": {},
-        "options": options,
-    }
 
 
 async def make_product(client, **cols: Any) -> dict:
