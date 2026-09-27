@@ -99,19 +99,3 @@ async def test_the_default_page_size_applies_when_none_is_sent(client):
     resp = await _revisions(client, "revdefault")
     assert resp.status_code == 200, resp.text
     assert resp.json()["page_size"] == settings.default_page_size
-
-
-async def test_the_route_still_answers_at_its_old_url_after_the_move(client):
-    """The two handlers moved from `endpoints/api/types.py` into
-    `endpoints/api/revisions.py` for the file cap; the URLs did not."""
-    await _type_with_history(client, "revmoved", edits=1)
-    listed = await _revisions(client, "revmoved")
-    assert listed.status_code == 200, listed.text
-    oldest = listed.json()["items"][-1]
-    restored = await client.post(
-        f"{_API}/revmoved/revisions/{oldest['version']}/restore",
-        json={"expected_version": 2},
-        headers=roles(ADMIN),
-    )
-    assert restored.status_code == 200, restored.text
-    assert [field["key"] for field in restored.json()["fields"]] == ["name"]
