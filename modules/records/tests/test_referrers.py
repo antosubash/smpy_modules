@@ -184,9 +184,9 @@ async def test_referrers_of_an_unknown_record_is_404(client):
 
 
 async def test_the_delete_path_still_ignores_a_trashed_referrer(client):
-    """The regression guard for ``referrers(include_deleted=...)``: the
-    listing opts in, and the delete path must not. A trashed referrer neither
-    blocks a ``restrict`` delete nor is followed by a ``cascade``."""
+    """The referrers panel lists trashed referrers (``_load_pairs`` opts in
+    with ``include_deleted``); the delete path must not. A trashed referrer
+    neither blocks a ``restrict`` delete nor is followed by a ``cascade``."""
     await _library(client)
     author = await make_record(client, "author", {"name": "Herbert"})
     book = await make_record(
