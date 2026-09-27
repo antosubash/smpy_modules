@@ -3,11 +3,10 @@ import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 import {
   apiCreateRecord,
-  apiCreateType,
   apiGetRecord,
   apiUpdateRecord,
   recordField,
-  uniqueTypeKey,
+  seedTextType,
 } from './records-helpers';
 
 /**
@@ -26,13 +25,7 @@ test.describe('Records — conflict overwrite', () => {
     page,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('conflict');
-    await apiCreateType(page, {
-      key,
-      label: 'Conflicted',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const key = await seedTextType(page, 'conflict', { label: 'Conflicted' });
     const record = await apiCreateRecord(page, key, { data: { title: 'Mine' } });
 
     await page.goto(`/admin/records/${key}/${record.uuid}`);

@@ -10,6 +10,7 @@ import {
   apiUpdateType,
   expectTypeSaved,
   recordField,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -21,13 +22,7 @@ import {
 test.describe('Records — revisions', () => {
   test('restores an earlier version of a record from its history', async ({ page }) => {
     await login(page);
-    const key = uniqueTypeKey('rev');
-    await apiCreateType(page, {
-      key,
-      label: 'Versioned',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const key = await seedTextType(page, 'rev', { label: 'Versioned' });
     const created = await apiCreateRecord(page, key, { data: { title: 'v1 title' } });
     const second = await apiUpdateRecord(page, key, created.uuid, created.version, {
       data: { title: 'v2 title' },
@@ -68,13 +63,7 @@ test.describe('Records — revisions', () => {
 
   test('a never-edited record still has its creation snapshot', async ({ page }) => {
     await login(page);
-    const key = uniqueTypeKey('norev');
-    await apiCreateType(page, {
-      key,
-      label: 'Fresh',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const key = await seedTextType(page, 'norev', { label: 'Fresh' });
     const created = await apiCreateRecord(page, key, { data: { title: 'Only' } });
 
     await page.goto(`/admin/records/${key}/${created.uuid}`);

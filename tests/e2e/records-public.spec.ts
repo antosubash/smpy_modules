@@ -1,7 +1,7 @@
 import { expect, request, test } from '@playwright/test';
 
 import { login } from './helpers';
-import { apiCreateRecord, apiCreateType, uniqueTypeKey } from './records-helpers';
+import { apiCreateRecord, seedTextType, uniqueTypeKey } from './records-helpers';
 
 /**
  * The anonymous read API (design §10): `is_public` on a Record Type serves
@@ -34,14 +34,7 @@ test.describe('Records — public read API', () => {
     baseURL,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('pub');
-    await apiCreateType(page, {
-      key,
-      label: 'Public thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-      is_public: true,
-    });
+    const key = await seedTextType(page, 'pub', { label: 'Public thing', is_public: true });
     const record = await apiCreateRecord(page, key, {
       data: { title: 'Hello' },
       status: 'published',
@@ -100,25 +93,14 @@ test.describe('Records — public read API', () => {
     baseURL,
   }) => {
     await login(page);
-    const publicKey = uniqueTypeKey('pub');
-    await apiCreateType(page, {
-      key: publicKey,
-      label: 'Public thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-      is_public: true,
-    });
+    const publicKey = await seedTextType(page, 'pub', { label: 'Public thing', is_public: true });
     const draft = await apiCreateRecord(page, publicKey, {
       data: { title: 'WIP' },
       status: 'draft',
     });
 
-    const privateKey = uniqueTypeKey('priv');
-    await apiCreateType(page, {
-      key: privateKey,
+    const privateKey = await seedTextType(page, 'priv', {
       label: 'Private thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
       is_public: false,
     });
     const privateRecord = await apiCreateRecord(page, privateKey, {
@@ -148,14 +130,7 @@ test.describe('Records — public read API', () => {
 
   test('the TypeEditor shows the public URL once "Public" is on', async ({ page }) => {
     await login(page);
-    const key = uniqueTypeKey('pub');
-    await apiCreateType(page, {
-      key,
-      label: 'Public thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-      is_public: true,
-    });
+    const key = await seedTextType(page, 'pub', { label: 'Public thing', is_public: true });
 
     await page.goto(`/admin/records/types/${key}`);
     const codeLine = page.getByTestId('records-public-url');
@@ -163,12 +138,8 @@ test.describe('Records — public read API', () => {
     await expect(codeLine).toContainText(`/api/records/public/${key}`);
 
     // Off by default for a type that isn't public — no stale URL left showing.
-    const privateKey = uniqueTypeKey('priv');
-    await apiCreateType(page, {
-      key: privateKey,
+    const privateKey = await seedTextType(page, 'priv', {
       label: 'Private thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
       is_public: false,
     });
     await page.goto(`/admin/records/types/${privateKey}`);

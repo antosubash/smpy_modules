@@ -6,6 +6,7 @@ import {
   apiCreateType,
   recordField,
   recordFieldError,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -164,13 +165,7 @@ test.describe('Records — editor UX', () => {
     page,
   }) => {
     await login(page);
-    const authorKey = uniqueTypeKey('uxauthor');
-    await apiCreateType(page, {
-      key: authorKey,
-      label: 'UX Author',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
+    const authorKey = await seedTextType(page, 'uxauthor', { field: 'name', label: 'UX Author' });
     for (const name of ['Kombu Alpha', 'Kombu Beta', 'Kombu Gamma']) {
       await apiCreateRecord(page, authorKey, { data: { name } });
     }

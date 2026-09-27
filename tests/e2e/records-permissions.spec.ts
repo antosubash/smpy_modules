@@ -1,7 +1,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { login } from './helpers';
-import { apiCreateType, uniqueTypeKey } from './records-helpers';
+import { seedTextType, uniqueTypeKey } from './records-helpers';
 
 /**
  * Who may reach the Records admin.
@@ -46,13 +46,7 @@ test.describe('Records — permissions', () => {
     browser,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('perm');
-    await apiCreateType(page, {
-      key,
-      label: 'Guarded',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const key = await seedTextType(page, 'perm', { label: 'Guarded' });
     const who = await createPlainUser(page);
 
     const other = await asUser(browser, who);

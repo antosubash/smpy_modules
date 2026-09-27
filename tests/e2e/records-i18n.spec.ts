@@ -4,10 +4,9 @@ import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
-  apiCreateType,
   applyFilter,
   rowTitles,
-  uniqueTypeKey,
+  seedTextType,
 } from './records-helpers';
 
 /**
@@ -21,25 +20,12 @@ import {
  * than a mocked one.
  */
 
-async function seedTranslatableType(page: import('@playwright/test').Page): Promise<string> {
-  const key = uniqueTypeKey('i18n');
-  await apiCreateType(page, {
-    key,
-    label: 'Localized thing',
-    label_plural: 'Localized things',
-    fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-    display_field: 'title',
-    translatable: true,
-  });
-  return key;
-}
-
 test.describe('Records — content i18n', () => {
   test('the Languages panel offers "Add" for the missing locale and creates a draft sibling', async ({
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page);
+    const key = await seedTextType(page, 'i18n', { translatable: true });
     const en = await apiCreateRecord(page, key, {
       data: { title: 'Hello' },
       status: 'published',
@@ -69,13 +55,7 @@ test.describe('Records — content i18n', () => {
     page,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('mono');
-    await apiCreateType(page, {
-      key,
-      label: 'Monolingual thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const key = await seedTextType(page, 'mono', { label: 'Monolingual thing' });
     const record = await apiCreateRecord(page, key, { data: { title: 'Only English' } });
 
     await page.goto(`/admin/records/${key}/${record.uuid}`);
@@ -93,7 +73,7 @@ test.describe('Records — content i18n', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page);
+    const key = await seedTextType(page, 'i18n', { translatable: true });
     const en = await apiCreateRecord(page, key, { data: { title: 'English one' } });
     await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
 

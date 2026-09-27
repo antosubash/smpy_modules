@@ -1,13 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
-import {
-  apiCreateRecord,
-  apiCreateType,
-  apiListRecords,
-  rowTitles,
-  uniqueTypeKey,
-} from './records-helpers';
+import { apiCreateRecord, apiListRecords, rowTitles, seedTextType } from './records-helpers';
 
 /**
  * Capped totals and the keyset cursor — Phase 5 §1, F4 and F11.
@@ -45,13 +39,10 @@ test.describe('Records — capped totals and cursor paging', () => {
     page,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('capped');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'capped', {
+      field: 'name',
       label: 'Capped thing',
       label_plural: 'Capped things',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
     });
     for (let i = 0; i < SEEDED; i += 1) {
       await apiCreateRecord(page, key, {
@@ -179,13 +170,10 @@ test.describe('Records — capped totals and cursor paging', () => {
 
   test('a cursor link that no longer fits is the notice, not an error page', async ({ page }) => {
     await login(page);
-    const key = uniqueTypeKey('badcursor');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'badcursor', {
+      field: 'name',
       label: 'Cursor misfit',
       label_plural: 'Cursor misfits',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
     });
     for (let i = 0; i < 3; i += 1) {
       await apiCreateRecord(page, key, { data: { name: title(i) }, position: i });
@@ -216,13 +204,10 @@ test.describe('Records — capped totals and cursor paging', () => {
 
   test('a type below the ceiling still reports an exact total', async ({ page }) => {
     await login(page);
-    const key = uniqueTypeKey('uncapped');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'uncapped', {
+      field: 'name',
       label: 'Small thing',
       label_plural: 'Small things',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
     });
     for (let i = 0; i < 3; i += 1) {
       await apiCreateRecord(page, key, { data: { name: `row-${i}` }, position: i });

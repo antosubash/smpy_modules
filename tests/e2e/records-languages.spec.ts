@@ -1,13 +1,12 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
-  apiCreateType,
   apiGetType,
   saveType,
-  uniqueTypeKey,
+  seedTextType,
 } from './records-helpers';
 
 /**
@@ -19,25 +18,12 @@ import {
  * `["en","de"]`, so "another language" here is German.
  */
 
-async function seedTranslatableType(page: Page, prefix = 'lang'): Promise<string> {
-  const key = uniqueTypeKey(prefix);
-  await apiCreateType(page, {
-    key,
-    label: 'Localized thing',
-    label_plural: 'Localized things',
-    fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-    display_field: 'title',
-    translatable: true,
-  });
-  return key;
-}
-
 test.describe('Records — languages', () => {
   test('turning "Translatable" off while a German record exists is refused inline', async ({
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page, 'transoff');
+    const key = await seedTextType(page, 'transoff', { translatable: true });
     const en = await apiCreateRecord(page, key, { data: { title: 'Hello' } });
     await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
 
@@ -67,7 +53,7 @@ test.describe('Records — languages', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page, 'transok');
+    const key = await seedTextType(page, 'transok', { translatable: true });
     await apiCreateRecord(page, key, { data: { title: 'English only' } });
 
     await page.goto(`/admin/records/types/${key}`);
@@ -85,7 +71,7 @@ test.describe('Records — languages', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page, 'badge');
+    const key = await seedTextType(page, 'badge', { translatable: true });
     const record = await apiCreateRecord(page, key, { data: { title: 'Hello' } });
 
     // The toggle's help text names the configured content locales — the
@@ -119,7 +105,7 @@ test.describe('Records — languages', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page, 'panel');
+    const key = await seedTextType(page, 'panel', { translatable: true });
     const en = await apiCreateRecord(page, key, { data: { title: 'Hello' } });
     const de = await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
 
@@ -145,7 +131,7 @@ test.describe('Records — languages', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedTranslatableType(page, 'panelrace');
+    const key = await seedTextType(page, 'panelrace', { translatable: true });
     const en = await apiCreateRecord(page, key, { data: { title: 'Hello' } });
 
     await page.goto(`/admin/records/${key}/${en.uuid}`);

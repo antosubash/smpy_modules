@@ -4,10 +4,9 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
-  apiCreateType,
   apiGetRecord,
   apiUpdateRecord,
-  uniqueTypeKey,
+  seedTextType,
 } from './records-helpers';
 
 /**
@@ -76,13 +75,9 @@ test.describe('RecordsList widget on a public page', () => {
     browser,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('widget');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'widget', {
       label: 'Widget thing',
       label_plural: 'Widget things',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
       is_public: true,
     });
     await apiCreateRecord(page, key, {
@@ -119,12 +114,8 @@ test.describe('RecordsList widget on a public page', () => {
 
   test('a private type renders the empty state, not its records', async ({ page, browser }) => {
     await login(page);
-    const key = uniqueTypeKey('priv');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'priv', {
       label: 'Private widget thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
       is_public: false,
     });
     await apiCreateRecord(page, key, {
@@ -159,13 +150,9 @@ test.describe('RecordsList widget on a public page', () => {
     browser,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('wlocale');
-    await apiCreateType(page, {
-      key,
+    const key = await seedTextType(page, 'wlocale', {
       label: 'Localized widget thing',
       label_plural: 'Localized widget things',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
       is_public: true,
       translatable: true,
     });
