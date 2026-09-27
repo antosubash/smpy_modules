@@ -5,11 +5,13 @@ import {
   addFieldInEditor,
   apiCreateRecord,
   apiCreateType,
+  apiDeleteRecord,
   apiDeleteType,
   apiGetType,
   apiListTypes,
   fieldRow,
   saveType,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -26,13 +28,7 @@ test.describe('Records — types', () => {
 
     // `relation` needs something to point at, and the editor only offers
     // types that already exist — so the target is seeded first.
-    const targetKey = uniqueTypeKey('tgt');
-    await apiCreateType(page, {
-      key: targetKey,
-      label: `Target ${targetKey}`,
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
+    const targetKey = await seedTextType(page, 'tgt', { field: 'name' });
 
     const key = uniqueTypeKey('kinds');
     await page.goto('/admin/records/types/new');
@@ -155,12 +151,14 @@ test.describe('Records — types', () => {
     });
     const keep = await apiCreateRecord(page, key, { data: { name: 'Keeper' } });
     const bin = await apiCreateRecord(page, key, { data: { name: 'Binned' } });
-    await page.request.delete(`/api/records/types/${key}/records/${bin.uuid}`);
+    await apiDeleteRecord(page, key, bin.uuid);
 
     await page.goto('/admin/records/');
     const row = page.locator(`[data-testid="records-type-row"][data-type-key="${key}"]`);
     await expect(row).toContainText(`Counted ${key}`);
     await expect(row).toContainText(key);
+    await expect(row).toContainText('1 record');
+    await expect(row).toContainText('(1 trashed)');
 
     // The row's primary link is the records, not the schema (UX review
     // R13.1) — browsing content is the frequent action.
@@ -169,25 +167,6 @@ test.describe('Records — types', () => {
     await expect(page.getByRole('heading', { name: `Counted ${key} items` })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Keeper' })).toBeVisible();
     expect(keep.display_title).toBe('Keeper');
-  });
-
-  test('the types list counts a type’s live and trashed records', async ({ page }) => {
-    await login(page);
-    const key = uniqueTypeKey('tally');
-    await apiCreateType(page, {
-      key,
-      label: `Tally ${key}`,
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
-    await apiCreateRecord(page, key, { data: { name: 'Keeper' } });
-    const bin = await apiCreateRecord(page, key, { data: { name: 'Binned' } });
-    await page.request.delete(`/api/records/types/${key}/records/${bin.uuid}`);
-
-    await page.goto('/admin/records/');
-    const row = page.locator(`[data-testid="records-type-row"][data-type-key="${key}"]`);
-    await expect(row).toContainText('1 record');
-    await expect(row).toContainText('(1 trashed)');
   });
 
   test('shows the empty state when no types exist', async ({ page }) => {

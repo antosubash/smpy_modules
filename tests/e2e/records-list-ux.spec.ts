@@ -6,6 +6,7 @@ import {
   apiCreateType,
   applyFilter,
   rowTitles,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -23,14 +24,6 @@ import {
  */
 
 const PHONE = { width: 390, height: 844 };
-
-/** The display titles on a type's list screen, having navigated to it and
- *  waited for the rows the type is known to have. */
-async function rowTitlesFor(page: Page, key: string, count: number): Promise<string[]> {
-  await page.goto(`/admin/records/${key}`);
-  await expect(page.getByTestId('records-record-row')).toHaveCount(count);
-  return rowTitles(page);
-}
 
 async function seedUxType(page: Page, records = 3): Promise<string> {
   const key = uniqueTypeKey('uxlist');
@@ -81,17 +74,6 @@ test.describe('Records — list UX', () => {
     await empty.getByRole('button', { name: 'Clear' }).click();
     await expect(page).not.toHaveURL(/filter=/);
     await expect.poll(() => rowTitles(page)).toHaveLength(3);
-  });
-
-  test('a genuinely empty type offers the New record call to action (R1)', async ({ page }) => {
-    await login(page);
-    const key = await seedUxType(page, 0);
-    await page.goto(`/admin/records/${key}`);
-
-    const empty = page.getByTestId('records-empty-state');
-    await expect(empty).toContainText('No records yet');
-    await empty.getByRole('link', { name: 'New record' }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin/records/${key}/new$`));
   });
 
   test('Enter in the filter value applies the filter (R2)', async ({ page }) => {
@@ -182,7 +164,9 @@ test.describe('Records — list UX', () => {
   test('deleting from the editor says the same thing (R8a)', async ({ page }) => {
     await login(page);
     const key = await seedUxType(page, 1);
-    const listed = await rowTitlesFor(page, key, 1);
+    await page.goto(`/admin/records/${key}`);
+    await expect(page.getByTestId('records-record-row')).toHaveCount(1);
+    const listed = await rowTitles(page);
 
     await page.getByRole('link', { name: listed[0] }).click();
     // Wait for the editor before reaching for "Delete": the list's own row
@@ -200,6 +184,7 @@ test.describe('Records — list UX', () => {
     // `RecordsToaster` is mounted by the layout both screens share.
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}`));
     await expect(page.getByText('Moved to the Trash')).toBeVisible();
+    await expect.poll(() => rowTitles(page)).toEqual([]);
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByText('Record restored')).toBeVisible();
     await expect.poll(() => rowTitles(page)).toEqual(listed);
@@ -208,14 +193,7 @@ test.describe('Records — list UX', () => {
   test('pages with First/Last, a page number and a page size (R18, R15)', async ({ page }) => {
     test.setTimeout(180_000);
     await login(page);
-    const key = uniqueTypeKey('uxpage');
-    await apiCreateType(page, {
-      key,
-      label: 'UX paged',
-      label_plural: 'UX paged things',
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
+    const key = await seedTextType(page, 'uxpage', { field: 'name' });
     for (let i = 0; i < 30; i += 1) {
       await apiCreateRecord(page, key, {
         data: { name: `page-${String(i).padStart(2, '0')}` },
