@@ -32,7 +32,7 @@ from sm_records.index.writer import write_index
 from sm_records.locales import resolve_locale
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid, tables_for
 from sm_records.services import _claims, _invalid, _payload
-from sm_records.services._common import guarded_bump, reload, utcnow
+from sm_records.services._common import bump_or_conflict, utcnow
 
 # Re-exported so the delete lifecycle is importable from the one module
 # endpoints already use; it lives in ``_lifecycle`` only for the file cap.
@@ -58,7 +58,7 @@ from sm_records.services._prepare import prepare as _prepare
 # make one and list one live beside the lifecycle they are part of — in
 # ``_translations`` only for the file cap.
 from sm_records.services._translations import create_translation, list_translations
-from sm_records.services.errors import Conflict, NotFound
+from sm_records.services.errors import NotFound
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import bound_tenant
@@ -245,11 +245,7 @@ async def update_record(
     await _claims.ensure_slug_free(db, rtype, resolved_slug, record.locale, exclude_id=record.id)
 
     record_cls = tables_for(rtype).record
-    if not await guarded_bump(db, record_cls, record.id, expected_version):
-        raise Conflict(
-            f"record {record.uuid} has changed since it was read",
-            current=await reload(db, record_cls, record.id),
-        )
+    await bump_or_conflict(db, record_cls, record.id, expected_version, f"record {record.uuid}")
 
     new_status = status or record.status
     record.published_at = _published_at(record, new_status)

@@ -164,6 +164,42 @@ async def check_targets(db: AsyncSession, defs: list[FieldDefinition], self_key:
         raise ValidationFailed("; ".join(item["message"] for item in errors), errors)
 
 
+def pointers_moved(rtype: RecordType, changes: dict[str, Any]) -> bool:
+    """Does ``changes`` move ``display_field`` or ``slug_field`` off its value?"""
+    return any(
+        name in changes and changes[name] != getattr(rtype, name)
+        for name in ("display_field", "slug_field")
+    )
+
+
+async def write_type_row(
+    db: AsyncSession,
+    rtype: RecordType,
+    *,
+    changes: dict[str, Any],
+    fields: list[dict[str, Any]] | None,
+    expected_version: int,
+    actor: str | None,
+    take_snapshot: bool,
+) -> None:
+    """Write an accepted edit onto the type row, after its guarded bump.
+
+    Both type-edit paths end here; each passes its own ``take_snapshot`` rule,
+    because they differ on which edits write a ``records_type_revision`` row.
+    """
+    for name, value in changes.items():
+        setattr(rtype, name, value)
+    if fields is not None:
+        rtype.fields = fields
+        rtype.schema_version = rtype.schema_version + 1
+    rtype.version = expected_version + 1
+    rtype.updated_by = actor
+    db.add(rtype)
+    await db.flush()
+    if take_snapshot:
+        await snapshot(db, rtype, actor)
+
+
 async def snapshot(db: AsyncSession, rtype: RecordType, actor: str | None) -> RecordTypeRevision:
     revision = RecordTypeRevision(
         type_id=rtype.id,

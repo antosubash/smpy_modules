@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeIndex
 from sm_records.models import RecordType, tables_for
+from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
@@ -150,6 +151,16 @@ async def guarded_bump(db: AsyncSession, model: Any, row_id: int, expected_versi
         mark_written(db)
         return True
     return False
+
+
+async def bump_or_conflict(
+    db: AsyncSession, model: Any, row_id: int, expected_version: int, label: str
+) -> None:
+    """:func:`guarded_bump`, or the 409 naming ``label`` and the row as it is now."""
+    if not await guarded_bump(db, model, row_id, expected_version):
+        raise Conflict(
+            f"{label} has changed since it was read", current=await reload(db, model, row_id)
+        )
 
 
 async def reload[T](db: AsyncSession, model: type[T], row_id: int) -> T | None:

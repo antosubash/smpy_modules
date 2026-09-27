@@ -26,8 +26,7 @@ from sm_records.index.reduce import snapshot
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.services import _payload, _relations
-from sm_records.services._common import guarded_bump, reload, role_blocked, type_resolver
-from sm_records.services.errors import Conflict
+from sm_records.services._common import bump_or_conflict, role_blocked, type_resolver
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 
@@ -118,11 +117,7 @@ async def apply_set_null(
     # The referrer's own class, which may be a different collection's from the
     # record being deleted (Phase 5 §6.4): ``on_delete`` crosses collections.
     referrer_cls = tables_for(ref.rtype).record
-    if not await guarded_bump(db, referrer_cls, ref.record.id, expected):
-        raise Conflict(
-            f"record {ref.record.uuid} has changed since it was read",
-            current=await reload(db, referrer_cls, ref.record.id),
-        )
+    await bump_or_conflict(db, referrer_cls, ref.record.id, expected, f"record {ref.record.uuid}")
     ref.record.data = data
     ref.record.version = expected + 1
     ref.record.updated_by = actor

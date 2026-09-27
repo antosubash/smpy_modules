@@ -31,7 +31,7 @@ from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
 from sm_records.services._claims import lock_type
-from sm_records.services._common import guarded_bump, reload, utcnow
+from sm_records.services._common import bump_or_conflict, reload, utcnow
 from sm_records.services._dry_run import change_report, refusal
 from sm_records.services._payload import field_defs
 from sm_records.services._preview import MISSING, pointer_preview_changes, reused_report
@@ -39,7 +39,13 @@ from sm_records.services._preview import MISSING, pointer_preview_changes, reuse
 # Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
 # this module's surface; it lives in ``_rollback`` for the 300-line cap.
 from sm_records.services._rollback import rollback
-from sm_records.services._schema import check_pointers, check_targets, normalise, snapshot
+from sm_records.services._schema import (
+    check_pointers,
+    check_targets,
+    normalise,
+    pointers_moved,
+    write_type_row,
+)
 from sm_records.services.errors import (
     Conflict,
     NotFound,
@@ -50,8 +56,6 @@ from sm_records.services.errors import (
 from sm_records.settings import RecordsSettings
 
 __all__ = ["MISSING", "apply", "preview", "rollback"]
-
-_POINTERS = ("display_field", "slug_field")
 
 
 def _added_keys(diff: SchemaDiff) -> list[str]:
@@ -262,29 +266,21 @@ async def apply(
     if report.failing and not force:
         raise SchemaChangeRefused(report, refusal(rtype, report))
 
-    pointer_moved = any(
-        name in changes and changes[name] != getattr(rtype, name) for name in _POINTERS
-    )
+    pointer_moved = pointers_moved(rtype, changes)
     display_moved = "display_field" in changes and changes["display_field"] != rtype.display_field
 
-    if not await guarded_bump(db, RecordType, rtype.id, expected_version):  # pragma: no cover
-        # Unreachable while the row lock holds; kept because on SQLite the lock
-        # compiles to nothing, and a lost race must still be a 409.
-        raise Conflict(
-            f"record type {rtype.key!r} has changed since it was read",
-            current=await reload(db, RecordType, rtype.id),
-        )
-    for name, value in changes.items():
-        setattr(rtype, name, value)
-    if new_fields is not None:
-        rtype.fields = new_fields
-        rtype.schema_version = rtype.schema_version + 1
-    rtype.version = expected_version + 1
-    rtype.updated_by = actor
-    db.add(rtype)
-    await db.flush()
-    if new_fields is not None or pointer_moved:
-        await snapshot(db, rtype, actor)
+    # A lost race is unreachable while the row lock holds; the guard stays
+    # because on SQLite the lock compiles to nothing, and it must still be a 409.
+    await bump_or_conflict(db, RecordType, rtype.id, expected_version, f"record type {rtype.key!r}")
+    await write_type_row(
+        db,
+        rtype,
+        changes=changes,
+        fields=new_fields,
+        expected_version=expected_version,
+        actor=actor,
+        take_snapshot=new_fields is not None or pointer_moved,
+    )
 
     if orphaned == _orphaned.DISCARD and conflicts:
         await _orphaned.discard(db, rtype, list(conflicts), batch_size=settings.reindex_batch_size)

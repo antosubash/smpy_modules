@@ -16,14 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
 from sm_records.models import RecordType, tables_for
-from sm_records.services._common import guarded_bump, record_count, reload
+from sm_records.services._common import bump_or_conflict, record_count
 from sm_records.services._payload import field_defs
 from sm_records.services._schema import (
     check_pointers,
     check_targets,
     check_type_text,
     normalise,
-    snapshot,
+    pointers_moved,
+    write_type_row,
 )
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.schema_change import apply as apply_schema_change
@@ -173,11 +174,7 @@ async def update_type(
     else:
         defs = field_defs(rtype)
 
-    pointer_changed = any(
-        name in changes and changes[name] != getattr(rtype, name)
-        for name in ("display_field", "slug_field")
-    )
-    if fields is not None or pointer_changed:
+    if fields is not None or pointers_moved(rtype, changes):
         # Including the trash: a trashed record still holds content these
         # fields describe, and a restore reads it back under them.
         held = await record_count(db, rtype, include_deleted=True)
@@ -208,22 +205,14 @@ async def update_type(
         changes.get("slug_field", rtype.slug_field),
     )
 
-    if not await guarded_bump(db, RecordType, rtype.id, expected_version):
-        raise Conflict(
-            f"record type {rtype.key!r} has changed since it was read",
-            current=await reload(db, RecordType, rtype.id),
-        )
-
-    needs_snapshot = fields is not None or any(n in changes for n in _SNAPSHOT_TRIGGERS)
-    for name, value in changes.items():
-        setattr(rtype, name, value)
-    if fields is not None:
-        rtype.fields = fields
-        rtype.schema_version = rtype.schema_version + 1
-    rtype.version = expected_version + 1
-    rtype.updated_by = actor
-    db.add(rtype)
-    await db.flush()
-    if needs_snapshot:
-        await snapshot(db, rtype, actor)
+    await bump_or_conflict(db, RecordType, rtype.id, expected_version, f"record type {rtype.key!r}")
+    await write_type_row(
+        db,
+        rtype,
+        changes=changes,
+        fields=fields,
+        expected_version=expected_version,
+        actor=actor,
+        take_snapshot=fields is not None or any(n in changes for n in _SNAPSHOT_TRIGGERS),
+    )
     return rtype
