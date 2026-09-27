@@ -44,7 +44,6 @@ __all__ = [
     "TypeResolver",
     "VirtualField",
     "clear",
-    "current_type_resolver",
     "note_dropped",
     "note_shadowed",
     "providers",
@@ -125,12 +124,6 @@ def use_type_resolver(resolve: TypeResolver) -> Iterator[None]:
         _resolver.reset(token)
 
 
-def current_type_resolver() -> TypeResolver:
-    """The resolver bound by ``use_type_resolver``, or one that resolves
-    nothing — outside a write, a relation simply does not index."""
-    return _resolver.get()
-
-
 def _entry(kind: IndexKind, key: str, value: object) -> IndexEntry | None:
     coerced = COERCE[kind](value)
     return None if coerced is None else IndexEntry(kind=kind, field_key=key, value=coerced)
@@ -164,50 +157,44 @@ def _ref_entry(key: str, value: object, declared_target: str | None, resolve: Ty
     return IndexEntry(kind=IndexKind.REF, field_key=key, value=(uuid, type_id))
 
 
-def make_schema_provider(resolve_type_id: TypeResolver) -> IndexProvider:
-    """The built-in provider, bound to a way of resolving relation targets."""
-
-    def schema_provider(record: Record, rtype: RecordType) -> Iterator[IndexEntry]:
-        data = record.data or {}
-        # The same fallback the read path takes (``schema.compile.from_stored``):
-        # a declared key that lives only under ``_orphaned`` is a value restored
-        # with a re-added field (§8.8), and the payload catches up lazily on the
-        # record's next write. Indexing from the top level only would leave that
-        # field queryable for nobody until every record happened to be edited.
-        orphaned = data.get(ORPHANED_KEY)
-        if not isinstance(orphaned, dict):
-            orphaned = {}
-        for raw in rtype.fields or []:
-            field = read_field(raw)
-            if field is None:
-                continue
-            if field.key in data:
-                value = data[field.key]
-            elif field.key in orphaned:
-                value = orphaned[field.key]
-            else:
-                continue
-            if value is None:
-                continue
-            # A to-many field given a scalar still indexes: the payload may
-            # predate the field becoming ``many``, and one row is the honest
-            # projection of one value.
-            values = value if field.many and isinstance(value, list) else [value]
-            for item in values:
-                entry = (
-                    _ref_entry(field.key, item, relation_target(raw), resolve_type_id)
-                    if field.kind is IndexKind.REF
-                    else _entry(field.kind, field.key, item)
-                )
-                if entry is not None:
-                    yield entry
-
-    return schema_provider
-
-
-schema_provider: IndexProvider = make_schema_provider(lambda key: current_type_resolver()(key))
-"""The default-registered instance. It defers to whatever resolver the current
-write bound, so one module-level provider serves every session."""
+def schema_provider(record: Record, rtype: RecordType) -> Iterator[IndexEntry]:
+    """The built-in provider, registered by default. It resolves relation
+    targets with whatever resolver the current write bound
+    (:func:`use_type_resolver`) — one that resolves nothing outside a write —
+    so one module-level provider serves every session."""
+    data = record.data or {}
+    # The same fallback the read path takes (``schema.compile.from_stored``):
+    # a declared key that lives only under ``_orphaned`` is a value restored
+    # with a re-added field (§8.8), and the payload catches up lazily on the
+    # record's next write. Indexing from the top level only would leave that
+    # field queryable for nobody until every record happened to be edited.
+    orphaned = data.get(ORPHANED_KEY)
+    if not isinstance(orphaned, dict):
+        orphaned = {}
+    for raw in rtype.fields or []:
+        field = read_field(raw)
+        if field is None:
+            continue
+        if field.key in data:
+            value = data[field.key]
+        elif field.key in orphaned:
+            value = orphaned[field.key]
+        else:
+            continue
+        if value is None:
+            continue
+        # A to-many field given a scalar still indexes: the payload may
+        # predate the field becoming ``many``, and one row is the honest
+        # projection of one value.
+        values = value if field.many and isinstance(value, list) else [value]
+        for item in values:
+            entry = (
+                _ref_entry(field.key, item, relation_target(raw), _resolver.get())
+                if field.kind is IndexKind.REF
+                else _entry(field.kind, field.key, item)
+            )
+            if entry is not None:
+                yield entry
 
 
 _providers: list[IndexProvider] = [schema_provider]
