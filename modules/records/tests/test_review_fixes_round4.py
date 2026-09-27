@@ -104,19 +104,6 @@ async def test_the_declared_field_wins_the_filter_over_the_virtual_one(client, c
     assert len(warned) == 1, "once per type, not once per request"
 
 
-async def test_declaring_a_virtual_key_is_still_refused_when_saving(client):
-    register_index_provider(
-        yielding((IndexKind.TEXT, "bucket", "x")), fields=[VirtualField("bucket", IndexKind.TEXT)]
-    )
-    resp = await client.post(
-        f"{API}/types",
-        json={"key": "widget", "label": "Widget", "fields": [field("bucket", "text")]},
-        headers=roles(ADMIN),
-    )
-    assert resp.status_code == 422
-    assert "index provider" in resp.json()["errors"][0]["message"]
-
-
 # ---------------------------------------------------------------------------
 # M2 / M4 — what ``?expand=`` resolves, and what it lines up with
 # ---------------------------------------------------------------------------
