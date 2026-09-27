@@ -48,6 +48,7 @@ def test_the_construction_time_hook_adds_nothing():
     assert registry.routes == []
 
 
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
 @pytest.mark.parametrize(
     "path",
     [
@@ -55,21 +56,11 @@ def test_the_construction_time_hook_adds_nothing():
         "/api/records/public/article/0123456789abcdef0123456789abcdef",
     ],
 )
-def test_the_public_read_api_is_anonymous(path):
-    assert _registry().matches("GET", path), f"{path} would 302 to login"
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/api/records/public/article",
-        "/api/records/public/article/0123456789abcdef0123456789abcdef",
-    ],
-)
-def test_head_is_allowed_too(path):
-    """Conditional GETs and link checkers issue HEAD, and Starlette answers it
-    on every GET route — so the exemption has to cover it or the check 302s."""
-    assert _registry().matches("HEAD", path)
+def test_the_public_read_api_is_anonymous(path, method):
+    """``HEAD`` too: conditional GETs and link checkers issue it, and Starlette
+    answers it on every GET route — so the exemption has to cover it or the
+    check 302s."""
+    assert _registry().matches(method, path), f"{method} {path} would 302 to login"
 
 
 @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
