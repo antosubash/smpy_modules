@@ -137,8 +137,6 @@ class Marker:
         self._now = utcnow()
         self._mark: list[Record] = []
         self._clear: list[Record] = []
-        self.marked = 0
-        self.cleared = 0
 
     def judge(self, record: Record, *, failed: bool) -> None:
         """Queue this record's mark, if the scan changes what it holds.
@@ -158,8 +156,6 @@ class Marker:
         """Write this batch's marks. Called once per batch by the scan."""
         if not self.enabled or not (self._mark or self._clear):
             return
-        self.marked += len(self._mark)
-        self.cleared += len(self._clear)
         await write_marks(self._db, self._rtype, mark=self._mark, clear=self._clear, now=self._now)
         self._mark, self._clear = [], []
 
