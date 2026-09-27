@@ -51,15 +51,6 @@ TYPE_REVISION_TABLE = "records_type_revision"
 partitions documents, and a type is what says which partition its documents
 live in."""
 
-RECORD_TABLE = f"{GLOBAL_PREFIX}{RECORD_SUFFIX}"
-REVISION_TABLE = f"{GLOBAL_PREFIX}{REVISION_SUFFIX}"
-INDEX_TEXT_TABLE = f"{GLOBAL_PREFIX}{INDEX_TEXT_SUFFIX}"
-INDEX_NUMBER_TABLE = f"{GLOBAL_PREFIX}{INDEX_NUMBER_SUFFIX}"
-INDEX_BOOL_TABLE = f"{GLOBAL_PREFIX}{INDEX_BOOL_SUFFIX}"
-INDEX_DATE_TABLE = f"{GLOBAL_PREFIX}{INDEX_DATE_SUFFIX}"
-INDEX_DATETIME_TABLE = f"{GLOBAL_PREFIX}{INDEX_DATETIME_SUFFIX}"
-INDEX_REF_TABLE = f"{GLOBAL_PREFIX}{INDEX_REF_SUFFIX}"
-
 INDEX_REDUCE_TABLE = f"{GLOBAL_PREFIX}index_reduce"
 """The reduce table is global too, and deliberately (§6.4): a reduce row is a
 fold keyed by ``type_id`` with no ``record_id`` to partition on, so it has
