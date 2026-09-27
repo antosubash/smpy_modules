@@ -51,15 +51,9 @@ from sm_records.index.query import (
     Filter,
     QueryError,
     Sort,
-    bounded_count_query,
-    decode_cursor,
-    encode_cursor,
-    page_query,
-    sort_plan,
-    sort_signature,
 )
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
-from sm_records.services._listing import RecordListPage
+from sm_records.services._listing import RecordListPage, page_of
 from sm_records.services._translations import published_siblings
 from sm_records.services.errors import NotFound
 from sm_records.settings import RecordsSettings
@@ -239,41 +233,21 @@ async def list_public_records(
     rows the outer then discards under-counts near the cap.
     """
     _check_columns(rtype, filters, sorts)
-    narrow = _narrow_for(tables_for(rtype).record, locale)
-    size = settings.clamp_page_size(page_size)
-    fields = list(rtype.fields or [])
-    # ``locale`` is in the signature because it is a predicate on the statement
-    # rather than one of the caller's filters (:func:`_narrow_for`): without it
-    # a cursor minted under ``?locale=en`` was accepted under ``?locale=de``,
-    # which is "resume after this row" spoken about a different listing. The
-    # terms' kinds are in it for the reason ``index._cursor`` gives.
-    plan = sort_plan(rtype, fields, sorts)
-    signature = sort_signature(rtype.key, sorts, locale=locale, terms=plan)
-    decoded = decode_cursor(after, signature, plan) if after else None
-
-    total: int | None = None
-    capped = False
-    if with_total:
-        cap = settings.max_count
-        counted = int(
-            (
-                await db.execute(
-                    bounded_count_query(rtype, fields, filters, cap=cap, narrow=narrow)
-                )
-            ).scalar_one()
-        )
-        capped = counted > cap
-        total = cap if capped else counted
-
-    stmt, terms = page_query(rtype, fields, filters, sorts, after=decoded)
-    stmt = narrow(stmt)
-    if decoded is None:
-        stmt = stmt.offset(max(page - 1, 0) * size)
-    rows = (await db.execute(stmt.limit(size))).all()
-    items = [row[0] for row in rows]
-    next_cursor = (
-        encode_cursor(signature, [*rows[-1][1 : len(terms) + 1], items[-1].id])
-        if len(rows) == size
-        else None
+    # ``locale`` goes into the cursor signature because it is a predicate on
+    # the statement rather than one of the caller's filters (:func:`_narrow_for`):
+    # without it a cursor minted under ``?locale=en`` was accepted under
+    # ``?locale=de``, which is "resume after this row" spoken about a different
+    # listing.
+    return await page_of(
+        db,
+        rtype,
+        settings=settings,
+        filters=filters,
+        sorts=sorts,
+        page=page,
+        page_size=page_size,
+        after=after,
+        with_total=with_total,
+        narrow=_narrow_for(tables_for(rtype).record, locale),
+        locale=locale,
     )
-    return RecordListPage(items, total, capped, next_cursor)

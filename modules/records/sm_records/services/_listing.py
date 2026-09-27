@@ -20,9 +20,9 @@ Nothing here commits, like everything else in this layer.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import partial
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +40,7 @@ from sm_records.index.query import (
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.settings import RecordsSettings
 
-__all__ = ["RecordListPage", "list_records"]
+__all__ = ["RecordListPage", "list_records", "page_of"]
 
 
 class RecordListPage(NamedTuple):
@@ -96,18 +96,57 @@ async def list_records(
     caller walking the whole type with ``after`` should do: it is paying for a
     number it does not read, on every page.
     """
-    size = settings.clamp_page_size(page_size)
-    fields = list(rtype.fields or [])
     # ``only_trashed`` takes the document class because a collection type's
     # trash lives in that collection's table (Phase 5 §6.3); the ``narrow``
     # contract downstream is still one-argument, so it is bound here.
     record = tables_for(rtype).record
     narrow = partial(only_trashed, record) if trashed else None
+    return await page_of(
+        db,
+        rtype,
+        settings=settings,
+        filters=filters,
+        sorts=sorts,
+        page=page,
+        page_size=page_size,
+        after=after,
+        with_total=with_total,
+        narrow=narrow,
+        trashed=trashed,
+    )
+
+
+async def page_of(
+    db: AsyncSession,
+    rtype: RecordType,
+    *,
+    settings: RecordsSettings,
+    filters: Sequence[Filter],
+    sorts: Sequence[Sort],
+    page: int,
+    page_size: int | None,
+    after: str | None,
+    with_total: bool,
+    narrow: Callable[[Any], Any] | None,
+    trashed: bool = False,
+    locale: str | None = None,
+) -> RecordListPage:
+    """The page, the bounded count and the cursor, shared by the admin listing
+    and the public one (``services.public.list_public_records``).
+
+    ``narrow`` is the caller's extra predicate, applied to the page and to
+    both halves of the bounded count. ``trashed`` and ``locale`` go into the
+    cursor signature only: each is a predicate the caller already put in
+    ``narrow``, and a cursor minted under one value must be refused under
+    another.
+    """
+    size = settings.clamp_page_size(page_size)
+    fields = list(rtype.fields or [])
     # The plan is resolved whether or not there is a cursor: its terms' index
     # kinds are part of the signature, so a field retyped between two pages of
     # a walk invalidates the cursor instead of comparing a decimal to a string.
     plan = sort_plan(rtype, fields, sorts)
-    signature = sort_signature(rtype.key, sorts, trashed=trashed, terms=plan)
+    signature = sort_signature(rtype.key, sorts, trashed=trashed, locale=locale, terms=plan)
     decoded = decode_cursor(after, signature, plan) if after else None
 
     total: int | None = None
