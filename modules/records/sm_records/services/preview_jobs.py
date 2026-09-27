@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -85,7 +85,6 @@ class PreviewJob:
     report: DryRunReport | None = None
     diff: SchemaDiff | None = None
     error: str | None = None
-    started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
 
     @property

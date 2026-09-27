@@ -26,7 +26,7 @@ from sm_records._text import has_nul
 from sm_records.contracts.io import ImportRowError
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
-from sm_records.services._export_cells import APOSTROPHE, ENVELOPE_COLUMNS
+from sm_records.services._export_cells import _JSON_CELL_TYPES, APOSTROPHE, ENVELOPE_COLUMNS
 from sm_records.services._import_parse import (
     ImportRow,
     ParsedFile,
@@ -36,9 +36,6 @@ from sm_records.services._import_parse import (
 from sm_records.services.errors import ImportParseFailed
 
 __all__ = ["parse_csv"]
-
-
-_JSON_CELL_TYPES = frozenset({FieldType.MULTISELECT, FieldType.JSON, FieldType.MEDIA})
 
 
 def _header(reader: Any, defs: list[FieldDefinition]) -> list[str]:

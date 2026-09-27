@@ -77,16 +77,6 @@ content by its absence (§10).
 """
 
 
-def _published(record: Any):
-    """ "published", against one table set's document class.
-
-    A function since Phase 5 §6.3 rather than the module-level predicate it was:
-    a public collection type's rows are in that collection's table, and a bound
-    column from the global class would name a table the statement does not
-    have."""
-    return record.status == RecordStatus.PUBLISHED
-
-
 def _published_only(record: Any, stmt):
     """The one predicate this whole surface is defined by. Bound to a document
     class it becomes the shape ``bounded_count_query``'s ``narrow`` takes, so
@@ -97,7 +87,10 @@ def _published_only(record: Any, stmt):
     the anonymous surface, where a row from the wrong tenant would be an
     enumeration oracle, so it does not rest on the framework's loader criteria
     alone."""
-    return stmt.where(_published(record), record.tenant_id == bound_tenant())
+    # ``record`` is whichever table set's document class the type lives in
+    # (Phase 5 §6.3): a bound column from the global class would name a table
+    # the statement does not have.
+    return stmt.where(record.status == RecordStatus.PUBLISHED, record.tenant_id == bound_tenant())
 
 
 def _narrow_for(record: Any, locale: str):

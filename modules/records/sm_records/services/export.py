@@ -49,7 +49,6 @@ from sm_records.services._export_cells import (
     ENVELOPE_COLUMNS,
     csv_cell,
     csv_header,
-    escape_formula,
 )
 from sm_records.services._payload import field_defs, read_view
 from sm_records.services.types import get_type_by_id
@@ -59,7 +58,6 @@ __all__ = [
     "ENVELOPE_COLUMNS",
     "csv_cell",
     "csv_header",
-    "escape_formula",
     "export_filename",
     "iter_csv",
     "iter_json",

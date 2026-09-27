@@ -29,13 +29,13 @@ from sm_records._text import has_nul
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
 from sm_records.models import RecordType, RecordTypeRevision
-from sm_records.schema.types import FieldType
 from sm_records.services._common import (
     PurgedRecord,
     record_count,
     record_counts,
     type_id_map,
 )
+from sm_records.services._referrer_sets import _declares_a_relation_to
 from sm_records.services._schema import (
     check_pointers,
     check_targets,
@@ -237,12 +237,7 @@ async def delete_type(
     referring = [
         other.key
         for other in await list_types(db)
-        if other.id != rtype.id
-        and any(
-            raw.get("type") == FieldType.RELATION.value
-            and (raw.get("options") or {}).get("target_type") == rtype.key
-            for raw in other.fields or []
-        )
+        if other.id != rtype.id and _declares_a_relation_to(other.fields, rtype.key)
     ]
     if referring:
         raise ReferencedByOthers(
