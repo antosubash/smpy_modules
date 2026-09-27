@@ -178,15 +178,11 @@ export function useRecordEditor(
         router.visit(`/admin/records/${type.key}/${saved.uuid}`);
         return;
       }
-      setCurrent(saved);
       // The server can derive its own `slug` (and, in principle, adjust
       // `status`/`position`), so the envelope inputs have to re-sync from
       // what it actually stored — otherwise a server-derived slug doesn't
       // show until the next full reload.
-      setStatus(saved.status);
-      setSlug(saved.slug ?? '');
-      setPosition(String(saved.position));
-      form.reset(saved);
+      applyRestored(saved);
       toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.body?.current) {
@@ -240,23 +236,20 @@ export function useRecordEditor(
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const reloadFromConflict = (server: RecordRead) => {
-    setCurrent(server);
-    setStatus(server.status);
-    setSlug(server.slug ?? '');
-    setPosition(String(server.position));
-    form.reset(server);
-    setConflict(null);
-  };
-
-  /** A trash-restore (`RecordActions`) and a revision restore (`RecordRevisions`)
-   *  both hand back a fresh `RecordRead`, so the envelope inputs and form re-sync. */
+  /** A trash-restore (`RecordActions`), a revision restore (`RecordRevisions`),
+   *  a save and a conflict reload all hand back a fresh `RecordRead`, so the
+   *  envelope inputs and form re-sync from it. */
   const applyRestored = (restored: RecordRead) => {
     setCurrent(restored);
     setStatus(restored.status);
     setSlug(restored.slug ?? '');
     setPosition(String(restored.position));
     form.reset(restored);
+  };
+
+  const reloadFromConflict = (server: RecordRead) => {
+    applyRestored(server);
+    setConflict(null);
   };
 
   /** "Save as copy": stash `current` (minus its `unique` fields — see

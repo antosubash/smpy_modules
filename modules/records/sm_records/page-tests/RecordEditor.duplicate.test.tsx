@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
+import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, mount } from '../test-dom';
+import { click, mount, settle } from '../test-dom';
+import { ApiError } from '../utils/api';
 import { takeDuplicate } from '../utils/duplicate';
 import type { RecordRead, TypeRead } from '../utils/types';
 
@@ -26,6 +28,7 @@ vi.mock('../utils/api-history', () => ({
 
 const RecordEditor = (await import('../pages/RecordEditor')).default;
 const { router } = await import('@inertiajs/react');
+const { updateRecord } = await import('../utils/api-records');
 
 function type(): TypeRead {
   return {
@@ -137,5 +140,33 @@ describe('RecordEditor — Missing-item "Save as copy"', () => {
     expect(fresh.find<HTMLInputElement>('#record-field-title')?.value).toBe('Dune');
     expect(fresh.find<HTMLInputElement>('#record-field-isbn')?.value ?? '').toBe('');
     await fresh.unmount();
+  });
+});
+
+/** A 409 on save opens `ConflictPanel`; its "Reload" adopts the server's copy
+ *  — the envelope inputs and the form re-sync from it and the panel closes
+ *  (`useRecordEditor`'s `reloadFromConflict`). */
+describe('RecordEditor — a stale save’s Reload adopts the server copy', () => {
+  it('re-syncs the form and the slug from the server record and closes the panel', async () => {
+    const server = {
+      ...record(),
+      version: 4,
+      slug: 'dune-2',
+      data: { title: 'Dune II', isbn: '000-1' },
+    };
+    vi.mocked(updateRecord).mockRejectedValueOnce(
+      new ApiError(409, { detail: 'stale', current: server } as never, 'stale'),
+    );
+    const view = await mount(<RecordEditor type={type()} record={record()} />);
+    await act(async () => {
+      (view.find('form') as HTMLFormElement).requestSubmit();
+    });
+    await settle();
+    expect(view.find('[data-testid="records-conflict-panel"]')).not.toBeNull();
+    await click(view.button('Reload'));
+    expect(view.find('[data-testid="records-conflict-panel"]')).toBeNull();
+    expect(view.find<HTMLInputElement>('#record-field-title')?.value).toBe('Dune II');
+    expect(view.find<HTMLInputElement>('#record-slug')?.value).toBe('dune-2');
+    await view.unmount();
   });
 });
