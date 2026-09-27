@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 import { RecordsToaster } from '../components/RecordsToaster';
 import { TenantBadge } from '../components/TenantBadge';
+import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
 import { groupErrors } from '../components/typeeditor/errors';
 import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
@@ -21,10 +22,11 @@ import {
 import { PointerFields } from '../components/typeeditor/PointerFields';
 import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
 import { SaveBar } from '../components/typeeditor/SaveBar';
+import { SchemaConflictPanel } from '../components/typeeditor/SchemaConflictPanel';
 import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
-import { TypeEditorFooter } from '../components/typeeditor/TypeEditorFooter';
 import { TypeIoMenu } from '../components/typeeditor/TypeIoMenu';
 import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
+import { TypeRevisions } from '../components/typeeditor/TypeRevisions';
 import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
 import type { SchemaApplyBody } from '../hooks/useSchemaApply';
 import { useSchemaApply } from '../hooks/useSchemaApply';
@@ -238,23 +240,30 @@ function TypeEditor({
             onSave={() => void save()}
           />
 
-          <TypeEditorFooter
-            current={isNew ? null : current}
+          {/* Below Save: the two 409 shapes a schema write can come back as,
+              the type's schema history and the danger zone — the last two
+              only for a type that has been created. */}
+          <SchemaConflictPanel
             report={schemaApply.report}
             conflicts={schemaApply.conflicts}
             pending={schemaApply.pending || pending}
             onForce={forceApply}
             onOrphaned={(choice) => schemaApply.retryWith({ orphaned: choice })}
-            onRestored={applySaved}
-            onDeleted={() => {
-              guard.allow();
-              // U9: the module's most destructive action ended in silence —
-              // seven records and a schema gone, with a missing row in a
-              // table the operator may not be looking at as the only sign.
-              toast.success(t('records.type_editor.deleted', { defaultValue: 'Type deleted' }));
-              router.visit(TYPES_LIST_HREF);
-            }}
           />
+          {!isNew && current && <TypeRevisions type={current} onRestored={applySaved} />}
+          {!isNew && current && (
+            <DeleteTypeSection
+              type={current}
+              onDeleted={() => {
+                guard.allow();
+                // U9: the module's most destructive action ended in silence —
+                // seven records and a schema gone, with a missing row in a
+                // table the operator may not be looking at as the only sign.
+                toast.success(t('records.type_editor.deleted', { defaultValue: 'Type deleted' }));
+                router.visit(TYPES_LIST_HREF);
+              }}
+            />
+          )}
         </div>
       </PageShell>
     </>
