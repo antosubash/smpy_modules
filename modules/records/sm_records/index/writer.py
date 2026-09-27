@@ -14,7 +14,6 @@ would break the caller's ability to roll the whole write back.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -72,12 +71,8 @@ def row_values(
         return table, {**base, "value": Decimal(entry.value)}
     if entry.kind is IndexKind.BOOL:
         return table, {**base, "value": bool(entry.value)}
-    if entry.kind is IndexKind.DATE:
-        value: date = entry.value
-        return table, {**base, "value": value}
-    if entry.kind is IndexKind.DATETIME:
-        moment: datetime = entry.value
-        return table, {**base, "value": moment}
+    if entry.kind in (IndexKind.DATE, IndexKind.DATETIME):
+        return table, {**base, "value": entry.value}
     target_uuid, target_type_id = entry.value
     return table, {**base, "target_uuid": target_uuid, "target_type_id": int(target_type_id)}
 
