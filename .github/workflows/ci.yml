@@ -259,8 +259,8 @@ jobs:
     # Raised from 15 when the multilingual specs landed (a green run reached
     # test 138 of 143 at 15m17s and was cancelled with the last file still to
     # go), and from 25 when the records specs took the suite from 149 tests to
-    # 223 — 16 `records-*.spec.ts` files, 74 tests. At the same measured ~7s a
-    # test that is ~26 minutes of tests alone, and `uv sync`, `npm ci`,
+    # 257 — 24 `records-*.spec.ts` files, 108 tests. At the same measured ~7s a
+    # test that is ~30 minutes of tests alone, and `uv sync`, `npm ci`,
     # `make sync-module-deps`, `make gen-pages`, the Playwright browser install
     # and up to 180s of `webServer` boot all sit inside this ceiling too. 45
     # covers that with room for a slow runner and the odd retry, without going
