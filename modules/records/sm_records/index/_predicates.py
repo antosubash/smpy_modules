@@ -12,6 +12,7 @@ both; ``query`` re-exports them, and that is the public surface.
 from __future__ import annotations
 
 import enum
+import operator
 from collections.abc import Sequence
 from typing import Any
 
@@ -100,17 +101,25 @@ def sort_column(table: Any, kind: IndexKind) -> Any:
     return getattr(table, SORT_ATTR[kind])
 
 
-_ORDERED = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
+ORDERED_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
+COMPARE = {
+    FilterOp.GT: operator.gt,
+    FilterOp.GTE: operator.ge,
+    FilterOp.LT: operator.lt,
+    FilterOp.LTE: operator.le,
+}
+"""The ordered operators and the comparison each builds — shared with the
+fixed-column builder (``_fixed.fixed_clause``), so the two spell them once."""
 _ALLOWED: dict[IndexKind, frozenset[FilterOp]] = {
     # Text is not ordered-comparable on purpose: ``value`` holds only the
     # first 512 characters, so ``>`` over it would answer with a prefix.
     IndexKind.TEXT: frozenset(
         {FilterOp.EQ, FilterOp.NE, FilterOp.IN, FilterOp.CONTAINS, FilterOp.STARTS_WITH}
     ),
-    IndexKind.NUMBER: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *_ORDERED}),
+    IndexKind.NUMBER: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *ORDERED_OPS}),
     IndexKind.BOOL: frozenset({FilterOp.EQ, FilterOp.NE}),
-    IndexKind.DATE: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *_ORDERED}),
-    IndexKind.DATETIME: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *_ORDERED}),
+    IndexKind.DATE: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *ORDERED_OPS}),
+    IndexKind.DATETIME: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN, *ORDERED_OPS}),
     IndexKind.REF: frozenset({FilterOp.EQ, FilterOp.NE, FilterOp.IN}),
 }
 
@@ -181,15 +190,7 @@ def _scalar_clause(
 ) -> ColumnElement[bool]:
     column = sort_column(table, kind)
     coerced = _coerce(kind, value, field)
-    if op is FilterOp.GT:
-        return column > coerced
-    if op is FilterOp.GTE:
-        return column >= coerced
-    if op is FilterOp.LT:
-        return column < coerced
-    if op is FilterOp.LTE:
-        return column <= coerced
-    return column == coerced
+    return COMPARE.get(op, operator.eq)(column, coerced)
 
 
 def value_clause(

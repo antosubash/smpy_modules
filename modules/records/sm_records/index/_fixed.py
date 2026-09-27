@@ -25,7 +25,9 @@ from sqlalchemy.sql import ColumnElement
 from sm_records.constants import ORPHANED_KEY
 from sm_records.index._coerce import coerce_bool, coerce_datetime, coerce_text
 from sm_records.index._predicates import (
+    COMPARE,
     LIKE_ESCAPE_CHAR,
+    ORDERED_OPS,
     FilterOp,
     QueryError,
     like_contains_pattern,
@@ -185,7 +187,6 @@ deliberately not one: a language tag is matched whole (``eq``, ``ne``, ``in``),
 and a prefix match over it would make ``de`` select ``de-AT`` on one install
 and nothing on the next."""
 _FIXED_ORDERED = frozenset({"position", "published_at", "created_at", "updated_at"})
-_ORDER_OPS = frozenset({FilterOp.GT, FilterOp.GTE, FilterOp.LT, FilterOp.LTE})
 
 
 def _fixed_value(field: str, value: Any) -> Any:
@@ -223,10 +224,9 @@ def _boolean_clause(column: Any, field: str, op: FilterOp, value: Any) -> Column
     — which here is the same set as ``eq:false``: an unmarked record is one
     with no ``invalid_since``. Both spellings are accepted rather than one
     refused, because a caller arriving from another fixed column has no reason
-    to expect the difference.
+    to expect the difference; :func:`fixed_clause` answers it before this is
+    reached, with the same ``IS NULL`` every fixed column gets.
     """
-    if op is FilterOp.IS_NULL:
-        return column.is_(None) if value in (None, True) else column.isnot(None)
     if op not in (FilterOp.EQ, FilterOp.NE):
         raise QueryError(field, "unsupported_op", f"{field!r} takes eq, ne or is_null")
     wanted = coerce_bool(value)
@@ -250,10 +250,10 @@ def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnEle
     ``NOT NULL`` and which carry a ``(type_id, col, id)`` index are facts about
     the *shape*, and a collection cannot differ in any of them."""
     column = fixed_column(record, field)
-    if field in _FIXED_BOOLEAN:
-        return _boolean_clause(column, field, op, value)
     if op is FilterOp.IS_NULL:
         return column.is_(None) if value in (None, True) else column.isnot(None)
+    if field in _FIXED_BOOLEAN:
+        return _boolean_clause(column, field, op, value)
     if op is FilterOp.CONTAINS:
         if field not in _FIXED_TEXT:
             raise QueryError(field, "unsupported_op", "contains needs a text column")
@@ -266,7 +266,7 @@ def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnEle
         # ``_predicates.prefix_range`` for why the range is the only spelling
         # an index can answer, and what it costs in case sensitivity.
         return starts_with_clause(column, _fixed_value(field, value))
-    if op in _ORDER_OPS and field not in _FIXED_ORDERED:
+    if op in ORDERED_OPS and field not in _FIXED_ORDERED:
         raise QueryError(field, "unsupported_op", f"{op.value} needs an ordered column")
     if op is FilterOp.IN:
         raw = value if isinstance(value, Sequence) and not isinstance(value, str) else []
@@ -276,9 +276,4 @@ def fixed_clause(record: Any, field: str, op: FilterOp, value: Any) -> ColumnEle
         return column == coerced
     if op is FilterOp.NE:
         return or_(column != coerced, column.is_(None))
-    return {
-        FilterOp.GT: column > coerced,
-        FilterOp.GTE: column >= coerced,
-        FilterOp.LT: column < coerced,
-        FilterOp.LTE: column <= coerced,
-    }[op]
+    return COMPARE[op](column, coerced)
