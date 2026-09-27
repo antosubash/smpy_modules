@@ -1,14 +1,15 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { login } from './helpers';
+import { clickAndConfirm, login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateType,
+  apiDeleteRecord,
   apiGetRecord,
   apiUpdateRecord,
-  confirmDialog,
   recordField,
   recordFieldError,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -56,13 +57,7 @@ const KITCHEN_SINK = [
 
 /** A type holding one field of every kind, plus a seeded relation target. */
 async function seedSinkType(page: Page): Promise<{ key: string; targetKey: string }> {
-  const targetKey = uniqueTypeKey('rel');
-  await apiCreateType(page, {
-    key: targetKey,
-    label: 'Owner',
-    fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-    display_field: 'name',
-  });
+  const targetKey = await seedTextType(page, 'rel', { field: 'name', label: 'Owner' });
   await apiCreateRecord(page, targetKey, { data: { name: 'Ada Lovelace' }, status: 'published' });
 
   const key = uniqueTypeKey('crud');
@@ -204,6 +199,11 @@ test.describe('Records — record CRUD', () => {
     await expect
       .poll(async () => (await apiGetRecord(page, key, record.uuid)).data.title)
       .toBe('After');
+    // The editor calls `toast.success('Saved')` here — and `toast.error(...)`
+    // for any failure that isn't a 409 or a 422, which is the only channel
+    // those have. `exact` matters: a loose match also matches the
+    // "Save"+"Delete" button row's combined text.
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     const stored = await apiGetRecord(page, key, record.uuid);
     expect(stored.data.title).toBe('After');
@@ -250,50 +250,18 @@ test.describe('Records — record CRUD', () => {
   // `records-crud-conflict.spec.ts` — this file was already near the
   // 300-line cap.
 
-  test('confirms a successful save on screen', async ({ page }) => {
-    await login(page);
-    const { key } = await seedSinkType(page);
-    const record = await apiCreateRecord(page, key, { data: { title: 'Feedback' } });
-
-    await page.goto(`/admin/records/${key}/${record.uuid}`);
-    await recordField(page, 'title').fill('Feedback edited');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect
-      .poll(async () => (await apiGetRecord(page, key, record.uuid)).data.title)
-      .toBe('Feedback edited');
-
-    // The editor calls `toast.success('Saved')` here — and `toast.error(...)`
-    // for any failure that isn't a 409 or a 422, which is the only channel
-    // those have. `exact` matters: a loose match also matches the
-    // "Save"+"Delete" button row's combined text.
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-  });
-
-  test('deletes a record from the editor', async ({ page }) => {
-    await login(page);
-    const { key } = await seedSinkType(page);
-    const record = await apiCreateRecord(page, key, { data: { title: 'Doomed' } });
-
-    await page.goto(`/admin/records/${key}/${record.uuid}`);
-    // U15: the action stays "Delete", the dialog it opens says what that
-    // really does — its title and confirm button read "Move to Trash".
-    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Move to Trash');
-    await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));
-    await expect(page.getByRole('link', { name: 'Doomed' })).toHaveCount(0);
-  });
-
   test('a deleted record can be reached and restored from the UI', async ({ page }) => {
     await login(page);
     const { key } = await seedSinkType(page);
     const record = await apiCreateRecord(page, key, { data: { title: 'Recoverable' } });
-    await page.request.delete(`/api/records/types/${key}/records/${record.uuid}`);
+    await apiDeleteRecord(page, key, record.uuid);
 
     // §8's soft delete is restorable, and `RecordActions`/`RecordEditor`
     // render a "Deleted" badge with Restore and Delete-permanently for
     // exactly that state — so the trashed record has to be reachable.
     await page.goto(`/admin/records/${key}/${record.uuid}`);
     await expect(page.getByText('Deleted')).toBeVisible();
-    await confirmDialog(page, page.getByRole('button', { name: 'Restore' }), 'Restore');
+    await clickAndConfirm(page, page.getByRole('button', { name: 'Restore' }), 'Restore');
     await expect(page.getByText('Deleted')).toHaveCount(0);
     expect((await apiGetRecord(page, key, record.uuid)).is_deleted).toBe(false);
   });

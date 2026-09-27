@@ -1,7 +1,13 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
-import { apiCreateRecord, apiCreateType, uniqueTypeKey } from './records-helpers';
+import {
+  apiCreateRecord,
+  apiDeleteRecord,
+  apiGetRecord,
+  importFile,
+  seedIoType,
+} from './records-helpers';
 
 /**
  * The import options `RecordIoMenu` exposes beyond the file itself — FAIL-1's
@@ -12,47 +18,12 @@ import { apiCreateRecord, apiCreateType, uniqueTypeKey } from './records-helpers
  * FAIL-1 is about, not because they belong to a different feature.
  */
 
-type Row = { uuid?: string; locale?: string; data: Record<string, unknown> };
-
-function jsonFile(rows: Row[]) {
-  return {
-    name: 'records.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ records: rows })),
-  };
-}
-
-/** A type with one indexed text field, its display field. */
-async function seedType(page: Page, prefix: string, extra: Record<string, unknown> = {}) {
-  const key = uniqueTypeKey(prefix);
-  await apiCreateType(page, {
-    key,
-    label: 'IO thing',
-    label_plural: 'IO things',
-    fields: [
-      { key: 'title', type: 'text', label: 'Title', indexed: true },
-      { key: 'note', type: 'text', label: 'Note' },
-    ],
-    display_field: 'title',
-    ...extra,
-  });
-  return key;
-}
-
-/** Pick a file and wait for the dry-run report dialog it always opens. */
-async function importFile(page: Page, file: ReturnType<typeof jsonFile>) {
-  await page.getByTestId('records-import-input').setInputFiles(file);
-  const dialog = page.getByTestId('records-import-report');
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
 test.describe('Records — import options and trash export', () => {
   test('editing an exported record and re-importing predicts the refusal, and "force" gets it through', async ({
     page,
   }) => {
     await login(page);
-    const key = await seedType(page, 'force');
+    const key = await seedIoType(page, 'force');
     const record = await apiCreateRecord(page, key, { data: { title: 'Original', note: 'x' } });
 
     await page.goto(`/admin/records/${key}`);
@@ -88,8 +59,7 @@ test.describe('Records — import options and trash export', () => {
     await expect(page.getByTestId('records-import-blocked')).toContainText(
       "1 of 1 row can't be imported, so nothing will be written.",
     );
-    const before = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
-    expect((await before.json()).data.title).toBe('Original');
+    expect((await apiGetRecord(page, key, record.uuid)).data.title).toBe('Original');
 
     // R21: the options trigger now lives inside this same dialog, above
     // Apply, instead of a toolbar popover that had already closed by the
@@ -114,15 +84,14 @@ test.describe('Records — import options and trash export', () => {
     // configured has now happened.
     await expect(page.getByTestId('records-import-options-trigger')).toHaveCount(0);
 
-    const after = await page.request.get(`/api/records/types/${key}/records/${record.uuid}`);
-    expect((await after.json()).data.title).toBe('Edited');
+    expect((await apiGetRecord(page, key, record.uuid)).data.title).toBe('Edited');
   });
 
   test('the export menu notes that a trash export cannot be re-imported', async ({ page }) => {
     await login(page);
-    const key = await seedType(page, 'trashnote');
+    const key = await seedIoType(page, 'trashnote');
     const record = await apiCreateRecord(page, key, { data: { title: 'Binned' } });
-    await page.request.delete(`/api/records/types/${key}/records/${record.uuid}`);
+    await apiDeleteRecord(page, key, record.uuid);
 
     await page.goto(`/admin/records/${key}`);
     await page.getByTestId('records-trash-toggle').click();

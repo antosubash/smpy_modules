@@ -4,6 +4,8 @@ import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateType,
+  apiGetType,
+  expandField,
   fieldRow,
   saveType,
   uniqueTypeKey,
@@ -58,16 +60,6 @@ async function seedType(page: Page): Promise<string> {
     });
   }
   return key;
-}
-
-/** Open one field row's editing body. Rows collapse to a one-line summary
- *  (UX review R9), so anything inside the body has to be expanded first;
- *  a row added through `addFieldInEditor` opens by itself. */
-async function expandField(page: Page, index: number): Promise<void> {
-  const row = fieldRow(page, index);
-  if ((await row.getAttribute('data-field-expanded')) === 'true') return;
-  await row.getByTestId('records-field-toggle').click();
-  await expect(row).toHaveAttribute('data-field-expanded', 'true');
 }
 
 /** Make `note` required — the restrictive change every test here previews. */
@@ -177,8 +169,7 @@ test.describe('Records — deferred schema preview', () => {
     ).toBeVisible();
 
     // Nothing was written: the type still has an optional `note`.
-    const current = await page.request.get(`/api/records/types/${key}`);
-    const fields = (await current.json()).fields as { key: string; required: boolean }[];
+    const { fields } = await apiGetType(page, key);
     expect(fields.find((f) => f.key === 'note')?.required).toBe(false);
   });
 

@@ -7,15 +7,9 @@ import {
   apiGetType,
   apiUpdateType,
   saveType,
-  type TypeRead,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
-
-// `show_in_menu` isn't on `records-helpers.ts::TypeRead` (that file sits
-// right at the 300-line cap already) — this local extension avoids growing
-// a shared helper every other `records-*.spec.ts` file also imports, for one
-// field only this spec reads off the wire response.
-type TypeReadWithSidebar = TypeRead & { show_in_menu: boolean };
 
 /**
  * Per-type sidebar entries (design contract: "per-type sidebar entries"):
@@ -85,15 +79,7 @@ test.describe('Records — sidebar entries', () => {
     page,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('sidebarsw');
-    const labelPlural = `Switch things ${key}`;
-    await apiCreateType(page, {
-      key,
-      label: `Switch thing ${key}`,
-      label_plural: labelPlural,
-      fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-      display_field: 'name',
-    });
+    const key = await seedTextType(page, 'sidebarsw', { field: 'name' });
 
     await page.goto(`/admin/records/types/${key}`);
     const toggle = page.locator('#type-editor-show-in-menu');
@@ -107,7 +93,7 @@ test.describe('Records — sidebar entries', () => {
     await page.reload();
     await expect(page.locator('#type-editor-show-in-menu')).toBeChecked();
 
-    const stored = (await apiGetType(page, key)) as TypeReadWithSidebar;
+    const stored = await apiGetType(page, key);
     expect(stored.show_in_menu).toBe(true);
 
     await apiDeleteType(page, key, 0);

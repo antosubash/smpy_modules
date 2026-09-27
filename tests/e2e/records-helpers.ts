@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { apiCreateType, type FieldDef, type Json, uniqueTypeKey } from './records-api';
+
 /**
  * Shared plumbing for the `records-*.spec.ts` suite: the page objects, plus a
  * re-export of the JSON-API seeding layer in `records-api.ts` (split out for
@@ -16,6 +18,16 @@ export * from './records-api';
 /** One row of the schema editor's field list, by position. */
 export function fieldRow(page: Page, index: number): Locator {
   return page.getByTestId('records-field-row').nth(index);
+}
+
+/** Open one field row's editing body. Rows collapse to a one-line summary
+ *  (UX review R9), so anything inside the body has to be expanded first;
+ *  a row added through `addFieldInEditor` opens by itself. */
+export async function expandField(page: Page, index: number): Promise<void> {
+  const row = fieldRow(page, index);
+  if ((await row.getAttribute('data-field-expanded')) === 'true') return;
+  await row.getByTestId('records-field-toggle').click();
+  await expect(row).toHaveAttribute('data-field-expanded', 'true');
 }
 
 /** One schema-driven input on the record form. Located by its generated id
@@ -98,25 +110,6 @@ export async function expectTypeSaved(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Preview changes' })).toBeDisabled();
 }
 
-/** Confirm an action behind the module's own `ConfirmDialog` (an `alertdialog`
- *  whose confirm button is scoped to the dialog, since the trigger behind it
- *  often carries a similar name). The confirm label is passed in rather than
- *  assumed to repeat the trigger's: a record delete is triggered by "Delete"
- *  and confirmed by "Move to Trash" (U15 — the dialog says what actually
- *  happens). No typed-phrase gate, unlike `helpers.ts::clickAndConfirm`:
- *  only `DeleteTypeSection` asks for one, and it asks for a record count. */
-export async function confirmDialog(
-  page: Page,
-  trigger: Locator,
-  confirmLabel: RegExp | string,
-): Promise<void> {
-  await trigger.click();
-  const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: confirmLabel }).click();
-  await expect(dialog).toHaveCount(0);
-}
-
 /** Apply one filter term through the filter bar. */
 export async function applyFilter(
   page: Page,
@@ -144,4 +137,90 @@ export async function rowTitles(page: Page): Promise<string[]> {
   return rows.evaluateAll((nodes) =>
     nodes.map((node) => node.querySelector('td a')?.textContent?.trim() ?? ''),
   );
+}
+
+// ---- Seeds --------------------------------------------------------------
+
+/** A type whose one field is an indexed text `title` (or `name`, via `field`)
+ *  that is also its display field. `extra` is spread into the create body —
+ *  `label`, `label_plural`, `is_public`, `translatable`, `show_in_menu` … —
+ *  and `label` defaults to `Type <key>`. */
+export async function seedTextType(
+  page: Page,
+  prefix: string,
+  { field = 'title', ...extra }: { field?: string } & Json = {},
+): Promise<string> {
+  const key = uniqueTypeKey(prefix);
+  await apiCreateType(page, {
+    key,
+    label: `Type ${key}`,
+    ...extra,
+    fields: [
+      { key: field, type: 'text', label: field === 'title' ? 'Title' : 'Name', indexed: true },
+    ],
+    display_field: field,
+  });
+  return key;
+}
+
+/** An indexed text field whose label is its key, upper-cased. */
+export function textField(key: string, extra: Partial<FieldDef> = {}): FieldDef {
+  return { key, type: 'text', label: key.toUpperCase(), indexed: true, ...extra };
+}
+
+/** A type shaped like a seeded one — never a seeded type itself, which no
+ *  type-editor test may edit. */
+export async function seedReviewedType(
+  page: Page,
+  prefix: string,
+  fields: FieldDef[],
+): Promise<string> {
+  const key = uniqueTypeKey(prefix);
+  await apiCreateType(page, {
+    key,
+    label: `Reviewed ${key}`,
+    label_plural: `Reviewed ${key} things`,
+    description: 'What this type is for.',
+    icon: 'package',
+    fields,
+    display_field: fields[0].key,
+  });
+  return key;
+}
+
+// ---- Import / export ----------------------------------------------------
+
+export type ImportRow = { uuid?: string; locale?: string; data: Record<string, unknown> };
+
+export function jsonFile(rows: ImportRow[]) {
+  return {
+    name: 'records.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ records: rows })),
+  };
+}
+
+/** A type with one indexed text field, its display field, and a free `note`. */
+export async function seedIoType(page: Page, prefix: string, extra: Json = {}): Promise<string> {
+  const key = uniqueTypeKey(prefix);
+  await apiCreateType(page, {
+    key,
+    label: 'IO thing',
+    label_plural: 'IO things',
+    fields: [
+      { key: 'title', type: 'text', label: 'Title', indexed: true },
+      { key: 'note', type: 'text', label: 'Note' },
+    ],
+    display_field: 'title',
+    ...extra,
+  });
+  return key;
+}
+
+/** Pick a file and wait for the dry-run report dialog it always opens. */
+export async function importFile(page: Page, file: ReturnType<typeof jsonFile>): Promise<Locator> {
+  await page.getByTestId('records-import-input').setInputFiles(file);
+  const dialog = page.getByTestId('records-import-report');
+  await expect(dialog).toBeVisible();
+  return dialog;
 }

@@ -1,15 +1,16 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { login } from './helpers';
+import { clickAndConfirm, login } from './helpers';
 import {
   addFieldInEditor,
   apiCreateRecord,
   apiCreateType,
+  apiGetType,
   applyFilter,
-  confirmDialog,
   recordField,
   rowTitles,
   saveType,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -91,8 +92,7 @@ test.describe('Records — collections', () => {
       page.getByText("A type can't be moved between collections once it is created."),
     ).toBeVisible();
 
-    const stored = await page.request.get(`/api/records/types/${key}`);
-    expect((await stored.json()).collection).toBe(COLLECTION);
+    expect((await apiGetType(page, key)).collection).toBe(COLLECTION);
 
     // Which collection a type is in is visible from the types list too, not
     // only from opening its editor (UX-6).
@@ -103,13 +103,7 @@ test.describe('Records — collections', () => {
     // A type on the shared tables shows no collection control at all — there
     // is nothing to say about it, and §6.5's "inert when unused" is what the
     // absence expresses.
-    const globalKey = uniqueTypeKey('global');
-    await apiCreateType(page, {
-      key: globalKey,
-      label: 'Shared thing',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    const globalKey = await seedTextType(page, 'global', { label: 'Shared thing' });
     await page.goto(`/admin/records/types/${globalKey}`);
     await expect(page.getByTestId('records-collection')).toHaveCount(0);
     await page.goto('/admin/records/');
@@ -162,7 +156,7 @@ test.describe('Records — collections', () => {
     // U15: the row/editor action stays "Delete", but the dialog it opens
     // names the reversible thing it really does — its title and confirm
     // button both read "Move to Trash".
-    await confirmDialog(page, page.getByRole('button', { name: 'Delete' }), 'Move to Trash');
+    await clickAndConfirm(page, page.getByRole('button', { name: 'Delete' }), 'Move to Trash');
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}$`));
     await expect.poll(() => rowTitles(page)).not.toContain('Matinee (moved)');
   });

@@ -4,9 +4,11 @@ import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateType,
+  apiDeleteRecord,
   apiGetRecord,
-  type Json,
-  type RecordRead,
+  apiListRecords,
+  apiRestoreRecord,
+  seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -16,31 +18,14 @@ import {
  * referrer-aware delete dialog.
  */
 
-async function apiDeleteRecord(page: Page, key: string, uuid: string): Promise<void> {
-  const res = await page.request.delete(`/api/records/types/${key}/records/${uuid}`);
-  if (!res.ok()) throw new Error(`delete ${key}/${uuid} → ${res.status()}: ${await res.text()}`);
-}
-
-async function apiRestoreRecord(page: Page, key: string, uuid: string): Promise<RecordRead> {
-  const res = await page.request.post(`/api/records/types/${key}/records/${uuid}/restore`);
-  if (!res.ok()) throw new Error(`restore ${key}/${uuid} → ${res.status()}: ${await res.text()}`);
-  return res.json();
-}
-
 /** An `author` type and a `book` type pointing at it — this suite's own copy
  *  of `tests/relation_helpers.py::library`, over the admin JSON API. */
 async function makeLibrary(
   page: Page,
   onDelete: 'restrict' | 'set_null' | 'cascade' = 'restrict',
 ): Promise<{ authorKey: string; bookKey: string }> {
-  const authorKey = uniqueTypeKey('author');
+  const authorKey = await seedTextType(page, 'author', { field: 'name', label: 'Author' });
   const bookKey = uniqueTypeKey('book');
-  await apiCreateType(page, {
-    key: authorKey,
-    label: 'Author',
-    fields: [{ key: 'name', type: 'text', label: 'Name', indexed: true }],
-    display_field: 'name',
-  });
   await apiCreateType(page, {
     key: bookKey,
     label: 'Book',
@@ -191,8 +176,7 @@ test.describe('Records — relations', () => {
     await expect(dialog).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`/admin/records/${authorKey}$`));
 
-    const books = await page.request.get(`/api/records/types/${bookKey}/records`);
-    const { items } = (await books.json()) as { items: { data: Json }[] };
+    const { items } = await apiListRecords(page, bookKey);
     expect(items[0].data.written_by ?? null).toBeNull();
   });
 

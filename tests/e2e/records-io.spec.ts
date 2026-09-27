@@ -1,12 +1,17 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
   apiCreateType,
+  apiGetRecord,
+  apiListRecords,
   applyFilter,
+  importFile,
+  jsonFile,
   rowTitles,
+  seedIoType,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -24,47 +29,12 @@ import {
  * path a file dialog takes without a temp file on disk.
  */
 
-type Row = { uuid?: string; locale?: string; data: Record<string, unknown> };
-
-function jsonFile(rows: Row[]) {
-  return {
-    name: 'records.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ records: rows })),
-  };
-}
-
-/** A type with one indexed text field, its display field. */
-async function seedType(page: Page, prefix: string, extra: Record<string, unknown> = {}) {
-  const key = uniqueTypeKey(prefix);
-  await apiCreateType(page, {
-    key,
-    label: 'IO thing',
-    label_plural: 'IO things',
-    fields: [
-      { key: 'title', type: 'text', label: 'Title', indexed: true },
-      { key: 'note', type: 'text', label: 'Note' },
-    ],
-    display_field: 'title',
-    ...extra,
-  });
-  return key;
-}
-
-/** Pick a file and wait for the dry-run report dialog it always opens. */
-async function importFile(page: Page, file: ReturnType<typeof jsonFile>) {
-  await page.getByTestId('records-import-input').setInputFiles(file);
-  const dialog = page.getByTestId('records-import-report');
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
 test.describe('Records — import / export from the list toolbar', () => {
   test('the export menu downloads JSON and CSV with the right content type and rows', async ({
     page,
   }) => {
     await login(page);
-    const key = await seedType(page, 'export');
+    const key = await seedIoType(page, 'export');
     await apiCreateRecord(page, key, {
       data: { title: 'First export', note: 'one' },
       status: 'published',
@@ -128,7 +98,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedType(page, 'expfilter');
+    const key = await seedIoType(page, 'expfilter');
     await apiCreateRecord(page, key, { data: { title: 'Keep me' } });
     await apiCreateRecord(page, key, { data: { title: 'Drop me' } });
 
@@ -148,7 +118,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedType(page, 'import');
+    const key = await seedIoType(page, 'import');
 
     await page.goto(`/admin/records/${key}`);
     const dialog = await importFile(
@@ -173,8 +143,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     // A dry run writes nothing — asserted against the API rather than the
     // screen, since the list behind the dialog was rendered before the
     // import and would look the same either way.
-    const beforeApply = await page.request.get(`/api/records/types/${key}/records`);
-    expect((await beforeApply.json()).total).toBe(0);
+    expect((await apiListRecords(page, key)).total).toBe(0);
 
     await page.getByTestId('records-import-apply').click();
     await expect(dialog.getByText('Import result')).toBeVisible();
@@ -207,7 +176,7 @@ test.describe('Records — import / export from the list toolbar', () => {
       page,
     }) => {
       await login(page);
-      const key = await seedType(page, `round${format}`);
+      const key = await seedIoType(page, `round${format}`);
       const first = await apiCreateRecord(page, key, { data: { title: 'Round trip' } });
 
       await page.goto(`/admin/records/${key}`);
@@ -227,8 +196,7 @@ test.describe('Records — import / export from the list toolbar', () => {
 
       // Nothing moved: `skipped` is what keeps a re-import from bumping every
       // record's version (README § Import and export).
-      const after = await page.request.get(`/api/records/types/${key}/records/${first.uuid}`);
-      expect((await after.json()).version).toBe(first.version);
+      expect((await apiGetRecord(page, key, first.uuid)).version).toBe(first.version);
     });
   }
 
@@ -269,7 +237,7 @@ test.describe('Records — import / export from the list toolbar', () => {
     page,
   }) => {
     await login(page);
-    const key = await seedType(page, 'iolocale', { translatable: true });
+    const key = await seedIoType(page, 'iolocale', { translatable: true });
     const en = await apiCreateRecord(page, key, { data: { title: 'English row' } });
     await apiCreateTranslation(page, key, en.uuid, { locale: 'de' });
 

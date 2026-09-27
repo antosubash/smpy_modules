@@ -7,6 +7,8 @@ import {
   apiCreateType,
   apiGetRecord,
   apiGetType,
+  apiListRecords,
+  expandField,
   expectTypeSaved,
   fieldRow,
   saveType,
@@ -21,16 +23,6 @@ import {
  * instead of rewriting them, the `_orphaned` decision a re-added key forces
  * (§8.8), and the reindex window an `indexed` toggle opens (§8.5).
  */
-
-/** Open one field row's editing body. Rows collapse to a one-line summary
- *  (UX review R9), so anything inside the body has to be expanded first;
- *  a row added through `addFieldInEditor` opens by itself. */
-async function expandField(page: Page, index: number): Promise<void> {
-  const row = fieldRow(page, index);
-  if ((await row.getAttribute('data-field-expanded')) === 'true') return;
-  await row.getByTestId('records-field-toggle').click();
-  await expect(row).toHaveAttribute('data-field-expanded', 'true');
-}
 
 async function seedPopulatedType(page: Page, prefix: string): Promise<string> {
   const key = uniqueTypeKey(prefix);
@@ -110,9 +102,7 @@ test.describe('Records — schema change', () => {
     expect(after.fields.map((f) => f.key)).toEqual(['title', 'note', 'rank']);
 
     // §8.3: marked, not hidden — and the editor says so on the record.
-    const { items } = await page.request
-      .get(`/api/records/types/${key}/records`)
-      .then((r) => r.json());
+    const { items } = await apiListRecords(page, key);
     const first = items[0];
     expect((await apiGetRecord(page, key, first.uuid)).invalid.length).toBeGreaterThan(0);
 
@@ -149,13 +139,8 @@ test.describe('Records — schema change', () => {
     await conflicts.getByRole('button', { name: 'Restore', exact: true }).click();
     await expectTypeSaved(page);
 
-    const { items } = await page.request
-      .get(`/api/records/types/${key}/records`)
-      .then((r) => r.json());
-    expect(items.map((i: { data: { note?: string } }) => i.data.note).sort()).toEqual([
-      'first',
-      'second',
-    ]);
+    const { items } = await apiListRecords(page, key);
+    expect(items.map((i) => i.data.note).sort()).toEqual(['first', 'second']);
   });
 
   test('discarding drops the orphaned values for good', async ({ page }) => {
@@ -177,9 +162,7 @@ test.describe('Records — schema change', () => {
     await conflicts.getByRole('button', { name: 'Discard' }).click();
     await expectTypeSaved(page);
 
-    const { items } = await page.request
-      .get(`/api/records/types/${key}/records`)
-      .then((r) => r.json());
+    const { items } = await apiListRecords(page, key);
     // Discarded: the key reads back empty rather than carrying the old value.
     for (const item of items) expect(item.data.note ?? null).toBeNull();
   });

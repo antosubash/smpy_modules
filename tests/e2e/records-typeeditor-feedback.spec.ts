@@ -1,13 +1,13 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
 import {
-  apiCreateType,
   apiDeleteType,
-  type FieldDef,
   fieldRow,
   saveType,
-  uniqueTypeKey,
+  seedReviewedType,
+  seedTextType,
+  textField,
 } from './records-helpers';
 
 /**
@@ -20,36 +20,15 @@ import {
  * - R6, both halves: a 422 the schema as a whole owns (`__root__`), which
  *   used to render nowhere at all, and one that names a field, which used
  *   to open its row and nothing else.
- * - R19's plural guess, which used to offer "Blog Postses".
  * - An icon name the framework cannot draw.
  * - R4's containment, on the one screen it had not reached: at 390 px the
  *   editor scrolled sideways.
  */
 
-function textField(key: string, extra: Partial<FieldDef> = {}): FieldDef {
-  return { key, type: 'text', label: key.toUpperCase(), indexed: true, ...extra };
-}
-
-/** A type shaped like a seeded one — never a seeded type itself, which no
- *  test here may edit. */
-async function seed(page: Page, prefix: string, fields: FieldDef[]): Promise<string> {
-  const key = uniqueTypeKey(prefix);
-  await apiCreateType(page, {
-    key,
-    label: `Reviewed ${key}`,
-    label_plural: `Reviewed ${key} things`,
-    description: 'What this type is for.',
-    icon: 'package',
-    fields,
-    display_field: fields[0].key,
-  });
-  return key;
-}
-
 test.describe('Records — type editor feedback', () => {
   test('R6: a refusal the schema as a whole owns is said out loud', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r6root', [textField('title')]);
+    const key = await seedReviewedType(page, 'r6root', [textField('title')]);
 
     await page.goto(`/admin/records/types/${key}`);
     // A field added and left unnamed: the server refuses the *list*, not any
@@ -72,7 +51,7 @@ test.describe('Records — type editor feedback', () => {
 
   test('R6: a refusal naming a field counts it, opens it and goes there', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r6field', [
+    const key = await seedReviewedType(page, 'r6field', [
       textField('title'),
       textField('note'),
       textField('extra'),
@@ -105,7 +84,7 @@ test.describe('Records — type editor feedback', () => {
     // field are what used to make a row's min-content 473 px wide, and a CSS
     // grid hands that width to the row, the list and the document (R4's
     // containment covered the record list and the hub only).
-    const key = await seed(page, 'r4te', [
+    const key = await seedReviewedType(page, 'r4te', [
       textField('name', { required: true, unique: true }),
       textField('website', { indexed: false }),
       { key: 'employees', type: 'integer', label: 'Employees', indexed: true },
@@ -135,17 +114,9 @@ test.describe('Records — type editor feedback', () => {
     page,
   }) => {
     await login(page);
-    const key = uniqueTypeKey('icon');
-    await apiCreateType(page, {
-      key,
-      label: `Icon ${key}`,
-      label_plural: `Icon ${key} things`,
-      // A real lucide-react name, and not one of `NavIcon`'s allowlist — the
-      // old help text promised any lucide icon and this one drew nothing.
-      icon: 'flask-conical',
-      fields: [{ key: 'title', type: 'text', label: 'Title', indexed: true }],
-      display_field: 'title',
-    });
+    // A real lucide-react name, and not one of `NavIcon`'s allowlist — the
+    // old help text promised any lucide icon and this one drew nothing.
+    const key = await seedTextType(page, 'icon', { icon: 'flask-conical' });
 
     await page.goto(`/admin/records/types/${key}`);
     const preview = page.getByTestId('records-type-icon-preview');
@@ -171,26 +142,5 @@ test.describe('Records — type editor feedback', () => {
     await expect(row.locator('svg')).toHaveCount(1);
 
     await apiDeleteType(page, key, 0);
-  });
-
-  test('R19: the plural guess leaves an already-plural label alone', async ({ page }) => {
-    await login(page);
-    // Nothing is created: the guess happens while typing, before any save.
-    await page.goto('/admin/records/types/new');
-
-    await page.locator('#type-editor-label').fill('Review Note');
-    await expect(page.locator('#type-editor-label-plural')).toHaveValue('Review Notes');
-
-    // The rough edge: every `s` ending used to take another `es`.
-    await page.locator('#type-editor-label').fill('Blog Posts');
-    await expect(page.locator('#type-editor-label-plural')).toHaveValue('Blog Posts');
-
-    // And a singular no suffix rule reaches is left for the operator to
-    // write, rather than guessed at as "Contact Persons".
-    await page.locator('#type-editor-label').fill('Contact Person');
-    await expect(page.locator('#type-editor-label-plural')).toHaveValue('Contact Person');
-
-    await page.locator('#type-editor-label').fill('City');
-    await expect(page.locator('#type-editor-label-plural')).toHaveValue('Cities');
   });
 });

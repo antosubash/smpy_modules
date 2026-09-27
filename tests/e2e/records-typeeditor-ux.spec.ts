@@ -4,12 +4,12 @@ import { login } from './helpers';
 import {
   addFieldInEditor,
   apiCreateRecord,
-  apiCreateType,
   apiDeleteType,
   expectTypeSaved,
-  type FieldDef,
   fieldRow,
   saveType,
+  seedReviewedType,
+  textField,
   uniqueTypeKey,
 } from './records-helpers';
 
@@ -21,24 +21,6 @@ import {
  * records), R19 (the permanent key gets help before it is typed) and R22b.
  */
 
-function textField(key: string, extra: Partial<FieldDef> = {}): FieldDef {
-  return { key, type: 'text', label: key.toUpperCase(), indexed: true, ...extra };
-}
-
-async function seed(page: Page, prefix: string, fields: FieldDef[]): Promise<string> {
-  const key = uniqueTypeKey(prefix);
-  await apiCreateType(page, {
-    key,
-    label: `Reviewed ${key}`,
-    label_plural: `Reviewed ${key} things`,
-    description: 'What this type is for.',
-    icon: 'package',
-    fields,
-    display_field: fields[0].key,
-  });
-  return key;
-}
-
 /** The field keys on screen, in order, read off the collapsed summaries. */
 async function fieldKeys(page: Page): Promise<string[]> {
   return page.getByTestId('records-field-key').allInnerTexts();
@@ -47,7 +29,7 @@ async function fieldKeys(page: Page): Promise<string[]> {
 test.describe('Records — type editor UX', () => {
   test('R9: field rows collapse to a summary and expand on click', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r9', [
+    const key = await seedReviewedType(page, 'r9', [
       textField('title', { required: true }),
       textField('note', { indexed: false }),
     ]);
@@ -84,7 +66,7 @@ test.describe('Records — type editor UX', () => {
 
   test('R9: a select field collapses its choices and takes a pasted list', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r9c', [
+    const key = await seedReviewedType(page, 'r9c', [
       textField('title'),
       {
         key: 'colour',
@@ -122,7 +104,7 @@ test.describe('Records — type editor UX', () => {
 
   test('R10: Move up twice moves a field two positions and keeps focus', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r10', [
+    const key = await seedReviewedType(page, 'r10', [
       textField('alpha'),
       textField('bravo'),
       textField('charlie'),
@@ -150,7 +132,10 @@ test.describe('Records — type editor UX', () => {
 
   test('R7: a forced change leaves its report, and "Check records" is honest', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r7', [textField('title'), textField('note', { indexed: false })]);
+    const key = await seedReviewedType(page, 'r7', [
+      textField('title'),
+      textField('note', { indexed: false }),
+    ]);
     await apiCreateRecord(page, key, { data: { title: 'One' } });
     await apiCreateRecord(page, key, { data: { title: 'Two' } });
 
@@ -188,7 +173,7 @@ test.describe('Records — type editor UX', () => {
 
   test('R22b: Save is disabled until something changes', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r22', [textField('title')]);
+    const key = await seedReviewedType(page, 'r22', [textField('title')]);
 
     await page.goto(`/admin/records/types/${key}`);
     const save = page.getByRole('button', { name: 'Save', exact: true });
@@ -209,7 +194,7 @@ test.describe('Records — type editor UX', () => {
 
   test('R12c: leaving with unsaved edits asks first, and Cancel respects it', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r12', [textField('title')]);
+    const key = await seedReviewedType(page, 'r12', [textField('title')]);
 
     await page.goto(`/admin/records/types/${key}`);
     await page.locator('#type-editor-description').fill('Unsaved.');
@@ -235,7 +220,7 @@ test.describe('Records — type editor UX', () => {
 
   test('R13: the hub row leads to the records, with the icon and description', async ({ page }) => {
     await login(page);
-    const key = await seed(page, 'r13', [textField('title')]);
+    const key = await seedReviewedType(page, 'r13', [textField('title')]);
 
     await page.goto('/admin/records/');
     await expect(page.getByRole('heading', { name: 'Records', exact: true })).toBeVisible();
