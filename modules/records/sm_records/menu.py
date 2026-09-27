@@ -56,6 +56,7 @@ from sqlalchemy import select
 
 from sm_records import constants
 from sm_records.models import RecordType
+from sm_records.settings import RecordsSettings
 from sm_records.tenancy import DEFAULT_TENANT, TenancyMode, tenant_scope
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only
@@ -252,7 +253,7 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
         return False
     now = time.monotonic()
     if not force and not module._menu_dirty:
-        settings = module.settings or _default_settings()
+        settings = module.settings or RecordsSettings()
         if now - module._menu_synced_at < settings.menu_refresh_seconds:
             return False
     module._menu_synced_at = now
@@ -270,9 +271,3 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
         return False
     module._type_menu_items = sync_type_menu(registry, types, previous=module._type_menu_items)
     return True
-
-
-def _default_settings():
-    from sm_records.settings import RecordsSettings
-
-    return RecordsSettings()

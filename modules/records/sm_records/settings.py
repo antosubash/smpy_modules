@@ -36,9 +36,8 @@ from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from sm_records.settings_boot import BootSettings
-from sm_records.settings_checks import DEFAULT_PUBLIC_ROUTE_PREFIX, check_public_route_prefix
 
-__all__ = ["DEFAULT_PUBLIC_ROUTE_PREFIX", "RecordsSettings", "check_public_route_prefix"]
+__all__ = ["RecordsSettings"]
 
 
 class RecordsSettings(BootSettings):

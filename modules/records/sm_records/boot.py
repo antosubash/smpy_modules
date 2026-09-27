@@ -28,11 +28,8 @@ import logging
 from fastapi import FastAPI
 
 from sm_records import constants
-from sm_records.settings import (
-    DEFAULT_PUBLIC_ROUTE_PREFIX,
-    RecordsSettings,
-    check_public_route_prefix,
-)
+from sm_records.settings import RecordsSettings
+from sm_records.settings_checks import DEFAULT_PUBLIC_ROUTE_PREFIX, check_public_route_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +42,7 @@ def public_prefix(settings: RecordsSettings) -> str:
     """The prefix to mount at, with a bad stored value demoted to a log line.
 
     ``RecordsSettings`` refuses a prefix that would exempt the admin surface
-    (:func:`~sm_records.settings.check_public_route_prefix`), so an operator
+    (:func:`~sm_records.settings_checks.check_public_route_prefix`), so an operator
     cannot save one. A row written before that rule existed can still reach
     here, and ``on_startup`` is the wrong place to discover it: raising takes
     the whole host down, and the only way to correct the setting is the

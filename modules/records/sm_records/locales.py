@@ -30,7 +30,7 @@ from sm_records.models import RecordType
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 
-__all__ = ["default", "is_supported", "require", "resolve", "resolve_locale", "supported"]
+__all__ = ["default", "require", "resolve", "resolve_locale", "supported"]
 
 
 def supported(settings: RecordsSettings) -> tuple[str, ...]:
@@ -58,10 +58,6 @@ def resolve(settings: RecordsSettings, value: str | None) -> str | None:
         if locale.lower() == lowered:
             return locale
     return None
-
-
-def is_supported(settings: RecordsSettings, value: str) -> bool:
-    return resolve(settings, value) is not None
 
 
 def require(settings: RecordsSettings, value: str | None, *, field: str = "locale") -> str:

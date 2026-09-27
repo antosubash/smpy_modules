@@ -49,10 +49,6 @@ equality: the exemption is a ``startswith`` over a prefix terminating in
 it to anonymous callers — ``AuthMiddleware`` is disabled for the whole
 subtree, other modules' routes included."""
 
-_LOCALE_RE: Final = re.compile(constants.LOCALE_PATTERN)
-"""Compiled once — :meth:`RecordsSettings._check_locales` runs on every
-settings hydration and on every settings-screen save."""
-
 
 def check_public_route_prefix(value: str) -> str:
     """The rule :attr:`RecordsSettings.public_route_prefix` must satisfy.

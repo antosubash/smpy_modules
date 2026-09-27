@@ -23,7 +23,8 @@ from simple_module_core.public_routes import PublicRouteRegistry
 from sm_records.index import IndexKind, VirtualField, register_index_provider
 from sm_records.index import providers as registry
 from sm_records.models import IndexRef, IndexText
-from sm_records.settings import RecordsSettings, check_public_route_prefix
+from sm_records.settings import RecordsSettings
+from sm_records.settings_checks import check_public_route_prefix
 from sqlalchemy import func, select
 
 from tests.app_harness import ADMIN, roles

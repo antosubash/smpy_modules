@@ -10,7 +10,7 @@ makes it checkable at a glance.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sm_records import locales
 from sm_records.models import Record, RecordType
@@ -18,9 +18,6 @@ from sm_records.seed.log import log
 from sm_records.services.errors import RecordsError
 from sm_records.services.records import create_translation
 from sm_records.settings import RecordsSettings
-
-if TYPE_CHECKING:  # pragma: no cover - import cycle at runtime, types only
-    pass
 
 __all__ = ["seed_translations"]
 

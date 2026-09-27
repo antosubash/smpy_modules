@@ -147,9 +147,13 @@ def restored(rtype: Any, record: Any) -> RecordRestored:
 
 
 def purged(rtype: Any, record: Any) -> RecordPurged:
+    return _purged(rtype.key, _tenant(rtype), record)
+
+
+def _purged(type_key: str, tenant: str, record: Any) -> RecordPurged:
     return RecordPurged(
-        type_key=rtype.key,
-        tenant_id=_tenant(rtype),
+        type_key=type_key,
+        tenant_id=tenant,
         uuid=record.uuid,
         locale=record.locale,
         translation_group=record.translation_group,
@@ -197,30 +201,20 @@ def type_changed(rtype: Any, before: Sequence[dict[str, Any]]) -> RecordTypeChan
     )
 
 
-def type_deleted(type_key: str, records: Sequence[Any], collection: str | None = None) -> list[Any]:
+def type_deleted(type_key: str, records: Sequence[Any]) -> list[Any]:
     """``RecordTypeDeleted`` plus one ``RecordPurged`` per record that went
     with it — the records first, so a subscriber that drops its own rows per
     record and then forgets the type sees them in that order.
 
     The purge events carry what the rows held, because after this there is
-    nothing to read them from. ``collection`` is accepted and unused for now;
-    the table set a record lived in is not part of any event, since a
-    subscriber addresses records by ``(type_key, uuid)`` exactly as the API
-    does.
+    nothing to read them from. The table set a record lived in is not part of
+    any event, since a subscriber addresses records by ``(type_key, uuid)``
+    exactly as the API does.
 
     The tenant is the bound one. The type row is deleted by the time this is
     called, and the request that deleted it was bound to the row's tenant.
     """
     tenant = bound_tenant()
-    events: list[Any] = [
-        RecordPurged(
-            type_key=type_key,
-            tenant_id=tenant,
-            uuid=record.uuid,
-            locale=record.locale,
-            translation_group=record.translation_group,
-        )
-        for record in records
-    ]
+    events: list[Any] = [_purged(type_key, tenant, record) for record in records]
     events.append(RecordTypeDeleted(type_key=type_key, tenant_id=tenant, purged=len(records)))
     return events

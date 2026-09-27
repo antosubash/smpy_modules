@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
 from sm_records._grammar import (
-    MALFORMED_FILTER,
     MAX_PAGE,
     PageCursor,
     parse_cursor,
@@ -241,7 +240,6 @@ async def load_schema_type(
 
 
 __all__ = [
-    "MALFORMED_FILTER",
     "MAX_PAGE",
     "REQUEST_SESSION_KEY",
     "PageCursor",
