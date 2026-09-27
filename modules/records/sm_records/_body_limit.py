@@ -30,6 +30,7 @@ the module's own. It is installed from
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any, Final
 
 from fastapi import HTTPException
@@ -38,7 +39,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from sm_records import constants
 from sm_records.settings import RecordsSettings
 
-__all__ = ["ENVELOPE_HEADROOM", "BodyLimitMiddleware", "body_ceiling"]
+__all__ = ["ENVELOPE_HEADROOM", "BodyLimitMiddleware", "body_ceiling", "counting_receive"]
 
 ENVELOPE_HEADROOM: Final = 65_536
 """How much a write body may exceed ``max_payload_bytes`` before this refuses.
@@ -75,12 +76,14 @@ def _declared_length(scope: Scope) -> int | None:
     return None
 
 
-def _guarded(receive: Receive, limit: int) -> Receive:
-    """``receive``, refusing at the first byte past ``limit``.
+def counting_receive(receive: Receive, limit: int, refuse: Callable[[], Exception]) -> Receive:
+    """``receive``, raising ``refuse()`` at the first byte past ``limit``.
 
-    The same shape as ``_io_upload._counting_receive`` and for the same
-    reason: a request with no ``Content-Length`` cannot be refused from its
-    headers, and the running total is the one number it cannot lie about.
+    A request with no ``Content-Length`` cannot be refused from its headers,
+    and the running total is the one number it cannot lie about. Shared with
+    the import route (``endpoints/api/_io_upload``), which passes its own
+    exception: the type differs per caller for the reason the module docstring
+    gives.
     """
     seen = 0
 
@@ -90,10 +93,7 @@ def _guarded(receive: Receive, limit: int) -> Receive:
         if message.get("type") == "http.request":
             seen += len(message.get("body", b"") or b"")
             if seen > limit:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"the request body is over the {limit}-byte limit",
-                )
+                raise refuse()
         return message
 
     return counted
@@ -133,7 +133,11 @@ class BodyLimitMiddleware:
             # is never read — which is the whole point of doing this here.
             await _refuse(declared, limit, send)
             return
-        await self.app(scope, _guarded(receive, limit), send)
+        too_large = f"the request body is over the {limit}-byte limit"
+        guarded = counting_receive(
+            receive, limit, lambda: HTTPException(status_code=413, detail=too_large)
+        )
+        await self.app(scope, guarded, send)
 
     def _limit(self, scope: Scope) -> int | None:
         """The ceiling for this request, or ``None`` to stay out of the way.

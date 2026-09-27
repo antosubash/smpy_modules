@@ -22,12 +22,12 @@ The two rules worth keeping in front of you:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from fastapi import Request
 from starlette.formparsers import MultiPartException
 
+from sm_records._body_limit import counting_receive
 from sm_records.contracts.io import ImportFormat
 from sm_records.services.errors import ImportParseFailed, PayloadTooLarge, ValidationFailed
 from sm_records.settings import RecordsSettings
@@ -90,36 +90,13 @@ def _check_size(raw_length: int | None, settings: RecordsSettings) -> None:
         )
 
 
-def _counting_receive(request: Request, limit: int) -> Callable[[], Any]:
-    """``request.receive``, refusing at the first byte past ``limit``.
-
-    The ASGI channel and not the parsed body, because that is the only layer
-    both paths share: the raw branch buffers with ``Request.body`` and the
-    multipart branch hands the same channel to Starlette's parser, which
-    spools each part to a ``SpooledTemporaryFile`` — a ceiling checked after
-    either has finished is a ceiling that has already paid for what it
-    refuses. A wrapped ``receive`` counts what actually arrived, which is the
-    one number a request without ``Content-Length`` cannot lie about.
-    """
-    seen = 0
-
-    async def receive() -> Any:
-        nonlocal seen
-        message = await request.receive()
-        if message.get("type") == "http.request":
-            seen += len(message.get("body", b"") or b"")
-            if seen > limit:
-                raise PayloadTooLarge(f"the uploaded file is over the {limit}-byte limit")
-        return message
-
-    return receive
-
-
 async def read_upload(request: Request, settings: RecordsSettings) -> tuple[bytes, str | None, Any]:
     """The bytes, the filename (if any) and the multipart form (if any).
 
     ``Content-Length`` is refused before a byte is read, and the body itself
-    is read through :func:`_counting_receive` so a request that declares no
+    is read through :func:`~sm_records._body_limit.counting_receive` — the
+    ASGI channel, the one layer the raw and multipart branches share — so a
+    request that declares no
     length — every chunked upload — is refused at the first byte over the
     ceiling rather than after the whole of it is in memory.
 
@@ -134,7 +111,10 @@ async def read_upload(request: Request, settings: RecordsSettings) -> tuple[byte
     declared = request.headers.get("content-length")
     _check_size(int(declared) if declared and declared.isdigit() else None, settings)
     limit = settings.max_import_bytes
-    capped = Request(request.scope, _counting_receive(request, limit))
+    too_large = f"the uploaded file is over the {limit}-byte limit"
+    capped = Request(
+        request.scope, counting_receive(request.receive, limit, lambda: PayloadTooLarge(too_large))
+    )
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
         try:
             form = await capped.form(
