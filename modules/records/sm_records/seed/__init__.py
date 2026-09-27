@@ -20,29 +20,6 @@ pools, not ``faker``.
 
 from __future__ import annotations
 
-from typing import Any
-
-from sm_records.seed.runner import SeedSummary, run
-from sm_records.settings import RecordsSettings
+from sm_records.seed.runner import SeedSummary, seed_database
 
 __all__ = ["SeedSummary", "seed_database"]
-
-
-async def seed_database(
-    db_state: Any,
-    settings: RecordsSettings,
-    *,
-    records: int = 5000,
-    seed: int = 42,
-    reset: bool = False,
-) -> SeedSummary:
-    """Seed (or top up, or reset-and-reseed) the demo dataset.
-
-    ``records`` is the *total* count across all five types, split roughly
-    5% / 25% / 15% / 45% / 10% (company / contact / product / order / store)
-    with a floor of one record per type. Deterministic for a given ``seed``;
-    re-running without ``reset`` adds ``records`` more on top of whatever is
-    already there, with fresh unique values (SKUs, emails, order numbers) —
-    see ``runner.py`` for how those avoid colliding with the existing rows.
-    """
-    return await run(db_state, settings, records=records, seed=seed, reset=reset)

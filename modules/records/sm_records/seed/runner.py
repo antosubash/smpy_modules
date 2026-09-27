@@ -146,15 +146,22 @@ async def _create(
     return record
 
 
-async def run(
+async def seed_database(
     db_state: Any,
     settings: RecordsSettings,
     *,
-    records: int,
-    seed: int,
-    reset: bool,
+    records: int = 5000,
+    seed: int = 42,
+    reset: bool = False,
 ) -> SeedSummary:
-    """The whole seeding run: optional reset, ensure types, generate records.
+    """Seed (or top up, or reset-and-reseed) the demo dataset.
+
+    ``records`` is the *total* count across all five types, split roughly
+    5% / 25% / 15% / 45% / 10% (company / contact / product / order / store)
+    with a floor of one record per type. Deterministic for a given ``seed``;
+    re-running without ``reset`` adds ``records`` more on top of whatever is
+    already there, with fresh unique values (SKUs, emails, order numbers) —
+    see ``offsets`` below for how those avoid colliding with the existing rows.
 
     One session for the entire run (matching ``cli.py reindex``'s shape) —
     ``expire_on_commit=False`` makes that safe across the periodic commits a
