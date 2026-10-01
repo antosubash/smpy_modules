@@ -33,6 +33,7 @@ from news.endpoints.public._urls import (
     etag_for,
     public_base_url,
 )
+from news.safe_url import canonical_or_none
 from news.settings import NewsSettings, active, public_article_path
 
 
@@ -139,7 +140,7 @@ def article_router(locale: str) -> APIRouter:
         if request.headers.get("if-none-match") == etag:
             return apply_headers(Response(status_code=304))
 
-        canonical = article.canonical_url or absolute_article(
+        canonical = canonical_or_none(article.canonical_url) or absolute_article(
             request, settings, slug, locale
         )
         siblings = await alternates(db, request, settings, article.translation_group)
