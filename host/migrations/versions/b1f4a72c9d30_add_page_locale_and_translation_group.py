@@ -18,6 +18,24 @@ Hand-adjusted from autogenerate in three places:
 * The slug unique index is replaced rather than added to: slugs are unique per
   language now, so the old single-column index would forbid exactly the case
   this change exists to allow — the same word as the address in two languages.
+
+**Offline mode (``alembic upgrade --sql``) takes a second path through both of
+the data steps above**, because a script that is generated without a database
+cannot read one. Two assumptions are therefore baked into the generated SQL,
+and they are the reason a ``--sql`` script from this revision is not a
+byte-for-byte substitute for running it online:
+
+* the default content locale is assumed to be ``_FALLBACK_LOCALE`` (``en``),
+  since ``settings_setting`` cannot be queried;
+* ``translation_group`` is backfilled by one set-based ``UPDATE`` deriving a
+  distinct value from each row's ``id`` rather than by a ``uuid4`` per row.
+  The column is opaque — nothing parses it, only its uniqueness within a
+  locale matters — so a value derived from the primary key satisfies the
+  unique index just as well.
+
+An operator applying a ``--sql`` script to an install whose default content
+locale is not ``en`` has to edit that literal before running it. Online runs
+are unchanged.
 """
 
 from collections.abc import Sequence
@@ -63,7 +81,15 @@ def _default_locale(bind: sa.Connection) -> str:
     assumed: it is created by the initial revision this one descends from, but
     a host that mounts pagebuilder without the Settings module would otherwise
     fail here instead of backfilling the default.
+
+    In offline mode there is no database to ask and ``op.get_bind()`` is a
+    ``MockConnection``, which ``sa.inspect`` refuses — that refusal is what
+    used to make ``alembic upgrade base:heads --sql`` impossible from this
+    revision onwards, on every dialect. The inspector is skipped there and the
+    fallback is emitted as a literal; see this module's docstring.
     """
+    if op.get_context().as_sql:
+        return _FALLBACK_LOCALE
     if not sa.inspect(bind).has_table(_SETTINGS_TABLE):
         return _FALLBACK_LOCALE
     stored = bind.scalar(
@@ -100,12 +126,27 @@ def upgrade() -> None:
     )
     # One group per existing page: nothing was a translation of anything before
     # this migration, so every row is a group of one.
-    for (page_id,) in bind.execute(sa.select(pages.c.id)).all():
-        bind.execute(
-            pages.update()
-            .where(pages.c.id == page_id)
-            .values(translation_group=uuid4().hex)
+    if op.get_context().as_sql:
+        # Offline: the rows cannot be read, so the per-row loop below has
+        # nothing to iterate and would emit no UPDATE at all — leaving
+        # `translation_group` NULL and the `SET NOT NULL` that follows it
+        # certain to fail on any non-empty table. One set-based statement
+        # derives a distinct value per row from the primary key instead;
+        # `||` and `CAST` are spelled the same by both dialects.
+        op.execute(
+            pages.update().values(
+                translation_group=sa.literal("p", sa.String).concat(
+                    sa.cast(pages.c.id, sa.String)
+                )
+            )
         )
+    else:
+        for (page_id,) in bind.execute(sa.select(pages.c.id)).all():
+            bind.execute(
+                pages.update()
+                .where(pages.c.id == page_id)
+                .values(translation_group=uuid4().hex)
+            )
 
     op.drop_index(op.f("ix_pagebuilder_pages_slug"), table_name=_PAGES)
     with op.batch_alter_table(_PAGES) as batch:

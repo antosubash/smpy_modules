@@ -1,0 +1,73 @@
+{
+  "errors": {
+    "generic_title": "Something went wrong",
+    "generic_description": "The page encountered an unexpected error. Try reloading, or return home.",
+    "reload_button": "Reload Page",
+    "go_home_button": "Go Home"
+  },
+  "nav": {
+    "admin": "Administration"
+  },
+  "switcher": {
+    "label": "Change language",
+    "single_locale": "Only {locale} is enabled"
+  },
+  "topbar": {
+    "log_out": "Log out"
+  },
+  "relative_time": {
+    "unknown": "unknown",
+    "just_now": "just now",
+    "seconds_ago": "{count}s ago",
+    "minutes_ago": "{count}m ago",
+    "hours_ago": "{count}h ago",
+    "days_ago": "{count}d ago",
+    "months_ago": "{count}mo ago",
+    "months_ago_one": "{count}mo ago",
+    "months_ago_other": "{count}mo ago",
+    "years_ago": "{count}y ago",
+    "years_ago_one": "{count}y ago",
+    "years_ago_other": "{count}y ago",
+    "in_minutes": "in {count}m",
+    "in_hours": "in {count}h",
+    "in_days": "in {count}d",
+    "expired": "expired"
+  },
+  "nav_groups": {
+    "access": "Access",
+    "appearance": "Appearance",
+    "content": "Content",
+    "system": "System",
+    "navigation": "Navigation",
+    "account": "Account"
+  },
+  "command_palette": {
+    "trigger": "Search",
+    "title": "Search",
+    "description": "Jump to any page you have access to.",
+    "placeholder": "Jump to…",
+    "empty": "Nothing matches that."
+  },
+  "admin": {
+    "panel_badge": "Admin panel",
+    "back_to_app": "Back to app"
+  },
+  "sidebar": {
+    "open": "Open sidebar",
+    "close": "Close sidebar",
+    "back": "Back"
+  },
+  "public_nav": {
+    "docs": "Docs",
+    "modules": "Modules",
+    "github": "GitHub",
+    "open_dashboard": "Open dashboard",
+    "sign_in": "Sign in",
+    "open_menu": "Open menu",
+    "close_menu": "Close menu"
+  },
+  "demo": {
+    "banner_read_only": "Demo mode — you are signed in to a shared account and changes are not saved.",
+    "banner_writable": "Demo mode — you are signed in to a shared account that everyone exploring this site uses."
+  }
+}

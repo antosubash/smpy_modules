@@ -12,7 +12,8 @@ keywords = ["simple-module", "news", "articles", "cms"]
 dependencies = [
     "simple_module_core>=0.0.25,<0.1",
     "simple_module_db>=0.0.25,<0.1",
-    "simple_module_hosting>=0.0.25,<0.1",
+    "simple_module_hosting>=0.0.35,<0.1",
+    "simple_module_inertia>=0.0.35,<0.1",
     # Lockstep sibling: floor tracks the first release that carried the block
     # registry this module registers NewsFeed into. Must stay a 0.0.x range —
     # the repo publishes at 0.0.x, so `>=0.1` would be unsatisfiable and the

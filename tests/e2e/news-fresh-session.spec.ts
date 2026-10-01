@@ -110,7 +110,7 @@ test.describe('News — first visit of a session', () => {
       const r = await fetch('/api/news/articles/999999', {
         method: 'PUT',
         credentials: 'same-origin',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        headers: { Accept: 'text/html', 'Content-Type': 'application/json' },
         body: JSON.stringify({ category: 'nope' }),
       });
       const text = await r.text();
@@ -122,7 +122,9 @@ test.describe('News — first visit of a session', () => {
     });
 
     // The server really does answer a browser-ish request with HTML — which is
-    // exactly why the client must not echo the body it gets back.
+    // exactly why the client must not echo the body it gets back. Since
+    // framework 0.0.35 it answers `Accept: application/json` with JSON (#346),
+    // so the request asks for HTML to keep the HTML body under test.
     expect(message.status).toBe(404);
     expect(
       message.bodyIsHtml,

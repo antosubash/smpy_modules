@@ -122,7 +122,13 @@ test.describe('Article editor', () => {
     // the Languages panel, which prints the same word for every unpublished
     // sibling — under two content locales that is a strict-mode violation, and
     // even under one it would stop saying which article is the draft.
-    await expect(page.getByText(`/news/${slug} · Draft`)).toBeVisible();
+    //
+    // Exact, not substring: the Languages panel also prints
+    // `/news/<slug> · Draft` for the article's own locale once its siblings
+    // load, and a substring match then resolves to two elements — a
+    // strict-mode failure that only shows when the panel wins the race.
+    // The header alone carries the `· undated` suffix.
+    await expect(page.getByText(`/news/${slug} · Draft · undated`, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /publish now/i }).click();
 
     // Preview is a link to the public URL, not a button — it opens the live

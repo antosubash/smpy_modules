@@ -1,8 +1,10 @@
 """Shared fixtures for pagebuilder integration tests.
 
-Each fixture spins up a fully-wired test app: in-memory aiosqlite
-backing the ``get_db`` dep (with audit listeners attached so writes
-actually commit), ``SessionMiddleware`` so CSRF + session state work,
+Each fixture spins up a fully-wired test app: a database from
+``pg_support.make_db_state`` backing the ``get_db`` dep (in-memory
+aiosqlite unless ``SM_TEST_DATABASE_URL`` names a Postgres one, with
+audit listeners attached either way so writes actually commit),
+``SessionMiddleware`` so CSRF + session state work,
 a minimal Inertia config so the public viewer can render, and a fresh
 ``MediaService`` rooted at ``tmp_path`` so uploads never escape the
 per-test sandbox.
@@ -24,8 +26,6 @@ import pytest
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from inertia import InertiaConfig, inertia_dependency_factory
-from pagebuilder.models import Base
 from pagebuilder.module import PagebuilderModule
 from pagebuilder.permissions import (
     ALL_PERMISSIONS,
@@ -36,15 +36,34 @@ from pagebuilder.permissions import (
     ROLE_EDITOR,
 )
 from pagebuilder.settings import PagebuilderSettings
+
+# ``pg_support`` owns the one decision every database fixture in this suite
+# makes: in-memory SQLite, or the Postgres database ``SM_TEST_DATABASE_URL``
+# names. See that module.
+from pg_support import arm_reset, make_db_state
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sqlalchemy.pool import StaticPool
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 _SESSION_SECRET = "pagebuilder-tests-secret"
+
+
+@pytest.fixture(autouse=True)
+def _arm_database_reset():
+    """Every test starts from an empty database.
+
+    A no-op on SQLite, where each test builds its own ``:memory:`` one and
+    there is nothing to empty. On Postgres it is what makes the *first*
+    database a test asks for a clean one — several fixtures here build two
+    (``authed_client`` plus ``db``, say), which are independent databases on
+    SQLite and two windows onto one database on Postgres. See
+    ``tests/pg_support.py`` at the repo root.
+    """
+    arm_reset()
+    yield
+
 
 # Tiny valid PNG header — matches the sniffer's PNG signature. Lives at
 # module scope so upload tests can import it instead of redefining.
@@ -120,22 +139,14 @@ async def _build_app(
     app.include_router(api_router)
     app.include_router(view_router)
 
-    # In-memory DB + auto-created schema. ``StaticPool`` reuses a single
-    # connection so every ``async with factory()`` sees the same
-    # ``:memory:`` instance — without it each connection gets a fresh
-    # DB and rows vanish between requests.
-    #
-    # ``register_listeners`` attaches the audit hook that flips the
-    # ``has_writes`` flag; ``get_db`` checks it to decide between commit
-    # and rollback. Skipping that turned every API write into a silent
-    # rollback in earlier iterations of this fixture.
-    db_state = init_db(
-        "sqlite+aiosqlite:///:memory:",
-        poolclass=StaticPool,
-    )
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # A database with pagebuilder's schema and no rows. ``make_db_state``
+    # keeps the two properties this harness has always depended on: a
+    # ``StaticPool`` so every ``async with factory()`` sees the same
+    # ``:memory:`` instance rather than a fresh empty one, and
+    # ``register_listeners`` so the audit hook flips the ``has_writes`` flag
+    # ``get_db`` reads to choose between commit and rollback — without it
+    # every API write is a silent rollback.
+    db_state = await make_db_state()
 
     # Wire up a permissions registry so RequiresPermission can resolve
     # non-admin roles. Without this, the framework's role-map fallback

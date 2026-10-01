@@ -1,0 +1,141 @@
+/**
+ * Anonymous `fetch` client for the records module's *public* read API
+ * (design doc §10), as consumed by the `RecordsList` Puck widget
+ * (`components/widget/`).
+ *
+ * Deliberately separate from `utils/api.ts`: that file talks to
+ * `/api/records/*`, which requires a session, and every request it sends
+ * carries `credentials: 'same-origin'` on the assumption there is a session
+ * to send. This module talks to `{public_route_prefix}/*` — no session, no
+ * cookie, callable from a visitor who has never logged in — so the two must
+ * never merge into one client that quietly assumes auth either way.
+ *
+ * `public_route_prefix` is a DB-backed setting (design §11) with no shared
+ * Inertia prop carrying it onto an arbitrary pagebuilder page (it currently
+ * rides along only on the records module's own TypeEditor screen — see
+ * `endpoints/views.py::_editor_context`), so the widget cannot read it from
+ * a shared prop the way the design doc's "if the host exposes one" allows
+ * for. `DEFAULT_PUBLIC_PREFIX` is therefore the widget's own field default,
+ * and an operator who changed the setting away from it re-points the widget
+ * by editing that one field.
+ */
+
+export type PublicRecordItem = {
+  uuid: string;
+  slug: string | null;
+  display_title: string;
+  published_at: string | null;
+  data: Record<string, unknown>;
+};
+
+export type PublicRecordPage = {
+  items: PublicRecordItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  /** How to show a `media` value to a visitor: a URL with `{id}` in it, or
+   *  `null` when the media library does not serve files anonymously — which
+   *  the framework `file_storage` module does not (`format.ts::publicMediaSrc`). */
+  media_url_template?: string | null;
+};
+
+export const DEFAULT_PUBLIC_PREFIX = '/api/records/public';
+
+/** The header a multi-tenant host's `TenantMiddleware` reads (tenancy design
+ *  §J item 4). Named literally here, the same way the design doc names it
+ *  for "anonymous readers and headless clients" — unlike the *admin* surface,
+ *  the public one has no shared prop carrying the framework's configured
+ *  header name onto an arbitrary pagebuilder page, so this widget sends the
+ *  one name the design commits to. A single-tenant host, or an install that
+ *  renamed the header, simply reads a request with no matching header —
+ *  never a 500 (`tenancy.resolve_public`, `TENANT_RE`). */
+export const TENANT_HEADER = 'X-Tenant-ID';
+
+export const MIN_LIMIT = 1;
+export const MAX_LIMIT = 50;
+export const DEFAULT_LIMIT = 10;
+
+/** Strip trailing slashes and fall back to the default when blank.
+ *
+ * Never rewrites a leading slash: a prefix an operator mistyped without one
+ * is a config problem for `RecordsSettings.check_public_route_prefix` to
+ * catch, not something this function should silently paper over.
+ */
+export function normalizePublicPrefix(prefix: string | null | undefined): string {
+  const trimmed = (prefix ?? '').trim();
+  const base = trimmed === '' ? DEFAULT_PUBLIC_PREFIX : trimmed;
+  const stripped = base.replace(/\/+$/, '');
+  return stripped === '' ? DEFAULT_PUBLIC_PREFIX : stripped;
+}
+
+/** Clamp to the block field's own declared range (1–50). A value outside it
+ *  reaches here only if content was hand-edited outside the field's `min`/
+ *  `max`, so this is a defensive floor/ceiling, not the primary guard. */
+export function clampLimit(limit: unknown): number {
+  const n = typeof limit === 'number' && Number.isFinite(limit) ? Math.trunc(limit) : Number.NaN;
+  const base = Number.isNaN(n) ? DEFAULT_LIMIT : n;
+  return Math.min(MAX_LIMIT, Math.max(MIN_LIMIT, base));
+}
+
+export type BuildPublicListUrlOptions = {
+  prefix?: string | null;
+  typeKey: string;
+  limit?: number;
+  filter?: string;
+  sort?: string;
+  /** Blank (the default) omits the param entirely — the public API then
+   *  answers with the default content locale, never "every locale" (design
+   *  §4.4). */
+  locale?: string;
+  /** Sent as `X-Tenant-ID`, not a query param (tenancy design §J item 4) —
+   *  blank or absent omits the header entirely, same as every other blank
+   *  option here. Read only by `fetchPublicRecords`; `buildPublicListUrl`
+   *  never puts it in the URL, so two tenants' requests for the same type
+   *  share one cacheable path and differ only by header (§H). */
+  tenant?: string;
+};
+
+/** `{prefix}/{typeKey}?page_size=&filter=&sort=` — the one anonymous list
+ *  route the widget calls. `filter`/`sort` are single terms (§ the block's
+ *  own prop help): the server's grammar happily repeats `?filter=`, but nothing
+ *  here needs more than one term at a time, and a second delimiter layered on
+ *  top of the term's own colons would just be one more thing to get wrong in
+ *  a text field with no editor of its own. */
+export function buildPublicListUrl(options: BuildPublicListUrlOptions): string {
+  const prefix = normalizePublicPrefix(options.prefix);
+  const typeKey = encodeURIComponent(options.typeKey.trim());
+  const params = new URLSearchParams();
+  params.set('page_size', String(clampLimit(options.limit)));
+  const filter = (options.filter ?? '').trim();
+  if (filter) params.set('filter', filter);
+  const sort = (options.sort ?? '').trim();
+  if (sort) params.set('sort', sort);
+  const locale = (options.locale ?? '').trim();
+  if (locale) params.set('locale', locale);
+  return `${prefix}/${typeKey}?${params.toString()}`;
+}
+
+/** Fetch one page of a public type's published records. Throws on a non-2xx
+ *  response or a network failure — the widget's render always wraps this in
+ *  its own try/catch and shows a muted error line, never a thrown render. */
+export async function fetchPublicRecords(
+  options: BuildPublicListUrlOptions,
+  signal?: AbortSignal,
+): Promise<PublicRecordPage> {
+  const url = buildPublicListUrl(options);
+  const tenant = (options.tenant ?? '').trim();
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (tenant) headers[TENANT_HEADER] = tenant;
+  const response = await fetch(url, {
+    // 'omit', not 'same-origin': this client is the anonymous one the header
+    // comment describes, and sending a session cookie to a surface that reads
+    // no user contradicts it — the widget renders for a visitor who has none.
+    credentials: 'omit',
+    headers,
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`records public API: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as PublicRecordPage;
+}

@@ -19,8 +19,14 @@ it becomes uninstallable in any host running a newer framework build.
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions
 against them. A module's first revision carries
-`branch_labels = ("<module>",)` so it can be removed on its own with
-`alembic downgrade <module>@base`.
+`branch_labels = ("<module>",)` so the revision can be named
+(`alembic downgrade <module>@base`). **That does not roll back only that
+module.** Autogenerate chains every revision off the current head, so the
+labelled revision sits on one linear history and `<module>@base` walks
+everything beneath it — verified: `downgrade records@base` ran 20 downgrades
+and emptied the database. Removing one module's schema in isolation needs its
+tables on a real branch (`down_revision = None`), which nothing here produces
+yet. Upstream: antosubash/simple_module_python#333.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
 `(locale, slug)`, and a rename records a redirect scoped to that locale.
@@ -92,8 +98,9 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n.** No module here is translated — pagebuilder, news and
-  ai all have hardcoded English TSX and no `locales/en.json`. The
+- **UI i18n.** Only `records` is translated (every string through `t()` and a
+  `locales/en.json`); pagebuilder, news and ai still have hardcoded English
+  TSX and no `locales/en.json`. The
   framework's own modules do have one, and the convention depends on
   `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
   *does* now wire it (`host/client_app/app.tsx` configures the catalog from

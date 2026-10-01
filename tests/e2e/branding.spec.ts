@@ -38,7 +38,7 @@ async function rootVar(page: Page, name: string): Promise<string> {
 }
 
 async function setBrandColor(page: Page, color: string) {
-  await page.goto('/branding');
+  await page.goto('/admin/branding/');
   const cookies = await page.context().cookies();
   const token = cookies.find((c) => c.name === 'branding_csrf')?.value;
   const response = await page.request.put('/api/branding/', {

@@ -248,7 +248,7 @@ class PageRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base
             SAEnum(RevisionEvent, name="pagebuilder_revision_event"),
             nullable=False,
             index=True,
-            server_default=RevisionEvent.PUBLISH.value,
+            server_default=RevisionEvent.PUBLISH.name,
         ),
     )
     note: str | None = Field(default=None, max_length=2000)
