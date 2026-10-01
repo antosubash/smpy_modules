@@ -41,6 +41,8 @@ export function useArticleBody(articleId: number) {
    */
   const savedRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The edit the debounce timer is waiting to save, if any. */
+  const pendingRef = useRef<Data | null>(null);
   /** Guards the state writes in `load` against a response that lands after the
    *  screen has moved on. */
   const aliveRef = useRef(true);
@@ -74,6 +76,7 @@ export function useArticleBody(articleId: number) {
    *  already saved or this save succeeded — and `false` when the save failed. */
   const flush = useCallback(
     async (next: Data): Promise<boolean> => {
+      pendingRef.current = null;
       const serialized = JSON.stringify(next);
       if (serialized === savedRef.current) return true;
       setSaveState('saving');
@@ -95,10 +98,19 @@ export function useArticleBody(articleId: number) {
     [articleId],
   );
 
+  /** Leaving the screen inside the debounce window must not drop the last edit. */
+  useEffect(
+    () => () => {
+      if (pendingRef.current) void flush(pendingRef.current);
+    },
+    [flush],
+  );
+
   /** Puck's `onChange`. Debounced — see `AUTOSAVE_DELAY_MS`. */
   const change = useCallback(
     (next: Data) => {
       setData(next);
+      pendingRef.current = next;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void flush(next), AUTOSAVE_DELAY_MS);
     },

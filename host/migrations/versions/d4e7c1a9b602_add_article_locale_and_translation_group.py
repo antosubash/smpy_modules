@@ -50,6 +50,11 @@ depends_on: str | Sequence[str] | None = None
 
 _ARTICLES = "news_articles"
 _REDIRECTS = "news_article_redirects"
+# Left by ``7a1a2e92f6df`` on a host whose pages were already multilingual
+# (any 0.0.7 install): each article's page language and translation group, and
+# its page's redirects with theirs, set aside before ``page_id`` was dropped.
+_LOCALE_CARRY = "news_article_locale_carry"
+_REDIRECT_CARRY = "news_article_redirect_carry"
 _LOCALE_LEN = 12
 _GROUP_LEN = 32
 
@@ -118,14 +123,31 @@ def upgrade() -> None:
         sa.column("id", sa.Integer),
         sa.column("translation_group", sa.String),
     )
-    # One group per existing article: nothing was a translation of anything
-    # before this migration, so every row is a group of one.
+    # One group per existing article, then the carried language and group laid
+    # over it where there is one. An article with no carry — every article on a
+    # host that never ran multilingual pages, or one whose page was already gone
+    # — is in the default language, a translation of nothing.
     for (article_id,) in bind.execute(sa.select(articles.c.id)).all():
         bind.execute(
             articles.update()
             .where(articles.c.id == article_id)
             .values(translation_group=uuid4().hex)
         )
+    inspector = sa.inspect(bind)
+    if inspector.has_table(_LOCALE_CARRY):
+        for column in ("locale", "translation_group"):
+            bind.execute(
+                sa.text(
+                    f"""
+                    UPDATE {_ARTICLES} SET {column} = (
+                        SELECT c.{column} FROM {_LOCALE_CARRY} c
+                        WHERE c.article_id = {_ARTICLES}.id
+                    )
+                    WHERE id IN (SELECT article_id FROM {_LOCALE_CARRY})
+                    """
+                )
+            )
+        op.drop_table(_LOCALE_CARRY)
 
     op.drop_index(op.f("ix_news_articles_slug"), table_name=_ARTICLES)
     with op.batch_alter_table(_ARTICLES) as batch:
@@ -163,6 +185,16 @@ def upgrade() -> None:
         ["locale", "from_slug"],
         unique=True,
     )
+    if inspector.has_table(_REDIRECT_CARRY):
+        bind.execute(
+            sa.text(
+                f"""
+                INSERT INTO {_REDIRECTS} (from_slug, article_id, locale)
+                SELECT from_slug, article_id, locale FROM {_REDIRECT_CARRY}
+                """
+            )
+        )
+        op.drop_table(_REDIRECT_CARRY)
 
 
 def downgrade() -> None:
