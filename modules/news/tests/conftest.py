@@ -5,10 +5,11 @@ is the headline change from the sidecar era, when every meaningful query was a
 join and the fixtures had to stand up pagebuilder's schema alongside news' own
 for any test to run at all.
 
-The rest mirrors the framework's house style — ``StaticPool`` so every session
-sees the same ``:memory:`` instance, ``register_listeners`` so ``get_db``
-actually commits, and a stub auth middleware standing in for
-``simple_module_auth``.
+The rest mirrors the framework's house style — the database comes from
+``pg_support.make_db_state`` (in-memory SQLite on a ``StaticPool`` by default,
+the Postgres database ``SM_TEST_DATABASE_URL`` names when it is set, with
+``register_listeners`` attached either way so ``get_db`` actually commits), and
+a stub auth middleware stands in for ``simple_module_auth``.
 
 Articles are created directly through the model rather than through the API.
 These are unit-ish integration tests: what matters is the row a query finds, not
@@ -35,16 +36,17 @@ import pytest_asyncio
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from inertia import InertiaConfig, inertia_dependency_factory
 from news.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
-from news.models import Base as NewsBase
 from news.module import NewsModule
+
+# ``pg_support`` owns the one decision both database fixtures make: in-memory
+# SQLite, or the Postgres database ``SM_TEST_DATABASE_URL`` names. It is also
+# where "news' tables, plus pagebuilder's where installed" is spelled out.
+from pg_support import arm_reset, make_db_state
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.pool import StaticPool
 from starlette.middleware.sessions import SessionMiddleware
 from stub_auth import StubAuthMiddleware, stub_user
 
@@ -59,18 +61,19 @@ _SHELL = (
 )
 
 
-async def _create_tables(conn) -> None:
-    """News' own tables, plus the optional neighbour's where it is installed.
+@pytest.fixture(autouse=True)
+def _arm_database_reset():
+    """Every test starts from an empty database.
 
-    Only one ``create_all`` is required. The sidecar needed both or no test
-    could run at all, because every meaningful query was a join.
+    A no-op on SQLite, where each test builds its own ``:memory:`` one and
+    there is nothing to empty. On Postgres it is what makes the *first*
+    database a test asks for a clean one — a test taking both ``db`` and a
+    client fixture has two independent databases on SQLite and two windows
+    onto one database on Postgres. See ``tests/pg_support.py`` at the repo
+    root.
     """
-    await conn.run_sync(NewsBase.metadata.create_all)
-    try:
-        from pagebuilder.models import Base as PagebuilderBase
-    except ImportError:  # pragma: no cover - the news-alone host
-        return
-    await conn.run_sync(PagebuilderBase.metadata.create_all)
+    arm_reset()
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -138,10 +141,7 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
     app.include_router(api_router)
     app.include_router(view_router)
 
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await _create_tables(conn)
+    db_state = await make_db_state()
 
     registry = PermissionRegistry()
     registry.add_group("News", [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
@@ -194,10 +194,7 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
     """A bare database with the module's tables, for direct service tests."""
-    state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await _create_tables(conn)
+    state = await make_db_state()
     yield state
     await state.engine.dispose()
 

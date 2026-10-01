@@ -13,8 +13,8 @@ still registers one view router and the URLs are unchanged.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
+from simple_module_inertia import InertiaResponse
 
 from pagebuilder.contracts.schemas import PendingImportRead, SnapshotRead
 from pagebuilder.deps import get_snapshot_service

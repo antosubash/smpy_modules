@@ -86,12 +86,12 @@ export async function login(
   { email = ADMIN_EMAIL, password = ADMIN_PASSWORD }: { email?: string; password?: string } = {},
 ) {
   await page.goto('/users/login');
-  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await Promise.all([
     page.waitForURL((url) => !url.pathname.startsWith('/users/login'), { timeout: 15_000 }),
-    page.getByRole('button', { name: /log in/i }).click(),
+    page.getByRole('button', { name: 'Sign in', exact: true }).click(),
   ]);
 }
 

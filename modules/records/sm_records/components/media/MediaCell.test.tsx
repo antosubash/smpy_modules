@@ -1,0 +1,283 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { act, mount, settle } from '../../test-dom';
+import {
+  availableColumns,
+  defaultColumnKeys,
+  firstMediaField,
+  resolveListColumns,
+} from '../../utils/listing';
+import { clearMediaCache } from '../../utils/media-api';
+import {
+  API,
+  loadRecordsCatalog,
+  MANUAL,
+  PHOTO,
+  stubLibrary,
+} from '../../utils/media-test-support';
+import type { FieldDef, RecordRead, TypeRead } from '../../utils/types';
+import { RecordCell } from '../RecordCell';
+import { MediaApiProvider } from './MediaApiContext';
+
+vi.mock('@inertiajs/react', () => ({
+  Link: ({ children, href }: { children?: unknown; href: string }) => (
+    <a href={href}>{children as React.ReactNode}</a>
+  ),
+}));
+
+const { RecordTable } = await import('../RecordTable');
+
+const IMAGE: FieldDef = {
+  key: 'image',
+  type: 'media',
+  label: 'Photo',
+  required: false,
+  unique: false,
+  indexed: false,
+  default: null,
+  help: null,
+  constraints: {},
+  options: {},
+};
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 8; i += 1) await settle();
+}
+
+function cell(value: unknown, withApi: boolean) {
+  const inner = <RecordCell field={IMAGE} value={value} />;
+  return withApi ? <MediaApiProvider value={API}>{inner}</MediaApiProvider> : inner;
+}
+
+beforeAll(() => loadRecordsCatalog());
+beforeEach(() => clearMediaCache());
+afterEach(() => vi.unstubAllGlobals());
+
+describe('the media cell', () => {
+  it('shows the stored id as text when there is no media library', async () => {
+    const view = await mount(cell(PHOTO.id, false));
+    const raw = view.find('[data-testid="records-media-raw"]');
+    expect(raw?.getAttribute('title')).toBe(PHOTO.id);
+    expect(raw?.textContent).toBe(`${PHOTO.id.slice(0, 24)}…`);
+    await view.unmount();
+  });
+
+  it('shows a small thumbnail for an image, named by its file', async () => {
+    stubLibrary([PHOTO]);
+    const view = await mount(cell(PHOTO.id, true));
+    await flush();
+    const img = view.find<HTMLImageElement>('img');
+    expect(img?.getAttribute('src')).toBe(`/api/file-storage/files/${PHOTO.id}/download`);
+    expect(img?.getAttribute('alt')).toBe('harbour.png');
+    expect(img?.getAttribute('loading')).toBe('lazy');
+    await view.unmount();
+  });
+
+  it('shows a file icon and the name for anything else', async () => {
+    stubLibrary([MANUAL]);
+    const view = await mount(cell(MANUAL.id, true));
+    await flush();
+    expect(view.find('img')).toBeNull();
+    expect(view.find('[data-testid="records-media-icon"]')).not.toBeNull();
+    expect(view.host.textContent).toContain('manual.pdf');
+    await view.unmount();
+  });
+
+  it('says a deleted file is missing', async () => {
+    stubLibrary([]);
+    const view = await mount(cell(PHOTO.id, true));
+    await flush();
+    expect(view.find('[data-testid="records-media-missing"]')?.textContent).toContain(
+      'File missing',
+    );
+    await view.unmount();
+  });
+
+  it('a thumbnail that fails to load forgets the file, so the next render re-asks', async () => {
+    stubLibrary([PHOTO]);
+    const view = await mount(cell(PHOTO.id, true));
+    await flush();
+    const img = view.find<HTMLImageElement>('img');
+    await act(async () => {
+      img?.dispatchEvent(new Event('error'));
+    });
+    expect(view.find('[data-testid="records-media-icon"]')).not.toBeNull();
+    await view.unmount();
+    // Deleted in the library since it was cached: the next render finds out.
+    stubLibrary([]);
+    const again = await mount(cell(PHOTO.id, true));
+    await flush();
+    expect(again.find('[data-testid="records-media-missing"]')).not.toBeNull();
+    await again.unmount();
+  });
+
+  it('a legacy URL is a link even without a media library', async () => {
+    const url = 'https://example.com/legacy/photo.jpg';
+    const view = await mount(cell(url, false));
+    const link = view.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
+    expect(link?.getAttribute('href')).toBe(url);
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(view.find('[data-testid="records-media-raw"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('clips a long URL or a missing id to one line in its column, whole in the title', async () => {
+    // Review 4, ux F7: the table's `whitespace-nowrap` beat `break-all`, and
+    // the value ran on under the next column.
+    const url = `https://example.com/${'long/'.repeat(20)}photo.jpg`;
+    const linked = await mount(cell(url, true));
+    const link = linked.find('[data-testid="records-media-url"]');
+    expect(link?.className.split(' ')).toEqual(expect.arrayContaining(['block', 'truncate']));
+    expect(link?.getAttribute('title')).toBe(url);
+    expect(link?.textContent).toBe(url);
+    await linked.unmount();
+
+    stubLibrary([]);
+    const missing = await mount(cell(PHOTO.id, true));
+    await flush();
+    const code = missing.find('[data-testid="records-media-missing"] code');
+    expect(code?.className.split(' ')).toEqual(expect.arrayContaining(['block', 'truncate']));
+    expect(code?.getAttribute('title')).toBe(PHOTO.id);
+    await missing.unmount();
+
+    const raw = await mount(cell(PHOTO.id, false));
+    expect(raw.find('[data-testid="records-media-raw"]')?.className).toContain('truncate');
+    await raw.unmount();
+  });
+
+  it('a legacy URL, a rooted path or free text is never looked up, only an id is — even with a library', async () => {
+    // Review: seeded/imported data (`sm_records.cli.seed`) writes path-like
+    // values such as `media/products/x.png`, which are neither an id nor a
+    // URL. Asking the library about one used to 404 and paint the whole
+    // column red with "File missing" for data that was simply never
+    // library-managed.
+    const fetchMock = stubLibrary([PHOTO]);
+
+    const url = await mount(cell('https://cdn.example.com/a.png', true));
+    await flush();
+    expect(url.find('[data-testid="records-media-url"]')?.getAttribute('href')).toBe(
+      'https://cdn.example.com/a.png',
+    );
+    await url.unmount();
+
+    const path = await mount(cell('/static/x.png', true));
+    await flush();
+    const pathLink = path.find<HTMLAnchorElement>('[data-testid="records-media-url"]');
+    expect(pathLink?.getAttribute('href')).toBe('/static/x.png');
+    await path.unmount();
+
+    const text = await mount(cell('media/products/x.png', true));
+    await flush();
+    const raw = text.find('[data-testid="records-media-text"]');
+    expect(raw?.textContent).toBe('media/products/x.png');
+    expect(raw?.getAttribute('title')).toBe('media/products/x.png');
+    expect(text.find('[data-testid="records-media-missing"]')).toBeNull();
+    await text.unmount();
+
+    // Not one request went to the library for any of the three above.
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // A real id still resolves normally.
+    const id = await mount(cell(PHOTO.id, true));
+    await flush();
+    expect(id.find('[data-testid="records-media-thumbnail"]')).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await id.unmount();
+  });
+
+  it('shows the empty dash for no value', async () => {
+    const view = await mount(cell(null, true));
+    expect(view.host.textContent).toBe('—');
+    await view.unmount();
+  });
+});
+
+describe('the media column', () => {
+  const type = {
+    key: 'product',
+    label: 'Product',
+    label_plural: 'Products',
+    display_field: 'title',
+    fields: [
+      { ...IMAGE, key: 'title', type: 'text', label: 'Title' },
+      IMAGE,
+      { ...IMAGE, key: 'backside', label: 'Back' },
+    ],
+  } as TypeRead;
+
+  it("is in the default view: the type's first media field, and only that one", () => {
+    expect(firstMediaField(type)?.key).toBe('image');
+    expect(firstMediaField({ fields: [] })).toBeNull();
+    expect(defaultColumnKeys(type, false)).toEqual([
+      'status',
+      'image',
+      'position',
+      'published_at',
+      'updated_at',
+    ]);
+  });
+
+  it('is left out of the default without a media library, and stays choosable', () => {
+    expect(defaultColumnKeys(type, false, false)).not.toContain('image');
+    const resolved = resolveListColumns({
+      type,
+      showLocale: false,
+      raw: null,
+      saved: null,
+      withMedia: false,
+    });
+    expect(resolved.columns.map((c) => c.key)).not.toContain('image');
+    expect(availableColumns(type, false).map((c) => c.key)).toContain('image');
+  });
+
+  it('renders a plain header and a thumbnail cell in the default table', async () => {
+    stubLibrary([PHOTO]);
+    const record = {
+      uuid: 'r1',
+      status: 'draft',
+      display_title: 'Lamp',
+      position: 0,
+      published_at: null,
+      created_at: '2026-01-01T00:00:00+00:00',
+      updated_at: null,
+      data: { title: 'Lamp', image: PHOTO.id },
+      invalid: [],
+    } as unknown as RecordRead;
+    const noop = async () => undefined;
+    const view = await mount(
+      <MediaApiProvider value={API}>
+        <RecordTable
+          type={type}
+          records={[record]}
+          sort={null}
+          onSort={() => {}}
+          onDelete={noop}
+          onRestore={noop}
+          onPurge={noop}
+        />
+      </MediaApiProvider>,
+    );
+    await flush();
+    // Minus the muted "not sortable" a non-indexed header carries.
+    const headers = view
+      .all('th')
+      .map((th) =>
+        th.textContent
+          ?.replace(th.querySelector('[data-testid="records-column-note"]')?.textContent ?? '', '')
+          .trim(),
+      );
+    expect(headers).toContain('Photo');
+    expect(headers).not.toContain('Back');
+    const mediaCell = view.find('[data-testid="records-media-cell"]');
+    expect(mediaCell?.querySelector('img')?.getAttribute('alt')).toBe('harbour.png');
+    // Not a sort button: a media field cannot be indexed, so it cannot sort.
+    expect(
+      view
+        .all('th')
+        .find((th) => th.textContent?.startsWith('Photo'))
+        ?.querySelector('button'),
+    ).toBeNull();
+    await view.unmount();
+  });
+});

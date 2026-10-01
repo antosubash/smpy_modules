@@ -76,8 +76,116 @@ jobs:
       - name: Run pytest (news)
         run: cd modules/news && uv run pytest
 
+      - name: Run pytest (records)
+        run: cd modules/records && uv run pytest
+
       - name: Run pytest (host)
         run: uv run pytest host/tests
+
+  postgres:
+    name: Postgres (migrations + records)
+    runs-on: ubuntu-latest
+    # The records unit suite alone is ~3 min on SQLite (~4 min measured
+    # against Postgres — postgres-2026-09-21.md § 3); the migration round
+    # trip and perf smoke add a few minutes more. 20 gives comfortable room
+    # without chasing a hung step to the billable ceiling.
+    timeout-minutes: 20
+    services:
+      # `postgres:16` is what postgres-2026-09-21.md verified against
+      # (16.13). POSTGRES_DB pre-creates the database the migration round
+      # trip runs against; the records unit and perf databases are created
+      # by a later step because pg_support.py and the perf suite each want
+      # their own (TRUNCATE-per-test and CREATE DATABASE … TEMPLATE would
+      # otherwise collide with the migrated schema).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Sync workspace (all packages)
+        run: uv sync --all-packages
+
+      # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
+      # needs no extra install. Two databases: one for the records unit
+      # suite (pg_support.py's TRUNCATE … RESTART IDENTITY reset) and one
+      # for the perf smoke (which also does CREATE DATABASE … TEMPLATE
+      # copies of its own) — kept apart from `ci`, and from each other, so
+      # none of the three resets the others' schema mid-job.
+      - name: Create records test databases
+        run: |
+          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records
+          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records_perf
+
+      # Migration round trip against a real Postgres database — this is what
+      # caught the four Postgres-only migration bugs in
+      # postgres-2026-09-21.md § 2 (a boolean server_default of `0`, an enum
+      # server_default naming a value where SQLAlchemy stores the name, and
+      # two revisions whose downgrade left enum types behind). None of them
+      # was visible on SQLite, and `alembic check` alone (no downgrade) missed
+      # the enum-leftover bug too.
+      - name: Migrate up (heads)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini upgrade heads
+
+      - name: Alembic check (after upgrade)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini check
+
+      - name: Migrate down (base)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini downgrade base
+
+      - name: Migrate up again (heads)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini upgrade heads
+
+      - name: Alembic check (after round trip)
+        env:
+          SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+        run: uv run --project host alembic -c host/alembic.ini check
+
+      # SM_TEST_DATABASE_URL is the name tests/pg_support.py reads first.
+      - name: Run pytest (records, Postgres)
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
+        run: cd modules/records && uv run pytest -q -p no:cacheprovider
+
+      # A short smoke, not the full study (which runs at N=20000): enough to
+      # exercise the write, read, aggregate and i18n statement-count
+      # assertions against a real Postgres database on every PR.
+      # tests/perf/conftest.py and the perf test files assert either bounded
+      # ceilings (`< 40`) or self-consistency across two runs on the same
+      # backend, never a hard-coded SQLite statement count, so the suite
+      # needs no `-k` filter here.
+      - name: Run pytest (records perf smoke, Postgres)
+        env:
+          RECORDS_PERF_N: 500
+          RECORDS_PERF_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records_perf
+        run: cd modules/records && uv run pytest -q -m perf tests/perf
 
   frontend-build:
     name: Frontend build (tsc + vite)
@@ -144,12 +252,22 @@ jobs:
     # billable runner time. Adjust upward only if the suite legitimately
     # grows beyond this.
     #
-    # Raised from 15 when the multilingual specs landed: a green run reached
+    # Raised from 15 when the multilingual specs landed (a green run reached
     # test 138 of 143 at 15m17s and was cancelled with the last file still to
-    # go. At ~7s a test the suite now needs a little under 16 minutes, so 25
-    # leaves room for a slow runner without going near the billable runaway
-    # this ceiling exists to stop.
-    timeout-minutes: 25
+    # go), and from 25 when the records specs took the suite from 149 tests to
+    # 257 — 24 `records-*.spec.ts` files, 108 tests. At the same measured ~7s a
+    # test that is ~30 minutes of tests alone, and `uv sync`, `npm ci`,
+    # `make sync-module-deps`, `make gen-pages`, the Playwright browser install
+    # and up to 180s of `webServer` boot all sit inside this ceiling too. 45
+    # covers that with room for a slow runner and the odd retry, without going
+    # near the billable runaway this ceiling exists to stop.
+    #
+    # Not sharded, and the number is sized on the assumption that it stays that
+    # way: `playwright.config.ts` sets `workers: 1` / `fullyParallel: false` on
+    # purpose, because every spec runs against the one host and the one SQLite
+    # database `start-test-server.sh` builds. A second worker is a second
+    # writer to that database, not a second suite.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 

@@ -14,12 +14,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
-from pagebuilder.models import Base, Page, PageStatus
+from pagebuilder.models import Page, PageStatus
 from pagebuilder.service import PagesService
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
+from pg_support import make_db_state
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.pool import StaticPool
 
 pytestmark = pytest.mark.asyncio
 
@@ -166,13 +164,7 @@ async def test_unpublish_clears_pending_unpublish_at(
 
 
 async def _bare_session_factory():
-    state = init_db(
-        "sqlite+aiosqlite:///:memory:",
-        poolclass=StaticPool,
-    )
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    state = await make_db_state()
     return state.engine, async_sessionmaker(
         state.engine,
         expire_on_commit=False,

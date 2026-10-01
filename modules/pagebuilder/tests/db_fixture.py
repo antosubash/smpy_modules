@@ -10,10 +10,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
-from pagebuilder.models import Base
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sqlalchemy.pool import StaticPool
+from pg_support import make_db_state
 
 
 @pytest.fixture
@@ -24,14 +21,12 @@ async def db() -> AsyncIterator[Any]:
     sweep runs from the scheduler tick, not from a request, so driving it
     through a client would mean testing a route that does not exist.
 
-    ``StaticPool`` so every session in the test sees the same ``:memory:``
-    instance, and ``register_listeners`` so the audit hook behaves as it does in
-    the app.
+    ``make_db_state`` keeps the ``StaticPool`` so every session in the test
+    sees the same ``:memory:`` instance, and ``register_listeners`` so the
+    audit hook behaves as it does in the app — and is what lets
+    ``SM_TEST_DATABASE_URL`` point this fixture at Postgres.
     """
-    state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(state)
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    state = await make_db_state()
     async with state.session_factory() as session:
         yield session
     await state.engine.dispose()

@@ -21,12 +21,9 @@ import pytest
 from conftest import _client_fixture
 from httpx import AsyncClient
 from pagebuilder import locales
-from pagebuilder.models import Base
 from pagebuilder.permissions import PERM_EDIT, PERM_PUBLISH, ROLE_PUBLISHER
 from pagebuilder.settings import PagebuilderSettings
-from simple_module_db.listeners import register_listeners
-from simple_module_db.session import init_db
-from sqlalchemy.pool import StaticPool
+from pg_support import make_db_state
 
 
 @pytest.fixture
@@ -47,13 +44,12 @@ async def publisher_client(tmp_path) -> AsyncIterator[AsyncClient]:
 async def snapshot_db(tmp_path) -> AsyncIterator[Any]:
     """An empty pagebuilder schema plus settings rooted in ``tmp_path``.
 
-    Same ``StaticPool`` reasoning as the app harness: one connection, so every
-    ``async with`` sees the same ``:memory:`` database instead of a fresh one.
+    Same ``make_db_state`` as the app harness, for the same reasons — one
+    connection on SQLite so every ``async with`` sees the same ``:memory:``
+    database instead of a fresh one, and the same ``SM_TEST_DATABASE_URL``
+    opt-in onto Postgres.
     """
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    db_state = await make_db_state()
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         snapshot_root=tmp_path / "snapshots",
@@ -74,10 +70,7 @@ async def bilingual_snapshot_db(tmp_path) -> AsyncIterator[Any]:
     quietly test the monolingual path instead. ``locale_fixture``'s autouse
     reset clears it again after the test.
     """
-    db_state = init_db("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-    register_listeners(db_state)
-    async with db_state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    db_state = await make_db_state()
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         snapshot_root=tmp_path / "snapshots",

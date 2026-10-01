@@ -6,7 +6,7 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@inertiajs/react": "^2.0.0",
+    "@inertiajs/react": "^3.7.0",
     "@simple-module-py/ui": "*"
   },
   "devDependencies": {

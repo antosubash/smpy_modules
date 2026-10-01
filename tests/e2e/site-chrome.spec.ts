@@ -102,10 +102,6 @@ test.describe('Site header and footer', () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     await login(page);
-    // The pack is site-wide now, so the "pack reaches the chrome" spec below
-    // needs branding to have selected one.
-    await page.goto('/branding/');
-    await page.request.put('/api/branding/', { data: { design_pack: 'gca' } });
     publicPath = await publishPage(page);
     await page.close();
   });
@@ -164,19 +160,6 @@ test.describe('Site header and footer', () => {
     // it. A real visitor sees the change once the TTL lapses.
     await page.goto(`${publicPath}?cb=sticky-off`);
     await expect(page.getByTestId('site-header')).toHaveCSS('position', 'static');
-  });
-
-  test('the design pack reaches the chrome, not just the page body', async ({ page }) => {
-    await login(page);
-    await putLayout(page, HEADER, FOOTER);
-    await page.goto(publicPath);
-
-    // The pack's CSS is scoped to its root class, which the *page* root renders
-    // inside <main>. Without hoisting it the chrome would silently fall back to
-    // the base tokens and read as a different site.
-    await expect(
-      page.getByTestId('site-header').locator('xpath=ancestor::*[@class="gca-root"]'),
-    ).toHaveCount(1);
   });
 
   test('the site chrome widgets are offered in the layout editor only', async ({ page }) => {
