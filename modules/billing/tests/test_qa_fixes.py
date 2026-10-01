@@ -178,6 +178,10 @@ def test_return_url_accepted(raw, stored):
         "https://app example.com",
         "https://a.example.com/" + "x" * 300,
         "https://" + "a" * 250 + ".com",
+        # urlsplit silently drops these, so they must be refused before parsing.
+        "https://exa\nmple.com",
+        "https://exa\tmple.com",
+        "https://example.com\x00",
     ],
 )
 def test_return_url_rejected(raw):

@@ -21,6 +21,7 @@ RETURN_URL_RULE = (
     f"no path, query or fragment, at most {RETURN_URL_MAX} characters."
 )
 _HOST_RE = re.compile(r"^[A-Za-z0-9.-]+$|^\[[0-9A-Fa-f:.]+\]$")
+_CONTROL_RE = re.compile(r"[\x00-\x20\x7f]")
 
 
 def _blank_to_none(value: str | None) -> str | None:
@@ -142,7 +143,9 @@ def normalise_return_url(value: str) -> str:
     value = value.strip()
     if not value:
         return ""
-    if len(value) > RETURN_URL_MAX:
+    # Whitespace/control characters first: urlsplit drops \t \n \r silently,
+    # so they would pass every check below and be stored verbatim.
+    if len(value) > RETURN_URL_MAX or _CONTROL_RE.search(value):
         raise ValueError(RETURN_URL_RULE)
     try:
         parts = urlsplit(value)
