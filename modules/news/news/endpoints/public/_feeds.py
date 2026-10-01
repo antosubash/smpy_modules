@@ -13,7 +13,7 @@ English item in that river is worse than no item.
 from __future__ import annotations
 
 from email.utils import format_datetime
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 from fastapi import APIRouter, Depends, Request, Response
 from simple_module_db import get_db
@@ -34,10 +34,6 @@ FEED_LIMIT = 20
 A feed is a window on the archive, not a copy of it: a reader subscribing today
 wants the recent run, and a reader who wants everything has the sitemap.
 """
-
-_ATTR_ENTITIES = {'"': "&quot;"}
-"""What ``escape`` adds for a double-quoted attribute value; it only does
-``&``, ``<`` and ``>`` by default."""
 
 
 def feed_router(locale: str) -> APIRouter:
@@ -119,7 +115,7 @@ def feed_router(locale: str) -> APIRouter:
                 f"<language>{escape(locale)}</language>"
                 # An attribute value, so quotes are escaped too: the URL can be built
                 # from the request's Host header when no public base URL is set.
-                f'<atom:link href="{escape(self_url, _ATTR_ENTITIES)}"'
+                f"<atom:link href={quoteattr(self_url)}"
                 ' rel="self" type="application/rss+xml"/>'
                 f"{''.join(entries)}"
                 "</channel></rss>"

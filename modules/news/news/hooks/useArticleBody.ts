@@ -92,6 +92,8 @@ export function useArticleBody(articleId: number) {
       } catch (e) {
         setSaveState('error');
         setError((e as Error).message);
+        // Still unsaved, so leaving the screen gets one more try at it.
+        if (pendingRef.current === null) pendingRef.current = next;
         return false;
       }
     },
