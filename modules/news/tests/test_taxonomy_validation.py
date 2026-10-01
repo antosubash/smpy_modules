@@ -123,3 +123,13 @@ async def test_tag_slug_rules() -> None:
     assert tag_slug("中文") == "中文"
     assert tag_slug("???") == ""
     assert tag_slug("snake_case") == "snake-case"
+
+
+async def test_tag_slug_keeps_combining_marks_and_safe_url_survives_bad_hosts() -> None:
+    from news.safe_url import image_or_none, is_http_url
+    from news.settings import public_tag_path
+
+    assert tag_slug("हिन्दी") == "हिन्दी"
+    assert public_tag_path("中文") == "/news/tag/%E4%B8%AD%E6%96%87"
+    assert is_http_url("http://[bad") is False
+    assert image_or_none("http://[bad") is None

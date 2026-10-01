@@ -22,6 +22,7 @@ module's copy when the Settings screen writes one.
 from __future__ import annotations
 
 from typing import Any, Final
+from urllib.parse import quote
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -216,7 +217,9 @@ def public_category_path(slug: str, locale: str | None = None) -> str:
 
 
 def public_tag_path(slug: str, locale: str | None = None) -> str:
-    return f"{public_prefix(locale)}/tag/{slug}"
+    """A tag's archive. The slug may be non-ASCII, so it is percent-encoded:
+    sitemaps, ``hreflang`` and canonical links want an RFC 3986 address."""
+    return f"{public_prefix(locale)}/tag/{quote(slug, safe='')}"
 
 
 def public_author_path(slug: str, locale: str | None = None) -> str:

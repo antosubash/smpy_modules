@@ -39,7 +39,10 @@ def slugify(value: str, *, fallback: str = "item", max_length: int = 80) -> str:
     return slug or fallback
 
 
-_TAG_SEPARATORS = re.compile(r"[\W_]+")
+def _keep(ch: str) -> str:
+    # Combining marks (Devanagari vowel signs, Thai tone marks, Arabic
+    # diacritics) are not alphanumeric, but splitting a word at them mangles it.
+    return ch if ch.isalnum() or unicodedata.category(ch).startswith("M") else "-"
 
 
 def tag_slug(value: str, *, max_length: int = 60) -> str:
@@ -51,7 +54,7 @@ def tag_slug(value: str, *, max_length: int = 60) -> str:
     a stand-in slug, or two unrelated tags collapse onto one row.
     """
     folded = unicodedata.normalize("NFKC", value).lower()
-    slug = _TRIM.sub("", _TAG_SEPARATORS.sub("-", folded))[:max_length]
+    slug = _TRIM.sub("", re.sub(r"-+", "-", "".join(_keep(ch) for ch in folded)))[:max_length]
     slug = _TRIM.sub("", slug)
     return slug if any(ch.isalnum() for ch in slug) else ""
 

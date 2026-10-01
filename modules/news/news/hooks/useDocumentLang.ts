@@ -10,6 +10,14 @@ import { useEffect } from 'react';
  */
 export function useDocumentLang(locale: string | undefined): void {
   useEffect(() => {
-    if (locale) document.documentElement.lang = locale;
+    if (!locale) return;
+    const root = document.documentElement;
+    const previous = root.lang;
+    root.lang = locale;
+    // Leaving for another screen (the console, say) must not carry this
+    // page's language along; the next public page sets its own.
+    return () => {
+      root.lang = previous;
+    };
   }, [locale]);
 }

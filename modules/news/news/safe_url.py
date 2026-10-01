@@ -17,7 +17,13 @@ def is_http_url(value: str) -> bool:
     """An absolute ``http`` / ``https`` URL with a host and no whitespace."""
     if not _clean(value):
         return False
-    parts = urlsplit(value)
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        # "http://[bad" and NFKC-unstable hosts raise rather than parse. Rows
+        # saved before the write path checked can hold either, and a public
+        # render must skip them, not 500.
+        return False
     return parts.scheme in {"http", "https"} and bool(parts.netloc)
 
 

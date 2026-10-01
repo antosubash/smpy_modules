@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 from factories import make_article
 from news.models import ArticleStatus, NewsArticleTag, NewsCategory, NewsTag
+from news.settings import public_tag_path
+from news.slugify import tag_slug
 
 pytestmark = pytest.mark.asyncio
 
@@ -147,6 +149,21 @@ class TestTagArchive:
         )
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["tagged"]
+
+    async def test_a_non_latin_tag_answers_at_the_address_the_site_links_to(
+        self, anon_client
+    ) -> None:
+        # The sitemap, canonical and hreflang carry the percent-encoded form,
+        # so that is the address a crawler or a reader will actually request.
+        tagged = await _seed(anon_client, "chinese")
+        await self._tag(anon_client, tagged, "中文", tag_slug("中文"))
+        path = public_tag_path(tag_slug("中文"))
+        assert "%" in path
+
+        response = await anon_client.get(path, headers={"X-Inertia": "true"})
+
+        assert response.status_code == 200, response.text
+        assert [i["slug"] for i in response.json()["props"]["items"]] == ["chinese"]
 
     async def test_an_unknown_tag_is_an_empty_archive_not_a_404(
         self, anon_client

@@ -11,6 +11,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { useInFlight } from '../../hooks/useInFlight';
 import {
   type ArticleRead,
   approveArticle,
@@ -18,6 +19,8 @@ import {
   submitArticle,
   unpublishArticle,
 } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 /** How long the card stays inert after a transition. The next action appears
  *  under the pointer — Submit becomes Approve — so a double click must not be
@@ -26,10 +29,6 @@ const TRANSITION_COOLDOWN_MS = 800;
 
 /** The server's bound on a send-back note. */
 const MAX_NOTE_LEN = 2000;
-
-import { useInFlight } from '../../hooks/useInFlight';
-import { keys, useT } from '../../utils/i18n';
-import { ConfirmDialog } from '../ConfirmDialog';
 
 /** The review step, for hosts that want one.
  *
