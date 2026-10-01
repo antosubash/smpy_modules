@@ -36,6 +36,7 @@ def _etag_for(
     page_id: int,
     updated_at: datetime | None,
     layout_updated_at: datetime | None = None,
+    variant: str = "html",
 ) -> str:
     """Stable, short ETag derived from page identity + last-modified time.
 
@@ -45,12 +46,16 @@ def _etag_for(
 
     The locale needs no place in the digest: a page belongs to exactly one
     language, so ``page_id`` already names it.
+
+    ``variant`` names the representation ("html" or "inertia"): one URL answers
+    with a full page or Inertia's JSON, and a shared tag lets a browser holding
+    the page get a 304 for the JSON request and hand Inertia cached HTML.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
     layout_stamp = (
         layout_updated_at.isoformat() if layout_updated_at is not None else ""
     )
-    digest = hashlib.sha1(f"{page_id}:{stamp}:{layout_stamp}".encode()).hexdigest()[:16]
+    digest = hashlib.sha1(f"{page_id}:{stamp}:{layout_stamp}:{variant}".encode()).hexdigest()[:16]
     return f'W/"{digest}"'
 
 
@@ -165,7 +170,8 @@ async def render_public_page(
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
-    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at)
+    variant = "inertia" if request.headers.get("x-inertia") else "html"
+    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at, variant)
     cache_parts = [f"max-age={settings.public_cache_max_age}"]
     if settings.public_cache_swr > 0:
         cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
@@ -173,6 +179,7 @@ async def render_public_page(
 
     def apply_headers(response: Response) -> Response:
         response.headers["ETag"] = etag
+        response.headers["Vary"] = "X-Inertia"
         response.headers["Cache-Control"] = cache_control
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
