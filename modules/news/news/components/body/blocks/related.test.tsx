@@ -16,6 +16,7 @@ function article(slug: string): ArticleRead {
     show_in_feed: true,
     author: '',
     published_at: null,
+    updated_at: null,
     locale: 'en',
     translation_group: '',
     status: 'published',

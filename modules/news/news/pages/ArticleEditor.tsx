@@ -52,6 +52,8 @@ export default function ArticleEditor() {
     dirty,
     valid,
     error,
+    conflict,
+    gone,
     setError,
     saved,
     load,
@@ -132,7 +134,16 @@ export default function ArticleEditor() {
       }
     >
       <Head title={article.title || t(copy.fallback_title)} />
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="mb-4 flex items-center gap-3 text-sm text-destructive">
+          <p className="min-w-0 flex-1">{error}</p>
+          {conflict && (
+            <Button size="sm" variant="outline" onClick={() => void load()}>
+              {t(keys.news.errors.reload)}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="space-y-3">
@@ -181,13 +192,15 @@ export default function ArticleEditor() {
             onChange={patch}
           />
 
-          <Button
-            className="w-full"
-            disabled={busy || !dirty || !valid}
-            onClick={() => void save()}
-          >
-            {t(copy.save)}
-          </Button>
+          {!gone && (
+            <Button
+              className="w-full"
+              disabled={busy || !dirty || !valid}
+              onClick={() => void save()}
+            >
+              {t(copy.save)}
+            </Button>
+          )}
 
           <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
 

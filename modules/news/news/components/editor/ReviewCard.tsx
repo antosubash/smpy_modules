@@ -11,8 +11,25 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { type ArticleRead, approveArticle, rejectArticle, submitArticle } from '../../utils/api';
+import {
+  type ArticleRead,
+  approveArticle,
+  rejectArticle,
+  submitArticle,
+  unpublishArticle,
+} from '../../utils/api';
+
+/** How long the card stays inert after a transition. The next action appears
+ *  under the pointer — Submit becomes Approve — so a double click must not be
+ *  able to land on it. */
+const TRANSITION_COOLDOWN_MS = 800;
+
+/** The server's bound on a send-back note. */
+const MAX_NOTE_LEN = 2000;
+
+import { useInFlight } from '../../hooks/useInFlight';
 import { keys, useT } from '../../utils/i18n';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 /** The review step, for hosts that want one.
  *
@@ -47,27 +64,57 @@ export function ReviewCard({
 }) {
   const { t } = useT();
   const copy = keys.news.review;
-  const [busy, setBusy] = useState(false);
+  const { busy, run: guard } = useInFlight(TRANSITION_COOLDOWN_MS);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
 
-  const run = async (action: () => Promise<unknown>, done: string) => {
-    setBusy(true);
-    try {
-      await action();
-      await onChanged();
-      toast.success(done);
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  /** Resolves `true` only when the transition went through, so a caller can
+   *  keep its dialog and its typed note open on failure. */
+  const run = async (action: () => Promise<unknown>, done: string): Promise<boolean> => {
+    const ok = await guard(async () => {
+      try {
+        await action();
+        await onChanged();
+        toast.success(done);
+        return true;
+      } catch (e) {
+        toast.error((e as Error).message);
+        return false;
+      }
+    });
+    return ok === true;
   };
 
   const submitted = article.status === 'submitted_for_review';
 
   // Nothing to offer: a published article has been through review, and an
   // author looking at someone else's submission has no decision to make.
+  if (article.status === 'published') {
+    // Only for someone who may publish: the route is behind `news.publish`.
+    if (!canPublish) return null;
+    return (
+      <div className="space-y-3 rounded-lg border p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
+        <p className="text-xs text-muted-foreground">{t(copy.published_help)}</p>
+        <ConfirmDialog
+          level="medium"
+          title={t(copy.unpublish_title, { title: article.title })}
+          description={t(copy.unpublish_description)}
+          confirmLabel={t(copy.unpublish)}
+          onConfirm={async () => {
+            const ok = await run(() => unpublishArticle(article.id), t(copy.unpublished_toast));
+            // The toast has already said why; throwing keeps the dialog open.
+            if (!ok) throw new Error(t(copy.unpublish_failed));
+          }}
+          trigger={
+            <Button size="sm" variant="outline" disabled={busy}>
+              {t(copy.unpublish)}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
   if (!submitted && article.status !== 'draft') return null;
   if (submitted && !canPublish) {
     return (
@@ -125,11 +172,15 @@ export function ReviewCard({
           <Textarea
             rows={3}
             value={note}
+            maxLength={MAX_NOTE_LEN}
             disabled={busy}
             aria-label={t(copy.reject_label)}
             placeholder={t(copy.reject_placeholder)}
             onChange={(e) => setNote(e.target.value)}
           />
+          <p className="text-right text-xs text-muted-foreground">
+            {t(copy.note_count, { count: note.length, max: MAX_NOTE_LEN })}
+          </p>
           <DialogFooter>
             <Button variant="outline" disabled={busy} onClick={() => setRejecting(false)}>
               {t(copy.cancel)}
@@ -138,7 +189,10 @@ export function ReviewCard({
               disabled={busy}
               onClick={() =>
                 void run(() => rejectArticle(article.id, note), t(copy.sent_back_toast)).then(
-                  () => {
+                  (ok) => {
+                    // Only on success: a failed send-back keeps the dialog and
+                    // the note, so a long note is not lost to a server refusal.
+                    if (!ok) return;
                     setRejecting(false);
                     setNote('');
                   },

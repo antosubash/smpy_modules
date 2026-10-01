@@ -83,10 +83,50 @@ describe('errorFrom — matching pagebuilder/utils/request.ts', () => {
 });
 
 describe('fromValidationErrors', () => {
-  it('names the field and says what is wrong', () => {
+  it("says a bad slug in the editor's words, not the regex", () => {
     expect(fromValidationErrors(PYDANTIC_SLUG_ERROR)).toBe(
-      "slug: String should match pattern '^[a-z0-9][a-z0-9-]*$'",
+      'Lowercase letters, numbers and hyphens, starting with a letter or number.',
     );
+  });
+
+  it('maps the common Pydantic types to sentences', () => {
+    expect(
+      fromValidationErrors([
+        { type: 'string_too_long', loc: ['body', 'title'], msg: 'x', ctx: { max_length: 300 } },
+      ]),
+    ).toBe('title can be at most 300 characters.');
+    expect(
+      fromValidationErrors([{ type: 'string_too_long', loc: ['body', 'title'], msg: 'x' }]),
+    ).toBe('title is too long.');
+    expect(
+      fromValidationErrors([
+        { type: 'string_too_short', loc: ['body', 'title'], msg: 'x', ctx: { min_length: 1 } },
+      ]),
+    ).toBe('title is required.');
+    expect(
+      fromValidationErrors([
+        { type: 'string_too_short', loc: ['body', 'note'], msg: 'x', ctx: { min_length: 5 } },
+      ]),
+    ).toBe('note must be at least 5 characters.');
+    expect(
+      fromValidationErrors([{ type: 'missing', loc: ['body', 'title'], msg: 'Field required' }]),
+    ).toBe('title is required.');
+    expect(
+      fromValidationErrors([
+        { type: 'string_pattern_mismatch', loc: ['body', 'author'], msg: 'x' },
+      ]),
+    ).toBe('author contains characters that are not allowed.');
+  });
+
+  it('keeps the server message for a type it has no sentence for', () => {
+    expect(fromValidationErrors([{ type: 'weird', loc: ['body', 'slug'], msg: 'odd' }])).toBe(
+      'slug: odd',
+    );
+  });
+
+  it('carries the status on the error', async () => {
+    const e = await errorFrom(response('{"detail":"Changed elsewhere."}', { status: 409 }));
+    expect(e.status).toBe(409);
   });
 
   it('drops the "body" wrapper, which means nothing to the reader', () => {
