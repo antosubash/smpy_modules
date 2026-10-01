@@ -126,7 +126,7 @@ function Connection() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CopyableId value={webhook_url} label="Webhook URL" />
+              <CopyableId value={webhook_url} title="Copy webhook URL" />
             </CardContent>
           </Card>
           <Card>
