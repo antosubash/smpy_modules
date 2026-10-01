@@ -8,10 +8,25 @@ inside the repo's 300-line cap; the methods rely on ``self.db`` and
 from __future__ import annotations
 
 from fastapi import HTTPException
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from news.models import NewsArticle, NewsArticleRevision, RevisionEvent
+
+
+async def clear_revisions(db: AsyncSession, article_id: int) -> None:
+    """Drop an article's history when the article itself is deleted.
+
+    ``ondelete="CASCADE"`` only fires where the database enforces foreign keys,
+    and SQLite does not unless ``PRAGMA foreign_keys=ON`` is set. Left behind,
+    the rows are keyed on an id SQLite will happily hand to the next article
+    inserted after the highest one is deleted — whose history panel would then
+    open on somebody else's revisions.
+    """
+    await db.execute(
+        sa_delete(NewsArticleRevision).where(NewsArticleRevision.article_id == article_id)
+    )
 
 
 class RevisionsMixin:

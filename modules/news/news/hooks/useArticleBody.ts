@@ -70,10 +70,12 @@ export function useArticleBody(articleId: number) {
     [articleId],
   );
 
+  /** Resolves `true` when the server holds `next` afterwards — either it was
+   *  already saved or this save succeeded — and `false` when the save failed. */
   const flush = useCallback(
-    async (next: Data) => {
+    async (next: Data): Promise<boolean> => {
       const serialized = JSON.stringify(next);
-      if (serialized === savedRef.current) return;
+      if (serialized === savedRef.current) return true;
       setSaveState('saving');
       try {
         const detail = await saveArticleBody(articleId, next as unknown as Record<string, unknown>);
@@ -83,9 +85,11 @@ export function useArticleBody(articleId: number) {
         if (detail) setArticle(detail);
         setSaveState('saved');
         setError(null);
+        return true;
       } catch (e) {
         setSaveState('error');
         setError((e as Error).message);
+        return false;
       }
     },
     [articleId],
@@ -102,9 +106,9 @@ export function useArticleBody(articleId: number) {
   );
 
   /** Save now, without waiting for the timer — the toolbar's Save. */
-  const saveNow = useCallback(async () => {
+  const saveNow = useCallback(async (): Promise<boolean> => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (data) await flush(data);
+    return data ? flush(data) : true;
   }, [data, flush]);
 
   const publish = useCallback(async () => {
@@ -114,7 +118,10 @@ export function useArticleBody(articleId: number) {
       // The pending draft goes first. Publishing snapshots whatever the server
       // holds, so skipping this would put the *previous* draft in front of
       // readers and leave the writer looking at something else entirely.
-      await saveNow();
+      // A failed save stops here: `flush` reports it rather than throwing, and
+      // carrying on would publish the *previous* draft while the writer's
+      // screen still shows the unsaved one.
+      if (!(await saveNow())) return;
       await publishArticle(articleId);
       await load();
     } catch (e) {

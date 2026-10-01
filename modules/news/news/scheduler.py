@@ -36,12 +36,10 @@ class Scheduler:
         self._task: asyncio.Task[None] | None = None
 
     def start(self, app: FastAPI, settings: NewsSettings) -> None:
+        # Stopped from ``NewsModule.on_shutdown``. A router shutdown handler
+        # would never run: the host supplies its own ``lifespan``, and those
+        # handlers are only honoured under the default one.
         self._task = asyncio.create_task(self._run(app, settings))
-        # FastAPI no longer exposes ``add_event_handler`` on the app itself; the
-        # router still carries it for ASGI lifespan hooks, which is what this
-        # wants — the task lives as long as the app and is cancelled on shutdown
-        # rather than outliving it.
-        app.router.add_event_handler("shutdown", self.stop)
 
     async def _run(self, app: FastAPI, settings: NewsSettings) -> None:
         """Publish and unpublish articles at their scheduled times.

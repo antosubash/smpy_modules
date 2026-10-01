@@ -15,7 +15,7 @@ from simple_module_hosting.permissions import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import locales, service
+from news import locales, service, tag_service
 from news.constants import (
     PERM_EDIT,
     PERM_PUBLISH,
@@ -24,6 +24,7 @@ from news.constants import (
 )
 from news.contracts.schemas import ArticleDetail, ArticleRead
 from news.models import NewsArticle
+from news.naive_utc import as_utc
 
 require_edit = Depends(RequiresPermission(PERM_EDIT))
 
@@ -145,11 +146,14 @@ async def read_one(db: AsyncSession, article_id: int) -> ArticleRead:
     """Re-read through the listing query so every response has one shape.
 
     Drafts are included: an editor has just written this row and must see it
-    back whatever state it is in.
+    back whatever state it is in. So are tags, which the listing attaches in
+    one query per page: a single read that left them off would hand the editor
+    an article with none, and its next Save would write that back.
     """
     article = await service.get_read(db, article_id, include_drafts=True)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
+    article.tags = await tag_service.list_for_article(db, article_id)
     return article
 
 
@@ -169,6 +173,8 @@ def detail_of(article: NewsArticle, listing: ArticleRead) -> ArticleDetail:
         index_in_search=article.index_in_search,
         json_ld=article.json_ld,
         rejection_note=article.rejection_note,
-        publish_at=article.publish_at,
-        unpublish_at=article.unpublish_at,
+        # A SQLite-backed database returns these without their zone; the
+        # browser would read a bare timestamp as local time.
+        publish_at=as_utc(article.publish_at),
+        unpublish_at=as_utc(article.unpublish_at),
     )

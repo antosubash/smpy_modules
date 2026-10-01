@@ -6,10 +6,10 @@ shape, the editor's, and every write, not one DTO.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from news.constants import (
     MAX_AUTHOR_LEN,
@@ -48,26 +48,15 @@ class ArticleRead(BaseModel):
     published_at: datetime | None = None
 
     locale: str = ""
-    """Which language the article is written in.
-
-    The article's own column now. It used to be the language of the
-    pagebuilder page the body lived in, which is why this had nowhere to come
-    from on a host that did not run that module. Defaulted rather than required
-    so a caller building an ``ArticleRead`` by hand — the search screen does —
-    need not supply it.
-    """
+    """Which language the article is written in. Defaulted so a caller building
+    an ``ArticleRead`` by hand — the search screen does — need not supply it."""
 
     translation_group: str = ""
     """What this article and its counterparts in other languages share.
 
-    Carried on the card so the admin list can mark which articles already have
-    a translation without a query per row — "has translations" is then "are
-    there siblings sharing this group", never a null check.
-
-    Empty only where the caller built the shape by hand with no group to give
-    (the search screen does). Every stored article has one: the column is NOT
-    NULL and every article starts a group of its own, so a lone article is a
-    group of one rather than an absence.
+    Carried on the card so the admin list can mark which articles have a
+    translation without a query per row. Empty only where the caller built the
+    shape by hand; every stored article has one, a lone one being a group of one.
     """
 
     status: ArticleStatus
@@ -241,6 +230,18 @@ class ArticleUpdate(BaseModel):
     _display_date = field_validator("published_at")(as_display_date)
     """Truncate to the calendar day as sent — see ``news.display_date``."""
 
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> ArticleUpdate:
+        """Refuse ``null`` for a NOT NULL column; omitting it is fine.
+
+        Otherwise the database rejects it and ``ArticlesService.update`` reports
+        "Slug already in use" — a 409 about the wrong thing.
+        """
+        for name in ("title", "slug", "index_in_search"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
 
 class ArticleBodyUpdate(BaseModel):
     """An autosave from the block canvas.
@@ -272,6 +273,17 @@ class ScheduleRequest(BaseModel):
 
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+
+    @field_validator("publish_at", "unpublish_at")
+    @classmethod
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
+        """Normalise to UTC: SQLite drops the offset on write without
+        converting, and ``process_due`` reads stored values back as UTC."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
 
 class RevisionRead(BaseModel):

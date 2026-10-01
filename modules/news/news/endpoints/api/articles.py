@@ -187,8 +187,11 @@ async def create_article(
     old one and orphan every redirect pointing at it. The counterpart in another
     language is a sibling — see :mod:`news.endpoints.api.translations`.
     """
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="An article needs a headline.")
     article = await ArticlesService(db).create(
-        title=body.title.strip(),
+        title=title,
         slug=body.slug,
         locale=checked_locale(body.locale),
         category=body.category,
@@ -249,9 +252,7 @@ async def update_article(
             author=sent.get("author"),
         )
 
-    read = await read_one(db, article_id)
-    read.tags = await tag_service.list_for_article(db, article_id)
-    return read
+    return await read_one(db, article_id)
 
 
 @router.delete(

@@ -226,6 +226,16 @@ class NewsModule(ModuleBase):
         if settings.scheduler_enabled:
             self._scheduler.start(app, settings)
 
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the scheduler.
+
+        Not via ``app.router.add_event_handler("shutdown", ...)``: the host
+        builds its app with its own ``lifespan``, and router shutdown handlers
+        only run under the default one — so they would never fire, leaving the
+        loop to tick against a database the lifespan has just disposed of.
+        """
+        await self._scheduler.stop()
+
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """Let an anonymous reader use the API the feed block reads.
 
