@@ -89,7 +89,7 @@ export function useRecordListNav({
       url,
       {},
       {
-        only: full ? undefined : ['records', 'errors'],
+        only: full ? undefined : ['records', 'list_errors'],
         preserveState: true,
         preserveScroll: true,
         // No `replace: true` (UX-R3). Every one of these is a change the user

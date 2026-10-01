@@ -8,14 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@inertiajs/react": "^2.0.0",
-    "@simple-module-py/i18n": "0.0.26",
-    "@simple-module-py/ui": "0.0.26",
+    "@inertiajs/react": "^3.7.0",
+    "@simple-module-py/i18n": "0.0.35",
+    "@simple-module-py/ui": "0.0.35",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@simple-module-py/tsconfig": "0.0.26",
+    "@simple-module-py/tsconfig": "0.0.35",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.0",

@@ -16,7 +16,7 @@ vi.mock('@inertiajs/react', () => ({
   Link: ({ children, href }: { children?: unknown; href: string }) => (
     <a href={href}>{children as React.ReactNode}</a>
   ),
-  usePage: () => ({ url: pageUrl, props: { errors: pageErrors, auth: { permissions: [] } } }),
+  usePage: () => ({ url: pageUrl, props: { list_errors: pageErrors, auth: { permissions: [] } } }),
   router: { get, replace, reload: vi.fn(), visit: vi.fn() },
 }));
 vi.mock('../components/RecordIoMenu', () => ({

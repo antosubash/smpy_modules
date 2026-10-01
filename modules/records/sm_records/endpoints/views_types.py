@@ -15,8 +15,8 @@ reason, so the two defences agree.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
+from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, locales, tenancy

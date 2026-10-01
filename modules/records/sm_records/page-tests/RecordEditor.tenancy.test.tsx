@@ -12,6 +12,8 @@ import type { RecordRead, TypeRead } from '../utils/types';
 // files could import from.
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,
+  // PageShell reads the URL to report its heading (ui 0.0.35).
+  usePage: () => ({ url: '/admin/records', props: {} }),
   Link: ({ children }: { children?: unknown }) => children,
   router: { visit: vi.fn(), reload: vi.fn(), on: () => () => {} },
 }));

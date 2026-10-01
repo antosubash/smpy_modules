@@ -6,6 +6,8 @@ import type { TypeRead } from '../utils/types';
 
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,
+  // PageShell reads the URL to report its heading (ui 0.0.35).
+  usePage: () => ({ url: '/admin/records', props: {} }),
   Link: ({ children, ...rest }: { children?: unknown; [key: string]: unknown }) => (
     // biome-ignore lint/suspicious/noExplicitAny: a thin passthrough stand-in for Inertia's Link
     <a {...(rest as any)}>{children as React.ReactNode}</a>

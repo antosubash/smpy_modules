@@ -26,7 +26,6 @@ import pytest
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from inertia import InertiaConfig, inertia_dependency_factory
 from pagebuilder.module import PagebuilderModule
 from pagebuilder.permissions import (
     ALL_PERMISSIONS,
@@ -44,6 +43,7 @@ from pagebuilder.settings import PagebuilderSettings
 from pg_support import arm_reset, make_db_state
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 

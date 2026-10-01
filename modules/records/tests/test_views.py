@@ -16,6 +16,9 @@ _INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 _TENANCY_PROPS = ("tenant", "tenancy_mode")
 """On every records screen: which tenant it reads and whether the host has
 several (tenancy design §J). ``test_tenancy_binding.py`` checks the values."""
+_PROTOCOL_PROPS = ("errors",)
+"""Added to every page by the Inertia adapter (``simple_module_inertia``), not
+by a records view: the protocol's validation bag, empty on a plain GET."""
 
 _NOW = "2026-09-19T10:00:00+00:00"
 """``reindex_pending`` maps a field key to when its rebuild was enqueued
@@ -34,7 +37,7 @@ async def test_type_list_view(client, records_app):
     # visits to a type start (UX-R13.1), so it needs the same
     # ``public_route_prefix`` the schema editor and the per-type list
     # already carry (design §11 — DB-backed, not derivable in the browser).
-    assert set(body["props"]) == {"types", "public_route_prefix", *_TENANCY_PROPS}
+    assert set(body["props"]) == {"types", "public_route_prefix", *_TENANCY_PROPS, *_PROTOCOL_PROPS}
     assert [item["key"] for item in body["props"]["types"]] == ["product"]
     assert body["props"]["public_route_prefix"] == "/api/records/public"
 
@@ -54,9 +57,12 @@ async def test_record_list_view(client, records_app):
     # every language, because an editor's question is "what exists" (§4.4).
     assert set(body["props"]) == {
         *_TENANCY_PROPS,
+        *_PROTOCOL_PROPS,
         "type",
         "records",
-        "errors",
+        # Not the protocol's ``errors`` bag (``_PROTOCOL_PROPS``): the
+        # adapter overwrites that from the session on every render.
+        "list_errors",
         "trashed",
         "content_locales",
         "default_locale",
@@ -75,7 +81,7 @@ async def test_record_list_view(client, records_app):
     assert body["props"]["type"]["key"] == "product"
     assert body["props"]["records"]["total"] == 1
     # Always present, so a partial reload after a bad filter clears the notice.
-    assert body["props"]["errors"] == {}
+    assert body["props"]["list_errors"] == {}
     assert body["props"]["max_import_bytes"] > 0
     assert body["props"]["public_route_prefix"] == "/api/records/public"
 
@@ -92,6 +98,7 @@ async def test_record_new_view(client, records_app):
     assert body["component"] == "Records/RecordEditor"
     assert set(body["props"]) == {
         *_TENANCY_PROPS,
+        *_PROTOCOL_PROPS,
         "type",
         "record",
         "translations",
@@ -190,7 +197,7 @@ async def test_record_list_view_reports_reindexing_filter_inline(client, records
     )
     assert resp.status_code == 200
     props = resp.json()["props"]
-    assert props["errors"] == {"filter": "reindexing"}
+    assert props["list_errors"] == {"filter": "reindexing"}
     assert props["records"]["items"] == []
     assert props["records"]["total"] == 0
 
@@ -219,6 +226,7 @@ async def test_type_editor_views_render_with_targets_and_roles(client, records_a
     assert body["props"]["type"]["key"] == "person"
     assert set(body["props"]) == {
         *_TENANCY_PROPS,
+        *_PROTOCOL_PROPS,
         "type",
         "target_types",
         "roles",

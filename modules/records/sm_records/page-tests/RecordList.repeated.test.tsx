@@ -22,7 +22,7 @@ vi.mock('@inertiajs/react', () => ({
   Link: ({ children, href }: { children?: unknown; href: string }) => (
     <a href={href}>{children as React.ReactNode}</a>
   ),
-  usePage: () => ({ url: pageUrl, props: { errors: {}, auth: { permissions: ['records.edit'] } } }),
+  usePage: () => ({ url: pageUrl, props: { list_errors: {}, auth: { permissions: ['records.edit'] } } }),
   router: { get, replace, reload: vi.fn(), visit: vi.fn() },
 }));
 vi.mock('../components/RecordIoMenu', () => ({ RecordIoMenu: () => null }));

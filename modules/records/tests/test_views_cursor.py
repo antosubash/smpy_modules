@@ -66,7 +66,7 @@ async def _walk(client, base: str) -> tuple[list[str], list[dict]]:
         if records["next_cursor"] is None:
             break
         props = await _page(client, f"{base}&after={records['next_cursor']}")
-        assert props["errors"] == {}
+        assert props["list_errors"] == {}
         records = props["records"]
     return seen, pages
 
@@ -114,19 +114,19 @@ async def test_a_tampered_cursor_is_the_lists_notice(client):
     first = (await _page(client, "sort=name&page_size=3"))["records"]
     tampered = first["next_cursor"][:-4] + "AAAA"
     props = await _page(client, f"sort=name&page_size=3&after={tampered}")
-    assert props["errors"] == {"filter": "bad_cursor"}
+    assert props["list_errors"] == {"filter": "bad_cursor"}
     assert props["records"]["items"] == []
     assert (props["records"]["page"], props["records"]["next_cursor"]) == (None, None)
 
     garbage = await _page(client, "sort=name&after=not-a-cursor")
-    assert garbage["errors"] == {"filter": "bad_cursor"}
+    assert garbage["list_errors"] == {"filter": "bad_cursor"}
 
 
 async def test_a_cursor_under_another_sort_is_refused(client):
     await _seed(client)
     first = (await _page(client, "sort=name&page_size=3"))["records"]
     props = await _page(client, f"sort=-name&page_size=3&after={first['next_cursor']}")
-    assert props["errors"] == {"filter": "bad_cursor"}
+    assert props["list_errors"] == {"filter": "bad_cursor"}
     assert props["records"]["items"] == []
 
 
@@ -136,7 +136,7 @@ async def test_a_live_cursor_in_the_trash_is_refused(client):
     await _seed(client)
     first = (await _page(client, "sort=name&page_size=3"))["records"]
     props = await _page(client, f"sort=name&page_size=3&trashed=true&after={first['next_cursor']}")
-    assert props["errors"] == {"filter": "bad_cursor"}
+    assert props["list_errors"] == {"filter": "bad_cursor"}
 
 
 async def test_page_and_after_together_are_refused(client):
@@ -146,19 +146,19 @@ async def test_page_and_after_together_are_refused(client):
     await _seed(client)
     first = (await _page(client, "sort=name&page_size=3"))["records"]
     props = await _page(client, f"sort=name&page_size=3&page=2&after={first['next_cursor']}")
-    assert props["errors"] == {"filter": "page_and_after"}
+    assert props["list_errors"] == {"filter": "page_and_after"}
     assert props["records"]["items"] == []
     # ``page=1`` is the parameter's default and means "no page was asked
     # for", exactly as the API reads it.
     ok = await _page(client, f"sort=name&page_size=3&page=1&after={first['next_cursor']}")
-    assert ok["errors"] == {}
+    assert ok["list_errors"] == {}
     assert len(ok["records"]["items"]) == 3
 
 
 async def test_an_empty_after_is_offset_paging(client):
     await _seed(client)
     props = await _page(client, "sort=name&page_size=3&page=2&after=")
-    assert props["errors"] == {}
+    assert props["list_errors"] == {}
     assert props["records"]["page"] == 2
     assert [item["display_title"] for item in props["records"]["items"]] == [
         "item-003",
@@ -173,4 +173,4 @@ async def test_a_malformed_filter_still_wins_over_the_cursor(client):
     await _seed(client)
     first = (await _page(client, "sort=name&page_size=3"))["records"]
     props = await _page(client, f"sort=name&filter=nonsense&after={first['next_cursor']}")
-    assert props["errors"] == {"filter": "malformed"}
+    assert props["list_errors"] == {"filter": "malformed"}

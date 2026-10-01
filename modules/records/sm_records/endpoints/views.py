@@ -10,8 +10,8 @@ would be swallowed by the generic editor route with ``uuid == "new"``.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from inertia import InertiaResponse
 from simple_module_hosting.inertia_deps import InertiaDep
+from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, locales, tenancy
@@ -234,14 +234,17 @@ async def record_list(
         page=None if cursor else page,
         page_size=size,
     )
-    # ``errors`` is sent on every render, empty or not: the list refetches
-    # with ``only: ["records", "errors"]`` and Inertia merges partial props
+    # ``list_errors`` is sent on every render, empty or not: the list refetches
+    # with ``only: ["records", "list_errors"]`` and Inertia merges partial props
     # over the page it has, so a prop that is simply absent when the filter
     # is clean would leave the previous request's notice on screen.
     props: dict[str, object] = {
         "type": type_read(rtype, *counts).model_dump(mode="json"),
         "records": records_page.model_dump(mode="json"),
-        "errors": errors,
+        # Not ``errors``: that is the Inertia protocol's validation bag, which
+        # the adapter fills from the session on every render, and a non-empty
+        # one makes the client treat the visit as failed.
+        "list_errors": errors,
         "trashed": trashed,
         # The import menu refuses an over-size file before uploading it, and
         # says the limit in its dialog (review R9/M13). The browser has no

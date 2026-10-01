@@ -193,7 +193,7 @@ async def test_an_admin_cursor_minted_in_one_tenant_is_refused_in_another(two_te
     )
     assert screen.status_code == 200, "a page navigation never errors"
     props = screen.json()["props"]
-    assert props["errors"] == {"filter": "bad_cursor"}
+    assert props["list_errors"] == {"filter": "bad_cursor"}
     assert props["records"]["items"] == []
 
 

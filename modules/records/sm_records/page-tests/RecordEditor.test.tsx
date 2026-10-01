@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { act, mount, press, settle, setValue } from '../test-dom';
 import { ApiError } from '../utils/api';
 import type { RecordRead, TypeRead } from '../utils/types';
@@ -12,6 +11,7 @@ let updateImpl: (...args: unknown[]) => Promise<RecordRead>;
 
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,
+  usePage: () => ({ url: '/admin/records', props: {} }),
   Link: ({ children }: { children?: unknown }) => children,
   router: { visit: vi.fn(), reload: vi.fn(), on: () => () => {} },
 }));

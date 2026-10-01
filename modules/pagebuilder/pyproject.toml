@@ -12,7 +12,8 @@ dependencies = [
     # uninstallable in any host running a newer framework build.
     "simple_module_core>=0.0.25,<0.1",
     "simple_module_db>=0.0.25,<0.1",
-    "simple_module_hosting>=0.0.25,<0.1",
+    "simple_module_hosting>=0.0.35,<0.1",
+    "simple_module_inertia>=0.0.35,<0.1",
     # This module's settings live in the DB-backed settings store, so
     # ``register_settings`` imports ``settings.registration``. Floor verified:
     # ``register_module_settings`` and ``apply_changes_and_reload`` both exist

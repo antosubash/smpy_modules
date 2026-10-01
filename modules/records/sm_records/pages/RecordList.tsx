@@ -70,7 +70,7 @@ function RecordList({
   tenancy_mode,
 }: Props) {
   const { t } = useT();
-  const page = usePage<{ errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
+  const page = usePage<{ list_errors?: Record<string, string>; auth?: SharedProps['auth'] }>();
   const search = new URL(page.url, window.location.origin).searchParams;
   const rawFilter = search.get('filter');
   // A cursor lives in the URL and nowhere else (`utils/listing.ts::listParams`).
@@ -85,7 +85,7 @@ function RecordList({
   // than one, so a monolingual type or install shows neither.
   const contentLocales = content_locales ?? [];
   const showLocaleUI = type.translatable && contentLocales.length > 1;
-  // Inertia's own `errors` bag — `record_list` (views.py) attaches
+  // `list_errors` — `record_list` (views.py) attaches
   // `{filter: exc.reason}` whenever building the query raises `QueryError`,
   // regardless of whether the offending term came from `?filter=` or
   // `?sort=` — both are resolved through the same index-lookup call, so a
@@ -99,7 +99,7 @@ function RecordList({
   // an actually-empty result. A sort on an *unindexed* field would land here
   // as well, but `SortableHeader` never offers one, so that branch shouldn't
   // be reachable from this UI short of a hand-edited URL.
-  const filterErrorReason = page.props.errors?.filter;
+  const filterErrorReason = page.props.list_errors?.filter;
   // A refused *cursor* arrives on the same channel, but the filter was fine:
   // Export and the bulk toolbar keep it, and the empty box offers page 1.
   const cursorRefused = isCursorRefusal(filterErrorReason);

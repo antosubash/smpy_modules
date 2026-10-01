@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { click, mount } from '../test-dom';
 import type { RecordListPage, RecordRead, TypeRead } from '../utils/types';
 
-// The page reads its URL and `errors` from `usePage()`; both change between
+// The page reads its URL and `list_errors` from `usePage()`; both change between
 // renders here, the way a cursor step changes them.
 let pageUrl = '/admin/records/book?sort=name&after=CURSOR-1';
 let pageErrors: Record<string, string> = {};
@@ -17,7 +17,7 @@ vi.mock('@inertiajs/react', () => ({
   ),
   usePage: () => ({
     url: pageUrl,
-    props: { errors: pageErrors, auth: { permissions: ['records.edit'] } },
+    props: { list_errors: pageErrors, auth: { permissions: ['records.edit'] } },
   }),
   router: { get: (...args: unknown[]) => get(...args), reload: vi.fn(), visit: vi.fn() },
 }));

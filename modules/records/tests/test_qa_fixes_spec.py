@@ -167,7 +167,7 @@ async def test_a_malformed_filter_on_the_list_view_lands_in_errors(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["component"] == "Records/RecordList"
-    assert body["props"]["errors"] == {"filter": "malformed"}
+    assert body["props"]["list_errors"] == {"filter": "malformed"}
     assert body["props"]["records"]["total"] == 0
 
 
@@ -176,7 +176,7 @@ async def test_a_well_formed_but_refused_filter_still_reports_its_own_reason(cli
     resp = await client.get(
         "/admin/records/product?filter=ghost:eq:1", headers={**roles(ADMIN), **_INERTIA}
     )
-    assert resp.json()["props"]["errors"] == {"filter": "unknown"}
+    assert resp.json()["props"]["list_errors"] == {"filter": "unknown"}
 
 
 async def test_the_json_api_still_refuses_a_malformed_filter_with_a_400(client):

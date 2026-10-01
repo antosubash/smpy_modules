@@ -23,7 +23,6 @@ import pytest_asyncio
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from inertia import InertiaConfig, inertia_dependency_factory
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
@@ -33,6 +32,7 @@ from simple_module_hosting.middleware import (
     InertiaLayoutDataMiddleware,
     TenantMiddleware,
 )
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from sm_records.models import Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
