@@ -310,7 +310,10 @@ def downgrade() -> None:
     would silently attach articles to whatever happened to hold them.
     """
     op.add_column("news_articles", sa.Column("page_id", sa.INTEGER(), nullable=True))
-    op.execute("UPDATE news_articles SET page_id = id")
+    # Negative, so it is NOT NULL and unique as the old schema demands yet can
+    # never name a real page — `id` itself would attach each article to
+    # whichever unrelated page happened to hold that number.
+    op.execute("UPDATE news_articles SET page_id = -id")
     op.drop_index(op.f("ix_news_articles_status"), table_name="news_articles")
     op.drop_index(op.f("ix_news_articles_slug"), table_name="news_articles")
     op.drop_index(op.f("ix_news_articles_deleted_at"), table_name="news_articles")
