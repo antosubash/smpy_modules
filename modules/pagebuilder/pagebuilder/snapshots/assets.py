@@ -5,12 +5,10 @@ assigned at upload — host-local by construction. Capture therefore replaces
 every such URL with ``asset://<bundle name>``, and restore puts back whatever
 URL the file was given on *this* host.
 
-This is the inverse of ``canopy_atlas.seed.uploads.rewrite_asset_paths``,
-generalised and made bidirectional. Only URLs that resolve to a row in the
-media library are rewritten: the mapping is built from the media table rather
-than guessed from string shape, so module static mounts
-(``/canopy-atlas/static/...``), external URLs and in-site links pass through
-untouched.
+Only URLs that resolve to a row in the media library are rewritten: the
+mapping is built from the media table rather than guessed from string shape,
+so module static mounts (``/<module>/static/...``), external URLs and in-site
+links pass through untouched.
 """
 
 from __future__ import annotations

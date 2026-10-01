@@ -93,12 +93,12 @@ venv and back. Neither touches a tracked file.
 ## Known deferred work
 
 - **UI i18n.** No module here is translated — pagebuilder, news and
-  canopy_atlas all have hardcoded English TSX and no `locales/en.json`. The
+  ai all have hardcoded English TSX and no `locales/en.json`. The
   framework's own modules do have one, and the convention depends on
   `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
   *does* now wire it (`host/client_app/app.tsx` configures the catalog from
   the `i18n` shared prop, and the framework mounts `LocaleMiddleware`), so the
-  blocker is gone — what remains is the conversion itself, and all three
+  blocker is gone — what remains is the conversion itself, and all the
   modules should convert together rather than piecemeal during unrelated work.
 
   Not to be confused with **content** i18n, which is done: pages and articles
