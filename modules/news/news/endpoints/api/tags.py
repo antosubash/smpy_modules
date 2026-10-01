@@ -16,6 +16,7 @@ from news.contracts.schemas import (
     TagUpdate,
 )
 from news.endpoints.api._deps import require_edit
+from news.tag_service import TagCollisionError, TagNameError
 
 router = APIRouter(prefix="/taxonomy", dependencies=[require_edit])
 
@@ -43,7 +44,10 @@ async def create_tag(body: TagCreate, db: AsyncSession = Depends(get_db)) -> Tag
     201 either way: the caller wanted the tag to exist and now it does, and
     distinguishing the two would only invite the client to branch on it.
     """
-    tag = await tag_service.get_or_create(db, body.name)
+    try:
+        tag = await tag_service.get_or_create(db, body.name)
+    except TagNameError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
     return _read(tag, 0)
 
 
@@ -52,7 +56,12 @@ async def rename_tag(
     tag_id: int, body: TagUpdate, db: AsyncSession = Depends(get_db)
 ) -> TagRead:
     tag = await _load(db, tag_id)
-    updated = await tag_service.rename(db, tag, body.name)
+    try:
+        updated = await tag_service.rename(db, tag, body.name)
+    except TagNameError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except TagCollisionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     counts = {t.id: t.article_count for t in await tag_service.list_tags(db)}
     return _read(updated, counts.get(updated.id or 0, 0))
 

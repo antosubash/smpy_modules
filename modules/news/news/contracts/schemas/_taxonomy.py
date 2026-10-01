@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 from news.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
+
+
+def _trimmed(max_length: int) -> StringConstraints:
+    """Stripped, non-empty text: ``'   '`` is a 422, ``' x '`` is stored ``'x'``."""
+    return StringConstraints(strip_whitespace=True, min_length=1, max_length=max_length)
+
+
+CategoryName = Annotated[str, _trimmed(MAX_CATEGORY_LEN)]
+TagName = Annotated[str, _trimmed(MAX_TAG_LEN)]
 
 
 class CategoryCount(BaseModel):
@@ -46,12 +57,12 @@ class CategoryAdminListResponse(BaseModel):
 
 
 class CategoryCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_CATEGORY_LEN)
+    name: CategoryName
     slug: str | None = Field(default=None, max_length=MAX_CATEGORY_LEN)
 
 
 class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=MAX_CATEGORY_LEN)
+    name: CategoryName | None = None
     slug: str | None = Field(default=None, min_length=1, max_length=MAX_CATEGORY_LEN)
 
 
@@ -78,11 +89,11 @@ class TagListResponse(BaseModel):
 
 
 class TagCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_TAG_LEN)
+    name: TagName
 
 
 class TagUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_TAG_LEN)
+    name: TagName
 
 
 class TagMerge(BaseModel):

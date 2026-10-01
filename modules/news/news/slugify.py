@@ -39,6 +39,23 @@ def slugify(value: str, *, fallback: str = "item", max_length: int = 80) -> str:
     return slug or fallback
 
 
+_TAG_SEPARATORS = re.compile(r"[\W_]+")
+
+
+def tag_slug(value: str, *, max_length: int = 60) -> str:
+    """Unicode-safe slug for tags: ``"中文"`` stays ``"中文"``.
+
+    NFKC-normalised and lowercased, runs of anything that is not a letter or
+    number collapse to one dash. Returns ``""`` when nothing alphanumeric is
+    left (``"???"``, emoji-only) — callers must reject that rather than invent
+    a stand-in slug, or two unrelated tags collapse onto one row.
+    """
+    folded = unicodedata.normalize("NFKC", value).lower()
+    slug = _TRIM.sub("", _TAG_SEPARATORS.sub("-", folded))[:max_length]
+    slug = _TRIM.sub("", slug)
+    return slug if any(ch.isalnum() for ch in slug) else ""
+
+
 def suffixed(base: str, *, max_length: int, limit: int) -> Iterator[str]:
     """``base-2``, ``base-3`` … ``base-{limit}``, each fitting ``max_length``.
 
