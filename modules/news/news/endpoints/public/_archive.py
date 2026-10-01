@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import constants, locales, service
 from news.endpoints.public import _head
+from news.endpoints.public._lang import set_html_lang
 from news.endpoints.public._urls import absolute, listing_cache_control
 from news.settings import NewsSettings, active, public_feed_path
 
@@ -220,7 +221,7 @@ async def render_archive(
         },
     )
     response = _head.inject(
-        rendered,
+        set_html_lang(rendered, locale),
         _head.listing_head(
             title=(
                 heading

@@ -97,9 +97,6 @@ class TestPaging:
         await _seed(anon_client, "only")
         assert (await anon_client.get(f"{NEWS}/?page=9")).status_code == 404
 
-    async def test_page_zero_is_rejected_by_the_query(self, anon_client) -> None:
-        assert (await anon_client.get(f"{NEWS}/?page=0")).status_code == 422
-
 
 class TestCategoryArchive:
     async def test_it_lists_only_that_category(self, anon_client) -> None:

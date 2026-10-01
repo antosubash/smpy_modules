@@ -25,6 +25,7 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from news import constants
 from news.authors import slug_for as author_slug
 from news.endpoints.public import _head
+from news.endpoints.public._lang import set_html_lang
 from news.models import ArticleStatus, NewsArticle
 from news.settings import NewsSettings, public_author_path
 
@@ -115,7 +116,7 @@ async def render_article(
     # The same tags `PublicArticle` renders through Inertia's `<Head>`, written
     # into the document server-side — see `_head` for why both are needed.
     return _head.inject(
-        rendered,
+        set_html_lang(rendered, locale),
         _head.article_head(
             title=article.title,
             description=article.meta_description or None,

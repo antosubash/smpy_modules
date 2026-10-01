@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
 import { ArchiveSearch } from '../components/ArchiveSearch';
+import { useDocumentLang } from '../hooks/useDocumentLang';
 import { type ArticleRead, formatArticleDate } from '../utils/api';
 import { archiveUrl } from '../utils/archiveUrl';
 import { keys, useT } from '../utils/i18n';
@@ -37,6 +38,7 @@ interface Props {
   narrowed?: boolean;
   feed_url: string;
   site_name?: string | null;
+  locale?: string;
 }
 
 export default function PublicIndex({
@@ -50,8 +52,10 @@ export default function PublicIndex({
   query = '',
   narrowed = false,
   feed_url,
+  locale,
 }: Props) {
   const { t } = useT();
+  useDocumentLang(locale);
   const copy = keys.news.public;
   return (
     <div>

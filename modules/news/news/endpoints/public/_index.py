@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.authors import resolve as resolve_author
 from news.endpoints.public._archive import render_archive
+from news.endpoints.public._paging import page_param
 from news.models import NewsCategory, NewsTag
 from news.settings import (
     active,
@@ -55,7 +56,7 @@ def index_router(locale: str) -> APIRouter:
     async def archive_index(
         request: Request,
         inertia: InertiaDep,
-        page: int = Query(1, ge=1),
+        page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
     ) -> Response:
@@ -76,7 +77,7 @@ def index_router(locale: str) -> APIRouter:
         slug: str,
         request: Request,
         inertia: InertiaDep,
-        page: int = Query(1, ge=1),
+        page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
     ) -> Response:
@@ -107,7 +108,7 @@ def index_router(locale: str) -> APIRouter:
         slug: str,
         request: Request,
         inertia: InertiaDep,
-        page: int = Query(1, ge=1),
+        page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
     ) -> Response:
@@ -137,7 +138,7 @@ def index_router(locale: str) -> APIRouter:
         slug: str,
         request: Request,
         inertia: InertiaDep,
-        page: int = Query(1, ge=1),
+        page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
     ) -> Response:

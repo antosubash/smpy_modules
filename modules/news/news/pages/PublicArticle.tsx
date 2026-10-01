@@ -5,7 +5,9 @@ import { useEffect } from 'react';
 import { Byline } from '../components/Byline';
 import { articlePuckConfig } from '../components/body/articlePuckConfig';
 import { articleOutline } from '../components/body/blocks/outline';
+import { type Alternate, LanguageSwitch } from '../components/LanguageSwitch';
 import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
+import { useDocumentLang } from '../hooks/useDocumentLang';
 import { formatArticleDate } from '../utils/api';
 
 /** What a reader gets at `{public_route_prefix}/{slug}`.
@@ -42,6 +44,10 @@ interface Props {
    *  text rather than as a link somewhere that cannot name this author. */
   author_url?: string | null;
   published_at?: string | null;
+  /** The article's language, and the same article in the others (with an
+   *  `x-default` entry for crawlers, which the switch skips). */
+  locale?: string;
+  alternates?: Alternate[];
   /** Present only on the authenticated preview at
    *  `{VIEW_PREFIX}/articles/{id}/preview`, which renders this same screen over
    *  `draft_data` so a reviewer approving an article has actually read it.
@@ -116,9 +122,12 @@ export default function PublicArticle({
   author,
   author_url,
   published_at,
+  locale,
+  alternates,
   preview,
 }: Props) {
   useAnchorOnArrival();
+  useDocumentLang(locale);
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   const dated = formatArticleDate(published_at ?? null);
 
@@ -180,6 +189,7 @@ export default function PublicArticle({
               person who wrote it was not. Its own component because the
               link-or-plain-text rule is the part that must not slip. */}
           <Byline author={author} dated={dated} url={author_url} />
+          <LanguageSwitch alternates={alternates} current={locale} />
           {og_image && (
             <img
               src={og_image}

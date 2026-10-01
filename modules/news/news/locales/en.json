@@ -543,5 +543,8 @@
     "required": "{field} is required.",
     "gone": "This article was moved to the trash or deleted.",
     "reload": "Reload"
+  },
+  "public_switch": {
+    "label": "Read this article in another language"
   }
 }
