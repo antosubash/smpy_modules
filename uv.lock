@@ -9,7 +9,6 @@ resolution-markers = [
 [manifest]
 members = [
     "simple-module-ai",
-    "simple-module-canopy-atlas",
     "simple-module-news",
     "simple-module-pagebuilder",
     "simple-module-python-modules",
@@ -1787,7 +1786,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-ai"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "modules/ai" }
 dependencies = [
     { name = "cryptography" },
@@ -1850,40 +1849,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/76/c3/3c4482f01033c0a66
 wheels = [
     { url = "https://files.pythonhosted.org/packages/21/f4/c4a5cfa968784a4436b20c4f7f958eec9882ba5594adab7b35eed996914f/simple_module_branding-0.0.26-py3-none-any.whl", hash = "sha256:ae0e695d36b383682902d29970f7f62492f459b1f37889982a91e5fe5b77b5df", size = 18377, upload-time = "2026-08-04T15:06:13.951Z" },
 ]
-
-[[package]]
-name = "simple-module-canopy-atlas"
-version = "0.0.6"
-source = { editable = "modules/canopy_atlas" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic-settings" },
-    { name = "simple-module-core" },
-    { name = "simple-module-db" },
-    { name = "simple-module-hosting" },
-    { name = "simple-module-pagebuilder" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "simple-module-test" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pydantic-settings", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
-    { name = "simple-module-core", specifier = ">=0.0.26,<0.1" },
-    { name = "simple-module-db", specifier = ">=0.0.25,<0.1" },
-    { name = "simple-module-hosting", specifier = ">=0.0.26,<0.1" },
-    { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
-    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.25,<0.1" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-cli"
@@ -1987,7 +1952,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-news"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "modules/news" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -2023,7 +1988,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-pagebuilder"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "modules/pagebuilder" }
 dependencies = [
     { name = "pillow" },
@@ -2076,7 +2041,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-python-modules"
-version = "0.0.6"
+version = "0.0.7"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -2161,7 +2126,6 @@ dependencies = [
     { name = "simple-module-ai" },
     { name = "simple-module-auth" },
     { name = "simple-module-branding" },
-    { name = "simple-module-canopy-atlas" },
     { name = "simple-module-dashboard" },
     { name = "simple-module-hosting" },
     { name = "simple-module-news" },
@@ -2187,7 +2151,6 @@ requires-dist = [
     { name = "simple-module-ai", editable = "modules/ai" },
     { name = "simple-module-auth", specifier = "==0.0.26" },
     { name = "simple-module-branding", specifier = "==0.0.26" },
-    { name = "simple-module-canopy-atlas", editable = "modules/canopy_atlas" },
     { name = "simple-module-dashboard", specifier = "==0.0.26" },
     { name = "simple-module-hosting", specifier = "==0.0.26" },
     { name = "simple-module-news", editable = "modules/news" },
