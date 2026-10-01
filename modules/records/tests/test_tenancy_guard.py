@@ -98,12 +98,14 @@ async def test_an_unbound_insert_is_refused_even_with_an_explicit_tenant(guarded
 
 
 async def test_an_unbound_update_cannot_move_a_row(guarded):
+    """Unbound, the framework refuses the move before records' guard sees the
+    flush (framework 0.0.35, #356); before it, the refusal was the guard's."""
     ids = await _seed(guarded)
     async with guarded.session_factory() as session:
         stmt = all_tenants(select(Record).where(Record.id == ids["acme"]))
         record = (await session.execute(stmt)).scalar_one()
         record.tenant_id = "globex"
-        with pytest.raises(TenantUnbound):
+        with pytest.raises(TenantIsolationError, match="Cannot change tenant_id"):
             await session.flush()
 
 

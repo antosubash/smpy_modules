@@ -11,9 +11,13 @@ bypass option. That is not hypothetical: on a multi-tenant host
 ``/health/ready`` runs inside ``TenantMiddleware``, which binds whatever tenant
 the caller's header names.
 
-So :func:`read_all` clears the binding for exactly one ``execute``, and tags the
-statement with ``all_tenants``. The soft-delete filter still applies unless the
-caller passes ``include_deleted``.
+So :func:`read_all` runs exactly one ``execute`` inside the framework's
+``all_tenants()`` waiver, which clears the binding and, on a multi-tenant host,
+waives strict isolation (framework 0.0.35): without it the read raises
+``MissingTenantError`` there, which is how a records-owning host failed to
+boot. It also tags the statement with records' own ``all_tenants``, which is
+what gets it past :func:`sm_records.tenancy.install_guard`. The soft-delete
+filter still applies unless the caller passes ``include_deleted``.
 
 **Read-only by construction.** Nothing may be pending on the session. An
 autoflush inside the unbound window would reach the guard's ``before_flush``
@@ -23,12 +27,11 @@ fails instead of landing unstamped. Every caller here uses a fresh session.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterator
-from contextlib import contextmanager
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
 
-from simple_module_db.listeners import current_tenant_id
+from simple_module_db import all_tenants as framework_all_tenants
 from sqlalchemy import func, select
 
 from sm_records.models import RecordType, table_sets
@@ -37,22 +40,13 @@ from sm_records.tenancy import all_tenants
 __all__ = ["TenantCounts", "read_all", "tenant_counts"]
 
 
-@contextmanager
-def _unbound() -> Iterator[None]:
-    token = current_tenant_id.set(None)
-    try:
-        yield
-    finally:
-        current_tenant_id.reset(token)
-
-
 async def read_all(session: Any, stmt: Any) -> Any:
     """Execute ``stmt`` across every tenant, whatever the caller has bound.
 
     The result is buffered (``AsyncSession.execute``), so the rows can be read
     after the binding is back.
     """
-    with _unbound():
+    with framework_all_tenants():
         return await session.execute(all_tenants(stmt))
 
 

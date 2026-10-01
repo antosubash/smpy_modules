@@ -114,8 +114,8 @@ class RecordsModule(ModuleBase):
         intersection with no admin bypass, so listing roles here would hide
         the entry from an ``admin`` user. The views carry their own
         permission dependencies."""
-        # ``label_key`` is not on the released framework's ``MenuItem`` yet
-        # (0.0.26); the literal label stands until it is, as in every sibling.
+        # ``MenuItem`` has ``label_key`` since framework 0.0.35; the literal
+        # label stands until the repo-wide UI i18n conversion (CLAUDE.md).
         # U17: this used to sit in the shared "Content" group, a header away
         # from the per-type entries it is the hub for — the parent read as a
         # peer of another module's screen rather than what it actually is.

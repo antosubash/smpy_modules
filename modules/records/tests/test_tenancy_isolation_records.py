@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 from sm_records.models import Record
+from sm_records.tenancy import tenant_scope
 from sqlalchemy import update
 
 from tests.isolation_support import (
@@ -209,13 +210,15 @@ async def test_expand_never_reaches_into_another_tenant(two_tenants):
     table = Record.__table__
 
     async def point_at(uuid: str) -> dict:
-        async with two_tenants.db_state.session_factory() as session:  # type: ignore[attr-defined]
-            await session.execute(
-                update(table)
-                .where(table.c.tenant_id == GLOBEX, table.c.uuid == GLOBEX_REF)
-                .values(data={"title": "globex ref", "score": 3, "link": link(uuid)})
-            )
-            await session.commit()
+        # In ``globex``'s scope: a strict host refuses an unbound UPDATE.
+        with tenant_scope(GLOBEX):
+            async with two_tenants.db_state.session_factory() as session:  # type: ignore[attr-defined]
+                await session.execute(
+                    update(table)
+                    .where(table.c.tenant_id == GLOBEX, table.c.uuid == GLOBEX_REF)
+                    .values(data={"title": "globex ref", "score": 3, "link": link(uuid)})
+                )
+                await session.commit()
         resp = await two_tenants.get(f"{RECORDS}/{GLOBEX_REF}?expand=link", headers=G)
         assert resp.status_code == 200, resp.text
         return resp.json()["data"]["link"]

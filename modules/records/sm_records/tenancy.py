@@ -6,10 +6,12 @@ answer to "queried with no tenant set" is *every tenant's rows* (FACT 1b) while
 a write with none is a ``NOT NULL`` failure (FACT 1a). So records binds a tenant
 at each of its own entry points and never relies on one happening to be set.
 
-**Mode** (§A.3) is read off the *built* middleware stack, not the setting: in
-framework 0.0.26 a DB edit of ``multi_tenant`` does not rebuild the stack.
+**Mode** (§A.3) is read off the *built* middleware stack, not the setting: the
+stack is built once at boot, so a later edit of ``multi_tenant`` does not
+reach it until a restart.
 
-* ``SINGLE`` (no ``TenantMiddleware``) — everything runs in :data:`DEFAULT_TENANT`,
+* ``SINGLE`` (no ``TenantMiddleware``, or one ``fixed`` to :data:`DEFAULT_TENANT`)
+  — everything runs in :data:`DEFAULT_TENANT`,
   whatever a user's ``tenant_id`` or a header says.
 * ``MULTI`` — the admin surface runs in the *user's own* tenant and refuses a
   user with none (403 ``tenant_required``), even when a header named one —
@@ -32,17 +34,24 @@ still need the explicit ``tenant_id`` predicate of §E.
 
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
-from enum import StrEnum
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
+from simple_module_db import tenant_context
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 
 from sm_records import constants
+from sm_records._tenancy_mode import (
+    DEFAULT_TENANT,
+    TenancyMode,
+    configure,
+    detect_mode,
+    mode_of,
+    tenant_header,
+)
 from sm_records.services.errors import TenantRequired
 
 __all__ = [
@@ -69,14 +78,6 @@ __all__ = [
     "view_props",
 ]
 
-logger = logging.getLogger(__name__)
-
-DEFAULT_TENANT: Final = "default"
-"""The tenant of a single-tenant host, and of every row that predates tenancy.
-
-A constant, not a setting: the ``tenant_id`` migration backfills this literal,
-so a setting that could drift from it would strand the legacy data (§A.3)."""
-
 ALL_TENANTS: Final = "records_all_tenants"
 """Execution option marking an **explicit** cross-tenant read — health, the CLI's
 enumeration. Only lets a statement past the guard; with a tenant bound, the
@@ -91,11 +92,6 @@ ADMIN_ROLE: Final = "admin"
 framework's own wildcard role (``DEFAULT_ROLE_PERMISSIONS``)."""
 
 
-class TenancyMode(StrEnum):
-    SINGLE = "single"
-    MULTI = "multi"
-
-
 class TenantUnbound(RuntimeError):  # noqa: N818 - the design's name for it
     """A records statement ran with no tenant bound. Always a bug, never a user
     error: the entry point that reached it forgot to bind one."""
@@ -103,66 +99,6 @@ class TenantUnbound(RuntimeError):  # noqa: N818 - the design's name for it
 
 def valid_tenant(value: object) -> bool:
     return isinstance(value, str) and TENANT_RE.match(value) is not None
-
-
-# --- mode --------------------------------------------------------------------
-
-
-def _tenant_middleware(app: Any) -> Any:
-    """The ``TenantMiddleware`` entry of the built stack, or ``None``."""
-    from simple_module_hosting.middleware import TenantMiddleware
-
-    entries = getattr(app, "user_middleware", ())
-    return next((e for e in entries if getattr(e, "cls", None) is TenantMiddleware), None)
-
-
-def detect_mode(app: Any) -> TenancyMode:
-    """``MULTI`` iff the framework's ``TenantMiddleware`` is in the built stack."""
-    return TenancyMode.SINGLE if _tenant_middleware(app) is None else TenancyMode.MULTI
-
-
-def tenant_header(app: Any) -> str | None:
-    """The header that middleware resolves a tenant from — its own ``header``
-    argument, as the host passed it — or ``None`` (single mode, or no header)."""
-    entry = _tenant_middleware(app)
-    header = (getattr(entry, "kwargs", None) or {}).get("header") if entry else None
-    return header or None
-
-
-def configure(app: Any) -> TenancyMode:
-    """Detect the mode once, store it on the services container, and warn when
-    the host's setting asked for tenancy the stack does not have. Called from
-    ``RecordsModule.on_startup``.
-
-    One direction only: ``multi_tenant`` is on in the database and the stack
-    has no ``TenantMiddleware``. That is the 0.0.26 behaviour of an edit made
-    in the admin UI — the setting changed, the stack did not, and records
-    follows the stack because the stack is what resolves tenants. The other
-    direction is every host that sets ``SM_MULTI_TENANT`` in the environment:
-    ``HostSettings`` reads no environment variable, so its ``multi_tenant`` is
-    ``False`` there on every boot (framework gap L14), and warning about it
-    would be noise.
-    """
-    mode = detect_mode(app)
-    services = getattr(app.state, constants.PACKAGE, None)
-    if services is not None:
-        services.tenancy = mode
-        services.tenant_header = tenant_header(app)
-    host = getattr(getattr(app.state, "host", None), "settings", None)
-    if getattr(host, "multi_tenant", False) is True and mode is TenancyMode.SINGLE:
-        logger.warning(
-            "records: the host setting multi_tenant is on but the middleware stack has no "
-            "TenantMiddleware, so records runs single-tenant. The stack is built once, from "
-            "SM_MULTI_TENANT, when the process starts"
-        )
-    return mode
-
-
-def mode_of(app: Any) -> TenancyMode:
-    """The stored mode, or a fresh detection before ``on_startup`` has run."""
-    services = getattr(app.state, constants.PACKAGE, None)
-    mode = getattr(services, "tenancy", None)
-    return mode if isinstance(mode, TenancyMode) else detect_mode(app)
 
 
 # --- binding -----------------------------------------------------------------
@@ -185,11 +121,10 @@ def tenant_scope(tenant_id: str) -> Iterator[str]:
         raise TenantIsolationError(
             f"cannot bind tenant {tenant_id!r} inside a scope bound to {current!r}"
         )
-    token = current_tenant_id.set(tenant_id)
-    try:
+    # The framework's binding, not a bare ``set()``: it also lifts an enclosing
+    # ``all_tenants()`` waiver, so strict isolation applies inside the scope.
+    with tenant_context(tenant_id):
         yield tenant_id
-    finally:
-        current_tenant_id.reset(token)
 
 
 def bound_tenant() -> str:
@@ -204,17 +139,19 @@ def _header_tenant_for(request: Any, user: Any) -> str | None:
     """The header's tenant for an ``admin`` with none of their own, when the
     operator opted in with ``admin_header_tenant``; otherwise ``None``.
 
-    Off by default because it is FACT 3-prime on purpose: the framework already
-    resolved ``request.state.tenant_id`` from the header for this user, and
-    this lets records honour it — for operators who administer several
-    tenants from one account, and only for holders of the ``admin`` role.
+    Off by default. For operators who administer several tenants from one
+    account, and only for holders of the ``admin`` role. Records reads the
+    header itself: since framework 0.0.35 (#358) ``TenantMiddleware`` resolves
+    it for anonymous requests only, so ``request.state.tenant_id`` is ``None``
+    for every signed-in user without a tenant.
     """
     services = getattr(request.app.state, constants.PACKAGE, None)
     if not getattr(getattr(services, "settings", None), "admin_header_tenant", False):
         return None
     if ADMIN_ROLE not in (getattr(user, "roles", None) or ()):
         return None
-    tenant = getattr(request.state, "tenant_id", None)
+    header = getattr(services, "tenant_header", None)
+    tenant = request.headers.get(header) if header else None
     return tenant if valid_tenant(tenant) else None
 
 

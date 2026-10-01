@@ -100,12 +100,13 @@ async function api<T>(
 
 /** Wait until a just-created row is readable over the API.
  *
- * The framework (0.0.26) commits a write in the session dependency's exit
- * code, which FastAPI runs *after* the response is delivered — so the 201
- * can reach this process before the row is visible to the next request
- * (upstream GH #257). Every seed here creates something and immediately
- * writes to or reads it, so the read-back lives here rather than in each
- * spec, and it waits on the row itself instead of on a clock. */
+ * Before framework 0.0.35 a write was committed in the session dependency's
+ * exit code, which FastAPI runs *after* the response is delivered — so the
+ * 201 could reach this process before the row was visible to the next
+ * request (upstream GH #257). 0.0.35 commits before the response starts; the
+ * read-back stays as a cheap guard, since every seed here creates something
+ * and immediately writes to or reads it, and it waits on the row itself
+ * instead of on a clock. */
 async function readable(page: Page, path: string): Promise<void> {
   await expect.poll(async () => (await page.request.get(`${BASE}${path}`)).status()).toBe(200);
 }

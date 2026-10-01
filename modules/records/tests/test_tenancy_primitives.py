@@ -129,8 +129,8 @@ def test_mode_is_read_off_the_stack_create_app_builds(monkeypatch, multi):
 def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(caplog):
     """Only one disagreement is worth a warning: ``multi_tenant`` on in the
     database with no ``TenantMiddleware`` in the stack (an admin-UI edit that
-    did nothing). A multi stack with the setting off is every host configured
-    through ``SM_MULTI_TENANT``, which ``HostSettings`` never reads (L14)."""
+    did nothing until a restart). A multi stack with the setting off says
+    nothing either: the stack, not the setting, is what resolves tenants."""
     single = FastAPI()
     services = SimpleNamespace(tenancy=None)
     setattr(single.state, constants.PACKAGE, services)
@@ -149,6 +149,23 @@ def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(
         with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
             assert configure(multi) is TenancyMode.MULTI
         assert caplog.text == ""
+
+
+def test_a_host_pinned_to_default_is_single_and_any_other_pin_is_refused():
+    """Framework 0.0.35 (#359): ``default_tenant`` without ``multi_tenant``
+    installs ``TenantMiddleware(fixed=…)``. One tenant, so records' single mode
+    — which only works when that tenant is the one records runs in."""
+    pinned = FastAPI()
+    pinned.add_middleware(TenantMiddleware, fixed=DEFAULT_TENANT)
+    setattr(pinned.state, constants.PACKAGE, SimpleNamespace(tenancy=None))
+    assert configure(pinned) is TenancyMode.SINGLE
+    assert tenant_header(pinned) is None
+
+    elsewhere = FastAPI()
+    elsewhere.add_middleware(TenantMiddleware, fixed="acme")
+    setattr(elsewhere.state, constants.PACKAGE, SimpleNamespace(tenancy=None))
+    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+        configure(elsewhere)
 
 
 def test_mode_of_prefers_the_stored_mode_and_detects_before_startup():

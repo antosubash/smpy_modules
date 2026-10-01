@@ -33,6 +33,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.routing import iter_route_contexts
 from httpx import ASGITransport, AsyncClient, Response
 from settings.module_registry import ModuleSettingsRegistry
+from simple_module_db import all_tenants
 from sm_records import boot, constants
 from sm_records.models import RecordType, table_sets
 from sm_records.module import RecordsModule
@@ -205,25 +206,33 @@ async def same_as_unknown(
 async def tenant_rows(db_state: Any, tenant: str = ACME) -> list[tuple]:
     """Every row ``tenant`` owns, and every index row of its records: what no
     ``globex`` request may change. Core selects with the predicate spelled
-    out, so the census sees ``tenant_id`` and the guard does not apply."""
+    out, so the census sees ``tenant_id`` and the guard does not apply. Since
+    framework 0.0.35 the framework filters Core selects on a mixin table too
+    (#332), so they run under its waiver, trashed rows included: otherwise a
+    strict host refuses them and a trashed row drops out of the oracle."""
     out: list[tuple] = []
-    async with db_state.session_factory() as session:
-        type_table = RecordType.__table__
-        types = select(type_table).where(type_table.c.tenant_id == tenant).order_by(type_table.c.id)
-        out += [tuple(r) for r in (await session.execute(types)).all()]
-        for tables in table_sets():
-            ids: list[int] = []
-            for cls in (tables.record, tables.revision):
-                table = cls.__table__
-                stmt = select(table).where(table.c.tenant_id == tenant).order_by(table.c.id)
-                rows = (await session.execute(stmt)).all()
-                out += [tuple(r) for r in rows]
-                if cls is tables.record:
-                    ids = [r.id for r in rows]
-            for index in tables.index_tables:
-                table = index.__table__
-                stmt = select(table).where(table.c.record_id.in_(ids)).order_by(*table.c)
-                out += [tuple(r) for r in (await session.execute(stmt)).all()]
+
+    async def rows(session: Any, stmt: Any) -> list[Any]:
+        return (await session.execute(stmt.execution_options(include_deleted=True))).all()
+
+    with all_tenants():
+        async with db_state.session_factory() as session:
+            type_table = RecordType.__table__
+            types = select(type_table).where(type_table.c.tenant_id == tenant)
+            out += [tuple(r) for r in await rows(session, types.order_by(type_table.c.id))]
+            for tables in table_sets():
+                ids: list[int] = []
+                for cls in (tables.record, tables.revision):
+                    table = cls.__table__
+                    stmt = select(table).where(table.c.tenant_id == tenant).order_by(table.c.id)
+                    found = await rows(session, stmt)
+                    out += [tuple(r) for r in found]
+                    if cls is tables.record:
+                        ids = [r.id for r in found]
+                for index in tables.index_tables:
+                    table = index.__table__
+                    stmt = select(table).where(table.c.record_id.in_(ids)).order_by(*table.c)
+                    out += [tuple(r) for r in await rows(session, stmt)]
     return out
 
 

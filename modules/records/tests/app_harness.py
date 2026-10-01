@@ -101,6 +101,11 @@ async def build_app(
         # ``permissions`` table the middleware above needs.
         db_state = await make_db_state()
 
+    # What ``app_builder`` does on a multi-tenant host (framework 0.0.35,
+    # #355): an unbound statement over a tenant-owned table raises rather than
+    # reading every tenant, so the multi suites run under the same refusal.
+    db_state.tenant_strict = tenancy == "multi"
+
     registry = PermissionRegistry()
     module.register_permissions(registry)
     _register_roles(registry)

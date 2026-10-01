@@ -266,18 +266,26 @@ SM_TENANT_HEADER=X-Tenant-ID   # only needed if anonymous readers or API
 ```
 
 Then **restart**. The middleware stack — whether `TenantMiddleware` is in it
-at all — is built once, from the environment, when `create_app` runs.
-Toggling `multi_tenant` on the Settings screen instead of the environment
-does not work: it edits the stored `HostSettings` row, which the stack was
-already built without consulting (a framework quirk — `HostSettings` has no
-`SM_` prefix registered, so the env var is the only thing that reaches the
-stack build), so the process keeps running single-tenant until it restarts
-with `SM_MULTI_TENANT=true` set. Records detects the mismatch by inspecting
-the built stack itself rather than trusting the setting, and logs a warning
-at boot when the DB row says multi-tenant but the stack has no
-`TenantMiddleware` in it — the direction an admin-UI edit produces. It stays
-silent about the opposite mismatch (env var on, DB row still off), which is
-what every host configured only through `SM_MULTI_TENANT` looks like.
+at all — is built once, when the process starts. Since framework 0.0.35 the
+host's settings resolve environment first, then the stored `HostSettings`
+row, then defaults, before the stack is built, so either `SM_MULTI_TENANT`
+or the Settings screen works — but a Settings-screen edit only takes effect
+at the next restart. Records reads the mode off the built stack, not the
+setting, and logs a warning at boot when the setting says multi-tenant but
+the stack has no `TenantMiddleware` (an edit made since the last restart).
+
+A multi-tenant host on framework 0.0.35 runs **strict**: a query on a
+tenant-owned table with no tenant bound raises `MissingTenantError` instead
+of reading every tenant. Records binds a tenant on every path it owns and runs
+its deliberate cross-tenant reads (the boot-time locale check,
+`/health/ready`, the reindex runner) under the framework's `all_tenants()`
+waiver, so nothing changes for an operator.
+
+`default_tenant` (framework 0.0.35, #359) pins every request of a
+**single-tenant** host to one tenant. Records runs a single-tenant host in
+`default`, where the tenancy migration put every existing row, so it accepts
+`default_tenant` unset or `default` and **refuses to start** with any other
+value rather than have the framework bind one tenant and records another.
 
 Before flipping this on a database that already has records in it, run the
 pre-upgrade `tenant_id` field-key check in
@@ -1157,8 +1165,30 @@ cd modules/records && RECORDS_PERF_N=20000 ../../.venv/bin/python -m pytest -q -
 
 ## Upstream framework issues this module works around
 
-All are open against
+Filed against
 [antosubash/simple_module_python](https://github.com/antosubash/simple_module_python).
+
+**Status as of framework 0.0.35** (the host's pin since this upgrade). Fixed
+upstream: #332, #343, #355, #356, #357, #358, #359, #363, #364, #365, #366
+(and #335, #336, #339 through `hard_delete`, `mark_written` and SQLite's WAL,
+`busy_timeout` and `foreign_keys=ON`). Closed without a fix: #360, #361, #362
+— their rows below still describe today's behaviour. Still open: #333, #334,
+#337, #338, #340, #341, #342, #367, #369. What records changed in response:
+
+* `read_all` (health, the CLI's enumeration, the reindex runner, the boot-time
+  locale check) runs under the framework's `all_tenants()` waiver — without
+  it a strict host refused the read and failed to boot.
+* `tenant_scope` binds through the framework's `tenant_context`.
+* `admin_header_tenant` reads the tenant header itself: since #358 the
+  framework resolves it for anonymous requests only.
+* A `TenantMiddleware(fixed=…)` (#359's `default_tenant`) is single mode, and a
+  fixed tenant other than `default` is refused at boot.
+
+The remaining workarounds in the rows below — the guard, the explicit
+`tenant_id` predicates, the module's own `mark_written` and purge — are now
+redundant with the framework on most paths but still correct; they stay
+until a deliberate cleanup, because the guard is also what protects a
+single-tenant host and the CLI, which do not run strict.
 
 | Issue | What it is | What records does about it |
 |---|---|---|
