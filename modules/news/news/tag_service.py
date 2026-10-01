@@ -69,6 +69,13 @@ async def get_or_create(db: AsyncSession, name: str) -> NewsTag:
     """
     slug = _slug_for(name)
     existing = await db.scalar(select(NewsTag).where(NewsTag.slug == slug))
+    if existing is None:
+        # A tag made before slugs kept non-ASCII letters has its old, folded
+        # slug ("Café" -> "cafe"), which the new one does not match. Its name
+        # still does.
+        existing = await db.scalar(
+            select(NewsTag).where(func.lower(NewsTag.name) == name.strip().lower())
+        )
     if existing is not None:
         return existing
     tag = NewsTag(name=name.strip(), slug=slug)

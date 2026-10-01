@@ -137,7 +137,7 @@ async def list_articles(
     )
 
     rows = (await db.execute(stmt)).all()
-    return [card.to_read(row) for row in rows], int(total or 0)
+    return [card.to_read(row, editorial=include_drafts) for row in rows], int(total or 0)
 
 
 async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
@@ -194,7 +194,7 @@ async def get_read(
     if include_drafts:
         stmt = stmt.add_columns(card.HAS_UNPUBLISHED_CHANGES)
     row = (await db.execute(stmt)).first()
-    return card.to_read(row) if row is not None else None
+    return card.to_read(row, editorial=include_drafts) if row is not None else None
 
 
 async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:

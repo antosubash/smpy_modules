@@ -132,13 +132,12 @@ export function useArticleEditor(articleId: number) {
         // An empty date is a real value — it undates the article — so it is sent
         // as null rather than omitted.
         const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-        // Run together — tags live in their own table, keyed only on the
-        // article's id — but *settled* rather than raced: `Promise.all` rejects
-        // on the first failure while the other call is still in flight and
-        // unobserved, which is how a failed save used to be able to sit next to
-        // a success message.
-        const [meta, tagsResult] = await Promise.allSettled([
-          updateArticle(articleId, {
+        // In sequence: the metadata PUT carries `expected_updated_at` and the
+        // tags PUT does not, so the tags wait for it. A stale tab is refused on
+        // the first and never gets to overwrite the other writer's tags.
+        let updated: ArticleRead | null;
+        try {
+          updated = await updateArticle(articleId, {
             // Sent every time rather than only when changed: the server compares
             // the incoming slug against the stored one and records a redirect only
             // for a real move, so an unchanged value costs nothing and diffing here
@@ -151,18 +150,19 @@ export function useArticleEditor(articleId: number) {
             show_in_feed: draft.showInFeed,
             author: draft.author,
             expected_updated_at: article.updated_at,
-          }),
-          setArticleTags(articleId, draft.tags),
-        ]);
+          });
+        } catch (e) {
+          fail(e);
+          return;
+        }
         // Every write response refreshes the copy, so the next save is made
         // against what the server now holds.
-        if (meta.status === 'fulfilled' && meta.value) {
-          const tags = tagsResult.status === 'fulfilled' ? tagsResult.value : null;
-          setArticle({ ...meta.value, tags: tags ?? article.tags });
-        }
-        const failure = [meta, tagsResult].find((r) => r.status === 'rejected');
-        if (failure) {
-          fail((failure as PromiseRejectedResult).reason);
+        if (updated) setArticle({ ...updated, tags: article.tags });
+        try {
+          const tags = await setArticleTags(articleId, draft.tags);
+          if (updated) setArticle({ ...updated, tags: tags ?? article.tags });
+        } catch (e) {
+          fail(e);
           return;
         }
         setDirty(false);

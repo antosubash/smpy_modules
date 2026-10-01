@@ -117,8 +117,13 @@ def base(include_drafts: bool, category: str | None, trashed_only: bool = False)
     return stmt
 
 
-def to_read(row) -> ArticleRead:
-    """One card row — the ``COLUMNS`` tuple — as the published DTO."""
+def to_read(row, *, editorial: bool = False) -> ArticleRead:
+    """One card row — the ``COLUMNS`` tuple — as the published DTO.
+
+    ``editorial`` is whether the caller may see drafts. ``updated_at`` is only
+    for them: it moves on every draft autosave, so on a public card it would
+    tell a reader that a live article is being rewritten.
+    """
     return ArticleRead(
         id=row.id or 0,
         slug=row.slug,
@@ -132,7 +137,7 @@ def to_read(row) -> ArticleRead:
         author=row.author,
         published_at=row.published_at,
         status=row.status,
-        updated_at=as_utc(row.updated_at),
+        updated_at=as_utc(row.updated_at) if editorial else None,
         locale=row.locale,
         translation_group=row.translation_group,
         # Absent unless the caller may see drafts — see

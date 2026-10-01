@@ -83,11 +83,15 @@ export function useArticleBody(articleId: number) {
     [articleId],
   );
 
-  /** Resolves `true` when the server holds `next` afterwards — either it was
-   *  already saved or this save succeeded — and `false` when the save failed. */
-  const flush = useCallback(
+  /** One save at a time. The timer, Save, Publish and unmount can all flush;
+   *  overlapping, the later request would carry the `updated_at` from before
+   *  the earlier one landed and be refused as a conflict with itself. */
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  /** One request; `flush` is what callers use. Reads the refs at send time,
+   *  so a queued save carries whatever the previous one left behind. */
+  const send = useCallback(
     async (next: Data): Promise<boolean> => {
-      pendingRef.current = null;
       const serialized = JSON.stringify(next);
       if (serialized === savedRef.current) return true;
       // Held until Reload: retrying a stale write would only be refused again,
@@ -126,6 +130,18 @@ export function useArticleBody(articleId: number) {
       }
     },
     [articleId],
+  );
+
+  /** Resolves `true` when the server holds `next` afterwards — either it was
+   *  already saved or this save succeeded — and `false` when the save failed. */
+  const flush = useCallback(
+    (next: Data): Promise<boolean> => {
+      pendingRef.current = null;
+      const run = queueRef.current.then(() => send(next));
+      queueRef.current = run.catch(() => undefined);
+      return run;
+    },
+    [send],
   );
 
   /** Leaving the screen inside the debounce window must not drop the last edit. */
