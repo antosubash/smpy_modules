@@ -1,0 +1,73 @@
+{
+  "errors": {
+    "generic_title": "Algo salió mal",
+    "generic_description": "La página encontró un error inesperado. Intenta recargar o volver al inicio.",
+    "reload_button": "Recargar página",
+    "go_home_button": "Ir al inicio"
+  },
+  "nav": {
+    "admin": "Administración"
+  },
+  "switcher": {
+    "label": "Cambiar idioma",
+    "single_locale": "Solo {locale} está habilitado"
+  },
+  "topbar": {
+    "log_out": "Cerrar sesión"
+  },
+  "relative_time": {
+    "unknown": "desconocido",
+    "just_now": "ahora mismo",
+    "seconds_ago": "hace {count} s",
+    "minutes_ago": "hace {count} min",
+    "hours_ago": "hace {count} h",
+    "days_ago": "hace {count} d",
+    "months_ago": "hace {count} meses",
+    "months_ago_one": "hace {count} mes",
+    "months_ago_other": "hace {count} meses",
+    "years_ago": "hace {count} años",
+    "years_ago_one": "hace {count} año",
+    "years_ago_other": "hace {count} años",
+    "in_minutes": "en {count} min",
+    "in_hours": "en {count} h",
+    "in_days": "en {count} d",
+    "expired": "caducado"
+  },
+  "nav_groups": {
+    "access": "Acceso",
+    "appearance": "Apariencia",
+    "content": "Contenido",
+    "system": "Sistema",
+    "navigation": "Navegación",
+    "account": "Cuenta"
+  },
+  "command_palette": {
+    "trigger": "Buscar",
+    "title": "Buscar",
+    "description": "Ve a cualquier página a la que tengas acceso.",
+    "placeholder": "Ir a…",
+    "empty": "No hay coincidencias."
+  },
+  "admin": {
+    "panel_badge": "Panel de administración",
+    "back_to_app": "Volver a la aplicación"
+  },
+  "sidebar": {
+    "open": "Abrir barra lateral",
+    "close": "Cerrar barra lateral",
+    "back": "Volver"
+  },
+  "public_nav": {
+    "docs": "Documentación",
+    "modules": "Módulos",
+    "github": "GitHub",
+    "open_dashboard": "Abrir panel",
+    "sign_in": "Iniciar sesión",
+    "open_menu": "Abrir menú",
+    "close_menu": "Cerrar menú"
+  },
+  "demo": {
+    "banner_read_only": "Modo demostración: has iniciado sesión en una cuenta compartida y los cambios no se guardan.",
+    "banner_writable": "Modo demostración: has iniciado sesión en una cuenta compartida que usan todas las personas que exploran este sitio."
+  }
+}

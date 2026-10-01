@@ -13,7 +13,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  */
 
 async function setPack(page: Page, pack: string) {
-  await page.goto('/branding/');
+  await page.goto('/admin/branding/');
   const response = await page.request.put('/api/branding/', { data: { design_pack: pack } });
   expect(response.ok(), `branding PUT design_pack=${pack}`).toBeTruthy();
 }
@@ -103,8 +103,8 @@ test.describe('Design pack comes from branding', () => {
 
   test('the branding page offers the installed packs', async ({ page }) => {
     await login(page);
-    await page.goto('/branding/');
-    const trigger = page.locator('#design_pack');
+    await page.goto('/admin/branding/');
+    const trigger = page.getByRole('combobox', { name: 'Design pack' });
     await expect(trigger).toBeVisible();
     // Branding uses the Radix select, as every other admin dropdown in the
     // framework does (`native-select` ships in the UI kit but nothing uses

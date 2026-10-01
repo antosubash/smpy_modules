@@ -39,7 +39,7 @@ async function packVar(page: Page, name: string): Promise<string> {
 }
 
 async function setBrandColor(page: Page, color: string) {
-  await page.goto('/branding');
+  await page.goto('/admin/branding/');
   const cookies = await page.context().cookies();
   const token = cookies.find((c) => c.name === 'branding_csrf')?.value;
   const response = await page.request.put('/api/branding/', {
@@ -101,7 +101,7 @@ test.describe('Branding drives the widget tokens', () => {
     original = (await current.json()).primary_color ?? '';
     // The pack is site-wide now, so a page no longer carries it — these specs
     // read tokens off `.gca-root`, which only exists once branding selects it.
-    await page.goto('/branding/');
+    await page.goto('/admin/branding/');
     await page.request.put('/api/branding/', { data: { design_pack: 'gca' } });
     publicPath = await seedGcaPage(page);
     await page.close();

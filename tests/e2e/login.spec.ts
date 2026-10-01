@@ -6,21 +6,21 @@ test.describe('Authentication', () => {
   test('unauthenticated visits are redirected to the login page', async ({ page }) => {
     await page.goto('/pagebuilder/');
     await expect(page).toHaveURL(/\/users\/login/);
-    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   });
 
   test('login page renders the expected form fields', async ({ page }) => {
     await page.goto('/users/login');
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /log in/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   });
 
   test('rejects bad credentials', async ({ page }) => {
     await page.goto('/users/login');
     await page.getByLabel('Email').fill('nobody@example.com');
     await page.getByLabel('Password', { exact: true }).fill('wrong-password');
-    await page.getByRole('button', { name: /log in/i }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByText('Invalid email or password.')).toBeVisible();
     await expect(page).toHaveURL(/\/users\/login/);
   });
