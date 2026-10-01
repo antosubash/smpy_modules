@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
 from news.content import ArticlesService
+from news.content._slugs import free_slug
 from news.contracts.schemas import ArticleRead, ArticleTranslationCreate
 from news.endpoints.api._deps import checked_locale, read_one, require_edit
 from news.models import NewsArticle
@@ -81,7 +82,7 @@ async def translate_article(
 
     translated = await service_.create(
         title=body.title or article.title,
-        slug=body.slug or article.slug,
+        slug=body.slug or await free_slug(db, article.slug, locale),
         locale=locale,
         translation_group=group,
         category=article.category,

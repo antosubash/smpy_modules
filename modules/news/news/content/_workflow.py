@@ -213,10 +213,10 @@ class WorkflowMixin(RevisionsMixin):
 
     async def submit_for_review(self, article_id: int) -> NewsArticle:
         article = await self.get_article(article_id)
+        if article.status is not ArticleStatus.DRAFT:
+            raise HTTPException(409, "Only a draft can be submitted for review.")
         return await self._transition(
-            article,
-            status=ArticleStatus.SUBMITTED_FOR_REVIEW,
-            event=RevisionEvent.SUBMIT,
+            article, status=ArticleStatus.SUBMITTED_FOR_REVIEW, event=RevisionEvent.SUBMIT
         )
 
     async def approve(self, article_id: int) -> NewsArticle:

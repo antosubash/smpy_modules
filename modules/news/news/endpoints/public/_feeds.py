@@ -46,6 +46,10 @@ A feed is a window on the archive, not a copy of it: a reader subscribing today
 wants the recent run, and a reader who wants everything has the sitemap.
 """
 
+_ATTR_ENTITIES = {'"': "&quot;"}
+"""What ``escape`` adds for a double-quoted attribute value; it only does
+``&``, ``<`` and ``>`` by default."""
+
 
 async def sitemap_entries(
     db: AsyncSession,
@@ -205,7 +209,9 @@ def feed_router(locale: str) -> APIRouter:
                 # Which language this river is in, so a reader that aggregates
                 # several of a site's feeds can tell them apart.
                 f"<language>{escape(locale)}</language>"
-                f'<atom:link href="{escape(self_url)}"'
+                # An attribute value, so quotes are escaped too: the URL can be built
+                # from the request's Host header when no public base URL is set.
+                f'<atom:link href="{escape(self_url, _ATTR_ENTITIES)}"'
                 ' rel="self" type="application/rss+xml"/>'
                 f"{''.join(entries)}"
                 "</channel></rss>"
