@@ -31,6 +31,13 @@ depends_on: str | Sequence[str] | None = None
 
 _PAGES = "pagebuilder_pages"
 
+# Named once, because Postgres keeps an enum as a type of its own: ``add_column``
+# does not create it (only ``create_table`` does), and dropping the column or
+# table does not drop it. Both are created and dropped explicitly below, which
+# is a no-op on SQLite, where an enum is only a CHECK-less VARCHAR.
+_STATUS = sa.Enum("DRAFT", "SUBMITTED_FOR_REVIEW", "PUBLISHED", name="news_article_status")
+_EVENT = sa.Enum("PUBLISH", "UNPUBLISH", "SUBMIT", "APPROVE", "REJECT", name="news_revision_event")
+
 
 def _has_pages(bind) -> bool:
     return _PAGES in sa.inspect(bind).get_table_names()
@@ -49,6 +56,14 @@ def _backfill(bind) -> None:
     """
     if not _has_pages(bind):
         return
+    # Pagebuilder's status is its own enum type on Postgres, and Postgres will
+    # not assign one enum type to another. The labels are identical, so going
+    # through text is exact. SQLite needs no cast — and must not get one: it
+    # would give the unknown type name NUMERIC affinity and turn every label
+    # into 0.
+    page_status = "p.status"
+    if bind.dialect.name == "postgresql":
+        page_status = "CAST(CAST(p.status AS TEXT) AS news_article_status)"
     bind.execute(
         sa.text(
             f"""
@@ -69,7 +84,7 @@ def _backfill(bind) -> None:
                     SELECT p.published_data FROM {_PAGES} p WHERE p.id = news_articles.page_id
                 ),
                 status = COALESCE(
-                    (SELECT p.status FROM {_PAGES} p WHERE p.id = news_articles.page_id),
+                    (SELECT {page_status} FROM {_PAGES} p WHERE p.id = news_articles.page_id),
                     status
                 ),
                 meta_description = (
@@ -156,7 +171,7 @@ def _fill_gaps(bind) -> None:
     # default: it is the one state that publishes nothing.
     bind.execute(sa.text("UPDATE news_articles SET status = 'DRAFT' WHERE status IS NULL"))
     bind.execute(
-        sa.text("UPDATE news_articles SET index_in_search = 1 WHERE index_in_search IS NULL")
+        sa.text("UPDATE news_articles SET index_in_search = TRUE WHERE index_in_search IS NULL")
     )
 
 
@@ -205,10 +220,7 @@ def upgrade() -> None:
         sa.Column("data", sa.JSON(), nullable=False),
         sa.Column(
             "event",
-            sa.Enum(
-                "PUBLISH", "UNPUBLISH", "SUBMIT", "APPROVE", "REJECT",
-                name="news_revision_event",
-            ),
+            _EVENT,
             server_default="PUBLISH",
             nullable=False,
         ),
@@ -242,16 +254,8 @@ def upgrade() -> None:
     op.add_column("news_articles", sa.Column("title", sa.String(length=300), nullable=True))
     op.add_column("news_articles", sa.Column("draft_data", sa.JSON(), nullable=True))
     op.add_column("news_articles", sa.Column("published_data", sa.JSON(), nullable=True))
-    op.add_column(
-        "news_articles",
-        sa.Column(
-            "status",
-            sa.Enum(
-                "DRAFT", "SUBMITTED_FOR_REVIEW", "PUBLISHED", name="news_article_status"
-            ),
-            nullable=True,
-        ),
-    )
+    _STATUS.create(op.get_bind(), checkfirst=True)
+    op.add_column("news_articles", sa.Column("status", _STATUS, nullable=True))
     op.add_column(
         "news_articles", sa.Column("meta_description", sa.String(length=500), nullable=True)
     )
@@ -281,9 +285,7 @@ def upgrade() -> None:
         batch.alter_column("draft_data", existing_type=sa.JSON(), nullable=False)
         batch.alter_column(
             "status",
-            existing_type=sa.Enum(
-                "DRAFT", "SUBMITTED_FOR_REVIEW", "PUBLISHED", name="news_article_status"
-            ),
+            existing_type=_STATUS,
             nullable=False,
         )
         batch.alter_column("index_in_search", existing_type=sa.Boolean(), nullable=False)
@@ -341,3 +343,6 @@ def downgrade() -> None:
         op.f("ix_news_article_redirects_article_id"), table_name="news_article_redirects"
     )
     op.drop_table("news_article_redirects")
+    bind = op.get_bind()
+    _STATUS.drop(bind, checkfirst=True)
+    _EVENT.drop(bind, checkfirst=True)
