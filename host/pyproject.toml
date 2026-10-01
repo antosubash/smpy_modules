@@ -11,7 +11,6 @@ dependencies = [
     "simple_module_permissions==0.0.35",
     "simple_module_branding==0.0.35",
     "simple_module_pagebuilder",
-    "simple_module_canopy_atlas",
     "simple_module_news",
     "simple_module_ai",
     "simple_module_records",
@@ -23,9 +22,6 @@ package = false
 
 # In-repo modules resolve from the workspace, not PyPI.
 [tool.uv.sources.simple_module_pagebuilder]
-workspace = true
-
-[tool.uv.sources.simple_module_canopy_atlas]
 workspace = true
 
 [tool.uv.sources.simple_module_news]

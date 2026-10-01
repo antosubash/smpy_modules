@@ -9,7 +9,6 @@ resolution-markers = [
 [manifest]
 members = [
     "simple-module-ai",
-    "simple-module-canopy-atlas",
     "simple-module-news",
     "simple-module-pagebuilder",
     "simple-module-python-modules",
@@ -1842,40 +1841,6 @@ wheels = [
 ]
 
 [[package]]
-name = "simple-module-canopy-atlas"
-version = "0.0.7"
-source = { editable = "modules/canopy_atlas" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic-settings" },
-    { name = "simple-module-core" },
-    { name = "simple-module-db" },
-    { name = "simple-module-hosting" },
-    { name = "simple-module-pagebuilder" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "simple-module-test" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pydantic-settings", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
-    { name = "simple-module-core", specifier = ">=0.0.26,<0.1" },
-    { name = "simple-module-db", specifier = ">=0.0.25,<0.1" },
-    { name = "simple-module-hosting", specifier = ">=0.0.26,<0.1" },
-    { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
-    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.25,<0.1" },
-]
-provides-extras = ["dev"]
-
-[[package]]
 name = "simple-module-cli"
 version = "0.0.35"
 source = { registry = "https://pypi.org/simple" }
@@ -2204,7 +2169,6 @@ dependencies = [
     { name = "simple-module-ai" },
     { name = "simple-module-auth" },
     { name = "simple-module-branding" },
-    { name = "simple-module-canopy-atlas" },
     { name = "simple-module-dashboard" },
     { name = "simple-module-hosting" },
     { name = "simple-module-news" },
@@ -2231,7 +2195,6 @@ requires-dist = [
     { name = "simple-module-ai", editable = "modules/ai" },
     { name = "simple-module-auth", specifier = "==0.0.35" },
     { name = "simple-module-branding", specifier = "==0.0.35" },
-    { name = "simple-module-canopy-atlas", editable = "modules/canopy_atlas" },
     { name = "simple-module-dashboard", specifier = "==0.0.35" },
     { name = "simple-module-hosting", specifier = "==0.0.35" },
     { name = "simple-module-news", editable = "modules/news" },
