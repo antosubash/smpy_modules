@@ -87,8 +87,30 @@ class PlanIn(BaseModel):
         return cleaned
 
 
-class PlanOut(PlanIn):
+class PlanOut(BaseModel):
+    """A stored plan as the API returns it.
+
+    Deliberately not a ``PlanIn`` subclass: input bounds and validators guard
+    writes, and a row stored before a bound existed must still be readable —
+    otherwise one legacy value 500s every screen that lists plans.
+    """
+
     id: int
+    key: str
+    name: str
+    description: str
+    pricing_model: PricingModel
+    currency: str
+    amount_month: int | None
+    amount_year: int | None
+    stripe_price_month: str | None
+    stripe_price_year: str | None
+    trial_days: int
+    limits: dict[str, int]
+    features: list[str]
+    is_default: bool
+    is_public: bool
+    sort_order: int
     archived_at: datetime | None = None
 
 

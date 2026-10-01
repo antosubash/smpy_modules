@@ -198,3 +198,18 @@ async def test_return_url_rejected_over_http(app, admin, raw):
     assert response.json()["detail"] == "invalid_return_url"
     assert response.json()["message"]
     assert app.state.sm_billing.settings.return_base_url == ""
+
+
+async def test_legacy_out_of_range_plan_still_lists(app, admin):
+    """Bounds guard writes, never reads: a row stored before them must not 500 the admin."""
+    async with app.state.sm.db.session_factory() as session:
+        await make_plan(
+            session, "legacy", amount_month=9_999_999_999_900, limits={"tenants.seats": 10**20}
+        )
+        await session.commit()
+    response = await admin.get(f"{ADMIN}/plans")
+    assert response.status_code == 200, response.text
+    legacy = next(p for p in response.json() if p["key"] == "legacy")
+    assert legacy["amount_month"] == 9_999_999_999_900
+    page = await admin.get("/admin/billing/plans", headers={"X-Inertia": "true"})
+    assert page.status_code == 200
