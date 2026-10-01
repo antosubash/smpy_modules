@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Any
 
 import stripe
@@ -89,10 +90,14 @@ class StripeProvider:
         params: dict[str, Any] = {"name": name, "metadata": {"tenant_id": tenant_id}}
         if email:
             params["email"] = email
-        # Keyed on the tenant: the customer row is rolled back with a failed
-        # checkout, and the retry must get the same Stripe customer back
-        # (Stripe keeps idempotency keys for 24h).
-        options = {"idempotency_key": f"sm-billing-customer-{tenant_id}"}
+        # Keyed on the tenant and the params: the customer row is rolled back
+        # with a failed checkout, and the retry must get the same Stripe
+        # customer back (Stripe keeps idempotency keys for 24h). The params are
+        # part of the key because Stripe rejects a reused key with different
+        # params, which would block checkout for a day after a rename or when
+        # another owner retries.
+        digest = sha256(f"{name}\0{email or ''}".encode()).hexdigest()[:16]
+        options = {"idempotency_key": f"sm-billing-customer-{tenant_id}-{digest}"}
         customer = await self._call(self._v1.customers.create_async, params=params, options=options)
         return customer["id"]
 
