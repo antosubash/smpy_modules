@@ -91,9 +91,9 @@ class PlanService:
 
     async def _take_default(self, plan_id: int) -> None:
         await self.db.execute(
-            update(Plan).where(Plan.id != plan_id, Plan.is_default.is_(True)).values(
-                is_default=False
-            )
+            update(Plan)
+            .where(Plan.id != plan_id, Plan.is_default.is_(True))
+            .values(is_default=False)
         )
 
     async def create(self, data: PlanIn) -> Plan:

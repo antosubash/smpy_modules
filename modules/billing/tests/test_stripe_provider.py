@@ -90,8 +90,12 @@ def provider():
         prices=_Recorder(
             p.calls,
             "prices",
-            {"id": "price_team_m", "currency": "eur", "active": True,
-             "recurring": {"interval": "month"}},
+            {
+                "id": "price_team_m",
+                "currency": "eur",
+                "active": True,
+                "recurring": {"interval": "month"},
+            },
         ),
     )
     return p
@@ -101,14 +105,21 @@ def test_parse_subscription_event(provider):
     body, headers = _signed(_event("customer.subscription.updated", SUBSCRIPTION))
     event = provider.parse_webhook(body, headers)
     assert (event.id, event.type, event.subscription_id) == (
-        "evt_1", "customer.subscription.updated", "sub_1"
+        "evt_1",
+        "customer.subscription.updated",
+        "sub_1",
     )
     assert (event.tenant_id, event.customer_id) == ("t1", "cus_1")
 
 
 def test_parse_checkout_completed(provider):
-    session = {"id": "cs_1", "object": "checkout.session", "subscription": "sub_9",
-               "client_reference_id": "t9", "customer": "cus_9"}
+    session = {
+        "id": "cs_1",
+        "object": "checkout.session",
+        "subscription": "sub_9",
+        "client_reference_id": "t9",
+        "customer": "cus_9",
+    }
     body, headers = _signed(_event("checkout.session.completed", session))
     event = provider.parse_webhook(body, headers)
     assert (event.subscription_id, event.tenant_id, event.customer_id) == ("sub_9", "t9", "cus_9")
@@ -146,8 +157,13 @@ async def test_fetch_subscription_maps_snapshot(provider):
 
 async def test_checkout_params(provider):
     url = await provider.checkout_url(
-        customer_id="cus_1", price_id="price_team_m", quantity=3, trial_days=14,
-        tenant_id="t1", success_url="https://a/ok", cancel_url="https://a/no",
+        customer_id="cus_1",
+        price_id="price_team_m",
+        quantity=3,
+        trial_days=14,
+        tenant_id="t1",
+        success_url="https://a/ok",
+        cancel_url="https://a/no",
     )
     assert url == "https://co/1"
     name, _, params = provider.calls[-1]
@@ -160,8 +176,13 @@ async def test_checkout_params(provider):
 
 async def test_checkout_without_trial_omits_trial(provider):
     await provider.checkout_url(
-        customer_id="cus_1", price_id="p", quantity=1, trial_days=0,
-        tenant_id="t1", success_url="s", cancel_url="c",
+        customer_id="cus_1",
+        price_id="p",
+        quantity=1,
+        trial_days=0,
+        tenant_id="t1",
+        success_url="s",
+        cancel_url="c",
     )
     assert "trial_period_days" not in provider.calls[-1][2]["subscription_data"]
 

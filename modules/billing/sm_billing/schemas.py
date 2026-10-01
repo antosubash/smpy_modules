@@ -41,7 +41,7 @@ class PlanIn(BaseModel):
     @classmethod
     def _key(cls, value: str) -> str:
         if not _KEY_RE.match(value):
-            raise ValueError("key must be 1–64 chars of a-z, 0-9, '-' or '_'")
+            raise ValueError("key must be 1-64 chars of a-z, 0-9, '-' or '_'")
         return value
 
     @field_validator("currency")
@@ -131,3 +131,24 @@ class ConnectionOut(BaseModel):
     has_webhook_secret: bool
     return_base_url: str
     webhook_path: str
+
+
+class SubscriptionRow(BaseModel):
+    """One tenant on the admin subscriptions screen (tenants without a row too)."""
+
+    tenant_id: str
+    tenant_name: str
+    tenant_slug: str
+    tenant_status: str
+    members: int
+    plan_id: int
+    plan_key: str
+    plan_name: str
+    status: SubscriptionStatus | None
+    interval: Interval | None
+    quantity: int | None
+    current_period_end: datetime | None
+    cancel_at_period_end: bool
+    suspended_by_billing: bool
+    provider_subscription_id: str | None
+    synced_at: datetime | None

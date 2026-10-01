@@ -80,8 +80,14 @@ async def test_manual_provider_skips(app):
 async def test_reconcile_refreshes_status_and_pushes_drift(app, fake):
     tenant_id = await _tenant_on(app, "per_seat", members=3)
     fake.snapshots["sub_1"] = SubscriptionSnapshot(
-        id="sub_1", customer_id="cus_1", tenant_id=tenant_id, status="past_due",
-        price_id="price_team_m", quantity=1, trial_end=None, current_period_end=None,
+        id="sub_1",
+        customer_id="cus_1",
+        tenant_id=tenant_id,
+        status="past_due",
+        price_id="price_team_m",
+        quantity=1,
+        trial_end=None,
+        current_period_end=None,
         cancel_at_period_end=False,
     )
     report = await reconcile(app)
@@ -115,6 +121,9 @@ def test_cli_lists_reconcile():
 async def test_members_count_matches_rows(app):
     tenant_id = await _tenant_on(app, "per_seat", members=2)
     async with app.state.sm.db.session_factory() as session:
-        rows = (await session.execute(select(Membership).where(
-            Membership.tenant_id == tenant_id))).scalars().all()
+        rows = (
+            (await session.execute(select(Membership).where(Membership.tenant_id == tenant_id)))
+            .scalars()
+            .all()
+        )
     assert len(rows) == 2

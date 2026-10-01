@@ -71,9 +71,7 @@ async def make_user(app, email: str) -> str:
         )
         session.add(user)
         await session.flush()
-        role = (
-            await session.execute(select(Role).where(Role.name == "user"))
-        ).scalar_one_or_none()
+        role = (await session.execute(select(Role).where(Role.name == "user"))).scalar_one_or_none()
         if role is not None:
             session.add(UserRole(user_id=user.id, role_id=role.id))
         await session.commit()
@@ -87,9 +85,7 @@ def user_client(app) -> Callable:
     @asynccontextmanager
     async def factory(email: str) -> AsyncIterator[tuple[httpx.AsyncClient, str]]:
         user_id = await make_user(app, email)
-        cookie = forge_session_cookie(
-            app.state.sm.settings.secret_key, {"user_id": user_id}
-        )
+        cookie = forge_session_cookie(app.state.sm.settings.secret_key, {"user_id": user_id})
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://testserver",

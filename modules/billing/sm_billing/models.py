@@ -68,9 +68,7 @@ class Customer(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
 
     tenant_id: str = Field(primary_key=True, max_length=_TENANT_ID_LEN)
     provider: str = Field(max_length=20)
-    provider_customer_id: str | None = Field(
-        default=None, max_length=255, unique=True, index=True
-    )
+    provider_customer_id: str | None = Field(default=None, max_length=255, unique=True, index=True)
     email: str | None = Field(default=None, max_length=320)
 
 

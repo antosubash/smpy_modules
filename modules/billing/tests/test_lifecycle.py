@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from simple_module_db import finalize_session
 from helpers import make_plan, make_sub, make_tenant
+from simple_module_db import finalize_session
 from sm_billing.constants import SubscriptionStatus as S
 from sm_billing.lifecycle import Actions, apply_lifecycle, decide
 from tenants.constants import TenantStatus as T

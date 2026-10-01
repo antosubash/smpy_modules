@@ -28,7 +28,9 @@ async def _plans(app, **team_kw):
 
 async def _subscribe(app, tenant_id: str, plan_id: int, sid: str = "sub_1") -> None:
     async with app.state.sm.db.session_factory() as session:
-        session.add(Subscription(tenant_id=tenant_id, plan_id=plan_id, provider_subscription_id=sid))
+        session.add(
+            Subscription(tenant_id=tenant_id, plan_id=plan_id, provider_subscription_id=sid)
+        )
         session.add(Customer(tenant_id=tenant_id, provider="stripe", provider_customer_id="cus_1"))
         await session.commit()
 
@@ -42,8 +44,15 @@ async def _add_members(app, tenant_id: str, n: int) -> None:
 
 def _snapshot(tenant_id, price, quantity=1, status="active", cancel=False):
     return SubscriptionSnapshot(
-        id="sub_1", customer_id="cus_1", tenant_id=tenant_id, status=status, price_id=price,
-        quantity=quantity, trial_end=None, current_period_end=None, cancel_at_period_end=cancel,
+        id="sub_1",
+        customer_id="cus_1",
+        tenant_id=tenant_id,
+        status=status,
+        price_id=price,
+        quantity=quantity,
+        trial_end=None,
+        current_period_end=None,
+        cancel_at_period_end=cancel,
     )
 
 
@@ -160,7 +169,9 @@ async def test_change_plan_paid_to_paid(app, user_client, fake):
         assert response.status_code == 200, response.text
         assert response.json()["plan"]["key"] == "pro"
     assert fake.called("change_plan")[-1] == {
-        "subscription_id": "sub_1", "price_id": "price_pro_m", "quantity": 1
+        "subscription_id": "sub_1",
+        "price_id": "price_pro_m",
+        "quantity": 1,
     }
 
 
