@@ -124,11 +124,14 @@ def article_router(locale: str) -> APIRouter:
                 )
             raise HTTPException(status_code=404, detail="Article not found")
 
-        etag = etag_for(article.id or 0, article.updated_at)
+        variant = "inertia" if request.headers.get("x-inertia") else "html"
+        etag = etag_for(article.id or 0, article.updated_at, variant)
         control = cache_control(settings)
 
         def apply_headers(response: Response) -> Response:
             response.headers["ETag"] = etag
+            # The same URL serves two representations; see `etag_for`.
+            response.headers["Vary"] = "X-Inertia"
             response.headers["Cache-Control"] = control
             # Which language was served, for caches and for anything reading
             # the response without parsing the body.

@@ -16,15 +16,20 @@ from fastapi import Request
 from news.settings import NewsSettings, public_article_path
 
 
-def etag_for(article_id: int, updated_at: datetime | None) -> str:
+def etag_for(article_id: int, updated_at: datetime | None, variant: str = "html") -> str:
     """Stable, short ETag derived from identity + last-modified time.
 
     Deliberately not a hash of the payload: the body is the biggest column in
     the table, and hashing it on every request would make a conditional GET cost
     more than an unconditional one.
+
+    ``variant`` names the representation. One URL answers with a full HTML
+    page or, for an in-app visit, Inertia's JSON; sharing a tag let a browser
+    holding the page revalidate the JSON request, get a 304, and hand Inertia
+    the cached HTML instead.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
-    digest = hashlib.sha1(f"{article_id}:{stamp}".encode()).hexdigest()[:16]
+    digest = hashlib.sha1(f"{article_id}:{stamp}:{variant}".encode()).hexdigest()[:16]
     return f'W/"{digest}"'
 
 

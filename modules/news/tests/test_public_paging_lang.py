@@ -57,7 +57,7 @@ class TestHtmlLang:
 
         body = (await bilingual_public_client.get("/de/news/haushalt")).text
 
-        assert '<html lang="de">' in body
+        assert '<html lang="de" data-shell-lang="en">' in body
 
     async def test_the_default_language_stays_english(self, bilingual_public_client) -> None:
         async with bilingual_public_client.db_state.session_factory() as db:
@@ -65,4 +65,4 @@ class TestHtmlLang:
 
         body = (await bilingual_public_client.get("/news/budget")).text
 
-        assert '<html lang="en">' in body
+        assert '<html lang="en" data-shell-lang="en">' in body

@@ -12,12 +12,14 @@ export function useDocumentLang(locale: string | undefined): void {
   useEffect(() => {
     if (!locale) return;
     const root = document.documentElement;
-    const previous = root.lang;
+    // The shell's own language, which the server records when it rewrites
+    // `lang` for a public page; otherwise whatever was there before this page.
+    const shell = root.dataset.shellLang || root.lang;
     root.lang = locale;
     // Leaving for another screen (the console, say) must not carry this
     // page's language along; the next public page sets its own.
     return () => {
-      root.lang = previous;
+      root.lang = shell;
     };
   }, [locale]);
 }
