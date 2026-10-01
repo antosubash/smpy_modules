@@ -25,6 +25,8 @@ const KEY_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const LIMIT_KEY_RE = /^[a-z0-9][a-z0-9_.-]{0,99}$/;
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
 const WHOLE_RE = /^\d+$/;
+/** The API's `PlanIn.trial_days` upper bound. */
+const MAX_TRIAL_DAYS = 730;
 
 export function emptyPlanForm(): PlanForm {
   return {
@@ -118,6 +120,9 @@ export function validatePlanForm(form: PlanForm): string | null {
     }
   }
   if (!WHOLE_RE.test(form.trial_days.trim() || '0')) return 'Trial days is a whole number.';
+  if (Number(form.trial_days || 0) > MAX_TRIAL_DAYS) {
+    return `A trial is at most ${MAX_TRIAL_DAYS} days.`;
+  }
   for (const row of form.limits) {
     if (!row.key.trim() && !row.value.trim()) continue;
     if (!LIMIT_KEY_RE.test(row.key.trim())) return `"${row.key}" is not a valid limit key.`;

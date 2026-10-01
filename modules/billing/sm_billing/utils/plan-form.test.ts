@@ -57,6 +57,9 @@ describe('plan form', () => {
       'whole number',
     );
     expect(validatePlanForm({ ...base, amount_month: 'abc' })).toContain('amount');
+    const paid = { ...base, pricing_model: 'flat' as const, stripe_price_month: 'p' };
+    expect(validatePlanForm({ ...paid, trial_days: '731' })).toContain('730');
+    expect(validatePlanForm({ ...paid, trial_days: '730' })).toBeNull();
     expect(validatePlanForm(base)).toBeNull();
   });
 });

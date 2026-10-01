@@ -181,9 +181,11 @@ async def test_connection_encrypts_and_masks(app, admin):
 
 
 async def test_connection_save_rebuilds_stripe_provider(app, admin):
+    # Stripe was chosen at startup but fell back to manual for lack of secrets.
     app.state.sm_billing.settings = app.state.sm_billing.settings.model_copy(
         update={"provider": "stripe"}
     )
+    app.state.sm_billing.provider_error = "missing"
     await admin.put(
         f"{ADMIN}/connection",
         json={"stripe_secret_key": "sk_test_1", "stripe_webhook_secret": "whsec_1"},
@@ -191,6 +193,24 @@ async def test_connection_save_rebuilds_stripe_provider(app, admin):
     assert isinstance(app.state.sm_billing.provider, StripeProvider)
     conn = (await admin.get(f"{ADMIN}/connection")).json()
     assert (conn["active_provider"], conn["provider_error"]) == ("stripe", "")
+
+
+async def test_connection_save_does_not_switch_provider(app, admin):
+    # Switching manual -> stripe is restart-required; only the setting changes.
+    app.state.sm_billing.settings = app.state.sm_billing.settings.model_copy(
+        update={"provider": "stripe"}
+    )
+    await admin.put(
+        f"{ADMIN}/connection",
+        json={"stripe_secret_key": "sk_test_1", "stripe_webhook_secret": "whsec_1"},
+    )
+    assert app.state.sm_billing.provider.name == "manual"
+
+
+async def test_assign_without_provider_is_503(app, admin):
+    app.state.sm_billing.provider = None
+    response = await admin.post(f"{ADMIN}/subscriptions/t-x/assign", json={"plan_id": 1})
+    assert (response.status_code, response.json()["detail"]) == (503, "provider_unavailable")
 
 
 async def test_suspended_tenant_listed(app, admin):

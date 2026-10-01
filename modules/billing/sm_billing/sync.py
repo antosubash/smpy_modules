@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from sm_billing.contracts.provider import SubscriptionSnapshot
+    from sm_billing.contracts.provider import BillingProvider, SubscriptionSnapshot
 
 
 class SyncError(Exception):
@@ -87,6 +87,10 @@ async def apply_snapshot(
         # A lapse needs no plan: apply the cancel / "unpaid" on the plan they
         # had, so an unmappable price never keeps paid access alive.
         plan_id, interval = sub.plan_id, sub.interval
+    elif sub is None and status not in ENTITLED_STATUSES:
+        # A lapse of something never mirrored here (e.g. a checkout that was
+        # abandoned on a since-deleted price): there is no access to revoke.
+        raise SyncError("nothing_to_apply", f"{snap.status} on {snap.price_id or '(none)'}")
     else:
         raise SyncError("unknown_price", snap.price_id or "(none)")
 
@@ -106,3 +110,11 @@ async def apply_snapshot(
     await db.flush()
     await apply_lifecycle(db, app, sub)
     return sub
+
+
+async def resync(
+    db: AsyncSession, app: FastAPI, provider: BillingProvider, subscription_id: str
+) -> Subscription:
+    """Re-fetch ``subscription_id`` from the provider and apply it."""
+    snapshot = await provider.fetch_subscription(subscription_id)
+    return await apply_snapshot(db, app, snapshot, provider=provider.name)

@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sm_billing import constants as c
 from sm_billing.models import Subscription
 from sm_billing.seats import push_quantity
-from sm_billing.sync import apply_snapshot
+from sm_billing.services import current_provider
+from sm_billing.sync import resync
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -45,10 +46,9 @@ async def _targets(app: FastAPI, tenant_id: str | None) -> list[tuple[str, str]]
 
 async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> bool:
     """Sync one tenant from the provider; returns whether a quantity was pushed."""
-    provider = getattr(app.state, c.PACKAGE).provider
-    snapshot = await provider.fetch_subscription(subscription_id)
+    provider = current_provider(app)
     async with app.state.sm.db.session_factory() as session:
-        await apply_snapshot(session, app, snapshot, provider=provider.name)
+        await resync(session, app, provider, subscription_id)
         await finalize_session(session)
     return await push_quantity(app, tenant_id)
 

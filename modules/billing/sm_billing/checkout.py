@@ -18,7 +18,8 @@ from sm_billing.models import Customer, Plan, Subscription
 from sm_billing.plans import PlanService
 from sm_billing.resolve import effective_plan, subscription_for
 from sm_billing.schemas import PlanOut, StatusOut, SubscriptionOut
-from sm_billing.sync import apply_snapshot
+from sm_billing.services import current_provider
+from sm_billing.sync import resync
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -50,8 +51,7 @@ class BillingService:
         self.db = db
         self.app = app
         self.tenant_id = tenant_id
-        services = getattr(app.state, c.PACKAGE)
-        self.provider: BillingProvider = services.provider
+        self.provider: BillingProvider = current_provider(app)
         self.plans = PlanService(db)
         self.tenants = tenant_service(db, app)
 
@@ -66,7 +66,11 @@ class BillingService:
         return StatusOut(
             plan=plan_out(plan),
             subscription=subscription_out(sub),
-            seats={"used": await self.members(), "limit": plan.limits.get(c.ENTITLEMENT_SEATS)},
+            # Pending invitations hold a seat, as in the seat guard and Members page.
+            seats={
+                "used": await self.tenants.seats_used(self.tenant_id),
+                "limit": plan.limits.get(c.ENTITLEMENT_SEATS),
+            },
             provider=self.provider.name,
             checkout_available=self.provider.supports_checkout,
             portal_available=self.provider.supports_checkout
@@ -113,10 +117,6 @@ class BillingService:
         if sub is None or sub.provider_subscription_id is None:
             return None
         return sub if sub.status in c.ENTITLED_STATUSES else None
-
-    async def _resync(self, subscription_id: str) -> None:
-        snapshot = await self.provider.fetch_subscription(subscription_id)
-        await apply_snapshot(self.db, self.app, snapshot, provider=self.provider.name)
 
     # ── writes ──────────────────────────────────────────────────
 
@@ -199,5 +199,5 @@ class BillingService:
             if sub.plan_id == plan.id and sub.interval == interval and not sub.cancel_at_period_end:
                 raise BillingError("already_on_plan", 409)
             await self.provider.change_plan(subscription_id, price, await self._quantity(plan))
-        await self._resync(subscription_id)
+        await resync(self.db, self.app, self.provider, subscription_id)
         return await self.status()

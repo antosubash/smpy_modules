@@ -69,6 +69,7 @@ class _Recorder:
     def __getattr__(self, method: str):
         async def call(*args: Any, **kwargs: Any):
             self._calls.append((f"{self._name}.{method}", args, kwargs.get("params")))
+            self.options = kwargs.get("options")
             return stripe.StripeObject.construct_from(self._result, "sk_test")
 
         return call
@@ -205,6 +206,8 @@ async def test_set_quantity_and_cancel(provider):
 async def test_customer_and_portal(provider):
     assert await provider.ensure_customer("t1", "Acme", "o@x.io") == "cus_new"
     assert provider.calls[-1][2]["metadata"] == {"tenant_id": "t1"}
+    # A retry after a failed checkout must reuse the customer, not add one.
+    assert provider._v1.customers.options == {"idempotency_key": "sm-billing-customer-t1"}
     assert await provider.portal_url("cus_1", "https://a/billing") == "https://bp/1"
 
 

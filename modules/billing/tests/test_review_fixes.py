@@ -226,6 +226,30 @@ async def test_foreign_subscription_is_acknowledged_not_retried(app, fake):
         assert row.processed_at is not None
 
 
+async def test_lapse_for_unknown_price_without_local_row_is_acknowledged(app, fake):
+    async with app.state.sm.db.session_factory() as session:
+        tenant = await make_tenant(session)
+        await session.commit()
+    fake.snapshots["sub_1"] = _snap(tenant.id, status="canceled", price="price_gone")
+    response = await _post_webhook(app, fake, "evt_1")
+    assert response.status_code == 200, response.text
+    async with app.state.sm.db.session_factory() as session:
+        row = await session.get(EventRow, "evt_1")
+        assert "nothing_to_apply" in row.error
+        assert row.processed_at is not None
+        assert (await session.execute(select(Subscription))).first() is None
+
+
+async def test_status_seats_count_pending_invitations(app, user_client):
+    async with user_client("owner@x.io") as (owner, _):
+        await create_tenant(owner)
+        invite = await owner.post(
+            "/api/tenants/current/invitations", json={"email": "m@x.io", "role": "member"}
+        )
+        assert invite.status_code == 201, invite.text
+        assert (await owner.get("/api/billing/status")).json()["seats"]["used"] == 2
+
+
 async def test_webhook_pushes_drifted_seat_quantity(app, fake):
     team = await _team(app, pricing_model="per_seat")
     async with app.state.sm.db.session_factory() as session:

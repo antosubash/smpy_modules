@@ -32,6 +32,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: SyncError codes that are final, mapped to the response detail.
+_ACKNOWLEDGED = {
+    "unknown_tenant": "ignored_unknown_tenant",
+    "nothing_to_apply": "ignored_nothing_to_apply",
+}
+
 
 async def _claim(app: FastAPI, event: WebhookEvent, provider: str) -> bool:
     """Record the event; ``False`` when it was already processed."""
@@ -96,14 +102,15 @@ async def process_webhook(
             tenant_id = sub.tenant_id
             await finalize_session(session)
     except SyncError as exc:
-        if exc.code != "unknown_tenant":
+        if exc.code not in _ACKNOWLEDGED:
             return await _failed(app, event, exc)
         # Not ours (another product on the same Stripe account, or a tenant
-        # since deleted) and no retry will make it ours. Acknowledge it, keep
-        # the reason: a permanent 500 would get the endpoint disabled for all.
+        # since deleted), or a lapse with nothing local to lapse; no retry
+        # changes that. Acknowledge it, keep the reason: a permanent 500
+        # would get the endpoint disabled for all.
         logger.warning("billing: webhook %s: %s — acknowledged", event.id, exc)
         await _finish(app, event.id, None, note=f"SyncError: {exc}")
-        return 200, "ignored_unknown_tenant"
+        return 200, _ACKNOWLEDGED[exc.code]
     except Exception as exc:
         return await _failed(app, event, exc)
     await _finish(app, event.id, None)

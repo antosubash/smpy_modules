@@ -39,4 +39,19 @@ describe('api', () => {
     });
     expect(ApiError).toBeDefined();
   });
+
+  it('reads a FastAPI validation error list', async () => {
+    const detail = [
+      { loc: ['body', 'trial_days'], msg: 'Input should be less than or equal to 730' },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ detail }), { status: 422 })),
+    );
+    await expect(api('/a', 't', { body: {} })).rejects.toMatchObject({
+      status: 422,
+      detail: 'validation_error',
+      message: 'trial_days: Input should be less than or equal to 730.',
+    });
+  });
 });

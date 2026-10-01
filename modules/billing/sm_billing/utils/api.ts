@@ -44,11 +44,20 @@ export function describeError(detail: string, body: Record<string, unknown> = {}
     const over = Number(body.used) - Number(body.limit);
     return `That plan allows ${body.limit} seats and you use ${body.used} — remove ${over} first.`;
   }
+  if (detail === 'validation_error' && typeof body.message === 'string') return body.message;
   if (detail === 'price_mismatch') return `Stripe price ${body.price}: ${body.reason}.`;
   if (detail === 'provider_error' && typeof body.message === 'string') {
     return `${MESSAGES.provider_error} ${body.message}`;
   }
   return MESSAGES[detail] ?? 'Something went wrong. Please try again.';
+}
+
+/** FastAPI's 422 body: `detail` is a list of `{loc, msg}`; show the first. */
+function validationMessage(items: unknown[]): string {
+  const first = (items[0] ?? {}) as { loc?: unknown; msg?: unknown };
+  const msg = typeof first.msg === 'string' ? first.msg : 'Invalid input';
+  const field = Array.isArray(first.loc) ? first.loc[first.loc.length - 1] : undefined;
+  return field === undefined ? `${msg}.` : `${field}: ${msg}.`;
 }
 
 export async function api<T>(
@@ -69,6 +78,12 @@ export async function api<T>(
   });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
+    if (Array.isArray(body.detail)) {
+      throw new ApiError(response.status, 'validation_error', {
+        ...body,
+        message: validationMessage(body.detail),
+      });
+    }
     const detail = typeof body.detail === 'string' ? body.detail : `http_${response.status}`;
     throw new ApiError(response.status, detail, body);
   }

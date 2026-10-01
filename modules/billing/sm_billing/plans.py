@@ -12,6 +12,7 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from sm_billing import constants as c
@@ -190,5 +191,10 @@ async def seed_default_plan(session_factory: async_sessionmaker) -> None:
                     is_default=True,
                 )
             )
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Another worker seeded it between our check and commit.
+            await session.rollback()
+            return
         logger.info("billing: seeded the free default plan")

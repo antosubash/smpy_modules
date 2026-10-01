@@ -75,9 +75,12 @@ class StripeProvider:
         self._v1 = self._client.v1
         self._webhook_secret = webhook_secret
 
-    async def _call(self, fn, *args: Any, params: dict | None = None) -> dict:
+    async def _call(
+        self, fn, *args: Any, params: dict | None = None, options: dict | None = None
+    ) -> dict:
+        kwargs = {k: v for k, v in (("params", params), ("options", options)) if v is not None}
         try:
-            result = await fn(*args, params=params) if params is not None else await fn(*args)
+            result = await fn(*args, **kwargs)
         except stripe.StripeError as exc:
             raise ProviderError(exc.user_message or str(exc)) from exc
         return result.to_dict()
@@ -86,7 +89,11 @@ class StripeProvider:
         params: dict[str, Any] = {"name": name, "metadata": {"tenant_id": tenant_id}}
         if email:
             params["email"] = email
-        customer = await self._call(self._v1.customers.create_async, params=params)
+        # Keyed on the tenant: the customer row is rolled back with a failed
+        # checkout, and the retry must get the same Stripe customer back
+        # (Stripe keeps idempotency keys for 24h).
+        options = {"idempotency_key": f"sm-billing-customer-{tenant_id}"}
+        customer = await self._call(self._v1.customers.create_async, params=params, options=options)
         return customer["id"]
 
     async def create_checkout(

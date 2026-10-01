@@ -16,7 +16,10 @@ from sm_billing.lifecycle import apply_lifecycle, tenant_service
 from sm_billing.models import Plan, Subscription
 from sm_billing.plans import PlanService
 from sm_billing.providers.factory import install_provider
+from sm_billing.resolve import subscription_for
 from sm_billing.schemas import ConnectionIn, ConnectionOut, PlanIn, SubscriptionRow
+from sm_billing.services import current_provider
+from sm_billing.sync import resync as resync_subscription
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -37,16 +40,27 @@ def _services(app: FastAPI):
 # ── plans ───────────────────────────────────────────────────────────
 
 
-async def verify_prices(app: FastAPI, data: PlanIn) -> None:
-    """Under Stripe, each price must exist, be active, and match currency + interval."""
+async def verify_prices(app: FastAPI, data: PlanIn, existing: Plan | None = None) -> None:
+    """Under Stripe, each price must exist, be active, and match currency + interval.
+
+    A price the plan already carries is not re-checked: Stripe prices get
+    archived over time, and that must not lock the plan against unrelated
+    edits (renaming, hiding, limits).
+    """
     provider = _services(app).provider
     if provider is None or not provider.supports_checkout:
         return
-    for interval, price_id in (
-        (c.Interval.MONTH, data.stripe_price_month),
-        (c.Interval.YEAR, data.stripe_price_year),
+    for interval, price_id, current in (
+        (
+            c.Interval.MONTH,
+            data.stripe_price_month,
+            existing.stripe_price_month if existing else None,
+        ),
+        (c.Interval.YEAR, data.stripe_price_year, existing.stripe_price_year if existing else None),
     ):
-        if not price_id:
+        if not price_id or (
+            price_id == current and existing and existing.currency == data.currency
+        ):
             continue
         try:
             info = await provider.verify_price(price_id)
@@ -64,8 +78,8 @@ async def verify_prices(app: FastAPI, data: PlanIn) -> None:
 
 
 async def save_plan(db: AsyncSession, app: FastAPI, data: PlanIn, plan_id: int | None) -> Plan:
-    await verify_prices(app, data)
     plans = PlanService(db)
+    await verify_prices(app, data, await plans.get(plan_id) if plan_id is not None else None)
     return await plans.create(data) if plan_id is None else await plans.update(plan_id, data)
 
 
@@ -132,16 +146,14 @@ async def one_row(db: AsyncSession, app: FastAPI, tenant_id: str) -> Subscriptio
 
 async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn) -> None:
     """Manual provider only: set the tenant's plan and status directly."""
-    if _services(app).provider.supports_checkout:
+    if current_provider(app).supports_checkout:
         raise BillingError("provider_managed", 409)
     if await db.get(Tenant, tenant_id) is None:
         raise BillingError("tenant_not_found", 404)
     plan = await PlanService(db).get(data.plan_id)
     if plan is None:
         raise BillingError("plan_not_found", 404)
-    sub = (
-        await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))
-    ).scalar_one_or_none()
+    sub = await subscription_for(db, tenant_id)
     if sub is None:
         sub = Subscription(tenant_id=tenant_id, plan_id=plan.id)
         db.add(sub)
@@ -155,18 +167,13 @@ async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn)
 
 
 async def resync(db: AsyncSession, app: FastAPI, tenant_id: str) -> None:
-    provider = _services(app).provider
+    provider = current_provider(app)
     if not provider.supports_checkout:
         raise BillingError("checkout_unavailable", 409)
-    sub = (
-        await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))
-    ).scalar_one_or_none()
+    sub = await subscription_for(db, tenant_id)
     if sub is None or sub.provider_subscription_id is None:
         raise BillingError("no_provider_subscription", 409)
-    from sm_billing.sync import apply_snapshot
-
-    snapshot = await provider.fetch_subscription(sub.provider_subscription_id)
-    await apply_snapshot(db, app, snapshot, provider=provider.name)
+    await resync_subscription(db, app, provider, sub.provider_subscription_id)
 
 
 # ── connection ──────────────────────────────────────────────────────
@@ -208,6 +215,12 @@ async def save_connection(db: AsyncSession, app: FastAPI, data: ConnectionIn) ->
     await apply_changes_and_reload(
         app, app.state.sm.event_bus, store, package=c.PACKAGE, changes=connection_changes(data)
     )
-    # New secrets take effect now; switching provider itself still needs a restart.
-    install_provider(_services(app))
+    # New secrets take effect now; switching provider itself still needs a
+    # restart. A stripe that fell back to manual at startup (secrets missing)
+    # is still the chosen provider, so its new secrets apply too.
+    services = _services(app)
+    running = services.provider.name if services.provider else ""
+    chosen = services.settings.provider
+    if chosen == running or (chosen == c.PROVIDER_STRIPE and services.provider_error):
+        install_provider(services)
     return connection_out(app)
