@@ -20,12 +20,31 @@ import type React from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
-import { ADMIN_API, api } from '../utils/api';
+import { ADMIN_API, ApiError, api } from '../utils/api';
 import type { AdminCommon, Connection as ConnectionInfo } from '../utils/types';
 
 interface Props extends AdminCommon {
   connection: ConnectionInfo;
   webhook_url: string;
+}
+
+const RETURN_URL_MAX = 255;
+const RETURN_URL_RULE =
+  'Return URL must be an http(s) origin such as https://app.example.com — no path, query or fragment, at most 255 characters.';
+
+/** Mirrors the server's `normalise_return_url`: blank is fine, else an http(s) origin. */
+function returnUrlError(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+  if (value.length > RETURN_URL_MAX || /[\s?#@]/.test(value)) return RETURN_URL_RULE;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return RETURN_URL_RULE;
+  }
+  const httpish = url.protocol === 'http:' || url.protocol === 'https:';
+  return httpish && url.hostname && url.pathname === '/' ? '' : RETURN_URL_RULE;
 }
 
 function SecretField(props: {
@@ -68,10 +87,14 @@ function Connection() {
   const [clearSecret, setClearSecret] = useState(false);
   const [clearWebhook, setClearWebhook] = useState(false);
   const [returnUrl, setReturnUrl] = useState(connection.return_base_url);
+  const [returnUrlMsg, setReturnUrlMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    const urlError = returnUrlError(returnUrl);
+    setReturnUrlMsg(urlError);
+    if (urlError) return;
     setBusy(true);
     try {
       await api(`${ADMIN_API}/connection`, csrf_token, {
@@ -89,6 +112,10 @@ function Connection() {
       setWebhook('');
       router.reload();
     } catch (err) {
+      if (err instanceof ApiError && err.detail === 'invalid_return_url') {
+        setReturnUrlMsg(String(err.body.message ?? RETURN_URL_RULE));
+        return;
+      }
       toast.error((err as Error).message);
     } finally {
       setBusy(false);
@@ -159,9 +186,20 @@ function Connection() {
                   <Input
                     id="return-url"
                     placeholder="https://app.example.com"
+                    maxLength={RETURN_URL_MAX}
                     value={returnUrl}
-                    onChange={(e) => setReturnUrl(e.target.value)}
+                    aria-invalid={returnUrlMsg ? true : undefined}
+                    aria-describedby={returnUrlMsg ? 'return-url-error' : undefined}
+                    onChange={(e) => {
+                      setReturnUrl(e.target.value);
+                      setReturnUrlMsg('');
+                    }}
                   />
+                  {returnUrlMsg && (
+                    <p id="return-url-error" role="alert" className="text-xs text-destructive">
+                      {returnUrlMsg}
+                    </p>
+                  )}
                 </div>
                 {can_manage && (
                   <Button type="submit" disabled={busy}>

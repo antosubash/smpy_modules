@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -11,6 +12,15 @@ from sm_billing.constants import Interval, PricingModel, SubscriptionStatus
 
 _KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 _LIMIT_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,99}$")
+# Stored in int4 columns (amounts, limits); keep well inside 2**31 - 1.
+MAX_AMOUNT = 2_000_000_000
+MAX_SORT_ORDER = 1_000_000
+RETURN_URL_MAX = 255
+RETURN_URL_RULE = (
+    "Return URL must be an http(s) origin such as https://app.example.com — "
+    f"no path, query or fragment, at most {RETURN_URL_MAX} characters."
+)
+_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+$|^\[[0-9A-Fa-f:.]+\]$")
 
 
 def _blank_to_none(value: str | None) -> str | None:
@@ -26,8 +36,8 @@ class PlanIn(BaseModel):
     description: str = Field(default="", max_length=500)
     pricing_model: PricingModel
     currency: str = Field(default="eur", min_length=3, max_length=3)
-    amount_month: int | None = Field(default=None, ge=0)
-    amount_year: int | None = Field(default=None, ge=0)
+    amount_month: int | None = Field(default=None, ge=0, le=MAX_AMOUNT)
+    amount_year: int | None = Field(default=None, ge=0, le=MAX_AMOUNT)
     stripe_price_month: str | None = Field(default=None, max_length=255)
     stripe_price_year: str | None = Field(default=None, max_length=255)
     trial_days: int = Field(default=0, ge=0, le=730)
@@ -35,7 +45,7 @@ class PlanIn(BaseModel):
     features: list[str] = Field(default_factory=list)
     is_default: bool = False
     is_public: bool = True
-    sort_order: int = 0
+    sort_order: int = Field(default=0, ge=-MAX_SORT_ORDER, le=MAX_SORT_ORDER)
 
     @field_validator("key")
     @classmethod
@@ -62,6 +72,8 @@ class PlanIn(BaseModel):
                 raise ValueError(f"invalid limit key {key!r}")
             if limit < 0:
                 raise ValueError(f"limit for {key!r} must be >= 0")
+            if limit > MAX_AMOUNT:
+                raise ValueError(f"limit for {key!r} must be <= {MAX_AMOUNT}")
         return value
 
     @field_validator("features")
@@ -120,7 +132,38 @@ class ConnectionIn(BaseModel):
     stripe_webhook_secret: str = ""
     clear_secret_key: bool = False
     clear_webhook_secret: bool = False
-    return_base_url: str = Field(default="", max_length=255)
+    # Validated by ``normalise_return_url`` so a bad value is a 400 with a
+    # readable message, not a raw 422.
+    return_base_url: str = ""
+
+
+def normalise_return_url(value: str) -> str:
+    """Blank, or an http(s) origin without a trailing "/". ``ValueError`` otherwise."""
+    value = value.strip()
+    if not value:
+        return ""
+    if len(value) > RETURN_URL_MAX:
+        raise ValueError(RETURN_URL_RULE)
+    try:
+        parts = urlsplit(value)
+        port_ok = parts.port is None or parts.port > 0
+    except ValueError as exc:
+        raise ValueError(RETURN_URL_RULE) from exc
+    netloc_host = parts.netloc.rsplit(":", 1)[0] if parts.port else parts.netloc
+    if (
+        parts.scheme.lower() not in ("http", "https")
+        or not parts.hostname
+        or "@" in parts.netloc
+        or not _HOST_RE.match(netloc_host)
+        or not port_ok
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+        or "?" in value
+        or "#" in value
+    ):
+        raise ValueError(RETURN_URL_RULE)
+    return value.rstrip("/")
 
 
 class ConnectionOut(BaseModel):

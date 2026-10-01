@@ -37,6 +37,7 @@ const MESSAGES: Record<string, string> = {
   plan_key_immutable: 'A plan key cannot change once created.',
   price_taken: 'Another plan already uses that Stripe price.',
   price_not_found: 'Stripe has no price with that ID.',
+  invalid_return_url: 'The return URL must be an http(s) origin like https://app.example.com.',
 };
 
 export function describeError(detail: string, body: Record<string, unknown> = {}): string {

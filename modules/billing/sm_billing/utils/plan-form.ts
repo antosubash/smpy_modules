@@ -23,10 +23,17 @@ export type PlanPayload = Omit<Plan, 'id' | 'archived_at'>;
 
 const KEY_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const LIMIT_KEY_RE = /^[a-z0-9][a-z0-9_.-]{0,99}$/;
+const FEATURE_RE = LIMIT_KEY_RE;
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
 const WHOLE_RE = /^\d+$/;
-/** The API's `PlanIn.trial_days` upper bound. */
+const INT_RE = /^-?\d+$/;
+/** The API's `PlanIn` bounds. */
+export const MAX_NAME = 120;
+export const MAX_DESCRIPTION = 500;
 const MAX_TRIAL_DAYS = 730;
+const MAX_MINOR = 2_000_000_000;
+const MAX_LIMIT = 2_000_000_000;
+const MAX_SORT = 1_000_000;
 
 export function emptyPlanForm(): PlanForm {
   return {
@@ -83,7 +90,28 @@ function parseFeatures(text: string): string[] {
   ];
 }
 
+/**
+ * Change the pricing model. Free hides the price/amount/trial fields, so their
+ * values are cleared rather than validated invisibly; paid plans cannot be the
+ * default, so the (then disabled) checkbox is unticked.
+ */
+export function withPricingModel(form: PlanForm, model: PricingModel): PlanForm {
+  if (model === 'free') {
+    return {
+      ...form,
+      pricing_model: model,
+      stripe_price_month: '',
+      stripe_price_year: '',
+      amount_month: '',
+      amount_year: '',
+      trial_days: '0',
+    };
+  }
+  return { ...form, pricing_model: model, is_default: false };
+}
+
 export function planPayload(form: PlanForm): PlanPayload {
+  const free = form.pricing_model === 'free';
   const limits: Record<string, number> = {};
   for (const row of form.limits) {
     if (row.key.trim() && row.value.trim()) limits[row.key.trim()] = Number(row.value);
@@ -94,11 +122,11 @@ export function planPayload(form: PlanForm): PlanPayload {
     description: form.description.trim(),
     pricing_model: form.pricing_model,
     currency: form.currency.trim().toLowerCase(),
-    amount_month: toMinor(form.amount_month),
-    amount_year: toMinor(form.amount_year),
-    stripe_price_month: orNull(form.stripe_price_month),
-    stripe_price_year: orNull(form.stripe_price_year),
-    trial_days: Number(form.trial_days || 0),
+    amount_month: free ? null : toMinor(form.amount_month),
+    amount_year: free ? null : toMinor(form.amount_year),
+    stripe_price_month: free ? null : orNull(form.stripe_price_month),
+    stripe_price_year: free ? null : orNull(form.stripe_price_year),
+    trial_days: free ? 0 : Number(form.trial_days || 0),
     limits,
     features: parseFeatures(form.features),
     is_default: form.is_default,
@@ -107,34 +135,70 @@ export function planPayload(form: PlanForm): PlanPayload {
   };
 }
 
+const amountOk = (text: string) =>
+  !text.trim() || (AMOUNT_RE.test(text.trim()) && (toMinor(text) ?? 0) <= MAX_MINOR);
+
+function validatePrice(form: PlanForm): string | null {
+  const amounts = [
+    ['Monthly', form.amount_month],
+    ['Yearly', form.amount_year],
+  ] as const;
+  for (const [label, amount] of amounts) {
+    if (!amountOk(amount)) {
+      return `${label} amount must be a number from 0 to 20,000,000 with at most two decimals.`;
+    }
+  }
+  const trial = form.trial_days.trim() || '0';
+  if (!WHOLE_RE.test(trial) || Number(trial) > MAX_TRIAL_DAYS) {
+    return `Trial days must be a whole number from 0 to ${MAX_TRIAL_DAYS}.`;
+  }
+  if (!form.stripe_price_month.trim() && !form.stripe_price_year.trim()) {
+    return 'A paid plan needs at least one Stripe price ID.';
+  }
+  if (form.is_default) return 'Only a free plan can be the default.';
+  return null;
+}
+
+function validateLimits(form: PlanForm): string | null {
+  const seen = new Set<string>();
+  for (const row of form.limits) {
+    const key = row.key.trim();
+    const value = row.value.trim();
+    if (!key && !value) continue;
+    if (!LIMIT_KEY_RE.test(key)) return `"${row.key}" is not a valid limit key.`;
+    if (seen.has(key)) return `Limit '${key}' is listed twice.`;
+    seen.add(key);
+    if (!WHOLE_RE.test(value) || Number(value) > MAX_LIMIT) {
+      return `Limit "${key}" must be a whole number from 0 to 2,000,000,000.`;
+    }
+  }
+  return null;
+}
+
 /** The first problem with the form, or null. Mirrors the server's invariants. */
 export function validatePlanForm(form: PlanForm): string | null {
   if (!KEY_RE.test(form.key.trim())) {
     return 'The key must be 1-64 lowercase letters, digits, "-" or "_".';
   }
   if (!form.name.trim()) return 'Give the plan a name.';
+  if (form.name.trim().length > MAX_NAME) return `The name is at most ${MAX_NAME} characters.`;
+  if (form.description.trim().length > MAX_DESCRIPTION) {
+    return `The description is at most ${MAX_DESCRIPTION} characters.`;
+  }
   if (!/^[a-zA-Z]{3}$/.test(form.currency.trim())) return 'Currency is a 3-letter code.';
-  for (const amount of [form.amount_month, form.amount_year]) {
-    if (amount.trim() && !AMOUNT_RE.test(amount.trim())) {
-      return 'Each amount is a number with at most two decimals.';
-    }
+  if (form.pricing_model !== 'free') {
+    const problem = validatePrice(form);
+    if (problem) return problem;
   }
-  if (!WHOLE_RE.test(form.trial_days.trim() || '0')) return 'Trial days is a whole number.';
-  if (Number(form.trial_days || 0) > MAX_TRIAL_DAYS) {
-    return `A trial is at most ${MAX_TRIAL_DAYS} days.`;
+  const sort = form.sort_order.trim() || '0';
+  if (!INT_RE.test(sort) || Math.abs(Number(sort)) > MAX_SORT) {
+    return 'Sort order must be a whole number from -1,000,000 to 1,000,000.';
   }
-  for (const row of form.limits) {
-    if (!row.key.trim() && !row.value.trim()) continue;
-    if (!LIMIT_KEY_RE.test(row.key.trim())) return `"${row.key}" is not a valid limit key.`;
-    if (!WHOLE_RE.test(row.value.trim())) return `Limit "${row.key}" must be a whole number ≥ 0.`;
-  }
-  const hasPrice = Boolean(form.stripe_price_month.trim() || form.stripe_price_year.trim());
-  if (form.pricing_model === 'free') {
-    if (hasPrice) return 'Free plans have no Stripe price.';
-    if (Number(form.trial_days || 0) > 0) return 'Free plans have no trial.';
-  } else {
-    if (!hasPrice) return 'A paid plan needs at least one Stripe price ID.';
-    if (form.is_default) return 'Only a free plan can be the default.';
+  const limitProblem = validateLimits(form);
+  if (limitProblem) return limitProblem;
+  const badFeature = parseFeatures(form.features).find((f) => !FEATURE_RE.test(f));
+  if (badFeature !== undefined) {
+    return `Feature "${badFeature}" is not valid: use lowercase letters, digits, ".", "_" or "-".`;
   }
   return null;
 }

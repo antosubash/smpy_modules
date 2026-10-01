@@ -5,7 +5,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card } from '@simple-module-py/ui/components/ui/card';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import { Archive, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
 import { PlanEditor } from '../components/PlanEditor';
@@ -26,26 +26,37 @@ function Plans() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [archiving, setArchiving] = useState<Plan | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Synchronous in-flight guard: `busy` state only lands on the next render,
+  // so a fast double click would otherwise send two POSTs.
+  const inFlight = useRef(false);
 
-  async function run(work: () => Promise<void>) {
+  async function run(work: () => Promise<void>, onError?: (message: string) => void) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     try {
       await work();
       router.reload();
     } catch (err) {
-      toast.error((err as Error).message);
+      const message = (err as Error).message;
+      onError?.(message);
+      toast.error(message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
 
   const open = (plan: Plan | null) => {
     setEditing(plan);
+    setSaveError(null);
     setEditorOpen(true);
   };
 
   const save = (form: PlanForm) =>
     run(async () => {
+      setSaveError(null);
       const body = planPayload(form);
       if (editing) {
         await api(`${ADMIN_API}/plans/${editing.id}`, csrf_token, { method: 'PUT', body });
@@ -54,7 +65,7 @@ function Plans() {
       }
       toast.success(editing ? 'Plan saved' : 'Plan created');
       setEditorOpen(false);
-    });
+    }, setSaveError);
 
   const archive = () =>
     run(async () => {
@@ -88,6 +99,7 @@ function Plans() {
         plan={editing}
         knownKeys={known_limit_keys}
         busy={busy}
+        serverError={saveError}
         onOpenChange={setEditorOpen}
         onSave={save}
       />

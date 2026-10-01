@@ -17,7 +17,13 @@ from sm_billing.models import Plan, Subscription
 from sm_billing.plans import PlanService
 from sm_billing.providers.factory import install_provider
 from sm_billing.resolve import subscription_for
-from sm_billing.schemas import ConnectionIn, ConnectionOut, PlanIn, SubscriptionRow
+from sm_billing.schemas import (
+    ConnectionIn,
+    ConnectionOut,
+    PlanIn,
+    SubscriptionRow,
+    normalise_return_url,
+)
 from sm_billing.services import current_provider
 from sm_billing.sync import resync as resync_subscription
 
@@ -195,7 +201,11 @@ def connection_out(app: FastAPI) -> ConnectionOut:
 
 def connection_changes(data: ConnectionIn) -> dict[str, Any]:
     """Blank secret = keep; a value is stripped and encrypted; ``clear_*`` wins."""
-    changes: dict[str, Any] = {"return_base_url": data.return_base_url.strip().rstrip("/")}
+    try:
+        return_base_url = normalise_return_url(data.return_base_url)
+    except ValueError as exc:
+        raise BillingError("invalid_return_url", message=str(exc)) from exc
+    changes: dict[str, Any] = {"return_base_url": return_base_url}
     for field in c.SECRET_FIELDS:
         value = getattr(data, field).strip()
         if value:

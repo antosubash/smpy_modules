@@ -44,6 +44,16 @@ def _check(data: PlanIn) -> None:
         raise PlanError("default_must_be_free")
 
 
+def _conflict_code(exc: IntegrityError) -> str:
+    """Which unique constraint fired, from the driver's message.
+
+    SQLite names the column (``billing_plan.stripe_price_month``); Postgres
+    names the constraint (``billing_plan_stripe_price_month_key``) — the key
+    column's is ``ix_billing_plan_key``.
+    """
+    return "price_taken" if "stripe_price" in str(exc.orig) else "plan_key_taken"
+
+
 class PlanService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -90,6 +100,21 @@ class PlanService:
         if data.stripe_price_month and data.stripe_price_month == data.stripe_price_year:
             raise PlanError("price_taken", status_code=409)
 
+    async def _flush_unique(self, data: PlanIn, plan_id: int | None, apply) -> None:
+        """Run ``apply`` and flush inside a savepoint; a unique clash is a 409.
+
+        ``_ensure_unique`` is check-then-write, so two concurrent requests can
+        both pass it. The constraint then fires at flush; roll back just the
+        savepoint (the request session stays usable) and report which one.
+        """
+        try:
+            async with self.db.begin_nested():
+                apply()
+                await self.db.flush()
+        except IntegrityError as exc:
+            await self._ensure_unique(data, plan_id)
+            raise PlanError(_conflict_code(exc), status_code=409) from exc
+
     async def _take_default(self, plan_id: int) -> None:
         await self.db.execute(
             update(Plan)
@@ -101,8 +126,7 @@ class PlanService:
         _check(data)
         await self._ensure_unique(data, None)
         plan = Plan(**data.model_dump())
-        self.db.add(plan)
-        await self.db.flush()
+        await self._flush_unique(data, None, lambda: self.db.add(plan))
         if plan.is_default:
             await self._take_default(plan.id)
         return plan
@@ -120,10 +144,13 @@ class PlanService:
             raise PlanError("cannot_archive_default", status_code=409)
         await self._guard_prices_in_use(plan, data)
         await self._ensure_unique(data, plan.id)
-        for field, value in data.model_dump().items():
-            setattr(plan, field, value)
-        plan.updated_at = datetime.now(UTC)
-        await self.db.flush()
+
+        def apply() -> None:
+            for field, value in data.model_dump().items():
+                setattr(plan, field, value)
+            plan.updated_at = datetime.now(UTC)
+
+        await self._flush_unique(data, plan.id, apply)
         if plan.is_default:
             await self._take_default(plan.id)
         return plan

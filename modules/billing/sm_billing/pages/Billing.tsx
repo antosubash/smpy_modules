@@ -113,11 +113,17 @@ function Billing() {
               icon={Lock}
               tone="warning"
               title="This organisation is suspended for non-payment"
-              description="Update your payment method and settle the open invoice; access returns as soon as Stripe confirms the payment."
+              description={
+                status.portal_available
+                  ? 'Update your payment method and settle any open invoice; access returns as soon as Stripe confirms the payment.'
+                  : 'Contact the site administrator to restore access.'
+              }
               action={
-                <Button size="sm" onClick={openPortal} disabled={busy}>
-                  Pay now
-                </Button>
+                status.portal_available ? (
+                  <Button size="sm" onClick={openPortal} disabled={busy}>
+                    Pay now
+                  </Button>
+                ) : undefined
               }
             />
           )}

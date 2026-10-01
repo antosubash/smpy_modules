@@ -14,7 +14,15 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { emptyPlanForm, formFromPlan, type PlanForm, validatePlanForm } from '../utils/plan-form';
+import {
+  emptyPlanForm,
+  formFromPlan,
+  MAX_DESCRIPTION,
+  MAX_NAME,
+  type PlanForm,
+  validatePlanForm,
+  withPricingModel,
+} from '../utils/plan-form';
 import type { Plan, PricingModel } from '../utils/types';
 import { LimitRows } from './LimitRows';
 
@@ -23,6 +31,8 @@ interface Props {
   plan: Plan | null;
   knownKeys: string[];
   busy: boolean;
+  /** A rejection from the API, shown in the dialog's alert area. */
+  serverError?: string | null;
   onOpenChange: (open: boolean) => void;
   onSave: (form: PlanForm) => void;
 }
@@ -36,7 +46,15 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
-export function PlanEditor({ open, plan, knownKeys, busy, onOpenChange, onSave }: Props) {
+export function PlanEditor({
+  open,
+  plan,
+  knownKeys,
+  busy,
+  serverError = null,
+  onOpenChange,
+  onSave,
+}: Props) {
   const [form, setForm] = useState<PlanForm>(emptyPlanForm());
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -54,6 +72,7 @@ export function PlanEditor({ open, plan, knownKeys, busy, onOpenChange, onSave }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     const problem = validatePlanForm(form);
     setError(problem);
     if (!problem) onSave(form);
@@ -74,13 +93,20 @@ export function PlanEditor({ open, plan, knownKeys, busy, onOpenChange, onSave }
               <Input id="plan-key" value={form.key} onChange={text('key')} disabled={!!plan} />
             </Field>
             <Field id="plan-name" label="Name">
-              <Input id="plan-name" value={form.name} onChange={text('name')} />
+              <Input
+                id="plan-name"
+                value={form.name}
+                maxLength={MAX_NAME}
+                onChange={text('name')}
+              />
             </Field>
             <Field id="plan-model" label="Pricing">
               <NativeSelect
                 id="plan-model"
                 value={form.pricing_model}
-                onChange={(e) => set('pricing_model', e.target.value as PricingModel)}
+                onChange={(e) =>
+                  setForm((f) => withPricingModel(f, e.target.value as PricingModel))
+                }
               >
                 <NativeSelectOption value="free">Free</NativeSelectOption>
                 <NativeSelectOption value="flat">Flat price</NativeSelectOption>
@@ -135,6 +161,7 @@ export function PlanEditor({ open, plan, knownKeys, busy, onOpenChange, onSave }
             <Textarea
               id="plan-description"
               value={form.description}
+              maxLength={MAX_DESCRIPTION}
               onChange={(e) => set('description', e.target.value)}
             />
           </Field>
@@ -166,9 +193,9 @@ export function PlanEditor({ open, plan, knownKeys, busy, onOpenChange, onSave }
               Default plan for new organisations
             </Label>
           </div>
-          {error && (
+          {(error ?? serverError) && (
             <p role="alert" className="text-sm text-destructive">
-              {error}
+              {error ?? serverError}
             </p>
           )}
           <DialogFooter>

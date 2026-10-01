@@ -9,6 +9,7 @@ import {
 } from '@simple-module-py/ui/components/ui/card';
 import { AlertTriangle, CreditCard } from 'lucide-react';
 import { formatDate } from '../utils/format';
+import { seatsLabel } from '../utils/seats';
 import type { Status } from '../utils/types';
 import { StatusBadge } from './StatusBadge';
 
@@ -23,7 +24,7 @@ interface Props {
 export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
   const sub = status.subscription;
   const { used, limit } = status.seats;
-  const seats = limit === null ? `${used} members` : `${used} of ${limit} seats used`;
+  const seats = seatsLabel(used, limit);
   const portal = canManage && status.portal_available;
 
   return (
