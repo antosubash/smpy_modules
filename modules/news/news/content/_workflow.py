@@ -18,7 +18,8 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._claims import claim, due_candidates, release, retire_missed_windows
-from news.content._revisions import RevisionsMixin
+from news.content._fresh import claim_status
+from news.content._trash import TrashMixin, _elapsed
 from news.models import ArticleStatus, NewsArticle, RevisionEvent
 from news.naive_utc import as_utc
 
@@ -32,13 +33,7 @@ cancelling a schedule is a real instruction, and ``None`` is how it is spelt.
 """
 
 
-def _elapsed(value: datetime | None, now: datetime) -> bool:
-    """Whether a stored timestamp, once normalized to UTC, is due or past."""
-    aware = as_utc(value)
-    return aware is not None and aware <= now
-
-
-class WorkflowMixin(RevisionsMixin):
+class WorkflowMixin(TrashMixin):
     """Status behaviour for :class:`ArticlesService`.
 
     Inherits rather than sitting beside :class:`RevisionsMixin`, and that is
@@ -77,9 +72,23 @@ class WorkflowMixin(RevisionsMixin):
         without every keystroke reaching its readers.
         """
         article = await self.get_article(article_id)
+        if (
+            article.status is ArticleStatus.PUBLISHED
+            and article.published_data == article.draft_data
+            and article.publish_at is None
+        ):
+            # Already live and identical: publishing again would only add a
+            # history row saying nothing happened.
+            return article
+        await claim_status(
+            self.db,
+            article,
+            expected=(article.status,),
+            to=ArticleStatus.PUBLISHED,
+            conflict="This article was just changed by someone else. Reload and try again.",
+        )
         article.published_data = article.draft_data
-        # Acted on, so the intention is spent. Left set, the next tick would
-        # find the article still due and publish it again every thirty seconds.
+        # Spent: left set, the next tick would publish it again.
         article.publish_at = None
         # A genuinely future `unpublish_at` is a real "take it down later"
         # instruction and survives — process_due still needs it. One that has
@@ -196,6 +205,13 @@ class WorkflowMixin(RevisionsMixin):
         rebuilding a served payload from.
         """
         article = await self.get_article(article_id)
+        await claim_status(
+            self.db,
+            article,
+            expected=(ArticleStatus.PUBLISHED,),
+            to=ArticleStatus.DRAFT,
+            conflict="Only a published article can be unpublished.",
+        )
         # Both timestamps are spent here, for two different reasons.
         # `unpublish_at` because the next tick would otherwise take it down
         # again; `publish_at` because a retraction a stale schedule can undo is
@@ -212,6 +228,13 @@ class WorkflowMixin(RevisionsMixin):
         article = await self.get_article(article_id)
         if article.status is not ArticleStatus.DRAFT:
             raise HTTPException(409, "Only a draft can be submitted for review.")
+        await claim_status(
+            self.db,
+            article,
+            expected=(ArticleStatus.DRAFT,),
+            to=ArticleStatus.SUBMITTED_FOR_REVIEW,
+            conflict="Only a draft can be submitted for review.",
+        )
         return await self._transition(
             article, status=ArticleStatus.SUBMITTED_FOR_REVIEW, event=RevisionEvent.SUBMIT
         )
@@ -225,6 +248,13 @@ class WorkflowMixin(RevisionsMixin):
             raise HTTPException(
                 status_code=409, detail="Only a submitted article can be approved."
             )
+        await claim_status(
+            self.db,
+            article,
+            expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
+            to=ArticleStatus.PUBLISHED,
+            conflict="Only a submitted article can be approved.",
+        )
         article.published_data = article.draft_data
         # Spent, exactly as in `publish`: approving *is* publishing, so a
         # reviewer who acts before the scheduled moment must not leave a date
@@ -245,6 +275,13 @@ class WorkflowMixin(RevisionsMixin):
             raise HTTPException(
                 status_code=409, detail="Only a submitted article can be rejected."
             )
+        await claim_status(
+            self.db,
+            article,
+            expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
+            to=ArticleStatus.DRAFT,
+            conflict="Only a submitted article can be rejected.",
+        )
         # A schedule set before submission must not survive the rejection —
         # otherwise the next `process_due` tick auto-publishes the very
         # article a reviewer just turned back, once its stale `publish_at`
@@ -261,37 +298,3 @@ class WorkflowMixin(RevisionsMixin):
             event=RevisionEvent.REJECT,
             note=note,
         )
-
-    async def trash(self, article_id: int) -> NewsArticle:
-        """Soft-delete. The slug stays claimed — see ``NewsArticle.deleted_at``."""
-        article = await self.get_article(article_id)
-        article.deleted_at = datetime.now(UTC)
-        self.db.add(article)
-        await self.db.flush()
-        await self.db.refresh(article)
-        return article
-
-    async def restore(self, article_id: int) -> NewsArticle:
-        """Bring an article back out of the trash, as it was.
-
-        Its status is untouched: an article that was published when it was
-        binned is published again, which is the only reading of "restore" that
-        does not quietly change what readers can see.
-
-        A schedule that elapsed while the article was trashed is a different
-        matter: `process_due` was correctly skipping it while trashed, and
-        must not treat coming back out of the trash as the moment that was
-        waiting for. Only a *stale* (already-past) timestamp is cleared — one
-        still in the future is exactly what the author asked for and stays.
-        """
-        article = await self.get_article(article_id, include_trashed=True)
-        article.deleted_at = None
-        now = datetime.now(UTC)
-        if _elapsed(article.publish_at, now):
-            article.publish_at = None
-        if _elapsed(article.unpublish_at, now):
-            article.unpublish_at = None
-        self.db.add(article)
-        await self.db.flush()
-        await self.db.refresh(article)
-        return article

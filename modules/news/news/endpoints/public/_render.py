@@ -27,6 +27,7 @@ from news.authors import slug_for as author_slug
 from news.endpoints.public import _head
 from news.endpoints.public._lang import set_html_lang
 from news.models import ArticleStatus, NewsArticle
+from news.safe_url import image_or_none
 from news.settings import NewsSettings, public_author_path
 
 
@@ -91,7 +92,7 @@ async def render_article(
         "slug": article.slug,
         "data": data,
         "meta_description": article.meta_description,
-        "og_image": article.og_image,
+        "og_image": image_or_none(article.og_image),
         "canonical_url": canonical,
         "og_url": canonical,
         "index_in_search": index_in_search,
@@ -121,7 +122,7 @@ async def render_article(
             title=article.title,
             description=article.meta_description or None,
             canonical=canonical,
-            image=article.og_image or None,
+            image=image_or_none(article.og_image),
             site_name=settings.site_name or None,
             twitter_handle=settings.twitter_handle or None,
             published_at=published_at,

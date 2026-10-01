@@ -24,6 +24,8 @@ from news import query_filters
 from news.constants import ARTICLE_BODY_URL
 from news.contracts.schemas import ArticleRead
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
+from news.naive_utc import as_utc
+from news.safe_url import image_or_none
 from news.settings import public_article_path
 
 COLUMNS: Final = (
@@ -42,6 +44,7 @@ COLUMNS: Final = (
     # switcher keys off the group, so both are read on every row.
     NewsArticle.locale,
     NewsArticle.translation_group,
+    NewsArticle.updated_at,
 )
 """The only columns a card reads. Named explicitly — see the module docstring."""
 
@@ -121,7 +124,7 @@ def to_read(row) -> ArticleRead:
         slug=row.slug,
         title=row.title,
         excerpt=row.meta_description or "",
-        cover_image_url=row.og_image or "",
+        cover_image_url=image_or_none(row.og_image) or "",
         category=row.category,
         tags=[],
         pinned=row.pinned,
@@ -129,6 +132,7 @@ def to_read(row) -> ArticleRead:
         author=row.author,
         published_at=row.published_at,
         status=row.status,
+        updated_at=as_utc(row.updated_at),
         locale=row.locale,
         translation_group=row.translation_group,
         # Absent unless the caller may see drafts — see

@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from news.constants import (
     MAX_AUTHOR_LEN,
@@ -23,10 +23,12 @@ from news.constants import (
     MAX_URL_LEN,
     SLUG_PATTERN,
 )
+from news.contracts.schemas import _guards
+from news.contracts.schemas._guards import NoNul
 from news.display_date import as_display_date
 
 
-class ArticleCreate(BaseModel):
+class ArticleCreate(NoNul):
     """Create an article.
 
     This used to be two DTOs and two requests: one that created a *page* and one
@@ -59,7 +61,7 @@ class ArticleCreate(BaseModel):
     """Truncate to the calendar day as sent — see ``news.display_date``."""
 
 
-class ArticleTranslationCreate(BaseModel):
+class ArticleTranslationCreate(NoNul):
     """Start an article's counterpart in another language.
 
     A translation is a *sibling article* sharing a ``translation_group``, not a
@@ -86,8 +88,10 @@ class ArticleTranslationCreate(BaseModel):
     starting point for a translator than a blank field, and it makes what still
     needs doing obvious in the list."""
 
+    _title = field_validator("title")(_guards.clean_title)
 
-class ArticleUpdate(BaseModel):
+
+class ArticleUpdate(NoNul):
     """The listing metadata, and the article's identity and SEO.
 
     Every field is optional and only the ones actually sent are applied, so the
@@ -116,8 +120,16 @@ class ArticleUpdate(BaseModel):
     index_in_search: bool | None = None
     json_ld: dict[str, Any] | None = None
 
+    expected_updated_at: datetime | None = None
+    """The ``updated_at`` this edit was made against. When sent and it differs
+    from the stored one the write is refused with a 409; omitted, the write
+    goes through as before."""
+
     _display_date = field_validator("published_at")(as_display_date)
     """Truncate to the calendar day as sent — see ``news.display_date``."""
+    _title = field_validator("title")(_guards.clean_title)
+    _canonical = field_validator("canonical_url")(_guards.canonical_url)
+    _og_image = field_validator("og_image")(_guards.og_image)
 
     @model_validator(mode="after")
     def _no_null_for_required(self) -> ArticleUpdate:
@@ -132,7 +144,7 @@ class ArticleUpdate(BaseModel):
         return self
 
 
-class ArticleBodyUpdate(BaseModel):
+class ArticleBodyUpdate(NoNul):
     """An autosave from the block canvas.
 
     Its own DTO, and its own endpoint, because it fires on a timer rather than
@@ -141,13 +153,15 @@ class ArticleBodyUpdate(BaseModel):
     """
 
     draft_data: dict[str, Any] = Field(default_factory=dict)
+    expected_updated_at: datetime | None = None
+    """See ``ArticleUpdate.expected_updated_at``."""
 
 
-class RejectRequest(BaseModel):
+class RejectRequest(NoNul):
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
 
 
-class ScheduleRequest(BaseModel):
+class ScheduleRequest(NoNul):
     """When an article should go live, and when it should come down.
 
     Both fields are three-valued and the endpoint passes only what was actually

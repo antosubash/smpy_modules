@@ -50,6 +50,10 @@ class ArticleRead(BaseModel):
     shape by hand; every stored article has one, a lone one being a group of one.
     """
 
+    updated_at: datetime | None = None
+    """Last write, in UTC. Send it back as ``expected_updated_at`` so a stale
+    tab is refused instead of overwriting a newer save."""
+
     status: ArticleStatus
     """Workflow state.
 

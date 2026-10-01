@@ -20,6 +20,7 @@ from news import counts as counts_module
 from news import locales, service, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.content import ArticlesService
+from news.content._fresh import ensure_fresh
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleListResponse,
@@ -223,7 +224,10 @@ async def update_article(
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
 
+    ensure_fresh(article, body.expected_updated_at)
+
     sent = body.model_dump(exclude_unset=True)
+    sent.pop("expected_updated_at", None)
     # Split by who owns the write. The identity and SEO columns go through
     # ArticlesService because renaming a slug has to record a redirect; the
     # listing metadata does not, and routing it through the same path would

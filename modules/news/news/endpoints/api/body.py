@@ -49,7 +49,9 @@ async def save_article_body(
     draft/published split exists to prevent.
     """
     service_ = ArticlesService(db)
-    article = await service_.save_body(article_id, body.draft_data)
+    article = await service_.save_body(
+        article_id, body.draft_data, expected_updated_at=body.expected_updated_at
+    )
     return detail_of(article, await read_one(db, article_id))
 
 
