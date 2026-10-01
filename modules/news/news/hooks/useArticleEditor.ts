@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
@@ -10,6 +9,7 @@ import {
   trashArticle,
   updateArticle,
 } from '../utils/api';
+import { isHttpStatus } from '../utils/http';
 import { keys, useT } from '../utils/i18n';
 import { SLUG_PATTERN } from '../utils/slugify';
 import {
@@ -18,6 +18,7 @@ import {
   listTags,
   setArticleTags,
 } from '../utils/taxonomyApi';
+import { useInFlight } from './useInFlight';
 
 /** Split a stored instant into the two controls the inspector shows.
  *
@@ -58,10 +59,15 @@ export function useArticleEditor(articleId: number) {
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const { busy, run: guard } = useInFlight();
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Someone else changed the article since this copy was loaded. The edits on
+   *  screen are kept; Save stays available only through Reload. */
+  const [conflict, setConflict] = useState(false);
+  /** The article was trashed or deleted elsewhere: nothing left to save to. */
+  const [gone, setGone] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -76,6 +82,8 @@ export function useArticleEditor(articleId: number) {
         setDraft(toDraft(found));
         setDirty(false);
         setError(null);
+        setConflict(false);
+        setGone(false);
       } catch (e) {
         if (signal?.aborted) return;
         setError((e as Error).message);
@@ -100,61 +108,81 @@ export function useArticleEditor(articleId: number) {
     setSaved(false);
   }, []);
 
-  const save = useCallback(async () => {
-    if (!draft) return;
-    setBusy(true);
-    setError(null);
-    try {
-      // An empty date is a real value — it undates the article — so it is sent
-      // as null rather than omitted.
-      const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-      // Run together rather than sequentially: tags live in their own table,
-      // keyed only on the article's id, which is already known and does not
-      // change here — neither call reads the other's result, so there is
-      // nothing for ordering to protect. `Promise.all` still rejects with
-      // whichever call failed first, which the catch below turns into the
-      // same error banner either one would have on its own.
-      const [updated, tags] = await Promise.all([
-        updateArticle(articleId, {
-          // Sent every time rather than only when changed: the server compares
-          // the incoming slug against the stored one and records a redirect only
-          // for a real move, so an unchanged value costs nothing and diffing here
-          // would be a second opinion about what counts as a rename.
-          title: draft.title.trim(),
-          slug: draft.slug,
-          category: draft.category,
-          published_at: publishedAt,
-          pinned: draft.pinned,
-          show_in_feed: draft.showInFeed,
-          author: draft.author,
-        }),
-        setArticleTags(articleId, draft.tags),
-      ]);
-      if (updated) setArticle({ ...updated, tags: tags ?? draft.tags });
-      setDirty(false);
-      setSaved(true);
-      toast.success(t(keys.news.editor.saved_toast));
-    } catch (e) {
+  /** One place that turns a failed write into the right state: a stale write
+   *  keeps the edits and offers Reload, a vanished article stops offering Save,
+   *  anything else is just the banner. */
+  const fail = useCallback(
+    (e: unknown) => {
+      if (isHttpStatus(e, 409)) setConflict(true);
+      if (isHttpStatus(e, 404)) {
+        setGone(true);
+        setError(t(keys.news.errors.gone));
+        return;
+      }
       setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, [articleId, draft, t]);
+    },
+    [t],
+  );
 
-  const publish = useCallback(async () => {
-    if (!article) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await publishArticle(article.id);
-      await load();
-      toast.success(t(keys.news.editor.published_toast));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, [article, load, t]);
+  const save = useCallback(
+    () =>
+      guard(async () => {
+        if (!draft || !article) return;
+        setError(null);
+        // An empty date is a real value — it undates the article — so it is sent
+        // as null rather than omitted.
+        const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
+        // Run together — tags live in their own table, keyed only on the
+        // article's id — but *settled* rather than raced: `Promise.all` rejects
+        // on the first failure while the other call is still in flight and
+        // unobserved, which is how a failed save used to be able to sit next to
+        // a success message.
+        const [meta, tagsResult] = await Promise.allSettled([
+          updateArticle(articleId, {
+            // Sent every time rather than only when changed: the server compares
+            // the incoming slug against the stored one and records a redirect only
+            // for a real move, so an unchanged value costs nothing and diffing here
+            // would be a second opinion about what counts as a rename.
+            title: draft.title.trim(),
+            slug: draft.slug,
+            category: draft.category,
+            published_at: publishedAt,
+            pinned: draft.pinned,
+            show_in_feed: draft.showInFeed,
+            author: draft.author,
+            expected_updated_at: article.updated_at,
+          }),
+          setArticleTags(articleId, draft.tags),
+        ]);
+        // Every write response refreshes the copy, so the next save is made
+        // against what the server now holds.
+        if (meta.status === 'fulfilled' && meta.value) {
+          const tags = tagsResult.status === 'fulfilled' ? tagsResult.value : null;
+          setArticle({ ...meta.value, tags: tags ?? article.tags });
+        }
+        const failure = [meta, tagsResult].find((r) => r.status === 'rejected');
+        if (failure) {
+          fail((failure as PromiseRejectedResult).reason);
+          return;
+        }
+        setDirty(false);
+        setSaved(true);
+        toast.success(t(keys.news.editor.saved_toast));
+      }).catch(fail),
+    [article, articleId, draft, fail, guard, t],
+  );
+
+  const publish = useCallback(
+    () =>
+      guard(async () => {
+        if (!article) return;
+        setError(null);
+        await publishArticle(article.id);
+        await load();
+        toast.success(t(keys.news.editor.published_toast));
+      }).catch(fail),
+    [article, fail, guard, load, t],
+  );
 
   // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
   // — so the editor screen only offers it to a viewer who has it.
@@ -172,7 +200,8 @@ export function useArticleEditor(articleId: number) {
    * which is not something this screen can turn into a sentence. A collision
    * still comes from the server — only it knows what is taken.
    */
-  const valid = draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
+  const valid =
+    !gone && draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
 
   return {
     article,
@@ -184,6 +213,8 @@ export function useArticleEditor(articleId: number) {
     valid,
     saved,
     error,
+    conflict,
+    gone,
     /** Exposed so a sibling panel — the language switcher — reports through the
      *  same banner rather than growing an error surface of its own. */
     setError,

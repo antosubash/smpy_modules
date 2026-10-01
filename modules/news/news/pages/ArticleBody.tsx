@@ -33,8 +33,21 @@ export default function ArticleBody() {
     article_id: number;
   };
 
-  const { article, data, saveState, error, busy, dirty, load, change, saveNow, publish } =
-    useArticleBody(article_id);
+  const {
+    article,
+    data,
+    saveState,
+    error,
+    busy,
+    dirty,
+    conflict,
+    reloadKey,
+    load,
+    change,
+    saveNow,
+    publish,
+    reload,
+  } = useArticleBody(article_id);
 
   // What the public viewer passes too, so `Contents` lists the same sections
   // here that a reader will get and every anchor resolves on both screens. The
@@ -115,7 +128,14 @@ export default function ArticleBody() {
       </header>
 
       {error && (
-        <p className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>
+        <div className="flex items-center gap-3 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          <p className="min-w-0 flex-1">{error}</p>
+          {conflict && (
+            <Button size="sm" variant="outline" onClick={() => void reload()}>
+              {t(copy.reload)}
+            </Button>
+          )}
+        </div>
       )}
 
       {article?.rejection_note && article.status === 'draft' && (
@@ -129,6 +149,7 @@ export default function ArticleBody() {
       <div className="min-h-0 flex-1">
         {data !== null && (
           <Puck
+            key={reloadKey}
             config={config}
             data={data ?? (emptyArticleData as never)}
             viewports={viewports}

@@ -32,6 +32,9 @@ export interface ArticleRead {
   show_in_feed: boolean;
   author: string;
   published_at: string | null;
+  /** When the row last changed (ISO, UTC). Sent back as `expected_updated_at`
+   *  so a write made from a stale copy is refused rather than applied. */
+  updated_at: string | null;
   /** Which language the article is written in. Fixed for its lifetime: slugs
    *  are unique per `(locale, slug)`, so this is half of what identifies the
    *  public address. */

@@ -72,6 +72,7 @@
     "language_label": "Language",
     "language_help": "Fixed once the article exists. To publish the same story in another language, add a translation from the editor.",
     "url_label": "URL",
+    "url_needed": "No address could be made from this headline. Type one using letters, numbers and hyphens, or leave it blank and one will be generated for you.",
     "category_label": "Category",
     "category_none": "Uncategorised",
     "date_label": "Display date",
@@ -153,7 +154,14 @@
     "reject_description": "The note appears on the body canvas, where the author is working. It clears when they resubmit.",
     "reject_label": "Reason",
     "reject_placeholder": "What needs to change?",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "note_count": "{count} / {max}",
+    "published_help": "This article is live. Unpublishing takes it off the public site and keeps the draft.",
+    "unpublish": "Unpublish",
+    "unpublish_title": "Unpublish \"{title}\"?",
+    "unpublish_description": "Readers will stop seeing it straight away. The draft and its history are kept, and you can publish it again.",
+    "unpublished_toast": "Unpublished",
+    "unpublish_failed": "Could not unpublish. Check the message and try again."
   },
   "schedule": {
     "heading": "Schedule",
@@ -224,6 +232,7 @@
     "saved": "Saved",
     "save_draft": "Save draft",
     "update_published": "Update published",
+    "reload": "Reload",
     "publish": "Publish",
     "sent_back": "Sent back:",
     "select_a_block": "Select a block to edit it. The headline, URL and publish date belong to the article — edit them on the article screen."
@@ -525,6 +534,14 @@
     "request_failed": "Request failed ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
     "field_message": "{field}: {message}",
-    "not_valid": "is not valid"
+    "not_valid": "is not valid",
+    "this_field": "This field",
+    "pattern_mismatch": "{field} contains characters that are not allowed.",
+    "too_long": "{field} can be at most {max} characters.",
+    "too_long_generic": "{field} is too long.",
+    "too_short": "{field} must be at least {min} characters.",
+    "required": "{field} is required.",
+    "gone": "This article was moved to the trash or deleted.",
+    "reload": "Reload"
   }
 }

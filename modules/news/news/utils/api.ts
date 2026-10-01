@@ -113,6 +113,8 @@ export const updateArticle = (
     og_image?: string;
     canonical_url?: string;
     index_in_search?: boolean;
+    /** The `updated_at` this edit was made against; a stale one answers 409. */
+    expected_updated_at?: string | null;
   },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
@@ -173,8 +175,15 @@ export const getArticleDetail = (id: number, signal?: AbortSignal) =>
  * Its own route, deliberately: it fires on a timer rather than on a person
  * pressing something, so it must not be able to reach the slug or the status.
  */
-export const saveArticleBody = (id: number, draft_data: Record<string, unknown>) =>
-  write<ArticleDetail>(`/articles/${id}/body`, 'PUT', { draft_data });
+export const saveArticleBody = (
+  id: number,
+  draft_data: Record<string, unknown>,
+  expected_updated_at?: string | null,
+) =>
+  write<ArticleDetail>(`/articles/${id}/body`, 'PUT', {
+    draft_data,
+    ...(expected_updated_at ? { expected_updated_at } : {}),
+  });
 
 export const listArticleRevisions = (id: number, signal?: AbortSignal) =>
   read<RevisionRead[]>(`/articles/${id}/revisions`, signal);

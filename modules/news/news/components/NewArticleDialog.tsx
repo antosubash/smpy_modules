@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { createArticle } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
-import { slugify } from '../utils/slugify';
+import { SLUG_PATTERN, slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
 
 const HEADLINE_ID = 'news-new-article-headline';
@@ -25,6 +25,10 @@ const SLUG_ID = 'news-new-article-slug';
 const CATEGORY_ID = 'news-new-article-category';
 const DATE_ID = 'news-new-article-date';
 const LOCALE_ID = 'news-new-article-locale';
+
+/** The server's column bounds — `title` and `slug` on the create DTO. */
+const MAX_TITLE_LEN = 300;
+const MAX_SLUG_LEN = 200;
 
 /** Today in the UTC calendar, which is the calendar `published_at` is stored in. */
 function todayUtc(): string {
@@ -65,6 +69,11 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
   const [error, setError] = useState<string | null>(null);
 
   const slug = slugOverride ?? slugify(headline);
+  // The same rule, and the same sentence, as the editor's URL field. An empty
+  // address is not invalid: the server derives one (falling back to "item" for
+  // a headline with nothing an address can use), so it only gets a hint.
+  const slugInvalid = slug !== '' && !SLUG_PATTERN.test(slug);
+  const slugEmpty = slug === '' && headline.trim() !== '';
 
   useEffect(() => {
     if (!open) return;
@@ -110,7 +119,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
         // sending it would turn a second article of the same headline into a
         // "Slug already in use" dead end — the server can only take the next
         // free variant for a slug nobody asked for by name.
-        slug: slugOverride ?? undefined,
+        slug: slugOverride || undefined,
         locale,
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
@@ -145,7 +154,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (headline.trim() && slug && !pending) void create();
+            if (headline.trim() && !slugInvalid && !pending) void create();
           }}
         >
           <DialogHeader>
@@ -160,6 +169,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
                 id={HEADLINE_ID}
                 value={headline}
                 autoFocus
+                maxLength={MAX_TITLE_LEN}
                 disabled={pending}
                 placeholder={t(copy.headline_placeholder)}
                 onChange={(e) => setHeadline(e.target.value)}
@@ -194,10 +204,16 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
                 <Input
                   id={SLUG_ID}
                   value={slug}
+                  maxLength={MAX_SLUG_LEN}
                   disabled={pending}
+                  aria-invalid={slugInvalid || undefined}
                   onChange={(e) => setSlugOverride(e.target.value)}
                 />
               </div>
+              {slugInvalid && (
+                <p className="text-xs text-destructive">{t(keys.news.inspector.slug_invalid)}</p>
+              )}
+              {slugEmpty && <p className="text-xs text-muted-foreground">{t(copy.url_needed)}</p>}
             </div>
 
             <div className="grid gap-2">
@@ -236,7 +252,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
             <Button type="button" variant="outline" disabled={pending} onClick={() => reset(false)}>
               {t(copy.cancel)}
             </Button>
-            <Button type="submit" disabled={pending || !headline.trim() || !slug}>
+            <Button type="submit" disabled={pending || !headline.trim() || slugInvalid}>
               {pending ? t(copy.creating) : t(copy.create)}
             </Button>
           </DialogFooter>
