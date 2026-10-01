@@ -53,7 +53,7 @@ test('a plan assigned by an admin is what the organisation gets', async ({ page 
   // The organisation sees it.
   await page.goto('/billing/');
   await expect(page.getByRole('heading', { name: 'Billing' })).toBeVisible();
-  await expect(page.getByText('1 of 1 seats used')).toBeVisible();
+  await expect(page.getByText('1 of 1 seat used')).toBeVisible();
   await expect(page.getByText(/Online payment is not set up here/)).toBeVisible();
 
   // And the tenants module enforces it: a second member does not fit.
@@ -69,6 +69,16 @@ test('a plan assigned by an admin is what the organisation gets', async ({ page 
   await assign.getByLabel('Status').selectOption('unpaid');
   await assign.getByRole('button', { name: 'Assign' }).click();
   await expect(row).toContainText('Suspended (unpaid)');
+
+  // The owner can still open billing, pay-only. With no payment provider
+  // there is nothing to pay through, so it says who to contact instead.
+  await page.goto('/billing/');
+  await expect(page.getByText('This organisation is suspended for non-payment')).toBeVisible();
+  await expect(page.getByText(/Contact the site administrator/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pay now' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Plans' })).toBeHidden();
+
+  await page.goto('/admin/billing/subscriptions');
   await row.getByRole('button', { name: 'Assign plan' }).click();
   await assign.getByLabel('Status').selectOption('active');
   await assign.getByRole('button', { name: 'Assign' }).click();

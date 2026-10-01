@@ -43,6 +43,27 @@ test.describe('Billing admin', () => {
     await expect(row).toContainText('Archived');
   });
 
+  test('switching a draft to Free drops its paid-only fields', async ({ page }) => {
+    const key = `starter-${Date.now()}`;
+    await page.goto('/admin/billing/plans');
+    await page.getByRole('button', { name: 'New plan' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Key').fill(key);
+    await dialog.getByLabel('Name').fill('Starter E2E');
+    await dialog.getByLabel('Pricing').selectOption('flat');
+    await dialog.getByLabel('Stripe price ID (monthly)').fill(`price_${key}`);
+    await dialog.getByLabel('Trial days').fill('7');
+    await dialog.getByLabel('Sort order').fill('abc');
+    await dialog.getByRole('button', { name: 'Create plan' }).click();
+    await expect(dialog.getByRole('alert')).toHaveText(/Sort order must be a whole number/);
+
+    await dialog.getByLabel('Sort order').fill('5');
+    await dialog.getByLabel('Pricing').selectOption('free');
+    await dialog.getByRole('button', { name: 'Create plan' }).click();
+    await expect(page.getByText('Plan created')).toBeVisible();
+    await expect(page.getByRole('row', { name: new RegExp(key) })).toContainText('Free');
+  });
+
   test('subscriptions screen lists organisations under the manual provider', async ({ page }) => {
     await page.goto('/admin/billing/subscriptions');
     await expect(page.getByText(/Assign plans by hand; nobody is charged/)).toBeVisible();
