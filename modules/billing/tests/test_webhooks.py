@@ -150,13 +150,6 @@ async def test_unknown_price_records_error(app, client, fake, world):
     assert await _sub(app, tenant_id) is None
 
 
-async def test_webhook_unknown_tenant_records_error(app, client, fake, world):
-    fake.snapshots["sub_1"] = snap(None, customer_id="cus_stranger")
-    response = await client.post(URL, content=event(fake, "evt_1"), headers=HEADERS)
-    assert response.status_code == 500
-    assert "unknown_tenant" in (await _event_row(app, "evt_1")).error
-
-
 async def test_tenant_found_through_customer(app, client, fake, world):
     tenant_id, _ = world
     async with app.state.sm.db.session_factory() as session:

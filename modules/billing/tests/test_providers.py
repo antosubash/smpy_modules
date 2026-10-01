@@ -19,7 +19,7 @@ async def test_manual_provider_has_no_checkout():
     assert manual.supports_checkout is False
     assert await manual.ensure_customer("t", "Acme", None) is None
     with pytest.raises(ProviderError):
-        await manual.checkout_url(
+        await manual.create_checkout(
             customer_id=None,
             price_id="p",
             quantity=1,

@@ -70,6 +70,9 @@ class Customer(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     provider: str = Field(max_length=20)
     provider_customer_id: str | None = Field(default=None, max_length=255, unique=True, index=True)
     email: str | None = Field(default=None, max_length=320)
+    # The one open Checkout session, expired when a new one is started so two
+    # tabs cannot both be paid into two subscriptions.
+    checkout_session_id: str | None = Field(default=None, max_length=255)
 
 
 class Subscription(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]

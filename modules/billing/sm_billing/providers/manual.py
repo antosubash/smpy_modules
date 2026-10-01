@@ -12,6 +12,7 @@ from collections.abc import Mapping
 
 from sm_billing.constants import PROVIDER_MANUAL
 from sm_billing.contracts.provider import (
+    CheckoutSession,
     PriceInfo,
     ProviderError,
     SubscriptionSnapshot,
@@ -28,8 +29,14 @@ class ManualProvider:
     async def ensure_customer(self, tenant_id: str, name: str, email: str | None) -> str | None:
         return None
 
-    async def checkout_url(self, **_: object) -> str:
+    async def create_checkout(self, **_: object) -> CheckoutSession:
         raise ProviderError(_NO)
+
+    async def expire_checkout(self, session_id: str) -> None:
+        raise ProviderError(_NO)
+
+    async def live_subscription_ids(self, customer_id: str) -> list[str]:
+        return []
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         raise ProviderError(_NO)

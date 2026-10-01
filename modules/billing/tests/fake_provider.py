@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sm_billing.contracts.provider import (
+    CheckoutSession,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
@@ -27,7 +28,9 @@ class FakeProvider:
     events: dict[str, WebhookEvent] = field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     fail: set[str] = field(default_factory=set)
+    live: dict[str, list[str]] = field(default_factory=dict)
     _customers: int = 0
+    _sessions: int = 0
 
     def _record(self, method: str, **kw: Any) -> None:
         self.calls.append((method, kw))
@@ -42,9 +45,17 @@ class FakeProvider:
         self._customers += 1
         return f"cus_{self._customers}"
 
-    async def checkout_url(self, **kw: Any) -> str:
-        self._record("checkout_url", **kw)
-        return "https://checkout.test/session"
+    async def create_checkout(self, **kw: Any) -> CheckoutSession:
+        self._record("create_checkout", **kw)
+        self._sessions += 1
+        return CheckoutSession(f"cs_{self._sessions}", "https://checkout.test/session")
+
+    async def expire_checkout(self, session_id: str) -> None:
+        self._record("expire_checkout", session_id=session_id)
+
+    async def live_subscription_ids(self, customer_id: str) -> list[str]:
+        self._record("live_subscription_ids", customer_id=customer_id)
+        return self.live.get(customer_id, [])
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         self._record("portal_url", customer_id=customer_id, return_url=return_url)

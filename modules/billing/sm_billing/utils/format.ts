@@ -29,6 +29,18 @@ export function priceLabel(plan: Plan, interval: Interval, locale?: string): str
   return `${money}${seat} / ${interval}`;
 }
 
+const LIVE: ReadonlyArray<SubscriptionStatus> = ['active', 'trialing', 'past_due'];
+
+/**
+ * Checkout has landed: a provider subscription that grants access. Not just
+ * "has a provider id" — a tenant re-subscribing still carries their old,
+ * canceled one, which would end the wait before the new one arrived.
+ */
+export function isActivated(status: Status): boolean {
+  const sub = status.subscription;
+  return Boolean(sub?.has_provider_subscription && sub.status && LIVE.includes(sub.status));
+}
+
 /** What the plan picker's button does for ``target``. */
 export type PlanCta = 'current' | 'checkout' | 'change' | 'downgrade' | 'unavailable';
 

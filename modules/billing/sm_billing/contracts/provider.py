@@ -50,6 +50,12 @@ class SubscriptionSnapshot:
 
 
 @dataclass(frozen=True)
+class CheckoutSession:
+    id: str
+    url: str
+
+
+@dataclass(frozen=True)
 class PriceInfo:
     id: str
     currency: str
@@ -66,7 +72,7 @@ class BillingProvider(Protocol):
         """Create the customer; returns its id (``None`` for providers without one)."""
         ...
 
-    async def checkout_url(
+    async def create_checkout(
         self,
         *,
         customer_id: str | None,
@@ -76,7 +82,15 @@ class BillingProvider(Protocol):
         tenant_id: str,
         success_url: str,
         cancel_url: str,
-    ) -> str: ...
+    ) -> CheckoutSession: ...
+
+    async def expire_checkout(self, session_id: str) -> None:
+        """Close an open Checkout session so it can no longer be paid."""
+        ...
+
+    async def live_subscription_ids(self, customer_id: str) -> list[str]:
+        """The customer's subscriptions that still bill or grant access."""
+        ...
 
     async def portal_url(self, customer_id: str, return_url: str) -> str: ...
 

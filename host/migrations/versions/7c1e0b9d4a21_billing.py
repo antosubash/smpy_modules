@@ -28,6 +28,7 @@ def upgrade() -> None:
     sa.Column('provider', sa.String(length=20), nullable=False),
     sa.Column('provider_customer_id', sa.String(length=255), nullable=True),
     sa.Column('email', sa.String(length=320), nullable=True),
+    sa.Column('checkout_session_id', sa.String(length=255), nullable=True),
     sa.PrimaryKeyConstraint('tenant_id', name=op.f('pk_billing_customer'))
     )
     op.create_index(op.f('ix_billing_customer_provider_customer_id'), 'billing_customer', ['provider_customer_id'], unique=True)

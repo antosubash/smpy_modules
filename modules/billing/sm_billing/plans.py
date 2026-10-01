@@ -15,7 +15,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from sm_billing import constants as c
-from sm_billing.models import Plan
+from sm_billing.models import Plan, Subscription
 from sm_billing.schemas import PlanIn
 
 logger = logging.getLogger(__name__)
@@ -117,6 +117,7 @@ class PlanService:
             raise PlanError("default_required", status_code=409)
         if data.is_default and plan.archived_at is not None:
             raise PlanError("cannot_archive_default", status_code=409)
+        await self._guard_prices_in_use(plan, data)
         await self._ensure_unique(data, plan.id)
         for field, value in data.model_dump().items():
             setattr(plan, field, value)
@@ -125,6 +126,33 @@ class PlanService:
         if plan.is_default:
             await self._take_default(plan.id)
         return plan
+
+    async def _guard_prices_in_use(self, plan: Plan, data: PlanIn) -> None:
+        """A price someone is subscribed on cannot be swapped or removed.
+
+        Webhooks map a subscription to its plan through the price; change it
+        under a live subscriber and every later event for them — including the
+        cancel or the "unpaid" — can no longer be mapped.
+        """
+        changes = (
+            (c.Interval.MONTH, plan.stripe_price_month, data.stripe_price_month),
+            (c.Interval.YEAR, plan.stripe_price_year, data.stripe_price_year),
+        )
+        for interval, old, new in changes:
+            if not old or old == new:
+                continue
+            stmt = (
+                select(Subscription.id)
+                .where(
+                    Subscription.plan_id == plan.id,
+                    Subscription.interval == interval,
+                    Subscription.provider_subscription_id.is_not(None),
+                    Subscription.status != c.SubscriptionStatus.CANCELED,
+                )
+                .limit(1)
+            )
+            if (await self.db.execute(stmt)).first() is not None:
+                raise PlanError("price_in_use", status_code=409)
 
     async def archive(self, plan_id: int) -> Plan:
         plan = await self.get(plan_id)

@@ -3,8 +3,9 @@ import { ConfirmActionDialog } from '@simple-module-py/ui/components/ConfirmActi
 import { InlineBanner } from '@simple-module-py/ui/components/InlineBanner';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { SegmentedControl } from '@simple-module-py/ui/components/SegmentedControl';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import { ArrowRightLeft, Info, Loader2 } from 'lucide-react';
+import { ArrowRightLeft, Info, Loader2, Lock } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { CurrentPlanCard } from '../components/CurrentPlanCard';
@@ -18,13 +19,16 @@ interface Props {
   status: Status;
   plans: Plan[];
   can_manage: boolean;
+  /** Suspended for non-payment: paying is the only thing offered. */
+  restore: boolean;
   csrf_token: string;
   checkout: string;
 }
 
 function Billing() {
-  const { status, plans, can_manage, csrf_token, checkout } = usePage<{ props: Props }>()
-    .props as unknown as Props;
+  const { status, plans, can_manage, restore, csrf_token, checkout } = usePage<{
+    props: Props;
+  }>().props as unknown as Props;
   const [interval, setBillingInterval] = useState<Interval>(
     status.subscription?.interval ?? 'month',
   );
@@ -104,14 +108,27 @@ function Billing() {
           {checkout === 'cancel' && (
             <InlineBanner icon={Info} title="Checkout cancelled — nothing was charged." />
           )}
+          {restore && (
+            <InlineBanner
+              icon={Lock}
+              tone="warning"
+              title="This organisation is suspended for non-payment"
+              description="Update your payment method and settle the open invoice; access returns as soon as Stripe confirms the payment."
+              action={
+                <Button size="sm" onClick={openPortal} disabled={busy}>
+                  Pay now
+                </Button>
+              }
+            />
+          )}
           <CurrentPlanCard
             status={status}
-            canManage={can_manage}
+            canManage={can_manage || restore}
             busy={busy}
             onPortal={openPortal}
           />
 
-          <section className="space-y-4">
+          <section className="space-y-4" hidden={restore}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Plans</h2>
               {sellsYearly && (

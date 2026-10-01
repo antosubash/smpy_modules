@@ -106,7 +106,7 @@ async def test_checkout_creates_customer_once(app, user_client, fake):
             assert response.status_code == 200, response.text
             assert response.json()["url"] == "https://checkout.test/session"
     assert len(fake.called("ensure_customer")) == 1
-    call = fake.called("checkout_url")[-1]
+    call = fake.called("create_checkout")[-1]
     assert call["price_id"] == "price_team_y"
     assert (call["quantity"], call["trial_days"], call["tenant_id"]) == (1, 14, tenant["id"])
     assert call["success_url"].endswith("/billing/?checkout=success")
@@ -219,7 +219,7 @@ async def test_change_plan_without_subscription_points_to_checkout(app, user_cli
 
 async def test_provider_error_is_502(app, user_client, fake):
     team = await _plans(app)
-    fake.fail.add("checkout_url")
+    fake.fail.add("create_checkout")
     async with user_client("owner@x.io") as (owner, _):
         await create_tenant(owner)
         await arm_csrf(owner)

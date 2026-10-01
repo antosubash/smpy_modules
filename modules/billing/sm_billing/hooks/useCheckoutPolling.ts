@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, BILLING_API } from '../utils/api';
+import { isActivated } from '../utils/format';
 import type { Status } from '../utils/types';
 
 const INTERVAL_MS = 2000;
@@ -25,7 +26,7 @@ export function useCheckoutPolling(
       tries += 1;
       try {
         const status = await api<Status>(`${BILLING_API}/status`, csrf);
-        if (!cancelled && status.subscription?.has_provider_subscription) {
+        if (!cancelled && isActivated(status)) {
           clearInterval(timer);
           setState('idle');
           onActivated();

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
 from sm_billing.checkout import BillingService
+from sm_billing.context import billing_context
 
 router = APIRouter()
 
@@ -33,12 +34,13 @@ def _perm(request: Request, permission: str) -> bool:
 async def billing_page(
     request: Request, inertia: InertiaDep, db: AsyncSession = Depends(get_db)
 ) -> InertiaResponse | RedirectResponse:
-    tenant_id = getattr(request.state, "tenant_id", None)
-    if tenant_id is None or not _perm(request, c.PERM_VIEW):
+    ctx = await billing_context(request, db)
+    if ctx is None or (not ctx.restore and not _perm(request, c.PERM_VIEW)):
         return RedirectResponse(NO_TENANT_REDIRECT, status_code=303)
-    service = BillingService(db, request.app, tenant_id)
-    can_manage = _perm(request, c.PERM_MANAGE) and (
-        getattr(request.state, "tenant_role", None) == c.TENANT_ROLE_OWNER
+    service = BillingService(db, request.app, ctx.tenant_id)
+    # Restore mode is pay-only: no plan changes from a suspended organisation.
+    can_manage = (
+        not ctx.restore and _perm(request, c.PERM_MANAGE) and ctx.role == c.TENANT_ROLE_OWNER
     )
     status = await service.status()
     return await inertia.render(
@@ -47,6 +49,7 @@ async def billing_page(
             "status": status.model_dump(mode="json"),
             "plans": [p.model_dump(mode="json") for p in await service.public_plans()],
             "can_manage": can_manage,
+            "restore": ctx.restore,
             "csrf_token": get_csrf_token(request),
             "checkout": request.query_params.get("checkout", ""),
         },

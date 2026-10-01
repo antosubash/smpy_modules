@@ -7,9 +7,11 @@ its answer, so the local row always mirrors what Stripe actually did.
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from sm_billing import constants as c
+from sm_billing.contracts.provider import ProviderError
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import tenant_service
 from sm_billing.models import Customer, Plan, Subscription
@@ -127,27 +129,50 @@ class BillingService:
         if await self._live_subscription() is not None:
             raise BillingError("already_subscribed", 409)
         await self._seat_guard(plan)
-        customer = await self.db.get(Customer, self.tenant_id)
-        if customer is None or customer.provider_customer_id is None:
-            tenant = await self.tenants.get(self.tenant_id)
-            customer_id = await self.provider.ensure_customer(
-                self.tenant_id, tenant.name if tenant else self.tenant_id, email
-            )
-            if customer is None:
-                customer = Customer(tenant_id=self.tenant_id, provider=self.provider.name)
-                self.db.add(customer)
-            customer.provider_customer_id = customer_id
-            customer.provider = self.provider.name
-            customer.email = email
-            await self.db.flush()
-        return await self.provider.checkout_url(
+        customer = await self._customer(email)
+        # The local row only changes when a webhook lands, so ask Stripe too:
+        # a subscription paid in another tab must not be joined by a second.
+        if await self.provider.live_subscription_ids(customer.provider_customer_id):
+            raise BillingError("already_subscribed", 409)
+        if customer.checkout_session_id:
+            # One open session per tenant: the older one can no longer be paid.
+            with contextlib.suppress(ProviderError):  # already completed or expired
+                await self.provider.expire_checkout(customer.checkout_session_id)
+        session = await self.provider.create_checkout(
             customer_id=customer.provider_customer_id,
             price_id=price,
             quantity=await self._quantity(plan),
-            trial_days=plan.trial_days,
+            trial_days=0 if await self._trial_used() else plan.trial_days,
             tenant_id=self.tenant_id,
             success_url=f"{base}{c.VIEW_PREFIX}/?checkout=success",
             cancel_url=f"{base}{c.VIEW_PREFIX}/?checkout=cancel",
+        )
+        customer.checkout_session_id = session.id
+        await self.db.flush()
+        return session.url
+
+    async def _customer(self, email: str | None) -> Customer:
+        customer = await self.db.get(Customer, self.tenant_id)
+        if customer is not None and customer.provider_customer_id is not None:
+            return customer
+        tenant = await self.tenants.get(self.tenant_id)
+        customer_id = await self.provider.ensure_customer(
+            self.tenant_id, tenant.name if tenant else self.tenant_id, email
+        )
+        if customer is None:
+            customer = Customer(tenant_id=self.tenant_id, provider=self.provider.name)
+            self.db.add(customer)
+        customer.provider_customer_id = customer_id
+        customer.provider = self.provider.name
+        customer.email = email
+        await self.db.flush()
+        return customer
+
+    async def _trial_used(self) -> bool:
+        """One trial per organisation: any earlier provider subscription spent it."""
+        sub = await subscription_for(self.db, self.tenant_id)
+        return sub is not None and (
+            sub.provider_subscription_id is not None or sub.trial_end is not None
         )
 
     async def portal(self, *, base: str) -> str:

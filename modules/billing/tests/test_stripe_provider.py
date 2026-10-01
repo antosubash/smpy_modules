@@ -156,7 +156,7 @@ async def test_fetch_subscription_maps_snapshot(provider):
 
 
 async def test_checkout_params(provider):
-    url = await provider.checkout_url(
+    session = await provider.create_checkout(
         customer_id="cus_1",
         price_id="price_team_m",
         quantity=3,
@@ -165,7 +165,7 @@ async def test_checkout_params(provider):
         success_url="https://a/ok",
         cancel_url="https://a/no",
     )
-    assert url == "https://co/1"
+    assert (session.id, session.url) == ("cs_1", "https://co/1")
     name, _, params = provider.calls[-1]
     assert name == "checkout.create_async"
     assert params["mode"] == "subscription"
@@ -175,7 +175,7 @@ async def test_checkout_params(provider):
 
 
 async def test_checkout_without_trial_omits_trial(provider):
-    await provider.checkout_url(
+    await provider.create_checkout(
         customer_id="cus_1",
         price_id="p",
         quantity=1,
@@ -235,3 +235,25 @@ def test_factory_builds_stripe_with_encrypted_secrets():
         crypto.set_secret_provider(lambda: "")
     assert isinstance(provider, StripeProvider)
     assert error == ""
+
+
+async def test_expire_checkout(provider):
+    await provider.expire_checkout("cs_1")
+    assert provider.calls[-1][:2] == ("checkout.expire_async", ("cs_1",))
+
+
+async def test_live_subscription_ids_filters_ended(provider):
+    listing = {
+        "object": "list",
+        "data": [
+            {"id": "sub_a", "object": "subscription", "status": "active"},
+            {"id": "sub_b", "object": "subscription", "status": "canceled"},
+            {"id": "sub_c", "object": "subscription", "status": "past_due"},
+            {"id": "sub_d", "object": "subscription", "status": "incomplete_expired"},
+        ],
+    }
+    provider._v1.subscriptions = _Recorder(provider.calls, "subscriptions", listing)
+    assert await provider.live_subscription_ids("cus_1") == ["sub_a", "sub_c"]
+    name, _, params = provider.calls[-1]
+    assert name == "subscriptions.list_async"
+    assert params == {"customer": "cus_1", "status": "all", "limit": 100}

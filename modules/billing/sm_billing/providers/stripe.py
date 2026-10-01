@@ -19,6 +19,7 @@ import stripe
 
 from sm_billing.constants import PROVIDER_STRIPE
 from sm_billing.contracts.provider import (
+    CheckoutSession,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
@@ -28,6 +29,8 @@ from sm_billing.contracts.provider import (
 
 _SUBSCRIPTION_EVENTS = ("customer.subscription.",)
 _CHECKOUT_COMPLETED = "checkout.session.completed"
+# Still billing or granting access — a second checkout would double-charge.
+_LIVE_STATUSES = frozenset({"active", "trialing", "past_due", "unpaid"})
 
 
 def _ts(value: Any) -> datetime | None:
@@ -86,7 +89,7 @@ class StripeProvider:
         customer = await self._call(self._v1.customers.create_async, params=params)
         return customer["id"]
 
-    async def checkout_url(
+    async def create_checkout(
         self,
         *,
         customer_id: str | None,
@@ -96,7 +99,7 @@ class StripeProvider:
         tenant_id: str,
         success_url: str,
         cancel_url: str,
-    ) -> str:
+    ) -> CheckoutSession:
         subscription_data: dict[str, Any] = {"metadata": {"tenant_id": tenant_id}}
         if trial_days > 0:
             subscription_data["trial_period_days"] = trial_days
@@ -111,7 +114,15 @@ class StripeProvider:
         if customer_id:
             params["customer"] = customer_id
         session = await self._call(self._v1.checkout.sessions.create_async, params=params)
-        return session["url"]
+        return CheckoutSession(id=session["id"], url=session["url"])
+
+    async def expire_checkout(self, session_id: str) -> None:
+        await self._call(self._v1.checkout.sessions.expire_async, session_id)
+
+    async def live_subscription_ids(self, customer_id: str) -> list[str]:
+        params = {"customer": customer_id, "status": "all", "limit": 100}
+        listing = await self._call(self._v1.subscriptions.list_async, params=params)
+        return [s["id"] for s in listing.get("data", []) if s.get("status") in _LIVE_STATUSES]
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         params = {"customer": customer_id, "return_url": return_url}

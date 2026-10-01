@@ -22,7 +22,8 @@ from sqlalchemy.exc import IntegrityError
 from sm_billing.constants import HANDLED_EVENTS
 from sm_billing.contracts.provider import InvalidWebhookSignature, ProviderError
 from sm_billing.models import WebhookEvent as EventRow
-from sm_billing.sync import apply_snapshot
+from sm_billing.seats import push_quantity
+from sm_billing.sync import SyncError, apply_snapshot
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -48,12 +49,16 @@ async def _claim(app: FastAPI, event: WebhookEvent, provider: str) -> bool:
     return True
 
 
-async def _finish(app: FastAPI, event_id: str, error: str | None) -> None:
+async def _finish(
+    app: FastAPI, event_id: str, error: str | None, *, note: str | None = None
+) -> None:
+    """Record the outcome. ``error`` leaves it for a retry; ``note`` is kept on
+    an event that is done but worth explaining."""
     async with app.state.sm.db.session_factory() as session:
         row = await session.get(EventRow, event_id)
         if row is None:  # pragma: no cover - claimed above
             return
-        row.error = error
+        row.error = error or note
         if error is None:
             row.processed_at = datetime.now(UTC)
         await session.commit()
@@ -87,11 +92,30 @@ async def process_webhook(
             # when the subscription's own metadata is missing.
             snapshot = replace(snapshot, tenant_id=event.tenant_id)
         async with app.state.sm.db.session_factory() as session:
-            await apply_snapshot(session, app, snapshot, provider=provider.name)
+            sub = await apply_snapshot(session, app, snapshot, provider=provider.name)
+            tenant_id = sub.tenant_id
             await finalize_session(session)
+    except SyncError as exc:
+        if exc.code != "unknown_tenant":
+            return await _failed(app, event, exc)
+        # Not ours (another product on the same Stripe account, or a tenant
+        # since deleted) and no retry will make it ours. Acknowledge it, keep
+        # the reason: a permanent 500 would get the endpoint disabled for all.
+        logger.warning("billing: webhook %s: %s — acknowledged", event.id, exc)
+        await _finish(app, event.id, None, note=f"SyncError: {exc}")
+        return 200, "ignored_unknown_tenant"
     except Exception as exc:
-        logger.exception("billing: webhook %s (%s) failed", event.id, event.type)
-        await _finish(app, event.id, f"{type(exc).__name__}: {exc}"[:2000])
-        return 500, "processing_failed"
+        return await _failed(app, event, exc)
     await _finish(app, event.id, None)
+    try:
+        # Members may have changed between opening Checkout and paying it.
+        await push_quantity(app, tenant_id)
+    except Exception:
+        logger.warning("billing: seat push after webhook %s failed", event.id, exc_info=True)
     return 200, "processed"
+
+
+async def _failed(app: FastAPI, event: WebhookEvent, exc: Exception) -> tuple[int, str]:
+    logger.error("billing: webhook %s (%s) failed: %s", event.id, event.type, exc, exc_info=exc)
+    await _finish(app, event.id, f"{type(exc).__name__}: {exc}"[:2000])
+    return 500, "processing_failed"

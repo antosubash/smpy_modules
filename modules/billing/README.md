@@ -51,6 +51,11 @@ has the following:
 | `limits` | `{key: int}`. **A key that is not set means unlimited; `0` forbids.** `tenants.seats` caps members plus pending invitations. |
 | `features` | Keys that `has_feature` answers `true` for |
 
+A Stripe price that a live subscription is billed on cannot be swapped or
+removed (`409 price_in_use`): webhooks map a subscription to its plan through
+its price. Create a new plan for new pricing instead. For the same reason, do
+not let the Customer Portal switch customers to prices that belong to no plan.
+
 Exactly one plan is the default. It must be free, and it can be neither
 unset nor archived. To change the default, mark another free plan as default.
 Plans are archived, never deleted. Tenants already on an archived plan keep
@@ -110,10 +115,24 @@ To try it locally:
 stripe listen --forward-to localhost:8000/billing/webhooks/stripe
 ```
 
+A tenant gets one trial: after any earlier Stripe subscription, Checkout runs
+without `trial_days`. Starting a new Checkout expires the tenant's previous
+open session, and Checkout is refused while Stripe still lists a live
+subscription for the customer, so two tabs cannot buy two subscriptions.
+
+The owner of an organisation that billing suspended can still open
+`/billing/` in a pay-only "restore" mode (status and Customer Portal, no plan
+changes); paying there reactivates it through the next webhook. An
+organisation an admin suspended stays closed.
+
 Webhooks are verified, deduplicated by event id, and never trusted for state:
 each one re-fetches the subscription from Stripe, so events that arrive out
 of order are harmless. A failed delivery records its error in
-`billing_webhook_event` and returns 500, so Stripe retries it.
+`billing_webhook_event` and returns 500, so Stripe retries it. A subscription
+that maps to no tenant (another product on the same Stripe account, or a
+tenant since deleted) is recorded and acknowledged with 200 instead, so it
+cannot get the endpoint disabled. A cancellation or `unpaid` whose price no
+plan knows is still applied, on the plan the tenant had.
 
 ### Reconcile
 

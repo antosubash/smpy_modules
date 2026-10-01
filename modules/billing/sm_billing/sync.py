@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from tenants.models import Tenant
 
-from sm_billing.constants import STRIPE_STATUS_MAP, SubscriptionStatus
+from sm_billing.constants import ENTITLED_STATUSES, STRIPE_STATUS_MAP, SubscriptionStatus
 from sm_billing.lifecycle import apply_lifecycle
 from sm_billing.models import Customer, Subscription
 from sm_billing.plans import PlanService
@@ -81,15 +81,20 @@ async def apply_snapshot(
         return sub
 
     match = await PlanService(db).by_price(snap.price_id) if snap.price_id else None
-    if match is None:
+    if match is not None:
+        plan_id, interval = match[0].id, match[1]
+    elif sub is not None and status not in ENTITLED_STATUSES:
+        # A lapse needs no plan: apply the cancel / "unpaid" on the plan they
+        # had, so an unmappable price never keeps paid access alive.
+        plan_id, interval = sub.plan_id, sub.interval
+    else:
         raise SyncError("unknown_price", snap.price_id or "(none)")
-    plan, interval = match
 
     await _link_customer(db, tenant_id, snap.customer_id, provider)
     if sub is None:
-        sub = Subscription(tenant_id=tenant_id, plan_id=plan.id)
+        sub = Subscription(tenant_id=tenant_id, plan_id=plan_id)
         db.add(sub)
-    sub.plan_id = plan.id
+    sub.plan_id = plan_id
     sub.status = status
     sub.interval = interval
     sub.provider_subscription_id = snap.id

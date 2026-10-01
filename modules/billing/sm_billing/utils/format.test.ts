@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, planCta, priceLabel, statusTone } from './format';
+import { formatMoney, isActivated, planCta, priceLabel, statusTone } from './format';
 import type { Plan, Status } from './types';
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
@@ -103,6 +103,15 @@ describe('planCta', () => {
   it('is unavailable without checkout or without a price', () => {
     expect(planCta(status({ checkout_available: false }), plan(), 'month')).toBe('unavailable');
     expect(planCta(status(), plan({ stripe_price_year: null }), 'year')).toBe('unavailable');
+  });
+});
+
+describe('isActivated', () => {
+  it('needs a live provider subscription, not a stale canceled one', () => {
+    expect(isActivated(status({ subscription: paidSub }))).toBe(true);
+    expect(isActivated(status({ subscription: { ...paidSub, status: 'trialing' } }))).toBe(true);
+    expect(isActivated(status({ subscription: { ...paidSub, status: 'canceled' } }))).toBe(false);
+    expect(isActivated(status())).toBe(false);
   });
 });
 
