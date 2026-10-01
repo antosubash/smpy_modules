@@ -19,8 +19,14 @@ it becomes uninstallable in any host running a newer framework build.
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions
 against them. A module's first revision carries
-`branch_labels = ("<module>",)` so it can be removed on its own with
-`alembic downgrade <module>@base`.
+`branch_labels = ("<module>",)` so the revision can be named
+(`alembic downgrade <module>@base`). **That does not roll back only that
+module.** Autogenerate chains every revision off the current head, so the
+labelled revision sits on one linear history and `<module>@base` walks
+everything beneath it — verified: `downgrade records@base` ran 20 downgrades
+and emptied the database. Removing one module's schema in isolation needs its
+tables on a real branch (`down_revision = None`), which nothing here produces
+yet. Upstream: antosubash/simple_module_python#333.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
 `(locale, slug)`, and a rename records a redirect scoped to that locale.
@@ -92,11 +98,11 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n — done.** news and pagebuilder both ship `locales/en.json` and call
-  `t(keys.<module>.<section>.<key>)`. canopy_atlas needs nothing: it has no
-  frontend at all — zero `.ts`/`.tsx` files, and its `pages/` holds only a
-  `.gitkeep` — so the older note here, claiming all three had hardcoded English
-  TSX, was wrong about it.
+- **UI i18n — done except `ai`.** news, pagebuilder and records all ship
+  `locales/en.json` and route every string through `t()`; `ai` still has
+  hardcoded English TSX. news and pagebuilder call
+  `t(keys.<module>.<section>.<key>)`; records passes string keys with a
+  `defaultValue`, which `tsc` cannot check against its catalogue.
 
   **The trap, if you add a module.** The framework generates the `keys` object
   and the `t()` key union into `packages/i18n/src`, from the merged registry of

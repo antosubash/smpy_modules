@@ -17,8 +17,8 @@ import secrets
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request
-from inertia import Inertia
 from simple_module_hosting.inertia_deps import get_inertia
+from simple_module_inertia import Inertia
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 

@@ -84,7 +84,7 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_superuser', sa.Boolean(), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
-    sa.Column('is_external', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('is_external', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.Column('full_name', sa.String(length=255), nullable=True),
     sa.Column('tenant_id', sa.String(length=50), nullable=True),
     sa.Column('disabled_at', sa.DateTime(timezone=True), nullable=True),

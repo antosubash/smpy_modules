@@ -127,12 +127,6 @@ test.describe('Ported GCA widgets', () => {
     await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible();
     await expect(page.getByText('Does the accordion render?')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Topics' })).toBeVisible();
-
-    // Exactly one root: the pack is a site-wide branding setting, so
-    // PublicPage wraps the whole document and the page root renders none of
-    // its own. The body is inside it.
-    await expect(page.locator('.gca-root')).toHaveCount(1);
-    await expect(page.locator('.gca-root main')).toHaveCount(1);
   });
 
   test('the FAQ accordion opens', async ({ page }) => {

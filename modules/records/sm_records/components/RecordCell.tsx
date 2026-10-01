@@ -1,0 +1,228 @@
+import { Link } from '@inertiajs/react';
+import { useT } from '@simple-module-py/i18n';
+
+import type { ExpandedRef, FieldDef } from '../utils/types';
+import { EMPTY_CELL as DASH, formatCalendarDate, formatDateTime } from '../utils/values';
+import { MediaCell } from './media/MediaCell';
+
+type Choice = { value: string; label: string };
+
+/** How many characters of a text-ish value a cell prints before an ellipsis;
+ *  the whole value stays in the cell's `title`. */
+const CELL_CHARS = 60;
+
+function truncate(text: string): string {
+  return text.length > CELL_CHARS ? `${text.slice(0, CELL_CHARS)}…` : text;
+}
+
+function choices(field: FieldDef): Choice[] {
+  const raw = field.options?.choices;
+  return Array.isArray(raw) ? (raw as Choice[]) : [];
+}
+
+/** `select`/`multiselect` store the choice's `value` (design doc §7.3); the
+ *  list shows the human `label` instead, falling back to the raw value if a
+ *  choice was since removed from the schema (design doc §8.8: an orphaned
+ *  value is not an error, it just no longer resolves to a label). */
+function choiceLabel(field: FieldDef, raw: unknown): string {
+  const match = choices(field).find((c) => c.value === raw);
+  return match ? match.label : String(raw);
+}
+
+function isRef(value: unknown): value is { type: string; uuid: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'uuid' in value &&
+    typeof (value as { uuid: unknown }).uuid === 'string'
+  );
+}
+
+/** One resolved relation target, rendered as a link, or a muted marker for
+ *  the two states that are not a live, visible record (design §9). */
+function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
+  const { t } = useT();
+  if (exp.restricted) {
+    return (
+      <span className="text-muted-foreground" data-testid="records-relation-restricted">
+        {t('records.relation.restricted', { defaultValue: 'Restricted' })}
+      </span>
+    );
+  }
+  if (exp.dangling) {
+    return (
+      <span
+        className="text-muted-foreground"
+        title={t('records.relation.deleted_title', {
+          defaultValue: 'The record this pointed at has been deleted.',
+        })}
+        data-testid="records-relation-deleted"
+      >
+        {t('records.relation.deleted', { defaultValue: 'Deleted' })} ({exp.uuid.slice(0, 8)})
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/records/${exp.type_key}/${exp.uuid}`}
+      className="hover:underline"
+      data-testid="records-relation-link"
+    >
+      {exp.display_title}
+    </Link>
+  );
+}
+
+/**
+ * Renders one indexed-field column's value in the record list, by field
+ * type (design doc §7.3's coercions, reversed for display).
+ *
+ * A relation renders its `expanded[field.key]` entry when the caller passed
+ * one — the target's `display_title` as a link, or a muted marker for a
+ * `dangling`/`restricted` target (design §9) — and falls back to the target
+ * uuid's first eight characters when there is none (no `?expand=` was asked,
+ * or this is an older payload with nothing to look it up in).
+ *
+ * `json`, `media` and `longtext` are not indexable (design doc §7.3), so
+ * they never sort — but the column chooser may show them, since every list
+ * row carries its full `data`: `longtext` prints its first line's worth with
+ * whitespace collapsed, `json` a compact one-line serialisation, and `media`
+ * goes through `MediaCell` — a thumbnail or an icon and the file's name when
+ * the page has a media library (`media_api`), the stored id when it has
+ * none. The default view includes a type's first `media` field
+ * (`defaultColumnKeys`): a thumbnail is how a list of products is scanned.
+ */
+export function RecordCell({
+  field,
+  value,
+  expanded,
+}: {
+  field: FieldDef;
+  value: unknown;
+  /** This field's slice of `RecordRead.expanded`, one entry per stored
+   *  reference in payload order — `undefined` when the caller did not
+   *  expand this column. */
+  expanded?: ExpandedRef[];
+}) {
+  const { t } = useT();
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">{DASH}</span>;
+  }
+
+  switch (field.type) {
+    case 'boolean':
+      // The glyph alone is `aria-hidden` (L1): unpaired, `true` announced as
+      // empty and `false` as a bare en-dash, so a screen-reader user could
+      // not tell true/false/missing apart in a boolean column. The `sr-only`
+      // word next to it is the same pattern `fields/FieldShell.tsx` uses for
+      // the required-field marker.
+      return value ? (
+        <span>
+          <span aria-hidden="true">✓</span>
+          <span className="sr-only">
+            {t('records.fields.boolean_yes', { defaultValue: 'Yes' })}
+          </span>
+        </span>
+      ) : (
+        <span className="text-muted-foreground">
+          <span aria-hidden="true">–</span>
+          <span className="sr-only">{t('records.fields.boolean_no', { defaultValue: 'No' })}</span>
+        </span>
+      );
+
+    case 'number':
+    case 'integer': {
+      // `number` arrives as a string (e.g. "9.99", design doc §7.3 /
+      // Decimal's JSON encoding); `integer` arrives as a JSON number. U28:
+      // both used to print the raw wire value verbatim — "2262.22",
+      // "4749" — with no thousands separator, next to dates that *are*
+      // locale-formatted. `Number()` on a wire value this module already
+      // validated as numeric cannot produce `NaN`; the fallback is only
+      // for a payload from a build old enough to have stored something
+      // else under the key.
+      const n = typeof value === 'number' ? value : Number(value);
+      return <span>{Number.isFinite(n) ? n.toLocaleString() : String(value)}</span>;
+    }
+
+    case 'date':
+      // A bare calendar day, fixed in UTC so it cannot shift a day for a
+      // viewer west of UTC — `formatCalendarDate` (utils/values.ts).
+      return <span>{typeof value === 'string' ? formatCalendarDate(value) : String(value)}</span>;
+
+    case 'datetime':
+      // ISO datetime (design doc §7.3), rendered in the viewer's own zone —
+      // `formatDateTime` (utils/values.ts) is the one place that formatting
+      // lives, shared with the envelope's own `published_at`/`updated_at`
+      // timestamps in `RecordTable`/`RecordCardList`.
+      return <span>{typeof value === 'string' ? formatDateTime(value) : String(value)}</span>;
+
+    case 'select':
+      return <span>{choiceLabel(field, value)}</span>;
+
+    case 'media':
+      return <MediaCell value={value} />;
+
+    case 'multiselect': {
+      const values = Array.isArray(value) ? value : [value];
+      if (values.length === 0) return <span className="text-muted-foreground">{DASH}</span>;
+      return <span>{values.map((v) => choiceLabel(field, v)).join(', ')}</span>;
+    }
+
+    case 'relation': {
+      const refs = Array.isArray(value) ? value : [value];
+      if (refs.length === 0) return <span className="text-muted-foreground">{DASH}</span>;
+      if (!expanded) {
+        const short = refs.map((r) => (isRef(r) ? r.uuid.slice(0, 8) : DASH)).join(', ');
+        return <span className="font-mono text-xs">{short}</span>;
+      }
+      // Matched by position: `expanded[field.key]` carries one `ExpandedRef`
+      // per stored reference, in payload order (design §9) — the same order
+      // `refs` is already in.
+      //
+      // The separator rides *inside* each chip's wrapper and trails it
+      // (UX-R17). As its own child of the `gap-x-1` flex row it was a flex
+      // item in its own right, so the gap applied on both sides of it and
+      // every relation column printed "A , B ,".
+      return (
+        <span className="flex flex-wrap items-center gap-x-1">
+          {refs.map((r, index) => {
+            const exp = expanded[index];
+            const key = isRef(r) ? r.uuid : String(index);
+            const last = index === refs.length - 1;
+            return (
+              <span key={exp ? exp.uuid : key} className="inline-flex items-center">
+                {exp ? (
+                  <ExpandedRefChip ref={exp} />
+                ) : (
+                  <span className="font-mono text-xs">{isRef(r) ? r.uuid.slice(0, 8) : DASH}</span>
+                )}
+                {!last && <span className="text-muted-foreground">,</span>}
+              </span>
+            );
+          })}
+        </span>
+      );
+    }
+
+    case 'longtext': {
+      const text = String(value);
+      return <span title={text}>{truncate(text.replace(/\s+/g, ' ').trim())}</span>;
+    }
+
+    case 'json': {
+      const text = JSON.stringify(value) ?? String(value);
+      return (
+        <code className="font-mono text-xs" title={text} data-testid="records-cell-json">
+          {truncate(text)}
+        </code>
+      );
+    }
+
+    default: {
+      // `text`, `email`, `url` and anything else text-indexed: truncate for
+      // the table, keep the full value reachable via `title`.
+      const text = String(value);
+      return <span title={text}>{truncate(text)}</span>;
+    }
+  }
+}

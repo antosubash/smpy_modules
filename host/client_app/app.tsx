@@ -21,13 +21,15 @@ createInertiaApp({
       locale: initial?.locale ?? 'en',
       messages: initial?.messages ?? {},
     });
-    let activeLocale = initial?.locale ?? null;
     router.on('success', (event) => {
       const block = (event.detail.page.props as { i18n?: I18nBlock }).i18n;
-      if (!block) return;
-      if (block.locale !== activeLocale && block.messages) {
+      // A non-null catalog is the server's signal that the client needs it; it
+      // sends `null` while the cached one is still good. Gating on a locale
+      // change dropped the catalog that arrives when only the *audience*
+      // changes: signing in swaps the public snapshot for one with admin-only
+      // modules at the same locale, and admin screens showed raw keys.
+      if (block?.messages) {
         updateI18n({ locale: block.locale, messages: block.messages });
-        activeLocale = block.locale;
       }
     });
     createRoot(el).render(<App {...props} />);

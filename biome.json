@@ -11,6 +11,7 @@
       "!**/node_modules",
       "!**/dist",
       "!host/client_app/modules.generated.ts",
+      "!host/client_app/modules.generated.css",
       "!host/client_app/modules.manifest.json"
     ],
     "ignoreUnknown": true
