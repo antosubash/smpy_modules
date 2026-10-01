@@ -8,10 +8,10 @@ named after the resource; these are the writes to it.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from news.constants import (
     MAX_AUTHOR_LEN,
@@ -119,6 +119,18 @@ class ArticleUpdate(BaseModel):
     _display_date = field_validator("published_at")(as_display_date)
     """Truncate to the calendar day as sent — see ``news.display_date``."""
 
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> ArticleUpdate:
+        """Refuse ``null`` for a NOT NULL column; omitting it is fine.
+
+        Otherwise the database rejects it and ``ArticlesService.update`` reports
+        "Slug already in use" — a 409 about the wrong thing.
+        """
+        for name in ("title", "slug", "index_in_search"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
 
 class ArticleBodyUpdate(BaseModel):
     """An autosave from the block canvas.
@@ -150,3 +162,14 @@ class ScheduleRequest(BaseModel):
 
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
+
+    @field_validator("publish_at", "unpublish_at")
+    @classmethod
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
+        """Normalise to UTC: SQLite drops the offset on write without
+        converting, and ``process_due`` reads stored values back as UTC."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)

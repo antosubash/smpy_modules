@@ -5,7 +5,7 @@ import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
   deleteArticle,
-  listArticles,
+  getArticleDetail,
   publishArticle,
   trashArticle,
   updateArticle,
@@ -66,16 +66,12 @@ export function useArticleEditor(articleId: number) {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        // No get-one endpoint: the listing is the one shape every article read
-        // has, and adding a second would mean two places to keep in step.
-        // `limit` is the API max so a mid-sized archive still finds the row.
-        const response = await listArticles({ limit: 100, undated_first: true, signal });
-        const found = response.items.find((a) => a.id === articleId) ?? null;
+        // By id, not by searching a page of the listing: a page tops out at
+        // the API's limit, past which an existing article read as deleted.
+        // The detail shape *is* the listing row widened, tags included, and a
+        // missing article answers 404 with its own message.
+        const found = await getArticleDetail(articleId, signal);
         if (signal?.aborted) return;
-        if (found === null) {
-          setError(t(keys.news.editor.gone));
-          return;
-        }
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
@@ -95,7 +91,7 @@ export function useArticleEditor(articleId: number) {
         })
         .catch(() => {});
     },
-    [articleId, t],
+    [articleId],
   );
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {

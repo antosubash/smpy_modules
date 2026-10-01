@@ -16,12 +16,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from simple_module_db import get_db
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import service
 from news.content import ArticlesService
+from news.content._slugs import free_slug
 from news.contracts.schemas import ArticleRead, ArticleTranslationCreate
 from news.endpoints.api._deps import checked_locale, read_one, require_edit
+from news.models import NewsArticle
 
 router = APIRouter(dependencies=[require_edit])
 
@@ -74,12 +77,12 @@ async def translate_article(
     if await _has_locale(db, group, locale):
         raise HTTPException(
             status_code=409,
-            detail=f"This article already has a {locale} translation.",
+            detail=f"This article already has a {locale} translation (check the trash).",
         )
 
     translated = await service_.create(
         title=body.title or article.title,
-        slug=body.slug or article.slug,
+        slug=body.slug or await free_slug(db, article.slug, locale),
         locale=locale,
         translation_group=group,
         category=article.category,
@@ -95,17 +98,18 @@ async def translate_article(
 async def _has_locale(db: AsyncSession, group: str, locale: str) -> bool:
     """Whether the group already holds an article in this language.
 
-    Asked through the same listing the language switcher reads rather than a
-    query of its own, so "the translations of this article" means one thing in
-    both places. Drafts count: a translation someone started and has not
-    published yet is exactly the one this would duplicate.
+    Drafts count, and so does the trash: ``(translation_group, locale)`` is
+    unique over every row, trashed ones included, so a binned German sibling
+    still blocks a new one and the insert would fail on the index with a "Slug
+    already in use" that names nothing the translator typed.
     """
-    existing, _ = await service.list_articles(
-        db,
-        limit=1,
-        group=group,
-        locale=locale,
-        include_drafts=True,
-        with_total=False,
-    )
-    return bool(existing)
+    return (
+        await db.scalar(
+            select(NewsArticle.id)
+            .where(
+                NewsArticle.translation_group == group,
+                NewsArticle.locale == locale,
+            )
+            .limit(1)
+        )
+    ) is not None

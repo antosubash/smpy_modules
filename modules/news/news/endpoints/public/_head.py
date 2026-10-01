@@ -190,7 +190,7 @@ def _safe_json_ld(doc: dict[str, Any]) -> str:
     return (
         json.dumps(doc)
         .replace("</", "<\\/")
-        .replace("<!--", "<\\!--")
+        .replace("<!--", "<\\u0021--")
     )
 
 

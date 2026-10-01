@@ -63,6 +63,35 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
 
 
+async def retire_missed_windows(db: AsyncSession, now: datetime) -> int:
+    """Cancel every draft whose publish *and* unpublish times have both passed.
+
+    The window opened and closed while no scheduler was running. Publishing now
+    would serve the article with nothing left to take it down: ``publish``
+    clears an elapsed ``unpublish_at`` as a leftover, which is right for a
+    person pressing Publish and wrong here, where the author's last word was
+    that the article is off the site by now. So both times are cleared and the
+    article stays a draft.
+
+    Safe on every replica at once without a claim: the statement is idempotent,
+    and the second to run finds nothing left to match. Returns the row count.
+    """
+    result = await db.execute(
+        update(NewsArticle)
+        .where(
+            NOT_TRASHED,
+            NewsArticle.status == ArticleStatus.DRAFT,
+            NewsArticle.publish_at.is_not(None),
+            NewsArticle.publish_at <= now,
+            NewsArticle.unpublish_at.is_not(None),
+            NewsArticle.unpublish_at <= now,
+        )
+        .values(publish_at=None, unpublish_at=None)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)
+
+
 async def due_candidates(
     db: AsyncSession,
     *,

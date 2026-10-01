@@ -39,26 +39,15 @@ class ArticleRead(BaseModel):
     published_at: datetime | None = None
 
     locale: str = ""
-    """Which language the article is written in.
-
-    The article's own column now. It used to be the language of the
-    pagebuilder page the body lived in, which is why this had nowhere to come
-    from on a host that did not run that module. Defaulted rather than required
-    so a caller building an ``ArticleRead`` by hand — the search screen does —
-    need not supply it.
-    """
+    """Which language the article is written in. Defaulted so a caller building
+    an ``ArticleRead`` by hand — the search screen does — need not supply it."""
 
     translation_group: str = ""
     """What this article and its counterparts in other languages share.
 
-    Carried on the card so the admin list can mark which articles already have
-    a translation without a query per row — "has translations" is then "are
-    there siblings sharing this group", never a null check.
-
-    Empty only where the caller built the shape by hand with no group to give
-    (the search screen does). Every stored article has one: the column is NOT
-    NULL and every article starts a group of its own, so a lone article is a
-    group of one rather than an absence.
+    Carried on the card so the admin list can mark which articles have a
+    translation without a query per row. Empty only where the caller built the
+    shape by hand; every stored article has one, a lone one being a group of one.
     """
 
     status: ArticleStatus

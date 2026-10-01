@@ -114,8 +114,7 @@
     "saved": "Saved",
     "save": "Save",
     "saved_toast": "Article saved",
-    "published_toast": "Published",
-    "gone": "That article no longer exists."
+    "published_toast": "Published"
   },
   "inspector": {
     "headline_label": "Headline",

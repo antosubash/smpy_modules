@@ -92,3 +92,20 @@ async def test_tags_for_a_missing_article_are_404_not_empty(
     response = await anon_client.get("/api/news/articles/999999/tags")
 
     assert response.status_code == 404, response.text
+
+
+async def test_the_editors_single_read_carries_the_tags(editor_client: AsyncClient) -> None:
+    """The editor loads an article by id, and saves back whatever tags it read.
+
+    A single read without them would hand the editor an untagged article, and
+    its next Save would write that back over the real ones.
+    """
+    article_id = await _seed(editor_client, status=ArticleStatus.DRAFT)
+
+    detail = await editor_client.get(f"/api/news/articles/{article_id}/detail")
+    assert detail.status_code == 200
+    assert sorted(detail.json()["tags"]) == sorted(TAGS)
+
+    submitted = await editor_client.post(f"/api/news/articles/{article_id}/submit")
+    assert submitted.status_code == 200
+    assert sorted(submitted.json()["tags"]) == sorted(TAGS)

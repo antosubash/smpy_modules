@@ -39,8 +39,49 @@ _STATUS = sa.Enum("DRAFT", "SUBMITTED_FOR_REVIEW", "PUBLISHED", name="news_artic
 _EVENT = sa.Enum("PUBLISH", "UNPUBLISH", "SUBMIT", "APPROVE", "REJECT", name="news_revision_event")
 
 
+# Where the article's language and translation links wait for
+# ``d4e7c1a9b602``, which adds the columns that hold them. Only created on a
+# host whose pages were already multilingual — see :func:`_pages_localised`.
+LOCALE_CARRY = "news_article_locale_carry"
+REDIRECT_CARRY = "news_article_redirect_carry"
+
+
 def _has_pages(bind) -> bool:
     return _PAGES in sa.inspect(bind).get_table_names()
+
+
+def _pages_localised(bind) -> bool:
+    """Whether pages already carry a language — ``b1f4a72c9d30`` has run.
+
+    True on any host upgrading from 0.0.7, where an article's language and its
+    translation links were its page's. This revision drops ``page_id``, the one
+    path back to them, before ``d4e7c1a9b602`` gives the article columns of its
+    own; so they are set aside here and applied there. The two revisions sit on
+    parallel branches, so on a fresh database either order is possible — which
+    is harmless, because there is no data to carry.
+    """
+    if not _has_pages(bind):
+        return False
+    return "locale" in {c["name"] for c in sa.inspect(bind).get_columns(_PAGES)}
+
+
+def _carry_locales(bind) -> None:
+    """Set each article's page language and translation group aside."""
+    op.create_table(
+        LOCALE_CARRY,
+        sa.Column("article_id", sa.Integer(), primary_key=True),
+        sa.Column("locale", sa.String(length=12), nullable=False),
+        sa.Column("translation_group", sa.String(length=32), nullable=False),
+    )
+    bind.execute(
+        sa.text(
+            f"""
+            INSERT INTO {LOCALE_CARRY} (article_id, locale, translation_group)
+            SELECT a.id, p.locale, p.translation_group
+            FROM news_articles a JOIN {_PAGES} p ON p.id = a.page_id
+            """
+        )
+    )
 
 
 def _backfill(bind) -> None:
@@ -126,6 +167,26 @@ def _carry_over_redirects(bind) -> None:
         return
     if "pagebuilder_page_redirects" not in sa.inspect(bind).get_table_names():
         return
+    if _pages_localised(bind):
+        # Unique per language there, and not yet here: ``news_article_redirects``
+        # gains its ``locale`` in ``d4e7c1a9b602``, which inserts these.
+        op.create_table(
+            REDIRECT_CARRY,
+            sa.Column("from_slug", sa.String(length=200), nullable=False),
+            sa.Column("article_id", sa.Integer(), nullable=False),
+            sa.Column("locale", sa.String(length=12), nullable=False),
+        )
+        bind.execute(
+            sa.text(
+                f"""
+                INSERT INTO {REDIRECT_CARRY} (from_slug, article_id, locale)
+                SELECT r.from_slug, a.id, r.locale
+                FROM pagebuilder_page_redirects r
+                JOIN news_articles a ON a.page_id = r.page_id
+                """
+            )
+        )
+        return
     bind.execute(
         sa.text(
             """
@@ -176,6 +237,10 @@ def _fill_gaps(bind) -> None:
 
 
 def upgrade() -> None:
+    # Two languages may share a slug on a multilingual host, so the slug indexes
+    # cannot be unique on their own yet; ``d4e7c1a9b602`` replaces both with
+    # per-language unique ones before anything reads them.
+    single_language = not _pages_localised(op.get_bind())
     op.create_table(
         "news_article_redirects",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -199,7 +264,7 @@ def upgrade() -> None:
         op.f("ix_news_article_redirects_from_slug"),
         "news_article_redirects",
         ["from_slug"],
-        unique=True,
+        unique=single_language,
     )
     op.create_table(
         "news_article_revisions",
@@ -273,6 +338,8 @@ def upgrade() -> None:
     )
 
     bind = op.get_bind()
+    if not single_language:
+        _carry_locales(bind)
     _backfill(bind)
     _carry_over_redirects(bind)
     _fill_gaps(bind)
@@ -294,7 +361,9 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_news_articles_deleted_at"), "news_articles", ["deleted_at"], unique=False
     )
-    op.create_index(op.f("ix_news_articles_slug"), "news_articles", ["slug"], unique=True)
+    op.create_index(
+        op.f("ix_news_articles_slug"), "news_articles", ["slug"], unique=single_language
+    )
     op.create_index(op.f("ix_news_articles_status"), "news_articles", ["status"], unique=False)
     # Last, so everything above could still read it.
     op.drop_column("news_articles", "page_id")
@@ -310,7 +379,10 @@ def downgrade() -> None:
     would silently attach articles to whatever happened to hold them.
     """
     op.add_column("news_articles", sa.Column("page_id", sa.INTEGER(), nullable=True))
-    op.execute("UPDATE news_articles SET page_id = id")
+    # Negative, so it is NOT NULL and unique as the old schema demands yet can
+    # never name a real page — `id` itself would attach each article to
+    # whichever unrelated page happened to hold that number.
+    op.execute("UPDATE news_articles SET page_id = -id")
     op.drop_index(op.f("ix_news_articles_status"), table_name="news_articles")
     op.drop_index(op.f("ix_news_articles_slug"), table_name="news_articles")
     op.drop_index(op.f("ix_news_articles_deleted_at"), table_name="news_articles")
@@ -344,5 +416,10 @@ def downgrade() -> None:
     )
     op.drop_table("news_article_redirects")
     bind = op.get_bind()
+    # Only present if the upgrade stopped short of ``d4e7c1a9b602``.
+    inspector = sa.inspect(bind)
+    for carry in (LOCALE_CARRY, REDIRECT_CARRY):
+        if inspector.has_table(carry):
+            op.drop_table(carry)
     _STATUS.drop(bind, checkfirst=True)
     _EVENT.drop(bind, checkfirst=True)

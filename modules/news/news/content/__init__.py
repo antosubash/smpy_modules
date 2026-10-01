@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from news import locales, redirects
+from news.content._revisions import clear_revisions
 from news.content._slugs import free_slug, slug_exhausted, slug_for_title, slug_taken
 from news.content._workflow import WorkflowMixin
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
@@ -215,7 +216,7 @@ class ArticlesService(WorkflowMixin):
         return article
 
     async def purge(self, article_id: int) -> None:
-        """Remove the row for good, with its redirects.
+        """Remove the row for good, with its redirects and its history.
 
         The tag links go by ``ondelete="CASCADE"`` where the database enforces
         it; ``news.tag_service.unlink_article`` is what the endpoint calls
@@ -224,5 +225,6 @@ class ArticlesService(WorkflowMixin):
         """
         article = await self.get_article(article_id, include_trashed=True)
         await redirects.clear_for_article(self.db, article_id)
+        await clear_revisions(self.db, article_id)
         await self.db.delete(article)
         await self.db.flush()

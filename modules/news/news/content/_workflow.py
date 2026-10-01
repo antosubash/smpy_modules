@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news.content._claims import claim, due_candidates, release
+from news.content._claims import claim, due_candidates, release, retire_missed_windows
 from news.content._revisions import RevisionsMixin
 from news.models import ArticleStatus, NewsArticle, RevisionEvent
 from news.naive_utc import as_utc
@@ -143,8 +143,8 @@ class WorkflowMixin(RevisionsMixin):
 
         Idempotent by construction: each tick re-queries, and both `publish` and `unpublish` clear
         the timestamp they acted on, so a process asleep an hour catches up rather than losing the
-        window — except one already elapsed, which `publish` clears rather than taking the article
-        down the same tick. One bad row is skipped rather than poisoning the whole tick —
+        window — unless the whole window passed while it slept, which is retired unpublished (see
+        `retire_missed_windows`). One bad row is skipped rather than poisoning the whole tick —
         its claim handed straight back, so a later tick retries instead of the
         schedule dying here — but never silently: each skip is logged with the
         article's id, because a schedule that quietly never fires leaves no
@@ -153,15 +153,12 @@ class WorkflowMixin(RevisionsMixin):
         Trashed articles are excluded. An article binned while carrying a
         schedule must not republish itself out of the trash.
         """
+        if missed := await retire_missed_windows(self.db, now):
+            logger.warning("news.scheduler.window_missed count=%s", missed)
         flipped: list[NewsArticle] = []
         for label, column, status, act in (
             ("publish", NewsArticle.publish_at, ArticleStatus.DRAFT, self.publish),
-            (
-                "unpublish",
-                NewsArticle.unpublish_at,
-                ArticleStatus.PUBLISHED,
-                self.unpublish,
-            ),
+            ("unpublish", NewsArticle.unpublish_at, ArticleStatus.PUBLISHED, self.unpublish),
         ):
             for article_id, due_at in await due_candidates(
                 self.db, column=column, status=status, now=now
@@ -213,10 +210,10 @@ class WorkflowMixin(RevisionsMixin):
 
     async def submit_for_review(self, article_id: int) -> NewsArticle:
         article = await self.get_article(article_id)
+        if article.status is not ArticleStatus.DRAFT:
+            raise HTTPException(409, "Only a draft can be submitted for review.")
         return await self._transition(
-            article,
-            status=ArticleStatus.SUBMITTED_FOR_REVIEW,
-            event=RevisionEvent.SUBMIT,
+            article, status=ArticleStatus.SUBMITTED_FOR_REVIEW, event=RevisionEvent.SUBMIT
         )
 
     async def approve(self, article_id: int) -> NewsArticle:

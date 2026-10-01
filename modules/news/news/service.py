@@ -261,11 +261,12 @@ async def update(
 
 
 async def delete(db: AsyncSession, article: NewsArticle) -> None:
-    """Remove the article outright, tags and all.
+    """Remove the article outright, with its tag links, redirects and history.
 
-    Tag links go explicitly, not by ``ondelete="CASCADE"`` — see
-    :func:`news.tag_service.delete` for why that never fires here.
+    Through ``purge``: SQLite does not cascade, and reuses the highest deleted
+    id, so any row left keyed on it would be inherited by the next article.
     """
+    from news.content import ArticlesService
+
     await tag_service.unlink_article(db, article.id or 0)
-    await db.delete(article)
-    await db.flush()
+    await ArticlesService(db).purge(article.id or 0)

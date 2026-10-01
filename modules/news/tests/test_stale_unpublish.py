@@ -79,3 +79,31 @@ async def test_rejecting_clears_an_elapsed_unpublish_at(db) -> None:
 
     await db.refresh(article)
     assert article.unpublish_at is None
+
+
+async def test_a_window_that_passed_unseen_is_retired_not_published(db) -> None:
+    """Both times passed while no scheduler ran. The author's last word was that
+    the article is off the site by now, so it must not go live — and must not
+    stay live forever, which is what publishing it and then clearing the
+    elapsed ``unpublish_at`` as a leftover would do."""
+    now = datetime.now(UTC)
+    missed = await make_article(
+        db, slug="missed", status=ArticleStatus.DRAFT, publish_body=False
+    )
+    still_open = await make_article(
+        db, slug="still-open", status=ArticleStatus.DRAFT, publish_body=False
+    )
+    service = ArticlesService(db)
+    await service.schedule(
+        missed.id, publish_at=now - timedelta(hours=3), unpublish_at=now - timedelta(hours=1)
+    )
+    await service.schedule(
+        still_open.id, publish_at=now - timedelta(hours=3), unpublish_at=now + timedelta(hours=1)
+    )
+
+    flipped = await service.process_due(now)
+
+    assert [a.id for a in flipped] == [still_open.id]
+    await db.refresh(missed)
+    assert missed.status is ArticleStatus.DRAFT
+    assert missed.publish_at is None and missed.unpublish_at is None

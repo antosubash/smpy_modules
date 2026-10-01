@@ -12,7 +12,7 @@ review step.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -156,7 +156,12 @@ async def purge_article(article_id: int, db: AsyncSession = Depends(get_db)) -> 
     """Remove a trashed article for good, with its redirects and tag links.
 
     Gated on ``news.publish`` as well as ``news.edit``: this is the one action
-    in the module that cannot be undone.
+    in the module that cannot be undone. A live article is refused: it is
+    taken down by trashing first, so that it can still be brought back.
     """
+    service_ = ArticlesService(db)
+    article = await service_.get_article(article_id, include_trashed=True)
+    if article.deleted_at is None:
+        raise HTTPException(status_code=409, detail="Only a trashed article can be purged.")
     await tag_service.unlink_article(db, article_id)
-    await ArticlesService(db).purge(article_id)
+    await service_.purge(article_id)

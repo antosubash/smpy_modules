@@ -274,3 +274,16 @@ class TestTrash:
         await service.restore(article.id)
 
         assert article.status is ArticleStatus.PUBLISHED
+
+    async def test_purging_a_live_article_is_refused(self, editor_client) -> None:
+        """Purge is the Trash screen's "delete forever": a live article has to
+        be trashed first, so there is always a step at which it can come back."""
+        article = await _draft(editor_client, slug="still-here")
+
+        refused = await editor_client.delete(f"{ARTICLES}/{article.id}/purge")
+        assert refused.status_code == 409
+        assert (await editor_client.get(ARTICLES)).json()["total"] == 1
+
+        await editor_client.post(f"{ARTICLES}/{article.id}/trash")
+        purged = await editor_client.delete(f"{ARTICLES}/{article.id}/purge")
+        assert purged.status_code == 204
