@@ -118,6 +118,13 @@ function describeError(
         : translate(e.required, { field: name });
     case 'missing':
       return translate(e.required, { field: name });
+    case 'value_error':
+      // Our own validators raise these, already written as a sentence that
+      // names the field; Pydantic only prepends its "Value error, " label.
+      if (typeof item.msg === 'string' && item.msg) {
+        return item.msg.replace(/^Value error, /, '');
+      }
+      return translate(e.not_valid);
     default: {
       const message = typeof item.msg === 'string' && item.msg ? item.msg : translate(e.not_valid);
       return field ? translate(e.field_message, { field, message }) : message;

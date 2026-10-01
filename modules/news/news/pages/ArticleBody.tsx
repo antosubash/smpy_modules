@@ -1,5 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Puck } from '@puckeditor/core';
+import { type Overrides, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
@@ -60,6 +60,35 @@ export default function ArticleBody() {
   // `localizeConfig` for why they cannot resolve them where they are written.
   const config = useMemo(() => localizeConfig(articlePuckConfig, t), [t]);
   const viewports = useMemo(() => localizeViewports(articleViewports, t), [t]);
+
+  // Stable across renders. Puck treats a new override as a new component
+  // and remounts what it wraps, so an inline object here remounted the
+  // field panel on every keystroke and the textarea lost focus after one
+  // character.
+  const overrides = useMemo<Partial<Overrides>>(
+    () => ({
+      // Puck's header renders its own primary "Publish", wired to a
+      // plain data change rather than to the workflow. Leaving it would
+      // put two differently-behaved Publish buttons on one screen, the
+      // louder of which does the quieter thing. The toolbar above is
+      // the only publish control; the title, undo/redo and the sidebar
+      // toggles stay in Puck's header.
+      headerActions: () => <></>,
+      // With nothing selected Puck shows the *root* field set, and this
+      // config deliberately has none — an article's headline is a
+      // column, edited next door, not a root prop (see
+      // `articlePuckConfig`). That would leave an empty panel where a
+      // writer looking for the headline would look first, so it says
+      // where the headline went instead.
+      fields: ({ children, itemSelector }) =>
+        itemSelector ? (
+          <>{children}</>
+        ) : (
+          <p className="p-4 text-sm text-muted-foreground">{t(copy.select_a_block)}</p>
+        ),
+    }),
+    [t],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,27 +184,7 @@ export default function ArticleBody() {
             viewports={viewports}
             iframe={{ enabled: true }}
             metadata={metadata}
-            overrides={{
-              // Puck's header renders its own primary "Publish", wired to a
-              // plain data change rather than to the workflow. Leaving it would
-              // put two differently-behaved Publish buttons on one screen, the
-              // louder of which does the quieter thing. The toolbar above is
-              // the only publish control; the title, undo/redo and the sidebar
-              // toggles stay in Puck's header.
-              headerActions: () => <></>,
-              // With nothing selected Puck shows the *root* field set, and this
-              // config deliberately has none — an article's headline is a
-              // column, edited next door, not a root prop (see
-              // `articlePuckConfig`). That would leave an empty panel where a
-              // writer looking for the headline would look first, so it says
-              // where the headline went instead.
-              fields: ({ children, itemSelector }) =>
-                itemSelector ? (
-                  <>{children}</>
-                ) : (
-                  <p className="p-4 text-sm text-muted-foreground">{t(copy.select_a_block)}</p>
-                ),
-            }}
+            overrides={overrides}
             onChange={change}
           />
         )}

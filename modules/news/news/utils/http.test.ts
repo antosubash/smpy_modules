@@ -124,6 +124,15 @@ describe('fromValidationErrors', () => {
     );
   });
 
+  it("shows our own validator's sentence without Pydantic's label or the field path", () => {
+    const sentence = 'The canonical URL must be a full http:// or https:// address.';
+    expect(
+      fromValidationErrors([
+        { type: 'value_error', loc: ['body', 'canonical_url'], msg: `Value error, ${sentence}` },
+      ]),
+    ).toBe(sentence);
+  });
+
   it('carries the status on the error', async () => {
     const e = await errorFrom(response('{"detail":"Changed elsewhere."}', { status: 409 }));
     expect(e.status).toBe(409);
