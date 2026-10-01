@@ -57,33 +57,38 @@ class Scheduler:
         future schedule — while cancellation propagates, because that is
         shutdown.
         """
-        from news.content import ArticlesService
-
         factory = app.state.sm.db.session_factory
         interval = max(1, settings.scheduler_interval_seconds)
         while True:
             try:
                 await asyncio.sleep(interval)
-                async with factory() as session:
-                    try:
-                        flipped = await ArticlesService(session).process_due(
-                            datetime.now(UTC)
-                        )
-                        if flipped:
-                            await session.commit()
-                            logger.info(
-                                "news.scheduler.flipped",
-                                extra={"count": len(flipped)},
-                            )
-                        else:
-                            await session.rollback()
-                    except Exception:
-                        await session.rollback()
-                        raise
+                await self.tick(factory)
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception("news.scheduler.tick_failed")
+
+    async def tick(self, factory) -> None:
+        """One pass: flip what is due, in one short session.
+
+        Always committed, never only when something flipped. ``process_due``
+        also writes without flipping — it retires a draft whose whole window
+        passed while no scheduler ran, and it hands a refused claim back — and
+        a rollback on an empty tick would discard the retirement, so the same
+        row would be found, warned about and rolled back again every interval,
+        forever.
+        """
+        from news.content import ArticlesService
+
+        async with factory() as session:
+            try:
+                flipped = await ArticlesService(session).process_due(datetime.now(UTC))
+                await session.commit()
+                if flipped:
+                    logger.info("news.scheduler.flipped", extra={"count": len(flipped)})
+            except Exception:
+                await session.rollback()
+                raise
 
     async def stop(self) -> None:
         task = self._task
