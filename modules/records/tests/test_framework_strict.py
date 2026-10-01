@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import pytest
 from simple_module_db import MissingTenantError
-from sqlalchemy import select
-
 from sm_records._cross_tenant import read_all, tenant_counts
 from sm_records.models import RecordType
 from sm_records.tenancy import tenant_scope
+from sqlalchemy import select
+
 from tests.conftest import create_record, create_type
 
 pytestmark = pytest.mark.unbound_tenant

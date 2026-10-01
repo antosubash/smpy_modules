@@ -132,6 +132,9 @@ def test_upgrade_backfills_default_and_leaves_every_other_index_alone(scratch):
     assert "WHERE" in after_indexes["ix_records_record_type_slug"]
     assert "DESC" in after_indexes["ix_records_c_events_record_type_updated_desc"]
 
+    # ``check`` refuses a database below head, and the revisions after this one
+    # (the framework 0.0.35 ``users`` columns) touch no records table.
+    must(alembic(url, "upgrade", "heads"))
     report = alembic(url, "check")
     if report.returncode != 0:  # another module's drift is not this revision's business
         output = (report.stdout + report.stderr).splitlines()
