@@ -10,10 +10,12 @@ dependencies = [
     "simple_module_dashboard==0.0.35",
     "simple_module_permissions==0.0.35",
     "simple_module_branding==0.0.35",
+    "simple_module_tenants==0.0.35",
     "simple_module_pagebuilder",
     "simple_module_news",
     "simple_module_ai",
     "simple_module_records",
+    "simple_module_billing",
 ]
 
 # Host is an application, not a distributable package.
@@ -31,6 +33,9 @@ workspace = true
 workspace = true
 
 [tool.uv.sources.simple_module_records]
+workspace = true
+
+[tool.uv.sources.simple_module_billing]
 workspace = true
 
 [dependency-groups]

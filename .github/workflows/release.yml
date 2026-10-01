@@ -149,6 +149,7 @@ jobs:
           - simple_module_news
           - simple_module_ai
           - simple_module_records
+          - simple_module_billing
     steps:
       - uses: actions/download-artifact@v8
         with:

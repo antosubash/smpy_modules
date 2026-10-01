@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "simple-module-ai",
+    "simple-module-billing",
     "simple-module-news",
     "simple-module-pagebuilder",
     "simple-module-python-modules",
@@ -1825,6 +1826,50 @@ wheels = [
 ]
 
 [[package]]
+name = "simple-module-billing"
+version = "0.0.7"
+source = { editable = "modules/billing" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "pydantic-settings" },
+    { name = "simple-module-core" },
+    { name = "simple-module-db" },
+    { name = "simple-module-hosting" },
+    { name = "simple-module-inertia" },
+    { name = "simple-module-settings" },
+    { name = "simple-module-tenants" },
+    { name = "sqlalchemy" },
+    { name = "stripe" },
+    { name = "typer" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "simple-module-test" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "simple-module-core", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-db", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-hosting", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-inertia", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-settings", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-tenants", specifier = ">=0.0.35,<0.1" },
+    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.35,<0.1" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
+    { name = "stripe", specifier = ">=16,<17" },
+    { name = "typer", specifier = ">=0.12" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "simple-module-branding"
 version = "0.0.35"
 source = { registry = "https://pypi.org/simple" }
@@ -2123,6 +2168,24 @@ wheels = [
 ]
 
 [[package]]
+name = "simple-module-tenants"
+version = "0.0.35"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cachetools" },
+    { name = "simple-module-auth" },
+    { name = "simple-module-core" },
+    { name = "simple-module-db" },
+    { name = "simple-module-hosting" },
+    { name = "simple-module-inertia" },
+    { name = "simple-module-settings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3e/c3/781ffb4dc2f4e059a21c6237566c173751f19d3e57c37adcbc947d025058/simple_module_tenants-0.0.35.tar.gz", hash = "sha256:27bff8fe0a1661ecacbd9f199e30682977625c9c967a88fdf427c599e77ce478", size = 39885, upload-time = "2026-10-01T09:42:51.768Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/e8/dfb71294411734d7d96a91ec97d015f11575b4ebe609896eba09a0b39482/simple_module_tenants-0.0.35-py3-none-any.whl", hash = "sha256:b8f0505e88d99ef80f51407c043406b404599364c4f80237a9422c7694366755", size = 49343, upload-time = "2026-10-01T09:42:50.47Z" },
+]
+
+[[package]]
 name = "simple-module-test"
 version = "0.0.35"
 source = { registry = "https://pypi.org/simple" }
@@ -2168,6 +2231,7 @@ source = { virtual = "host" }
 dependencies = [
     { name = "simple-module-ai" },
     { name = "simple-module-auth" },
+    { name = "simple-module-billing" },
     { name = "simple-module-branding" },
     { name = "simple-module-dashboard" },
     { name = "simple-module-hosting" },
@@ -2175,6 +2239,7 @@ dependencies = [
     { name = "simple-module-pagebuilder" },
     { name = "simple-module-permissions" },
     { name = "simple-module-records" },
+    { name = "simple-module-tenants" },
     { name = "simple-module-users" },
 ]
 
@@ -2194,6 +2259,7 @@ dev = [
 requires-dist = [
     { name = "simple-module-ai", editable = "modules/ai" },
     { name = "simple-module-auth", specifier = "==0.0.35" },
+    { name = "simple-module-billing", editable = "modules/billing" },
     { name = "simple-module-branding", specifier = "==0.0.35" },
     { name = "simple-module-dashboard", specifier = "==0.0.35" },
     { name = "simple-module-hosting", specifier = "==0.0.35" },
@@ -2201,6 +2267,7 @@ requires-dist = [
     { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
     { name = "simple-module-permissions", specifier = "==0.0.35" },
     { name = "simple-module-records", editable = "modules/records" },
+    { name = "simple-module-tenants", specifier = "==0.0.35" },
     { name = "simple-module-users", specifier = "==0.0.35" },
 ]
 
@@ -2296,6 +2363,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/bb/2799cc2ede3ed41131f8975621e7213dfc7ef4acbbaadfa440f32500c370/starlette-1.3.1-py3-none-any.whl", hash = "sha256:c7372aae11c3c3f26a42df7bd626cec2f47d03483d261d369516a615a53714c6", size = 73632, upload-time = "2026-06-12T09:23:10.017Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "16.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/a7/4a8546b293a09f39a2b55ca8a11539ae9654126df59065868c5d3993f0dd/stripe-16.0.0.tar.gz", hash = "sha256:5016068d54aebb43e61b3c377ef45bede4e0b4eb1817d7a12af81630c55a23d2", size = 1665584, upload-time = "2026-10-01T00:42:03.388Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b5/de/5141ae3990862cc3d61a1cdd4acff72bcb587afb7b4d31c52eaddbb6bc8f/stripe-16.0.0-py3-none-any.whl", hash = "sha256:6a401baf2fc19c59ccb59005e674f8da8fa256e8db319ad8c50292f4cddf8c26", size = 2543794, upload-time = "2026-10-01T00:42:01.65Z" },
 ]
 
 [[package]]
