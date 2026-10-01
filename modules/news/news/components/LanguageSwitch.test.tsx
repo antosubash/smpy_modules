@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { LanguageSwitch, endonym } from './LanguageSwitch';
+import { endonym, LanguageSwitch } from './LanguageSwitch';
 
 const alternates = [
   { locale: 'en', url: 'https://x.test/news/budget' },

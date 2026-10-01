@@ -87,7 +87,7 @@ export default function ArticleBody() {
           <p className="p-4 text-sm text-muted-foreground">{t(copy.select_a_block)}</p>
         ),
     }),
-    [t],
+    [t, copy.select_a_block],
   );
 
   useEffect(() => {
