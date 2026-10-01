@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from simple_module_core.permissions import PermissionRegistry, grants
 from sm_billing import constants as c
 from sm_billing.module import BillingModule
@@ -42,3 +44,16 @@ def test_member_gets_nothing():
 async def test_module_boots_with_state(app):
     services = getattr(app.state, c.PACKAGE)
     assert isinstance(services.settings, BillingSettings)
+
+
+def test_every_page_constant_has_a_page_file():
+    """``import.meta.glob`` names pages by path: a constant without its file
+    renders a blank screen, and a stray file under pages/ registers a page."""
+    pages_dir = Path(c.__file__).parent / "pages"
+    names = {
+        value
+        for name, value in vars(c).items()
+        if name.startswith("_PAGE_") and isinstance(value, str)
+    }
+    files = {f"{c.MODULE_NAME}/{p.stem}" for p in pages_dir.glob("*.tsx")}
+    assert names == files
