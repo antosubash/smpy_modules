@@ -68,6 +68,11 @@ class BillingModule(ModuleBase):
 
         crypto.set_secret_provider(_live_secret)
 
+    def register_exception_handlers(self, app: FastAPI) -> None:
+        from sm_billing.errors import install_exception_handlers
+
+        install_exception_handlers(app)
+
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(
             c.MODULE_NAME,

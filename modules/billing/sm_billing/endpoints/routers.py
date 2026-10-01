@@ -7,10 +7,14 @@ from fastapi import APIRouter
 
 def include(api_router: APIRouter, view_router: APIRouter) -> None:
     """Mount the tenant API, admin API, webhook and tenant views."""
+    from sm_billing.endpoints.api import router as api
+    from sm_billing.endpoints.views import router as views
     from sm_billing.endpoints.webhooks import router as webhooks
 
+    api_router.include_router(api)
     # No CSRF on the webhook: Stripe has no session, the signature is the auth.
     view_router.include_router(webhooks)
+    view_router.include_router(views)
 
 
 def include_admin(admin_router: APIRouter) -> None:
