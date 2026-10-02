@@ -21,8 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.constants import MAX_CATEGORY_LEN, UNCATEGORISED_LABEL
 from news.contracts.schemas import CategoryRead
-from news.integrations.pagebuilder import NOT_TRASHED, Page
-from news.models import NewsArticle, NewsCategory
+from news.models import NOT_TRASHED, NewsArticle, NewsCategory
 from news.slugify import slugify, unique_slug
 
 # Free-text categories sort after every ordered one. Large enough that no
@@ -43,16 +42,16 @@ async def _counts(db: AsyncSession) -> dict[str, int]:
     This is the editor's screen: a category holding nothing but drafts still
     has to show its true weight, or deleting it looks free when it is not.
 
-    Trashed pages are the other half of that. Their articles are deliberately
-    left in place — see ``service._base`` — so counting the raw rows reports
-    articles no listing will show, and the editor deciding whether a category
-    is safe to delete reads a number nothing on screen can account for.
+    Trashed articles are the other half of that. Counting the raw rows would
+    report articles no listing will show, and the editor deciding whether a
+    category is safe to delete would read a number nothing on screen can
+    account for.
     """
     rows = (
         await db.execute(
             select(NewsArticle.category, func.count())
             .select_from(NewsArticle)
-            .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
+            .where(NOT_TRASHED)
             .group_by(NewsArticle.category)
         )
     ).all()

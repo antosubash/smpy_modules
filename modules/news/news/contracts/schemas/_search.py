@@ -1,4 +1,7 @@
-"""Results of the admin search, which spans articles, pages and media."""
+"""Results of the admin search — one shape for hits from every section.
+
+It spans articles always, and pages and media where the host runs pagebuilder.
+"""
 
 from __future__ import annotations
 
@@ -41,8 +44,10 @@ class SearchResults(BaseModel):
 
     Sent rather than assembled in the screen because both land in pagebuilder,
     and how that module routes its own list and its media library is not
-    something this one should be spelling out in TSX — see
-    ``news.integrations.pagebuilder``.
+    something this one should be spelling out in TSX. Both are therefore ``""``
+    on a host that does not run it — see ``news.integrations.pagebuilder`` —
+    and the screen renders no link for an empty one rather than a link to
+    nowhere.
     """
 
     @property

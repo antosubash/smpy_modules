@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { seedArticle } from './article-helpers';
+import { login, uniqueSlug } from './helpers';
 
 /**
  * The article editor — everything about an article except its body.
@@ -14,26 +15,7 @@ async function makeArticle(
   page: Page,
   { publish = true, prefix = 'editor' }: { publish?: boolean; prefix?: string } = {},
 ) {
-  const headers = await csrfHeader(page);
-  const slug = uniqueSlug(prefix);
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: `Editor ${slug}`,
-      slug,
-      draft_data: { root: { props: { title: slug, width: 'full' } }, content: [], zones: {} },
-    },
-  });
-  const { id: pageId } = (await created.json()) as { id: number };
-  if (publish) {
-    await page.request.post(`/api/pagebuilder/pages/${pageId}/publish`, { headers, data: {} });
-  }
-  const attached = await page.request.post('/api/news/articles', {
-    headers,
-    data: { page_id: pageId, category: '', published_at: null },
-  });
-  const article = (await attached.json()) as { id: number };
-  return { articleId: article.id, pageId, slug };
+  return seedArticle(page, { prefix, titlePrefix: 'Editor', publish });
 }
 
 test.describe('Article editor', () => {
@@ -57,7 +39,7 @@ test.describe('Article editor', () => {
 
     await page.goto(`/admin/news/articles/${articleId}/edit`);
     await page.getByLabel('Author').fill('J. Okonkwo');
-    await page.getByLabel('Publish date').fill('2026-03-12');
+    await page.getByLabel('Display date').fill('2026-03-12');
     await page.getByLabel('Pin to the top of listings').check();
     await page.getByLabel('Show in feed blocks').uncheck();
     await page.getByRole('button', { name: /^save$/i }).click();
@@ -131,12 +113,13 @@ test.describe('Article editor', () => {
     await expect(page.getByText(`/news/${slug} · Draft · undated`, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /publish now/i }).click();
 
-    // Preview is a link to the public URL, not a button — it opens the live
-    // article rather than doing anything to it.
-    await expect(page.getByRole('link', { name: /^preview$/i })).toBeVisible();
+    // "View live" is the one that appears on publishing. Preview sits beside it
+    // in every state and renders the draft, so it says nothing about whether
+    // this article reached readers; the live link exists only once one has.
+    await expect(page.getByRole('link', { name: /^view live$/i })).toBeVisible();
     const listed = await page.request.get(`/api/news/articles?q=${slug}`);
-    const body = (await listed.json()) as { items: { page_status: string }[] };
-    expect(body.items[0].page_status).toBe('published');
+    const body = (await listed.json()) as { items: { status: string }[] };
+    expect(body.items[0].status).toBe('published');
   });
 
   test('pinning lifts the article above newer ones in the feed order', async ({ page }) => {
@@ -152,12 +135,12 @@ test.describe('Article editor', () => {
 
     // Give them dates so the order is unambiguous.
     await page.goto(`/admin/news/articles/${older.articleId}/edit`);
-    await page.getByLabel('Publish date').fill('2026-01-01');
+    await page.getByLabel('Display date').fill('2026-01-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     await page.goto(`/admin/news/articles/${newer.articleId}/edit`);
-    await page.getByLabel('Publish date').fill('2026-06-01');
+    await page.getByLabel('Display date').fill('2026-06-01');
     await page.getByRole('button', { name: /^save$/i }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 

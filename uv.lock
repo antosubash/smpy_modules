@@ -1965,7 +1965,6 @@ dependencies = [
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
     { name = "simple-module-inertia" },
-    { name = "simple-module-pagebuilder" },
     { name = "simple-module-settings" },
     { name = "sqlalchemy" },
 ]
@@ -1975,6 +1974,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
+]
+pagebuilder = [
+    { name = "simple-module-pagebuilder" },
 ]
 
 [package.metadata]
@@ -1986,12 +1988,12 @@ requires-dist = [
     { name = "simple-module-db", specifier = ">=0.0.25,<0.1" },
     { name = "simple-module-hosting", specifier = ">=0.0.35,<0.1" },
     { name = "simple-module-inertia", specifier = ">=0.0.35,<0.1" },
-    { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
+    { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-settings", specifier = ">=0.0.25,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.25,<0.1" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-pagebuilder"

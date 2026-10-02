@@ -93,3 +93,10 @@ class TagMerge(BaseModel):
 
 class TagMergeResult(BaseModel):
     moved: int
+
+
+class ArticleTagsUpdate(BaseModel):
+    """Full replacement set — a tag the writer removed has to disappear."""
+
+    tags: list[str] = Field(default_factory=list)
+

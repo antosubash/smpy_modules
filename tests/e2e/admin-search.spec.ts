@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { seedArticle } from './article-helpers';
 import { csrfHeader, login, uniqueSlug } from './helpers';
 
 /**
@@ -33,14 +34,17 @@ async function makePage(page: Page, title: string, body = '') {
 }
 
 async function makeArticle(page: Page, title: string, category: string) {
-  const { id, slug, headers } = await makePage(page, title);
-  await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
-  const newsCsrf = (await page.context().cookies()).find((c) => c.name === 'news_csrf')?.value;
-  await page.request.post('/api/news/articles', {
-    headers: newsCsrf ? { 'X-CSRF-Token': decodeURIComponent(newsCsrf) } : {},
-    data: { page_id: id, category, published_at: null },
+  // No page involved. The Pages section of this screen still searches
+  // pagebuilder's own pages — `makePage` above makes those — but an article is
+  // no longer one of them, which is why the two sections can no longer
+  // double-count a single row.
+  const { articleId, slug } = await seedArticle(page, {
+    prefix: 'search-article',
+    title,
+    category,
+    publish: true,
   });
-  return { id, slug };
+  return { id: articleId, slug };
 }
 
 const section = (page: Page, label: string) =>

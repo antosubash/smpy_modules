@@ -11,17 +11,16 @@ import { login } from './helpers';
  * readable cookie — so every other spec primes the cookie before it does
  * anything, and none of them can see it missing.
  *
- * Creating an article used to POST to pagebuilder's CSRF-protected page API
- * from the browser. A user who clicks News in the sidebar and then "New
- * article" has never requested a pagebuilder path, so the cookie was unset and
- * the POST came back 403 with no page and no article — the module's documented
- * primary flow, broken on a fresh login.
+ * Creating an article once POSTed to pagebuilder's CSRF-protected page API from
+ * the browser. A user who clicked News in the sidebar and then "New article"
+ * had never requested a pagebuilder path, so the cookie was unset and the POST
+ * came back 403 with no page and no article — the module's documented primary
+ * flow, broken on a fresh login. It then became one request to news' own API,
+ * which created the page and attached the article server-side.
  *
- * It is now one request to news' own API, which creates the page and attaches
- * the article server-side in a single transaction, so no pagebuilder cookie is
- * involved at any point. The precondition below therefore asserts something
- * stronger than it used to: not merely that the cookie is unset when the flow
- * starts, but that a flow which never needs it still works.
+ * There is no page in it at all now. The cookie assertion below is kept even so:
+ * it is the cheapest possible statement that this flow touches nothing of
+ * pagebuilder's, and it would fail the moment something reached back across.
  */
 test.describe('News — first visit of a session', () => {
   test('creates an article without having visited Pages first', async ({ page }) => {
@@ -46,19 +45,20 @@ test.describe('News — first visit of a session', () => {
     await dialog.getByLabel('Headline').fill(title);
     await dialog.getByRole('button', { name: 'Create draft' }).click();
 
-    // Success is landing in the editor for the page that was just created.
-    // The /edit suffix matters: /pagebuilder/{id} without it is a 404 — the
-    // old flow navigated there and this pattern let it pass unnoticed.
-    await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
-    // Assert on the editor itself, not on the absence of "Not Found": a
+    // Success is landing in the body canvas for the article just created —
+    // news' own screen, where it used to be `/pagebuilder/{id}/edit`.
+    await page.waitForURL(/\/admin\/news\/articles\/\d+\/body$/, { timeout: 15_000 });
+    // Assert on the canvas itself, not on the absence of "Not Found": a
     // toHaveCount(0) passes on its first poll and so cannot catch an error
-    // page that renders a moment after the URL settles. The toolbar's title
-    // field carries the page title, so this proves both that the editor
-    // mounted and that it opened the page just created.
-    await expect(page.getByPlaceholder('Page title')).toHaveValue(title);
+    // page that renders a moment after the URL settles. The toolbar carries
+    // the article's title, so this proves both that the screen mounted and
+    // that it opened the article just created.
+    //
+    // Located by test id rather than by text: Puck renders the document title
+    // in its own header as well, so a text locator matches twice.
+    await expect(page.getByTestId('article-body-title')).toHaveText(title);
 
-    // And the article row exists, rather than a page with no metadata attached.
-    // Rows are cards now, not table rows.
+    // And the article row exists. Rows are cards, not table rows.
     await page.goto('/admin/news/');
     await expect(
       page.locator('[data-testid="article-row"]').filter({ hasText: title }),
@@ -82,7 +82,7 @@ test.describe('News — first visit of a session', () => {
       await dialog.getByLabel('Headline').fill(headline);
       slugs.push(await dialog.locator('#news-new-article-slug').inputValue());
       await dialog.getByRole('button', { name: 'Create draft' }).click();
-      await page.waitForURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 20_000 });
+      await page.waitForURL(/\/admin\/news\/articles\/\d+\/body$/, { timeout: 20_000 });
     }
 
     // Same preview both times — the dialog has no idea the first one is taken.

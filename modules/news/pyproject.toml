@@ -1,7 +1,7 @@
 [project]
 name = "simple_module_news"
 version = "0.0.7"
-description = "News articles backed by page-builder pages"
+description = "A self-contained news archive — articles, categories, tags and a public viewer"
 requires-python = ">=3.12"
 readme = "README.md"
 license = "MIT"
@@ -14,15 +14,14 @@ dependencies = [
     "simple_module_db>=0.0.25,<0.1",
     "simple_module_hosting>=0.0.35,<0.1",
     "simple_module_inertia>=0.0.35,<0.1",
-    # Lockstep sibling: floor tracks the first release that carried the block
-    # registry this module registers NewsFeed into. Must stay a 0.0.x range —
-    # the repo publishes at 0.0.x, so `>=0.1` would be unsatisfiable and the
-    # wheel uninstallable.
-    "simple_module_pagebuilder>=0.0.1,<0.1",
     # ``register_settings`` imports ``settings.registration``: this module's
     # settings are DB-backed rather than read from the environment. Floor
     # verified: ``register_module_settings`` exists at 0.0.25.
     "simple_module_settings>=0.0.25,<0.1",
+    # simple_module_pagebuilder is deliberately NOT here — it is an optional
+    # extra below. main carried it as a hard dependency because an article's
+    # body lived in a pagebuilder page; this branch gives the article its own
+    # content, so the only things left behind it are two conveniences.
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
 ]
@@ -35,6 +34,14 @@ news = "news.module:NewsModule"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.25,<0.1"]
+# Optional, and only for two conveniences on a host that runs both modules: the
+# admin search screen gains a Pages and a Media section, and the NewsFeed block
+# joins pagebuilder's palette. Nothing here imports it at module scope — see
+# ``news/integrations/pagebuilder.py`` — so news installs and serves without it.
+#
+# Must stay a 0.0.x range: the repo publishes at 0.0.x, so `>=0.1` would be
+# unsatisfiable and the extra uninstallable.
+pagebuilder = ["simple_module_pagebuilder>=0.0.1,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

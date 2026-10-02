@@ -14,7 +14,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
-import { createArticleWithPage } from '../utils/api';
+import { createArticle } from '../utils/api';
 import { localeLabel } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 import { type CategoryRead, listManagedCategories } from '../utils/taxonomyApi';
@@ -43,10 +43,10 @@ interface Props {
  * work in progress, and defaulting to that would make every new article land in
  * the undated pile whether or not its author meant it to.
  *
- * The language is fixed once the article exists, because an article *is* a
- * page and a page's language is: moving one would strand its slug in the old
- * language and orphan the redirect pointing at it. The way to the same story
- * in another language is a translation, offered from the editor.
+ * The language is fixed once the article exists: a slug is unique per
+ * `(locale, slug)`, so moving one would strand its slug in the old language and
+ * orphan the redirect pointing at it. The way to the same story in another
+ * language is a translation, offered from the editor.
  */
 export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) {
   const [open, setOpen] = useState(false);
@@ -94,14 +94,13 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
     setPending(true);
     setError(null);
     try {
-      // One request: the server creates the page and attaches the article in a
-      // single transaction. This used to be two calls from here — creating the
-      // page through pagebuilder's API and then attaching — which needed both a
-      // borrowed CSRF cookie and a `created` state to remember the page a
-      // failed attempt had already committed, so a retry could adopt it instead
-      // of stranding another empty one. Neither is reachable any more: a
-      // failure now leaves nothing behind to adopt.
-      const article = await createArticleWithPage({
+      // One request, one insert. This used to be two calls from here —
+      // creating the page through pagebuilder's API and then attaching — which
+      // needed both a borrowed CSRF cookie and a `created` state to remember
+      // the page a failed attempt had already committed, so a retry could adopt
+      // it instead of stranding another empty one. Neither is reachable any
+      // more: a failure now leaves nothing behind to adopt.
+      const article = await createArticle({
         title: headline.trim(),
         // Only when the author actually typed one. While `slugOverride` is
         // null the field is a *preview* of what the headline derives, and
@@ -113,12 +112,15 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
         category,
         published_at: date ? `${date}T00:00:00Z` : null,
       });
-      // `write` resolves to null on a 204. This route answers 201 with a body,
-      // so this is unreachable in practice — but reading `edit_url` off null
-      // would throw past the catch below and leave the dialog stuck on
-      // "Creating…" with both buttons disabled, which is the one outcome worth
-      // spending three lines to avoid.
+      // `write` types its result as `T | null` because a 204 carries no body.
+      // This route answers 201 with the article, so the null branch is
+      // unreachable — but reading `edit_url` off null would throw past the
+      // catch below and leave the dialog stuck on "Creating…" with both
+      // buttons disabled, which is the one outcome worth three lines to avoid.
       if (!article) throw new Error('The server created the article but returned nothing.');
+      // `edit_url` is the body canvas: creating an article and writing it are
+      // one motion. It used to be a pagebuilder editor URL, which is why this
+      // is served by the API rather than assembled here.
       router.visit(article.edit_url, {
         // A visit that lands unmounts this component, so this only fires when
         // one does not. Without it a failed navigation leaves the dialog on
@@ -218,7 +220,7 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={DATE_ID}>Publish date</Label>
+              <Label htmlFor={DATE_ID}>Display date</Label>
               <Input
                 id={DATE_ID}
                 type="date"
@@ -227,8 +229,8 @@ export function NewArticleDialog({ locales = [], defaultLocale = 'en' }: Props) 
                 onChange={(e) => setDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                A future date lists the article as scheduled. Clearing it makes it undated work in
-                progress.
+                The date shown on the article — it does not schedule a publish. Clearing it makes it
+                undated work in progress.
               </p>
             </div>
 

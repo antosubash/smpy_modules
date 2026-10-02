@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { seedArticle } from './article-helpers';
 import { csrfHeader, login, uniqueSlug } from './helpers';
 
 /**
@@ -14,7 +15,11 @@ test.describe('New page', () => {
   test('derives the URL from the title until it is edited', async ({ page }) => {
     await login(page);
     await page.goto('/pagebuilder/');
-    await page.getByRole('button', { name: 'New page' }).click();
+    // `.first()` because the page list renders NewPageDialog twice: once in
+    // the header and once in the empty-state slot. Both are on screen when
+    // there are no pages — which this spec can now genuinely hit, since news
+    // articles stopped being pages and no longer populate the list for it.
+    await page.getByRole('button', { name: 'New page' }).first().click();
 
     const url = page.getByLabel('URL');
     await page.getByLabel('Title').fill('Field Methods');
@@ -46,7 +51,11 @@ test.describe('New page', () => {
 
     const newSlug = uniqueSlug('copy');
     await page.goto('/pagebuilder/');
-    await page.getByRole('button', { name: 'New page' }).click();
+    // `.first()` because the page list renders NewPageDialog twice: once in
+    // the header and once in the empty-state slot. Both are on screen when
+    // there are no pages — which this spec can now genuinely hit, since news
+    // articles stopped being pages and no longer populate the list for it.
+    await page.getByRole('button', { name: 'New page' }).first().click();
     await page.getByLabel('Title').fill(`Copy ${newSlug}`);
     await page.getByLabel('URL').fill(newSlug);
     await page.getByLabel('Start from').selectOption(String(sourceId));
@@ -71,7 +80,11 @@ test.describe('New page', () => {
 
     const childSlug = uniqueSlug('child');
     await page.goto('/pagebuilder/');
-    await page.getByRole('button', { name: 'New page' }).click();
+    // `.first()` because the page list renders NewPageDialog twice: once in
+    // the header and once in the empty-state slot. Both are on screen when
+    // there are no pages — which this spec can now genuinely hit, since news
+    // articles stopped being pages and no longer populate the list for it.
+    await page.getByRole('button', { name: 'New page' }).first().click();
     await page.getByLabel('Title').fill(`Child ${childSlug}`);
     await page.getByLabel('URL').fill(childSlug);
     await page.getByLabel('Parent').selectOption(String(parentId));
@@ -99,10 +112,10 @@ test.describe('New article', () => {
     await dialog.getByLabel('Headline').fill(headline);
     // The date defaults to today rather than to empty, so a new article does
     // not silently land in the undated pile.
-    await expect(dialog.getByLabel('Publish date')).not.toHaveValue('');
+    await expect(dialog.getByLabel('Display date')).not.toHaveValue('');
     await dialog.getByRole('button', { name: 'Create draft' }).click();
 
-    await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
+    await expect(page).toHaveURL(/\/admin\/news\/articles\/\d+\/body$/);
   });
 
   test('the category chosen at creation is the one the list shows', async ({ page }) => {
@@ -133,7 +146,7 @@ test.describe('New article', () => {
     await expect(categorySelect.locator(`option[value="${category}"]`)).toBeAttached();
     await categorySelect.selectOption(category);
     await dialog.getByRole('button', { name: 'Create draft' }).click();
-    await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/);
+    await expect(page).toHaveURL(/\/admin\/news\/articles\/\d+\/body$/);
 
     // Searched, not scrolled to: the list pages at 25, and by the time the
     // whole suite has run there are more articles than that ahead of this one.
@@ -147,18 +160,11 @@ test.describe('New article', () => {
 test.describe('Empty states', () => {
   test('a filtered-to-nothing list offers to widen rather than clear', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
     // One published article, so "all statuses" has something to find.
-    const slug = uniqueSlug('empty');
-    const created = await page.request.post('/api/pagebuilder/pages', {
-      headers,
-      data: { title: `Empty ${slug}`, slug, draft_data: { content: [] } },
-    });
-    const { id } = (await created.json()) as { id: number };
-    await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
-    await page.request.post('/api/news/articles', {
-      headers,
-      data: { page_id: id, category: '', published_at: null },
+    const { slug } = await seedArticle(page, {
+      prefix: 'empty',
+      titlePrefix: 'Empty',
+      publish: true,
     });
 
     // Search for it, but filtered to drafts — it is published, so nothing matches.

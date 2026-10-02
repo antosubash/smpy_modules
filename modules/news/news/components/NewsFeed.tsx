@@ -25,7 +25,8 @@ function toCard(article: ArticleRead): ArticleCardItem {
     date: formatArticleDate(article.published_at),
     title: article.title,
     body: article.excerpt,
-    // An article *is* a page, so this is the page's own public URL.
+    // The article's own public URL, served by news. Sent by the server rather
+    // than assembled here, so a card holds no opinion about the route.
     href: article.url,
   };
 }

@@ -10,8 +10,7 @@ uncacheable response expensive, and a wrongly-cacheable one a leak.
 from __future__ import annotations
 
 import pytest
-from conftest import make_page
-from news import service
+from factories import make_article
 from news.constants import (
     PRIVATE_CACHE_CONTROL,
     PUBLIC_CACHE_CONTROL,
@@ -28,8 +27,7 @@ async def _seed(client, rows: list[tuple[str, str, str]]) -> None:
     """rows of (slug, title, category)."""
     async with client.db_state.session_factory() as db:
         for slug, title, category in rows:
-            page = await make_page(db, slug=slug, title=title)
-            await service.create(db, page_id=page.id, category=category, published_at=None)
+            await make_article(db, slug=slug, title=title, category=category)
         await db.commit()
 
 

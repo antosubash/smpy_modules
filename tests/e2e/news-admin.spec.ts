@@ -1,10 +1,14 @@
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { seedArticle } from './article-helpers';
+import { csrfHeader, login } from './helpers';
 
 /**
- * The admin list is the only place an article's category and date can be set —
- * the page editor knows nothing about either.
+ * The admin list is where an article's category and date are set.
+ *
+ * They used to be the *only* things news owned — the rest of an article was a
+ * pagebuilder page, and the page editor knew nothing about either. The list has
+ * not changed much; what changed is that there is no second document behind it.
  */
 test.describe('News admin', () => {
   test.describe.configure({ mode: 'serial' });
@@ -22,24 +26,11 @@ test.describe('News admin', () => {
 
   test('lists an article with its public URL and lets its category be edited', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
-    const slug = uniqueSlug('e2e-admin');
-    const created = await page.request.post('/api/pagebuilder/pages', {
-      headers,
-      data: {
-        title: `Admin ${slug}`,
-        slug,
-        draft_data: { root: { props: { title: 'Admin', width: 'full' } }, content: [], zones: {} },
-      },
-    });
-    const { id } = await created.json();
-    await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers,
-      data: { note: 'admin' },
-    });
-    await page.request.post('/api/news/articles', {
-      headers,
-      data: { page_id: id, category: 'Before', published_at: null },
+    const { slug } = await seedArticle(page, {
+      prefix: 'e2e-admin',
+      titlePrefix: 'Admin',
+      category: 'Before',
+      publish: true,
     });
 
     await page.goto('/admin/news/');
@@ -77,23 +68,16 @@ test.describe('News admin', () => {
 
   test('the category filter is in the URL and survives a reload', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
-
     // Two articles in different categories, so a filter has something to hide.
     const made: Record<string, string> = {};
     for (const category of ['Alpha', 'Beta']) {
-      const slug = uniqueSlug(`filt-${category.toLowerCase()}`);
+      const { slug } = await seedArticle(page, {
+        prefix: `filt-${category.toLowerCase()}`,
+        titlePrefix: category,
+        category,
+        publish: true,
+      });
       made[category] = slug;
-      const created = await page.request.post('/api/pagebuilder/pages', {
-        headers,
-        data: { title: `${category} ${slug}`, slug, draft_data: { content: [] } },
-      });
-      const { id } = await created.json();
-      await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
-      await page.request.post('/api/news/articles', {
-        headers,
-        data: { page_id: id, category, published_at: null },
-      });
     }
 
     const card = (slug: string) => page.locator(`[data-testid="article-row"][data-slug="${slug}"]`);
@@ -121,31 +105,30 @@ test.describe('News admin', () => {
 });
 
 test.describe('Article lifecycle', () => {
-  test('deleting the page removes its article', async ({ page }) => {
-    // Not tidiness: there is no cross-module foreign key to cascade from, and
-    // SQLite reuses a deleted page's id — so a leftover row re-attaches to the
-    // next page created and the feed shows one article's title under
-    // another's metadata. That is a real bug this suite caught.
+  test('deleting an article removes it, body and all', async ({ page }) => {
+    // This test used to delete the *page* behind an article and then wait for
+    // news to notice. That was not tidiness: `page_id` was an unenforceable
+    // pointer into another module's table, and SQLite reuses a deleted row's
+    // id — so a leftover article re-attached to the next page created and the
+    // feed showed one article's title under another's metadata. A real bug
+    // this suite caught, and one the schema no longer permits.
+    //
+    // An article is one row now, so what is left to check is that deleting it
+    // actually deletes it.
     await login(page);
-    const headers = await csrfHeader(page);
-    const slug = uniqueSlug('e2e-doomed');
-    const created = await page.request.post('/api/pagebuilder/pages', {
-      headers,
-      data: {
-        title: `Doomed ${slug}`,
-        slug,
-        draft_data: { root: { props: { title: 'Doomed', width: 'full' } }, content: [], zones: {} },
-      },
+    const { articleId, slug } = await seedArticle(page, {
+      prefix: 'e2e-doomed',
+      titlePrefix: 'Doomed',
+      category: 'Temp',
+      publish: true,
     });
-    const { id } = await created.json();
-    const attached = await page.request.post('/api/news/articles', {
-      headers,
-      data: { page_id: id, category: 'Temp', published_at: null },
-    });
-    expect(attached.status()).toBe(201);
 
-    const deleted = await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
-    expect(deleted.ok()).toBeTruthy();
+    // It is there, and it serves.
+    expect((await page.request.get(`/news/${slug}`)).status()).toBe(200);
+
+    const headers = await csrfHeader(page);
+    const deleted = await page.request.delete(`/api/news/articles/${articleId}`, { headers });
+    expect(deleted.status(), await deleted.text()).toBe(204);
 
     await expect
       .poll(async () => {
@@ -154,16 +137,12 @@ test.describe('Article lifecycle', () => {
             headers: { Accept: 'application/json' },
           })
         ).json();
-        return body.items.filter((i: { page_id: number }) => i.page_id === id).length;
+        return body.items.filter((i: { id: number }) => i.id === articleId).length;
       })
       .toBe(0);
 
-    // And the page itself is gone, so attaching to that id is a 404 rather
-    // than quietly creating a row that the next page to reuse the id inherits.
-    const reattach = await page.request.post('/api/news/articles', {
-      headers,
-      data: { page_id: id, category: 'Fresh', published_at: null },
-    });
-    expect(reattach.status(), 'attaching to a deleted page must not succeed').toBe(404);
+    // And its public address stops answering, rather than serving a document
+    // whose row is gone.
+    expect((await page.request.get(`/news/${slug}`)).status()).toBe(404);
   });
 });

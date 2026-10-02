@@ -1,20 +1,24 @@
-"""News — articles backed by page-builder pages.
+"""News — a self-contained archive of articles.
 
-An article *is* a page: the body, slug, approval workflow and revisions all
-belong to ``pagebuilder``. This module adds only the metadata a page has no
-concept of — category and display date — plus the listing API and the feed
-block that renders it.
+An article used to *be* a pagebuilder page: the body, the slug, the workflow,
+the revisions and the public rendering all belonged to that module, and this one
+added a category and a date beside it. That made ``simple_module_news``
+uninstallable without its neighbour, made every listing a cross-module join, and
+left article rows that could be orphaned by a deletion news never saw.
 
-The one thing it does own is the article's public *address*.
-Articles used to share pagebuilder's generic page prefix, sitting at
-``/p/{slug}`` alongside the contact page, so the URL said nothing about what
-the document was. They serve at ``{NewsSettings.public_route_prefix}/{slug}``
-now, and pagebuilder is told so — the page stops answering at ``/p`` and the
-sitemap advertises the news address instead.
+It owns its content now. ``NewsArticle`` carries the body, the address, the
+status and the SEO; :mod:`news.content` performs the writes;
+:mod:`news.endpoints.public` serves the reader. Pagebuilder is optional —
+where a host runs it, the admin search screen gains a Pages and a Media section,
+the feed block joins its palette, and the site's content languages are its.
+Where a host does not, news publishes in one language and nothing here notices.
+See :mod:`news.integrations.pagebuilder`.
 
-The *rendering* is still pagebuilder's: the news route resolves the slug and
-hands off to its viewer, so the ETag, cache, CSP, canonical and site-layout
-handling stay in one place rather than being duplicated and left to drift.
+Everything this module reads *while booting* — where the viewer mounts, which
+languages it mounts for, whether the scheduler runs — is read in
+:meth:`NewsModule.on_startup`, never during app construction. The host hydrates
+module settings from the database at lifespan start, so a value read earlier is
+the pydantic default no matter what an operator has configured.
 """
 
 from __future__ import annotations
@@ -30,14 +34,9 @@ from simple_module_core.menu import MenuItem, MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from news import constants
+from news import boot, constants, locales
 from news import settings as news_settings
-from news.integrations.locales import (
-    content_locales,
-    default_locale,
-    locale_path_prefix,
-)
-from news.integrations.pagebuilder import PageDeleted, claim_slugs
+from news.scheduler import Scheduler
 from news.settings import NewsSettings
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _NewsServices:
-    """Module-scoped state on ``app.state.news``, mirroring pagebuilder's.
+    """Module-scoped state on ``app.state.news``.
 
     Not frozen: the host's hydrate step assigns the DB-resolved settings onto
     this object at lifespan start, and the Settings screen assigns again on
@@ -55,10 +54,6 @@ class _NewsServices:
     settings: NewsSettings
 
 
-def _dir_prefix(prefix: str) -> str:
-    """Normalise a route prefix to end in exactly one "/"."""
-    return f"{prefix.rstrip('/')}/"
-
 _VERSION = importlib.metadata.version("simple_module_news")
 
 
@@ -67,7 +62,12 @@ class NewsModule(ModuleBase):
         name="News",
         route_prefix=constants.ROUTE_PREFIX_API,
         view_prefix=constants.VIEW_PREFIX,
-        depends_on=[constants._MODULE_PAGEBUILDER, constants._MODULE_SETTINGS],
+        # "PageBuilder" is deliberately absent. That entry was here for as long
+        # as an article was a page; this module now boots, migrates and serves
+        # entirely on its own, and the neighbour is an optional extra. Settings
+        # *is* depended on, so the host has built its module registry before
+        # ``register_settings`` tries to register against it.
+        depends_on=[constants._MODULE_SETTINGS],
         version=_VERSION,
         # The framework API version (1.0.0) is decoupled from the framework
         # package version (0.0.x) — this range is correct as written.
@@ -76,10 +76,33 @@ class NewsModule(ModuleBase):
 
     def __init__(self) -> None:
         super().__init__()
-        # Pre-seeding this pins the settings for a test with no database
-        # behind it: ``register_settings`` hands it to the services container
-        # in place of the pydantic defaults, and nothing overwrites it.
+        # Pre-seeding this pins the settings for a test with no database behind
+        # it: ``register_settings`` hands it to the services container in place
+        # of the pydantic defaults, and nothing overwrites it.
         self.settings: NewsSettings | None = None
+        self._scheduler = Scheduler()
+
+    def register_settings(self, app: FastAPI) -> None:
+        """Register the settings class; the host hydrates it from the DB.
+
+        ``register_module_settings`` records the class so the host can hydrate
+        it at lifespan start — it assigns the result onto the container this
+        creates, which is why every later read goes through ``app.state.news``
+        rather than a captured local.
+        """
+        from settings.registration import register_module_settings
+
+        register_module_settings(
+            app,
+            constants.PACKAGE,
+            NewsSettings,
+            lambda defaults: _NewsServices(settings=self.settings or defaults),
+        )
+        # Published immediately as well as from ``on_startup``: the article
+        # serializer builds the public URL from a pure function, and a row
+        # written before the app ever starts — a CLI, a migration, a test —
+        # still has to come out with the right address.
+        news_settings.use(self.settings or NewsSettings())
 
     def _live_settings(self, app: FastAPI) -> NewsSettings:
         """The settings the app is actually running on.
@@ -97,18 +120,6 @@ class NewsModule(ModuleBase):
         news_settings.use(settings)
         return settings
 
-    def register_settings(self, app: FastAPI) -> None:
-        """Register the settings class; the host hydrates it from the DB."""
-        from settings.registration import register_module_settings
-
-        register_module_settings(
-            app,
-            constants.PACKAGE,
-            NewsSettings,
-            lambda defaults: _NewsServices(settings=self.settings or defaults),
-        )
-        news_settings.use(self.settings or NewsSettings())
-
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from news.endpoints.api import router as api
         from news.endpoints.views import router as views
@@ -118,7 +129,8 @@ class NewsModule(ModuleBase):
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(
-            NewsModule.meta.name, [constants.PERM_VIEW, constants.PERM_EDIT]
+            NewsModule.meta.name,
+            [constants.PERM_VIEW, constants.PERM_EDIT, constants.PERM_PUBLISH],
         )
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
@@ -140,9 +152,20 @@ class NewsModule(ModuleBase):
                     order=110,
                     group=constants.MENU_GROUP,
                 ),
-                # Its own group: the screen searches pages and media as well,
-                # so listing it under News would say something untrue about
-                # what it covers.
+                # In the rail rather than behind a filter on the list: a trashed
+                # article keeps its slug claimed, so an author who bins one and
+                # cannot find it tries to recreate it and is told the URL is
+                # taken by something they cannot see.
+                MenuItem(
+                    label=constants.MENU_LABEL_TRASH,
+                    url=constants.MENU_URL_TRASH,
+                    icon=constants.MENU_ICON_TRASH,
+                    order=120,
+                    group=constants.MENU_GROUP,
+                ),
+                # Its own group: where pagebuilder is installed the screen
+                # searches pages and media as well, so listing it under News
+                # would say something untrue about what it covers.
                 MenuItem(
                     label=constants.MENU_LABEL_SEARCH,
                     url=constants.ADMIN_SEARCH_URL,
@@ -154,131 +177,88 @@ class NewsModule(ModuleBase):
         )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
-        """Drop an article when its page is deleted.
+        """Re-publish the settings when an operator saves them.
 
-        This is not tidiness. There is no cross-module foreign key to cascade
-        from, and a leftover row does not merely dangle: SQLite reuses the
-        deleted page's id, so the article silently re-attaches to whatever page
-        is created next and the listing shows one article's title under
-        another's metadata.
-
-        This is the fast path, not a guarantee — the bus logs a handler failure
-        rather than raising it, and pagebuilder has already committed the page
-        deletion by the time we run. ``on_startup``'s sweep is what makes the
-        outcome eventual rather than merely likely.
+        Everything this module reads per request goes through
+        ``news.settings.active()`` — a process-global, because the article
+        serializer is a pure function with no request to read ``app.state``
+        from. The Settings screen assigns the new instance onto the services
+        container and publishes this event; without picking it up, that global
+        would keep answering with whatever boot resolved, and every field not
+        marked ``requires_restart`` would silently need one after all.
         """
         if app is None:
             return
 
-        async def _drop_article(event: PageDeleted) -> None:
-            from news import service
+        from settings.contracts.events import SettingsReloaded
 
-            # Outside a request, so `get_db` is not managing this session and
-            # the commit is ours to make.
-            async with app.state.sm.db.session_factory() as db:
-                article = await service.get_by_page(db, event.page_id)
-                if article is not None:
-                    await service.delete(db, article)
-                    await db.commit()
+        async def _republish(event: SettingsReloaded) -> None:
+            if event.package == constants.PACKAGE:
+                self._live_settings(app)
 
-        bus.subscribe(PageDeleted, _drop_article)
+        bus.subscribe(SettingsReloaded, _republish)
 
     async def on_startup(self, app: FastAPI) -> None:
-        """Sweep away articles whose page no longer exists.
+        """Mount everything that depends on a hydrated setting.
 
-        Closes the window the ``PageDeleted`` subscription cannot: if that
-        handler ever fails, the row survives with nothing to retry it, and the
-        only trace is a log line. A restart is a cheap, natural boundary at
-        which to reconcile, and the sweep costs one indexed anti-join over a
-        table holding one row per article.
-
-        A non-zero count means an event was lost, so it is logged at warning —
-        the repair should be visible, not silent.
+        This hook used to also sweep away articles whose page had been deleted,
+        and subscribe to a ``PageDeleted`` event to catch the same thing sooner.
+        Neither exists any more: an article's body is its own row, so there is
+        no foreign row whose disappearance could orphan it, and nothing to
+        reconcile after the fact.
         """
-        from news import service
-        from news.endpoints.public_views import (
-            default_locale_alias_router,
-            locale_router,
-            slug_claim,
-        )
         from news.endpoints.views import admin_router
 
+        # Which languages this site publishes in, before anything reads them.
+        boot.publish_locales(app)
+
         # Mounted here rather than through ``register_routes`` because that
-        # router is hard-prefixed with ``view_prefix``; this screen belongs at
-        # the app root, for the same reason pagebuilder's public viewer does.
+        # router is hard-prefixed with ``view_prefix``; this screen spans more
+        # than the news console and belongs at the app root.
         app.include_router(admin_router, prefix=constants.ADMIN_SEARCH_PREFIX)
 
-        # The public viewer, mounted at the app root for the same reason and
-        # claimed with pagebuilder in the same breath: the prefix an article is
-        # served at and the prefix a crawler is sent to are one value, so they
-        # cannot drift apart.
+        # The public viewer and the archive, at the address articles serve on.
         settings = self._live_settings(app)
         prefix = settings.public_route_prefix
-        locales = content_locales()
-        for locale in locales:
-            # The site's default language keeps the bare prefix so no article
-            # URL that already exists changes; every other one is prefixed with
-            # its tag, exactly as pagebuilder addresses pages.
-            app.include_router(
-                locale_router(locale), prefix=f"{locale_path_prefix(locale)}{prefix}"
-            )
-        if len(locales) > 1:
-            app.include_router(
-                default_locale_alias_router(prefix),
-                prefix=f"/{default_locale()}{prefix}",
-            )
-        claim_slugs(slug_claim())
-        self._exempt_public_routes(app, prefix, locales)
+        boot.mount_public_routers(app, prefix)
+        self._exempt_public_routes(app, prefix, locales.supported())
 
-        async with app.state.sm.db.session_factory() as db:
-            dropped = await service.reconcile_orphans(db)
-            await db.commit()
-        if dropped:
-            logger.warning(
-                "Dropped %d orphaned news article(s) whose page no longer exists; "
-                "a PageDeleted event was missed.",
-                dropped,
-            )
+        if settings.scheduler_enabled:
+            self._scheduler.start(app, settings)
+
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the scheduler.
+
+        Not via ``app.router.add_event_handler("shutdown", ...)``: the host
+        builds its app with its own ``lifespan``, and router shutdown handlers
+        only run under the default one — so they would never fire, leaving the
+        loop to tick against a database the lifespan has just disposed of.
+        """
+        await self._scheduler.stop()
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
-        """Let the feed block and the article API be read anonymously.
+        """Let an anonymous reader use the API the feed block reads.
 
         Reads only, and by exact prefix: the same API paths carry
         POST/PUT/DELETE, which must stay behind ``news.edit``.
 
         The *viewer's* prefixes are not here. They depend on
-        ``public_route_prefix`` and on pagebuilder's content locales, neither
-        of which the host has hydrated from the database yet at this point in
-        boot — so they are added from ``on_startup`` instead, into the same
-        registry, which ``AuthMiddleware`` reads live.
+        ``public_route_prefix`` and on the site's content languages, neither of
+        which the host has hydrated from the database at this point in boot — so
+        they are added from ``on_startup`` instead, into the same registry,
+        which ``AuthMiddleware`` reads live.
         """
         for prefix in constants.PUBLIC_READ_PREFIXES:
             registry.add_prefix(prefix, methods={"GET"})
 
     def _exempt_public_routes(
-        self, app: FastAPI, prefix: str, locales: tuple[str, ...]
+        self, app: FastAPI, prefix: str, languages: tuple[str, ...]
     ) -> None:
-        """Exempt the public article viewer, one prefix per language.
+        """Exempt the public article viewer from auth, one prefix per language.
 
-        Without this every article 302s an anonymous reader to the login
-        screen, which is the whole point of a public address. The trailing
-        slash is load-bearing — these are ``startswith`` prefixes, so a bare
-        "/news" would also exempt anything that merely starts with those
-        characters.
+        A method rather than a straight call to :mod:`news.boot` because it is
+        the one piece of boot wiring that has to be exercisable on its own: what
+        it exempts, and what it must *not*, is a security boundary with a test
+        of its own.
         """
-        registry = getattr(app.state, "public_routes", None)
-        if registry is None:
-            # No auth middleware in this app, so nothing to be exempt from.
-            return
-        for locale in locales:
-            registry.add_prefix(
-                _dir_prefix(f"{locale_path_prefix(locale)}{prefix}"),
-                methods={"GET", "HEAD"},
-            )
-        if len(locales) > 1:
-            # The default language's redundant prefix, which 301s to the bare
-            # address. Exempt too, or the redirect that exists to be forgiving
-            # answers with a login page.
-            registry.add_prefix(
-                _dir_prefix(f"/{default_locale()}{prefix}"), methods={"GET", "HEAD"}
-            )
+        boot.exempt_public_routes(app, prefix, languages)

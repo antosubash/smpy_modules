@@ -1,10 +1,9 @@
-import { ConfirmDialog } from '@simple-module-py/pagebuilder/pagebuilder/components/ConfirmDialog';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useState } from 'react';
-
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { isManaged } from '../../utils/taxonomyApi';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 const REASSIGN_SELECT_ID = 'news-category-reassign';
 const UNCATEGORISED = '';

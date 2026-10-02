@@ -1,36 +1,27 @@
 """An article in more than one language.
 
-News gets the language dimension almost for free, and that is the point: an
-article *is* a pagebuilder page, so its language is the page's language and
-there is no second copy of it here to drift. What this module has to get right
-is the three places that are its own — the public address an article reports,
-the listing filter a feed block passes, and the sidecar row a translation
-needs alongside the translated page.
+This used to come almost for free: an article *was* a pagebuilder page, so its
+language was the page's and there was no second copy of it here to drift. The
+article owns its content now, so it owns its language too — and every one of
+these properties is news' own to keep.
+
+This file is the *data* half: what language an article is in, what a listing
+shows, and what a group holds. The addressing half — which routes exist, which
+language a slug resolves in, which redirect an old URL honours — is in
+``test_locale_addressing``, and starting a translation is in
+``test_article_translations``. Three files rather than one for the repo's
+300-line cap, split where the seams already were.
 """
 
 from __future__ import annotations
 
 import pytest
-from conftest import make_page
-from news import service
-from news.integrations.pagebuilder import PageStatus
+from factories import make_article
+from news.models import ArticleStatus
 
 pytestmark = pytest.mark.asyncio
 
 API = "/api/news"
-
-
-async def _article(db, slug: str, *, locale: str | None = None, **kwargs):
-    page = await make_page(db, slug=slug, title=slug, locale=locale)
-    article = await service.create(
-        db,
-        page_id=page.id,
-        category=kwargs.pop("category", ""),
-        published_at=kwargs.pop("published_at", None),
-        author=kwargs.pop("author", ""),
-    )
-    await db.commit()
-    return page, article
 
 
 class TestPublicAddress:
@@ -40,7 +31,7 @@ class TestPublicAddress:
         """No article URL that already exists changes when a site adds a
         second language."""
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "field-notes", locale="en")
+            await make_article(db, slug="field-notes", locale="en")
 
         body = (await editor_client.get(f"{API}/articles")).json()
 
@@ -48,7 +39,7 @@ class TestPublicAddress:
 
     async def test_another_language_is_prefixed(self, editor_client, bilingual) -> None:
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "feldnotizen", locale="de")
+            await make_article(db, slug="feldnotizen", locale="de")
 
         body = (await editor_client.get(f"{API}/articles")).json()
 
@@ -63,8 +54,8 @@ class TestListingFilter:
         """A feed block on a German page passes ``de``. An English card in a
         German list is worse than no card."""
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "english-one", locale="en")
-            await _article(db, "german-one", locale="de")
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
 
         body = (await editor_client.get(f"{API}/articles?locale=de")).json()
 
@@ -76,8 +67,8 @@ class TestListingFilter:
         """An editor looking for an article should not have to guess which
         translation they filed the headline under."""
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "english-one", locale="en")
-            await _article(db, "german-one", locale="de")
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
 
         body = (await editor_client.get(f"{API}/articles")).json()
 
@@ -89,12 +80,148 @@ class TestListingFilter:
         """The value arrives from a query string; a link to a language the site
         has since dropped should show the list, not an error."""
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "english-one", locale="en")
+            await make_article(db, slug="english-one", locale="en")
 
         response = await editor_client.get(f"{API}/articles?locale=fr")
 
         assert response.status_code == 200
         assert len(response.json()["items"]) == 1
+
+
+class TestABlankFilterMatchesNothing:
+    """A filter supplied as empty must never widen to the whole site.
+
+    Below the endpoint both of these reach ``query_filters``, where
+    ``if not value`` reads an empty string as "no filter" — so a caller that
+    computed an empty group id would get every article on the site handed back
+    under a name that promised one story's translations. The endpoint is the
+    only layer that can still tell "absent" from "supplied as nothing", so the
+    distinction is drawn there and these pin it.
+
+    Deliberately different from ``?locale=fr`` above: that value names a
+    language, just not one this site publishes, and the documented rule for it
+    is to ignore the filter. An empty value names nothing at all.
+    """
+
+    async def test_a_blank_group_returns_nothing_not_everything(
+        self, editor_client, bilingual
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="unrelated-one", locale="en")
+            await make_article(db, slug="unrelated-two", locale="de")
+
+        response = await editor_client.get(f"{API}/articles?translation_group=")
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []
+
+    async def test_a_whitespace_group_is_blank_too(
+        self, editor_client, bilingual
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="unrelated-one", locale="en")
+
+        response = await editor_client.get(f"{API}/articles?translation_group=%20")
+
+        assert response.json()["items"] == []
+
+    async def test_a_blank_locale_returns_nothing_not_every_language(
+        self, editor_client, bilingual
+    ) -> None:
+        """A feed block whose language prop came through empty shows an empty
+        feed, not an English card in a German list."""
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
+
+        response = await editor_client.get(f"{API}/articles?locale=")
+
+        assert response.json()["items"] == []
+
+    async def test_omitting_them_entirely_still_lists_everything(
+        self, editor_client, bilingual
+    ) -> None:
+        """The other half of the distinction, or the guard above would be a
+        very quiet way to break the admin list."""
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="english-one", locale="en")
+            await make_article(db, slug="german-one", locale="de")
+
+        assert len((await editor_client.get(f"{API}/articles")).json()["items"]) == 2
+
+
+class TestSlugsAreUniquePerLanguage:
+    """``/news/budget`` and ``/de/news/budget`` are two documents.
+
+    The whole reason the unique index is on ``(locale, slug)`` rather than on
+    ``slug`` alone: forcing the German article to pick a different word would
+    make the URL a workaround for a schema decision.
+    """
+
+    async def test_two_languages_can_hold_the_same_slug(
+        self, editor_client, bilingual
+    ) -> None:
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="budget", locale="en")
+            await make_article(db, slug="budget", locale="de")
+
+        body = (await editor_client.get(f"{API}/articles")).json()
+
+        assert sorted(item["url"] for item in body["items"]) == [
+            "/de/news/budget",
+            "/news/budget",
+        ]
+
+    async def test_the_derived_slug_only_avoids_its_own_language(
+        self, editor_client, bilingual
+    ) -> None:
+        """A translator should not be handed ``budget-2`` for a word nothing in
+        their language has claimed."""
+        async with editor_client.db_state.session_factory() as db:
+            await make_article(db, slug="budget", title="Budget", locale="en")
+
+        created = await editor_client.post(
+            f"{API}/articles", json={"title": "Budget", "locale": "de"}
+        )
+
+        assert created.status_code == 201, created.text
+        assert created.json()["slug"] == "budget"
+
+
+class TestCreatingInALanguage:
+    async def test_an_article_is_created_in_the_language_asked_for(
+        self, editor_client, bilingual
+    ) -> None:
+        created = await editor_client.post(
+            f"{API}/articles", json={"title": "Feldnotizen", "locale": "de"}
+        )
+
+        assert created.status_code == 201, created.text
+        assert created.json()["locale"] == "de"
+        assert created.json()["url"] == "/de/news/feldnotizen"
+
+    async def test_no_language_means_the_sites_default(
+        self, editor_client, bilingual
+    ) -> None:
+        """What every caller written before there was such a thing as a
+        language means, and what keeps a monolingual host from having to say
+        ``en`` on every create."""
+        created = await editor_client.post(f"{API}/articles", json={"title": "Notes"})
+
+        assert created.json()["locale"] == "en"
+
+    async def test_an_unconfigured_language_is_refused(
+        self, editor_client, bilingual
+    ) -> None:
+        """A write is refused rather than quietly filed under the default: the
+        locale is fixed for the article's lifetime and is part of its address,
+        so guessing would put it at a URL nobody can move it off."""
+        response = await editor_client.post(
+            f"{API}/articles", json={"title": "Notes", "locale": "fr"}
+        )
+
+        assert response.status_code == 422
+        assert "fr" in response.json()["detail"]
 
 
 class TestTheGroupIsListable:
@@ -104,7 +231,7 @@ class TestTheGroupIsListable:
         """Through the listing rather than a route of its own, so it inherits
         the visibility rule instead of restating it."""
         async with editor_client.db_state.session_factory() as db:
-            _, article = await _article(db, "budget", locale="en")
+            article = await make_article(db, slug="budget", locale="en")
         translated = (
             await editor_client.post(
                 f"{API}/articles/{article.id}/translations", json={"locale": "de"}
@@ -123,9 +250,13 @@ class TestTheGroupIsListable:
         self, viewer_client, bilingual
     ) -> None:
         async with viewer_client.db_state.session_factory() as db:
-            published, _ = await _article(db, "live", locale="en")
-            await make_page(
-                db, slug="entwurf", title="Entwurf", status=PageStatus.DRAFT, locale="de"
+            published = await make_article(db, slug="live", locale="en")
+            await make_article(
+                db,
+                slug="entwurf",
+                locale="de",
+                status=ArticleStatus.DRAFT,
+                translation_group=published.translation_group,
             )
 
         body = (
@@ -142,67 +273,10 @@ class TestMonolingualSitesAreUnaffected:
         """No ``bilingual`` fixture: one language, and every article URL is
         exactly what it was before there was such a thing as a language."""
         async with editor_client.db_state.session_factory() as db:
-            await _article(db, "field-notes")
+            await make_article(db, slug="field-notes")
 
         body = (await editor_client.get(f"{API}/articles")).json()
 
         assert body["items"][0]["url"] == "/news/field-notes"
 
 
-class TestPublicRoutesAreMountedPerLanguage:
-    """``on_startup`` mounts one viewer per content locale.
-
-    A router each rather than a ``/{locale}`` path parameter: a parameter
-    matches *any* first segment, and the public-route registry exempts by
-    string prefix — so the exemption would have to be widened to something
-    that no longer describes what is public.
-    """
-
-    def _paths(self, client) -> set[str]:
-        # Read off the OpenAPI schema rather than walking ``app.routes``:
-        # FastAPI 0.136 wraps an included router in an opaque
-        # ``_IncludedRouter`` with no ``path``, so the route list no longer
-        # answers "what is mounted where" — the schema does.
-        return set(client.app.openapi()["paths"])
-
-    async def test_each_language_gets_its_own(self, bilingual_public_client) -> None:
-        paths = self._paths(bilingual_public_client)
-
-        assert "/news/{slug}" in paths
-        assert "/de/news/{slug}" in paths
-
-    async def test_the_default_languages_prefix_only_redirects(
-        self, bilingual_public_client
-    ) -> None:
-        """Serving the article at both would put one document at two
-        addresses; 404 would be correct and useless."""
-        assert "/en/news/{slug}" in self._paths(bilingual_public_client)
-
-        response = await bilingual_public_client.get(
-            "/en/news/budget", follow_redirects=False
-        )
-
-        assert response.status_code == 301
-        assert response.headers["location"] == "/news/budget"
-
-
-class TestWhichSlugsAreArticles:
-    """The query behind both the viewer and the claim news registers."""
-
-    async def test_it_answers_within_one_language(self, db, bilingual) -> None:
-        from news.endpoints.public_views import published_article_slugs
-
-        await _article(db, "budget", locale="en")
-
-        assert await published_article_slugs(db, ["budget"], "en") == {"budget"}
-        assert await published_article_slugs(db, ["budget"], "de") == set()
-
-    async def test_the_claim_carries_the_language_prefix(self, db, bilingual) -> None:
-        """The address a crawler is sent to and the address the admin list
-        shows come from one function, so they cannot disagree."""
-        from news.endpoints.public_views import slug_claim
-
-        await _article(db, "budget", locale="de")
-
-        assert await slug_claim()(db, ["budget"], "de") == {"budget": "/de/news/budget"}
-        assert await slug_claim()(db, ["budget"], "en") == {}

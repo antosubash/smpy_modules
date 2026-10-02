@@ -4,11 +4,13 @@ import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
-  detachArticle,
-  listArticles,
+  deleteArticle,
+  getArticleDetail,
   publishArticle,
+  trashArticle,
   updateArticle,
 } from '../utils/api';
+import { SLUG_PATTERN } from '../utils/slugify';
 import {
   type CategoryRead,
   listManagedCategories,
@@ -30,6 +32,8 @@ function splitInstant(iso: string | null): { date: string; time: string } {
 function toDraft(article: ArticleRead): ArticleDraft {
   const { date, time } = splitInstant(article.published_at);
   return {
+    title: article.title,
+    slug: article.slug,
     category: article.category,
     tags: article.tags ?? [],
     date,
@@ -60,16 +64,12 @@ export function useArticleEditor(articleId: number) {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        // No get-one endpoint: the listing is the one shape every article read
-        // has, and adding a second would mean two places to keep in step.
-        // `limit` is the API max so a mid-sized archive still finds the row.
-        const response = await listArticles({ limit: 100, undated_first: true, signal });
-        const found = response.items.find((a) => a.id === articleId) ?? null;
+        // By id, not by searching a page of the listing: a page tops out at
+        // the API's limit, past which an existing article read as deleted.
+        // The detail shape *is* the listing row widened, tags included, and a
+        // missing article answers 404 with its own message.
+        const found = await getArticleDetail(articleId, signal);
         if (signal?.aborted) return;
-        if (found === null) {
-          setError('That article no longer exists.');
-          return;
-        }
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
@@ -106,14 +106,28 @@ export function useArticleEditor(articleId: number) {
       // An empty date is a real value — it undates the article — so it is sent
       // as null rather than omitted.
       const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-      const updated = await updateArticle(articleId, {
-        category: draft.category,
-        published_at: publishedAt,
-        pinned: draft.pinned,
-        show_in_feed: draft.showInFeed,
-        author: draft.author,
-      });
-      const tags = await setArticleTags(articleId, draft.tags);
+      // Run together rather than sequentially: tags live in their own table,
+      // keyed only on the article's id, which is already known and does not
+      // change here — neither call reads the other's result, so there is
+      // nothing for ordering to protect. `Promise.all` still rejects with
+      // whichever call failed first, which the catch below turns into the
+      // same error banner either one would have on its own.
+      const [updated, tags] = await Promise.all([
+        updateArticle(articleId, {
+          // Sent every time rather than only when changed: the server compares
+          // the incoming slug against the stored one and records a redirect only
+          // for a real move, so an unchanged value costs nothing and diffing here
+          // would be a second opinion about what counts as a rename.
+          title: draft.title.trim(),
+          slug: draft.slug,
+          category: draft.category,
+          published_at: publishedAt,
+          pinned: draft.pinned,
+          show_in_feed: draft.showInFeed,
+          author: draft.author,
+        }),
+        setArticleTags(articleId, draft.tags),
+      ]);
       if (updated) setArticle({ ...updated, tags: tags ?? draft.tags });
       setDirty(false);
       setSaved(true);
@@ -140,7 +154,23 @@ export function useArticleEditor(articleId: number) {
     }
   }, [article, load]);
 
-  const detach = useCallback(() => detachArticle(articleId), [articleId]);
+  // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
+  // — so the editor screen only offers it to a viewer who has it.
+  const remove = useCallback(() => deleteArticle(articleId), [articleId]);
+
+  // The recoverable door `news.edit` alone keeps open, for a viewer who
+  // cannot hard-delete.
+  const trash = useCallback(() => trashArticle(articleId), [articleId]);
+
+  /** Whether Save would be accepted.
+   *
+   * Checked here rather than left to the server because the two fields that can
+   * fail are the two the DTO validates structurally: an empty title and a
+   * malformed slug both come back as a 422 whose body names a Pydantic path,
+   * which is not something this screen can turn into a sentence. A collision
+   * still comes from the server — only it knows what is taken.
+   */
+  const valid = draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
 
   return {
     article,
@@ -149,6 +179,7 @@ export function useArticleEditor(articleId: number) {
     tagSuggestions,
     busy,
     dirty,
+    valid,
     saved,
     error,
     /** Exposed so a sibling panel — the language switcher — reports through the
@@ -158,6 +189,7 @@ export function useArticleEditor(articleId: number) {
     patch,
     save,
     publish,
-    detach,
+    remove,
+    trash,
   };
 }

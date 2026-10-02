@@ -1,8 +1,22 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
-import { type ArticleRead, listArticles, translateArticle } from '../../utils/api';
+import {
+  type ArticleRead,
+  type ArticleStatus,
+  listArticles,
+  translateArticle,
+} from '../../utils/api';
 import { localeLabel } from '../../utils/locale';
+
+/** Three words for three states. A submission is not a draft the author is
+ *  still holding and it is not live either, and "Draft" for both is how a
+ *  reviewer ends up chasing a translation that is already waiting on them. */
+const STATUS_WORD: Record<ArticleStatus, string> = {
+  draft: 'Draft',
+  submitted_for_review: 'Pending review',
+  published: 'Live',
+};
 
 interface Props {
   article: ArticleRead;
@@ -14,9 +28,10 @@ interface Props {
 /**
  * The article's counterparts in the site's other languages.
  *
- * A translation is an ordinary article on an ordinary page — its own slug, its
- * own body, its own publish state — so this panel only answers which languages
- * the story exists in and offers to start the ones it does not.
+ * A translation is a sibling article — its own slug, its own body, its own
+ * workflow state — sharing a `translation_group` with this one, so this panel
+ * only answers which languages the story exists in and offers to start the ones
+ * it does not.
  *
  * Category, byline and date are not asked for again when adding one. They are
  * facts about the story rather than about the language it is told in, so the
@@ -25,14 +40,25 @@ interface Props {
 export function ArticleTranslations({ article, locales, onError }: Props) {
   const [siblings, setSiblings] = useState<ArticleRead[] | null>(null);
   const [busyLocale, setBusyLocale] = useState<string | null>(null);
+  const group = article.translation_group;
 
   useEffect(() => {
+    // Emptiness, not presence. An article with no group is a group of one, and
+    // the degenerate value is `""` — which `listArticles` treats as "no filter
+    // given" and answers with every article on the site. Without this guard
+    // they would all render here as counterparts of this story. Invisible
+    // against a single-article fixture, wrong the moment a second unrelated
+    // article exists.
+    if (!group) {
+      setSiblings([]);
+      return;
+    }
     const controller = new AbortController();
     // The ordinary listing, filtered to the group: it already applies the
     // visibility rule, so a reader without `news.edit` sees the published
     // translations and nothing else, exactly as they would anywhere else.
     void listArticles({
-      translation_group: article.translation_group,
+      translation_group: group,
       limit: locales.length,
       signal: controller.signal,
     })
@@ -41,7 +67,7 @@ export function ArticleTranslations({ article, locales, onError }: Props) {
       // still saves.
       .catch(() => setSiblings([]));
     return () => controller.abort();
-  }, [article.translation_group, locales.length]);
+  }, [group, locales.length]);
 
   const byLocale = new Map((siblings ?? []).map((entry) => [entry.locale, entry]));
 
@@ -82,7 +108,7 @@ export function ArticleTranslations({ article, locales, onError }: Props) {
                 <span className="font-medium">{localeLabel(tag)}</span>
                 {sibling && (
                   <span className="block truncate text-xs text-muted-foreground">
-                    {sibling.url} · {sibling.page_status === 'published' ? 'Live' : 'Draft'}
+                    {sibling.url} · {STATUS_WORD[sibling.status]}
                   </span>
                 )}
               </span>

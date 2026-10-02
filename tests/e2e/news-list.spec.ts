@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { seedArticle } from './article-helpers';
+import { login } from './helpers';
 
 /**
  * The redesigned article list — search, the two-state pipeline filters, and
@@ -15,25 +16,13 @@ async function makeArticle(
   page: Page,
   { category = '', publish = false }: { category?: string; publish?: boolean } = {},
 ) {
-  const headers = await csrfHeader(page);
-  const slug = uniqueSlug('list');
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: `List ${slug}`,
-      slug,
-      draft_data: { root: { props: { title: slug, width: 'full' } }, content: [], zones: {} },
-    },
+  const { articleId, slug } = await seedArticle(page, {
+    prefix: 'list',
+    titlePrefix: 'List',
+    category,
+    publish,
   });
-  const { id } = (await created.json()) as { id: number };
-  if (publish) {
-    await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
-  }
-  await page.request.post('/api/news/articles', {
-    headers,
-    data: { page_id: id, category, published_at: null },
-  });
-  return { id, slug };
+  return { id: articleId, slug };
 }
 
 const card = (page: Page, slug: string) =>
@@ -105,8 +94,8 @@ test.describe('Article list', () => {
     await expect(row).toContainText('Published');
     // And it is genuinely live, not just relabelled.
     const listed = await page.request.get(`/api/news/articles?q=${slug}`);
-    const body = (await listed.json()) as { items: { slug: string; page_status: string }[] };
-    expect(body.items.find((i) => i.slug === slug)?.page_status).toBe('published');
+    const body = (await listed.json()) as { items: { slug: string; status: string }[] };
+    expect(body.items.find((i) => i.slug === slug)?.status).toBe('published');
   });
 
   test('status counts on the pills reflect the search, not the whole archive', async ({ page }) => {
