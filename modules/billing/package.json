@@ -1,0 +1,17 @@
+{
+  "name": "@simple-module-py/billing",
+  "version": "0.0.7",
+  "private": true,
+  "description": "Frontend assets for the Billing module",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@inertiajs/react": "^3.7.0",
+    "@simple-module-py/ui": "*",
+    "sonner": "^2.0.0"
+  },
+  "devDependencies": {
+    "@simple-module-py/tsconfig": "*"
+  },
+  "dependencies": {}
+}

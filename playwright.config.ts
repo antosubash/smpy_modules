@@ -80,6 +80,9 @@ export default defineConfig({
       SM_VITE_DEV_URL: `http://localhost:${UI_PORT}`,
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
+      // Opt-in: the billing tenant flow needs an active organisation, which
+      // only exists with multi-tenancy on. The default suite runs without it.
+      ...(process.env.E2E_MULTI_TENANT ? { SM_MULTI_TENANT: 'true' } : {}),
       // Consumed by Makefile dev-api and vite.config.ts respectively.
       API_PORT,
       SM_UI_PORT: UI_PORT,

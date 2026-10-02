@@ -15,6 +15,7 @@ and adds one dependency line, no registration code.
 | `modules/pagebuilder` | [`simple_module_pagebuilder`](https://pypi.org/project/simple_module_pagebuilder/) | Drag-and-drop visual page builder with revisions, approvals, media library, scheduling, multilingual content, and SEO |
 | `modules/news` | [`simple_module_news`](https://pypi.org/project/simple_module_news/) | News articles backed by page-builder pages — listing API, category/date metadata, translations, and a live feed block |
 | `modules/records` | [`simple_module_records`](https://pypi.org/project/simple_module_records/) | Admin-defined record types stored as JSON documents with typed SQL indexes — schema editor, generic CRUD screens, relations, revisions, import/export, and an anonymous read API |
+| `modules/billing` | [`simple_module_billing`](https://pypi.org/project/simple_module_billing/) | Plans, Stripe subscriptions and entitlements for multi-tenant apps — plan editor, Checkout and Customer Portal, webhooks, per-seat sync, dunning suspension, and a manual provider for installs without Stripe ([docs](modules/billing/docs/index.md)) |
 
 ### Publishing in more than one language
 

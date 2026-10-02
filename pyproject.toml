@@ -40,6 +40,7 @@ asyncio_mode = "auto"
 testpaths = [
     "host/tests",
     "modules/ai/tests",
+    "modules/billing/tests",
     "modules/news/tests",
     "modules/pagebuilder/tests",
     "modules/records/tests",

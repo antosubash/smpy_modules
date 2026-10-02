@@ -74,6 +74,9 @@ jobs:
       - name: Run pytest (ai)
         run: cd modules/ai && uv run pytest
 
+      - name: Run pytest (billing)
+        run: cd modules/billing && uv run pytest
+
       - name: Run pytest (pagebuilder)
         run: cd modules/pagebuilder && uv run pytest
 
