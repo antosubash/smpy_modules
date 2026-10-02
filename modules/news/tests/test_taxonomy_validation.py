@@ -126,10 +126,22 @@ async def test_tag_slug_rules() -> None:
 
 
 async def test_tag_slug_keeps_combining_marks_and_safe_url_survives_bad_hosts() -> None:
-    from news.safe_url import image_or_none, is_http_url
+    from news.safe_url import canonical_or_none, image_or_none, is_http_url
     from news.settings import public_tag_path
 
     assert tag_slug("हिन्दी") == "हिन्दी"
     assert public_tag_path("中文") == "/news/tag/%E4%B8%AD%E6%96%87"
-    assert is_http_url("http://[bad") is False
-    assert image_or_none("http://[bad") is None
+    for bad in (
+        "http://:80",
+        "https://@",
+        "https://user:pw@/x",
+        "http://:8080/path",
+        "http://[bad",
+    ):
+        assert is_http_url(bad) is False
+        assert canonical_or_none(bad) is None
+        assert image_or_none(bad) is None
+    for good in ("https://example.com", "http://user@host:80/x", "http://[::1]/"):
+        assert is_http_url(good) is True
+        assert canonical_or_none(good) == good
+        assert image_or_none(good) == good

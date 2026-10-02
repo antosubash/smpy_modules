@@ -55,7 +55,18 @@ async def test_a_blank_translation_title_is_a_422(editor_client, bilingual) -> N
 
 # ── BUG-011 ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("field", ["canonical_url", "og_image"])
-@pytest.mark.parametrize("bad", ["not a url", "javascript:alert(1)", "data:text/html,x"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "not a url",
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "http://:80",
+        "https://@",
+        "https://user:pw@/x",
+        "http://:8080/path",
+    ],
+)
 async def test_unsafe_urls_are_refused(editor_client, field: str, bad: str) -> None:
     article_id = await _article(editor_client, f"url-{field}".replace("_", "-"))
     response = await editor_client.put(f"{ARTICLES}/{article_id}", json={field: bad})
@@ -86,6 +97,22 @@ async def test_a_stored_javascript_url_is_not_rendered(editor_public_client) -> 
     page = await editor_public_client.get("/news/legacy")
     assert page.status_code == 200
     assert "javascript:" not in page.text
+
+
+@pytest.mark.parametrize(
+    "bad", ["http://:80", "https://@", "https://user:pw@/x", "http://:8080/path"]
+)
+async def test_a_stored_hostless_url_is_not_rendered(editor_public_client, bad: str) -> None:
+    async with editor_public_client.db_state.session_factory() as db:
+        article = await make_article(db, slug="legacy-hostless", og_image=bad)
+        article.canonical_url = bad
+        db.add(article)
+        await db.commit()
+    page = await editor_public_client.get("/news/legacy-hostless")
+    assert page.status_code == 200
+    assert bad not in page.text
+    assert 'rel="canonical" href="http://test/news/legacy-hostless"' in page.text
+    assert 'property="og:image"' not in page.text
 
 
 # ── BUG-016 ──────────────────────────────────────────────────────────
