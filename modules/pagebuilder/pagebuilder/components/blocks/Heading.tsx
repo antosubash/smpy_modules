@@ -1,6 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
-
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from '../widgets/_internal/rich-text';
 
@@ -53,28 +53,28 @@ function headingStyle(level: HeadingProps['level']): CSSProperties {
 }
 
 export const HeadingBlock: ComponentConfig<HeadingProps> = {
-  label: 'Heading',
+  label: keys.pagebuilder.blocks.heading.label,
   fields: {
-    text: { type: 'text', label: 'Text' },
+    text: { type: 'text', label: keys.pagebuilder.blocks.heading.text },
     level: {
       type: 'select',
-      label: 'Level',
+      label: keys.pagebuilder.blocks.heading.level,
       options: [
-        { label: 'H1', value: 'h1' },
-        { label: 'H2', value: 'h2' },
-        { label: 'H3', value: 'h3' },
-        { label: 'H4', value: 'h4' },
-        { label: 'H5', value: 'h5' },
-        { label: 'H6', value: 'h6' },
+        { label: keys.pagebuilder.blocks.heading.level_h1, value: 'h1' },
+        { label: keys.pagebuilder.blocks.heading.level_h2, value: 'h2' },
+        { label: keys.pagebuilder.blocks.heading.level_h3, value: 'h3' },
+        { label: keys.pagebuilder.blocks.heading.level_h4, value: 'h4' },
+        { label: keys.pagebuilder.blocks.heading.level_h5, value: 'h5' },
+        { label: keys.pagebuilder.blocks.heading.level_h6, value: 'h6' },
       ],
     },
     align: {
       type: 'radio',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.heading.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
-        { label: 'Right', value: 'right' },
+        { label: keys.pagebuilder.blocks.heading.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.heading.align_center, value: 'center' },
+        { label: keys.pagebuilder.blocks.heading.align_right, value: 'right' },
       ],
     },
   },

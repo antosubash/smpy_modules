@@ -4,39 +4,43 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { ArticleCardsGrid, type ArticleCardsWidgetProps } from './article-cards-render';
 
 export type { ArticleCardItem, ArticleCardsWidgetProps } from './article-cards-render';
 export { ArticleCardsGrid } from './article-cards-render';
 
 export const ArticleCardsWidget: ComponentConfig<ArticleCardsWidgetProps> = {
-  label: 'Article cards (image-top, with category & date)',
+  label: keys.pagebuilder.blocks.article_cards.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
-    viewAllLabel: { type: 'text', label: 'View-all link label' },
-    viewAllHref: { type: 'text', label: 'View-all link URL' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    viewAllLabel: { type: 'text', label: keys.pagebuilder.blocks.article_cards.view_all_label },
+    viewAllHref: { type: 'text', label: keys.pagebuilder.blocks.article_cards.view_all_href },
     columns: {
       type: 'select',
-      label: 'Columns (desktop)',
+      label: keys.pagebuilder.blocks.article_cards.columns,
       options: [
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
+        { label: keys.pagebuilder.blocks.article_cards.columns_2, value: '2' },
+        { label: keys.pagebuilder.blocks.article_cards.columns_3, value: '3' },
+        { label: keys.pagebuilder.blocks.article_cards.columns_4, value: '4' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Articles',
+      label: keys.pagebuilder.blocks.article_cards.items,
       arrayFields: {
-        imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
-        imageAlt: { type: 'text', label: 'Image alt text' },
-        eyebrow: { type: 'text', label: 'Category tag' },
-        date: { type: 'text', label: 'Date' },
-        title: { type: 'text', label: 'Title' },
+        imageUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.article_cards.items_image_url,
+        ),
+        imageAlt: { type: 'text', label: keys.pagebuilder.blocks.article_cards.items_image_alt },
+        eyebrow: { type: 'text', label: keys.pagebuilder.blocks.article_cards.items_eyebrow },
+        date: { type: 'text', label: keys.pagebuilder.blocks.article_cards.items_date },
+        title: { type: 'text', label: keys.pagebuilder.blocks.article_cards.items_title },
         // The whole card is a link, so markdown links in this copy render
         // as their label text only — say so where the editor can see it.
-        body: { type: 'textarea', label: 'Body (links not supported here)' },
-        href: { type: 'text', label: 'Link' },
+        body: { type: 'textarea', label: keys.pagebuilder.blocks.article_cards.items_body },
+        href: { type: 'text', label: keys.pagebuilder.blocks.article_cards.items_href },
       },
       defaultItemProps: {
         imageUrl: '',

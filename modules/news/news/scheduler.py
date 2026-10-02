@@ -5,14 +5,18 @@ cap, and shaped like :mod:`pagebuilder.scheduler` for the same reason: it is a
 coherent piece to lift, because everything here is about *when* an article
 changes state and nothing else in the module registration is.
 
-A deployment that drives :meth:`ArticlesService.process_due` from a separate
-worker — Celery beat, a cron job, a k8s CronJob — turns this off with the
-``scheduler_enabled`` setting, on the Settings screen or via
-``scripts/set_setting.py news scheduler_enabled false``. Not an environment
-variable: this module reads none, so an ``SM_NEWS_SCHEDULER_ENABLED`` in a
-deploy manifest would leave the in-process loop running and racing the worker,
-which is exactly the double publish that switch exists to prevent. The setting's
-own docstring has the full warning.
+One of these runs per process, so a replica set runs several. That is no longer
+a hazard: :meth:`ArticlesService.process_due` claims each due article with a
+single conditional ``UPDATE`` before flipping it, so two ticks landing on the
+same instant flip it exactly once — see :mod:`news.content._claims`. The same
+holds for a separate worker driving ``process_due`` alongside the loop.
+
+``scheduler_enabled`` turns this off anyway where a deployment would rather one
+place did the polling — Celery beat, a cron job, a k8s CronJob. It is set on the
+Settings screen or via ``scripts/set_setting.py news scheduler_enabled false``,
+never an environment variable: this module reads none, so an
+``SM_NEWS_SCHEDULER_ENABLED`` in a deploy manifest would leave the loop running
+with nothing on screen saying so. The setting's own docstring has the detail.
 """
 
 from __future__ import annotations
@@ -36,10 +40,14 @@ class Scheduler:
         self._task: asyncio.Task[None] | None = None
 
     def start(self, app: FastAPI, settings: NewsSettings) -> None:
-        # Stopped from ``NewsModule.on_shutdown``. A router shutdown handler
-        # would never run: the host supplies its own ``lifespan``, and those
-        # handlers are only honoured under the default one.
         self._task = asyncio.create_task(self._run(app, settings))
+        # Not wired through ``app.router.add_event_handler("shutdown", ...)``:
+        # the host builds the app with a custom ``lifespan=``, and under a
+        # custom lifespan FastAPI never installs the ``_DefaultLifespan`` that
+        # drains the router's own shutdown-handler list, so a handler added
+        # that way is never called. The host's lifespan instead calls every
+        # module's ``on_shutdown(app)`` directly — see :meth:`NewsModule.on_shutdown`,
+        # which is what actually stops this task.
 
     async def _run(self, app: FastAPI, settings: NewsSettings) -> None:
         """Publish and unpublish articles at their scheduled times.
@@ -49,44 +57,66 @@ class Scheduler:
         future schedule — while cancellation propagates, because that is
         shutdown.
         """
-        from news.content import ArticlesService
-
         factory = app.state.sm.db.session_factory
         interval = max(1, settings.scheduler_interval_seconds)
         while True:
             try:
                 await asyncio.sleep(interval)
-                async with factory() as session:
-                    try:
-                        flipped = await ArticlesService(session).process_due(
-                            datetime.now(UTC)
-                        )
-                        if flipped:
-                            await session.commit()
-                            logger.info(
-                                "news.scheduler.flipped",
-                                extra={"count": len(flipped)},
-                            )
-                        else:
-                            await session.rollback()
-                    except Exception:
-                        await session.rollback()
-                        raise
+                await self.tick(factory)
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception("news.scheduler.tick_failed")
+
+    async def tick(self, factory) -> None:
+        """One pass: flip what is due, in one short session.
+
+        Always committed, never only when something flipped. ``process_due``
+        also writes without flipping — it retires a draft whose whole window
+        passed while no scheduler ran, and it hands a refused claim back — and
+        a rollback on an empty tick would discard the retirement, so the same
+        row would be found, warned about and rolled back again every interval,
+        forever.
+        """
+        from news.content import ArticlesService
+
+        async with factory() as session:
+            try:
+                flipped = await ArticlesService(session).process_due(datetime.now(UTC))
+                await session.commit()
+                if flipped:
+                    logger.info("news.scheduler.flipped", extra={"count": len(flipped)})
+            except Exception:
+                await session.rollback()
+                raise
 
     async def stop(self) -> None:
         task = self._task
         if task is None:
             return
         task.cancel()
-        # Only ``CancelledError`` is suppressed, deliberately narrower than
-        # pagebuilder's catch-all: cancelling is the expected outcome here and
-        # says nothing, but a tick that died of something else has a traceback
-        # worth seeing, and swallowing it at shutdown is how a scheduler that
-        # stopped working weeks ago goes unnoticed.
-        with suppress(asyncio.CancelledError):
-            await task
-        self._task = None
+        try:
+            # Only ``CancelledError`` is suppressed, and that narrowness is the
+            # point: cancelling is the expected outcome of the line above and
+            # says nothing, while a task that died of something else has a
+            # traceback worth seeing. ``_run`` already logs and continues past a
+            # failed *tick*, so anything arriving here died before the loop — a
+            # missing ``app.state.sm``, an import that failed — and quietly
+            # discarding it is how a scheduler that stopped working weeks ago
+            # goes unnoticed.
+            with suppress(asyncio.CancelledError):
+                await task
+        except Exception:
+            # Logged rather than re-raised, which is not general defensiveness.
+            # This is reached from ``NewsModule.on_shutdown``, which the host's
+            # lifespan calls in a bare ``for mod in reversed(modules)`` with no
+            # ``try`` around each one — and then disposes the database engine
+            # *after* the loop (``simple_module_hosting/app_builder.py``). An
+            # exception escaping here therefore skips every module registered
+            # before news' — another scheduler's polling task never cancelled —
+            # and skips the engine disposal too. Nothing about this failure is
+            # lost; only its blast radius. Pagebuilder's ``stop`` does the
+            # same, for the same reason and in the other direction.
+            logger.exception("news.scheduler.stop_failed")
+        finally:
+            self._task = None

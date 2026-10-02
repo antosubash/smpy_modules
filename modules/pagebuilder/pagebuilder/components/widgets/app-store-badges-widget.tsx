@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 
 export type AppStoreBadgesWidgetProps = {
@@ -22,27 +23,33 @@ const INDENT_CLASSES: Record<'2' | '4', string> = {
 };
 
 export const AppStoreBadgesWidget: ComponentConfig<AppStoreBadgesWidgetProps> = {
-  label: 'App store badges',
+  label: keys.pagebuilder.blocks.app_store_badges.label,
   fields: {
-    googlePlayHref: { type: 'text', label: 'Google Play link' },
-    appStoreHref: { type: 'text', label: 'App Store link' },
-    googlePlaySrc: { type: 'text', label: 'Google Play badge image' },
-    appStoreSrc: { type: 'text', label: 'App Store badge image' },
+    googlePlayHref: {
+      type: 'text',
+      label: keys.pagebuilder.blocks.app_store_badges.google_play_href,
+    },
+    appStoreHref: { type: 'text', label: keys.pagebuilder.blocks.app_store_badges.app_store_href },
+    googlePlaySrc: {
+      type: 'text',
+      label: keys.pagebuilder.blocks.app_store_badges.google_play_src,
+    },
+    appStoreSrc: { type: 'text', label: keys.pagebuilder.blocks.app_store_badges.app_store_src },
     align: {
       type: 'select',
-      label: 'Align',
+      label: keys.pagebuilder.blocks.app_store_badges.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
+        { label: keys.pagebuilder.blocks.app_store_badges.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.app_store_badges.align_center, value: 'center' },
       ],
     },
     indent: {
       type: 'select',
-      label: 'Grid indent',
+      label: keys.pagebuilder.blocks.app_store_badges.indent,
       options: [
-        { label: 'None', value: 'none' },
-        { label: '2nd column', value: '2' },
-        { label: '4th column', value: '4' },
+        { label: keys.pagebuilder.blocks.app_store_badges.indent_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.app_store_badges.indent_2, value: '2' },
+        { label: keys.pagebuilder.blocks.app_store_badges.indent_4, value: '4' },
       ],
     },
   },
@@ -77,12 +84,20 @@ export const AppStoreBadgesWidget: ComponentConfig<AppStoreBadgesWidgetProps> = 
       >
         {googlePlaySrc && (
           <a href={googlePlayHref} target="_blank" rel="noopener noreferrer">
-            <img src={googlePlaySrc} alt="Get it on Google Play" className="h-16 w-auto" />
+            <img
+              src={googlePlaySrc}
+              alt={translate(keys.pagebuilder.blocks.common.google_play_alt)}
+              className="h-16 w-auto"
+            />
           </a>
         )}
         {appStoreSrc && (
           <a href={appStoreHref} target="_blank" rel="noopener noreferrer">
-            <img src={appStoreSrc} alt="Download on the App Store" className="h-16 w-auto" />
+            <img
+              src={appStoreSrc}
+              alt={translate(keys.pagebuilder.blocks.common.app_store_alt)}
+              className="h-16 w-auto"
+            />
           </a>
         )}
       </div>

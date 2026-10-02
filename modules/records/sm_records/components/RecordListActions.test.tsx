@@ -119,11 +119,10 @@ describe('RecordListActions — the tenant badge (tenancy design §J)', () => {
         onToggleTrashed={() => {}}
       />,
     );
-    // i18next is unconfigured under vitest, so `{tenant}` is not substituted
-    // (`RecordRowAction.test.tsx`'s own note) — the badge rendering at all,
-    // gated on `tenancyMode`, is what this test is actually pinning.
+    // The badge rendering at all, gated on `tenancyMode`, is what this test
+    // pins — and, with the catalogue loaded, that it names the tenant.
     const badge = view.find('[data-testid="records-tenant-badge"]');
-    expect(badge?.textContent).toBe('Tenant: {tenant}');
+    expect(badge?.textContent).toBe('Tenant: acme');
     await view.unmount();
   });
 });

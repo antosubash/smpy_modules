@@ -1,6 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
-
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from '../widgets/_internal/rich-text';
 
@@ -43,44 +43,44 @@ const sizeClass: Record<ButtonProps['size'], string> = {
 };
 
 export const ButtonBlock: ComponentConfig<ButtonProps> = {
-  label: 'Button',
+  label: keys.pagebuilder.blocks.button.label,
   fields: {
-    label: { type: 'text', label: 'Label' },
-    href: { type: 'text', label: 'Link' },
+    label: { type: 'text', label: keys.pagebuilder.blocks.button.label_field },
+    href: { type: 'text', label: keys.pagebuilder.blocks.button.href },
     variant: {
       type: 'select',
-      label: 'Variant',
+      label: keys.pagebuilder.blocks.button.variant,
       options: [
-        { label: 'Primary', value: 'primary' },
-        { label: 'Secondary', value: 'secondary' },
-        { label: 'Outline', value: 'outline' },
-        { label: 'Ghost', value: 'ghost' },
+        { label: keys.pagebuilder.blocks.button.variant_primary, value: 'primary' },
+        { label: keys.pagebuilder.blocks.button.variant_secondary, value: 'secondary' },
+        { label: keys.pagebuilder.blocks.button.variant_outline, value: 'outline' },
+        { label: keys.pagebuilder.blocks.button.variant_ghost, value: 'ghost' },
       ],
     },
     size: {
       type: 'select',
-      label: 'Size',
+      label: keys.pagebuilder.blocks.button.size,
       options: [
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.button.size_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.button.size_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.button.size_lg, value: 'lg' },
       ],
     },
     target: {
       type: 'radio',
-      label: 'Link target',
+      label: keys.pagebuilder.blocks.button.target,
       options: [
-        { label: 'Same tab', value: '_self' },
-        { label: 'New tab', value: '_blank' },
+        { label: keys.pagebuilder.blocks.button.target_self, value: '_self' },
+        { label: keys.pagebuilder.blocks.button.target_blank, value: '_blank' },
       ],
     },
-    color: { type: 'text', label: 'Colour (CSS, optional)' },
+    color: { type: 'text', label: keys.pagebuilder.blocks.button.color },
     indent: {
       type: 'select',
-      label: 'Grid indent',
+      label: keys.pagebuilder.blocks.button.indent,
       options: [
-        { label: 'None', value: 'none' },
-        { label: '4th column', value: '4' },
+        { label: keys.pagebuilder.blocks.button.indent_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.button.indent_4, value: '4' },
       ],
     },
   },

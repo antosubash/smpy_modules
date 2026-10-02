@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createCheckboxField } from '../../fields';
+import { keys, translate } from '../../utils/i18n';
 import { EmptyPlaceholder } from './_shared';
 
 export type VideoWidgetProps = {
@@ -34,20 +35,20 @@ function isEmbeddable(url: string): {
 }
 
 export const VideoWidget: ComponentConfig<VideoWidgetProps> = {
-  label: 'Video',
+  label: keys.pagebuilder.blocks.video.label,
   fields: {
-    src: { type: 'text', label: 'Video URL (YouTube, Vimeo, or file)' },
-    autoplay: createCheckboxField('Autoplay'),
-    controls: createCheckboxField('Show controls'),
-    loop: createCheckboxField('Loop'),
-    muted: createCheckboxField('Muted'),
+    src: { type: 'text', label: keys.pagebuilder.blocks.video.src },
+    autoplay: createCheckboxField(keys.pagebuilder.blocks.video.autoplay),
+    controls: createCheckboxField(keys.pagebuilder.blocks.video.controls),
+    loop: createCheckboxField(keys.pagebuilder.blocks.video.loop),
+    muted: createCheckboxField(keys.pagebuilder.blocks.video.muted),
     width: {
       type: 'select',
-      label: 'Width',
+      label: keys.pagebuilder.blocks.video.width,
       options: [
-        { label: 'Full', value: 'full' },
-        { label: 'Container', value: 'container' },
-        { label: 'Narrow (centered)', value: 'narrow' },
+        { label: keys.pagebuilder.blocks.video.width_full, value: 'full' },
+        { label: keys.pagebuilder.blocks.video.width_container, value: 'container' },
+        { label: keys.pagebuilder.blocks.video.width_narrow, value: 'narrow' },
       ],
     },
   },
@@ -61,7 +62,7 @@ export const VideoWidget: ComponentConfig<VideoWidgetProps> = {
   },
   render: ({ src, autoplay, controls, loop, muted, width = 'full' }) => {
     if (!src) {
-      return <EmptyPlaceholder label="Video (no source)" />;
+      return <EmptyPlaceholder label={translate(keys.pagebuilder.blocks.video.empty)} />;
     }
     const wrap =
       width === 'narrow' ? 'mx-auto max-w-3xl' : width === 'container' ? 'mx-auto max-w-5xl' : '';
@@ -91,7 +92,7 @@ export const VideoWidget: ComponentConfig<VideoWidgetProps> = {
             <iframe
               className="absolute inset-0 w-full h-full rounded-lg"
               src={embedSrc}
-              title="Embedded video"
+              title={translate(keys.pagebuilder.blocks.video.frame_title)}
               allow="autoplay; encrypted-media; picture-in-picture"
               allowFullScreen
             />

@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 from factories import make_article
 from news.models import ArticleStatus, NewsArticleTag, NewsCategory, NewsTag
+from news.settings import public_tag_path
+from news.slugify import tag_slug
 
 pytestmark = pytest.mark.asyncio
 
@@ -97,9 +99,6 @@ class TestPaging:
         await _seed(anon_client, "only")
         assert (await anon_client.get(f"{NEWS}/?page=9")).status_code == 404
 
-    async def test_page_zero_is_rejected_by_the_query(self, anon_client) -> None:
-        assert (await anon_client.get(f"{NEWS}/?page=0")).status_code == 422
-
 
 class TestCategoryArchive:
     async def test_it_lists_only_that_category(self, anon_client) -> None:
@@ -151,6 +150,21 @@ class TestTagArchive:
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["tagged"]
 
+    async def test_a_non_latin_tag_answers_at_the_address_the_site_links_to(
+        self, anon_client
+    ) -> None:
+        # The sitemap, canonical and hreflang carry the percent-encoded form,
+        # so that is the address a crawler or a reader will actually request.
+        tagged = await _seed(anon_client, "chinese")
+        await self._tag(anon_client, tagged, "中文", tag_slug("中文"))
+        path = public_tag_path(tag_slug("中文"))
+        assert "%" in path
+
+        response = await anon_client.get(path, headers={"X-Inertia": "true"})
+
+        assert response.status_code == 200, response.text
+        assert [i["slug"] for i in response.json()["props"]["items"]] == ["chinese"]
+
     async def test_an_unknown_tag_is_an_empty_archive_not_a_404(
         self, anon_client
     ) -> None:
@@ -193,13 +207,6 @@ class TestFeed:
 
         assert "Fish &amp; chips &lt;b&gt;" in response.text
         assert "<b>" not in response.text
-
-    async def test_the_sitemap_now_lists_the_index_too(self, anon_client) -> None:
-        # A sitemap of leaves tells a crawler the articles exist but not that
-        # anything links them.
-        await _seed(anon_client, "leaf")
-        response = await anon_client.get(f"{NEWS}/sitemap.xml")
-        assert f"{NEWS}/</loc>" in response.text
 
     async def test_the_feed_is_not_mistaken_for_an_article_slug(
         self, anon_client

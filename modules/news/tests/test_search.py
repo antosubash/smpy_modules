@@ -235,3 +235,32 @@ class TestSeeAllLinks:
         assert results.pages_more_url
         assert results.media_more_url
         assert results.articles == []
+
+
+class TestItAgreesWithTheArticleList:
+    """The console has two search boxes, and they must not disagree.
+
+    This screen is a deliberate *superset* of the article list's own ``q``
+    (``news.query_filters.search``): it adds the category and the body on top.
+    What it must never do is find *less* — a row the list surfaced and this
+    screen did not would read as this screen being broken.
+    """
+
+    async def test_it_finds_an_article_by_its_excerpt(self, db) -> None:
+        # The field the list's `q` gained when the public archive grew a search
+        # box. Without it here, one box finds the row and the other does not.
+        await make_article(
+            db, slug="quiet", title="Quiet", meta_description="On canopy loss."
+        )
+
+        results = await search_service.search(db, "canopy loss")
+
+        assert [hit.title for hit in results.articles] == ["Quiet"]
+
+    async def test_it_still_finds_more_than_the_list_does(self, db) -> None:
+        # The body, which the public filter deliberately does not reach.
+        await _article(db, "bodied", draft_data=BODY)
+
+        results = await search_service.search(db, "mixed canopy")
+
+        assert [hit.title for hit in results.articles] == ["bodied"]

@@ -1,16 +1,19 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Puck } from '@puckeditor/core';
+import { type Overrides, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import {
   articlePuckConfig,
   articleViewports,
   emptyArticleData,
 } from '../components/body/articlePuckConfig';
+import { localizeConfig, localizeViewports } from '../components/body/localizeConfig';
 import { useArticleBody } from '../hooks/useArticleBody';
+import { useArticleOutline } from '../hooks/useArticleOutline';
+import { keys, useT } from '../utils/i18n';
 
 /** The canvas an article's body is written in.
  *
@@ -24,12 +27,68 @@ import { useArticleBody } from '../hooks/useArticleBody';
  * each save on their own, and this one wants the whole viewport.
  */
 export default function ArticleBody() {
+  const { t } = useT();
+  const copy = keys.news.body;
   const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
     article_id: number;
   };
 
-  const { article, data, saveState, error, busy, dirty, load, change, saveNow, publish } =
-    useArticleBody(article_id);
+  const {
+    article,
+    data,
+    saveState,
+    error,
+    busy,
+    dirty,
+    conflict,
+    reloadKey,
+    load,
+    change,
+    saveNow,
+    publish,
+    reload,
+  } = useArticleBody(article_id);
+
+  // What the public viewer passes too, so `Contents` lists the same sections
+  // here that a reader will get and every anchor resolves on both screens. The
+  // hook keeps the identity stable between heading edits — see its docstring
+  // for why handing Puck a fresh object per keystroke would be expensive.
+  const outline = useArticleOutline(data);
+  const metadata = useMemo(() => ({ outline }), [outline]);
+
+  // The block configs hold catalogue keys where their labels go — see
+  // `localizeConfig` for why they cannot resolve them where they are written.
+  const config = useMemo(() => localizeConfig(articlePuckConfig, t), [t]);
+  const viewports = useMemo(() => localizeViewports(articleViewports, t), [t]);
+
+  // Stable across renders. Puck treats a new override as a new component
+  // and remounts what it wraps, so an inline object here remounted the
+  // field panel on every keystroke and the textarea lost focus after one
+  // character.
+  const overrides = useMemo<Partial<Overrides>>(
+    () => ({
+      // Puck's header renders its own primary "Publish", wired to a
+      // plain data change rather than to the workflow. Leaving it would
+      // put two differently-behaved Publish buttons on one screen, the
+      // louder of which does the quieter thing. The toolbar above is
+      // the only publish control; the title, undo/redo and the sidebar
+      // toggles stay in Puck's header.
+      headerActions: () => <></>,
+      // With nothing selected Puck shows the *root* field set, and this
+      // config deliberately has none — an article's headline is a
+      // column, edited next door, not a root prop (see
+      // `articlePuckConfig`). That would leave an empty panel where a
+      // writer looking for the headline would look first, so it says
+      // where the headline went instead.
+      fields: ({ children, itemSelector }) =>
+        itemSelector ? (
+          <>{children}</>
+        ) : (
+          <p className="p-4 text-sm text-muted-foreground">{t(copy.select_a_block)}</p>
+        ),
+    }),
+    [t, copy.select_a_block],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -49,13 +108,13 @@ export default function ArticleBody() {
 
   const status =
     saveState === 'saving'
-      ? 'Saving…'
+      ? t(copy.saving)
       : saveState === 'error'
-        ? 'Save failed'
+        ? t(copy.save_failed)
         : dirty
-          ? 'Unsaved changes'
+          ? t(copy.unsaved)
           : saveState === 'saved'
-            ? 'Saved'
+            ? t(copy.saved)
             : '';
 
   return (
@@ -65,7 +124,7 @@ export default function ArticleBody() {
           the preview would show the framework's default action colour while
           the published article shows the configured one. */}
       <BrandingHead />
-      <Head title={article ? `${article.title} — body` : 'Article body'} />
+      <Head title={article ? t(copy.title, { title: article.title }) : t(copy.fallback_title)} />
 
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
         <Button
@@ -73,11 +132,11 @@ export default function ArticleBody() {
           size="sm"
           onClick={() => router.visit(`/admin/news/articles/${article_id}/edit`)}
         >
-          ← Article
+          {t(copy.back)}
         </Button>
         <div className="min-w-0 flex-1">
           <p data-testid="article-body-title" className="truncate font-medium">
-            {article?.title ?? 'Loading…'}
+            {article?.title ?? t(copy.loading)}
           </p>
           <p className="truncate text-xs text-muted-foreground">{article?.url}</p>
         </div>
@@ -90,20 +149,27 @@ export default function ArticleBody() {
           disabled={busy || !dirty}
           onClick={() => void saveNow()}
         >
-          Save draft
+          {t(copy.save_draft)}
         </Button>
         <Button size="sm" disabled={busy} onClick={() => void publish()}>
-          {article?.status === 'published' ? 'Update published' : 'Publish'}
+          {article?.status === 'published' ? t(copy.update_published) : t(copy.publish)}
         </Button>
       </header>
 
       {error && (
-        <p className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>
+        <div className="flex items-center gap-3 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          <p className="min-w-0 flex-1">{error}</p>
+          {conflict && (
+            <Button size="sm" variant="outline" onClick={() => void reload()}>
+              {t(copy.reload)}
+            </Button>
+          )}
+        </div>
       )}
 
       {article?.rejection_note && article.status === 'draft' && (
         <div className="border-b bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>Sent back:</strong> {article.rejection_note}
+          <strong>{t(copy.sent_back)}</strong> {article.rejection_note}
         </div>
       )}
 
@@ -112,34 +178,13 @@ export default function ArticleBody() {
       <div className="min-h-0 flex-1">
         {data !== null && (
           <Puck
-            config={articlePuckConfig}
+            key={reloadKey}
+            config={config}
             data={data ?? (emptyArticleData as never)}
-            viewports={articleViewports}
+            viewports={viewports}
             iframe={{ enabled: true }}
-            overrides={{
-              // Puck's header renders its own primary "Publish", wired to a
-              // plain data change rather than to the workflow. Leaving it would
-              // put two differently-behaved Publish buttons on one screen, the
-              // louder of which does the quieter thing. The toolbar above is
-              // the only publish control; the title, undo/redo and the sidebar
-              // toggles stay in Puck's header.
-              headerActions: () => <></>,
-              // With nothing selected Puck shows the *root* field set, and this
-              // config deliberately has none — an article's headline is a
-              // column, edited next door, not a root prop (see
-              // `articlePuckConfig`). That would leave an empty panel where a
-              // writer looking for the headline would look first, so it says
-              // where the headline went instead.
-              fields: ({ children, itemSelector }) =>
-                itemSelector ? (
-                  <>{children}</>
-                ) : (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    Select a block to edit it. The headline, URL and publish date belong to the
-                    article — edit them on the article screen.
-                  </p>
-                ),
-            }}
+            metadata={metadata}
+            overrides={overrides}
             onChange={change}
           />
         )}

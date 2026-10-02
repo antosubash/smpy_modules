@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { keys, useT } from "../../utils/i18n";
 import type { FileItem, FilePickerAdapter } from "./types";
 
 interface FileGalleryProps {
@@ -23,6 +24,7 @@ export function FileGallery({
 	onClose,
 	onSelect,
 }: FileGalleryProps) {
+	const { t } = useT();
 	const [items, setItems] = useState<FileItem[]>([]);
 	const [totalCount, setTotalCount] = useState(0);
 	const [loading, setLoading] = useState(false);
@@ -69,7 +71,9 @@ export function FileGallery({
 		>
 			<div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col m-4">
 				<div className="flex items-center justify-between px-4 py-3 border-b">
-					<h2 className="text-lg font-semibold">Select a file</h2>
+					<h2 className="text-lg font-semibold">
+						{t(keys.pagebuilder.gallery.title)}
+					</h2>
 					<button
 						type="button"
 						onClick={onClose}
@@ -80,10 +84,12 @@ export function FileGallery({
 				</div>
 				<div className="flex-1 overflow-y-auto p-4">
 					{loading ? (
-						<div className="text-center py-8 text-gray-500">Loading...</div>
+						<div className="text-center py-8 text-gray-500">
+							{t(keys.pagebuilder.gallery.loading)}
+						</div>
 					) : items.length === 0 ? (
 						<div className="text-center py-8 text-gray-500">
-							No files uploaded yet.
+							{t(keys.pagebuilder.gallery.empty)}
 						</div>
 					) : (
 						<div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -118,7 +124,7 @@ export function FileGallery({
 				</div>
 				<div className="flex items-center justify-between px-4 py-3 border-t">
 					<span className="text-sm text-gray-500">
-						{totalCount} file{totalCount !== 1 ? "s" : ""}
+						{t(keys.pagebuilder.gallery.file_count, { count: totalCount })}
 					</span>
 					<div className="flex gap-2">
 						<button
@@ -127,7 +133,7 @@ export function FileGallery({
 							disabled={!hasPrev}
 							className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
 						>
-							Prev
+							{t(keys.pagebuilder.gallery.prev)}
 						</button>
 						<button
 							type="button"
@@ -135,7 +141,7 @@ export function FileGallery({
 							disabled={!hasMore}
 							className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
 						>
-							Next
+							{t(keys.pagebuilder.gallery.next)}
 						</button>
 					</div>
 				</div>

@@ -111,12 +111,10 @@ describe('U3: the link never claims a count its own destination might not show',
 
   it('discloses the wider (live + trashed) scope next to the link', async () => {
     const view = await press('records-check-records', report(12));
-    // (i18next is unconfigured under vitest, so `{count}` is not
-    // interpolated here — see `RecordRowAction.test.tsx`'s U27 tests for
-    // the same note. What matters is that the disclosure sentence itself
-    // renders, mentioning the Trash.)
+    // The disclosure sentence carries the count the link itself does not,
+    // and says it includes the Trash.
     const note = view.find('[data-testid="records-schema-preview"] p.text-muted-foreground');
-    expect(note?.textContent).toContain('{count}');
+    expect(note?.textContent).toContain('12 records');
     expect(note?.textContent).toContain('Trash');
     await view.unmount();
   });

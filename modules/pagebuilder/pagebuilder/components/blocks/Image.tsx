@@ -6,6 +6,7 @@ import {
   lookupAsset,
   type MediaAssetRead,
 } from '../../utils/api';
+import { keys, translate } from '../../utils/i18n';
 import { MEASURE_OPTIONS, type Measure, measureClass } from '../../utils/measure';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from '../widgets/_internal/rich-text';
@@ -62,7 +63,7 @@ function resolveSizes(srcset: string, sizes: string): string | undefined {
 }
 
 export const ImageBlock: ComponentConfig<ImageProps> = {
-  label: 'Image',
+  label: keys.pagebuilder.blocks.image.label,
   fields: {
     src: {
       type: 'custom',
@@ -77,21 +78,25 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
     altKind: {
       type: 'radio',
       options: [
-        { label: 'Meaningful (describe the image)', value: 'meaningful' },
-        { label: 'Decorative (hidden from screen readers)', value: 'decorative' },
+        { label: keys.pagebuilder.blocks.image.alt_kind_meaningful, value: 'meaningful' },
+        { label: keys.pagebuilder.blocks.image.alt_kind_decorative, value: 'decorative' },
       ],
     },
     alt: { type: 'text' },
-    caption: { type: 'text', label: 'Caption' },
-    maxWidth: { type: 'select', label: 'Max width', options: MEASURE_OPTIONS },
+    caption: { type: 'text', label: keys.pagebuilder.blocks.image.caption },
+    maxWidth: {
+      type: 'select',
+      label: keys.pagebuilder.blocks.image.max_width,
+      options: MEASURE_OPTIONS,
+    },
     rounded: {
       type: 'select',
-      label: 'Rounded',
+      label: keys.pagebuilder.blocks.image.rounded,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
-        { label: 'Extra Large', value: 'xl' },
+        { label: keys.pagebuilder.blocks.image.rounded_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.image.rounded_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.image.rounded_lg, value: 'lg' },
+        { label: keys.pagebuilder.blocks.image.rounded_xl, value: 'xl' },
       ],
     },
     width: { type: 'number' },
@@ -99,9 +104,9 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
     objectFit: {
       type: 'select',
       options: [
-        { label: 'Cover', value: 'cover' },
-        { label: 'Contain', value: 'contain' },
-        { label: 'Fill', value: 'fill' },
+        { label: keys.pagebuilder.blocks.image.object_fit_cover, value: 'cover' },
+        { label: keys.pagebuilder.blocks.image.object_fit_contain, value: 'contain' },
+        { label: keys.pagebuilder.blocks.image.object_fit_fill, value: 'fill' },
       ],
     },
     srcset: { type: 'textarea' },
@@ -164,7 +169,7 @@ export const ImageBlock: ComponentConfig<ImageProps> = {
     if (!src) {
       return (
         <div className="my-3 p-6 border-2 border-dashed border-gray-300 rounded text-center text-gray-500 text-sm">
-          No image selected. Use the inspector to pick one.
+          {translate(keys.pagebuilder.blocks.image.empty)}
         </div>
       );
     }

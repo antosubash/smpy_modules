@@ -1,8 +1,8 @@
 """Everything news serves to an anonymous reader.
 
-Split by surface — the archive pages, the feeds, one article — because the
-article viewer alone had already filled a file, and the front door added four
-more routes to it.
+Split by surface — the archive pages, the feed, the sitemap, one article —
+because the article viewer alone had already filled a file, and the front door
+added four more routes to it.
 
 **One router per content locale.** The site's default language keeps the bare
 prefix (``/news/…``) so no address that already exists changes, and every other
@@ -26,8 +26,9 @@ from fastapi import APIRouter
 
 from news import locales
 from news.endpoints.public._article import article_router, default_locale_alias_router
-from news.endpoints.public._feeds import feed_router, sitemap_entries, sitemap_router
+from news.endpoints.public._feeds import feed_router
 from news.endpoints.public._index import index_router
+from news.endpoints.public._sitemap import sitemap_entries, sitemap_router
 
 
 def public_router(locale: str) -> APIRouter:

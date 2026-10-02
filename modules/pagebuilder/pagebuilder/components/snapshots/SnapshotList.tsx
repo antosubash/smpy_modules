@@ -1,5 +1,6 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { keys, useT } from '../../utils/i18n';
 import { formatBytes } from '../../utils/mediaFormat';
 import { downloadUrl, type Snapshot } from '../../utils/snapshotsApi';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -34,10 +35,11 @@ export function SnapshotList({
   onRestore: (snapshot: Snapshot) => Promise<unknown>;
   onDelete: (snapshot: Snapshot) => Promise<unknown>;
 }) {
+  const { t } = useT();
   if (snapshots.length === 0) {
     return (
       <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-        No snapshots yet. Take one before a big change, and this is where you come back to.
+        {t(keys.pagebuilder.snapshot_list.empty)}
       </p>
     );
   }
@@ -50,7 +52,9 @@ export function SnapshotList({
           <li key={snapshot.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{snapshot.note || `Snapshot #${snapshot.id}`}</span>
+                <span className="font-medium">
+                  {snapshot.note || t(keys.pagebuilder.snapshot_list.untitled, { id: snapshot.id })}
+                </span>
                 <Badge variant="secondary">{sourceLabel(snapshot.source)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -65,16 +69,16 @@ export function SnapshotList({
 
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="outline" size="sm" asChild>
-                <a href={downloadUrl(snapshot.id)}>Download</a>
+                <a href={downloadUrl(snapshot.id)}>{t(keys.pagebuilder.snapshot_list.download)}</a>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={busy || hasPending}
-                title={hasPending ? 'An import is already awaiting approval' : undefined}
+                title={hasPending ? t(keys.pagebuilder.snapshot_list.pending_hint) : undefined}
                 onClick={() => void onRestore(snapshot)}
               >
-                Restore…
+                {t(keys.pagebuilder.snapshot_list.restore)}
               </Button>
               <ConfirmDialog
                 trigger={
@@ -84,21 +88,16 @@ export function SnapshotList({
                     disabled={busy || pendingSnapshotId === snapshot.id}
                     title={
                       pendingSnapshotId === snapshot.id
-                        ? 'A restore staged from this snapshot is awaiting approval'
+                        ? t(keys.pagebuilder.snapshot_list.staged_hint)
                         : undefined
                     }
                   >
-                    Delete
+                    {t(keys.pagebuilder.snapshot_list.delete)}
                   </Button>
                 }
-                title="Delete this snapshot?"
-                description={
-                  <>
-                    This restore point goes for good. The site is not affected — but if you were
-                    keeping this one to fall back on, download it first.
-                  </>
-                }
-                confirmLabel="Delete snapshot"
+                title={t(keys.pagebuilder.snapshot_list.delete_title)}
+                description={t(keys.pagebuilder.snapshot_list.delete_description)}
+                confirmLabel={t(keys.pagebuilder.snapshot_list.delete_confirm)}
                 destructive
                 level="medium"
                 onConfirm={() => onDelete(snapshot)}

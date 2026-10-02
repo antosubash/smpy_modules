@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type TestimonialItem = {
@@ -15,17 +16,20 @@ export type TestimonialWidgetProps = {
 };
 
 export const TestimonialWidget: ComponentConfig<TestimonialWidgetProps> = {
-  label: 'Testimonials',
+  label: keys.pagebuilder.blocks.testimonial.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     items: {
       type: 'array',
-      label: 'Testimonials',
+      label: keys.pagebuilder.blocks.testimonial.items,
       arrayFields: {
-        quote: { type: 'textarea', label: 'Quote' },
-        name: { type: 'text', label: 'Name' },
-        role: { type: 'text', label: 'Role' },
-        avatarUrl: createImageField(mediaLibraryAdapter, 'Avatar URL'),
+        quote: { type: 'textarea', label: keys.pagebuilder.blocks.testimonial.items_quote },
+        name: { type: 'text', label: keys.pagebuilder.blocks.testimonial.items_name },
+        role: { type: 'text', label: keys.pagebuilder.blocks.testimonial.items_role },
+        avatarUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.testimonial.items_avatar_url,
+        ),
       },
       defaultItemProps: {
         quote: 'Great product!',

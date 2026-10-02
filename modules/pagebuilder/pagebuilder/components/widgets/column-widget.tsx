@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 
 export type ColumnWidgetProps = {
@@ -24,28 +25,28 @@ const GAP_CLASS: Record<ColumnWidgetProps['gap'], string> = {
 };
 
 export const ColumnWidget: ComponentConfig<ColumnWidgetProps> = {
-  label: 'Column',
+  label: keys.pagebuilder.blocks.column.label,
   fields: {
     width: {
       type: 'select',
-      label: 'Width',
+      label: keys.pagebuilder.blocks.column.width,
       options: [
-        { label: 'Quarter', value: '1/4' },
-        { label: 'Third', value: '1/3' },
-        { label: 'Half', value: '1/2' },
-        { label: 'Two thirds', value: '2/3' },
-        { label: 'Three quarters', value: '3/4' },
-        { label: 'Full', value: 'full' },
+        { label: keys.pagebuilder.blocks.column.width_1_4, value: '1/4' },
+        { label: keys.pagebuilder.blocks.column.width_1_3, value: '1/3' },
+        { label: keys.pagebuilder.blocks.column.width_1_2, value: '1/2' },
+        { label: keys.pagebuilder.blocks.column.width_2_3, value: '2/3' },
+        { label: keys.pagebuilder.blocks.column.width_3_4, value: '3/4' },
+        { label: keys.pagebuilder.blocks.column.width_full, value: 'full' },
       ],
     },
     gap: {
       type: 'select',
-      label: 'Gap',
+      label: keys.pagebuilder.blocks.common.gap,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.common.gap_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.common.gap_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.common.gap_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.common.gap_lg, value: 'lg' },
       ],
     },
     column: { type: 'slot' },

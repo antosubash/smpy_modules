@@ -33,6 +33,7 @@ async def make_article(
     published_at: datetime | None = None,
     pinned: bool = False,
     show_in_feed: bool = True,
+    index_in_search: bool = True,
     draft_data: dict | None = None,
     publish_body: bool = True,
 ) -> NewsArticle:
@@ -73,6 +74,7 @@ async def make_article(
         published_at=published_at,
         pinned=pinned,
         show_in_feed=show_in_feed,
+        index_in_search=index_in_search,
     )
     db.add(article)
     await db.commit()

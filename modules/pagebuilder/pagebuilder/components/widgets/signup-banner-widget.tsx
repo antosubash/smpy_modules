@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
 export type SignupBannerWidgetProps = {
@@ -9,12 +10,12 @@ export type SignupBannerWidgetProps = {
 };
 
 export const SignupBannerWidget: ComponentConfig<SignupBannerWidgetProps> = {
-  label: 'Signup banner',
+  label: keys.pagebuilder.blocks.signup_banner.label,
   fields: {
-    heading: { type: 'text', label: 'Heading' },
-    subheading: { type: 'textarea', label: 'Subheading' },
-    primaryLabel: { type: 'text', label: 'Button label' },
-    primaryHref: { type: 'text', label: 'Button link' },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    subheading: { type: 'textarea', label: keys.pagebuilder.blocks.common.subheading },
+    primaryLabel: { type: 'text', label: keys.pagebuilder.blocks.signup_banner.primary_label },
+    primaryHref: { type: 'text', label: keys.pagebuilder.blocks.signup_banner.primary_href },
   },
   defaultProps: {
     heading: 'Join us today',

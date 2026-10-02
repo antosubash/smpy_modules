@@ -9,6 +9,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys, useT } from '../../../utils/i18n';
+
 import { cells, itemKey, lines } from './lines';
 
 export interface KeyPointsProps {
@@ -24,10 +26,10 @@ export interface KeyPointsProps {
  * one unit and cannot be half-scrolled past.
  */
 export const KeyPointsBlock: ComponentConfig<KeyPointsProps> = {
-  label: 'Key points',
+  label: keys.news.blocks.key_points.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
-    items: { type: 'textarea', label: 'One point per line' },
+    title: { type: 'text', label: keys.news.blocks.common.heading },
+    items: { type: 'textarea', label: keys.news.blocks.key_points.items },
   },
   defaultProps: { title: 'What you need to know', items: '' },
   render: ({ title, items }) => {
@@ -62,17 +64,17 @@ const TONES: Record<CalloutTone, { box: string; label: string; fallback: string 
   note: {
     box: 'border-sky-300 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40',
     label: 'text-sky-900 dark:text-sky-200',
-    fallback: 'Note',
+    fallback: keys.news.blocks.callout.tone_note,
   },
   important: {
     box: 'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40',
     label: 'text-amber-900 dark:text-amber-200',
-    fallback: 'Important',
+    fallback: keys.news.blocks.callout.tone_important,
   },
   correction: {
     box: 'border-rose-300 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/40',
     label: 'text-rose-900 dark:text-rose-200',
-    fallback: 'Correction',
+    fallback: keys.news.blocks.callout.tone_correction,
   },
 };
 
@@ -89,36 +91,41 @@ export interface CalloutProps {
  * indistinguishable from the reporting it is correcting.
  */
 export const CalloutBlock: ComponentConfig<CalloutProps> = {
-  label: 'Callout',
+  label: keys.news.blocks.callout.label,
   fields: {
     tone: {
       type: 'select',
-      label: 'Kind',
+      label: keys.news.blocks.callout.kind,
       options: [
-        { label: 'Note', value: 'note' },
-        { label: 'Important', value: 'important' },
-        { label: 'Correction', value: 'correction' },
+        { label: keys.news.blocks.callout.kind_note, value: 'note' },
+        { label: keys.news.blocks.callout.kind_important, value: 'important' },
+        { label: keys.news.blocks.callout.kind_correction, value: 'correction' },
       ],
     },
-    title: { type: 'text', label: 'Label (optional)' },
-    text: { type: 'textarea', label: 'Text' },
+    title: { type: 'text', label: keys.news.blocks.callout.title },
+    text: { type: 'textarea', label: keys.news.blocks.common.text },
   },
   defaultProps: { tone: 'note', title: '', text: '' },
-  render: ({ tone, title, text }) => {
-    if (!text.trim()) return <></>;
-    // A document written before a tone was added, or with one edited by hand,
-    // still has to render as something.
-    const style = TONES[tone] ?? TONES.note;
-    return (
-      <aside className={`my-8 rounded-lg border p-5 ${style.box}`}>
-        <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${style.label}`}>
-          {title || style.fallback}
-        </p>
-        <p className="whitespace-pre-line leading-relaxed">{text}</p>
-      </aside>
-    );
-  },
+  // A component rather than JSX inline, because the tone's own word is
+  // translated and Puck calls `render` as a plain function.
+  render: ({ tone, title, text }) => <CalloutRender tone={tone} title={title} text={text} />,
 };
+
+function CalloutRender({ tone, title, text }: CalloutProps) {
+  const { t } = useT();
+  if (!text.trim()) return <></>;
+  // A document written before a tone was added, or with one edited by hand,
+  // still has to render as something.
+  const style = TONES[tone] ?? TONES.note;
+  return (
+    <aside className={`my-8 rounded-lg border p-5 ${style.box}`}>
+      <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${style.label}`}>
+        {title || t(style.fallback)}
+      </p>
+      <p className="whitespace-pre-line leading-relaxed">{text}</p>
+    </aside>
+  );
+}
 
 export interface DefinitionsProps {
   title: string;
@@ -134,10 +141,10 @@ export interface DefinitionsProps {
  * A box can be read or skipped; a parenthesis cannot.
  */
 export const DefinitionsBlock: ComponentConfig<DefinitionsProps> = {
-  label: 'Definitions',
+  label: keys.news.blocks.definitions.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
-    items: { type: 'textarea', label: 'One per line — "term | what it means"' },
+    title: { type: 'text', label: keys.news.blocks.common.heading },
+    items: { type: 'textarea', label: keys.news.blocks.definitions.items },
   },
   defaultProps: { title: 'The terms', items: '' },
   render: ({ title, items }) => {
@@ -176,10 +183,10 @@ export interface SourcesProps {
  * nowhere to point.
  */
 export const SourcesBlock: ComponentConfig<SourcesProps> = {
-  label: 'Sources',
+  label: keys.news.blocks.sources.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
-    items: { type: 'textarea', label: 'One per line — "what it is | https://…"' },
+    title: { type: 'text', label: keys.news.blocks.common.heading },
+    items: { type: 'textarea', label: keys.news.blocks.sources.items },
   },
   defaultProps: { title: 'Sources', items: '' },
   render: ({ title, items }) => {

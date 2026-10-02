@@ -15,7 +15,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news.constants import MAX_TAG_LEN
 from news.contracts.schemas import TagRead
 from news.models import NewsArticleTag, NewsTag
-from news.slugify import slugify, unique_slug
+from news.slugify import tag_slug
+
+
+class TagNameError(ValueError):
+    """The name cannot become a tag (no letters or numbers)."""
+
+
+class TagCollisionError(ValueError):
+    """Another tag already uses this name or address."""
+
+
+NO_ALNUM_MESSAGE = "A tag needs at least one letter or number."
+
+
+def _slug_for(name: str) -> str:
+    slug = tag_slug(name, max_length=MAX_TAG_LEN)
+    if not slug:
+        raise TagNameError(NO_ALNUM_MESSAGE)
+    return slug
 
 
 async def list_tags(db: AsyncSession) -> list[TagRead]:
@@ -49,12 +67,18 @@ async def get_or_create(db: AsyncSession, name: str) -> NewsTag:
     one tag to a writer, and letting them become three is how a tag list turns
     into noise. The first spelling wins as the display name.
     """
-    slug = slugify(name, max_length=MAX_TAG_LEN)
+    slug = _slug_for(name)
     existing = await db.scalar(select(NewsTag).where(NewsTag.slug == slug))
+    if existing is None:
+        # A tag made before slugs kept non-ASCII letters has its old, folded
+        # slug ("Café" -> "cafe"), which the new one does not match. Its name
+        # still does.
+        existing = await db.scalar(
+            select(NewsTag).where(func.lower(NewsTag.name) == name.strip().lower())
+        )
     if existing is not None:
         return existing
-    taken = set((await db.execute(select(NewsTag.slug))).scalars().all())
-    tag = NewsTag(name=name.strip(), slug=unique_slug(name, taken, max_length=MAX_TAG_LEN))
+    tag = NewsTag(name=name.strip(), slug=slug)
     db.add(tag)
     await db.flush()
     await db.refresh(tag)
@@ -126,13 +150,18 @@ async def set_for_article(db: AsyncSession, article_id: int, names: list[str]) -
 
 async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
     """Rename a tag in place. The slug follows, so links stay derivable."""
-    taken = set(
-        (await db.execute(select(NewsTag.slug).where(NewsTag.id != tag.id)))
-        .scalars()
-        .all()
+    name = name.strip()
+    slug = _slug_for(name)
+    clash = await db.scalar(
+        select(NewsTag.id).where(
+            NewsTag.id != tag.id,
+            (NewsTag.slug == slug) | (func.lower(NewsTag.name) == name.lower()),
+        )
     )
-    tag.name = name.strip()
-    tag.slug = unique_slug(name, taken, max_length=MAX_TAG_LEN)
+    if clash is not None:
+        raise TagCollisionError(f"A tag named {name!r} already exists.")
+    tag.name = name
+    tag.slug = slug
     db.add(tag)
     await db.flush()
     await db.refresh(tag)

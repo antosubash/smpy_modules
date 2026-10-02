@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type SimpleActionItem = {
@@ -13,20 +14,20 @@ export type SimpleActionListWidgetProps = {
 };
 
 export const SimpleActionListWidget: ComponentConfig<SimpleActionListWidgetProps> = {
-  label: 'Action List',
+  label: keys.pagebuilder.blocks.simple_action_list.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     items: {
       type: 'array',
-      label: 'Actions',
+      label: keys.pagebuilder.blocks.simple_action_list.items,
       arrayFields: {
-        title: { type: 'text', label: 'Title' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.simple_action_list.items_title },
         // Each row is a link, so markdown links here render as label text.
         description: {
           type: 'textarea',
-          label: 'Description (links not supported here)',
+          label: keys.pagebuilder.blocks.simple_action_list.items_description,
         },
-        href: { type: 'text', label: 'Link URL' },
+        href: { type: 'text', label: keys.pagebuilder.blocks.simple_action_list.items_href },
       },
       defaultItemProps: {
         title: 'Action',

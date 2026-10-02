@@ -4,6 +4,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 
 import type { ArticleRead } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { SLUG_PATTERN } from '../../utils/slugify';
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { TagInput } from './TagInput';
@@ -63,6 +64,8 @@ export function ArticleInspector({
   busy,
   onChange,
 }: Props) {
+  const { t } = useT();
+  const copy = keys.news.inspector;
   const future = draft.date
     ? new Date(`${draft.date}T${draft.time || '00:00'}`) > new Date()
     : false;
@@ -76,7 +79,7 @@ export function ArticleInspector({
   return (
     <div className="space-y-5">
       <div className="grid gap-2">
-        <Label htmlFor={TITLE_ID}>Headline</Label>
+        <Label htmlFor={TITLE_ID}>{t(copy.headline_label)}</Label>
         <Input
           id={TITLE_ID}
           value={draft.title}
@@ -84,12 +87,12 @@ export function ArticleInspector({
           onChange={(e) => onChange({ title: e.target.value })}
         />
         {!draft.title.trim() && (
-          <p className="text-xs text-destructive">An article needs a headline.</p>
+          <p className="text-xs text-destructive">{t(copy.headline_required)}</p>
         )}
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={SLUG_ID}>URL</Label>
+        <Label htmlFor={SLUG_ID}>{t(copy.url_label)}</Label>
         <div className="flex items-center gap-1">
           <span className="shrink-0 text-sm text-muted-foreground">{prefix}</span>
           <Input
@@ -100,27 +103,21 @@ export function ArticleInspector({
           />
         </div>
         {draft.slug && !SLUG_PATTERN.test(draft.slug) ? (
-          <p className="text-xs text-destructive">
-            Lowercase letters, numbers and hyphens, starting with a letter or number.
-          </p>
+          <p className="text-xs text-destructive">{t(copy.slug_invalid)}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Changing this moves the article. The old address keeps working — a rename records a
-            redirect, because it is already in bookmarks and in a search index that has not
-            recrawled.
-          </p>
+          <p className="text-xs text-muted-foreground">{t(copy.slug_help)}</p>
         )}
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={CATEGORY_ID}>Category</Label>
+        <Label htmlFor={CATEGORY_ID}>{t(copy.category_label)}</Label>
         <NativeSelect
           id={CATEGORY_ID}
           value={draft.category}
           disabled={busy}
           onChange={(e) => onChange({ category: e.target.value })}
         >
-          <option value="">Uncategorised</option>
+          <option value="">{t(copy.category_none)}</option>
           {categories.map((c) => (
             <option key={c.name} value={c.name}>
               {c.name}
@@ -130,7 +127,7 @@ export function ArticleInspector({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="news-article-tags">Tags</Label>
+        <Label htmlFor="news-article-tags">{t(copy.tags_label)}</Label>
         <TagInput
           tags={draft.tags}
           disabled={busy}
@@ -141,7 +138,7 @@ export function ArticleInspector({
 
       <div className="grid grid-cols-2 gap-2">
         <div className="grid gap-2">
-          <Label htmlFor={DATE_ID}>Display date</Label>
+          <Label htmlFor={DATE_ID}>{t(copy.date_label)}</Label>
           <Input
             id={DATE_ID}
             type="date"
@@ -151,7 +148,7 @@ export function ArticleInspector({
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={TIME_ID}>Time</Label>
+          <Label htmlFor={TIME_ID}>{t(copy.time_label)}</Label>
           <Input
             id={TIME_ID}
             type="time"
@@ -166,24 +163,24 @@ export function ArticleInspector({
           ? // It used to say "lists this as scheduled", which read as a promise
             // the module could not keep — nothing acted on the date. Real
             // scheduling is the Go-live control below; this one is editorial.
-            'The date shown to readers. It does not publish anything — use Go live for that.'
-          : 'Clearing the date makes this undated work in progress, which sorts to the top of the list.'}
+            t(copy.date_help_future)
+          : t(copy.date_help_past)}
       </p>
 
       <div className="grid gap-2">
-        <Label htmlFor={AUTHOR_ID}>Author</Label>
+        <Label htmlFor={AUTHOR_ID}>{t(copy.author_label)}</Label>
         <Input
           id={AUTHOR_ID}
           value={draft.author}
           disabled={busy}
-          placeholder="Byline"
+          placeholder={t(copy.author_placeholder)}
           onChange={(e) => onChange({ author: e.target.value })}
         />
       </div>
 
       <fieldset className="m-0 grid gap-3 border-0 p-0">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Feed behaviour
+          {t(copy.feed_legend)}
         </legend>
 
         <div className="flex items-start gap-2">
@@ -194,11 +191,8 @@ export function ArticleInspector({
             onCheckedChange={(checked) => onChange({ pinned: checked === true })}
           />
           <div className="grid gap-0.5">
-            <Label htmlFor={PIN_ID}>Pin to the top of listings</Label>
-            <p className="text-xs text-muted-foreground">
-              Sorts before the date rather than changing it, so the archive still reads correctly
-              once it is unpinned.
-            </p>
+            <Label htmlFor={PIN_ID}>{t(copy.pin_label)}</Label>
+            <p className="text-xs text-muted-foreground">{t(copy.pin_help)}</p>
           </div>
         </div>
 
@@ -210,10 +204,8 @@ export function ArticleInspector({
             onCheckedChange={(checked) => onChange({ showInFeed: checked === true })}
           />
           <div className="grid gap-0.5">
-            <Label htmlFor={FEED_ID}>Show in feed blocks</Label>
-            <p className="text-xs text-muted-foreground">
-              Off keeps the article at its own URL and out of the chronological feed.
-            </p>
+            <Label htmlFor={FEED_ID}>{t(copy.feed_label)}</Label>
+            <p className="text-xs text-muted-foreground">{t(copy.feed_help)}</p>
           </div>
         </div>
       </fieldset>

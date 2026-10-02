@@ -5,10 +5,20 @@
  * library belongs to pagebuilder, and these have to render on a host that never
  * installed it. Where that module *is* installed, its picker hands out exactly
  * this — a URL to paste.
+ *
+ * The single-URL fields show what the address points at as it is typed (see
+ * `./imageUrlField.tsx`). That is not the picker and does not close the gap;
+ * it only means a wrong address is caught in the panel rather than on the
+ * published page. `Gallery` keeps a plain textarea: its field is a *list*, and
+ * a strip of thumbnails is a different control rather than the same one with a
+ * picture under it.
  */
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys } from '../../../utils/i18n';
+
+import { imageUrlField } from './imageUrlField';
 import { cells, itemKey, lines } from './lines';
 
 export interface ImageProps {
@@ -19,16 +29,19 @@ export interface ImageProps {
 }
 
 export const ImageBlock: ComponentConfig<ImageProps> = {
-  label: 'Image',
+  label: keys.news.blocks.image.label,
   fields: {
-    url: { type: 'text', label: 'Image URL' },
-    alt: { type: 'text', label: 'Alt text (describe the image)' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    // A URL, still — see `./imageUrlField.tsx` and the README's known gaps.
+    // The field shows what the address points at, so a typo is caught where it
+    // was made rather than on the published page.
+    url: imageUrlField(keys.news.blocks.image.url),
+    alt: { type: 'text', label: keys.news.blocks.image.alt },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
     // Separate from the caption because it is a different obligation: a caption
     // explains the picture and a credit says whose it is, and a publication
     // that runs the second inside the first eventually runs a picture with
     // neither.
-    credit: { type: 'text', label: 'Credit (optional)' },
+    credit: { type: 'text', label: keys.news.blocks.image.credit },
   },
   defaultProps: { url: '', alt: '', caption: '', credit: '' },
   render: ({ url, alt, caption, credit }) => {
@@ -61,15 +74,15 @@ export interface GalleryProps {
  * they were shown — and costs one reading it in a feed reader all of them.
  */
 export const GalleryBlock: ComponentConfig<GalleryProps> = {
-  label: 'Gallery',
+  label: keys.news.blocks.gallery.label,
   fields: {
-    images: { type: 'textarea', label: 'One per line — "https://… | alt text | caption"' },
+    images: { type: 'textarea', label: keys.news.blocks.gallery.images },
     columns: {
       type: 'select',
-      label: 'Across',
+      label: keys.news.blocks.gallery.columns,
       options: [
-        { label: 'Two', value: '2' },
-        { label: 'Three', value: '3' },
+        { label: keys.news.blocks.gallery.columns_2, value: '2' },
+        { label: keys.news.blocks.gallery.columns_3, value: '3' },
       ],
     },
   },
@@ -123,13 +136,13 @@ export interface ComparisonProps {
  * interaction, and a reader who never touches it sees neither picture whole.
  */
 export const ComparisonBlock: ComponentConfig<ComparisonProps> = {
-  label: 'Before / after',
+  label: keys.news.blocks.comparison.label,
   fields: {
-    beforeUrl: { type: 'text', label: 'Before — image URL' },
-    beforeLabel: { type: 'text', label: 'Before — label' },
-    afterUrl: { type: 'text', label: 'After — image URL' },
-    afterLabel: { type: 'text', label: 'After — label' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    beforeUrl: imageUrlField(keys.news.blocks.comparison.before_url),
+    beforeLabel: { type: 'text', label: keys.news.blocks.comparison.before_label },
+    afterUrl: imageUrlField(keys.news.blocks.comparison.after_url),
+    afterLabel: { type: 'text', label: keys.news.blocks.comparison.after_label },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: {
     beforeUrl: '',
@@ -174,16 +187,16 @@ export interface EmbedProps {
 }
 
 export const EmbedBlock: ComponentConfig<EmbedProps> = {
-  label: 'Embed (video, map…)',
+  label: keys.news.blocks.embed.label,
   fields: {
-    url: { type: 'text', label: 'Embed URL' },
-    title: { type: 'text', label: 'Title (read by screen readers)' },
+    url: { type: 'text', label: keys.news.blocks.embed.url },
+    title: { type: 'text', label: keys.news.blocks.embed.title },
     ratio: {
       type: 'select',
-      label: 'Aspect ratio',
+      label: keys.news.blocks.embed.ratio,
       options: [
-        { label: '16:9', value: '16/9' },
-        { label: '4:3', value: '4/3' },
+        { label: keys.news.blocks.embed.ratio_16_9, value: '16/9' },
+        { label: keys.news.blocks.embed.ratio_4_3, value: '4/3' },
       ],
     },
   },

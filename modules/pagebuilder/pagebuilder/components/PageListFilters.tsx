@@ -2,6 +2,7 @@ import { FilterPills } from '@simple-module-py/ui/components/FilterPills';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useRef, useState } from 'react';
 
+import { keys, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
 
 export interface PageListFilterState {
@@ -15,11 +16,13 @@ export interface PageListFilterState {
   limit: number;
 }
 
+// Labels are catalogue keys, resolved where the pills render — a module-scope
+// constant has no hook to call.
 const STATUS_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'draft', label: 'Drafts' },
-  { value: 'submitted_for_review', label: 'In review' },
-  { value: 'published', label: 'Published' },
+  { value: '', label: keys.pagebuilder.filters.status_all },
+  { value: 'draft', label: keys.pagebuilder.filters.status_draft },
+  { value: 'submitted_for_review', label: keys.pagebuilder.filters.status_review },
+  { value: 'published', label: keys.pagebuilder.filters.status_published },
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -43,6 +46,7 @@ export function PageListFilters({
   /** Always resets paging: page 3 of the old filter is meaningless. */
   onChange: (next: { search: string; status: string; locale: string }) => void;
 }) {
+  const { t } = useT();
   const [search, setSearch] = useState(filters.search);
 
   // The last values this component sent (or accepted from outside). Two jobs:
@@ -106,8 +110,8 @@ export function PageListFilters({
       <Input
         type="search"
         value={search}
-        aria-label="Search pages"
-        placeholder="Search title or slug…"
+        aria-label={t(keys.pagebuilder.filters.search_label)}
+        placeholder={t(keys.pagebuilder.filters.search_placeholder)}
         className="h-9 w-64"
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -120,7 +124,7 @@ export function PageListFilters({
           sent.current = { search, status, locale: sent.current.locale };
           onChange({ search, status, locale: sent.current.locale });
         }}
-        options={STATUS_OPTIONS}
+        options={STATUS_OPTIONS.map((option) => ({ ...option, label: t(option.label) }))}
       />
       {locales.length > 1 && (
         <FilterPills
@@ -130,7 +134,7 @@ export function PageListFilters({
             onChange({ search, status: sent.current.status, locale });
           }}
           options={[
-            { value: '', label: 'All languages' },
+            { value: '', label: t(keys.pagebuilder.filters.locale_all) },
             ...locales.map((tag) => ({ value: tag, label: localeLabel(tag) })),
           ]}
         />

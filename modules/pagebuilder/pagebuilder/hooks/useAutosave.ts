@@ -10,6 +10,7 @@ import {
   type SaveState,
   snapshotKey,
 } from '../utils/editorSnapshot';
+import { keys, translate } from '../utils/i18n';
 
 interface Params {
   pageId: number | null;
@@ -121,7 +122,9 @@ export function useAutosave({
         setAutosaveError(null);
         setSaveState('idle');
       } catch (e) {
-        setAutosaveError(e instanceof Error ? e.message : 'Save failed');
+        setAutosaveError(
+          e instanceof Error ? e.message : translate(keys.pagebuilder.workflow.save_failed),
+        );
         setSaveState('error');
       } finally {
         autosaveInFlight.current = false;

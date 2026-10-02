@@ -24,8 +24,10 @@ the pydantic default no matter what an operator has configured.
 from __future__ import annotations
 
 import importlib.metadata
+import importlib.resources
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from simple_module_core import ModuleBase, ModuleMeta
@@ -227,14 +229,33 @@ class NewsModule(ModuleBase):
             self._scheduler.start(app, settings)
 
     async def on_shutdown(self, app: FastAPI) -> None:
-        """Stop the scheduler.
+        """Stop the scheduler's polling task.
 
-        Not via ``app.router.add_event_handler("shutdown", ...)``: the host
-        builds its app with its own ``lifespan``, and router shutdown handlers
-        only run under the default one — so they would never fire, leaving the
-        loop to tick against a database the lifespan has just disposed of.
+        Not reached through a FastAPI ``shutdown`` event handler — the host
+        builds the app with a custom ``lifespan=``, which bypasses the
+        router's own event-handler list entirely. This hook is what the
+        host's lifespan actually calls on the way down, for every module, in
+        reverse start order.
         """
         await self._scheduler.stop()
+
+    def locale_dirs(self) -> dict[str, Path]:
+        """Where the console's own strings live, for the host's i18n registry.
+
+        ``importlib.resources.files`` rather than ``__file__``: the JSON ships
+        inside the wheel, so a host that pip-installed news has to resolve it
+        through the package rather than off a source tree that isn't there.
+
+        The directory sits beside :mod:`news.locales`, which is a different
+        thing entirely — that one is the languages an *article* can be written
+        in, this one is the language the *console* speaks. They coexist because
+        the directory has no ``__init__.py``: an import of ``news.locales``
+        resolves the module, and this joins the path without importing
+        anything. Adding an ``__init__.py`` here would shadow the module and
+        take the public router down with it.
+        """
+        base = Path(str(importlib.resources.files(__package__) / "locales"))
+        return {constants.LOCALE_NAMESPACE: base}
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """Let an anonymous reader use the API the feed block reads.

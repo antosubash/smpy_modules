@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 
 import { useContentLocale } from '../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../utils/api';
+import { keys } from '../utils/i18n';
 
 export interface NewsFeedProps {
   title: string;
@@ -74,23 +75,36 @@ export function NewsFeedRender({
   );
 }
 
+/**
+ * The palette entry, whose labels are catalogue keys like every other block's.
+ *
+ * The resolver is the difference: an article-body block is localized by
+ * `ArticleBody`, which is news' own screen, while this one lands in
+ * *pagebuilder's* palette and is resolved by pagebuilder's `localizeConfig`
+ * when `PageEditor` mounts Puck. That works because the host merges every
+ * module's catalogue into one flat table and i18next is configured with
+ * `keySeparator: false`, so `news.feed.…` is a whole key rather than a path
+ * into a namespace pagebuilder would have to know about — see the floor on the
+ * `pagebuilder` extra in `pyproject.toml`, which is what guarantees the
+ * neighbour is new enough to resolve them.
+ */
 export const NewsFeedBlock: ComponentConfig<NewsFeedProps> = {
-  label: 'News feed (live articles)',
+  label: keys.news.feed.label,
   fields: {
-    title: { type: 'text', label: 'Heading' },
-    category: { type: 'text', label: 'Category filter (blank = all)' },
-    limit: { type: 'number', label: 'How many', min: 1, max: 12 },
+    title: { type: 'text', label: keys.news.feed.title },
+    category: { type: 'text', label: keys.news.feed.category },
+    limit: { type: 'number', label: keys.news.feed.limit, min: 1, max: 12 },
     columns: {
       type: 'select',
-      label: 'Columns (desktop)',
+      label: keys.news.feed.columns,
       options: [
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
+        { label: keys.news.feed.columns_2, value: '2' },
+        { label: keys.news.feed.columns_3, value: '3' },
+        { label: keys.news.feed.columns_4, value: '4' },
       ],
     },
-    viewAllLabel: { type: 'text', label: 'View-all link label' },
-    viewAllHref: { type: 'text', label: 'View-all link URL' },
+    viewAllLabel: { type: 'text', label: keys.news.feed.view_all_label },
+    viewAllHref: { type: 'text', label: keys.news.feed.view_all_href },
   },
   defaultProps: {
     title: 'Latest news',

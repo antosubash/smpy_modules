@@ -16,6 +16,7 @@ Creation, editing and slug handling stay here.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -24,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from news import locales, redirects
+from news.content._fresh import ensure_fresh
 from news.content._revisions import clear_revisions
 from news.content._slugs import free_slug, slug_exhausted, slug_for_title, slug_taken
 from news.content._workflow import WorkflowMixin
@@ -153,6 +155,9 @@ class ArticlesService(WorkflowMixin):
             if draft_data is not None
             else empty_article_document(title),
             status=ArticleStatus.DRAFT,
+            # Stamped at birth so a first edit from a stale tab is detectable
+            # too; otherwise there is nothing to compare until the first save.
+            updated_at=datetime.now(UTC),
             **({"translation_group": translation_group} if translation_group else {}),
         )
         self.db.add(article)
@@ -199,7 +204,11 @@ class ArticlesService(WorkflowMixin):
         return article
 
     async def save_body(
-        self, article_id: int, data: dict[str, Any]
+        self,
+        article_id: int,
+        data: dict[str, Any],
+        *,
+        expected_updated_at: datetime | None = None,
     ) -> NewsArticle:
         """Autosave from the block canvas — the draft only, never the live copy.
 
@@ -209,6 +218,7 @@ class ArticlesService(WorkflowMixin):
         record a redirect for.
         """
         article = await self.get_article(article_id)
+        ensure_fresh(article, expected_updated_at)
         article.draft_data = data
         self.db.add(article)
         await self.db.flush()

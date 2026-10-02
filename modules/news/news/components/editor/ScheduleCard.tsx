@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { getArticleDetail, scheduleArticle } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 
 const GO_LIVE_ID = 'article-publish-at';
 const COME_DOWN_ID = 'article-unpublish-at';
@@ -22,6 +23,8 @@ const COME_DOWN_ID = 'article-unpublish-at';
  * both are cleared the moment they are acted on.
  */
 export function ScheduleCard({ articleId }: { articleId: number }) {
+  const { t } = useT();
+  const copy = keys.news.schedule;
   const [publishAt, setPublishAt] = useState('');
   const [unpublishAt, setUnpublishAt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,7 +56,7 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
         unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
       });
       setSaved(true);
-      toast.success('Schedule saved');
+      toast.success(t(copy.saved_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -64,14 +67,14 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide">Schedule</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide">{t(copy.heading)}</h2>
         <span className="text-xs text-muted-foreground" aria-live="polite">
-          {busy ? 'Saving…' : saved ? 'Saved' : ''}
+          {busy ? t(copy.saving) : saved ? t(copy.saved) : ''}
         </span>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={GO_LIVE_ID}>Go live</Label>
+        <Label htmlFor={GO_LIVE_ID}>{t(copy.publish_at_label)}</Label>
         <Input
           id={GO_LIVE_ID}
           type="datetime-local"
@@ -82,7 +85,7 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={COME_DOWN_ID}>Come down</Label>
+        <Label htmlFor={COME_DOWN_ID}>{t(copy.unpublish_at_label)}</Label>
         <Input
           id={COME_DOWN_ID}
           type="datetime-local"
@@ -92,13 +95,10 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
         />
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Both are optional, and clearing one cancels it. The article changes state within a minute of
-        the time you set, not exactly on it.
-      </p>
+      <p className="text-xs text-muted-foreground">{t(copy.help)}</p>
 
       <Button className="w-full" variant="outline" disabled={busy} onClick={() => void save()}>
-        Save schedule
+        {t(copy.save)}
       </Button>
     </div>
   );

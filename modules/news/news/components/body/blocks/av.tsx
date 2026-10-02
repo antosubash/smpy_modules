@@ -12,6 +12,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys, useT } from '../../../utils/i18n';
+
 export interface VideoProps {
   url: string;
   poster: string;
@@ -19,11 +21,11 @@ export interface VideoProps {
 }
 
 export const VideoBlock: ComponentConfig<VideoProps> = {
-  label: 'Video file',
+  label: keys.news.blocks.video.label,
   fields: {
-    url: { type: 'text', label: 'Video URL (mp4, webm)' },
-    poster: { type: 'text', label: 'Poster image URL (optional)' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    url: { type: 'text', label: keys.news.blocks.video.url },
+    poster: { type: 'text', label: keys.news.blocks.video.poster },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: { url: '', poster: '', caption: '' },
   render: ({ url, poster, caption }) => {
@@ -59,34 +61,37 @@ export interface AudioProps {
 }
 
 export const AudioBlock: ComponentConfig<AudioProps> = {
-  label: 'Audio clip',
+  label: keys.news.blocks.audio.label,
   fields: {
-    url: { type: 'text', label: 'Audio URL (mp3, m4a, ogg)' },
-    title: { type: 'text', label: 'What it is' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    url: { type: 'text', label: keys.news.blocks.audio.url },
+    title: { type: 'text', label: keys.news.blocks.audio.title },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: { url: '', title: '', caption: '' },
-  render: ({ url, title, caption }) => {
-    if (!url) return <></>;
-    return (
-      <figure className="my-8 rounded-lg border bg-muted/40 p-4">
-        {title && <p className="mb-2 text-sm font-semibold">{title}</p>}
-        {/* Labelled by the title where there is one: a bare player announces
-            itself as "audio" and nothing else, which in an article carrying
-            three of them tells a listener nothing. */}
-        <audio
-          src={url}
-          controls
-          preload="metadata"
-          aria-label={title || 'Audio clip'}
-          className="w-full"
-        >
-          <track kind="captions" />
-        </audio>
-        {caption && (
-          <figcaption className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>
-        )}
-      </figure>
-    );
-  },
+  // A component rather than JSX inline: the fallback accessible name is
+  // translated, and Puck calls `render` as a plain function.
+  render: ({ url, title, caption }) => <AudioRender url={url} title={title} caption={caption} />,
 };
+
+function AudioRender({ url, title, caption }: AudioProps) {
+  const { t } = useT();
+  if (!url) return <></>;
+  return (
+    <figure className="my-8 rounded-lg border bg-muted/40 p-4">
+      {title && <p className="mb-2 text-sm font-semibold">{title}</p>}
+      {/* Labelled by the title where there is one: a bare player announces
+          itself as "audio" and nothing else, which in an article carrying
+          three of them tells a listener nothing. */}
+      <audio
+        src={url}
+        controls
+        preload="metadata"
+        aria-label={title || t(keys.news.blocks.audio.fallback_label)}
+        className="w-full"
+      >
+        <track kind="captions" />
+      </audio>
+      {caption && <figcaption className="mt-2 text-sm text-muted-foreground">{caption}</figcaption>}
+    </figure>
+  );
+}

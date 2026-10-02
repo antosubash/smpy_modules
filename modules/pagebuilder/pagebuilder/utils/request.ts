@@ -7,6 +7,8 @@
  * `pagebuilder_csrf` cookie set by the view layer).
  */
 
+import { keys, translate } from './i18n';
+
 export const BASE = '/api/pagebuilder';
 
 export const CSRF_COOKIE = 'pagebuilder_csrf';
@@ -42,8 +44,13 @@ export function fromValidationErrors(detail: unknown): string | null {
     const field = Array.isArray(item.loc)
       ? item.loc.filter((p) => p !== 'body' && typeof p !== 'number').join('.')
       : '';
-    const message = typeof item.msg === 'string' && item.msg ? item.msg : 'is not valid';
-    parts.push(field ? `${field}: ${message}` : message);
+    const message =
+      typeof item.msg === 'string' && item.msg
+        ? item.msg
+        : translate(keys.pagebuilder.errors.not_valid);
+    parts.push(
+      field ? translate(keys.pagebuilder.errors.field_message, { field, message }) : message,
+    );
   }
   return parts.join('; ');
 }
@@ -72,7 +79,10 @@ export function fromValidationErrors(detail: unknown): string | null {
  * assert the same six cases.
  */
 export async function errorMessage(response: Response): Promise<string> {
-  const fallback = `Request failed (${response.status} ${response.statusText})`.trim();
+  const fallback = translate(keys.pagebuilder.errors.request_failed, {
+    status: response.status,
+    statusText: response.statusText,
+  }).trim();
   const body = await response.text().catch(() => '');
   if (!body) return fallback;
 
@@ -91,7 +101,9 @@ export async function errorMessage(response: Response): Promise<string> {
   // Anything that looks like a document is structure, not a message.
   if (/^\s*[<{[]/.test(body)) return fallback;
   const snippet = body.trim().slice(0, MAX_BODY_SNIPPET);
-  return snippet ? `${fallback}: ${snippet}` : fallback;
+  return snippet
+    ? translate(keys.pagebuilder.errors.request_failed_snippet, { message: fallback, snippet })
+    : fallback;
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

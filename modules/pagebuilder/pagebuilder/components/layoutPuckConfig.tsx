@@ -1,5 +1,7 @@
 import type { Config } from '@puckeditor/core';
 
+import { keys } from '../utils/i18n';
+
 import { registeredBlocks, registryVersion } from './blockRegistry';
 import { basePageConfig, getPuckConfig } from './puckConfig';
 import { SiteFooterWidget } from './widgets/site-footer-widget';
@@ -31,13 +33,19 @@ export function getLayoutPuckConfig(): Config {
     // Site chrome is registered here and NOT in the page palette: a nav bar
     // dropped into the middle of a page would render a second one under the
     // real header.
-    chrome: { title: 'Site chrome', components: ['SiteHeader', 'SiteFooter'] },
+    chrome: {
+      title: keys.pagebuilder.blocks.categories.chrome,
+      components: ['SiteHeader', 'SiteFooter'],
+    },
     typography: { components: ['Heading', 'Text'] },
     media: { components: ['Image'] },
     actions: { components: ['Button'] },
     // The partner strip under the GCA footer is this widget rather than markup
     // baked into SiteFooter, so an author can reorder or drop it.
-    collections: { title: 'Collections', components: ['LogoCloud'] },
+    collections: {
+      title: keys.pagebuilder.blocks.categories.collections,
+      components: ['LogoCloud'],
+    },
     layout: { components: ['Spacer', 'Divider'] },
     // Offered in the site-layout editor before the palette was curated, so a
     // header or footer saved back then may contain one. Kept registered — Puck

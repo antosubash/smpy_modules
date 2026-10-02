@@ -4,77 +4,83 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
-
+import { keys } from '../../utils/i18n';
 import { type FeatureCardsWidgetProps, FeatureCardsWidgetRender } from './feature-cards-render';
 
 export type * from './feature-cards-render';
 
 export const FeatureCardsWidget: ComponentConfig<FeatureCardsWidgetProps> = {
-  label: 'Feature cards (linked grid)',
+  label: keys.pagebuilder.blocks.feature_cards.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow (left of title)' },
-    title: { type: 'text', label: 'Section title' },
-    subtitle: { type: 'textarea', label: 'Section subtitle' },
-    linkLabel: { type: 'text', label: 'Header link label' },
-    linkHref: { type: 'text', label: 'Header link URL' },
-    cardLinkLabel: { type: 'text', label: 'Card link label' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.feature_cards.subtitle },
+    linkLabel: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.link_label },
+    linkHref: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.link_href },
+    cardLinkLabel: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.card_link_label },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.feature_cards.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Soft grey panel', value: 'muted' },
+        { label: keys.pagebuilder.blocks.feature_cards.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.feature_cards.surface_muted, value: 'muted' },
       ],
     },
     cardSurface: {
       type: 'select',
-      label: 'Card surface',
+      label: keys.pagebuilder.blocks.feature_cards.card_surface,
       options: [
-        { label: 'White + border', value: 'default' },
-        { label: 'Soft grey', value: 'muted' },
+        { label: keys.pagebuilder.blocks.feature_cards.card_surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.feature_cards.card_surface_muted, value: 'muted' },
       ],
     },
     columns: {
       type: 'select',
-      label: 'Columns',
+      label: keys.pagebuilder.blocks.feature_cards.columns,
       options: [
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
+        { label: keys.pagebuilder.blocks.feature_cards.columns_2, value: '2' },
+        { label: keys.pagebuilder.blocks.feature_cards.columns_3, value: '3' },
+        { label: keys.pagebuilder.blocks.feature_cards.columns_4, value: '4' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Cards',
+      label: keys.pagebuilder.blocks.feature_cards.items,
       arrayFields: {
-        title: { type: 'text', label: 'Title' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.items_title },
         // The whole card is a link, so markdown links in this copy render
         // as their label text only — say so where the editor can see it.
         description: {
           type: 'textarea',
-          label: 'Description (links not supported here)',
+          label: keys.pagebuilder.blocks.feature_cards.items_description,
         },
         icon: {
           type: 'select',
-          label: 'Icon',
+          label: keys.pagebuilder.blocks.feature_cards.items_icon,
           options: [
-            { label: 'None', value: '' },
-            { label: 'Chart', value: 'chart' },
-            { label: 'Search', value: 'search' },
-            { label: 'Thermometer', value: 'thermometer' },
-            { label: 'Tree', value: 'tree' },
-            { label: 'Paw', value: 'paw' },
-            { label: 'Waves', value: 'waves' },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_blank, value: '' },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_chart, value: 'chart' },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_search, value: 'search' },
+            {
+              label: keys.pagebuilder.blocks.feature_cards.items_icon_thermometer,
+              value: 'thermometer',
+            },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_tree, value: 'tree' },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_paw, value: 'paw' },
+            { label: keys.pagebuilder.blocks.feature_cards.items_icon_waves, value: 'waves' },
           ],
         },
-        iconBg: { type: 'text', label: 'Icon badge colour' },
-        iconUrl: createImageField(mediaLibraryAdapter, 'Icon image (overrides icon)'),
-        iconAlt: { type: 'text', label: 'Icon image alt text' },
-        href: { type: 'text', label: 'Link URL' },
-        tag: { type: 'text', label: 'Tag (top-right)' },
+        iconBg: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.items_icon_bg },
+        iconUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.feature_cards.items_icon_url,
+        ),
+        iconAlt: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.items_icon_alt },
+        href: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.items_href },
+        tag: { type: 'text', label: keys.pagebuilder.blocks.feature_cards.items_tag },
         cardBg: {
           type: 'text',
-          label: 'Card colour (CSS, white text — optional)',
+          label: keys.pagebuilder.blocks.feature_cards.items_card_bg,
         },
       },
       defaultItemProps: {

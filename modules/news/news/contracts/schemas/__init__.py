@@ -10,19 +10,13 @@ of the contract.
 from __future__ import annotations
 
 from news.contracts.schemas._articles import (
-    ArticleBodyUpdate,
     ArticleCounts,
-    ArticleCreate,
     ArticleDetail,
     ArticleListResponse,
     ArticleRead,
     ArticleStatus,
-    ArticleTranslationCreate,
-    ArticleUpdate,
-    RejectRequest,
     RevisionEvent,
     RevisionRead,
-    ScheduleRequest,
 )
 from news.contracts.schemas._search import SearchHit, SearchResults
 from news.contracts.schemas._taxonomy import (
@@ -41,6 +35,14 @@ from news.contracts.schemas._taxonomy import (
     TagMergeResult,
     TagRead,
     TagUpdate,
+)
+from news.contracts.schemas._writes import (
+    ArticleBodyUpdate,
+    ArticleCreate,
+    ArticleTranslationCreate,
+    ArticleUpdate,
+    RejectRequest,
+    ScheduleRequest,
 )
 
 __all__ = [

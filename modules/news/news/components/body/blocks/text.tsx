@@ -6,7 +6,10 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys } from '../../../utils/i18n';
+
 import { cells, itemKey, lines } from './lines';
+import { headingAnchor, outlineFromMetadata } from './outline';
 
 export interface HeadingProps {
   text: string;
@@ -14,27 +17,39 @@ export interface HeadingProps {
 }
 
 /** Levels start at 2: the article's own title is the page's `<h1>`, so a
- *  body heading that claimed it would give the document two. */
+ *  body heading that claimed it would give the document two.
+ *
+ *  Each one carries an `id` so `Contents` has something to link to, and so a
+ *  reader can share a link to the section rather than to the article. The id
+ *  comes from the document's outline rather than from this block's own text —
+ *  see `./outline.ts`: only the document knows whether this is the first
+ *  "Background" or the second. */
 export const HeadingBlock: ComponentConfig<HeadingProps> = {
-  label: 'Heading',
+  label: keys.news.blocks.heading.label,
   fields: {
-    text: { type: 'text', label: 'Text' },
+    text: { type: 'text', label: keys.news.blocks.common.text },
     level: {
       type: 'select',
-      label: 'Level',
+      label: keys.news.blocks.heading.level,
       options: [
-        { label: 'Section (H2)', value: '2' },
-        { label: 'Sub-section (H3)', value: '3' },
+        { label: keys.news.blocks.heading.level_h2, value: '2' },
+        { label: keys.news.blocks.heading.level_h3, value: '3' },
       ],
     },
   },
   defaultProps: { text: 'Section heading', level: '2' },
-  render: ({ text, level }) =>
-    level === '3' ? (
-      <h3 className="mt-8 mb-3 text-xl font-semibold tracking-tight">{text}</h3>
+  render: ({ id, level, puck, text }) => {
+    const anchor = headingAnchor(id, text, outlineFromMetadata(puck?.metadata));
+    return level === '3' ? (
+      <h3 id={anchor} className="mt-8 mb-3 text-xl font-semibold tracking-tight">
+        {text}
+      </h3>
     ) : (
-      <h2 className="mt-10 mb-4 text-2xl font-semibold tracking-tight">{text}</h2>
-    ),
+      <h2 id={anchor} className="mt-10 mb-4 text-2xl font-semibold tracking-tight">
+        {text}
+      </h2>
+    );
+  },
 };
 
 export interface ParagraphProps {
@@ -43,15 +58,15 @@ export interface ParagraphProps {
 }
 
 export const ParagraphBlock: ComponentConfig<ParagraphProps> = {
-  label: 'Paragraph',
+  label: keys.news.blocks.paragraph.label,
   fields: {
-    text: { type: 'textarea', label: 'Text' },
+    text: { type: 'textarea', label: keys.news.blocks.common.text },
     lead: {
       type: 'radio',
-      label: 'Style',
+      label: keys.news.blocks.common.style,
       options: [
-        { label: 'Body', value: false },
-        { label: 'Lead (larger)', value: true },
+        { label: keys.news.blocks.paragraph.style_body, value: false },
+        { label: keys.news.blocks.paragraph.style_lead, value: true },
       ],
     },
   },
@@ -77,10 +92,10 @@ export interface QuoteProps {
 }
 
 export const QuoteBlock: ComponentConfig<QuoteProps> = {
-  label: 'Pull quote',
+  label: keys.news.blocks.quote.label,
   fields: {
-    text: { type: 'textarea', label: 'Quote' },
-    attribution: { type: 'text', label: 'Attribution (optional)' },
+    text: { type: 'textarea', label: keys.news.blocks.quote.text },
+    attribution: { type: 'text', label: keys.news.blocks.quote.attribution },
   },
   defaultProps: { text: '', attribution: '' },
   render: ({ text, attribution }) => (
@@ -108,10 +123,10 @@ export interface QandAProps {
  * happens to end in a question mark.
  */
 export const QandABlock: ComponentConfig<QandAProps> = {
-  label: 'Q&A',
+  label: keys.news.blocks.qanda.label,
   fields: {
-    title: { type: 'text', label: 'Who is answering (optional)' },
-    items: { type: 'textarea', label: 'One per line — "question | answer"' },
+    title: { type: 'text', label: keys.news.blocks.qanda.title },
+    items: { type: 'textarea', label: keys.news.blocks.qanda.items },
   },
   defaultProps: { title: '', items: '' },
   render: ({ title, items }) => {
@@ -145,16 +160,16 @@ export interface ListProps {
 }
 
 export const ListBlock: ComponentConfig<ListProps> = {
-  label: 'List',
+  label: keys.news.blocks.list.label,
   fields: {
     // One item per line rather than Puck's array field — see `./lines`.
-    items: { type: 'textarea', label: 'One item per line' },
+    items: { type: 'textarea', label: keys.news.blocks.list.items },
     ordered: {
       type: 'radio',
-      label: 'Style',
+      label: keys.news.blocks.common.style,
       options: [
-        { label: 'Bulleted', value: false },
-        { label: 'Numbered', value: true },
+        { label: keys.news.blocks.list.style_bulleted, value: false },
+        { label: keys.news.blocks.list.style_numbered, value: true },
       ],
     },
   },

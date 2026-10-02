@@ -22,6 +22,7 @@ module's copy when the Settings screen writes one.
 from __future__ import annotations
 
 from typing import Any, Final
+from urllib.parse import quote
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -92,22 +93,34 @@ class NewsSettings(BaseSettings):
     scheduler_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Run an in-process loop that publishes articles at their scheduled time.
 
-    **Turn this off before you scale the app out.** The loop starts in *every*
-    process that boots the module, so ``uvicorn -w 4``, gunicorn with workers,
-    or a Deployment with ``replicas > 1`` runs one scheduler per replica.
-    ``ArticlesService.process_due`` takes no lock — no ``FOR UPDATE SKIP
-    LOCKED``, no advisory lock, nothing that would exist on SQLite anyway — so
-    two replicas can find the same due article in the same tick and both publish
-    it, leaving two PUBLISH revision rows and, for an unpublish, a flip-flop. A
-    single process is the only configuration this default is safe in.
+    Safe to leave on when the app is scaled out. The loop still starts in
+    *every* process that boots the module — ``uvicorn -w 4``, gunicorn with
+    workers, a Deployment with ``replicas > 1`` — but ``process_due`` now claims
+    each due article with a single conditional ``UPDATE`` before it touches it,
+    so exactly one replica flips it: one PUBLISH revision row, and no flip-flop
+    on the way back down. An external worker driving ``process_due`` on its own
+    schedule is safe alongside the loop for the same reason. See
+    ``news.content._claims`` for the shape and its limits.
 
-    Multi-replica deployments should set this False everywhere and drive
-    ``process_due`` from one place instead — a cron job, a k8s CronJob, a single
-    dedicated worker. The same applies where such a worker already exists
-    alongside a single app process: both racing gives the same double publish.
+    Two things the claim does not do. It does not stop N replicas each polling
+    the database every ``scheduler_interval_seconds``; where that traffic is
+    unwanted, set this False everywhere and drive ``process_due`` from one place
+    — a cron job, a k8s CronJob, a dedicated worker. And it does not make the
+    replicas' clocks agree: each tick asks its own ``now``, so an article goes
+    live when the *first* replica to think it due acts, which a badly skewed
+    clock moves by that skew. That was already true of the poll interval, and it
+    is why the claim itself depends on no clock — it settles who acts, never
+    when.
 
-    Same name, default and reasoning as pagebuilder's: a host running both
-    should not have to learn two vocabularies for one idea.
+    Turn it off from the Settings screen or with
+    ``scripts/set_setting.py news scheduler_enabled false``, never an
+    environment variable: this module reads none, so an
+    ``SM_NEWS_SCHEDULER_ENABLED`` in a deploy manifest would leave the loop
+    running with nothing on screen saying so.
+
+    Same name and default as pagebuilder's, so a host running both does not have
+    to learn two vocabularies for one idea — but not the same guarantee.
+    Pagebuilder's loop takes no claim and is still single-process only.
     """
 
     scheduler_interval_seconds: int = Field(default=30, json_schema_extra=_RESTART)
@@ -204,7 +217,19 @@ def public_category_path(slug: str, locale: str | None = None) -> str:
 
 
 def public_tag_path(slug: str, locale: str | None = None) -> str:
-    return f"{public_prefix(locale)}/tag/{slug}"
+    """A tag's archive. The slug may be non-ASCII, so it is percent-encoded:
+    sitemaps, ``hreflang`` and canonical links want an RFC 3986 address."""
+    return f"{public_prefix(locale)}/tag/{quote(slug, safe='')}"
+
+
+def public_author_path(slug: str, locale: str | None = None) -> str:
+    """A byline's archive.
+
+    Two segments, like a category's, so it cannot collide with an article slug.
+    The slug is *derived* from the byline rather than read off a row — there is
+    no author table; see :mod:`news.authors` for why not.
+    """
+    return f"{public_prefix(locale)}/author/{slug}"
 
 
 def public_feed_path(locale: str | None = None) -> str:

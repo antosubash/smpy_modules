@@ -58,8 +58,12 @@ test.describe('News — first visit of a session', () => {
     // in its own header as well, so a text locator matches twice.
     await expect(page.getByTestId('article-body-title')).toHaveText(title);
 
-    // And the article row exists. Rows are cards, not table rows.
+    // And the article row exists. Rows are cards, not table rows. Found by
+    // searching rather than assumed to be on the first page: the list puts
+    // undated drafts first, and other specs sharing this database leave more
+    // than a page of them, so a new article dated today can sort past page one.
     await page.goto('/admin/news/');
+    await page.getByLabel('Search headline or slug').fill(title);
     await expect(
       page.locator('[data-testid="article-row"]').filter({ hasText: title }),
     ).toBeVisible();

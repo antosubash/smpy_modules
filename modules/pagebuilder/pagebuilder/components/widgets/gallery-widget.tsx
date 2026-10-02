@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys, translate } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 import { maskStyle } from './_shared';
@@ -37,37 +38,37 @@ const COLS_CLASS: Record<GalleryWidgetProps['columns'], string> = {
 };
 
 export const GalleryWidget: ComponentConfig<GalleryWidgetProps> = {
-  label: 'Image gallery',
+  label: keys.pagebuilder.blocks.gallery.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     columns: {
       type: 'select',
-      label: 'Columns',
+      label: keys.pagebuilder.blocks.gallery.columns,
       options: [
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
-        { label: '5', value: '5' },
+        { label: keys.pagebuilder.blocks.gallery.columns_2, value: '2' },
+        { label: keys.pagebuilder.blocks.gallery.columns_3, value: '3' },
+        { label: keys.pagebuilder.blocks.gallery.columns_4, value: '4' },
+        { label: keys.pagebuilder.blocks.gallery.columns_5, value: '5' },
       ],
     },
     itemShape: {
       type: 'select',
-      label: 'Item shape',
+      label: keys.pagebuilder.blocks.gallery.item_shape,
       options: [
-        { label: 'Square crop', value: 'square' },
-        { label: "Image's own shape", value: 'image' },
+        { label: keys.pagebuilder.blocks.gallery.item_shape_square, value: 'square' },
+        { label: keys.pagebuilder.blocks.gallery.item_shape_image, value: 'image' },
       ],
     },
     maskUrl: {
       type: 'text',
-      label: 'Item mask URL (organic shape — optional)',
+      label: keys.pagebuilder.blocks.gallery.mask_url,
     },
     items: {
       type: 'array',
-      label: 'Items',
+      label: keys.pagebuilder.blocks.gallery.items,
       arrayFields: {
-        src: createImageField(mediaLibraryAdapter, 'Image URL'),
-        alt: { type: 'text', label: 'Alt text' },
+        src: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.gallery.items_src),
+        alt: { type: 'text', label: keys.pagebuilder.blocks.gallery.items_alt },
       },
       defaultItemProps: { src: '', alt: '' },
       min: 1,
@@ -130,7 +131,7 @@ export const GalleryWidget: ComponentConfig<GalleryWidgetProps> = {
           </div>
         ) : (
           <div className="text-gray-500 text-center py-4">
-            Add images in the editor to populate the gallery.
+            {translate(keys.pagebuilder.blocks.gallery.empty)}
           </div>
         )}
       </section>

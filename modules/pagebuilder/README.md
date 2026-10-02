@@ -221,6 +221,42 @@ Its breadcrumb parent is the parent's own counterpart, so a trail never crosses
 languages. A page's own language is fixed for its lifetime — moving one would
 strand its slug and orphan the redirect pointing at it.
 
+## The editor's language
+
+Separate from the page's. The section above is about what the *site*
+publishes; this is about what the *editor* speaks, and the two are configured
+in different places — `content_locales` for one, the host's
+`SM_I18N_SUPPORTED_LOCALES` for the other.
+
+Every editor string lives in `pagebuilder/locales/en.json`, registered by
+`PagebuilderModule.locale_dirs()` under the `pagebuilder` namespace, so a key
+reads `pagebuilder.<section>.<name>` in the merged catalogue the host ships to
+the browser. Add a language by adding `pagebuilder/locales/<tag>.json` with the
+same shape; the framework's `SM013`–`SM016` diagnostics report a file that has
+drifted from the default.
+
+The frontend derives its key tree from that JSON at compile time —
+`pagebuilder/utils/i18n.ts` — rather than from the framework's generated
+`keys`, which only carries the namespaces of modules that live in the
+framework's own monorepo. The upshot is that `tsc` rejects a key the catalogue
+does not define, and `pagebuilder/utils/i18n.test.ts` rejects an entry nothing
+references, a plural missing a form, and a placeholder nothing fills.
+
+**Block labels are keys, resolved at the screen.** A Puck config is a
+module-scope constant — the palette is assembled before the app has rendered
+anything — so a block cannot call a hook where its labels are written. What it
+holds instead is the key, and `components/localizeConfig.ts` resolves the whole
+assembled config once inside `PageEditor` and `LayoutEditor`: component labels,
+field labels (including the ones nested in an `array` or `object` field),
+select options, category titles and the viewport switcher. Because it walks the
+*assembled* config, a block another module registered is localized on the same
+pass, provided that module's labels are catalogue keys too.
+
+`defaultProps` stay literal on purpose. They are the seed *content* a block is
+inserted with and are then saved into the document, so translating them at
+render time would rewrite what a visitor is served in whatever language the
+author happened to be working in.
+
 ## Content snapshots
 
 **Content › Import / Export** captures the site as a restore point. Every entry

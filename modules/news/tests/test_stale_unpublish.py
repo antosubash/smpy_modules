@@ -79,3 +79,57 @@ async def test_rejecting_clears_an_elapsed_unpublish_at(db) -> None:
 
     await db.refresh(article)
     assert article.unpublish_at is None
+
+
+async def test_a_window_that_passed_unseen_is_retired_not_published(db) -> None:
+    """Both times passed while no scheduler ran. The author's last word was that
+    the article is off the site by now, so it must not go live — and must not
+    stay live forever, which is what publishing it and then clearing the
+    elapsed ``unpublish_at`` as a leftover would do."""
+    now = datetime.now(UTC)
+    missed = await make_article(
+        db, slug="missed", status=ArticleStatus.DRAFT, publish_body=False
+    )
+    still_open = await make_article(
+        db, slug="still-open", status=ArticleStatus.DRAFT, publish_body=False
+    )
+    service = ArticlesService(db)
+    await service.schedule(
+        missed.id, publish_at=now - timedelta(hours=3), unpublish_at=now - timedelta(hours=1)
+    )
+    await service.schedule(
+        still_open.id, publish_at=now - timedelta(hours=3), unpublish_at=now + timedelta(hours=1)
+    )
+
+    flipped = await service.process_due(now)
+
+    assert [a.id for a in flipped] == [still_open.id]
+    await db.refresh(missed)
+    assert missed.status is ArticleStatus.DRAFT
+    assert missed.publish_at is None and missed.unpublish_at is None
+
+
+async def test_a_tick_that_flips_nothing_still_persists_a_retired_window(db_state) -> None:
+    """``Scheduler.tick`` used to roll back unless something flipped, which
+    discarded ``retire_missed_windows``' write: the row was found, warned about
+    and rolled back again on every interval."""
+    from news.scheduler import Scheduler
+
+    factory = db_state.session_factory
+    now = datetime.now(UTC)
+    async with factory() as db:
+        missed = await make_article(
+            db, slug="missed-tick", status=ArticleStatus.DRAFT, publish_body=False
+        )
+        service = ArticlesService(db)
+        await service.schedule(missed.id, publish_at=now - timedelta(hours=3))
+        await service.schedule(missed.id, unpublish_at=now - timedelta(hours=1))
+        await db.commit()
+        article_id = missed.id
+
+    await Scheduler().tick(factory)
+
+    async with factory() as db:
+        row = await ArticlesService(db).get_article(article_id)
+        assert row.status is ArticleStatus.DRAFT
+        assert row.publish_at is None and row.unpublish_at is None

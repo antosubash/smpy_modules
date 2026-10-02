@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news import service, tag_service
 from news.contracts.schemas import ArticleTagsUpdate
 from news.endpoints.api._deps import may_see_drafts, require_edit
+from news.tag_service import TagNameError
 
 router = APIRouter()
 
@@ -61,4 +62,7 @@ async def set_article_tags(
     """Replace the article's tags, creating any name that is new."""
     if await service.get(db, article_id) is None:
         raise HTTPException(status_code=404, detail="Article not found.")
-    return await tag_service.set_for_article(db, article_id, body.tags)
+    try:
+        return await tag_service.set_for_article(db, article_id, body.tags)
+    except TagNameError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None

@@ -23,11 +23,12 @@
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
 import { NewsFeedBlock } from './components/NewsFeed';
+import { keys } from './utils/i18n';
 
 try {
   registerPuckBlocks({
     blocks: { NewsFeed: NewsFeedBlock },
-    category: { key: 'feeds', title: 'Feeds' },
+    category: { key: 'feeds', title: keys.news.feed.palette_group },
     // Page-only: a news grid in the site header or footer would repeat on
     // every page of the site.
   });

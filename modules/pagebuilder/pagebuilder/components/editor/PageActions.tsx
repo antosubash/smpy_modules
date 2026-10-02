@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageDetail } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { createPage, deletePage, savePage } from '../../utils/pagesApi';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -31,6 +32,7 @@ export function PageActions({
   onError,
   onNotice,
 }: Props) {
+  const { t } = useT();
   if (pageId === null) return null;
 
   const published = status === 'published';
@@ -51,7 +53,7 @@ export function PageActions({
             .catch((e: Error) => onError(e.message));
         }}
       >
-        Duplicate page
+        {t(keys.pagebuilder.actions.duplicate)}
       </Button>
 
       <Button
@@ -60,11 +62,11 @@ export function PageActions({
         size="sm"
         onClick={() => {
           void savePage(pageId, { is_template: true })
-            .then(() => onNotice('Saved as a template. It is now offered under "Start from".'))
+            .then(() => onNotice(t(keys.pagebuilder.actions.templated)))
             .catch((e: Error) => onError(e.message));
         }}
       >
-        Save as template
+        {t(keys.pagebuilder.actions.save_template)}
       </Button>
 
       <ConfirmDialog
@@ -73,28 +75,26 @@ export function PageActions({
         // public, not whether it is recoverable.
         level={published ? 'high' : 'low'}
         confirmPhrase={published ? slug : undefined}
-        title={`Delete "${title}"?`}
+        title={t(keys.pagebuilder.row.delete_title, { title })}
         description={
           published ? (
             <>
-              This page is published. <code>{`${publicPrefix}/${slug}`}</code> starts answering 404
-              the moment you confirm. It goes to the trash for 30 days.
+              {t(keys.pagebuilder.row.delete_published_before)}{' '}
+              <code>{`${publicPrefix}/${slug}`}</code>{' '}
+              {t(keys.pagebuilder.actions.delete_published_after)}
             </>
           ) : (
-            <>
-              It was never published, so nothing on the site changes. It goes to the trash for 30
-              days.
-            </>
+            t(keys.pagebuilder.row.delete_draft)
           )
         }
-        confirmLabel="Delete"
+        confirmLabel={t(keys.pagebuilder.actions.delete)}
         onConfirm={async () => {
           await deletePage(pageId);
           router.visit('/pagebuilder/');
         }}
         trigger={
           <Button type="button" variant="ghost" size="sm" className="text-destructive">
-            Delete page
+            {t(keys.pagebuilder.actions.delete_page)}
           </Button>
         }
       />

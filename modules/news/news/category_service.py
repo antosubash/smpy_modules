@@ -118,6 +118,20 @@ async def get_by_name(db: AsyncSession, name: str) -> NewsCategory | None:
     return await db.scalar(select(NewsCategory).where(NewsCategory.name == name))
 
 
+async def find_by_name(
+    db: AsyncSession, name: str, *, excluding: int | None = None
+) -> NewsCategory | None:
+    """Case-insensitive twin of :func:`get_by_name`, for collision checks."""
+    stmt = select(NewsCategory).where(func.lower(NewsCategory.name) == name.strip().lower())
+    if excluding is not None:
+        stmt = stmt.where(NewsCategory.id != excluding)
+    return (await db.scalars(stmt)).first()
+
+
+async def slug_taken(db: AsyncSession, slug: str, *, excluding: int | None = None) -> bool:
+    return slug in await _taken_slugs(db, excluding=excluding)
+
+
 async def resolve_slug(db: AsyncSession, slug: str) -> str | None:
     """Category *name* for a slug, so public URLs can filter by slug.
 
@@ -131,7 +145,7 @@ async def create(db: AsyncSession, *, name: str, slug: str | None = None) -> New
     """Add a category. Position lands it at the end of the order."""
     last = await db.scalar(select(func.max(NewsCategory.position)))
     resolved = (
-        slugify(slug or name, max_length=MAX_CATEGORY_LEN)
+        slugify(slug, fallback="", max_length=MAX_CATEGORY_LEN)
         if slug
         else unique_slug(name, await _taken_slugs(db), max_length=MAX_CATEGORY_LEN)
     )
@@ -167,7 +181,7 @@ async def rename(
         )
         category.name = name
     if slug is not None:
-        category.slug = slugify(slug, max_length=MAX_CATEGORY_LEN)
+        category.slug = slugify(slug, fallback="", max_length=MAX_CATEGORY_LEN)
     db.add(category)
     await db.flush()
     await db.refresh(category)

@@ -13,6 +13,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type ReactNode, useId, useState } from 'react';
 
 import { usePendingDialog } from '../hooks/usePendingDialog';
+import { keys, useT } from '../utils/i18n';
 
 /**
  * Collect a note — a rejection reason, a publish message — before running an
@@ -47,13 +48,15 @@ export function NoteDialog({
   /** Rejecting keeps the dialog open and surfaces the message. */
   onSubmit: (note: string) => Promise<unknown>;
 }) {
+  const { t } = useT();
   const fieldId = useId();
   const [note, setNote] = useState('');
   // The open/pending/error lifecycle is shared with ConfirmDialog — see the
   // hook. The note clears on every close path so a reopened dialog starts
   // blank rather than carrying a half-typed message.
-  const { open, pending, error, change, run } = usePendingDialog(`${submitLabel} failed`, () =>
-    setNote(''),
+  const { open, pending, error, change, run } = usePendingDialog(
+    t(keys.pagebuilder.confirm.failed, { action: submitLabel }),
+    () => setNote(''),
   );
 
   const submit = () => {
@@ -79,7 +82,11 @@ export function NoteDialog({
           <div className="grid gap-2 py-4">
             <Label htmlFor={fieldId}>
               {label}
-              {!required && <span className="ml-1 text-muted-foreground">(optional)</span>}
+              {!required && (
+                <span className="ml-1 text-muted-foreground">
+                  {t(keys.pagebuilder.confirm.optional)}
+                </span>
+              )}
             </Label>
             <Textarea
               id={fieldId}
@@ -99,14 +106,14 @@ export function NoteDialog({
               disabled={pending}
               onClick={() => change(false)}
             >
-              Cancel
+              {t(keys.pagebuilder.confirm.cancel)}
             </Button>
             <Button
               type="submit"
               variant={destructive ? 'destructive' : 'default'}
               disabled={pending || (required && !note.trim())}
             >
-              {pending ? 'Working…' : submitLabel}
+              {pending ? t(keys.pagebuilder.confirm.working) : submitLabel}
             </Button>
           </DialogFooter>
         </form>

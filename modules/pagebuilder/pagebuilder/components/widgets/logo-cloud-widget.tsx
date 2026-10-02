@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';
 import { renderRichText } from './_internal/rich-text';
 
@@ -19,26 +20,26 @@ export type LogoCloudWidgetProps = {
 };
 
 export const LogoCloudWidget: ComponentConfig<LogoCloudWidgetProps> = {
-  label: 'Logo cloud (partners / funders)',
+  label: keys.pagebuilder.blocks.logo_cloud.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
-    eyebrow: { type: 'text', label: 'Eyebrow (enables section layout)' },
-    heading: { type: 'text', label: 'Heading (section layout)' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.logo_cloud.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.logo_cloud.heading },
     variant: {
       type: 'select',
-      label: 'Layout',
+      label: keys.pagebuilder.blocks.logo_cloud.variant,
       options: [
-        { label: 'Inline strip', value: 'inline' },
-        { label: 'Grid', value: 'grid' },
+        { label: keys.pagebuilder.blocks.logo_cloud.variant_inline, value: 'inline' },
+        { label: keys.pagebuilder.blocks.logo_cloud.variant_grid, value: 'grid' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Logos',
+      label: keys.pagebuilder.blocks.logo_cloud.items,
       arrayFields: {
-        src: createImageField(mediaLibraryAdapter, 'Image'),
-        alt: { type: 'text', label: 'Alt text' },
-        href: { type: 'text', label: 'Link (optional)' },
+        src: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.logo_cloud.items_src),
+        alt: { type: 'text', label: keys.pagebuilder.blocks.logo_cloud.items_alt },
+        href: { type: 'text', label: keys.pagebuilder.blocks.logo_cloud.items_href },
       },
       defaultItemProps: { src: '', alt: 'Partner logo', href: '' },
       min: 1,

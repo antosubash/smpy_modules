@@ -1,5 +1,6 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
+import { keys, translate, useT } from '../../utils/i18n';
 import type { ImportPlan, PagePlanEntry } from '../../utils/snapshotsApi';
 import { describeLayoutSide, overwriteWarning, planTotals, untouchedNote } from './planSummary';
 
@@ -42,16 +43,21 @@ function Group({
   );
 }
 
-/** How a page's blocks differ, when it is one being overwritten. */
+/** How a page's blocks differ, when it is one being overwritten.
+ *
+ *  Through `translate` rather than a hook: `Group` takes this as a plain
+ *  callback, so it runs outside a component body. */
 function blockSummary(entry: PagePlanEntry): string | null {
   const parts: string[] = [];
   if (entry.added) parts.push(`+${entry.added}`);
   if (entry.removed) parts.push(`−${entry.removed}`);
   if (entry.changed) parts.push(`~${entry.changed}`);
-  const blocks = parts.length ? `${parts.join(' ')} blocks` : 'metadata only';
+  const blocks = parts.length
+    ? translate(keys.pagebuilder.plan.block_changes, { changes: parts.join(' ') })
+    : translate(keys.pagebuilder.plan.metadata_only);
   // Worth saying out loud: this slug looks free, but the page under it is in
   // the trash and the restore overwrites and un-bins it.
-  return entry.revived ? `${blocks} · revived from trash` : blocks;
+  return entry.revived ? translate(keys.pagebuilder.plan.revived, { blocks }) : blocks;
 }
 
 /**
@@ -63,6 +69,7 @@ function blockSummary(entry: PagePlanEntry): string | null {
  * the fact they most needed.
  */
 export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
+  const { t } = useT();
   const totals = planTotals(plan);
   const untouched = untouchedNote(plan);
 
@@ -77,18 +84,18 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
       </p>
 
       <Group
-        title="Overwritten"
+        title={t(keys.pagebuilder.plan.group_overwritten)}
         entries={plan.pages.overwritten}
         tone="warning"
         describe={blockSummary}
       />
-      <Group title="Created" entries={plan.pages.new} />
-      <Group title="Unchanged" entries={plan.pages.unchanged} />
+      <Group title={t(keys.pagebuilder.plan.group_created)} entries={plan.pages.new} />
+      <Group title={t(keys.pagebuilder.plan.group_unchanged)} entries={plan.pages.unchanged} />
 
       <div className="space-y-2">
-        <h3 className="text-sm font-medium">Site layout</h3>
+        <h3 className="text-sm font-medium">{t(keys.pagebuilder.plan.site_layout)}</h3>
         <p className="text-sm text-muted-foreground">
-          {describeLayoutSide('Header', plan.layout.header, plan.layout.header_present)}
+          {describeLayoutSide('header', plan.layout.header, plan.layout.header_present)}
           {', '}
           {describeLayoutSide('footer', plan.layout.footer, plan.layout.footer_present)}.
         </p>
@@ -98,7 +105,7 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
         totals.redirectsRemoved > 0 ||
         totals.redirectsDropped > 0) && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Redirects</h3>
+          <h3 className="text-sm font-medium">{t(keys.pagebuilder.plan.redirects)}</h3>
           <div className="flex flex-wrap gap-2 text-xs">
             {totals.redirectsAdded > 0 && (
               <Badge variant="secondary">+{totals.redirectsAdded}</Badge>
@@ -108,14 +115,15 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
             )}
             {totals.redirectsDropped > 0 && (
               <Badge variant="destructive">
-                {totals.redirectsDropped} dropped — target missing
+                {t(keys.pagebuilder.plan.redirects_dropped, { count: totals.redirectsDropped })}
               </Badge>
             )}
           </div>
           {plan.redirects.dropped.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Dropped: {plan.redirects.dropped.join(', ')}. A redirect pointing at a page that does
-              not exist would only produce a 404.
+              {t(keys.pagebuilder.plan.dropped_detail, {
+                slugs: plan.redirects.dropped.join(', '),
+              })}
             </p>
           )}
         </div>
@@ -123,7 +131,7 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
 
       {untouched && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Left alone</h3>
+          <h3 className="text-sm font-medium">{t(keys.pagebuilder.plan.left_alone)}</h3>
           <p className="text-sm text-muted-foreground">{untouched}</p>
           <ul className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             {plan.pages.untouched.map((entry) => (

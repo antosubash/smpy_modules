@@ -19,6 +19,8 @@
  * from before it was taken down is not that case, and saying so would be a
  * sentence about readers who are not being served anything.
  */
+import { keys, type Translate, useT } from '../utils/i18n';
+
 export interface ArticlePreviewState {
   status: 'draft' | 'submitted_for_review' | 'published';
   has_unpublished_changes: boolean;
@@ -31,45 +33,44 @@ export interface ArticlePreviewState {
 /** Which of the four things this is, in the reader's terms rather than the
  *  workflow's: what matters to whoever is looking is whether readers can see
  *  it, not which enum member the row holds. */
-function reading(preview: ArticlePreviewState): { state: string; detail: string } {
+function reading(preview: ArticlePreviewState, t: Translate): { state: string; detail: string } {
+  const p = keys.news.preview;
   if (preview.status === 'draft') {
-    return { state: 'Draft', detail: 'Readers cannot see this yet.' };
+    return { state: t(p.state_draft), detail: t(p.detail_draft) };
   }
   if (preview.status === 'submitted_for_review') {
-    return {
-      state: 'Pending review',
-      detail: 'Readers cannot see this until it is approved.',
-    };
+    return { state: t(p.state_pending), detail: t(p.detail_pending) };
   }
   if (preview.has_unpublished_changes) {
     return {
-      state: 'Unpublished changes',
-      detail: 'Readers are still being served the published version.',
+      state: t(p.state_unpublished_changes),
+      detail: t(p.detail_unpublished_changes),
     };
   }
-  return { state: 'Published', detail: 'This matches what readers are served.' };
+  return { state: t(p.state_published), detail: t(p.detail_published) };
 }
 
 export function PreviewBanner({ preview }: { preview: ArticlePreviewState }) {
-  const { state, detail } = reading(preview);
+  const { t } = useT();
+  const { state, detail } = reading(preview, t);
 
   return (
     // Inverted rather than tinted: it has to read as chrome at a glance, in
     // either theme, without borrowing a colour the article itself might use.
     // Sticky, because the thing it is disclaiming scrolls.
     <aside
-      aria-label="Preview"
+      aria-label={t(keys.news.preview.label)}
       className="sticky top-0 z-50 bg-foreground text-background print:hidden"
     >
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
         <span className="rounded bg-background/20 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide">
-          Preview
+          {t(keys.news.preview.badge)}
         </span>
         <span className="font-medium">{state}</span>
         <span className="text-background/70">{detail}</span>
         <span className="ml-auto flex items-center gap-3">
           <a className="underline underline-offset-2" href={preview.editor_url}>
-            Back to the editor
+            {t(keys.news.preview.back_to_editor)}
           </a>
           {/* Only when the public URL resolves. The two answer different
               questions for a published article with pending edits — what is on
@@ -81,7 +82,7 @@ export function PreviewBanner({ preview }: { preview: ArticlePreviewState }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              View live
+              {t(keys.news.preview.view_live)}
             </a>
           )}
         </span>

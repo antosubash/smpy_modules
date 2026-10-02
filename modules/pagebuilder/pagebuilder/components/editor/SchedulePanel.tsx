@@ -5,6 +5,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useId } from 'react';
 
 import { fromLocalInput, toLocalInput } from '../../utils/datetime';
+import { keys, useT } from '../../utils/i18n';
 
 interface Props {
   publishAt: string | null;
@@ -29,18 +30,19 @@ export function SchedulePanel({
   clearDisabled,
   error,
 }: Props) {
+  const { t } = useT();
   const publishId = useId();
   const unpublishId = useId();
   return (
     <fieldset className="md:col-span-2 rounded border bg-card p-3">
-      <legend className="px-1 text-sm font-medium">Schedule</legend>
+      <legend className="px-1 text-sm font-medium">{t(keys.pagebuilder.schedule.legend)}</legend>
       {/* Explicit htmlFor rather than wrapping: the control is a component, so
           nesting it no longer associates the two — for a screen reader or for
           `getByLabelText`. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs" htmlFor={publishId}>
-            Publish at
+            {t(keys.pagebuilder.schedule.publish_at)}
           </label>
           <Input
             id={publishId}
@@ -51,12 +53,12 @@ export function SchedulePanel({
             data-testid="schedule-publish-at"
           />
           <span className="text-xs text-muted-foreground">
-            Draft auto-publishes at this time. Cleared after the flip.
+            {t(keys.pagebuilder.schedule.publish_help)}
           </span>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs" htmlFor={unpublishId}>
-            Unpublish at
+            {t(keys.pagebuilder.schedule.unpublish_at)}
           </label>
           <Input
             id={unpublishId}
@@ -67,7 +69,7 @@ export function SchedulePanel({
             data-testid="schedule-unpublish-at"
           />
           <span className="text-xs text-muted-foreground">
-            Published page reverts to draft at this time.
+            {t(keys.pagebuilder.schedule.unpublish_help)}
           </span>
         </div>
       </div>
@@ -80,7 +82,7 @@ export function SchedulePanel({
           disabled={saveDisabled}
           data-testid="schedule-save"
         >
-          Save schedule
+          {t(keys.pagebuilder.schedule.save)}
         </Button>
         <Button
           type="button"
@@ -89,7 +91,7 @@ export function SchedulePanel({
           onClick={onClear}
           disabled={clearDisabled}
         >
-          Clear
+          {t(keys.pagebuilder.schedule.clear)}
         </Button>
         {error && (
           <span className="text-xs text-destructive" data-testid="schedule-error">

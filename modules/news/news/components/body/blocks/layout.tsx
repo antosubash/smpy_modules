@@ -2,6 +2,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys } from '../../../utils/i18n';
+
 export interface DividerProps {
   spacing: 'small' | 'large';
   style: 'rule' | 'asterism';
@@ -16,22 +18,22 @@ export interface DividerProps {
  * reader who knows the convention reads straight through it.
  */
 export const DividerBlock: ComponentConfig<DividerProps> = {
-  label: 'Divider',
+  label: keys.news.blocks.divider.label,
   fields: {
     style: {
       type: 'radio',
-      label: 'Style',
+      label: keys.news.blocks.common.style,
       options: [
-        { label: 'Rule', value: 'rule' },
-        { label: 'Asterism', value: 'asterism' },
+        { label: keys.news.blocks.divider.style_rule, value: 'rule' },
+        { label: keys.news.blocks.divider.style_asterism, value: 'asterism' },
       ],
     },
     spacing: {
       type: 'select',
-      label: 'Spacing',
+      label: keys.news.blocks.divider.spacing,
       options: [
-        { label: 'Small', value: 'small' },
-        { label: 'Large', value: 'large' },
+        { label: keys.news.blocks.divider.spacing_small, value: 'small' },
+        { label: keys.news.blocks.divider.spacing_large, value: 'large' },
       ],
     },
   },

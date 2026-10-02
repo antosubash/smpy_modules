@@ -5,6 +5,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys } from '../../../utils/i18n';
+
 import { cells, itemKey, lines, row } from './lines';
 
 export interface TableProps {
@@ -21,18 +23,18 @@ export interface TableProps {
  * harder to correct than one that looks wrong.
  */
 export const TableBlock: ComponentConfig<TableProps> = {
-  label: 'Table',
+  label: keys.news.blocks.table.label,
   fields: {
-    rows: { type: 'textarea', label: 'One row per line, cells split by |' },
+    rows: { type: 'textarea', label: keys.news.blocks.table.rows },
     header: {
       type: 'radio',
-      label: 'First row',
+      label: keys.news.blocks.table.header,
       options: [
-        { label: 'Is a header', value: true },
-        { label: 'Is data', value: false },
+        { label: keys.news.blocks.table.header_is_header, value: true },
+        { label: keys.news.blocks.table.header_is_data, value: false },
       ],
     },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: { rows: '', header: true, caption: '' },
   render: ({ rows, header, caption }) => {
@@ -99,11 +101,11 @@ export interface CodeProps {
  * some bundled grammar happens to support.
  */
 export const CodeBlock: ComponentConfig<CodeProps> = {
-  label: 'Code',
+  label: keys.news.blocks.code.label,
   fields: {
-    code: { type: 'textarea', label: 'Code' },
-    language: { type: 'text', label: 'Language label (optional)' },
-    caption: { type: 'text', label: 'Caption (optional)' },
+    code: { type: 'textarea', label: keys.news.blocks.code.code },
+    language: { type: 'text', label: keys.news.blocks.code.language },
+    caption: { type: 'text', label: keys.news.blocks.common.caption_optional },
   },
   defaultProps: { code: '', language: '', caption: '' },
   render: ({ code, language, caption }) => {
@@ -142,10 +144,10 @@ export interface FactsProps {
  * is what carries, and the label only says what it counts.
  */
 export const FactsBlock: ComponentConfig<FactsProps> = {
-  label: 'Key figures',
+  label: keys.news.blocks.facts.label,
   fields: {
-    title: { type: 'text', label: 'Heading (optional)' },
-    items: { type: 'textarea', label: 'One per line — "21 | sensors installed"' },
+    title: { type: 'text', label: keys.news.blocks.common.heading_optional },
+    items: { type: 'textarea', label: keys.news.blocks.facts.items },
   },
   defaultProps: { title: '', items: '' },
   render: ({ title, items }) => {
@@ -187,10 +189,10 @@ export interface TimelineProps {
  * reporting does not have.
  */
 export const TimelineBlock: ComponentConfig<TimelineProps> = {
-  label: 'Timeline',
+  label: keys.news.blocks.timeline.label,
   fields: {
-    title: { type: 'text', label: 'Heading (optional)' },
-    items: { type: 'textarea', label: 'One per line — "when | what happened"' },
+    title: { type: 'text', label: keys.news.blocks.common.heading_optional },
+    items: { type: 'textarea', label: keys.news.blocks.timeline.items },
   },
   defaultProps: { title: '', items: '' },
   render: ({ title, items }) => {

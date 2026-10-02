@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { useState } from 'react';
 
 import type { PageStatus, PageTranslationRead } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { localeLabel, publicPath } from '../../utils/locale';
 import { createTranslation } from '../../utils/pagesApi';
 
@@ -19,10 +20,12 @@ interface Props {
   onError: (message: string | null) => void;
 }
 
+// Catalogue keys, resolved where the rows render — a module-scope constant
+// has no hook to call.
 const STATUS_LABEL: Record<PageStatus, string> = {
-  draft: 'Draft',
-  submitted_for_review: 'In review',
-  published: 'Live',
+  draft: keys.pagebuilder.translations.status_draft,
+  submitted_for_review: keys.pagebuilder.translations.status_review,
+  published: keys.pagebuilder.translations.status_live,
 };
 
 /**
@@ -46,6 +49,7 @@ export function TranslationsPanel({
   publicPrefix,
   onError,
 }: Props) {
+  const { t } = useT();
   const [busyLocale, setBusyLocale] = useState<string | null>(null);
   const bySlugLocale = new Map(translations.map((entry) => [entry.locale, entry]));
 
@@ -55,7 +59,7 @@ export function TranslationsPanel({
   if (pageId === null) {
     return (
       <p className="text-sm text-muted-foreground" data-testid="translations-unsaved">
-        Save this page before adding a translation.
+        {t(keys.pagebuilder.translations.unsaved)}
       </p>
     );
   }
@@ -68,15 +72,17 @@ export function TranslationsPanel({
       router.visit(`/pagebuilder/${created.id}/edit`);
     } catch (error) {
       setBusyLocale(null);
-      onError(error instanceof Error ? error.message : 'Could not create the translation.');
+      onError(error instanceof Error ? error.message : t(keys.pagebuilder.translations.failed));
     }
   };
 
   return (
     <div data-testid="translations-panel">
+      {/* The language name is a <strong> span inside the sentence, so the two
+          halves are separate keys rather than one with a placeholder. */}
       <p className="mb-3 text-sm text-muted-foreground">
-        This page is written in <strong>{localeLabel(locale)}</strong>. Each language has its own
-        address, its own draft and its own approval — publishing one never publishes another.
+        {t(keys.pagebuilder.translations.written_in_before)} <strong>{localeLabel(locale)}</strong>
+        {t(keys.pagebuilder.translations.written_in_after)}
       </p>
       <ul className="divide-y rounded-md border bg-background">
         {locales.map((entryLocale) => {
@@ -94,12 +100,16 @@ export function TranslationsPanel({
                 {sibling && (
                   <span className="block truncate text-xs text-muted-foreground">
                     {publicPath(publicPrefix, sibling.slug, entryLocale, defaultLocale)} ·{' '}
-                    {sibling.trashed ? 'In trash' : STATUS_LABEL[sibling.status]}
+                    {sibling.trashed
+                      ? t(keys.pagebuilder.translations.in_trash)
+                      : t(STATUS_LABEL[sibling.status])}
                   </span>
                 )}
               </span>
               {isCurrent ? (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">Editing</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
+                  {t(keys.pagebuilder.translations.editing)}
+                </span>
               ) : sibling?.trashed ? (
                 // The language is taken even though the page is binned:
                 // (translation_group, locale) is unique regardless of
@@ -110,14 +120,14 @@ export function TranslationsPanel({
                   className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                   data-testid={`translation-trashed-${entryLocale}`}
                 >
-                  In trash
+                  {t(keys.pagebuilder.translations.in_trash)}
                 </span>
               ) : sibling ? (
                 <a
                   className="shrink-0 text-primary underline"
                   href={`/pagebuilder/${sibling.id}/edit`}
                 >
-                  Open
+                  {t(keys.pagebuilder.translations.open)}
                 </a>
               ) : (
                 <button
@@ -127,7 +137,9 @@ export function TranslationsPanel({
                   onClick={() => void handleAdd(entryLocale)}
                   data-testid={`add-translation-${entryLocale}`}
                 >
-                  {busyLocale === entryLocale ? 'Creating…' : 'Add translation'}
+                  {busyLocale === entryLocale
+                    ? t(keys.pagebuilder.translations.creating)
+                    : t(keys.pagebuilder.translations.add)}
                 </button>
               )}
             </li>

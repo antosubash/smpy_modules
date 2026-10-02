@@ -2,6 +2,8 @@
 
 import type { Data } from '@puckeditor/core';
 
+import { keys, translate } from './i18n';
+
 export const AUTOSAVE_DEBOUNCE_MS = 2000;
 
 export type SaveState = 'idle' | 'saving' | 'error';
@@ -34,19 +36,30 @@ export function snapshotKey(payload: EditorSnapshot): string {
   return JSON.stringify(payload);
 }
 
+/**
+ * The autosave status line.
+ *
+ * Resolved through `translate` rather than a hook because this is a plain
+ * function the toolbar calls while rendering — it reads the language in force
+ * at that moment without every caller threading `t` in.
+ */
 export function formatSaveLabel(
   state: SaveState,
   isDirty: boolean,
   lastSavedAt: Date | null,
   errorMessage: string | null,
 ): string {
-  if (state === 'saving') return 'Saving…';
-  if (state === 'error') return errorMessage ? `Save failed: ${errorMessage}` : 'Save failed';
-  if (isDirty) return 'Unsaved changes';
+  if (state === 'saving') return translate(keys.pagebuilder.autosave.saving);
+  if (state === 'error') {
+    return errorMessage
+      ? translate(keys.pagebuilder.autosave.failed_with_reason, { reason: errorMessage })
+      : translate(keys.pagebuilder.autosave.failed);
+  }
+  if (isDirty) return translate(keys.pagebuilder.autosave.unsaved);
   if (lastSavedAt) {
     const hh = String(lastSavedAt.getHours()).padStart(2, '0');
     const mm = String(lastSavedAt.getMinutes()).padStart(2, '0');
-    return `Saved at ${hh}:${mm}`;
+    return translate(keys.pagebuilder.autosave.saved_at, { time: `${hh}:${mm}` });
   }
-  return 'Saved';
+  return translate(keys.pagebuilder.autosave.saved);
 }

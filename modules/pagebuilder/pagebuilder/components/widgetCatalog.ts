@@ -8,6 +8,8 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 
+import { keys } from '../utils/i18n';
+
 import { ButtonBlock } from './blocks/Button';
 import { ColumnsBlock } from './blocks/Columns';
 import { HeadingBlock } from './blocks/Heading';
@@ -168,7 +170,7 @@ export const catalogCategories: Record<string, CatalogCategory> = {
     components: ['Columns', 'Container', 'Row', 'Column', 'Grid', 'Spacer', 'Divider'],
   },
   sections: {
-    title: 'Sections',
+    title: keys.pagebuilder.blocks.categories.sections,
     components: [
       'PageHeader',
       'Hero',
@@ -182,7 +184,7 @@ export const catalogCategories: Record<string, CatalogCategory> = {
     ],
   },
   collections: {
-    title: 'Collections',
+    title: keys.pagebuilder.blocks.categories.collections,
     components: [
       'FeatureCards',
       'FeatureCard',
@@ -198,10 +200,16 @@ export const catalogCategories: Record<string, CatalogCategory> = {
       'Table',
     ],
   },
-  forms: { title: 'Forms', components: ['ContactForm', 'Tags', 'Newsletter', 'SignupBanner'] },
-  interactive: { title: 'Interactive', components: ['Accordion', 'Tabs'] },
+  forms: {
+    title: keys.pagebuilder.blocks.categories.forms,
+    components: ['ContactForm', 'Tags', 'Newsletter', 'SignupBanner'],
+  },
+  interactive: {
+    title: keys.pagebuilder.blocks.categories.interactive,
+    components: ['Accordion', 'Tabs'],
+  },
   utility: {
-    title: 'Utility',
+    title: keys.pagebuilder.blocks.categories.utility,
     components: ['Html', 'Alert', 'SocialBanner', 'UnderConstruction', 'Welcome'],
   },
   _hidden: { components: ['CenteredHero'], visible: false },

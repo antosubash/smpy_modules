@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { cn, parseList } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { ContentMedia, CTAButton, EyebrowText, Heading, Section } from './_shared';
@@ -17,24 +18,27 @@ export type FeatureShowcaseWidgetProps = {
 };
 
 export const FeatureShowcaseWidget: ComponentConfig<FeatureShowcaseWidgetProps> = {
-  label: 'Feature showcase (image + bullets)',
+  label: keys.pagebuilder.blocks.feature_showcase.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow (optional)' },
-    title: { type: 'text', label: 'Title' },
-    description: { type: 'textarea', label: 'Description' },
-    imageUrl: createImageField(mediaLibraryAdapter, 'Image URL'),
-    imageAlt: { type: 'text', label: 'Image alt text' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.feature_showcase.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    description: { type: 'textarea', label: keys.pagebuilder.blocks.common.description },
+    imageUrl: createImageField(
+      mediaLibraryAdapter,
+      keys.pagebuilder.blocks.feature_showcase.image_url,
+    ),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.common.image_alt },
     imagePosition: {
       type: 'select',
-      label: 'Image position',
+      label: keys.pagebuilder.blocks.feature_showcase.image_position,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Right', value: 'right' },
+        { label: keys.pagebuilder.blocks.feature_showcase.image_position_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.feature_showcase.image_position_right, value: 'right' },
       ],
     },
-    bulletList: { type: 'textarea', label: 'Bullet list (one per line)' },
-    ctaLabel: { type: 'text', label: 'CTA label (optional)' },
-    ctaHref: { type: 'text', label: 'CTA link (optional)' },
+    bulletList: { type: 'textarea', label: keys.pagebuilder.blocks.feature_showcase.bullet_list },
+    ctaLabel: { type: 'text', label: keys.pagebuilder.blocks.feature_showcase.cta_label },
+    ctaHref: { type: 'text', label: keys.pagebuilder.blocks.feature_showcase.cta_href },
   },
   defaultProps: {
     eyebrow: '',

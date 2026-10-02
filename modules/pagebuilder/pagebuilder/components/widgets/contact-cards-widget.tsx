@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import { User } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { AccentText } from './_internal/accent-text';
 import { renderRichText } from './_internal/rich-text';
 
@@ -28,27 +29,30 @@ const DISPLAY_STYLE: CSSProperties = {
 };
 
 export const ContactCardsWidget: ComponentConfig<ContactCardsWidgetProps> = {
-  label: 'Contact Cards',
+  label: keys.pagebuilder.blocks.contact_cards.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    title: { type: 'text', label: 'Title' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.contact_cards.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     variant: {
       type: 'select',
-      label: 'Style',
+      label: keys.pagebuilder.blocks.contact_cards.variant,
       options: [
-        { label: 'Contact (round avatar)', value: 'contact' },
-        { label: 'Team (image-top card)', value: 'team' },
+        { label: keys.pagebuilder.blocks.contact_cards.variant_contact, value: 'contact' },
+        { label: keys.pagebuilder.blocks.contact_cards.variant_team, value: 'team' },
       ],
     },
     items: {
       type: 'array',
-      label: 'Contacts',
+      label: keys.pagebuilder.blocks.contact_cards.items,
       arrayFields: {
-        name: { type: 'text', label: 'Name' },
-        role: { type: 'text', label: 'Role' },
-        email: { type: 'text', label: 'Email' },
-        phone: { type: 'text', label: 'Phone' },
-        imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
+        name: { type: 'text', label: keys.pagebuilder.blocks.contact_cards.items_name },
+        role: { type: 'text', label: keys.pagebuilder.blocks.contact_cards.items_role },
+        email: { type: 'text', label: keys.pagebuilder.blocks.contact_cards.items_email },
+        phone: { type: 'text', label: keys.pagebuilder.blocks.contact_cards.items_phone },
+        imageUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.contact_cards.items_image_url,
+        ),
       },
       defaultItemProps: {
         name: 'Jane Doe',

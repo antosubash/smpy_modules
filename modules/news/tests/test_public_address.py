@@ -191,6 +191,26 @@ class TestCachingHeaders:
 
         assert response.status_code == 304
 
+    async def test_the_page_etag_does_not_validate_an_in_app_visit(self, anon_client) -> None:
+        """A browser that holds the full page must not get a 304 for Inertia's
+        JSON: it would hand Inertia the cached HTML and the visit would fail."""
+        await _seed(anon_client, "two-shapes")
+        page = await anon_client.get(f"{NEWS}/two-shapes")
+        assert "X-Inertia" in page.headers["Vary"]
+
+        visit = await anon_client.get(
+            f"{NEWS}/two-shapes",
+            headers={"X-Inertia": "true", "If-None-Match": page.headers["ETag"]},
+        )
+
+        assert visit.status_code == 200
+        assert visit.headers["ETag"] != page.headers["ETag"]
+        again = await anon_client.get(
+            f"{NEWS}/two-shapes",
+            headers={"X-Inertia": "true", "If-None-Match": visit.headers["ETag"]},
+        )
+        assert again.status_code == 304
+
     async def test_a_stale_etag_is_not(self, anon_client) -> None:
         await _seed(anon_client, "moved-on")
 

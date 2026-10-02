@@ -2,6 +2,7 @@
 
 import type { DragEvent } from 'react';
 
+import { keys, useT } from '../../utils/i18n';
 import type { UploadItem } from './types';
 
 interface DropzoneProps {
@@ -17,6 +18,7 @@ export function MediaDropzone({
   onDragActiveChange,
   onDrop,
 }: DropzoneProps) {
+  const { t } = useT();
   return (
     // A drag-and-drop target has no interactive ARIA role that fits. The
     // keyboard-accessible path to the same action is the header Upload button.
@@ -36,8 +38,11 @@ export function MediaDropzone({
       }`}
       data-testid="media-dropzone"
     >
-      Drop image files here to upload to <strong>{uploadFolder.trim() || 'Unfiled'}</strong>.
-      Multiple files are accepted.
+      {/* The folder name is a <strong> span inside the sentence, so the two
+          halves are separate keys rather than one with a placeholder. */}
+      {t(keys.pagebuilder.dropzone.before)}{' '}
+      <strong>{uploadFolder.trim() || t(keys.pagebuilder.folders.unfiled)}</strong>
+      {t(keys.pagebuilder.dropzone.after)}
     </div>
   );
 }
@@ -48,6 +53,7 @@ interface QueueProps {
 }
 
 export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
+  const { t } = useT();
   if (uploads.length === 0) return null;
   return (
     <div className="mb-4 space-y-1" data-testid="upload-list">
@@ -84,9 +90,9 @@ export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
           </div>
           <div className="w-16 text-right tabular-nums text-muted-foreground">
             {u.status === 'done'
-              ? 'Done'
+              ? t(keys.pagebuilder.upload.done)
               : u.status === 'error'
-                ? 'Failed'
+                ? t(keys.pagebuilder.upload.failed)
                 : `${Math.round((u.loaded / Math.max(1, u.total)) * 100)}%`}
           </div>
           {(u.status === 'done' || u.status === 'error') && (
@@ -94,7 +100,7 @@ export function MediaUploadQueue({ uploads, onDismiss }: QueueProps) {
               type="button"
               onClick={() => onDismiss(u.id)}
               className="text-muted-foreground hover:text-foreground"
-              aria-label="Dismiss"
+              aria-label={t(keys.pagebuilder.upload.dismiss)}
             >
               ×
             </button>

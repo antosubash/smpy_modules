@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -27,17 +28,20 @@ const DISPLAY_STYLE: CSSProperties = {
 };
 
 export const StatsWidget: ComponentConfig<StatsWidgetProps> = {
-  label: 'Statistics',
+  label: keys.pagebuilder.blocks.stats.label,
   fields: {
-    title: { type: 'text', label: 'Title' },
-    subtitle: { type: 'textarea', label: 'Subtitle' },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    subtitle: { type: 'textarea', label: keys.pagebuilder.blocks.common.subtitle },
     items: {
       type: 'array',
-      label: 'Statistics',
+      label: keys.pagebuilder.blocks.stats.items,
       arrayFields: {
-        value: { type: 'text', label: 'Value' },
-        label: { type: 'text', label: 'Label' },
-        iconUrl: createImageField(mediaLibraryAdapter, 'Icon image (optional)'),
+        value: { type: 'text', label: keys.pagebuilder.blocks.stats.items_value },
+        label: { type: 'text', label: keys.pagebuilder.blocks.stats.items_label },
+        iconUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.stats.items_icon_url,
+        ),
       },
       defaultItemProps: { value: '100+', label: 'Item' },
       min: 1,
@@ -45,11 +49,11 @@ export const StatsWidget: ComponentConfig<StatsWidgetProps> = {
     },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.stats.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Lime', value: 'lime' },
-        { label: 'Cards', value: 'cards' },
+        { label: keys.pagebuilder.blocks.stats.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.stats.surface_lime, value: 'lime' },
+        { label: keys.pagebuilder.blocks.stats.surface_cards, value: 'cards' },
       ],
     },
   },

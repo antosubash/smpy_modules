@@ -4,8 +4,9 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useEffect } from 'react';
-import { ConfirmDialog } from '../components/ConfirmDialog';
+import { editorStatus } from '../components/articleStatus';
 
+import { ArticleDangerZone } from '../components/editor/ArticleDangerZone';
 import { ArticleInspector } from '../components/editor/ArticleInspector';
 import { ArticleTranslations } from '../components/editor/ArticleTranslations';
 import { HistoryCard } from '../components/editor/HistoryCard';
@@ -14,6 +15,7 @@ import { ScheduleCard } from '../components/editor/ScheduleCard';
 import { SeoCard } from '../components/editor/SeoCard';
 import { useArticleEditor } from '../hooks/useArticleEditor';
 import { formatArticleDate } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 /** The article editor — everything about an article except its body.
  *
@@ -24,6 +26,8 @@ import { formatArticleDate } from '../utils/api';
  * independently, and a full-bleed editor.
  */
 export default function ArticleEditor() {
+  const { t } = useT();
+  const copy = keys.news.editor;
   const props = usePage<{
     props: { article_id: number; preview_url: string; locales?: string[] };
   }>().props as unknown as {
@@ -48,6 +52,8 @@ export default function ArticleEditor() {
     dirty,
     valid,
     error,
+    conflict,
+    gone,
     setError,
     saved,
     load,
@@ -66,12 +72,12 @@ export default function ArticleEditor() {
 
   if (!article || !draft) {
     return (
-      <PageShell title="Article" description="Loading…">
-        <Head title="Article" />
+      <PageShell title={t(copy.fallback_title)} description={t(copy.loading)}>
+        <Head title={t(copy.fallback_title)} />
         {error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : (
-          <div role="status" aria-label="Loading article" className="space-y-2">
+          <div role="status" aria-label={t(copy.loading_article)} className="space-y-2">
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-40 w-full" />
           </div>
@@ -83,24 +89,16 @@ export default function ArticleEditor() {
   const isDraft = article.status === 'draft';
   const isPublished = article.status === 'published';
   const dated = formatArticleDate(article.published_at);
-  // Three statuses, three readings — `submitted_for_review` used to fall
-  // through the `!isDraft` branch and read as published, which is wrong in
-  // a way that specifically hurts the reviewer: whoever is looking at a
-  // just-submitted article needs to know it is *not* live yet.
-  const status = isPublished
-    ? `Published${dated ? ` · ${dated}` : ''}`
-    : article.status === 'submitted_for_review'
-      ? `Pending review${dated ? ` · dated ${dated}` : ''}`
-      : `Draft${dated ? ` · dated ${dated}` : ' · undated'}`;
+  const status = editorStatus(article.status, dated, t);
 
   return (
     <PageShell
-      title={article.title || 'Untitled article'}
-      description={`${article.url} · ${status}`}
+      title={article.title || t(copy.untitled)}
+      description={t(copy.description, { url: article.url, status })}
       actions={
         <>
           <Button variant="outline" onClick={() => router.visit('/admin/news/')}>
-            News / Articles
+            {t(copy.back_to_list)}
           </Button>
           {/* Always available now. This used to be the *only* preview and had
               to hide itself unless `status === 'published'`, because it linked
@@ -110,7 +108,7 @@ export default function ArticleEditor() {
               own screen, so it resolves in every state. */}
           <Button variant="outline" asChild>
             <a href={preview_url} target="_blank" rel="noopener noreferrer">
-              Preview
+              {t(copy.preview)}
             </a>
           </Button>
           {/* Kept beside it rather than replaced by it: for a published
@@ -123,84 +121,65 @@ export default function ArticleEditor() {
           {isPublished && (
             <Button variant="outline" asChild>
               <a href={article.url} target="_blank" rel="noopener noreferrer">
-                View live
+                {t(copy.view_live)}
               </a>
             </Button>
           )}
           {isDraft && (
             <Button disabled={busy} onClick={() => void publish()}>
-              Publish now
+              {t(copy.publish_now)}
             </Button>
           )}
         </>
       }
     >
-      <Head title={article.title || 'Article'} />
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      <Head title={article.title || t(copy.fallback_title)} />
+      {error && (
+        <div className="mb-4 flex items-center gap-3 text-sm text-destructive">
+          <p className="min-w-0 flex-1">{error}</p>
+          {conflict && (
+            <Button size="sm" variant="outline" onClick={() => void load()}>
+              {t(keys.news.errors.reload)}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="space-y-3">
           <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="font-medium">The body has its own canvas</p>
+            <p className="font-medium">{t(copy.body_card_title)}</p>
             <p className="mx-auto mt-1 max-w-prose text-sm text-muted-foreground">
-              Blocks, autosave and revision history live there. This screen owns everything else —
-              category, tags, display date, byline and how the article behaves in feeds.
+              {t(copy.body_card_description)}
             </p>
             <Button className="mt-3" onClick={() => router.visit(article.edit_url)}>
-              Edit the body
+              {t(copy.edit_body)}
             </Button>
           </div>
 
-          {canPublish ? (
-            <ConfirmDialog
-              // Medium, where this used to be low — see ArticleRow for why the
-              // same button changed cost when the sidecar went away.
-              //
-              // Gated on canPublish: the backend requires news.publish for a
-              // hard delete, the same pair it requires for purge, because
-              // nothing here comes back. An author with news.edit alone gets
-              // the recoverable trash below instead.
-              level="medium"
-              title={`Delete “${article.title}”?`}
-              description="The article, its body and its tags are removed, and its public URL stops working. This cannot be undone from here."
-              confirmLabel="Delete"
-              onConfirm={async () => {
-                await remove();
-                router.visit('/admin/news/');
-              }}
-              trigger={
-                <Button variant="ghost" size="sm" className="text-destructive" disabled={busy}>
-                  Delete article
-                </Button>
-              }
-            />
-          ) : (
-            <ConfirmDialog
-              // Medium for a published article — trashing takes it off the
-              // public site immediately, same as unpublish, even though it is
-              // fully reversible. A draft that was never public gets low.
-              level={isPublished ? 'medium' : 'low'}
-              title={`Move “${article.title}” to trash?`}
-              description="It comes off the public site and out of the list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse."
-              confirmLabel="Move to trash"
-              onConfirm={async () => {
-                await trash();
-                router.visit('/admin/news/');
-              }}
-              trigger={
-                <Button variant="ghost" size="sm" disabled={busy}>
-                  Move article to trash
-                </Button>
-              }
-            />
-          )}
+          <ArticleDangerZone
+            title={article.title}
+            isPublished={isPublished}
+            busy={busy}
+            canPublish={canPublish}
+            onDelete={async () => {
+              await remove();
+              router.visit('/admin/news/');
+            }}
+            onTrash={async () => {
+              await trash();
+              router.visit('/admin/news/');
+            }}
+          />
         </section>
 
         <aside className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide">Article</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide">
+              {t(copy.aside_heading)}
+            </h2>
             <span className="text-xs text-muted-foreground" aria-live="polite">
-              {busy ? 'Saving…' : dirty ? 'Unsaved changes' : saved ? 'Saved' : ''}
+              {busy ? t(copy.saving) : dirty ? t(copy.unsaved) : saved ? t(copy.saved) : ''}
             </span>
           </div>
 
@@ -213,13 +192,15 @@ export default function ArticleEditor() {
             onChange={patch}
           />
 
-          <Button
-            className="w-full"
-            disabled={busy || !dirty || !valid}
-            onClick={() => void save()}
-          >
-            Save
-          </Button>
+          {!gone && (
+            <Button
+              className="w-full"
+              disabled={busy || !dirty || !valid}
+              onClick={() => void save()}
+            >
+              {t(copy.save)}
+            </Button>
+          )}
 
           <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
 

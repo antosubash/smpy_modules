@@ -20,6 +20,7 @@ from news import counts as counts_module
 from news import locales, service, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.content import ArticlesService
+from news.content._fresh import ensure_fresh
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleListResponse,
@@ -49,8 +50,11 @@ async def list_articles(
     category: str | None = Query(None),
     q: str | None = Query(
         None,
-        description="Free-text filter over headline and slug. Applied before "
-        "paging, so `total` reflects the search rather than the whole list.",
+        description="Free-text filter over headline, address, excerpt and "
+        "tags — what a card shows. Not the body: the admin search screen "
+        "covers that, and it scans the *draft*, which a public route must not "
+        "answer for. Applied before paging, so `total` reflects the search "
+        "rather than the whole list.",
     ),
     status: str | None = Query(
         None,
@@ -220,7 +224,10 @@ async def update_article(
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
 
+    ensure_fresh(article, body.expected_updated_at)
+
     sent = body.model_dump(exclude_unset=True)
+    sent.pop("expected_updated_at", None)
     # Split by who owns the write. The identity and SEO columns go through
     # ArticlesService because renaming a slug has to record a redirect; the
     # listing metadata does not, and routing it through the same path would

@@ -105,11 +105,10 @@ describe('RecordRowAction — U27: every row action names the record it acts on'
       />,
     );
     const btn = view.find<HTMLButtonElement>('button');
-    // (i18next is unconfigured under vitest, so `{title}` is not
-    // interpolated — what matters here is that this button's accessible
-    // name is a distinct, record-specific key rather than the plain
-    // "Delete" every other row would share.)
-    expect(btn?.getAttribute('aria-label')).toBe('Delete {title}');
+    // A record-specific name rather than the plain "Delete" every other row
+    // would share. The catalogue is loaded under vitest (`tests/vitest-i18n.ts`),
+    // so this also proves the title is interpolated.
+    expect(btn?.getAttribute('aria-label')).toBe('Delete Dune');
     await view.unmount();
   });
 
@@ -127,7 +126,7 @@ describe('RecordRowAction — U27: every row action names the record it acts on'
     );
     const buttons = view.all<HTMLButtonElement>('button');
     const labels = buttons.map((btn) => btn.getAttribute('aria-label'));
-    expect(labels).toEqual(['Restore {title}', 'Delete {title} permanently']);
+    expect(labels).toEqual(['Restore Dune', 'Delete Dune permanently']);
     await view.unmount();
   });
 });

@@ -1,6 +1,7 @@
 /** Client for the news read API. */
 
 import { BASE, read, write } from './http';
+import { keys, type Translate } from './i18n';
 import type {
   ArticleDetail,
   ArticleListResponse,
@@ -112,6 +113,8 @@ export const updateArticle = (
     og_image?: string;
     canonical_url?: string;
     index_in_search?: boolean;
+    /** The `updated_at` this edit was made against; a stale one answers 409. */
+    expected_updated_at?: string | null;
   },
 ) => write<ArticleRead>(`/articles/${id}`, 'PUT', data);
 
@@ -172,8 +175,15 @@ export const getArticleDetail = (id: number, signal?: AbortSignal) =>
  * Its own route, deliberately: it fires on a timer rather than on a person
  * pressing something, so it must not be able to reach the slug or the status.
  */
-export const saveArticleBody = (id: number, draft_data: Record<string, unknown>) =>
-  write<ArticleDetail>(`/articles/${id}/body`, 'PUT', { draft_data });
+export const saveArticleBody = (
+  id: number,
+  draft_data: Record<string, unknown>,
+  expected_updated_at?: string | null,
+) =>
+  write<ArticleDetail>(`/articles/${id}/body`, 'PUT', {
+    draft_data,
+    ...(expected_updated_at ? { expected_updated_at } : {}),
+  });
 
 export const listArticleRevisions = (id: number, signal?: AbortSignal) =>
   read<RevisionRead[]>(`/articles/${id}/revisions`, signal);
@@ -221,15 +231,15 @@ export const restoreArticle = (id: number) =>
  * UTC, so reading it in the viewer's own timezone shifts it a day for everyone
  * west of UTC.
  */
-export function relativeDay(iso: string | null, now = new Date()): string {
+export function relativeDay(iso: string | null, t: Translate, now = new Date()): string {
   if (!iso) return '';
   const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(then.getTime())) return '';
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const days = Math.round((then.getTime() - today) / 86_400_000);
-  if (days === 0) return 'today';
-  if (days > 0) return `in ${days}d`;
-  return `${-days}d ago`;
+  if (days === 0) return t(keys.news.dates.today);
+  if (days > 0) return t(keys.news.dates.in_days, { days });
+  return t(keys.news.dates.days_ago, { days: -days });
 }
 
 export type {

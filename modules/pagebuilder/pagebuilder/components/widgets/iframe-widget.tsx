@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createCheckboxField } from '../../fields';
+import { keys, translate } from '../../utils/i18n';
 import { EmptyPlaceholder } from './_shared';
 
 export type IframeWidgetProps = {
@@ -10,12 +11,12 @@ export type IframeWidgetProps = {
 };
 
 export const IframeWidget: ComponentConfig<IframeWidgetProps> = {
-  label: 'Iframe',
+  label: keys.pagebuilder.blocks.iframe.label,
   fields: {
-    src: { type: 'text', label: 'Source URL' },
-    title: { type: 'text', label: 'Title (accessibility)' },
-    height: { type: 'text', label: 'Height (e.g. 600px)' },
-    sandboxed: createCheckboxField('Sandbox (block popups & navigation)'),
+    src: { type: 'text', label: keys.pagebuilder.blocks.iframe.src },
+    title: { type: 'text', label: keys.pagebuilder.blocks.iframe.title },
+    height: { type: 'text', label: keys.pagebuilder.blocks.iframe.height },
+    sandboxed: createCheckboxField(keys.pagebuilder.blocks.iframe.sandboxed),
   },
   defaultProps: {
     src: '',
@@ -28,7 +29,7 @@ export const IframeWidget: ComponentConfig<IframeWidgetProps> = {
       <div className="container mx-auto py-6">
         <iframe
           src={src}
-          title={title || 'Embedded content'}
+          title={title || translate(keys.pagebuilder.blocks.iframe.fallback_title)}
           className="w-full rounded-lg border"
           style={{ height }}
           // NOTE: allow-scripts + allow-same-origin lets a SAME-ORIGIN embedded
@@ -39,6 +40,6 @@ export const IframeWidget: ComponentConfig<IframeWidgetProps> = {
         />
       </div>
     ) : (
-      <EmptyPlaceholder label="Iframe (no source)" />
+      <EmptyPlaceholder label={translate(keys.pagebuilder.blocks.iframe.empty)} />
     ),
 };

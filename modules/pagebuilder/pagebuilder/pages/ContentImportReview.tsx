@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
 import { ImportPlanSummary } from '../components/snapshots/ImportPlanSummary';
+import { keys, useT } from '../utils/i18n';
 import { approveImport, type PendingImport, rejectImport } from '../utils/snapshotsApi';
 
 interface Props {
@@ -25,20 +26,24 @@ const CONTENT_URL = '/pagebuilder/content';
  * overstate the risk, and a confirmation that overstates gets clicked through.
  */
 export default function ContentImportReview() {
+  const { t } = useT();
   const { pending } = usePage<{ props: Props }>().props as unknown as Props;
   const [error, setError] = useState<string | null>(null);
 
   if (!pending) {
     return (
       <AuthenticatedLayout>
-        <Head title="Review import" />
-        <PageShell title="Review import" description="Nothing is waiting for approval.">
+        <Head title={t(keys.pagebuilder.import_review.title)} />
+        <PageShell
+          title={t(keys.pagebuilder.import_review.title)}
+          description={t(keys.pagebuilder.import_review.empty_description)}
+        >
           <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No import is staged. Pick a snapshot and choose Restore to stage one.
+            {t(keys.pagebuilder.import_review.empty)}
           </p>
           <div className="mt-4">
             <Button asChild variant="outline">
-              <Link href={CONTENT_URL}>Back to snapshots</Link>
+              <Link href={CONTENT_URL}>{t(keys.pagebuilder.import_review.back)}</Link>
             </Button>
           </div>
         </PageShell>
@@ -49,14 +54,16 @@ export default function ContentImportReview() {
   const apply = async () => {
     try {
       const result = await approveImport(pending.id);
-      toast.success('Snapshot restored', {
-        description:
-          `${result.pages_created} created, ${result.pages_updated} updated. ` +
-          'A snapshot of the previous state was taken first.',
+      toast.success(t(keys.pagebuilder.import_review.applied), {
+        description: t(keys.pagebuilder.import_review.applied_description, {
+          created: result.pages_created,
+          updated: result.pages_updated,
+        }),
       });
       router.visit(CONTENT_URL);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Apply failed';
+      const message =
+        e instanceof Error ? e.message : t(keys.pagebuilder.import_review.apply_failed);
       setError(message);
       throw e;
     }
@@ -64,19 +71,24 @@ export default function ContentImportReview() {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Review import" />
+      <Head title={t(keys.pagebuilder.import_review.title)} />
       <PageShell
-        title="Review import"
-        description={`Snapshot #${pending.snapshot_id}, staged by ${pending.created_by ?? 'someone'}.`}
+        title={t(keys.pagebuilder.import_review.title)}
+        description={t(keys.pagebuilder.import_review.description, {
+          id: pending.snapshot_id,
+          author: pending.created_by ?? t(keys.pagebuilder.import_review.someone),
+        })}
         actions={
           <div className="flex items-center gap-2">
             <NoteDialog
-              trigger={<Button variant="outline">Reject</Button>}
-              title="Reject this import"
-              description="The staged restore is discarded. The site is untouched either way."
-              label="Why?"
-              placeholder="Wrong bundle, stale content, …"
-              submitLabel="Reject"
+              trigger={
+                <Button variant="outline">{t(keys.pagebuilder.import_review.reject)}</Button>
+              }
+              title={t(keys.pagebuilder.import_review.reject_title)}
+              description={t(keys.pagebuilder.import_review.reject_description)}
+              label={t(keys.pagebuilder.import_review.reject_label)}
+              placeholder={t(keys.pagebuilder.import_review.reject_placeholder)}
+              submitLabel={t(keys.pagebuilder.import_review.reject)}
               required
               onSubmit={async (note) => {
                 await rejectImport(pending.id, note);
@@ -84,15 +96,10 @@ export default function ContentImportReview() {
               }}
             />
             <ConfirmDialog
-              trigger={<Button>Approve &amp; apply</Button>}
-              title="Apply this snapshot?"
-              description={
-                <>
-                  A snapshot of the site as it stands right now is taken first, so this can be
-                  undone by restoring that one.
-                </>
-              }
-              confirmLabel="Apply"
+              trigger={<Button>{t(keys.pagebuilder.import_review.approve)}</Button>}
+              title={t(keys.pagebuilder.import_review.approve_title)}
+              description={t(keys.pagebuilder.import_review.approve_description)}
+              confirmLabel={t(keys.pagebuilder.import_review.apply)}
               level="medium"
               onConfirm={apply}
             />

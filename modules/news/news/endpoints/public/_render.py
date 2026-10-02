@@ -23,9 +23,12 @@ from fastapi import Response
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from news import constants
+from news.authors import slug_for as author_slug
 from news.endpoints.public import _head
-from news.models import NewsArticle
-from news.settings import NewsSettings
+from news.endpoints.public._lang import set_html_lang
+from news.models import ArticleStatus, NewsArticle
+from news.safe_url import image_or_none
+from news.settings import NewsSettings, public_author_path
 
 
 async def render_article(
@@ -60,6 +63,26 @@ async def render_article(
     published_at = (
         article.published_at.isoformat() if article.published_at is not None else None
     )
+    # The byline's archive, where it has one. It was a dead end before: rendered
+    # on the page and emitted as ``article:author``, with nowhere for a reader
+    # who liked the writer to go, while a category and a tag each had a page.
+    #
+    # ``None`` for a byline that slugs to nothing — a name in a script that does
+    # not transliterate — and the viewer then renders it as plain text. An
+    # address that cannot name this author is worse than no address; see
+    # :mod:`news.authors`.
+    #
+    # Also ``None`` when *this* article is not itself listed
+    # (``news.authors._LISTED``'s own predicate, minus the parts this row
+    # already satisfies by construction). This function has no database
+    # session to ask "does the byline have some OTHER listed article", so it
+    # answers the cheaper, safe half of that question: if this article proves
+    # the author has at least one listed piece, link; otherwise say nothing
+    # rather than link to an archive that resolves to an empty page titled
+    # with the raw slug. An author whose *other* work is listed still gets a
+    # working link from that other article.
+    listed = article.status == ArticleStatus.PUBLISHED and article.show_in_feed
+    byline_slug = author_slug(article.author) if listed else ""
     props: dict[str, Any] = {
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to
@@ -69,7 +92,7 @@ async def render_article(
         "slug": article.slug,
         "data": data,
         "meta_description": article.meta_description,
-        "og_image": article.og_image,
+        "og_image": image_or_none(article.og_image),
         "canonical_url": canonical,
         "og_url": canonical,
         "index_in_search": index_in_search,
@@ -78,6 +101,7 @@ async def render_article(
         "twitter_handle": settings.twitter_handle or None,
         "category": article.category,
         "author": article.author,
+        "author_url": public_author_path(byline_slug, locale) if byline_slug else None,
         "published_at": published_at,
         "locale": locale,
         "alternates": alternates or [],
@@ -93,12 +117,12 @@ async def render_article(
     # The same tags `PublicArticle` renders through Inertia's `<Head>`, written
     # into the document server-side — see `_head` for why both are needed.
     return _head.inject(
-        rendered,
+        set_html_lang(rendered, locale),
         _head.article_head(
             title=article.title,
             description=article.meta_description or None,
             canonical=canonical,
-            image=article.og_image or None,
+            image=image_or_none(article.og_image),
             site_name=settings.site_name or None,
             twitter_handle=settings.twitter_handle or None,
             published_at=published_at,

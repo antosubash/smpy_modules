@@ -56,7 +56,7 @@ _SHELL = (
     # SSR. `endpoints.public._head` writes an article's real metadata into that
     # head, and against a stub with nowhere to write it every test asserting on
     # server-rendered metadata would pass by asserting nothing.
-    "<html><head><title>SimpleModule</title>{% inertia_head %}</head>"
+    "<html lang=\"en\"><head><title>SimpleModule</title>{% inertia_head %}</head>"
     "<body>{% inertia_body %}</body></html>"
 )
 

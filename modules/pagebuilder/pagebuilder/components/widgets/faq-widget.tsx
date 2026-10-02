@@ -2,43 +2,43 @@
  *  Types, styles and render live in faq-render.tsx. */
 
 import type { ComponentConfig } from '@puckeditor/core';
-
+import { keys } from '../../utils/i18n';
 import { FaqRender, type FaqWidgetProps } from './faq-render';
 
 export type { FaqItem, FaqWidgetProps } from './faq-render';
 
 export const FaqWidget: ComponentConfig<FaqWidgetProps> = {
-  label: 'FAQ',
+  label: keys.pagebuilder.blocks.faq.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow (enables 2-column layout)' },
-    title: { type: 'text', label: 'Title' },
-    lead: { type: 'textarea', label: 'Lead paragraph (2-column layout)' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.faq.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    lead: { type: 'textarea', label: keys.pagebuilder.blocks.faq.lead },
     variant: {
       type: 'select',
-      label: 'Style',
+      label: keys.pagebuilder.blocks.faq.variant,
       options: [
-        { label: 'Cards', value: 'cards' },
-        { label: 'Divider rows', value: 'divider' },
+        { label: keys.pagebuilder.blocks.faq.variant_cards, value: 'cards' },
+        { label: keys.pagebuilder.blocks.faq.variant_divider, value: 'divider' },
       ],
     },
     surface: {
       type: 'select',
-      label: 'Surface (2-column layout)',
+      label: keys.pagebuilder.blocks.faq.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Muted (soft card)', value: 'muted' },
+        { label: keys.pagebuilder.blocks.faq.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.faq.surface_muted, value: 'muted' },
       ],
     },
     surfaceColor: {
       type: 'text',
-      label: 'Surface color (CSS, white text — optional)',
+      label: keys.pagebuilder.blocks.common.surface_color,
     },
     items: {
       type: 'array',
-      label: 'Questions',
+      label: keys.pagebuilder.blocks.faq.items,
       arrayFields: {
-        question: { type: 'text', label: 'Question' },
-        answer: { type: 'textarea', label: 'Answer' },
+        question: { type: 'text', label: keys.pagebuilder.blocks.faq.items_question },
+        answer: { type: 'textarea', label: keys.pagebuilder.blocks.faq.items_answer },
       },
       defaultItemProps: {
         question: 'Your question?',

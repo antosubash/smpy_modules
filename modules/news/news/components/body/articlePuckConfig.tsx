@@ -16,15 +16,21 @@
 
 import type { Config } from '@puckeditor/core';
 
+import { keys } from '../../utils/i18n';
+
 import {
   AudioBlock,
   type AudioProps,
   CalloutBlock,
   type CalloutProps,
+  ChartBlock,
+  type ChartProps,
   CodeBlock,
   type CodeProps,
   ComparisonBlock,
   type ComparisonProps,
+  ContentsBlock,
+  type ContentsProps,
   DefinitionsBlock,
   type DefinitionsProps,
   DividerBlock,
@@ -72,6 +78,7 @@ export interface ArticleBodyProps {
   Definitions: DefinitionsProps;
   Sources: SourcesProps;
   Related: RelatedProps;
+  Contents: ContentsProps;
   Image: ImageProps;
   Gallery: GalleryProps;
   Comparison: ComparisonProps;
@@ -79,6 +86,7 @@ export interface ArticleBodyProps {
   Audio: AudioProps;
   Embed: EmbedProps;
   Table: TableProps;
+  Chart: ChartProps;
   Facts: FactsProps;
   Code: CodeProps;
   Timeline: TimelineProps;
@@ -123,17 +131,23 @@ export const articlePuckConfig: ArticleConfig = {
   // beside List, because a writer wanting a summary box is not shopping for a
   // list — they are looking for the thing that sits outside the story.
   categories: {
-    text: { title: 'Text', components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'] },
+    text: {
+      title: keys.news.blocks.categories.text,
+      components: ['Heading', 'Paragraph', 'List', 'Quote', 'QandA'],
+    },
     asides: {
-      title: 'Set apart',
-      components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related'],
+      title: keys.news.blocks.categories.asides,
+      components: ['KeyPoints', 'Callout', 'Definitions', 'Sources', 'Related', 'Contents'],
     },
     media: {
-      title: 'Media',
+      title: keys.news.blocks.categories.media,
       components: ['Image', 'Gallery', 'Comparison', 'Video', 'Audio', 'Embed'],
     },
-    data: { title: 'Data', components: ['Table', 'Facts', 'Code', 'Timeline'] },
-    layout: { title: 'Layout', components: ['Divider'] },
+    data: {
+      title: keys.news.blocks.categories.data,
+      components: ['Table', 'Chart', 'Facts', 'Code', 'Timeline'],
+    },
+    layout: { title: keys.news.blocks.categories.layout, components: ['Divider'] },
   },
   components: {
     Heading: HeadingBlock,
@@ -146,6 +160,7 @@ export const articlePuckConfig: ArticleConfig = {
     Definitions: DefinitionsBlock,
     Sources: SourcesBlock,
     Related: RelatedBlock,
+    Contents: ContentsBlock,
     Image: ImageBlock,
     Gallery: GalleryBlock,
     Comparison: ComparisonBlock,
@@ -153,6 +168,7 @@ export const articlePuckConfig: ArticleConfig = {
     Audio: AudioBlock,
     Embed: EmbedBlock,
     Table: TableBlock,
+    Chart: ChartBlock,
     Facts: FactsBlock,
     Code: CodeBlock,
     Timeline: TimelineBlock,
@@ -184,7 +200,7 @@ export const emptyArticleData = {
  * than specific devices so the preview reflects what readers see.
  */
 export const articleViewports = [
-  { width: 360, height: 640, label: 'Mobile', icon: 'Smartphone' },
-  { width: 768, height: 1024, label: 'Tablet', icon: 'Tablet' },
-  { width: 1280, height: 800, label: 'Desktop', icon: 'Monitor' },
+  { width: 360, height: 640, label: keys.news.blocks.viewports.mobile, icon: 'Smartphone' },
+  { width: 768, height: 1024, label: keys.news.blocks.viewports.tablet, icon: 'Tablet' },
+  { width: 1280, height: 800, label: keys.news.blocks.viewports.desktop, icon: 'Monitor' },
 ];

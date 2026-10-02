@@ -8,6 +8,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys, translate, useT } from '../../utils/i18n';
 
 export interface SiteFooterLink {
   label: string;
@@ -29,20 +30,26 @@ export function SiteFooterRender({
   links,
   note,
 }: SiteFooterWidgetProps) {
+  const { t } = useT();
   return (
     <div className="gca-display bg-primary-800 px-6 py-16 text-white lg:py-20">
       <div className="mx-auto flex max-w-[1440px] flex-col items-center gap-10 lg:gap-16">
-        <a href={homeHref || '/'} aria-label={logoAlt || 'Home'}>
+        <a
+          href={homeHref || '/'}
+          aria-label={logoAlt || t(keys.pagebuilder.blocks.site_footer.home)}
+        >
           {logoUrl ? (
             <img src={logoUrl} alt={logoAlt} className="h-16 w-auto lg:h-20" />
           ) : (
-            <span className="text-lg font-bold uppercase tracking-wide">{logoAlt || 'Home'}</span>
+            <span className="text-lg font-bold uppercase tracking-wide">
+              {logoAlt || t(keys.pagebuilder.blocks.site_footer.home)}
+            </span>
           )}
         </a>
 
         {links.length > 0 && (
           <nav
-            aria-label="Footer"
+            aria-label={t(keys.pagebuilder.blocks.site_footer.nav_aria)}
             className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
           >
             {links.map((link, index) => (
@@ -68,23 +75,26 @@ export function SiteFooterRender({
 }
 
 export const SiteFooterWidget: ComponentConfig<SiteFooterWidgetProps> = {
-  label: 'Site footer (logo + links)',
+  label: keys.pagebuilder.blocks.site_footer.label,
   fields: {
-    logoUrl: createImageField(mediaLibraryAdapter, 'Logo (reversed / light)'),
-    logoAlt: { type: 'text', label: 'Logo alt text' },
-    homeHref: { type: 'text', label: 'Logo link' },
+    logoUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.site_footer.logo_url),
+    logoAlt: { type: 'text', label: keys.pagebuilder.blocks.common.logo_alt },
+    homeHref: { type: 'text', label: keys.pagebuilder.blocks.site_footer.home_href },
     links: {
       type: 'array',
-      label: 'Links',
+      label: keys.pagebuilder.blocks.site_footer.links,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'Link' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.site_footer.links_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.site_footer.links_href },
       },
       defaultItemProps: { label: 'Link', href: '#' },
-      getItemSummary: (item) => item.label || 'Link',
+      // `translate` rather than a hook: Puck calls this while rendering the
+      // array field, outside any component of ours.
+      getItemSummary: (item) =>
+        item.label || translate(keys.pagebuilder.blocks.site_footer.links_summary),
       max: 12,
     },
-    note: { type: 'textarea', label: 'Small print (optional)' },
+    note: { type: 'textarea', label: keys.pagebuilder.blocks.site_footer.note },
   },
   defaultProps: {
     logoUrl: '',
