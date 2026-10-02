@@ -18,6 +18,12 @@ module exposes:
 - **Events.** On `MembershipAdded` and `MembershipRemoved`, billing keeps the
   Stripe quantity of a per-seat plan equal to the member count.
 
+**Full documentation** lives in [`docs/`](docs/index.md):
+[user guide](docs/user-guide.md) (admin screens and the owner's Billing page),
+[API reference](docs/api-reference.md) (endpoints, errors, gating a feature on
+a plan), [operations](docs/operations.md) (install, Stripe setup,
+reconcile, troubleshooting) and [architecture](docs/architecture.md).
+
 ## Install
 
 ```bash

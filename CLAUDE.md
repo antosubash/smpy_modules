@@ -48,9 +48,21 @@ dependency specifiers — the framework's own copy of that script does, which
 would pin the framework to a version that doesn't exist. `scripts/tests/`
 guards this and CI runs `--check-current`.
 
-**`pagebuilder` and `news` read no environment variables.** Their settings are
+**`billing` commits outside a request with `finalize_session`, never
+`commit()`.** Every `session_factory()` session is a `RequestSession`;
+`TenantService.set_status` queues `TenantStatusChanged` and the membership-cache
+invalidation on `on_commit`, which only `simple_module_db.finalize_session`
+runs. A bare `commit()` in a webhook, reconcile or event handler suspends the
+tenant in the database while every member's cached view still says active.
+Two more billing invariants: webhook payloads are never trusted for state (every
+event re-fetches the subscription through `sync.resync`/`apply_snapshot`, the
+one place provider state becomes local state), and response models
+(`PlanOut`) must not inherit input bounds — a stored row that predates a bound
+would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
+
+**`pagebuilder`, `news` and `billing` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
-and both classes drop pydantic-settings' env, `.env` and secrets sources — so
+and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
 `SM_PAGEBUILDER_*` line anywhere is dead. Configure them on the Settings screen
 or with `scripts/set_setting.py`. Anything the module reads while booting
@@ -99,7 +111,7 @@ venv and back. Neither touches a tracked file.
 ## Known deferred work
 
 - **UI i18n.** Only `records` is translated (every string through `t()` and a
-  `locales/en.json`); pagebuilder, news and ai still have hardcoded English
+  `locales/en.json`); pagebuilder, news, ai and billing still have hardcoded English
   TSX and no `locales/en.json`. The
   framework's own modules do have one, and the convention depends on
   `@simple-module-py/i18n` (`t(keys.<module>.<section>.<key>)`). The host
@@ -115,3 +127,9 @@ venv and back. Neither touches a tracked file.
   publishes, the other what the console speaks.
 - **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
   repo is canonical; that one is frozen.
+- **The demo host is single-tenant.** `billing`'s tenant screens need
+  `SM_MULTI_TENANT=true`, but `news`' startup reconcile does not yet run under
+  strict tenant isolation, so the host can't turn it on with News enabled.
+  The billing tenant e2e spec is opt-in for that reason
+  (`E2E_MULTI_TENANT=1` + `SM_MODULES_ENABLED` without News — see the spec's
+  header). Making news tenant-aware unblocks it.
