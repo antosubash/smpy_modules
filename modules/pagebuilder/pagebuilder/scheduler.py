@@ -36,11 +36,14 @@ class Scheduler:
 
     def start(self, app: FastAPI, settings: PagebuilderSettings) -> None:
         self._task = asyncio.create_task(self._run(app, settings))
-        # FastAPI 0.136 no longer exposes ``add_event_handler`` on the app
-        # itself; the router still carries it for ASGI lifespan hooks, which is
-        # what we want here — the task lives as long as the app does and gets
-        # cancelled on shutdown.
-        app.router.add_event_handler("shutdown", self.stop)
+        # Not wired through ``app.router.add_event_handler("shutdown", ...)``:
+        # the host builds the app with a custom ``lifespan=``, and under a
+        # custom lifespan FastAPI never installs the ``_DefaultLifespan`` that
+        # drains the router's own shutdown-handler list, so a handler added
+        # that way is never called. The host's lifespan instead calls every
+        # module's ``on_shutdown(app)`` directly — see
+        # :meth:`PagebuilderModule.on_shutdown`, which is what actually stops
+        # this task.
 
     async def _run(self, app: FastAPI, settings: PagebuilderSettings) -> None:
         """Poll for scheduled publish / unpublish flips.
@@ -82,11 +85,29 @@ class Scheduler:
                 _log.exception("pagebuilder.scheduler.tick_failed")
 
     async def stop(self) -> None:
-        if self._task is None:
+        task = self._task
+        if task is None:
             return
-        self._task.cancel()
-        # CancelledError is listed explicitly because it derives from
-        # BaseException, not Exception, so it isn't covered by the latter.
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await self._task
-        self._task = None
+        task.cancel()
+        try:
+            # Only ``CancelledError`` is suppressed — it is the expected
+            # outcome of the ``cancel`` above and says nothing. It used to be
+            # ``(CancelledError, Exception)``, which swallowed everything, and
+            # that is how a scheduler which stopped working weeks ago goes
+            # unnoticed. ``_run`` already logs and continues past a failed
+            # tick, so anything reaching here died *before* the loop — a
+            # missing ``app.state.sm``, an import that failed — and has a
+            # traceback worth seeing. Matches ``news.scheduler.Scheduler``.
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        except Exception:
+            # Logged rather than re-raised. This is reached from
+            # ``PagebuilderModule.on_shutdown``, which the host's lifespan calls
+            # in a bare ``for mod in reversed(modules)`` with no ``try`` around
+            # each one, then disposes the database engine after the loop
+            # (``simple_module_hosting/app_builder.py``). Raising here would
+            # skip every module registered before this one — another
+            # scheduler never stopped at all — and the engine disposal too.
+            _log.exception("pagebuilder.scheduler.stop_failed")
+        finally:
+            self._task = None

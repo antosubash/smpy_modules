@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { renderRichText } from './_internal/rich-text';
 
 export type SocialBannerLink = {
@@ -15,17 +16,20 @@ export type SocialBannerWidgetProps = {
 };
 
 export const SocialBannerWidget: ComponentConfig<SocialBannerWidgetProps> = {
-  label: 'Social banner (follow links)',
+  label: keys.pagebuilder.blocks.social_banner.label,
   fields: {
-    heading: { type: 'text', label: 'Heading' },
-    subheading: { type: 'text', label: 'Subheading' },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    subheading: { type: 'text', label: keys.pagebuilder.blocks.common.subheading },
     links: {
       type: 'array',
-      label: 'Links',
+      label: keys.pagebuilder.blocks.social_banner.links,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'URL' },
-        iconUrl: createImageField(mediaLibraryAdapter, 'Icon URL'),
+        label: { type: 'text', label: keys.pagebuilder.blocks.social_banner.links_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.social_banner.links_href },
+        iconUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.social_banner.links_icon_url,
+        ),
       },
       defaultItemProps: {
         label: 'Twitter',

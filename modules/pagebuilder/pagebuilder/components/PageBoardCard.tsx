@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageRead } from '../utils/api';
+import { keys, translate, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -21,14 +22,20 @@ function whenLabel(iso: string | null | undefined): string {
   });
 }
 
-/** "in 21d" / "2d ago", from a full timestamp. */
+/** "in 21d" / "2d ago", from a full timestamp.
+ *
+ *  Through `translate` rather than a hook: this is a plain function the card
+ *  calls while rendering, so it reads the language in force at that moment
+ *  without every caller threading `t` in. */
 function relative(iso: string | null | undefined): string {
   if (!iso) return '';
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';
   const days = Math.round((then - Date.now()) / 86_400_000);
-  if (days === 0) return 'today';
-  return days > 0 ? `in ${days}d` : `${-days}d ago`;
+  if (days === 0) return translate(keys.pagebuilder.card.today);
+  return days > 0
+    ? translate(keys.pagebuilder.card.in_days, { count: days })
+    : translate(keys.pagebuilder.card.days_ago, { count: -days });
 }
 
 interface Props {
@@ -53,12 +60,16 @@ export function PageBoardCard({
   onPublish,
   onUnpublish,
 }: Props) {
+  const { t } = useT();
   const scheduled = stage === 'scheduled';
   const published = page.status === 'published';
   const address = publicPath(PUBLIC_PREFIX, page.slug, page.locale, defaultLocale);
 
   const meta = scheduled
-    ? `publishes ${whenLabel(page.publish_at)} · ${relative(page.publish_at)}`
+    ? t(keys.pagebuilder.card.publishes, {
+        when: whenLabel(page.publish_at),
+        relative: relative(page.publish_at),
+      })
     : `${address}${page.updated_at ? ` · ${relative(page.updated_at)}` : ''}`;
 
   return (
@@ -72,7 +83,7 @@ export function PageBoardCard({
         onClick={() => router.visit(`/pagebuilder/${page.id}/edit`)}
         className="block w-full text-left font-medium hover:underline"
       >
-        {page.title || 'Untitled page'}
+        {page.title || t(keys.pagebuilder.card.untitled)}
       </button>
       <p className="mt-0.5 truncate text-xs text-muted-foreground">{meta}</p>
 
@@ -83,19 +94,19 @@ export function PageBoardCard({
           variant="outline"
           onClick={() => router.visit(`/pagebuilder/${page.id}/edit`)}
         >
-          Edit
+          {t(keys.pagebuilder.card.edit)}
         </Button>
 
         {!published && (
           <Button type="button" size="sm" onClick={() => void onPublish(page).catch(() => {})}>
-            {scheduled ? 'Publish now' : 'Publish'}
+            {scheduled ? t(keys.pagebuilder.card.publish_now) : t(keys.pagebuilder.card.publish)}
           </Button>
         )}
 
         {published && (
           <Button type="button" size="sm" variant="outline" asChild>
             <a href={address} target="_blank" rel="noopener noreferrer">
-              View
+              {t(keys.pagebuilder.card.view)}
             </a>
           </Button>
         )}
@@ -106,18 +117,19 @@ export function PageBoardCard({
             // lost — which is the distinction the copy has to carry, or people
             // read "unpublish" as "delete".
             level="medium"
-            title={`Take “${page.title}” offline?`}
+            title={t(keys.pagebuilder.card.unpublish_title, { title: page.title })}
             description={
+              // The address is a <code> span inside the sentence, so the two
+              // halves are separate keys rather than one with a placeholder.
               <>
-                <code>/p/{page.slug}</code> starts answering 404 immediately. Your content is kept —
-                this becomes a draft you can republish.
+                <code>/p/{page.slug}</code> {t(keys.pagebuilder.card.unpublish_description)}
               </>
             }
-            confirmLabel="Unpublish"
+            confirmLabel={t(keys.pagebuilder.card.unpublish)}
             onConfirm={() => onUnpublish(page)}
             trigger={
               <Button type="button" size="sm" variant="ghost">
-                Unpublish
+                {t(keys.pagebuilder.card.unpublish)}
               </Button>
             }
           />
@@ -130,25 +142,22 @@ export function PageBoardCard({
           // has ever seen.
           level={published ? 'high' : 'low'}
           confirmPhrase={published ? page.slug : undefined}
-          title={`Delete "${page.title}"?`}
+          title={t(keys.pagebuilder.row.delete_title, { title: page.title })}
           description={
             published ? (
               <>
-                This page is published. <code>/p/{page.slug}</code> starts answering 404 the moment
-                you confirm. It goes to the trash for 30 days, and after that it is gone.
+                {t(keys.pagebuilder.row.delete_published_before)} <code>/p/{page.slug}</code>{' '}
+                {t(keys.pagebuilder.row.delete_published_after)}
               </>
             ) : (
-              <>
-                It was never published, so nothing on the site changes. It goes to the trash for 30
-                days.
-              </>
+              t(keys.pagebuilder.row.delete_draft)
             )
           }
-          confirmLabel="Delete"
+          confirmLabel={t(keys.pagebuilder.card.delete)}
           onConfirm={() => onDelete(page)}
           trigger={
             <Button type="button" size="sm" variant="ghost" className="text-destructive">
-              Delete
+              {t(keys.pagebuilder.card.delete)}
             </Button>
           }
         />

@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { type CSSProperties, useId } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys, translate } from '../../utils/i18n';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -22,19 +23,19 @@ export type NewsletterWidgetProps = {
 };
 
 export const NewsletterWidget: ComponentConfig<NewsletterWidgetProps> = {
-  label: 'Newsletter signup',
+  label: keys.pagebuilder.blocks.newsletter.label,
   fields: {
-    heading: { type: 'text', label: 'Heading' },
-    subheading: { type: 'textarea', label: 'Subheading' },
-    placeholder: { type: 'text', label: 'Email placeholder' },
-    buttonLabel: { type: 'text', label: 'Button label' },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    subheading: { type: 'textarea', label: keys.pagebuilder.blocks.common.subheading },
+    placeholder: { type: 'text', label: keys.pagebuilder.blocks.newsletter.placeholder },
+    buttonLabel: { type: 'text', label: keys.pagebuilder.blocks.newsletter.button_label },
     privacyText: {
       type: 'text',
-      label: 'Consent text (*word* links to the privacy link)',
+      label: keys.pagebuilder.blocks.newsletter.privacy_text,
     },
-    privacyHref: { type: 'text', label: 'Privacy link' },
-    imageUrl: createImageField(mediaLibraryAdapter, 'Background image (optional)'),
-    imageAlt: { type: 'text', label: 'Background image alt text' },
+    privacyHref: { type: 'text', label: keys.pagebuilder.blocks.newsletter.privacy_href },
+    imageUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.newsletter.image_url),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.newsletter.image_alt },
   },
   defaultProps: {
     heading: 'Subscribe to our newsletter',
@@ -127,7 +128,7 @@ function NewsletterRender({
           <form className="pt-8">
             <div className="flex flex-col gap-4 sm:flex-row">
               <label htmlFor={emailId} className="sr-only">
-                {placeholder || 'Email address'}
+                {placeholder || translate(keys.pagebuilder.blocks.newsletter.email_label)}
               </label>
               <input
                 id={emailId}

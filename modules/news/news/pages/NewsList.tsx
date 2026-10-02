@@ -10,23 +10,42 @@ import { ArticleFilters } from '../components/ArticleFilters';
 import { ArticleRow } from '../components/ArticleRow';
 import { NewArticleDialog } from '../components/NewArticleDialog';
 import { useArticleList } from '../hooks/useArticleList';
-import { detachArticle, publishArticle, updateArticle } from '../utils/api';
+import { deleteArticle, publishArticle, trashArticle, updateArticle } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 
-/** Plural nouns for the empty state, so it reads "No drafts match" rather than
- *  splicing the raw status value in and producing "No draft match". */
-const STATUS_NOUN: Record<string, string> = {
-  draft: 'drafts',
-  published: 'published articles',
-  undated: 'undated articles',
+/** The whole empty-state sentence per status, in each of its two endings.
+ *
+ *  A sentence rather than a noun spliced into one: "No drafts match" and "No
+ *  published articles match" differ by more than a word in a language that
+ *  declines the noun after a negation, and a catalogue holding only the noun
+ *  gives a translator nowhere to say so.
+ */
+const NO_MATCH: Record<string, { query: string; filter: string }> = {
+  '': {
+    query: keys.news.list.no_match_articles_query,
+    filter: keys.news.list.no_match_articles_filter,
+  },
+  draft: {
+    query: keys.news.list.no_match_drafts_query,
+    filter: keys.news.list.no_match_drafts_filter,
+  },
+  published: {
+    query: keys.news.list.no_match_published_query,
+    filter: keys.news.list.no_match_published_filter,
+  },
+  undated: {
+    query: keys.news.list.no_match_undated_query,
+    filter: keys.news.list.no_match_undated_filter,
+  },
 };
 
-/** The article list: search, two-state pipeline filters, and card rows.
+/** The article list: search, status filters, and card rows.
  *
  * Rows are cards rather than table cells because the metadata is a sentence
- * about state ("Draft · publishes in 15d"), not a set of comparable columns —
- * a table would line up four values nobody scans vertically.
+ * about state ("Draft · dated Feb 15"), not a set of comparable columns — a
+ * table would line up four values nobody scans vertically.
  */
 interface LocaleProps {
   /** Every language the site publishes in, and the one that serves at the
@@ -37,10 +56,14 @@ interface LocaleProps {
 }
 
 export default function NewsList() {
+  const { t } = useT();
   const props = usePage<{ props: SharedProps & LocaleProps }>().props as unknown as SharedProps &
     LocaleProps;
   const { auth } = props;
   const canEdit = auth?.permissions?.includes('news.edit');
+  // Hard delete needs `news.publish` too — see `ArticleRow`. Without it a
+  // row offers the recoverable trash instead.
+  const canPublish = auth?.permissions?.includes('news.publish') ?? false;
   const locales = props.locales ?? [];
   const defaultLocale = props.default_locale ?? 'en';
 
@@ -67,16 +90,20 @@ export default function NewsList() {
   }, [load]);
 
   const filtered = !!(filters.q || filters.status || filters.category || filters.locale);
+  const noMatch = NO_MATCH[filters.status] ?? NO_MATCH[''];
 
   return (
     <PageShell
-      title="News"
-      description={`${counts.published} published · ${counts.draft} drafts · public at /news/:slug`}
+      title={t(keys.news.list.title)}
+      description={t(keys.news.list.description, {
+        published: counts.published,
+        draft: counts.draft,
+      })}
       actions={
         canEdit ? <NewArticleDialog locales={locales} defaultLocale={defaultLocale} /> : undefined
       }
     >
-      <Head title="News" />
+      <Head title={t(keys.news.list.title)} />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
       <ArticleFilters
@@ -91,7 +118,7 @@ export default function NewsList() {
       />
 
       {articles === null ? (
-        <div role="status" aria-label="Loading articles" className="space-y-2">
+        <div role="status" aria-label={t(keys.news.list.loading)} className="space-y-2">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
@@ -101,16 +128,15 @@ export default function NewsList() {
           {filtered ? (
             <>
               <p className="font-medium">
-                No {STATUS_NOUN[filters.status] ?? 'articles'} match
-                {filters.q ? ` “${filters.q}”` : ' this filter'}
+                {filters.q ? t(noMatch.query, { query: filters.q }) : t(noMatch.filter)}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {/* Say what a wider filter would find. "No results" alone
                     leaves the reader guessing whether the search or the
                     status pill is the thing that is too narrow. */}
                 {counts.all > 0
-                  ? `${counts.all} article${counts.all === 1 ? '' : 's'} match across all statuses. Widen the filter or clear the search.`
-                  : 'Nothing in the archive matches. Try a shorter search.'}
+                  ? t(keys.news.list.across_statuses, { count: counts.all })
+                  : t(keys.news.list.nothing_in_archive)}
               </p>
               <div className="mt-3 flex justify-center gap-2">
                 {filters.status && counts.all > 0 && (
@@ -120,7 +146,7 @@ export default function NewsList() {
                     size="sm"
                     onClick={() => setFilters({ status: '', offset: 0 })}
                   >
-                    Search all statuses
+                    {t(keys.news.list.search_all_statuses)}
                   </Button>
                 )}
                 <Button
@@ -129,16 +155,15 @@ export default function NewsList() {
                   size="sm"
                   onClick={() => setFilters({ q: '', status: '', category: '', offset: 0 })}
                 >
-                  Clear
+                  {t(keys.news.list.clear)}
                 </Button>
               </div>
             </>
           ) : (
             <>
-              <p className="font-medium">No articles yet</p>
+              <p className="font-medium">{t(keys.news.list.empty_title)}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                “New article” creates a page and opens it in the editor. Set the category and date
-                back here afterwards.
+                {t(keys.news.list.empty_description)}
               </p>
             </>
           )}
@@ -154,10 +179,12 @@ export default function NewsList() {
               article={article}
               busy={busyId === article.id || busy || !canEdit}
               suggestionsId={CATEGORY_SUGGESTIONS_ID}
+              canPublish={canPublish}
               onSave={(id, category, publishedAt) =>
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }
-              onDetach={(id) => runRow(id, () => detachArticle(id))}
+              onDelete={(id) => runRow(id, () => deleteArticle(id))}
+              onTrash={(id) => runRow(id, () => trashArticle(id))}
               onPublish={(target) => runRow(target.id, () => publishArticle(target.id))}
             />
           ))}
@@ -166,12 +193,10 @@ export default function NewsList() {
 
       {articles !== null && articles.length > 0 && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Showing {shown} of {total}
-          </span>
+          <span>{t(keys.news.list.showing, { shown, total })}</span>
           {shown < total && (
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={loadMore}>
-              Load more
+              {t(keys.news.list.load_more)}
             </Button>
           )}
         </div>

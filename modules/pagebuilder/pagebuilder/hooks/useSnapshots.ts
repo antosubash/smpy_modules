@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
+import { keys, translate } from '../utils/i18n';
 import {
   deleteSnapshot,
   type PendingImport,
@@ -34,7 +35,8 @@ export function useSnapshots(initial: Snapshot[], pending: PendingImport | null)
         reload();
         return true;
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Something went wrong';
+        const message =
+          e instanceof Error ? e.message : translate(keys.pagebuilder.snapshots.generic_error);
         setError(message);
         toast.error(message);
         return false;
@@ -49,8 +51,8 @@ export function useSnapshots(initial: Snapshot[], pending: PendingImport | null)
     (note?: string) =>
       guard(async () => {
         await takeSnapshot(note);
-        toast.success('Snapshot taken', {
-          description: 'The site as it stands is now a restore point.',
+        toast.success(translate(keys.pagebuilder.snapshots.taken), {
+          description: translate(keys.pagebuilder.snapshots.taken_description),
         });
       }),
     [guard],

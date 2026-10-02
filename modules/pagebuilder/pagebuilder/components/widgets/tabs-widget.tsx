@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { useId, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
 export type TabItem = {
@@ -12,19 +13,22 @@ export type TabsWidgetProps = {
 };
 
 function TabsRenderer({ items }: TabsWidgetProps) {
+  const { t } = useT();
   const [active, setActive] = useState(0);
   const baseId = useId();
   if (!items || items.length === 0) {
     return (
-      <div className="text-gray-500 text-center py-4">
-        Add tabs in the editor to populate this section.
-      </div>
+      <div className="text-gray-500 text-center py-4">{t(keys.pagebuilder.blocks.tabs.empty)}</div>
     );
   }
   const safeIndex = Math.min(active, items.length - 1);
   return (
     <div className="container mx-auto max-w-3xl py-8">
-      <div className="border-b flex flex-wrap gap-2" role="tablist" aria-label="Tabs">
+      <div
+        className="border-b flex flex-wrap gap-2"
+        role="tablist"
+        aria-label={t(keys.pagebuilder.blocks.tabs.tablist)}
+      >
         {items.map((item, idx) => {
           const isActive = idx === safeIndex;
           const tabId = `${baseId}-tab-${idx}`;
@@ -71,14 +75,14 @@ function TabsRenderer({ items }: TabsWidgetProps) {
 }
 
 export const TabsWidget: ComponentConfig<TabsWidgetProps> = {
-  label: 'Tabs',
+  label: keys.pagebuilder.blocks.tabs.label,
   fields: {
     items: {
       type: 'array',
-      label: 'Tabs',
+      label: keys.pagebuilder.blocks.tabs.items,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        content: { type: 'textarea', label: 'Content' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.tabs.items_label },
+        content: { type: 'textarea', label: keys.pagebuilder.blocks.tabs.items_content },
       },
       defaultItemProps: { label: 'Tab', content: 'Tab content...' },
       min: 1,

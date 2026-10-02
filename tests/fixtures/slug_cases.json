@@ -1,0 +1,34 @@
+{
+  "note": "The one slug rule, stated once. Three implementations derive a URL from a title and they must not disagree: news/slugify.py (the backend that actually mints an article's slug), news/news/utils/slugify.ts (the new-article dialog's preview of it) and pagebuilder/pagebuilder/utils/slugify.ts (the page editor, where the browser IS the source of truth — pagebuilder's server only validates the slug it is handed). Each has a test that reads this file, so a change to any one of them fails somewhere. Expectations were generated from the Python; it is the implementation with a database behind it, so it wins any argument.",
+  "rule": "NFKD-decompose, drop everything that did not come out as ASCII, lowercase, collapse each run of non-alphanumerics into a single hyphen, trim hyphens from both ends, truncate to max_length, trim again.",
+  "dropped_not_separated": "Characters NFKD leaves whole (ß, æ, ø, ł, đ, þ, ħ, CJK) are DROPPED, not turned into hyphens. That is what encode('ascii', 'ignore') does in the Python. Some of the results below are poor slugs because of it — 'Ærø & Ålborg' losing its first word is the worst — but a preview that disagrees with the slug the server mints is worse than an ugly one, and the rule cannot be improved in one place alone: a slug that shifts under an existing article or page silently breaks every link to it already in the wild.",
+  "max_length": 200,
+  "cases": [
+    { "input": "Field Campaign in Estonia", "expected": "field-campaign-in-estonia" },
+    { "input": "  leading and trailing  ", "expected": "leading-and-trailing" },
+    { "input": "--leading hyphens--", "expected": "leading-hyphens" },
+    { "input": "punctuation!!! -- everywhere", "expected": "punctuation-everywhere" },
+    { "input": "CAFÉ 100% Naturel", "expected": "cafe-100-naturel" },
+    { "input": "Ünïcodé folds", "expected": "unicode-folds" },
+    { "input": "Ostrów Wielkopolski", "expected": "ostrow-wielkopolski" },
+    { "input": "Ãnother — em dash", "expected": "another-em-dash" },
+
+    { "input": "Straße Festival", "expected": "strae-festival" },
+    { "input": "Grüße aus Köln", "expected": "grue-aus-koln" },
+    { "input": "Søren Kierkegaard", "expected": "sren-kierkegaard" },
+    { "input": "Reykjavík Þing 2026", "expected": "reykjavik-ing-2026" },
+    { "input": "Zürich Æther", "expected": "zurich-ther" },
+    { "input": "ẞ alone", "expected": "alone" },
+    { "input": "Ærø & Ålborg", "expected": "r-alborg" },
+    { "input": "Łódź Święto", "expected": "odz-swieto" },
+    { "input": "Đà Nẵng đại hội", "expected": "a-nang-ai-hoi" },
+    { "input": "Þórshöfn", "expected": "orshofn" },
+    { "input": "Ħaż-Żebbuġ", "expected": "az-zebbug" },
+
+    { "input": "İstanbul", "expected": "istanbul" },
+
+    { "input": "日本語", "expected": "" },
+    { "input": "???", "expected": "" },
+    { "input": "", "expected": "" }
+  ]
+}

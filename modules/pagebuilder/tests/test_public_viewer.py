@@ -77,3 +77,21 @@ async def test_if_none_match_returns_304(authed_client: AsyncClient) -> None:
     )
     assert second.status_code == 304
     assert second.headers["ETag"] == etag
+
+
+async def test_the_page_etag_does_not_validate_an_in_app_visit(
+    authed_client: AsyncClient,
+) -> None:
+    """A browser holding the full page must not get a 304 for Inertia's JSON:
+    it would hand Inertia the cached HTML and the visit would fail."""
+    await _create_published(authed_client)
+    page = await authed_client.get("/p/hello")
+    assert "X-Inertia" in page.headers["Vary"]
+
+    visit = await authed_client.get(
+        "/p/hello",
+        headers={**_INERTIA_HEADERS, "If-None-Match": page.headers["ETag"]},
+    )
+
+    assert visit.status_code == 200
+    assert visit.headers["ETag"] != page.headers["ETag"]

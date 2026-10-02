@@ -3,15 +3,18 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageRevisionRead, RevisionDiff, RevisionEvent } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { DiffSummary } from '../DiffSummary';
 
+// Catalogue keys, resolved where the list renders — a module-scope constant
+// has no hook to call.
 const EVENT_LABELS: Record<RevisionEvent, string> = {
-  publish: 'Published',
-  unpublish: 'Unpublished',
-  submit: 'Submitted for review',
-  approve: 'Approved',
-  reject: 'Rejected',
+  publish: keys.pagebuilder.history.event_publish,
+  unpublish: keys.pagebuilder.history.event_unpublish,
+  submit: keys.pagebuilder.history.event_submit,
+  approve: keys.pagebuilder.history.event_approve,
+  reject: keys.pagebuilder.history.event_reject,
 };
 
 // Revision events whose ``data`` snapshot matches what /p/{slug} served.
@@ -35,10 +38,15 @@ export function RevisionHistoryPanel({
   onCompare,
   onRestore,
 }: Props) {
+  const { t } = useT();
+  // The raw event name is the fallback for a value the map does not know —
+  // it is not translatable, and saying it is truer than saying nothing.
+  const eventLabel = (event: RevisionEvent) =>
+    EVENT_LABELS[event] ? t(EVENT_LABELS[event]) : event;
   return (
     <div className="border-b bg-muted px-4 py-3 text-sm">
       {revisions.length === 0 ? (
-        <p className="text-muted-foreground">No history yet. Publish or submit to record one.</p>
+        <p className="text-muted-foreground">{t(keys.pagebuilder.history.empty)}</p>
       ) : (
         <ul className="space-y-1 max-h-48 overflow-y-auto">
           {revisions.map((r, idx) => {
@@ -53,15 +61,21 @@ export function RevisionHistoryPanel({
             return (
               <li key={r.id} className="flex items-start justify-between gap-3 py-1">
                 <div className="flex-1 min-w-0">
-                  <span className="font-medium">{EVENT_LABELS[r.event] ?? r.event}</span>
+                  <span className="font-medium">{eventLabel(r.event)}</span>
                   <span className="ml-2">{r.title}</span>
                   <span className="ml-2 text-muted-foreground">
                     {new Date(r.created_at).toLocaleString()}
                   </span>
                   {r.created_by && (
-                    <span className="ml-2 text-muted-foreground">by {r.created_by}</span>
+                    <span className="ml-2 text-muted-foreground">
+                      {t(keys.pagebuilder.history.by, { author: r.created_by })}
+                    </span>
                   )}
-                  {r.note && <div className="mt-0.5 break-words">Note: {r.note}</div>}
+                  {r.note && (
+                    <div className="mt-0.5 break-words">
+                      {t(keys.pagebuilder.history.note, { note: r.note })}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3 shrink-0">
                   {previous && (
@@ -73,7 +87,9 @@ export function RevisionHistoryPanel({
                       onClick={() => onCompare(previous.id, r.id)}
                       data-testid={`compare-${r.id}`}
                     >
-                      {isOpen ? 'Hide diff' : 'Compare'}
+                      {isOpen
+                        ? t(keys.pagebuilder.history.hide_diff)
+                        : t(keys.pagebuilder.history.compare)}
                     </Button>
                   )}
                   {RESTORABLE_EVENTS.has(r.event) && (
@@ -86,12 +102,15 @@ export function RevisionHistoryPanel({
                           className="h-auto p-0"
                           disabled={busy}
                         >
-                          Restore as draft
+                          {t(keys.pagebuilder.history.restore_trigger)}
                         </Button>
                       }
-                      title="Replace the current draft?"
-                      description={`Everything unsaved in the editor is overwritten by the "${EVENT_LABELS[r.event] ?? r.event}" revision from ${new Date(r.created_at).toLocaleString()}. The live page is untouched until you publish again.`}
-                      confirmLabel="Restore"
+                      title={t(keys.pagebuilder.history.restore_title)}
+                      description={t(keys.pagebuilder.history.restore_description, {
+                        event: eventLabel(r.event),
+                        when: new Date(r.created_at).toLocaleString(),
+                      })}
+                      confirmLabel={t(keys.pagebuilder.history.restore)}
                       onConfirm={() => onRestore(r.id)}
                     />
                   )}

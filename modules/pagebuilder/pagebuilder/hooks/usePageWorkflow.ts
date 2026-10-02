@@ -13,6 +13,7 @@ import {
   unpublishPage,
 } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { keys, useT } from '../utils/i18n';
 import type { EditorForm } from './useEditorForm';
 
 interface Params {
@@ -35,6 +36,7 @@ export interface PageWorkflow {
 }
 
 export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params): PageWorkflow {
+  const { t } = useT();
   const snapshotWith = (newData: Data): EditorSnapshot => ({
     ...form.snapshotPayload,
     data: newData,
@@ -60,10 +62,10 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
         const updated = await savePage(form.pageId, draftPayload(newData));
         form.setStatus(updated.status);
         markSaved(snapshotWith(newData));
-        setMessage('Draft saved.');
+        setMessage(t(keys.pagebuilder.workflow.draft_saved));
       }
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Save failed');
+      setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.workflow.save_failed));
     } finally {
       setBusy(false);
     }
@@ -85,7 +87,7 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
       markSaved(snapshotWith(form.data));
       const result = await publishPage(form.pageId, note);
       form.setStatus(result.status);
-      setMessage('Published.');
+      setMessage(t(keys.pagebuilder.workflow.published));
       router.reload({ only: ['revisions'] });
     } finally {
       setBusy(false);
@@ -99,9 +101,9 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     try {
       const result = await unpublishPage(form.pageId);
       form.setStatus(result.status);
-      setMessage('Unpublished.');
+      setMessage(t(keys.pagebuilder.workflow.unpublished));
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Unpublish failed');
+      setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.workflow.unpublish_failed));
     } finally {
       setBusy(false);
     }
@@ -109,7 +111,7 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
 
   const handleSubmitForReview = async () => {
     if (form.pageId === null) {
-      setMessage('Save a draft first.');
+      setMessage(t(keys.pagebuilder.workflow.save_first));
       return;
     }
     setBusy(true);
@@ -119,10 +121,10 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
       markSaved(snapshotWith(form.data));
       const result = await submitPage(form.pageId);
       form.setStatus(result.status);
-      setMessage('Submitted for review.');
+      setMessage(t(keys.pagebuilder.workflow.submitted));
       router.reload({ only: ['revisions', 'page'] });
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Submit failed');
+      setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.workflow.submit_failed));
     } finally {
       setBusy(false);
     }
@@ -135,10 +137,10 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     try {
       const result = await approvePage(form.pageId);
       form.setStatus(result.status);
-      setMessage('Approved and published.');
+      setMessage(t(keys.pagebuilder.workflow.approved));
       router.reload({ only: ['revisions', 'page'] });
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Approve failed');
+      setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.workflow.approve_failed));
     } finally {
       setBusy(false);
     }
@@ -151,7 +153,7 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     try {
       const result = await rejectPage(form.pageId, note);
       form.setStatus(result.status);
-      setMessage('Sent back to draft.');
+      setMessage(t(keys.pagebuilder.workflow.rejected));
       router.reload({ only: ['revisions', 'page'] });
     } finally {
       setBusy(false);

@@ -1,6 +1,8 @@
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
 
+import { keys, useT } from '../../utils/i18n';
+
 const INPUT_ID = 'news-article-tags';
 
 interface Props {
@@ -19,6 +21,7 @@ const SUGGESTIONS_ID = 'news-article-tag-suggestions';
  * than one oddly-named one.
  */
 export function TagInput({ tags, disabled = false, suggestions, onChange }: Props) {
+  const { t } = useT();
   const [draft, setDraft] = useState('');
 
   const add = (raw: string) => {
@@ -47,7 +50,7 @@ export function TagInput({ tags, disabled = false, suggestions, onChange }: Prop
           <button
             type="button"
             disabled={disabled}
-            aria-label={`Remove tag ${tag}`}
+            aria-label={t(keys.news.tag_input.remove, { tag })}
             className="text-muted-foreground hover:text-foreground"
             onClick={() => onChange(tags.filter((t) => t !== tag))}
           >
@@ -58,8 +61,8 @@ export function TagInput({ tags, disabled = false, suggestions, onChange }: Prop
 
       <Input
         id={INPUT_ID}
-        aria-label="Add a tag"
-        placeholder="add…"
+        aria-label={t(keys.news.tag_input.add_label)}
+        placeholder={t(keys.news.tag_input.add_placeholder)}
         list={SUGGESTIONS_ID}
         value={draft}
         disabled={disabled}

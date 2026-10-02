@@ -7,6 +7,8 @@
 
 import type { Config } from '@puckeditor/core';
 
+import { keys } from '../utils/i18n';
+
 import {
   type BlockRegistration,
   declareBuiltInBlocks,
@@ -41,8 +43,8 @@ export const basePageConfig: PageConfig = {
       width: {
         type: 'radio',
         options: [
-          { label: 'Contained', value: 'contained' },
-          { label: 'Full width', value: 'full' },
+          { label: keys.pagebuilder.blocks.page.width_contained, value: 'contained' },
+          { label: keys.pagebuilder.blocks.page.width_full, value: 'full' },
         ],
       },
     },
@@ -115,7 +117,7 @@ export const emptyData = {
  * than specific devices so the preview reflects what visitors see.
  */
 export const editorViewports = [
-  { width: 360, height: 640, label: 'Mobile', icon: 'Smartphone' },
-  { width: 768, height: 1024, label: 'Tablet', icon: 'Tablet' },
-  { width: 1280, height: 800, label: 'Desktop', icon: 'Monitor' },
+  { width: 360, height: 640, label: keys.pagebuilder.blocks.viewports.mobile, icon: 'Smartphone' },
+  { width: 768, height: 1024, label: keys.pagebuilder.blocks.viewports.tablet, icon: 'Tablet' },
+  { width: 1280, height: 800, label: keys.pagebuilder.blocks.viewports.desktop, icon: 'Monitor' },
 ];

@@ -4,88 +4,88 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
-
+import { keys } from '../../utils/i18n';
 import { imageSrcsetField, resolveImageSrcset } from './_shared';
 import { type MediaObjectWidgetProps, MediaObjectWidgetRender } from './media-object-render';
 
 export type * from './media-object-render';
 
 export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
-  label: 'Media object (image + body + link)',
+  label: keys.pagebuilder.blocks.media_object.label,
   fields: {
-    imageUrl: createImageField(mediaLibraryAdapter, 'Image'),
-    imageAlt: { type: 'text', label: 'Image alt text' },
+    imageUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.media_object.image_url),
+    imageAlt: { type: 'text', label: keys.pagebuilder.blocks.common.image_alt },
     imageSrcset: imageSrcsetField,
     imageMaskUrl: {
       type: 'text',
-      label: 'Image mask URL (organic shape — optional)',
+      label: keys.pagebuilder.blocks.media_object.image_mask_url,
     },
     imageShape: {
       type: 'select',
-      label: 'Image shape',
+      label: keys.pagebuilder.blocks.media_object.image_shape,
       options: [
-        { label: 'Rounded rectangle', value: 'rounded' },
-        { label: "Image's own shape (transparent artwork)", value: 'native' },
+        { label: keys.pagebuilder.blocks.media_object.image_shape_rounded, value: 'rounded' },
+        { label: keys.pagebuilder.blocks.media_object.image_shape_native, value: 'native' },
       ],
     },
-    imageTag: { type: 'text', label: 'Image tag (overlay top-left)' },
-    imageTagColor: { type: 'text', label: 'Image tag color (CSS)' },
+    imageTag: { type: 'text', label: keys.pagebuilder.blocks.media_object.image_tag },
+    imageTagColor: { type: 'text', label: keys.pagebuilder.blocks.media_object.image_tag_color },
     imageTagMaskUrl: {
       type: 'text',
-      label: 'Image tag mask URL (organic tag shape — optional)',
+      label: keys.pagebuilder.blocks.media_object.image_tag_mask_url,
     },
     imageTagImageUrl: {
       type: 'text',
-      label: 'Image tag artwork (transparent PNG — replaces mask + colour)',
+      label: keys.pagebuilder.blocks.media_object.image_tag_image_url,
     },
     imagePosition: {
       type: 'select',
-      label: 'Image position',
+      label: keys.pagebuilder.blocks.media_object.image_position,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Right', value: 'right' },
+        { label: keys.pagebuilder.blocks.media_object.image_position_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.media_object.image_position_right, value: 'right' },
       ],
     },
-    eyebrow: { type: 'text', label: 'Eyebrow (grid/banner layouts)' },
-    datePill: { type: 'text', label: 'Date pill (above heading)' },
-    datePillColor: { type: 'text', label: 'Date pill color (CSS)' },
-    heading: { type: 'text', label: 'Heading' },
-    body: { type: 'textarea', label: 'Body' },
-    linkLabel: { type: 'text', label: 'Link label' },
-    linkHref: { type: 'text', label: 'Link URL' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.media_object.eyebrow },
+    datePill: { type: 'text', label: keys.pagebuilder.blocks.media_object.date_pill },
+    datePillColor: { type: 'text', label: keys.pagebuilder.blocks.media_object.date_pill_color },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    body: { type: 'textarea', label: keys.pagebuilder.blocks.common.body },
+    linkLabel: { type: 'text', label: keys.pagebuilder.blocks.media_object.link_label },
+    linkHref: { type: 'text', label: keys.pagebuilder.blocks.media_object.link_href },
     headingWidth: {
       type: 'select',
-      label: 'Heading width',
+      label: keys.pagebuilder.blocks.media_object.heading_width,
       options: [
-        { label: 'Auto', value: 'auto' },
-        { label: 'Narrow (wrap)', value: 'narrow' },
+        { label: keys.pagebuilder.blocks.media_object.heading_width_auto, value: 'auto' },
+        { label: keys.pagebuilder.blocks.media_object.heading_width_narrow, value: 'narrow' },
       ],
     },
     layout: {
       type: 'select',
-      label: 'Layout',
+      label: keys.pagebuilder.blocks.media_object.layout,
       options: [
-        { label: 'Half (50/50 split)', value: 'half' },
-        { label: 'Page grid (12-col)', value: 'grid' },
-        { label: 'Banner (image below text)', value: 'banner' },
+        { label: keys.pagebuilder.blocks.media_object.layout_half, value: 'half' },
+        { label: keys.pagebuilder.blocks.media_object.layout_grid, value: 'grid' },
+        { label: keys.pagebuilder.blocks.media_object.layout_banner, value: 'banner' },
       ],
     },
     textWidth: {
       type: 'select',
-      label: 'Text width (page-grid layout)',
+      label: keys.pagebuilder.blocks.media_object.text_width,
       options: [
-        { label: 'Auto', value: 'auto' },
-        { label: 'XS (~315px)', value: 'xs' },
-        { label: 'SM (~432px)', value: 'sm' },
-        { label: 'MD (~546px)', value: 'md' },
+        { label: keys.pagebuilder.blocks.media_object.text_width_auto, value: 'auto' },
+        { label: keys.pagebuilder.blocks.media_object.text_width_xs, value: 'xs' },
+        { label: keys.pagebuilder.blocks.media_object.text_width_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.media_object.text_width_md, value: 'md' },
       ],
     },
     bullets: {
       type: 'array',
-      label: 'Points (bulleted list under the body)',
+      label: keys.pagebuilder.blocks.media_object.bullets,
       arrayFields: {
-        title: { type: 'text', label: 'Point title' },
-        body: { type: 'textarea', label: 'Point body (optional)' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.media_object.bullets_title },
+        body: { type: 'textarea', label: keys.pagebuilder.blocks.media_object.bullets_body },
       },
       defaultItemProps: { title: '', body: '' },
       min: 0,
@@ -93,36 +93,36 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
     },
     bulletSize: {
       type: 'select',
-      label: 'Point title size',
+      label: keys.pagebuilder.blocks.media_object.bullet_size,
       options: [
-        { label: '20px', value: 'md' },
-        { label: '24px', value: 'lg' },
+        { label: keys.pagebuilder.blocks.media_object.bullet_size_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.media_object.bullet_size_lg, value: 'lg' },
       ],
     },
-    bodyMaxWidth: { type: 'text', label: 'Body max width (CSS, e.g. 478px)' },
-    footnote: { type: 'text', label: 'Footnote (semibold italic, under body)' },
+    bodyMaxWidth: { type: 'text', label: keys.pagebuilder.blocks.media_object.body_max_width },
+    footnote: { type: 'text', label: keys.pagebuilder.blocks.media_object.footnote },
     linkVariant: {
       type: 'select',
-      label: 'Link style',
+      label: keys.pagebuilder.blocks.media_object.link_variant,
       options: [
-        { label: 'Text link', value: 'link' },
-        { label: 'Button', value: 'button' },
+        { label: keys.pagebuilder.blocks.media_object.link_variant_link, value: 'link' },
+        { label: keys.pagebuilder.blocks.media_object.link_variant_button, value: 'button' },
       ],
     },
     bulletMarker: {
       type: 'select',
-      label: 'Point marker',
+      label: keys.pagebuilder.blocks.media_object.bullet_marker,
       options: [
-        { label: 'Square', value: 'square' },
-        { label: 'None', value: 'none' },
+        { label: keys.pagebuilder.blocks.media_object.bullet_marker_square, value: 'square' },
+        { label: keys.pagebuilder.blocks.media_object.bullet_marker_none, value: 'none' },
       ],
     },
     logos: {
       type: 'array',
-      label: 'Logos (optional)',
+      label: keys.pagebuilder.blocks.media_object.logos,
       arrayFields: {
-        src: createImageField(mediaLibraryAdapter, 'Logo image'),
-        alt: { type: 'text', label: 'Alt text' },
+        src: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.media_object.logos_src),
+        alt: { type: 'text', label: keys.pagebuilder.blocks.media_object.logos_alt },
       },
       defaultItemProps: { src: '', alt: '' },
       // Explicit 0: the strip is optional (defaultProps ships []) — declared
@@ -132,16 +132,16 @@ export const MediaObjectWidget: ComponentConfig<MediaObjectWidgetProps> = {
     },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.media_object.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Dark', value: 'dark' },
-        { label: 'Muted (soft card)', value: 'muted' },
+        { label: keys.pagebuilder.blocks.media_object.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.media_object.surface_dark, value: 'dark' },
+        { label: keys.pagebuilder.blocks.media_object.surface_muted, value: 'muted' },
       ],
     },
     surfaceColor: {
       type: 'text',
-      label: 'Surface color (CSS, white text — optional)',
+      label: keys.pagebuilder.blocks.common.surface_color,
     },
   },
   defaultProps: {

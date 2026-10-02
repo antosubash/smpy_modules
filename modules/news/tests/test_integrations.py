@@ -1,118 +1,180 @@
 """Unit tests for the seam news borrows pagebuilder through.
 
-``news.integrations.pagebuilder`` is the only module here that imports that
-package, so it is also the only place where a change on pagebuilder's side can
-break news silently. Everything the seam restates rather than imports — the
-status vocabulary, the slug rules, the admin routes — is pinned here against
-pagebuilder's own declarations rather than against a copy of them.
-
-Synchronous, and therefore in its own file: the endpoint tests carry a
-module-level ``asyncio`` mark that a plain function must not inherit.
+``news.integrations`` is the only package here that imports pagebuilder, so it
+is also the only place where a change on pagebuilder's side (or its absence)
+can break news silently. This is asserted rather than left to review because it
+is the kind of thing a single convenient import quietly undoes, and nothing
+else would fail.
 """
 
 from __future__ import annotations
 
-import re
+import ast
+import pathlib
 from datetime import UTC, datetime, timedelta, timezone
 
-import pytest
+import news
 from news import settings as news_settings
-from news.constants import MAX_SLUG_LEN
-from news.contracts.schemas import ArticleStatus
 from news.display_date import as_display_date
 from news.integrations import pagebuilder as pb
-from news.integrations import pages as pb_pages
 from news.settings import NewsSettings, public_article_path
-from pagebuilder.contracts.schemas import PageCreate
 
-# Pagebuilder's own constraint on the field, read off the schema rather than
-# copied, so tightening it there fails here instead of in production.
-PAGE_SLUG_PATTERN = re.compile(PageCreate.model_fields["slug"].metadata[-1].pattern)
+
+def _imports_pagebuilder(node: ast.AST) -> bool:
+    """Whether one AST node is an import of pagebuilder.
+
+    Parsed rather than grepped. The regex this replaced matched any line
+    *beginning* "from pagebuilder", which a wrapped docstring does about as
+    often as an import does — ``endpoints/views.py`` tripped it with the prose
+    "borrowed \\n from pagebuilder where that module is installed". Parsing also
+    catches the opposite mistake, an import the regex cannot see: one indented
+    inside a function still binds the package.
+    """
+    if isinstance(node, ast.Import):
+        names = [alias.name for alias in node.names]
+    elif isinstance(node, ast.ImportFrom) and node.level == 0:
+        names = [node.module or ""]
+    else:
+        return False
+    return any(name == "pagebuilder" or name.startswith("pagebuilder.") for name in names)
 
 
 class TestNoOtherModuleImportsPagebuilder:
     def test_the_seam_is_the_only_importer(self) -> None:
         """The rule the whole package exists to state.
 
-        Asserted rather than left to review because it is the kind of thing a
-        single convenient import quietly undoes, and nothing else would fail.
-
         The unit is ``news/integrations/`` rather than one file in it — which
         is what the package docstring has always said. It outgrew a single
-        module when the 300-line cap split the page *writes* and the content
-        locales into siblings; both still sit behind the same boundary, and
-        widening the check to the directory is what keeps it checkable by
-        reading one directory listing.
+        module when the 300-line cap split the content locales into a sibling;
+        both still sit behind the same boundary, and widening the check to the
+        directory is what keeps it checkable by reading one directory listing.
+
+        Every node, not just module scope: outside the seam a deferred import
+        is no better than an eager one, because the package is bound either
+        way the moment that code path runs.
         """
-        import pathlib
-
-        import news
-
         root = pathlib.Path(news.__file__).parent
         seam = root / "integrations"
         offenders = sorted(
             path.relative_to(root).as_posix()
             for path in root.rglob("*.py")
             if seam not in path.parents
-            and re.search(r"^\s*(from|import) pagebuilder", path.read_text(), re.M)
+            and any(_imports_pagebuilder(n) for n in ast.walk(ast.parse(path.read_text())))
         )
 
         assert offenders == []
 
+    def test_the_seam_itself_defers_its_imports(self) -> None:
+        """Being inside the seam is not enough — the import must be deferred.
 
-class TestSlugForTitle:
-    @pytest.mark.parametrize(
-        ("title", "expected"),
-        [
-            ("Field Campaign in Estonia", "field-campaign-in-estonia"),
-            ("  leading and trailing  ", "leading-and-trailing"),
-            ("Ünïcodé folds", "unicode-folds"),
-            ("punctuation!!! -- everywhere", "punctuation-everywhere"),
-            ("--leading hyphens--", "leading-hyphens"),
-        ],
-    )
-    def test_folds_a_title_to_a_slug(self, title: str, expected: str) -> None:
-        assert pb_pages.slug_for_title(title) == expected
-
-    @pytest.mark.parametrize(
-        "title",
-        [
-            "Field Campaign in Estonia",
-            "--leading hyphens--",
-            "Ünïcodé folds",
-            "a " * 300,
-            "x" * 500,
-            # Nothing survives the fold, so the shared fallback is all that
-            # stands between this and a slug the column rejects.
-            "???",
-            "日本語",
-        ],
-    )
-    def test_anything_at_all_satisfies_pagebuilders_pattern(self, title: str) -> None:
-        """A slug that fails the pattern is a 422 the author cannot act on.
-
-        Truncating to the column bound is where this nearly went wrong: the cut
-        can land mid-separator, and a trailing hyphen fails the pattern.
+        ``news.settings`` reads the content locales, which live in
+        ``integrations.locales``. If that module imported pagebuilder at module
+        scope, importing ``news.settings`` would pull pagebuilder in, and news
+        would stop booting on a host that installed it without the optional
+        ``pagebuilder`` extra — the arrangement this module's whole shape
+        exists to allow. The check above would not catch it, because the
+        offending import sits legitimately inside the seam.
         """
-        slug = pb_pages.slug_for_title(title)
+        seam = pathlib.Path(news.__file__).parent / "integrations"
+        offenders = sorted(
+            path.name
+            for path in seam.glob("*.py")
+            # Module scope only, deliberately: inside the seam a deferred
+            # import is the whole point, and only a top-level one makes the
+            # package a hard requirement of importing news.
+            if any(_imports_pagebuilder(n) for n in ast.parse(path.read_text()).body)
+        )
 
-        assert slug, "never empty — the column is unique and NOT NULL"
-        assert len(slug) <= MAX_SLUG_LEN
-        assert PAGE_SLUG_PATTERN.match(slug)
+        assert offenders == [], (
+            f"{offenders} import pagebuilder at module scope; defer it into the "
+            "function that needs it so news imports without the optional extra"
+        )
 
 
-class TestArticleStatus:
-    def test_every_page_status_has_a_news_name(self) -> None:
-        """News' enum is its own, so only a test keeps the two total.
+class TestNewsImportsWithoutPagebuilder:
+    """The property the two tests above are only a proxy for.
 
-        A status added to pagebuilder that news cannot name would otherwise
-        surface as a ValueError raised from inside a listing.
+    They check *where* imports sit; this checks what that buys — that news
+    boots on a host which never installed the optional extra. Worth asserting
+    directly, because the proxy can pass while the property fails: an import
+    deferred into a function still raises when the function runs, and a
+    ``from pagebuilder import x`` written as ``importlib.import_module`` is
+    invisible to a parser.
+
+    In a subprocess, because the only honest way to ask is to make the package
+    genuinely unimportable, and this workspace has it installed.
+    """
+
+    def test_the_whole_module_imports_with_the_package_blocked(self) -> None:
+        import subprocess
+        import sys
+        import textwrap
+
+        probe = textwrap.dedent("""
+            import sys
+
+            class Blocker:
+                def find_spec(self, name, path=None, target=None):
+                    if name == "pagebuilder" or name.startswith("pagebuilder."):
+                        raise ImportError("pagebuilder is not installed")
+                    return None
+
+            sys.meta_path.insert(0, Blocker())
+
+            # Everything a host touches on the way up. `settings` and `models`
+            # are the load-bearing two: `models` is what alembic imports, so a
+            # hard dependency here stops the database migrating at all.
+            import news.settings
+            import news.models
+            import news.module
+            import news.locales
+            import news.service
+            import news.endpoints.api
+            import news.endpoints.views
+
+            from news.integrations import pagebuilder as pb
+
+            assert pb.available() is False, "available() must answer, not raise"
+            assert pb.page_editor_path(7) == ""
+            assert news.locales.supported() == ("en",)
+            assert news.locales.default() == "en"
+
+            print("ok")
+        """)
+
+        done = subprocess.run(
+            [sys.executable, "-c", probe], capture_output=True, text=True
+        )
+
+        assert done.returncode == 0, done.stderr
+        assert done.stdout.strip().endswith("ok")
+
+
+class TestAvailability:
+    """The seam's whole job on a host that did not install the extra.
+
+    There was a ``TestArticleStatus`` here that walked ``pb.PageStatus`` and
+    checked news could name every one of them. It went with the re-export: an
+    article's status is a column on ``NewsArticle`` now, and news' enum answers
+    to nothing in another module. Keeping the test would have pinned a coupling
+    this branch exists to remove.
+    """
+
+    def test_availability_is_a_question_and_not_an_import(self) -> None:
+        # Truthy or falsy either way — what matters is that asking is safe.
+        assert pb.available() in (True, False)
+
+    def test_the_links_go_nowhere_without_it(self, monkeypatch) -> None:
+        """A missing neighbour is a missing affordance, not a broken link.
+
+        The frontend renders a section's "see all" only when it has somewhere
+        to send you, so "" is what a host without pagebuilder should get.
         """
-        for status in pb.PageStatus:
-            assert pb.article_status(status) == ArticleStatus(status.value)
+        monkeypatch.setattr(pb, "available", lambda: False)
 
-    def test_the_two_vocabularies_have_not_drifted(self) -> None:
-        assert {s.value for s in ArticleStatus} == {s.value for s in pb.PageStatus}
+        assert pb.page_editor_path(7) == ""
+        assert pb.media_library_path() == ""
+        assert pb.page_search_path("sensors") == ""
 
 
 class TestRoutes:

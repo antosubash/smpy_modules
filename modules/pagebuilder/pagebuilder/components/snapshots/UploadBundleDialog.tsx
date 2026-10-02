@@ -13,6 +13,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type ReactNode, useState } from 'react';
 
 import { usePendingDialog } from '../../hooks/usePendingDialog';
+import { keys, useT } from '../../utils/i18n';
 import { uploadBundle } from '../../utils/snapshotsApi';
 
 const FILE_INPUT = 'snapshot-bundle-file';
@@ -35,9 +36,11 @@ export function UploadBundleDialog({
   trigger: ReactNode;
   onUploaded: () => void;
 }) {
+  const { t } = useT();
   const [file, setFile] = useState<File | null>(null);
-  const { open, pending, error, change, run } = usePendingDialog('Upload failed', () =>
-    setFile(null),
+  const { open, pending, error, change, run } = usePendingDialog(
+    t(keys.pagebuilder.bundle.upload_failed),
+    () => setFile(null),
   );
 
   return (
@@ -45,15 +48,12 @@ export function UploadBundleDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload a bundle</DialogTitle>
-          <DialogDescription>
-            Adds the bundle to this list. Nothing on the site changes until you restore it and an
-            approver applies it.
-          </DialogDescription>
+          <DialogTitle>{t(keys.pagebuilder.bundle.title)}</DialogTitle>
+          <DialogDescription>{t(keys.pagebuilder.bundle.description)}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-2 py-2">
-          <Label htmlFor={FILE_INPUT}>Bundle (.zip)</Label>
+          <Label htmlFor={FILE_INPUT}>{t(keys.pagebuilder.bundle.file_label)}</Label>
           <Input
             id={FILE_INPUT}
             type="file"
@@ -67,7 +67,7 @@ export function UploadBundleDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => change(false)} disabled={pending}>
-            Cancel
+            {t(keys.pagebuilder.bundle.cancel)}
           </Button>
           <Button
             disabled={!file || pending}
@@ -79,7 +79,7 @@ export function UploadBundleDialog({
               })
             }
           >
-            {pending ? 'Uploading…' : 'Upload'}
+            {pending ? t(keys.pagebuilder.bundle.uploading) : t(keys.pagebuilder.bundle.upload)}
           </Button>
         </DialogFooter>
       </DialogContent>

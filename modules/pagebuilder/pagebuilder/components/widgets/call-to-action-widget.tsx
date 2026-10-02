@@ -4,49 +4,49 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
-
+import { keys } from '../../utils/i18n';
 import { type CallToActionWidgetProps, CallToActionWidgetRender } from './call-to-action-render';
 
 export type * from './call-to-action-render';
 
 export const CallToActionWidget: ComponentConfig<CallToActionWidgetProps> = {
-  label: 'Call to action',
+  label: keys.pagebuilder.blocks.call_to_action.label,
   fields: {
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.call_to_action.surface,
       options: [
-        { label: 'Default (accent)', value: 'default' },
-        { label: 'Lime band', value: 'lime' },
-        { label: 'Soft band (links)', value: 'soft' },
-        { label: 'Related links band', value: 'related' },
+        { label: keys.pagebuilder.blocks.call_to_action.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.call_to_action.surface_lime, value: 'lime' },
+        { label: keys.pagebuilder.blocks.call_to_action.surface_soft, value: 'soft' },
+        { label: keys.pagebuilder.blocks.call_to_action.surface_related, value: 'related' },
       ],
     },
     surfaceColor: {
       type: 'text',
-      label: 'Surface color (CSS, white text — optional)',
+      label: keys.pagebuilder.blocks.common.surface_color,
     },
-    eyebrow: { type: 'text', label: 'Eyebrow' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.eyebrow },
     align: {
       type: 'select',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.common.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
+        { label: keys.pagebuilder.blocks.common.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.common.align_center, value: 'center' },
       ],
     },
-    heading: { type: 'text', label: 'Heading' },
-    subheading: { type: 'textarea', label: 'Subheading' },
-    primaryLabel: { type: 'text', label: 'Primary label' },
-    primaryHref: { type: 'text', label: 'Primary link' },
-    secondaryLabel: { type: 'text', label: 'Secondary label' },
-    secondaryHref: { type: 'text', label: 'Secondary link' },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
+    subheading: { type: 'textarea', label: keys.pagebuilder.blocks.common.subheading },
+    primaryLabel: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.primary_label },
+    primaryHref: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.primary_href },
+    secondaryLabel: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.secondary_label },
+    secondaryHref: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.secondary_href },
     links: {
       type: 'array',
-      label: 'Links (soft band)',
+      label: keys.pagebuilder.blocks.call_to_action.links,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'URL' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.links_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.links_href },
       },
       defaultItemProps: { label: 'Link', href: '#' },
       min: 1,
@@ -54,11 +54,14 @@ export const CallToActionWidget: ComponentConfig<CallToActionWidgetProps> = {
     },
     images: {
       type: 'array',
-      label: 'Images (lime band)',
+      label: keys.pagebuilder.blocks.call_to_action.images,
       arrayFields: {
-        src: createImageField(mediaLibraryAdapter, 'Image'),
-        alt: { type: 'text', label: 'Alt text' },
-        caption: { type: 'text', label: 'Caption' },
+        src: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.call_to_action.images_src,
+        ),
+        alt: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.images_alt },
+        caption: { type: 'text', label: keys.pagebuilder.blocks.call_to_action.images_caption },
       },
       defaultItemProps: { src: '', alt: '', caption: '' },
       min: 1,

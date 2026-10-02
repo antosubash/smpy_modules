@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import type { PageRead } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { localeLabel, localePrefix } from '../utils/locale';
 import { createPage, listPages, listTemplates } from '../utils/pagesApi';
 import { slugify } from '../utils/slugify';
@@ -55,6 +56,7 @@ export function NewPageDialog({
   locales = ['en'],
   defaultLocale = 'en',
 }: Props) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   // Null until the author edits it: while it is null the slug tracks the title,
@@ -124,7 +126,7 @@ export function NewPageDialog({
   return (
     <Dialog open={open} onOpenChange={reset}>
       <DialogTrigger asChild>
-        <Button type="button">New page</Button>
+        <Button type="button">{t(keys.pagebuilder.new_page.trigger)}</Button>
       </DialogTrigger>
       <DialogContent>
         <form
@@ -134,28 +136,26 @@ export function NewPageDialog({
           }}
         >
           <DialogHeader>
-            <DialogTitle>New page</DialogTitle>
-            <DialogDescription>
-              A few fields, all changeable later except the language. Creating opens the editor.
-            </DialogDescription>
+            <DialogTitle>{t(keys.pagebuilder.new_page.title)}</DialogTitle>
+            <DialogDescription>{t(keys.pagebuilder.new_page.description)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor={TITLE_ID}>Title</Label>
+              <Label htmlFor={TITLE_ID}>{t(keys.pagebuilder.new_page.title_label)}</Label>
               <Input
                 id={TITLE_ID}
                 value={title}
                 autoFocus
                 disabled={pending}
-                placeholder="Field methods"
+                placeholder={t(keys.pagebuilder.new_page.title_placeholder)}
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
 
             {locales.length > 1 && (
               <div className="grid gap-2">
-                <Label htmlFor={LOCALE_ID}>Language</Label>
+                <Label htmlFor={LOCALE_ID}>{t(keys.pagebuilder.new_page.language_label)}</Label>
                 <NativeSelect
                   id={LOCALE_ID}
                   value={locale}
@@ -176,14 +176,13 @@ export function NewPageDialog({
                   ))}
                 </NativeSelect>
                 <p className="text-xs text-muted-foreground">
-                  Fixed once the page exists. To publish the same page in another language, add a
-                  translation from the editor's Languages tab.
+                  {t(keys.pagebuilder.new_page.language_help)}
                 </p>
               </div>
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor={SLUG_ID}>URL</Label>
+              <Label htmlFor={SLUG_ID}>{t(keys.pagebuilder.new_page.url_label)}</Label>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-muted-foreground">
                   {localePrefix(locale, defaultLocale)}
@@ -199,16 +198,16 @@ export function NewPageDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={START_ID}>Start from</Label>
+              <Label htmlFor={START_ID}>{t(keys.pagebuilder.new_page.start_label)}</Label>
               <NativeSelect
                 id={START_ID}
                 value={startFrom}
                 disabled={pending}
                 onChange={(e) => setStartFrom(e.target.value)}
               >
-                <option value={BLANK}>Blank</option>
+                <option value={BLANK}>{t(keys.pagebuilder.new_page.start_blank)}</option>
                 {templates.length > 0 && (
-                  <NativeSelectOptGroup label="Templates">
+                  <NativeSelectOptGroup label={t(keys.pagebuilder.new_page.start_templates)}>
                     {templates.map((t) => (
                       <option key={t.id} value={String(t.id)}>
                         {t.title}
@@ -217,7 +216,7 @@ export function NewPageDialog({
                   </NativeSelectOptGroup>
                 )}
                 {copyable.length > 0 && (
-                  <NativeSelectOptGroup label="Copy a page">
+                  <NativeSelectOptGroup label={t(keys.pagebuilder.new_page.start_copy)}>
                     {copyable.map((p) => (
                       <option key={p.id} value={String(p.id)}>
                         {p.title}
@@ -227,20 +226,19 @@ export function NewPageDialog({
                 )}
               </NativeSelect>
               <p className="text-xs text-muted-foreground">
-                Templates are ordinary pages flagged as templates, so the set grows without a
-                developer.
+                {t(keys.pagebuilder.new_page.start_help)}
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor={PARENT_ID}>Parent</Label>
+              <Label htmlFor={PARENT_ID}>{t(keys.pagebuilder.new_page.parent_label)}</Label>
               <NativeSelect
                 id={PARENT_ID}
                 value={parentId}
                 disabled={pending}
                 onChange={(e) => setParentId(e.target.value)}
               >
-                <option value="">None</option>
+                <option value="">{t(keys.pagebuilder.new_page.parent_none)}</option>
                 {pages
                   .filter((p) => p.locale === locale)
                   .map((p) => (
@@ -250,8 +248,7 @@ export function NewPageDialog({
                   ))}
               </NativeSelect>
               <p className="text-xs text-muted-foreground">
-                Optional. Affects the breadcrumb, not the URL. Only pages in the same language — a
-                breadcrumb that crosses languages sends a reader out of theirs.
+                {t(keys.pagebuilder.new_page.parent_help)}
               </p>
             </div>
 
@@ -260,10 +257,12 @@ export function NewPageDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => reset(false)}>
-              Cancel
+              {t(keys.pagebuilder.new_page.cancel)}
             </Button>
             <Button type="submit" disabled={pending || !title.trim() || !slug}>
-              {pending ? 'Creating…' : 'Create and open editor'}
+              {pending
+                ? t(keys.pagebuilder.new_page.creating)
+                : t(keys.pagebuilder.new_page.create)}
             </Button>
           </DialogFooter>
         </form>

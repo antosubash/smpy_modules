@@ -6,6 +6,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import type { ReactNode } from 'react';
 
 import type { PageRead } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 
 const TITLE_ID = 'page-settings-title';
 const SLUG_ID = 'page-settings-slug';
@@ -61,48 +62,49 @@ export function PageSettingsPanel({
   publicPrefix,
   actions,
 }: Props) {
+  const { t } = useT();
   const slugMoved = savedSlug !== null && savedSlug !== slug;
 
   return (
     <div className="grid gap-5 text-sm md:grid-cols-2">
       <div className="grid gap-2">
-        <Label htmlFor={TITLE_ID}>Title</Label>
+        <Label htmlFor={TITLE_ID}>{t(keys.pagebuilder.settings.title)}</Label>
         <Input id={TITLE_ID} value={title} onChange={(e) => onTitleChange(e.target.value)} />
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={SLUG_ID}>URL</Label>
+        <Label htmlFor={SLUG_ID}>{t(keys.pagebuilder.settings.url)}</Label>
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">{publicPrefix}/</span>
           <Input id={SLUG_ID} value={slug} onChange={(e) => onSlugChange(e.target.value)} />
         </div>
         <p className="text-xs text-muted-foreground">
           {slugMoved
-            ? `Saving leaves a permanent redirect from ${publicPrefix}/${savedSlug}, so existing links keep working.`
-            : 'Changing this leaves a redirect from the old URL.'}
+            ? t(keys.pagebuilder.settings.slug_moved, { from: `${publicPrefix}/${savedSlug}` })
+            : t(keys.pagebuilder.settings.slug_help)}
         </p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={PARENT_ID}>Parent page</Label>
+        <Label htmlFor={PARENT_ID}>{t(keys.pagebuilder.settings.parent)}</Label>
         <NativeSelect
           id={PARENT_ID}
           value={parentId === null ? '' : String(parentId)}
           onChange={(e) => onParentChange(e.target.value ? Number(e.target.value) : null)}
         >
-          <option value="">None</option>
+          <option value="">{t(keys.pagebuilder.settings.parent_none)}</option>
           {pages.map((page) => (
             <option key={page.id} value={String(page.id)}>
               {page.title}
             </option>
           ))}
         </NativeSelect>
-        <p className="text-xs text-muted-foreground">Affects the breadcrumb, not the URL.</p>
+        <p className="text-xs text-muted-foreground">{t(keys.pagebuilder.settings.parent_help)}</p>
       </div>
 
       <fieldset className="m-0 grid content-start gap-3 border-0 p-0">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Navigation
+          {t(keys.pagebuilder.settings.navigation)}
         </legend>
         <div className="flex items-center gap-2">
           <Checkbox
@@ -110,7 +112,7 @@ export function PageSettingsPanel({
             checked={showInHeaderNav}
             onCheckedChange={(checked) => onShowInHeaderNavChange(checked === true)}
           />
-          <Label htmlFor={HEADER_ID}>Show in header nav</Label>
+          <Label htmlFor={HEADER_ID}>{t(keys.pagebuilder.settings.show_in_header)}</Label>
         </div>
         <div className="flex items-center gap-2">
           <Checkbox
@@ -118,14 +120,14 @@ export function PageSettingsPanel({
             checked={showInFooter}
             onCheckedChange={(checked) => onShowInFooterChange(checked === true)}
           />
-          <Label htmlFor={FOOTER_ID}>Show in footer</Label>
+          <Label htmlFor={FOOTER_ID}>{t(keys.pagebuilder.settings.show_in_footer)}</Label>
         </div>
-        <p className="text-xs text-muted-foreground">Order is set in the site layout editor.</p>
+        <p className="text-xs text-muted-foreground">{t(keys.pagebuilder.settings.nav_help)}</p>
       </fieldset>
 
       <fieldset className="m-0 grid content-start gap-3 border-0 p-0">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Visibility
+          {t(keys.pagebuilder.settings.visibility)}
         </legend>
         <div className="flex items-center gap-2">
           <Checkbox
@@ -133,11 +135,13 @@ export function PageSettingsPanel({
             checked={indexInSearch}
             onCheckedChange={(checked) => onIndexInSearchChange(checked === true)}
           />
-          <Label htmlFor={INDEX_ID}>Allow indexing</Label>
+          <Label htmlFor={INDEX_ID}>{t(keys.pagebuilder.settings.allow_indexing)}</Label>
         </div>
+        {/* `noindex` is a <code> span inside the sentence, so the two halves
+            are separate keys rather than one with a placeholder. */}
         <p className="text-xs text-muted-foreground">
-          Off emits <code>noindex</code> and drops the page from the sitemap. Whether it is public
-          at all is the publish state, set from the toolbar.
+          {t(keys.pagebuilder.settings.indexing_help_before)} <code>noindex</code>{' '}
+          {t(keys.pagebuilder.settings.indexing_help_after)}
         </p>
       </fieldset>
 

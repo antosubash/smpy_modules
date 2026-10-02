@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 
 import { listMedia, type MediaAssetRead, rememberPickedAsset } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 
 interface MediaPickerProps {
   value: string;
@@ -18,6 +19,7 @@ interface MediaPickerProps {
 }
 
 export function MediaPicker({ value, onChange, readOnly }: MediaPickerProps) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
 
   return (
@@ -27,7 +29,7 @@ export function MediaPicker({ value, onChange, readOnly }: MediaPickerProps) {
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         readOnly={readOnly}
-        placeholder="Pick from library or paste a URL"
+        placeholder={t(keys.pagebuilder.media_picker.placeholder)}
         className="w-full px-2 py-1.5 border rounded text-sm"
       />
       <div className="flex gap-2">
@@ -37,7 +39,7 @@ export function MediaPicker({ value, onChange, readOnly }: MediaPickerProps) {
           onClick={() => setOpen(true)}
           className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Browse media…
+          {t(keys.pagebuilder.media_picker.browse)}
         </button>
         {value && (
           <button
@@ -46,7 +48,7 @@ export function MediaPicker({ value, onChange, readOnly }: MediaPickerProps) {
             onClick={() => onChange('')}
             className="px-3 py-1.5 text-sm rounded border hover:bg-gray-50 disabled:opacity-50"
           >
-            Clear
+            {t(keys.pagebuilder.media_picker.clear)}
           </button>
         )}
       </div>
@@ -74,6 +76,7 @@ function MediaPickerModal({
   onPick: (asset: MediaAssetRead) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [assets, setAssets] = useState<MediaAssetRead[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,12 +87,13 @@ function MediaPickerModal({
         if (!cancelled) setAssets(r.items);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load media');
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : t(keys.pagebuilder.media.load_failed));
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   // Close on Escape so keyboard-only users aren't trapped.
   useEffect(() => {
@@ -107,7 +111,7 @@ function MediaPickerModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Media library picker"
+      aria-label={t(keys.pagebuilder.media_picker.dialog)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
@@ -120,23 +124,23 @@ function MediaPickerModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="text-lg font-semibold">Pick an image</h2>
+          <h2 className="text-lg font-semibold">{t(keys.pagebuilder.media_picker.title)}</h2>
           <button
             type="button"
             onClick={onClose}
             className="text-gray-500 hover:text-gray-800 text-xl leading-none"
-            aria-label="Close picker"
+            aria-label={t(keys.pagebuilder.media_picker.close)}
           >
             ×
           </button>
         </div>
         <div className="flex-1 overflow-auto p-4">
           {error && <div className="text-red-600 text-sm">{error}</div>}
-          {!error && assets === null && <div className="text-gray-500 text-sm">Loading…</div>}
+          {!error && assets === null && (
+            <div className="text-gray-500 text-sm">{t(keys.pagebuilder.media_picker.loading)}</div>
+          )}
           {assets && assets.length === 0 && (
-            <div className="text-gray-500 text-sm">
-              No uploads yet. Upload images from the Media library page.
-            </div>
+            <div className="text-gray-500 text-sm">{t(keys.pagebuilder.media_picker.empty)}</div>
           )}
           {assets && assets.length > 0 && (
             <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

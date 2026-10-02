@@ -1,10 +1,10 @@
-import { ConfirmDialog } from '@simple-module-py/pagebuilder/pagebuilder/components/ConfirmDialog';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useState } from 'react';
-
+import { keys, useT } from '../../utils/i18n';
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { isManaged } from '../../utils/taxonomyApi';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 const REASSIGN_SELECT_ID = 'news-category-reassign';
 const UNCATEGORISED = '';
@@ -29,6 +29,7 @@ interface Props {
  * when it matters.
  */
 export function CategoryDeleteDialog({ category, all, trigger, onConfirm }: Props) {
+  const { t } = useT();
   const [reassignTo, setReassignTo] = useState(UNCATEGORISED);
 
   const destinations = all.filter((c) => isManaged(c) && c.id !== category.id);
@@ -38,30 +39,30 @@ export function CategoryDeleteDialog({ category, all, trigger, onConfirm }: Prop
     <ConfirmDialog
       trigger={trigger}
       level={count === 0 ? 'low' : 'medium'}
-      title={`Delete "${category.name}"?`}
+      title={t(keys.news.categories.delete_title, { name: category.name })}
+      // One catalogue entry rather than a sentence assembled around a
+      // <strong>: the destination and the count both move in a translation,
+      // and splitting them into fragments is what makes that impossible.
       description={
-        count === 0 ? (
-          <>The category is empty, so nothing moves. The public filter loses one entry.</>
-        ) : (
-          <>
-            {count} {count === 1 ? 'article' : 'articles'} will move to{' '}
-            <strong>{reassignTo || 'Uncategorised'}</strong>. Nothing is deleted with the category —
-            the articles keep their body, slug and date.
-          </>
-        )
+        count === 0
+          ? t(keys.news.categories.delete_empty)
+          : t(keys.news.categories.delete_moving, {
+              count,
+              destination: reassignTo || t(keys.news.categories.uncategorised),
+            })
       }
-      confirmLabel="Delete category"
+      confirmLabel={t(keys.news.categories.delete_confirm)}
       onConfirm={() => onConfirm(reassignTo)}
     >
       {count > 0 && (
         <>
-          <Label htmlFor={REASSIGN_SELECT_ID}>Move its articles to</Label>
+          <Label htmlFor={REASSIGN_SELECT_ID}>{t(keys.news.categories.reassign_label)}</Label>
           <NativeSelect
             id={REASSIGN_SELECT_ID}
             value={reassignTo}
             onChange={(e) => setReassignTo(e.target.value)}
           >
-            <option value={UNCATEGORISED}>Uncategorised</option>
+            <option value={UNCATEGORISED}>{t(keys.news.categories.uncategorised)}</option>
             {destinations.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}

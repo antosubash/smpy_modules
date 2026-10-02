@@ -1,6 +1,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { OutlineEntry } from '../../utils/blockOutline';
+import { keys, useT } from '../../utils/i18n';
 
 interface Props {
   entries: OutlineEntry[];
@@ -21,10 +22,11 @@ interface Props {
  * reordering that a keyboard or a screen reader can reach.
  */
 export function BlockOutline({ entries, onMove, label, disabled, emptyHint }: Props) {
+  const { t } = useT();
   if (entries.length === 0) {
     return (
       <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-        {emptyHint ?? 'No blocks yet. Add them on a wider screen.'}
+        {emptyHint ?? t(keys.pagebuilder.outline.empty)}
       </p>
     );
   }
@@ -53,7 +55,7 @@ export function BlockOutline({ entries, onMove, label, disabled, emptyHint }: Pr
               size="icon-sm"
               variant="outline"
               disabled={disabled || index === 0}
-              aria-label={`Move ${entry.label} up`}
+              aria-label={t(keys.pagebuilder.outline.move_up, { block: entry.label })}
               onClick={() => onMove(index, -1)}
             >
               ↑
@@ -63,7 +65,7 @@ export function BlockOutline({ entries, onMove, label, disabled, emptyHint }: Pr
               size="icon-sm"
               variant="outline"
               disabled={disabled || index === entries.length - 1}
-              aria-label={`Move ${entry.label} down`}
+              aria-label={t(keys.pagebuilder.outline.move_down, { block: entry.label })}
               onClick={() => onMove(index, 1)}
             >
               ↓

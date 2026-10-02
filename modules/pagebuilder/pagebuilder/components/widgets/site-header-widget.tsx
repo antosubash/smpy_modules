@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys, translate, useT } from '../../utils/i18n';
 import { SOCIAL_ICON_OPTIONS, SocialIcon, type SocialIconName } from './_shared';
 import { DesktopNav, MobileNav, type SiteNavItem } from './site-header-nav';
 
@@ -57,6 +58,7 @@ export function SiteHeaderRender({
   ctaHref,
   sticky,
 }: SiteHeaderWidgetProps) {
+  const { t } = useT();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileMenuId = useId();
 
@@ -70,12 +72,15 @@ export function SiteHeaderRender({
 
       <div className="border-b border-[color:var(--border,#e4e6e7)] bg-[var(--pb-surface,#fff)]">
         <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:h-[112px] lg:px-12">
-          <a href={homeHref || '/'} aria-label={logoAlt || 'Home'}>
+          <a
+            href={homeHref || '/'}
+            aria-label={logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
+          >
             {logoUrl ? (
               <img src={logoUrl} alt={logoAlt} className="h-10 w-auto lg:h-16" />
             ) : (
               <span className="text-sm font-bold uppercase leading-tight tracking-wide text-primary-800">
-                {logoAlt || 'Home'}
+                {logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
               </span>
             )}
           </a>
@@ -94,7 +99,11 @@ export function SiteHeaderRender({
           <button
             type="button"
             onClick={() => setMobileOpen((open) => !open)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-label={
+              mobileOpen
+                ? t(keys.pagebuilder.blocks.site_header.close_menu)
+                : t(keys.pagebuilder.blocks.site_header.open_menu)
+            }
             aria-expanded={mobileOpen}
             aria-controls={mobileMenuId}
             className="-mr-2 inline-flex size-10 items-center justify-center rounded-md text-primary-800 transition-colors hover:text-primary-900 lg:hidden"
@@ -118,52 +127,67 @@ export function SiteHeaderRender({
 }
 
 export const SiteHeaderWidget: ComponentConfig<SiteHeaderWidgetProps> = {
-  label: 'Site header (logo + navigation)',
+  label: keys.pagebuilder.blocks.site_header.label,
   fields: {
-    logoUrl: createImageField(mediaLibraryAdapter, 'Logo'),
-    logoAlt: { type: 'text', label: 'Logo alt text' },
-    homeHref: { type: 'text', label: 'Logo link' },
+    logoUrl: createImageField(mediaLibraryAdapter, keys.pagebuilder.blocks.site_header.logo_url),
+    logoAlt: { type: 'text', label: keys.pagebuilder.blocks.common.logo_alt },
+    homeHref: { type: 'text', label: keys.pagebuilder.blocks.site_header.home_href },
     utilityLinks: {
       type: 'array',
-      label: 'Utility bar (top strip)',
+      label: keys.pagebuilder.blocks.site_header.utility_links,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'Link' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.site_header.utility_links_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.site_header.utility_links_href },
         icon: {
           type: 'select',
-          label: 'Show as icon (optional)',
-          options: [{ label: 'Text label', value: '' }, ...SOCIAL_ICON_OPTIONS],
+          label: keys.pagebuilder.blocks.site_header.utility_links_icon,
+          options: [
+            { label: keys.pagebuilder.blocks.site_header.utility_links_icon_blank, value: '' },
+            ...SOCIAL_ICON_OPTIONS,
+          ],
         },
       },
       defaultItemProps: { label: 'Link', href: '#', icon: '' },
-      getItemSummary: (item) => item.label || 'Link',
+      // `translate` rather than a hook: Puck calls this while rendering the
+      // array field, outside any component of ours.
+      getItemSummary: (item) =>
+        item.label || translate(keys.pagebuilder.blocks.site_header.utility_links_summary),
       max: 8,
     },
     navItems: {
       type: 'array',
-      label: 'Navigation',
+      label: keys.pagebuilder.blocks.site_header.nav_items,
       arrayFields: {
-        label: { type: 'text', label: 'Label' },
-        href: { type: 'text', label: 'Link (ignored when sub-links are set)' },
+        label: { type: 'text', label: keys.pagebuilder.blocks.site_header.nav_items_label },
+        href: { type: 'text', label: keys.pagebuilder.blocks.site_header.nav_items_href },
         children: {
           type: 'array',
-          label: 'Sub-links (makes this a dropdown)',
+          label: keys.pagebuilder.blocks.site_header.nav_items_children,
           arrayFields: {
-            label: { type: 'text', label: 'Label' },
-            href: { type: 'text', label: 'Link' },
+            label: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.site_header.nav_items_children_label,
+            },
+            href: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.site_header.nav_items_children_href,
+            },
           },
           defaultItemProps: { label: 'Sub-link', href: '#' },
-          getItemSummary: (child) => child.label || 'Sub-link',
+          getItemSummary: (child) =>
+            child.label ||
+            translate(keys.pagebuilder.blocks.site_header.nav_items_children_summary),
           max: 10,
         },
       },
       defaultItemProps: { label: 'Section', href: '#', children: [] },
-      getItemSummary: (item) => item.label || 'Section',
+      getItemSummary: (item) =>
+        item.label || translate(keys.pagebuilder.blocks.site_header.nav_items_summary),
       max: 10,
     },
-    ctaLabel: { type: 'text', label: 'Call-to-action label' },
-    ctaHref: { type: 'text', label: 'Call-to-action link' },
-    sticky: createCheckboxField('Stick to the top of the page on scroll'),
+    ctaLabel: { type: 'text', label: keys.pagebuilder.blocks.site_header.cta_label },
+    ctaHref: { type: 'text', label: keys.pagebuilder.blocks.site_header.cta_href },
+    sticky: createCheckboxField(keys.pagebuilder.blocks.site_header.sticky),
   },
   defaultProps: {
     logoUrl: '',

@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys, translate } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
@@ -40,42 +41,42 @@ function ArrowUpRight() {
 }
 
 export const StepsWidget: ComponentConfig<StepsWidgetProps> = {
-  label: 'Steps (how to)',
+  label: keys.pagebuilder.blocks.steps.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    title: { type: 'text', label: 'Title' },
-    intro: { type: 'textarea', label: 'Intro text' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.steps.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    intro: { type: 'textarea', label: keys.pagebuilder.blocks.steps.intro },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.steps.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Muted', value: 'muted' },
+        { label: keys.pagebuilder.blocks.steps.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.steps.surface_muted, value: 'muted' },
       ],
     },
-    googlePlaySrc: { type: 'text', label: 'Google Play badge image' },
-    appStoreSrc: { type: 'text', label: 'App Store badge image' },
+    googlePlaySrc: { type: 'text', label: keys.pagebuilder.blocks.steps.google_play_src },
+    appStoreSrc: { type: 'text', label: keys.pagebuilder.blocks.steps.app_store_src },
     items: {
       type: 'array',
-      label: 'Steps',
+      label: keys.pagebuilder.blocks.steps.items,
       arrayFields: {
-        title: { type: 'text', label: 'Step title' },
-        description: { type: 'textarea', label: 'Description' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.steps.items_title },
+        description: { type: 'textarea', label: keys.pagebuilder.blocks.steps.items_description },
         links: {
           type: 'array',
-          label: 'Links',
+          label: keys.pagebuilder.blocks.steps.items_links,
           arrayFields: {
-            label: { type: 'text', label: 'Label' },
-            href: { type: 'text', label: 'Link' },
+            label: { type: 'text', label: keys.pagebuilder.blocks.steps.items_links_label },
+            href: { type: 'text', label: keys.pagebuilder.blocks.steps.items_links_href },
           },
           defaultItemProps: { label: 'Link', href: '#' },
         },
         showAppBadges: {
           type: 'radio',
-          label: 'Show app store badges',
+          label: keys.pagebuilder.blocks.steps.items_show_app_badges,
           options: [
-            { label: 'Yes', value: true },
-            { label: 'No', value: false },
+            { label: keys.pagebuilder.blocks.steps.items_show_app_badges_yes, value: true },
+            { label: keys.pagebuilder.blocks.steps.items_show_app_badges_no, value: false },
           ],
         },
       },
@@ -173,14 +174,14 @@ export const StepsWidget: ComponentConfig<StepsWidgetProps> = {
                     {googlePlaySrc && (
                       <img
                         src={googlePlaySrc}
-                        alt="Get it on Google Play"
+                        alt={translate(keys.pagebuilder.blocks.common.google_play_alt)}
                         className="h-16 w-auto"
                       />
                     )}
                     {appStoreSrc && (
                       <img
                         src={appStoreSrc}
-                        alt="Download on the App Store"
+                        alt={translate(keys.pagebuilder.blocks.common.app_store_alt)}
                         className="h-16 w-auto"
                       />
                     )}

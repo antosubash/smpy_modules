@@ -2,6 +2,8 @@
 
 import { ChevronDown } from 'lucide-react';
 
+import { keys, useT } from '../../utils/i18n';
+
 export interface SiteNavChild {
   label: string;
   href: string;
@@ -61,8 +63,12 @@ function Dropdown({ item }: { item: SiteNavItem }) {
 }
 
 export function DesktopNav({ items }: { items: SiteNavItem[] }) {
+  const { t } = useT();
   return (
-    <nav aria-label="Main" className="hidden items-center gap-8 lg:flex">
+    <nav
+      aria-label={t(keys.pagebuilder.blocks.site_header.nav_aria)}
+      className="hidden items-center gap-8 lg:flex"
+    >
       {items.map((item, index) =>
         isNavGroup(item) ? (
           // Index keys: nav entries are author-ordered and an author may well
@@ -94,10 +100,11 @@ export function MobileNav({
   ctaHref: string;
   onNavigate: () => void;
 }) {
+  const { t } = useT();
   return (
     <nav
       id={id}
-      aria-label="Main"
+      aria-label={t(keys.pagebuilder.blocks.site_header.nav_aria)}
       className="border-b border-[color:var(--border,#e4e6e7)] bg-[var(--pb-surface,#fff)] lg:hidden"
     >
       <ul className="mx-auto max-w-[1440px] divide-y divide-[color:var(--border,#e4e6e7)] px-4 sm:px-6">

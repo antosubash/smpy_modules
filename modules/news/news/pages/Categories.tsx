@@ -10,6 +10,7 @@ import { CategoryDeleteDialog } from '../components/categories/CategoryDeleteDia
 import { CategoryRow } from '../components/categories/CategoryRow';
 import { TagPanel } from '../components/categories/TagPanel';
 import { useTaxonomy } from '../hooks/useTaxonomy';
+import { keys, useT } from '../utils/i18n';
 import { isManaged } from '../utils/taxonomyApi';
 
 /** Categories and tags — the two taxonomies, side by side.
@@ -20,6 +21,7 @@ import { isManaged } from '../utils/taxonomyApi';
  * question about how a topic is filed.
  */
 export default function Categories() {
+  const { t } = useT();
   const {
     categories,
     tags,
@@ -84,8 +86,8 @@ export default function Categories() {
 
   return (
     <PageShell
-      title="Categories"
-      description="One category per article, many tags. The category drives the public /news filters and every feed block."
+      title={t(keys.news.categories.title)}
+      description={t(keys.news.categories.description)}
       actions={
         <form
           className="flex gap-2"
@@ -101,19 +103,19 @@ export default function Categories() {
           }}
         >
           <Input
-            aria-label="New category name"
-            placeholder="New category"
+            aria-label={t(keys.news.categories.new_label)}
+            placeholder={t(keys.news.categories.new_placeholder)}
             value={draftName}
             disabled={busy}
             onChange={(e) => setDraftName(e.target.value)}
           />
           <Button type="submit" disabled={busy || !draftName.trim()}>
-            Add
+            {t(keys.news.categories.add)}
           </Button>
         </form>
       }
     >
-      <Head title="Categories" />
+      <Head title={t(keys.news.categories.title)} />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -121,7 +123,7 @@ export default function Categories() {
             the page h1, and a second one only duplicates the accessible name. */}
         <section className="space-y-3">
           {categories.length === 0 ? (
-            <div role="status" aria-label="Loading categories" className="space-y-2">
+            <div role="status" aria-label={t(keys.news.categories.loading)} className="space-y-2">
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
@@ -158,7 +160,7 @@ export default function Categories() {
                         onConfirm={(reassignTo) => removeCategory(category.id, reassignTo)}
                         trigger={
                           <Button type="button" size="sm" variant="ghost" disabled={busy}>
-                            Delete
+                            {t(keys.news.categories.delete)}
                           </Button>
                         }
                       />
@@ -169,10 +171,7 @@ export default function Categories() {
             </ul>
           )}
 
-          <p className="pt-2 text-sm text-muted-foreground">
-            Drag to change the order categories appear in the public /news filter bar. Deleting one
-            asks where its articles go — nothing is deleted with it.
-          </p>
+          <p className="pt-2 text-sm text-muted-foreground">{t(keys.news.categories.help)}</p>
         </section>
 
         <TagPanel tags={tags} busy={busy} onCreate={addTag} onMerge={mergeTags} />

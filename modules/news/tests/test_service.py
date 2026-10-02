@@ -1,9 +1,14 @@
-"""Service-level behaviour: the read-back, partial updates, and reconciliation.
+"""Service-level behaviour: the read-back, partial updates, and transactions.
 
 These sit between ``test_models.py`` (which pins the table's shape) and the
-Playwright suite (which drives a browser). Everything tested here was
-previously covered by neither, which is why three of these cases describe bugs
-that shipped.
+Playwright suite (which drives a browser).
+
+The whole ``TestReconcileOrphans`` class that used to live here is gone, and
+deliberately so. It covered a failure mode the sidecar created: an article row
+pointed at a ``pagebuilder_pages`` id with no foreign key behind it, so deleting
+the page left a row that SQLite would silently re-attach to whatever page took
+the id next. An article's body is a column on its own row now, so there is no
+second row whose disappearance could orphan it and nothing left to reconcile.
 """
 
 from __future__ import annotations
@@ -11,12 +16,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from conftest import make_page
+from factories import make_article
 from news import service
 from news.constants import MAX_LIMIT
-from news.models import NewsArticle
-from pagebuilder.models import Page, PageStatus
-from sqlalchemy import delete as sa_delete
+from news.content import ArticlesService
+from news.models import ArticleStatus, NewsArticle
 from sqlmodel import select
 
 pytestmark = pytest.mark.asyncio
@@ -24,16 +28,16 @@ pytestmark = pytest.mark.asyncio
 DATED = datetime(2026, 2, 1, tzinfo=UTC)
 
 
-class TestReadBackByPage:
-    async def test_finds_a_newly_attached_article(self, db) -> None:
-        page = await make_page(db, slug="solo", title="Solo")
-        await service.create(db, page_id=page.id, category="News", published_at=None)
+class TestReadBack:
+    async def test_finds_a_newly_created_article(self, db) -> None:
+        article = await ArticlesService(db).create(title="Solo", category="News")
 
-        found = await service.get_read_by_page(db, page.id)
+        found = await service.get_read(db, article.id)
 
         assert found is not None
-        assert found.page_id == page.id
+        assert found.id == article.id
         assert found.title == "Solo"
+        assert found.slug == "solo"
         assert found.url == "/news/solo"
 
     async def test_finds_an_undated_article_behind_a_full_page_of_dated_ones(
@@ -47,45 +51,79 @@ class TestReadBackByPage:
         articles existed — POST returned 404 for a row it had just written.
         """
         for i in range(MAX_LIMIT):
-            dated = await make_page(db, slug=f"dated-{i}", title=f"Dated {i}")
-            await service.create(
-                db, page_id=dated.id, category="Archive", published_at=DATED
+            await make_article(
+                db, slug=f"dated-{i}", title=f"Dated {i}", category="Archive",
+                published_at=DATED,
             )
 
-        fresh = await make_page(db, slug="fresh", title="Fresh")
-        await service.create(db, page_id=fresh.id, category="News", published_at=None)
+        fresh = await ArticlesService(db).create(title="Fresh", category="News")
+        await db.commit()
 
         # It is genuinely past the first page — that is the point of the setup.
-        first_page, total = await service.list_articles(db, limit=MAX_LIMIT)
+        first_page, total = await service.list_articles(
+            db, limit=MAX_LIMIT, include_drafts=True
+        )
         assert total == MAX_LIMIT + 1
-        assert fresh.id not in {item.page_id for item in first_page}
+        assert fresh.id not in {item.id for item in first_page}
 
-        found = await service.get_read_by_page(db, fresh.id)
+        found = await service.get_read(db, fresh.id)
         assert found is not None, "a just-written article must be readable back"
         assert found.title == "Fresh"
 
-    async def test_returns_none_when_the_page_is_gone(self, db) -> None:
-        page = await make_page(db, slug="doomed")
-        await service.create(db, page_id=page.id, category="", published_at=None)
-        await db.execute(sa_delete(Page).where(Page.id == page.id))
-        await db.commit()
-
-        assert await service.get_read_by_page(db, page.id) is None
+    async def test_returns_none_for_an_id_that_never_existed(self, db) -> None:
+        assert await service.get_read(db, 4242) is None
 
     async def test_hides_a_draft_unless_drafts_are_asked_for(self, db) -> None:
-        page = await make_page(db, slug="wip", status=PageStatus.DRAFT)
-        await service.create(db, page_id=page.id, category="", published_at=None)
+        article = await make_article(db, slug="wip", status=ArticleStatus.DRAFT)
 
-        assert await service.get_read_by_page(db, page.id, include_drafts=False) is None
-        assert await service.get_read_by_page(db, page.id, include_drafts=True) is not None
+        assert await service.get_read(db, article.id, include_drafts=False) is None
+        assert await service.get_read(db, article.id, include_drafts=True) is not None
+
+    async def test_hides_a_trashed_article_from_everyone(self, db) -> None:
+        """Trash is not a status — an editor who may see drafts still must not
+        see something they binned sitting in the list."""
+        article = await make_article(db, slug="binned")
+        await ArticlesService(db).trash(article.id)
+        await db.commit()
+
+        assert await service.get_read(db, article.id, include_drafts=True) is None
+
+
+class TestSkippingTheCount:
+    """``with_total=False`` — for the callers with no pager to feed.
+
+    The RSS feed takes a fixed window and discards the total, so counting the
+    archive behind it was a second full scan per request for a number nothing
+    read.
+    """
+
+    async def test_the_rows_are_the_same_ones(self, db) -> None:
+        for i in range(3):
+            await make_article(db, slug=f"counted-{i}", published_at=DATED)
+
+        counted, total = await service.list_articles(db)
+        uncounted, skipped = await service.list_articles(db, with_total=False)
+
+        assert [item.id for item in uncounted] == [item.id for item in counted]
+        assert total == 3
+        assert skipped == 0
+
+    async def test_paging_still_reports_the_real_total(self, db) -> None:
+        # The default has to stay honest — every paged caller counts against it.
+        for i in range(3):
+            await make_article(db, slug=f"paged-{i}", published_at=DATED)
+
+        page, total = await service.list_articles(db, limit=2)
+
+        assert len(page) == 2
+        assert total == 3
 
 
 class TestPartialUpdate:
     async def test_omitting_published_at_leaves_the_date_alone(self, db) -> None:
         """`UNSET` is the default, so a caller that says nothing changes nothing."""
-        page = await make_page(db, slug="dated")
-        article = await service.create(
-            db, page_id=page.id, category="Before", published_at=DATED
+        article = await make_article(
+            db, slug="dated", category="Before", published_at=DATED
         )
 
         await service.update(db, article, category="After")
@@ -98,9 +136,8 @@ class TestPartialUpdate:
         # An undated article is a real state, not an error — this has to stay
         # reachable, which is why the sentinel exists rather than a truthiness
         # test.
-        page = await make_page(db, slug="undate-me")
-        article = await service.create(
-            db, page_id=page.id, category="News", published_at=DATED
+        article = await make_article(
+            db, slug="undate-me", category="News", published_at=DATED
         )
 
         await service.update(db, article, published_at=None)
@@ -109,10 +146,7 @@ class TestPartialUpdate:
         assert article.category == "News"
 
     async def test_omitting_category_leaves_it_alone(self, db) -> None:
-        page = await make_page(db, slug="keep-category")
-        article = await service.create(
-            db, page_id=page.id, category="Events", published_at=None
-        )
+        article = await make_article(db, slug="keep-category", category="Events")
 
         await service.update(db, article, published_at=DATED)
 
@@ -127,8 +161,7 @@ class TestWritesDoNotCommit:
     """
 
     async def test_create_is_rolled_back_by_its_caller(self, db) -> None:
-        page = await make_page(db, slug="rollback")
-        await service.create(db, page_id=page.id, category="Ghost", published_at=None)
+        await ArticlesService(db).create(title="Ghost", category="Ghost")
 
         await db.rollback()
 
@@ -136,98 +169,13 @@ class TestWritesDoNotCommit:
         assert remaining == []
 
     async def test_delete_is_rolled_back_by_its_caller(self, db) -> None:
-        page = await make_page(db, slug="undelete")
+        article = await make_article(db, slug="undelete", category="Keep")
         # Held as a plain int: the commit below expires the ORM instance, and
-        # reading `page.id` afterwards would trigger a lazy refresh from sync
+        # reading `article.id` afterwards would trigger a lazy refresh from sync
         # context.
-        page_id = page.id
-        article = await service.create(
-            db, page_id=page_id, category="Keep", published_at=None
-        )
-        await db.commit()
+        article_id = article.id
 
         await service.delete(db, article)
         await db.rollback()
 
-        assert await service.get_by_page(db, page_id) is not None
-
-
-class TestReconcileOrphans:
-    async def _orphan(self, db) -> int:
-        """An article whose page was deleted without the event firing."""
-        page = await make_page(db, slug="vanished")
-        await service.create(db, page_id=page.id, category="Stale", published_at=None)
-        await db.commit()
-        await db.execute(sa_delete(Page).where(Page.id == page.id))
-        await db.commit()
-        return page.id
-
-    async def test_deletes_a_row_whose_page_is_gone(self, db) -> None:
-        page_id = await self._orphan(db)
-        assert await service.get_by_page(db, page_id) is not None
-
-        dropped = await service.reconcile_orphans(db)
-        await db.commit()
-
-        assert dropped == 1
-        assert await service.get_by_page(db, page_id) is None
-
-    async def test_leaves_a_row_whose_page_exists(self, db) -> None:
-        page = await make_page(db, slug="alive")
-        await service.create(db, page_id=page.id, category="Live", published_at=None)
-        await db.commit()
-
-        assert await service.reconcile_orphans(db) == 0
-        assert await service.get_by_page(db, page.id) is not None
-
-    async def test_leaves_an_article_on_a_draft_page(self, db) -> None:
-        # A draft page is not a missing page. Sweeping it would delete an
-        # editor's unpublished work.
-        page = await make_page(db, slug="draft", status=PageStatus.DRAFT)
-        await service.create(db, page_id=page.id, category="", published_at=None)
-        await db.commit()
-
-        assert await service.reconcile_orphans(db) == 0
-        assert await service.get_by_page(db, page.id) is not None
-
-    async def test_an_orphan_is_invisible_to_the_listing_before_the_sweep(
-        self, db
-    ) -> None:
-        # The inner join is what makes the orphan harmless in the meantime; the
-        # sweep is what stops SQLite's id reuse from making it harmful later.
-        await self._orphan(db)
-
-        items, total = await service.list_articles(db, include_drafts=True)
-
-        assert items == []
-        assert total == 0
-
-    async def test_is_idempotent(self, db) -> None:
-        await self._orphan(db)
-        assert await service.reconcile_orphans(db) == 1
-        await db.commit()
-        assert await service.reconcile_orphans(db) == 0
-
-    async def test_the_startup_hook_runs_and_commits_the_sweep(
-        self, db, db_state
-    ) -> None:
-        """`on_startup` is the only thing that calls this in production.
-
-        Wiring it wrong — not committing, or never registering the hook — would
-        leave the sweep as dead code with every other test still green.
-        """
-        from types import SimpleNamespace
-
-        from fastapi import FastAPI
-        from news.module import NewsModule
-
-        page_id = await self._orphan(db)
-
-        app = FastAPI()
-        app.state.sm = SimpleNamespace(db=db_state)
-        await NewsModule().on_startup(app)
-
-        # A fresh session, so this reads committed state rather than `db`'s
-        # identity map.
-        async with db_state.session_factory() as fresh:
-            assert await service.get_by_page(fresh, page_id) is None
+        assert await service.get(db, article_id) is not None

@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { useMemo } from 'react';
+import { keys } from '../../utils/i18n';
 import { parseMarkdownBlocks as renderMarkdown } from '../../utils/markdown';
 import { renderRichText } from './_internal/rich-text';
 
@@ -23,27 +24,27 @@ export type MarkdownWidgetProps = {
 const renderInline = renderRichText;
 
 export const MarkdownWidget: ComponentConfig<MarkdownWidgetProps> = {
-  label: 'Markdown',
+  label: keys.pagebuilder.blocks.markdown.label,
   fields: {
     width: {
       type: 'select',
-      label: 'Text width',
+      label: keys.pagebuilder.blocks.markdown.width,
       options: [
-        { label: 'Auto (centred)', value: 'auto' },
-        { label: '660px', value: '660' },
+        { label: keys.pagebuilder.blocks.markdown.width_auto, value: 'auto' },
+        { label: keys.pagebuilder.blocks.markdown.width_660, value: '660' },
       ],
     },
     indent: {
       type: 'select',
-      label: 'Grid indent',
+      label: keys.pagebuilder.blocks.markdown.indent,
       options: [
-        { label: 'None', value: 'none' },
-        { label: '4th column', value: '4' },
+        { label: keys.pagebuilder.blocks.markdown.indent_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.markdown.indent_4, value: '4' },
       ],
     },
     content: {
       type: 'textarea',
-      label: 'Markdown content',
+      label: keys.pagebuilder.blocks.markdown.content,
     },
   },
   defaultProps: {

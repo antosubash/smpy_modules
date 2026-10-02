@@ -16,6 +16,7 @@ import { type BoardStage, PageBoard } from '../components/PageBoard';
 import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
 import { PageListRow } from '../components/PageListRow';
 import { deletePage, type PageRead } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { publishPage, restorePage, unpublishPage } from '../utils/pagesApi';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export default function PageList() {
+  const { t } = useT();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { pages, board, filters } = props;
   const locales = props.locales ?? [];
@@ -95,16 +97,16 @@ export default function PageList() {
   const handleDelete = async (page: PageRead) => {
     await deletePage(page.id);
     reload();
-    toast(`“${page.title}” deleted`, {
+    toast(t(keys.pagebuilder.pages.deleted, { title: page.title }), {
       duration: 10_000,
-      description: 'It is in the trash for 30 days.',
+      description: t(keys.pagebuilder.pages.deleted_description),
       action: {
-        label: 'Undo',
+        label: t(keys.pagebuilder.pages.undo),
         onClick: () => {
           void restorePage(page.id)
             .then(() => {
               reload();
-              toast.success(`“${page.title}” restored as a draft`);
+              toast.success(t(keys.pagebuilder.pages.restored, { title: page.title }));
             })
             .catch((e: Error) => toast.error(e.message));
         },
@@ -116,8 +118,8 @@ export default function PageList() {
   const handleUnpublish = async (page: PageRead) => {
     await unpublishPage(page.id);
     reload();
-    toast(`“${page.title}” is offline`, {
-      description: 'It is a draft again. Publish it to put it back.',
+    toast(t(keys.pagebuilder.pages.unpublished, { title: page.title }), {
+      description: t(keys.pagebuilder.pages.unpublished_description),
     });
   };
 
@@ -127,29 +129,29 @@ export default function PageList() {
   const handlePublish = async (page: PageRead) => {
     await publishPage(page.id);
     reload();
-    toast.success(`“${page.title}” published`);
+    toast.success(t(keys.pagebuilder.pages.published, { title: page.title }));
   };
 
   return (
     <PageShell
-      title="Pages"
-      description="Drafts, scheduled drafts, published · public at /p/:slug"
+      title={t(keys.pagebuilder.pages.title)}
+      description={t(keys.pagebuilder.pages.description)}
       actions={
         <>
           <Button variant="outline" onClick={() => go({ view: boardView ? 'list' : 'board' })}>
-            {boardView ? 'List view' : 'Board view'}
+            {boardView ? t(keys.pagebuilder.pages.list_view) : t(keys.pagebuilder.pages.board_view)}
           </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/trash')}>
-            Trash
+            {t(keys.pagebuilder.pages.trash)}
           </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/pending')}>
-            Pending review
+            {t(keys.pagebuilder.pages.pending_review)}
           </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/layout')}>
-            Site layout
+            {t(keys.pagebuilder.pages.site_layout)}
           </Button>
           <Button variant="outline" onClick={() => router.visit('/pagebuilder/media')}>
-            Media library
+            {t(keys.pagebuilder.pages.media_library)}
           </Button>
           <NewPageDialog locales={locales} defaultLocale={defaultLocale} />
         </>
@@ -176,32 +178,34 @@ export default function PageList() {
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           {filtering ? (
             <>
-              No pages match this filter.{' '}
+              {t(keys.pagebuilder.pages.no_match)}{' '}
               <Button
                 type="button"
                 variant="link"
                 className="h-auto p-0"
                 onClick={() => go({ search: '', status: '', locale: '' })}
               >
-                Clear filters
+                {t(keys.pagebuilder.pages.clear_filters)}
               </Button>
             </>
           ) : (
-            'No pages yet. Click "New page" to create your first one.'
+            t(keys.pagebuilder.pages.empty)
           )}
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Slug</TableHead>
+              <TableHead>{t(keys.pagebuilder.pages.column_title)}</TableHead>
+              <TableHead>{t(keys.pagebuilder.pages.column_slug)}</TableHead>
               {/* Only on a multilingual site: a column reading "English" on
                   every row is a column nobody reads twice. */}
-              {multilingual && <TableHead>Language</TableHead>}
-              <TableHead>Status</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              {multilingual && <TableHead>{t(keys.pagebuilder.pages.column_language)}</TableHead>}
+              <TableHead>{t(keys.pagebuilder.pages.column_status)}</TableHead>
+              <TableHead>{t(keys.pagebuilder.pages.column_updated)}</TableHead>
+              <TableHead className="text-right">
+                {t(keys.pagebuilder.pages.column_actions)}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -223,8 +227,11 @@ export default function PageList() {
       {!boardView && pages.total > limit && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {Math.min(offset + 1, pages.total)}–{Math.min(offset + limit, pages.total)} of{' '}
-            {pages.total}
+            {t(keys.pagebuilder.pages.showing, {
+              from: Math.min(offset + 1, pages.total),
+              to: Math.min(offset + limit, pages.total),
+              total: pages.total,
+            })}
           </span>
           <div className="space-x-2">
             <Button
@@ -234,7 +241,7 @@ export default function PageList() {
               disabled={offset === 0}
               onClick={() => go({ offset: Math.max(0, offset - limit) })}
             >
-              Previous
+              {t(keys.pagebuilder.pages.previous)}
             </Button>
             <Button
               type="button"
@@ -243,7 +250,7 @@ export default function PageList() {
               disabled={offset + limit >= pages.total}
               onClick={() => go({ offset: offset + limit })}
             >
-              Next
+              {t(keys.pagebuilder.pages.next)}
             </Button>
           </div>
         </div>

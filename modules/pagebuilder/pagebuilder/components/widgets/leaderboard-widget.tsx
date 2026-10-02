@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { renderRichText } from './_internal/rich-text';
@@ -54,25 +55,28 @@ function Avatar({ src, size }: { src?: string; size: string }) {
 }
 
 export const LeaderboardWidget: ComponentConfig<LeaderboardWidgetProps> = {
-  label: 'Leaderboard',
+  label: keys.pagebuilder.blocks.leaderboard.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    title: { type: 'text', label: 'Title' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
     surface: {
       type: 'select',
-      label: 'Surface',
+      label: keys.pagebuilder.blocks.leaderboard.surface,
       options: [
-        { label: 'Default', value: 'default' },
-        { label: 'Navy band', value: 'navy' },
+        { label: keys.pagebuilder.blocks.leaderboard.surface_default, value: 'default' },
+        { label: keys.pagebuilder.blocks.leaderboard.surface_navy, value: 'navy' },
       ],
     },
     top: {
       type: 'array',
-      label: 'Podium (top 3)',
+      label: keys.pagebuilder.blocks.leaderboard.top,
       arrayFields: {
-        name: { type: 'text', label: 'Name' },
-        score: { type: 'text', label: 'Score' },
-        avatarUrl: createImageField(mediaLibraryAdapter, 'Avatar image'),
+        name: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.top_name },
+        score: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.top_score },
+        avatarUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.leaderboard.top_avatar_url,
+        ),
       },
       defaultItemProps: { name: 'Player', score: '0', avatarUrl: '' },
       min: 1,
@@ -80,12 +84,15 @@ export const LeaderboardWidget: ComponentConfig<LeaderboardWidgetProps> = {
     },
     rows: {
       type: 'array',
-      label: 'Ranked rows',
+      label: keys.pagebuilder.blocks.leaderboard.rows,
       arrayFields: {
-        rank: { type: 'text', label: 'Rank' },
-        name: { type: 'text', label: 'Name' },
-        score: { type: 'text', label: 'Score' },
-        avatarUrl: createImageField(mediaLibraryAdapter, 'Avatar image'),
+        rank: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.rows_rank },
+        name: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.rows_name },
+        score: { type: 'text', label: keys.pagebuilder.blocks.leaderboard.rows_score },
+        avatarUrl: createImageField(
+          mediaLibraryAdapter,
+          keys.pagebuilder.blocks.leaderboard.rows_avatar_url,
+        ),
       },
       defaultItemProps: {
         rank: '1',

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 
+import { keys, useT } from '../../utils/i18n';
 import { DESCRIPTION_LIMIT, SeoPreview, TITLE_LIMIT } from './SeoPreview';
 
 interface Props {
@@ -65,12 +66,13 @@ export function SeoSettingsPanel({
   host,
   schedule,
 }: Props) {
+  const { t } = useT();
   return (
     <div className="grid grid-cols-1 gap-5 text-sm lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="flex items-baseline justify-between">
-            <span className="font-medium">Meta title</span>
+            <span className="font-medium">{t(keys.pagebuilder.seo.meta_title)}</span>
             <Counter value={metaTitle.length} limit={TITLE_LIMIT} />
           </span>
           <input
@@ -78,17 +80,17 @@ export function SeoSettingsPanel({
             value={metaTitle}
             onChange={(e) => onMetaTitleChange(e.target.value)}
             maxLength={200}
-            placeholder={pageTitle || 'Falls back to the page title'}
+            placeholder={pageTitle || t(keys.pagebuilder.seo.meta_title_placeholder)}
             className="rounded border px-2 py-1"
           />
           <span className="text-xs text-muted-foreground">
-            Leave blank to use the page title, which is right more often than not.
+            {t(keys.pagebuilder.seo.meta_title_help)}
           </span>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="flex items-baseline justify-between">
-            <span className="font-medium">Meta description</span>
+            <span className="font-medium">{t(keys.pagebuilder.seo.meta_description)}</span>
             <Counter value={metaDescription.length} limit={DESCRIPTION_LIMIT} />
           </span>
           <textarea
@@ -96,42 +98,44 @@ export function SeoSettingsPanel({
             onChange={(e) => onMetaDescriptionChange(e.target.value)}
             maxLength={500}
             rows={3}
-            placeholder="Shown in search results and link previews."
+            placeholder={t(keys.pagebuilder.seo.meta_description_placeholder)}
             className="rounded border px-2 py-1"
           />
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-medium">Social image</span>
+          <span className="font-medium">{t(keys.pagebuilder.seo.social_image)}</span>
           <input
             type="text"
             value={ogImage}
             onChange={(e) => onOgImageChange(e.target.value)}
             maxLength={500}
-            placeholder="https://… or /media/pagebuilder/…"
+            placeholder={t(keys.pagebuilder.seo.social_image_placeholder)}
             className="rounded border px-2 py-1 font-mono"
           />
+          {/* The middle of the sentence is a link, so it is three keys rather
+              than one with a placeholder. */}
           <span className="text-xs text-muted-foreground">
-            1200×630. Paste a URL from the{' '}
+            {t(keys.pagebuilder.seo.social_image_help_before)}{' '}
             <a href="/pagebuilder/media" className="text-primary hover:underline">
-              media library
+              {t(keys.pagebuilder.seo.social_image_help_link)}
             </a>
-            , or leave blank to fall back to the first image on the page.
+            {t(keys.pagebuilder.seo.social_image_help_after)}
           </span>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-medium">Canonical URL</span>
+          <span className="font-medium">{t(keys.pagebuilder.seo.canonical)}</span>
           <input
             type="text"
             value={canonicalUrl}
             onChange={(e) => onCanonicalUrlChange(e.target.value)}
             maxLength={500}
-            placeholder="Defaults to this page's own URL."
+            placeholder={t(keys.pagebuilder.seo.canonical_placeholder)}
             className="rounded border px-2 py-1 font-mono"
           />
           <span className="text-xs text-muted-foreground">
-            Override when this page duplicates content hosted elsewhere.
+            {t(keys.pagebuilder.seo.canonical_help)}
           </span>
         </label>
 
@@ -143,15 +147,16 @@ export function SeoSettingsPanel({
             className="mt-1"
           />
           <span className="flex flex-col">
-            <span className="font-medium">Allow search engines to index this page</span>
+            <span className="font-medium">{t(keys.pagebuilder.seo.allow_indexing)}</span>
             <span className="text-xs text-muted-foreground">
-              Uncheck to emit <code>noindex,nofollow</code> and exclude from the sitemap.
+              {t(keys.pagebuilder.seo.allow_indexing_help_before)} <code>noindex,nofollow</code>{' '}
+              {t(keys.pagebuilder.seo.allow_indexing_help_after)}
             </span>
           </span>
         </label>
 
         <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="font-medium">JSON-LD structured data</span>
+          <span className="font-medium">{t(keys.pagebuilder.seo.json_ld)}</span>
           <textarea
             value={jsonLdText}
             onChange={(e) => onJsonLdChange(e.target.value)}
@@ -165,8 +170,9 @@ export function SeoSettingsPanel({
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">
-              Embedded inside <code>&lt;script type="application/ld+json"&gt;</code>. Leave blank to
-              omit.
+              {t(keys.pagebuilder.seo.json_ld_help_before)}{' '}
+              <code>&lt;script type="application/ld+json"&gt;</code>
+              {t(keys.pagebuilder.seo.json_ld_help_after)}
             </span>
           )}
         </label>

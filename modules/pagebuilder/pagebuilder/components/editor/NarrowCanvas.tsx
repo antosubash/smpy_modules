@@ -1,6 +1,9 @@
 import type { Data } from '@puckeditor/core';
+import { useMemo } from 'react';
 
 import { blockLabels, moveBlock, outlineOf } from '../../utils/blockOutline';
+import { keys, useT } from '../../utils/i18n';
+import { localizeConfig } from '../localizeConfig';
 import { getPuckConfig } from '../puckConfig';
 import { BlockOutline } from './BlockOutline';
 
@@ -21,15 +24,19 @@ interface Props {
  * screen is still worth opening rather than a wall saying "come back later".
  */
 export function NarrowCanvas({ data, onChange, previewUrl, busy }: Props) {
-  const entries = outlineOf(data, blockLabels(getPuckConfig().components));
+  const { t } = useT();
+  // Through `localizeConfig` rather than the raw config: a block's label is a
+  // catalogue key until something resolves it, and an unresolved one would
+  // name every row in the outline after its own key.
+  const labels = useMemo(() => blockLabels(localizeConfig(getPuckConfig(), t).components), [t]);
+  const entries = outlineOf(data, labels);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 p-4">
       <section className="rounded-lg border bg-muted/40 p-4">
-        <h2 className="text-sm font-semibold">Preview and publish here, edit on a larger screen</h2>
+        <h2 className="text-sm font-semibold">{t(keys.pagebuilder.narrow.title)}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Drag-and-drop layout needs width, so the canvas is read-only at this size. You can still
-          preview the draft, reorder blocks below, schedule and publish.
+          {t(keys.pagebuilder.narrow.description)}
         </p>
         {previewUrl && (
           <a
@@ -38,18 +45,18 @@ export function NarrowCanvas({ data, onChange, previewUrl, busy }: Props) {
             rel="noopener noreferrer"
             className="mt-3 inline-flex h-9 items-center rounded-md border bg-background px-4 text-sm font-medium hover:bg-accent"
           >
-            Preview the draft
+            {t(keys.pagebuilder.narrow.preview)}
           </a>
         )}
       </section>
 
       <section>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Outline
+          {t(keys.pagebuilder.narrow.outline)}
         </h2>
         <BlockOutline
           entries={entries}
-          label="Page outline"
+          label={t(keys.pagebuilder.narrow.page_outline)}
           disabled={busy}
           onMove={(index, direction) => onChange(moveBlock(data, index, direction))}
         />

@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 
 interface SpacerProps {
   size: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -13,16 +14,16 @@ const heights: Record<SpacerProps['size'], number> = {
 };
 
 export const SpacerBlock: ComponentConfig<SpacerProps> = {
-  label: 'Spacer',
+  label: keys.pagebuilder.blocks.spacer.label,
   fields: {
     size: {
       type: 'select',
       options: [
-        { label: 'XS', value: 'xs' },
-        { label: 'S', value: 'sm' },
-        { label: 'M', value: 'md' },
-        { label: 'L', value: 'lg' },
-        { label: 'XL', value: 'xl' },
+        { label: keys.pagebuilder.blocks.spacer.size_xs, value: 'xs' },
+        { label: keys.pagebuilder.blocks.spacer.size_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.spacer.size_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.spacer.size_lg, value: 'lg' },
+        { label: keys.pagebuilder.blocks.spacer.size_xl, value: 'xl' },
       ],
     },
   },

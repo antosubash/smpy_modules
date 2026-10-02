@@ -9,19 +9,17 @@ both tags.
 from __future__ import annotations
 
 import pytest
-from conftest import make_page
+from factories import make_article
 from news import category_service, service, tag_service
 from news.constants import UNCATEGORISED_LABEL
-from news.models import NewsArticle
-from pagebuilder.models import PageStatus
+from news.models import ArticleStatus, NewsArticle
 from sqlmodel import select
 
 pytestmark = pytest.mark.asyncio
 
 
-async def _article(db, slug: str, category: str, *, status=PageStatus.PUBLISHED):
-    page = await make_page(db, slug=slug, title=slug, status=status)
-    return await service.create(db, page_id=page.id, category=category, published_at=None)
+async def _article(db, slug: str, category: str, *, status=ArticleStatus.PUBLISHED):
+    return await make_article(db, slug=slug, title=slug, status=status, category=category)
 
 
 class TestCategoryListing:
@@ -43,7 +41,7 @@ class TestCategoryListing:
 
     async def test_counts_include_drafts(self, db) -> None:
         """The editor's screen: a category of drafts still has real weight."""
-        await _article(db, "d", "Research", status=PageStatus.DRAFT)
+        await _article(db, "d", "Research", status=ArticleStatus.DRAFT)
 
         found = next(
             c for c in await category_service.list_categories(db) if c.name == "Research"

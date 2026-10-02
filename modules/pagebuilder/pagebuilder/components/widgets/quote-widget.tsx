@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 
@@ -10,17 +11,17 @@ export type QuoteWidgetProps = {
 };
 
 export const QuoteWidget: ComponentConfig<QuoteWidgetProps> = {
-  label: 'Quote',
+  label: keys.pagebuilder.blocks.quote.label,
   fields: {
-    quote: { type: 'textarea', label: 'Quote' },
-    author: { type: 'text', label: 'Author' },
-    source: { type: 'text', label: 'Source' },
+    quote: { type: 'textarea', label: keys.pagebuilder.blocks.quote.quote },
+    author: { type: 'text', label: keys.pagebuilder.blocks.quote.author },
+    source: { type: 'text', label: keys.pagebuilder.blocks.quote.source },
     align: {
       type: 'select',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.common.align,
       options: [
-        { label: 'Left', value: 'left' },
-        { label: 'Center', value: 'center' },
+        { label: keys.pagebuilder.blocks.common.align_left, value: 'left' },
+        { label: keys.pagebuilder.blocks.common.align_center, value: 'center' },
       ],
     },
   },

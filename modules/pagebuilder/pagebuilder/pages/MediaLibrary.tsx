@@ -27,6 +27,7 @@ import {
   type MediaListResponse,
   uploadMedia,
 } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { parseKB } from '../utils/mediaFormat';
 
 interface Props {
@@ -36,6 +37,7 @@ interface Props {
 const PAGE_LIMIT = 60;
 
 export default function MediaLibrary() {
+  const { t } = useT();
   const { initial } = usePage<{ props: Props }>().props as unknown as Props;
 
   const [assets, setAssets] = useState<MediaAssetRead[]>(initial.items);
@@ -87,13 +89,13 @@ export default function MediaLibrary() {
         setNextCursor(response.next_cursor);
         setFolders(response.folders);
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : 'Failed to load media');
+        setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.media.load_failed));
       } finally {
         if (isAppend) setLoadingMore(false);
         else setLoading(false);
       }
     },
-    [filters.contentType, filters.folder, filters.maxKB, filters.minKB, query],
+    [filters.contentType, filters.folder, filters.maxKB, filters.minKB, query, t],
   );
 
   // Reload from the server whenever a filter or the debounced query
@@ -133,7 +135,7 @@ export default function MediaLibrary() {
       setCopied(asset.id);
       setTimeout(() => setCopied((c) => (c === asset.id ? null : c)), 1500);
     } catch {
-      setMessage('Copy failed — select the URL manually.');
+      setMessage(t(keys.pagebuilder.media.copy_failed));
     }
   };
 
@@ -179,15 +181,15 @@ export default function MediaLibrary() {
   };
 
   const activeFolderLabel = (() => {
-    if (filters.folder === null) return 'All assets';
-    if (filters.folder === '') return 'Unfiled';
+    if (filters.folder === null) return t(keys.pagebuilder.media.all_assets);
+    if (filters.folder === '') return t(keys.pagebuilder.media.unfiled);
     return filters.folder;
   })();
 
   return (
     <PageShell
-      title="Media library"
-      description="Images available to every page."
+      title={t(keys.pagebuilder.media.title)}
+      description={t(keys.pagebuilder.media.description)}
       maxWidth="full"
       actions={<MediaHeader fileInputRef={fileInputRef} onFilesSelected={onFileInputChange} />}
     >
@@ -205,8 +207,8 @@ export default function MediaLibrary() {
           <MediaFilters filters={filters} onChange={setFilters} />
 
           <div className="mb-2 text-sm text-muted-foreground">
-            Browsing <strong>{activeFolderLabel}</strong>
-            {loading && <span className="ml-2">Loading…</span>}
+            {t(keys.pagebuilder.media.browsing)} <strong>{activeFolderLabel}</strong>
+            {loading && <span className="ml-2">{t(keys.pagebuilder.media.loading)}</span>}
           </div>
 
           {message && (
@@ -240,7 +242,9 @@ export default function MediaLibrary() {
                 disabled={loadingMore}
                 onClick={() => void refresh('append', nextCursor)}
               >
-                {loadingMore ? 'Loading…' : 'Load more'}
+                {loadingMore
+                  ? t(keys.pagebuilder.media.loading)
+                  : t(keys.pagebuilder.media.load_more)}
               </Button>
             </div>
           )}

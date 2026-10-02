@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -45,25 +46,43 @@ function SectionImages({ section }: { section: DefinitionSection }) {
 }
 
 export const DefinitionListWidget: ComponentConfig<DefinitionListWidgetProps> = {
-  label: 'Definition list (rich accordion)',
+  label: keys.pagebuilder.blocks.definition_list.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    heading: { type: 'text', label: 'Heading' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.definition_list.eyebrow },
+    heading: { type: 'text', label: keys.pagebuilder.blocks.common.heading },
     items: {
       type: 'array',
-      label: 'Definitions',
+      label: keys.pagebuilder.blocks.definition_list.items,
       arrayFields: {
-        title: { type: 'text', label: 'Title' },
+        title: { type: 'text', label: keys.pagebuilder.blocks.definition_list.items_title },
         sections: {
           type: 'array',
-          label: 'Sections',
+          label: keys.pagebuilder.blocks.definition_list.items_sections,
           arrayFields: {
-            subheading: { type: 'text', label: 'Sub-heading' },
-            body: { type: 'textarea', label: 'Body' },
-            image1: { type: 'text', label: 'Image 1 URL' },
-            image1Alt: { type: 'text', label: 'Image 1 alt' },
-            image2: { type: 'text', label: 'Image 2 URL (optional)' },
-            image2Alt: { type: 'text', label: 'Image 2 alt' },
+            subheading: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_subheading,
+            },
+            body: {
+              type: 'textarea',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_body,
+            },
+            image1: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_image1,
+            },
+            image1Alt: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_image1_alt,
+            },
+            image2: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_image2,
+            },
+            image2Alt: {
+              type: 'text',
+              label: keys.pagebuilder.blocks.definition_list.items_sections_image2_alt,
+            },
           },
           defaultItemProps: {
             subheading: '',

@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useState } from 'react';
 
+import { keys, useT } from '../../utils/i18n';
 import type { TagRead } from '../../utils/taxonomyApi';
 
 const TAG_INPUT_ID = 'news-tag-find-or-create';
@@ -28,6 +29,7 @@ interface Props {
  * impossible to show.
  */
 export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
+  const { t } = useT();
   const [draft, setDraft] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
 
@@ -64,11 +66,9 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
     <section aria-labelledby="news-tags-heading" className="space-y-3">
       <div>
         <h2 id="news-tags-heading" className="text-sm font-semibold uppercase tracking-wide">
-          Tags
+          {t(keys.news.tags.heading)}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Freeform, and made while writing. Select two to merge them.
-        </p>
+        <p className="text-sm text-muted-foreground">{t(keys.news.tags.description)}</p>
       </div>
 
       <form
@@ -85,24 +85,24 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
       >
         <Input
           id={TAG_INPUT_ID}
-          aria-label="Find or create a tag"
-          placeholder="Find or create a tag"
+          aria-label={t(keys.news.tags.find_or_create)}
+          placeholder={t(keys.news.tags.find_or_create)}
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
         />
         <Button type="submit" variant="outline" disabled={busy || !draft.trim() || exact}>
-          Create
+          {t(keys.news.tags.create)}
         </Button>
       </form>
 
       {selected.length === 2 && (
         <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 p-2 text-sm">
-          <span>
-            Merge <strong>{sourceName}</strong> into <strong>{targetName}</strong>
-          </span>
+          {/* One entry, two placeholders: which name comes first is the
+              translator's to decide, which a pair of <strong>s would not be. */}
+          <span>{t(keys.news.tags.merge_summary, { source: sourceName, target: targetName })}</span>
           <Button type="button" size="sm" disabled={busy} onClick={() => void merge()}>
-            Merge
+            {t(keys.news.tags.merge)}
           </Button>
         </div>
       )}
@@ -110,8 +110,8 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
       {filtered.length === 0 ? (
         <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
           {draft.trim()
-            ? `No tag matches "${draft.trim()}". Create it above.`
-            : 'No tags yet. They appear here as writers add them to articles.'}
+            ? t(keys.news.tags.no_match, { query: draft.trim() })
+            : t(keys.news.tags.empty)}
         </p>
       ) : (
         <ul className="flex flex-wrap gap-2">

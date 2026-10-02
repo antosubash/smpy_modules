@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 
 import type { UploadItem } from '../components/media/types';
 import { type MediaAssetRead, uploadMedia } from '../utils/api';
+import { keys, translate } from '../utils/i18n';
 import { uploadKey } from '../utils/mediaFormat';
 
 interface Params {
@@ -70,7 +71,10 @@ export function useMediaUploads({ uploadFolder, onUploaded, setMessage }: Params
                   ? {
                       ...u,
                       status: 'error',
-                      error: e instanceof Error ? e.message : 'Upload failed',
+                      error:
+                        e instanceof Error
+                          ? e.message
+                          : translate(keys.pagebuilder.bundle.upload_failed),
                     }
                   : u,
               ),

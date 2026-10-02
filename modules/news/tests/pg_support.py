@@ -5,9 +5,10 @@ variable names — belongs to ``tests/pg_support.py`` at the repo root, which
 ``records`` and ``pagebuilder`` reach the same way. Everything about *why* it
 works the way it does is documented there.
 
-What is local to news is that a database needs **both** modules' tables: an
-article is a sidecar over a page, so every meaningful query is a join and a
-schema holding only ``news_*`` would fail on the first read.
+What is local to news is which tables a database needs: news' own, plus
+pagebuilder's when it is importable. News owns its content, so nothing here
+joins to a page; pagebuilder is an optional extra whose admin-search sections
+read its tables on a host that installed both, and this workspace is one.
 """
 
 from __future__ import annotations
@@ -43,8 +44,14 @@ arm_reset = _pg.arm_reset
 
 
 async def make_db_state() -> Any:
-    """A ``DatabaseState`` holding pagebuilder's and news' tables, empty."""
+    """A ``DatabaseState`` holding news' tables — and pagebuilder's, if installed."""
     from news.models import Base as NewsBase
-    from pagebuilder.models import Base as PagebuilderBase
 
-    return await _pg.make_db_state(PagebuilderBase.metadata, NewsBase.metadata)
+    metadatas = [NewsBase.metadata]
+    try:
+        from pagebuilder.models import Base as PagebuilderBase
+    except ImportError:  # pragma: no cover - the news-alone host
+        pass
+    else:
+        metadatas.insert(0, PagebuilderBase.metadata)
+    return await _pg.make_db_state(*metadatas)

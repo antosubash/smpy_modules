@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 
 export type ContainerWidgetProps = {
@@ -33,39 +34,39 @@ const ROUNDED_CLASS: Record<ContainerWidgetProps['rounded'], string> = {
 };
 
 export const ContainerWidget: ComponentConfig<ContainerWidgetProps> = {
-  label: 'Container',
+  label: keys.pagebuilder.blocks.container.label,
   fields: {
-    backgroundColor: { type: 'text', label: 'Background color (CSS)' },
+    backgroundColor: { type: 'text', label: keys.pagebuilder.blocks.container.background_color },
     padding: {
       type: 'select',
-      label: 'Padding',
+      label: keys.pagebuilder.blocks.container.padding,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.container.padding_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.container.padding_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.container.padding_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.container.padding_lg, value: 'lg' },
       ],
     },
     maxWidth: {
       type: 'select',
-      label: 'Max width',
+      label: keys.pagebuilder.blocks.container.max_width,
       options: [
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
-        { label: 'Extra Large', value: 'xl' },
-        { label: '2XL', value: '2xl' },
-        { label: 'Full', value: 'full' },
+        { label: keys.pagebuilder.blocks.container.max_width_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.container.max_width_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.container.max_width_lg, value: 'lg' },
+        { label: keys.pagebuilder.blocks.container.max_width_xl, value: 'xl' },
+        { label: keys.pagebuilder.blocks.container.max_width_2xl, value: '2xl' },
+        { label: keys.pagebuilder.blocks.container.max_width_full, value: 'full' },
       ],
     },
     rounded: {
       type: 'select',
-      label: 'Rounded',
+      label: keys.pagebuilder.blocks.container.rounded,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
-        { label: 'Extra Large', value: 'xl' },
+        { label: keys.pagebuilder.blocks.container.rounded_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.container.rounded_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.container.rounded_lg, value: 'lg' },
+        { label: keys.pagebuilder.blocks.container.rounded_xl, value: 'xl' },
       ],
     },
     container: { type: 'slot' },

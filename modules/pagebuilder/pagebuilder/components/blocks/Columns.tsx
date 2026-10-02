@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 
 export interface ColumnsProps {
   /**
@@ -18,7 +19,7 @@ const gapClass: Record<ColumnsProps['gap'], string> = {
 };
 
 export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
-  label: 'Columns',
+  label: keys.pagebuilder.blocks.columns.label,
   fields: {
     columns: {
       type: 'array',
@@ -31,9 +32,9 @@ export const ColumnsBlock: ComponentConfig<ColumnsProps> = {
     gap: {
       type: 'select',
       options: [
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.columns.gap_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.columns.gap_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.columns.gap_lg, value: 'lg' },
       ],
     },
   },

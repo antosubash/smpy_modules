@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock } from './_internal/rich-text';
 import { CTAButton, EyebrowText, Heading, Section } from './_shared';
@@ -28,38 +29,38 @@ const INDENT_CLASSES: Record<'2' | '4', string> = {
 };
 
 export const PageHeaderWidget: ComponentConfig<PageHeaderWidgetProps> = {
-  label: 'Page header',
+  label: keys.pagebuilder.blocks.page_header.label,
   fields: {
-    eyebrow: { type: 'text', label: 'Eyebrow' },
-    title: { type: 'text', label: 'Title' },
-    description: { type: 'textarea', label: 'Description' },
+    eyebrow: { type: 'text', label: keys.pagebuilder.blocks.page_header.eyebrow },
+    title: { type: 'text', label: keys.pagebuilder.blocks.common.title },
+    description: { type: 'textarea', label: keys.pagebuilder.blocks.common.description },
     align: {
       type: 'select',
-      label: 'Alignment',
+      label: keys.pagebuilder.blocks.common.align,
       options: [
-        { label: 'Center', value: 'center' },
-        { label: 'Left', value: 'left' },
+        { label: keys.pagebuilder.blocks.common.align_center, value: 'center' },
+        { label: keys.pagebuilder.blocks.common.align_left, value: 'left' },
       ],
     },
     indent: {
       type: 'select',
-      label: 'Grid indent (left-aligned)',
+      label: keys.pagebuilder.blocks.page_header.indent,
       options: [
-        { label: 'None', value: 'none' },
-        { label: '2nd column', value: '2' },
-        { label: '4th column', value: '4' },
+        { label: keys.pagebuilder.blocks.page_header.indent_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.page_header.indent_2, value: '2' },
+        { label: keys.pagebuilder.blocks.page_header.indent_4, value: '4' },
       ],
     },
     bodyWidth: {
       type: 'select',
-      label: 'Description width',
+      label: keys.pagebuilder.blocks.page_header.body_width,
       options: [
-        { label: 'Auto', value: 'auto' },
-        { label: '546px', value: '546' },
+        { label: keys.pagebuilder.blocks.page_header.body_width_auto, value: 'auto' },
+        { label: keys.pagebuilder.blocks.page_header.body_width_546, value: '546' },
       ],
     },
-    ctaLabel: { type: 'text', label: 'CTA label (optional)' },
-    ctaHref: { type: 'text', label: 'CTA link (optional)' },
+    ctaLabel: { type: 'text', label: keys.pagebuilder.blocks.page_header.cta_label },
+    ctaHref: { type: 'text', label: keys.pagebuilder.blocks.page_header.cta_href },
   },
   defaultProps: {
     eyebrow: 'Section',

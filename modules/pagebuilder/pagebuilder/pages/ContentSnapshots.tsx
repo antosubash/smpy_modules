@@ -6,6 +6,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { SnapshotList } from '../components/snapshots/SnapshotList';
 import { UploadBundleDialog } from '../components/snapshots/UploadBundleDialog';
 import { useSnapshots } from '../hooks/useSnapshots';
+import { keys, useT } from '../utils/i18n';
 import type { PendingImport, Snapshot } from '../utils/snapshotsApi';
 
 interface Props {
@@ -23,23 +24,24 @@ interface Props {
  * capture.
  */
 export default function ContentSnapshots() {
+  const { t } = useT();
   const { snapshots, pending } = usePage<{ props: Props }>().props as unknown as Props;
   const state = useSnapshots(snapshots, pending);
 
   return (
     <AuthenticatedLayout>
-      <Head title="Import / Export" />
+      <Head title={t(keys.pagebuilder.snapshots.title)} />
       <PageShell
-        title="Import / Export"
-        description="Snapshot the whole site, move it between hosts, and roll back to any point."
+        title={t(keys.pagebuilder.snapshots.title)}
+        description={t(keys.pagebuilder.snapshots.description)}
         actions={
           <div className="flex items-center gap-2">
             <UploadBundleDialog
-              trigger={<Button variant="outline">Upload bundle…</Button>}
+              trigger={<Button variant="outline">{t(keys.pagebuilder.snapshots.upload)}</Button>}
               onUploaded={state.reload}
             />
             <Button disabled={state.busy} onClick={() => void state.take()}>
-              Take snapshot
+              {t(keys.pagebuilder.snapshots.take)}
             </Button>
           </div>
         }
@@ -47,13 +49,17 @@ export default function ContentSnapshots() {
         {state.pending && (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-4">
             <div>
-              <p className="font-medium text-amber-900">A restore is waiting for approval.</p>
+              <p className="font-medium text-amber-900">
+                {t(keys.pagebuilder.snapshots.pending_title)}
+              </p>
               <p className="text-sm text-amber-800">
-                Nothing has changed on the site yet. Someone with approval rights has to apply it.
+                {t(keys.pagebuilder.snapshots.pending_description)}
               </p>
             </div>
             <Button asChild>
-              <Link href="/pagebuilder/content/review">Review it</Link>
+              <Link href="/pagebuilder/content/review">
+                {t(keys.pagebuilder.snapshots.pending_review)}
+              </Link>
             </Button>
           </div>
         )}
@@ -70,8 +76,7 @@ export default function ContentSnapshots() {
         />
 
         <p className="mt-6 text-xs text-muted-foreground">
-          Restoring never deletes: a page on the site but absent from the snapshot is left alone.
-          Branding and news articles are not part of a snapshot.
+          {t(keys.pagebuilder.snapshots.footnote)}
         </p>
       </PageShell>
     </AuthenticatedLayout>

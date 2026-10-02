@@ -6,6 +6,7 @@
 
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
+import { keys, useT } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
@@ -44,12 +45,14 @@ export const FeatureCardsWidgetRender = ({
   subtitle,
   linkLabel,
   linkHref,
-  cardLinkLabel = 'Learn more',
+  cardLinkLabel,
   surface = 'default',
   cardSurface = 'default',
   columns,
   items,
 }: FeatureCardsWidgetProps) => {
+  const { t } = useT();
+  const cardLink = cardLinkLabel ?? t(keys.pagebuilder.blocks.feature_cards.card_link_default);
   const hasHeaderLink = Boolean(linkLabel && linkHref);
   const hasSide = Boolean(eyebrow) || hasHeaderLink;
   const panelClass =
@@ -233,7 +236,7 @@ export const FeatureCardsWidgetRender = ({
                   {linked &&
                     (colored ? null : (
                       <span className="mt-auto inline-flex items-center gap-1 pt-6 text-sm font-medium text-[color:var(--pb-link-color,var(--pb-accent))] group-hover:text-[color:var(--pb-link-hover-color,var(--pb-link-color,var(--pb-accent)))]">
-                        {renderRichText(cardLinkLabel, { allowLinks: false })}
+                        {renderRichText(cardLink, { allowLinks: false })}
                         <ArrowUpRight className="size-4" />
                       </span>
                     ))}
@@ -250,9 +253,10 @@ export const FeatureCardsWidgetRender = ({
 };
 
 function EmptyState() {
+  const { t } = useT();
   return (
     <div className="text-center text-gray-500 py-6">
-      Add cards in the editor to populate this section.
+      {t(keys.pagebuilder.blocks.feature_cards.empty)}
     </div>
   );
 }

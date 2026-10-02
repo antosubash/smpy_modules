@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { schedulePage } from '../utils/api';
 import { fromLocalInput } from '../utils/datetime';
+import { keys, useT } from '../utils/i18n';
 import type { EditorForm } from './useEditorForm';
 
 interface Params {
@@ -19,18 +20,19 @@ export interface PageSchedule {
 }
 
 export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSchedule {
+  const { t } = useT();
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const handleSaveSchedule = async () => {
     if (form.pageId === null) {
-      setScheduleError('Save a draft first.');
+      setScheduleError(t(keys.pagebuilder.workflow.save_first));
       return;
     }
     setScheduleError(null);
     const publish = fromLocalInput(form.publishAt);
     const unpublish = fromLocalInput(form.unpublishAt);
     if (publish && unpublish && publish >= unpublish) {
-      setScheduleError('Unpublish time must be after publish time.');
+      setScheduleError(t(keys.pagebuilder.schedule.order_error));
       return;
     }
     setBusy(true);
@@ -41,9 +43,9 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
       });
       form.setPublishAt(updated.publish_at);
       form.setUnpublishAt(updated.unpublish_at);
-      setMessage('Schedule saved.');
+      setMessage(t(keys.pagebuilder.schedule.saved));
     } catch (e) {
-      setScheduleError(e instanceof Error ? e.message : 'Could not save schedule');
+      setScheduleError(e instanceof Error ? e.message : t(keys.pagebuilder.schedule.save_failed));
     } finally {
       setBusy(false);
     }
@@ -60,9 +62,9 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
       });
       form.setPublishAt(updated.publish_at);
       form.setUnpublishAt(updated.unpublish_at);
-      setMessage('Schedule cleared.');
+      setMessage(t(keys.pagebuilder.schedule.cleared));
     } catch (e) {
-      setScheduleError(e instanceof Error ? e.message : 'Could not clear schedule');
+      setScheduleError(e instanceof Error ? e.message : t(keys.pagebuilder.schedule.clear_failed));
     } finally {
       setBusy(false);
     }

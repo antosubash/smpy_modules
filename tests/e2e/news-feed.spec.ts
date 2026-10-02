@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { paragraphBody, seedArticle } from './article-helpers';
 import { csrfHeader, login, uniqueSlug } from './helpers';
 
 /**
@@ -10,35 +11,39 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  * a NewsFeed block renders nothing at all with every other suite still green.
  */
 
+/** Deliberately absurd, and deliberately a constant.
+ *
+ * The unfiltered feed below shows the newest four articles in the whole
+ * archive, so it is only deterministic if this one is guaranteed to be among
+ * them. It is not enough to be recent: `create-flows.spec.ts` creates articles
+ * through the New-article dialog, whose date field defaults to *today*, and
+ * "today" beats any fixed date in the past. A date far enough ahead that no
+ * suite run can produce a later one is what makes this test order-independent
+ * rather than merely usually-passing.
+ */
+const FEED_DATE = '2099-01-01T00:00:00Z';
+const FEED_DATE_LABEL = 'Jan 1, 2099';
+
 async function publishArticle(page: Page, category: string): Promise<string> {
+  // An article, not a page. The *feed block* is still pagebuilder's — it is
+  // registered into that module's palette and rendered on one of its pages,
+  // which is exactly the optional integration this suite exists to cover.
+  // What it lists is now a row of news' own.
+  const { slug, articleId } = await seedArticle(page, {
+    prefix: 'e2e-article',
+    titlePrefix: 'Article',
+    category,
+    publishedAt: FEED_DATE,
+    body: paragraphBody('Body'),
+    publish: true,
+  });
   const headers = await csrfHeader(page);
-  const slug = uniqueSlug('e2e-article');
-  const created = await page.request.post('/api/pagebuilder/pages', {
+  // The card excerpt is the article's meta description.
+  await page.request.put(`/api/news/articles/${articleId}`, {
     headers,
-    data: {
-      title: `Article ${slug}`,
-      slug,
-      meta_description: 'The excerpt.',
-      draft_data: {
-        root: { props: { title: 'Article', width: 'full' } },
-        content: [
-          { type: 'Heading', props: { id: 'h', text: 'Body', level: 'h1', align: 'left' } },
-        ],
-        zones: {},
-      },
-    },
+    data: { meta_description: 'The excerpt.' },
   });
-  expect(created.ok()).toBeTruthy();
-  const { id } = await created.json();
-  await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-    headers,
-    data: { note: 'article' },
-  });
-  const attached = await page.request.post('/api/news/articles', {
-    headers,
-    data: { page_id: id, category, published_at: '2026-02-01T00:00:00Z' },
-  });
-  expect(attached.status(), await attached.text()).toBe(201);
+  await page.request.post(`/api/news/articles/${articleId}/publish`, { headers, data: {} });
   return slug;
 }
 
@@ -111,7 +116,7 @@ test.describe('News feed block', () => {
     // An article *is* a page, so the card links at the page's own URL.
     await expect(card).toHaveAttribute('href', `/news/${articleSlug}`);
     await expect(card).toContainText('The excerpt.');
-    await expect(card).toContainText('Feb 1, 2026');
+    await expect(card).toContainText(FEED_DATE_LABEL);
   });
 
   test('honours the category filter', async ({ page }) => {

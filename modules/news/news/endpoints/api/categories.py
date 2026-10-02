@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from simple_module_db import get_db
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import category_service
-from news.constants import UNCATEGORISED_LABEL
+from news.constants import MAX_CATEGORY_LEN, UNCATEGORISED_LABEL
 from news.contracts.schemas import (
     CategoryAdminListResponse,
     CategoryCreate,
@@ -23,8 +24,25 @@ from news.contracts.schemas import (
     CategoryUpdate,
 )
 from news.endpoints.api._deps import require_edit
+from news.slugify import slugify
 
 router = APIRouter(prefix="/taxonomy", dependencies=[require_edit])
+
+_SLUG_TAKEN = "That address is already used by another category."
+_SLUG_EMPTY = "The address needs at least one letter or number."
+
+
+async def _checked_slug(
+    db: AsyncSession, slug: str | None, *, excluding: int | None = None
+) -> None:
+    """422 for a slug that normalises to nothing, 409 for one another row owns."""
+    if slug is None:
+        return
+    normalised = slugify(slug, fallback="", max_length=MAX_CATEGORY_LEN)
+    if not normalised:
+        raise HTTPException(status_code=422, detail=_SLUG_EMPTY)
+    if await category_service.slug_taken(db, normalised, excluding=excluding):
+        raise HTTPException(status_code=409, detail=_SLUG_TAKEN)
 
 
 async def _load(db: AsyncSession, category_id: int):
@@ -53,11 +71,15 @@ async def create_category(
             status_code=409,
             detail=f"{UNCATEGORISED_LABEL} is a system category and always exists.",
         )
-    if await category_service.get_by_name(db, body.name) is not None:
+    if await category_service.find_by_name(db, body.name) is not None:
         raise HTTPException(
             status_code=409, detail=f"A category named {body.name!r} already exists."
         )
-    category = await category_service.create(db, name=body.name, slug=body.slug)
+    await _checked_slug(db, body.slug)
+    try:
+        category = await category_service.create(db, name=body.name, slug=body.slug)
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail=_SLUG_TAKEN) from None
     return CategoryRead(
         id=category.id or 0,
         name=category.name,
@@ -85,15 +107,19 @@ async def update_category(
                 status_code=409,
                 detail=f"{UNCATEGORISED_LABEL} is a system category and always exists.",
             )
-        clash = await category_service.get_by_name(db, body.name)
+        clash = await category_service.find_by_name(db, body.name, excluding=category.id)
         if clash is not None:
             raise HTTPException(
                 status_code=409,
                 detail=f"A category named {body.name!r} already exists.",
             )
-    updated = await category_service.rename(
-        db, category, name=body.name, slug=body.slug
-    )
+    await _checked_slug(db, body.slug, excluding=category.id)
+    try:
+        updated = await category_service.rename(
+            db, category, name=body.name, slug=body.slug
+        )
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail=_SLUG_TAKEN) from None
     counts = {c.name: c.article_count for c in await category_service.list_categories(db)}
     return CategoryRead(
         id=updated.id or 0,

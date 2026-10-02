@@ -11,6 +11,15 @@
 /** Pagebuilder's bound on the `slug` column. */
 const MAX_SLUG_LEN = 200;
 
+/** What `news.constants.SLUG_PATTERN` accepts, mirrored for the one field a
+ *  slug is *typed* into rather than derived — the article screen's URL.
+ *
+ *  Duplicated for the same reason `MAX_SLUG_LEN` is: the rule has to stay
+ *  stable forever, and a screen that cannot say "that is not a valid address"
+ *  before saving has to report it as a raw 422 afterwards. Derived slugs never
+ *  need it — `slugify` cannot produce a string this rejects. */
+export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
 /** Anything the decomposition did not reduce to ASCII. Written as a Unicode
  *  property escape rather than a `\x00-\x7F` range, which reads as a control
  *  character class and is a lint error. */

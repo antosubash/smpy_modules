@@ -11,8 +11,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # Every pull request, whatever it targets. A branch stacked on another
+  # feature branch — #34 on #29 — otherwise gets no checks at all, and its
+  # only verification is whatever the author ran locally. The required-check
+  # gate on `main` is unchanged; this only adds coverage for PRs that are not
+  # yet aimed at it.
   pull_request:
-    branches: [main]
 
 # Cancel any in-progress run when a new commit is pushed to the same ref,
 # unless that ref is `main` (we always want main's history to be fully

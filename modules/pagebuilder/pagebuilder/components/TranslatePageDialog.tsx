@@ -15,6 +15,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 
 import type { PageRead } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { localeLabel, publicPath } from '../utils/locale';
 import { createTranslation, getPage } from '../utils/pagesApi';
 
@@ -43,6 +44,7 @@ interface Props {
  * a language that already exists turns one click into a 409.
  */
 export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix }: Props) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [missing, setMissing] = useState<string[] | null>(null);
   const [target, setTarget] = useState('');
@@ -94,7 +96,7 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
     >
       <DialogTrigger asChild>
         <Button variant="link" size="sm" data-testid={`translate-page-${page.id}`}>
-          Translate
+          {t(keys.pagebuilder.translate.trigger)}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -105,28 +107,27 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
           }}
         >
           <DialogHeader>
-            <DialogTitle>Translate “{page.title}”</DialogTitle>
-            <DialogDescription>
-              Creates a copy of this page in another language. It gets its own address, its own
-              draft and its own approval — publishing it never publishes this one.
-            </DialogDescription>
+            <DialogTitle>{t(keys.pagebuilder.translate.title, { title: page.title })}</DialogTitle>
+            <DialogDescription>{t(keys.pagebuilder.translate.description)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             {missing === null && !error && (
-              <p className="text-sm text-muted-foreground">Checking which languages are free…</p>
+              <p className="text-sm text-muted-foreground">
+                {t(keys.pagebuilder.translate.checking)}
+              </p>
             )}
 
             {missing?.length === 0 && (
               <p className="text-sm" data-testid="translate-page-none-left">
-                This page already exists in every language the site publishes.
+                {t(keys.pagebuilder.translate.none_left)}
               </p>
             )}
 
             {missing && missing.length > 0 && (
               <>
                 <div className="grid gap-2">
-                  <Label htmlFor={LOCALE_ID}>Language</Label>
+                  <Label htmlFor={LOCALE_ID}>{t(keys.pagebuilder.translate.language)}</Label>
                   <NativeSelect
                     id={LOCALE_ID}
                     value={target}
@@ -139,10 +140,13 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
                       </option>
                     ))}
                   </NativeSelect>
+                  {/* The address is a <code> span inside the sentence, so the
+                      two halves are separate keys rather than one with a
+                      placeholder. */}
                   <p className="text-xs text-muted-foreground">
-                    It will serve at{' '}
-                    <code>{publicPath(publicPrefix, page.slug, target, defaultLocale)}</code> — the
-                    same slug, under the new language. Change it later in the editor.
+                    {t(keys.pagebuilder.translate.address_before)}{' '}
+                    <code>{publicPath(publicPrefix, page.slug, target, defaultLocale)}</code>{' '}
+                    {t(keys.pagebuilder.translate.address_after)}
                   </p>
                 </div>
 
@@ -154,10 +158,9 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
                     onCheckedChange={(v) => setCopyContent(v === true)}
                   />
                   <div className="grid gap-1">
-                    <Label htmlFor={COPY_ID}>Copy this page's content</Label>
+                    <Label htmlFor={COPY_ID}>{t(keys.pagebuilder.translate.copy_label)}</Label>
                     <p className="text-xs text-muted-foreground">
-                      A translator replaces the words, not the layout. Turn this off to start from
-                      an empty page instead.
+                      {t(keys.pagebuilder.translate.copy_help)}
                     </p>
                   </div>
                 </div>
@@ -174,10 +177,12 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
               disabled={pending}
               onClick={() => setOpen(false)}
             >
-              Cancel
+              {t(keys.pagebuilder.translate.cancel)}
             </Button>
             <Button type="submit" disabled={pending || !target}>
-              {pending ? 'Creating…' : 'Create and open editor'}
+              {pending
+                ? t(keys.pagebuilder.translate.creating)
+                : t(keys.pagebuilder.translate.create)}
             </Button>
           </DialogFooter>
         </form>

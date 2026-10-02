@@ -21,8 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.constants import MAX_CATEGORY_LEN, UNCATEGORISED_LABEL
 from news.contracts.schemas import CategoryRead
-from news.integrations.pagebuilder import NOT_TRASHED, Page
-from news.models import NewsArticle, NewsCategory
+from news.models import NOT_TRASHED, NewsArticle, NewsCategory
 from news.slugify import slugify, unique_slug
 
 # Free-text categories sort after every ordered one. Large enough that no
@@ -43,16 +42,16 @@ async def _counts(db: AsyncSession) -> dict[str, int]:
     This is the editor's screen: a category holding nothing but drafts still
     has to show its true weight, or deleting it looks free when it is not.
 
-    Trashed pages are the other half of that. Their articles are deliberately
-    left in place — see ``service._base`` — so counting the raw rows reports
-    articles no listing will show, and the editor deciding whether a category
-    is safe to delete reads a number nothing on screen can account for.
+    Trashed articles are the other half of that. Counting the raw rows would
+    report articles no listing will show, and the editor deciding whether a
+    category is safe to delete would read a number nothing on screen can
+    account for.
     """
     rows = (
         await db.execute(
             select(NewsArticle.category, func.count())
             .select_from(NewsArticle)
-            .join(Page, (Page.id == NewsArticle.page_id) & NOT_TRASHED)
+            .where(NOT_TRASHED)
             .group_by(NewsArticle.category)
         )
     ).all()
@@ -119,6 +118,20 @@ async def get_by_name(db: AsyncSession, name: str) -> NewsCategory | None:
     return await db.scalar(select(NewsCategory).where(NewsCategory.name == name))
 
 
+async def find_by_name(
+    db: AsyncSession, name: str, *, excluding: int | None = None
+) -> NewsCategory | None:
+    """Case-insensitive twin of :func:`get_by_name`, for collision checks."""
+    stmt = select(NewsCategory).where(func.lower(NewsCategory.name) == name.strip().lower())
+    if excluding is not None:
+        stmt = stmt.where(NewsCategory.id != excluding)
+    return (await db.scalars(stmt)).first()
+
+
+async def slug_taken(db: AsyncSession, slug: str, *, excluding: int | None = None) -> bool:
+    return slug in await _taken_slugs(db, excluding=excluding)
+
+
 async def resolve_slug(db: AsyncSession, slug: str) -> str | None:
     """Category *name* for a slug, so public URLs can filter by slug.
 
@@ -132,7 +145,7 @@ async def create(db: AsyncSession, *, name: str, slug: str | None = None) -> New
     """Add a category. Position lands it at the end of the order."""
     last = await db.scalar(select(func.max(NewsCategory.position)))
     resolved = (
-        slugify(slug or name, max_length=MAX_CATEGORY_LEN)
+        slugify(slug, fallback="", max_length=MAX_CATEGORY_LEN)
         if slug
         else unique_slug(name, await _taken_slugs(db), max_length=MAX_CATEGORY_LEN)
     )
@@ -168,7 +181,7 @@ async def rename(
         )
         category.name = name
     if slug is not None:
-        category.slug = slugify(slug, max_length=MAX_CATEGORY_LEN)
+        category.slug = slugify(slug, fallback="", max_length=MAX_CATEGORY_LEN)
     db.add(category)
     await db.flush()
     await db.refresh(category)

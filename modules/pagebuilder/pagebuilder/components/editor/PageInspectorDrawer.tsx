@@ -3,7 +3,18 @@ import { useEffect, useState } from 'react';
 import type { EditorForm } from '../../hooks/useEditorForm';
 import type { PageSchedule } from '../../hooks/usePageSchedule';
 import type { PageRead, PageTranslationRead } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import { listPages } from '../../utils/pagesApi';
+
+/** The tabs, by their internal name. Values are lowercase because the button
+ *  carries `capitalize` — supplying "Page" here would render identically, but
+ *  a translator's string is the one that has to survive the class. */
+const TAB_LABELS = {
+  page: keys.pagebuilder.inspector.tab_page,
+  seo: keys.pagebuilder.inspector.tab_seo,
+  languages: keys.pagebuilder.inspector.tab_languages,
+};
+
 import { PageActions } from './PageActions';
 import { PageSettingsPanel } from './PageSettingsPanel';
 import { SchedulePanel } from './SchedulePanel';
@@ -44,6 +55,7 @@ export function PageInspectorDrawer({
   translations,
   onMessage,
 }: Props) {
+  const { t } = useT();
   const multilingual = locales.length > 1;
   const [tab, setTab] = useState<'page' | 'seo' | 'languages'>('page');
   /** Every other page, for the parent select. Loaded when the drawer opens
@@ -63,7 +75,11 @@ export function PageInspectorDrawer({
 
   return (
     <div className="border-b bg-muted px-4 py-3">
-      <div role="tablist" aria-label="Page inspector" className="mb-3 flex gap-1 border-b pb-2">
+      <div
+        role="tablist"
+        aria-label={t(keys.pagebuilder.inspector.tablist)}
+        className="mb-3 flex gap-1 border-b pb-2"
+      >
         {(multilingual ? (['page', 'seo', 'languages'] as const) : (['page', 'seo'] as const)).map(
           (name) => (
             <button
@@ -79,7 +95,7 @@ export function PageInspectorDrawer({
                   : 'text-muted-foreground hover:bg-background/60'
               }`}
             >
-              {name === 'seo' ? 'SEO' : name}
+              {t(TAB_LABELS[name])}
             </button>
           ),
         )}

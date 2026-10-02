@@ -2,12 +2,13 @@ import { type Data, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
 import { usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { NarrowCanvas } from '../components/editor/NarrowCanvas';
 import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { PageInspectorDrawer } from '../components/editor/PageInspectorDrawer';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
+import { localizeConfig, localizeViewports } from '../components/localizeConfig';
 import { migrateContent } from '../components/migrateContent';
 import { editorViewports, emptyData, getPuckConfig } from '../components/puckConfig';
 import { useAutosave } from '../hooks/useAutosave';
@@ -18,6 +19,7 @@ import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
 import type { PageDetail, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
+import { keys, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
 import { slugify } from '../utils/slugify';
 
@@ -67,6 +69,7 @@ function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
 }
 
 export default function PageEditor() {
+  const { t } = useT();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { page } = props;
   const revisions = props.revisions ?? [];
@@ -83,6 +86,10 @@ export default function PageEditor() {
 
   const form = useEditorForm(page, defaultLocale);
   const isNarrow = useIsNarrow();
+  // The palette's labels are written as catalogue keys — see `localizeConfig`
+  // for why a module-scope block config cannot resolve them itself.
+  const config = useMemo(() => localizeConfig(getPuckConfig(), t), [t]);
+  const viewports = useMemo(() => localizeViewports(editorViewports, t), [t]);
 
   const { isDirty, saveState, lastSavedAt, autosaveError, markSaved } = useAutosave({
     pageId: form.pageId,
@@ -136,7 +143,7 @@ export default function PageEditor() {
 
       {rejectionNote && form.status === 'draft' && (
         <div className="border-b bg-red-50 px-4 py-3 text-sm text-red-800">
-          <strong>Rejected:</strong> {rejectionNote}
+          <strong>{t(keys.pagebuilder.editor.rejected)}</strong> {rejectionNote}
         </div>
       )}
 
@@ -176,9 +183,9 @@ export default function PageEditor() {
           />
         ) : (
           <Puck
-            config={getPuckConfig()}
+            config={config}
             data={form.data}
-            viewports={editorViewports}
+            viewports={viewports}
             iframe={{ enabled: true }}
             // Puck's header renders its own primary "Publish" alongside a copy of
             // the page title. Its Publish was wired to a draft save, so the app

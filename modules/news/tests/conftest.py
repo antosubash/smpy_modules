@@ -1,42 +1,64 @@
 """Shared fixtures for the news integration tests.
 
-News is a sidecar over pagebuilder, so every meaningful query is a join and the
-harness has to create *both* modules' tables against one database. That is the
-only real difference from pagebuilder's own conftest; the rest mirrors it — the
-database comes from ``pg_support.make_db_state`` (in-memory SQLite on a
-``StaticPool`` by default, the Postgres database ``SM_TEST_DATABASE_URL`` names
-when it is set, with ``register_listeners`` attached either way so ``get_db``
-actually commits), and a stub auth middleware stands in for
-``simple_module_auth``.
+News owns its content, so the harness creates exactly one module's tables. That
+is the headline change from the sidecar era, when every meaningful query was a
+join and the fixtures had to stand up pagebuilder's schema alongside news' own
+for any test to run at all.
 
-Pages are created directly through the ``Page`` model rather than through
-pagebuilder's API. These are news tests: what matters is the row the join finds,
-not the workflow that produced it.
+The rest mirrors the framework's house style — the database comes from
+``pg_support.make_db_state`` (in-memory SQLite on a ``StaticPool`` by default,
+the Postgres database ``SM_TEST_DATABASE_URL`` names when it is set, with
+``register_listeners`` attached either way so ``get_db`` actually commits), and
+a stub auth middleware stands in for ``simple_module_auth``.
+
+Articles are created directly through the model rather than through the API.
+These are unit-ish integration tests: what matters is the row a query finds, not
+the workflow that produced it — ``test_workflow`` covers that separately.
+
+Pagebuilder's tables are created too, but only when it happens to be importable
+— which it is in this workspace, and is not on a host that installed news alone.
+That models the real dual-module deployment, where the optional extra is
+installed *and* migrated, so the admin search screen's Pages and Media sections
+have something to read. ``test_search`` covers the other shape by making
+``available()`` answer False.
 """
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import AsyncIterator
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
+from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from news.constants import PERM_EDIT, PERM_VIEW
+from news.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
 from news.module import NewsModule
-from pagebuilder.models import Page, PageStatus
-from pagebuilder.permissions import PERM_EDIT as PAGE_EDIT
-from pagebuilder.permissions import PERM_PUBLISH as PAGE_PUBLISH
 
 # ``pg_support`` owns the one decision both database fixtures make: in-memory
 # SQLite, or the Postgres database ``SM_TEST_DATABASE_URL`` names. It is also
-# where "both modules' tables" is spelled out.
+# where "news' tables, plus pagebuilder's where installed" is spelled out.
 from pg_support import arm_reset, make_db_state
+from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from stub_auth import StubAuthMiddleware, stub_user
+
+_SHELL = (
+    # Shaped like the host's page, not a bare `<html></html>`: a `<head>` with a
+    # fixed app title and the `{% inertia_head %}` slot that stays empty without
+    # SSR. `endpoints.public._head` writes an article's real metadata into that
+    # head, and against a stub with nowhere to write it every test asserting on
+    # server-rendered metadata would pass by asserting nothing.
+    "<html lang=\"en\"><head><title>SimpleModule</title>{% inertia_head %}</head>"
+    "<body>{% inertia_body %}</body></html>"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -56,25 +78,26 @@ def _arm_database_reset():
 
 @pytest.fixture(autouse=True)
 def _no_leaked_module_state():
-    """Every registry the modules write to at startup is process-global.
+    """Every registry the module writes to at startup is process-global.
 
-    ``on_startup`` registers news' slug claim with pagebuilder and publishes
-    the resolved settings; without this a test that boots the module changes
-    the answers of every later test in the same process.
+    ``on_startup`` publishes the resolved settings and mounts one public router
+    per content locale; without this a test that boots the module changes the
+    public URL every later test in the same process reads back.
 
-    Pagebuilder's content locales are the third: ``Page.locale``'s column
-    default reads them, so a multilingual test that left them behind would make
-    the *next* test's pages come out in whatever language it configured — an
-    order-dependent failure with no visible cause.
+    Pagebuilder's content locales are the other half: news reads them to decide
+    which languages to mount, so a multilingual test that left them behind
+    would mount the *next* test's routes in whatever language it configured —
+    an order-dependent failure with no visible cause.
+
+    There is no slug claim to reset any more. An article was a pagebuilder page
+    when there was, and it is not one now.
     """
     from news import settings as news_settings
-    from pagebuilder import locales, public_claims
+    from pagebuilder import locales
 
-    public_claims.reset()
     news_settings.reset()
     locales.reset()
     yield
-    public_claims.reset()
     news_settings.reset()
     locales.reset()
 
@@ -83,10 +106,12 @@ def _no_leaked_module_state():
 def bilingual():
     """Configure the site to publish in English (default) and German.
 
-    Set through ``pagebuilder.locales`` because that is where content languages
-    live — an article *is* a page, so a language news offered that pagebuilder
-    did not would be one no article could be written in. Reset by
-    ``_no_leaked_module_state`` above.
+    Set through ``pagebuilder.locales`` because that is where the site's content
+    languages live. An article is no longer a page — it owns its own content and
+    its own ``locale`` — but which languages the *site* publishes in is still one
+    decision, not two, and offering a language the rest of the site does not have
+    would strand every article written in it. Reset by ``_no_leaked_module_state``
+    above.
     """
     from pagebuilder import locales
     from pagebuilder.settings import PagebuilderSettings
@@ -98,42 +123,12 @@ def bilingual():
 
 
 ROLE_EDITOR = "news-editor"
-#: ``news.edit`` and nothing of pagebuilder's — the case the page-writing
-#: routes must refuse.
-ROLE_NEWS_ONLY = "news-only"
+#: ``news.edit`` without ``news.publish`` — the case every workflow route that
+#: puts something in front of readers has to refuse. This separation used to be
+#: pagebuilder's, enforced by requiring its permissions on the routes that wrote
+#: a page; owning the content means owning the separation.
+ROLE_AUTHOR = "news-author"
 ROLE_VIEWER = "news-viewer"
-
-
-def _stub_user(roles: tuple[str, ...]) -> SimpleNamespace:
-    """Stand in for ``auth.UserContext``.
-
-    Deliberately carries no ``permissions`` attribute — the real UserContext has
-    none either, and a fixture that invented one would hide exactly the bug
-    ``_may_see_drafts`` used to have.
-    """
-    return SimpleNamespace(
-        id="test-user",
-        email="test@example.com",
-        name="Test User",
-        roles=list(roles),
-    )
-
-
-class _StubAuthMiddleware(BaseHTTPMiddleware):
-    """Populate ``request.state.user`` the way the host's auth middleware would.
-
-    ``user=None`` leaves the request anonymous, which is what the public feed
-    block looks like.
-    """
-
-    def __init__(self, app: Any, user: Any) -> None:
-        super().__init__(app)
-        self._user = user
-
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        if self._user is not None:
-            request.state.user = self._user
-        return await call_next(request)
 
 
 async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI, Any]:
@@ -146,32 +141,59 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
     app.include_router(api_router)
     app.include_router(view_router)
 
-    # Both metadatas: an article is only ever read through a join to a page.
     db_state = await make_db_state()
 
     registry = PermissionRegistry()
-    registry.add_group("News", [PERM_VIEW, PERM_EDIT])
-    # An article author needs pagebuilder's permissions too: creating and
-    # publishing an article writes a *page*, and news does not get to route
-    # around the editor → publisher separation that module maintains.
-    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT, PAGE_EDIT, PAGE_PUBLISH])
-    registry.map_role(ROLE_NEWS_ONLY, [PERM_VIEW, PERM_EDIT])
+    registry.add_group("News", [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
+    registry.map_role(ROLE_EDITOR, [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
+    registry.map_role(ROLE_AUTHOR, [PERM_VIEW, PERM_EDIT])
     registry.map_role(ROLE_VIEWER, [PERM_VIEW])
     app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
+    # News' settings are DB-backed, so ``register_settings`` registers the class
+    # against the settings module's registry rather than reading the
+    # environment. Nothing hydrates it here: these tests want the declared
+    # defaults, which is exactly what the container is built from.
+    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
+    module.register_settings(app)
 
-    app.add_middleware(_StubAuthMiddleware, user=user)
+    # Minimal Inertia config — enough to render without the real host
+    # templates. News serves its own public viewer, so the render happens here.
+    # See ``_SHELL`` for why it is shaped like the host's page rather than a stub.
+    templates_dir = Path(tempfile.mkdtemp()) / "templates"
+    templates_dir.mkdir(parents=True)
+    (templates_dir / "index.html").write_text(_SHELL)
+    app.state.inertia_dependency = inertia_dependency_factory(
+        InertiaConfig(
+            environment="development",
+            version="1.0",
+            dev_url="http://localhost:5050",
+            templates=Jinja2Templates(directory=str(templates_dir)),
+            root_template_filename="index.html",
+            entrypoint_filename="main.tsx",
+            root_directory=".",
+            use_flash_errors=True,
+        )
+    )
+
+    app.add_middleware(StubAuthMiddleware, user=user)
+    # Inertia reads flashed errors off the session on every render, so the
+    # public viewer cannot answer at all without this. Added last so it ends up
+    # outermost at runtime — Starlette runs the last-added middleware first on
+    # the way in — which matches the host's own order.
+    app.add_middleware(SessionMiddleware, secret_key="news-tests")
+
     if mount_public:
         # Most fixtures skip this: the admin API is what they exercise, and
-        # ``on_startup`` also registers a process-global slug claim. The public
-        # viewer only exists once it has run, so the tests that are *about* the
-        # article's address ask for it.
+        # ``on_startup`` mounts a router per content locale, which is
+        # process-global. The public viewer only exists once it has run, so the
+        # tests that are *about* the article's address ask for it.
         await module.on_startup(app)
     return app, db_state
 
 
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
-    """A bare database with both modules' tables, for direct service tests."""
+    """A bare database with the module's tables, for direct service tests."""
     state = await make_db_state()
     yield state
     await state.engine.dispose()
@@ -195,8 +217,8 @@ async def _client(user: Any, *, mount_public: bool = False) -> AsyncIterator[Asy
 
 @pytest_asyncio.fixture
 async def editor_client() -> AsyncIterator[AsyncClient]:
-    """Authenticated as a role that maps to `news.edit` — not to WILDCARD."""
-    async for client in _client(_stub_user((ROLE_EDITOR,))):
+    """`news.edit` *and* `news.publish` — not WILDCARD."""
+    async for client in _client(stub_user((ROLE_EDITOR,))):
         yield client
 
 
@@ -204,33 +226,49 @@ async def editor_client() -> AsyncIterator[AsyncClient]:
 async def admin_client() -> AsyncIterator[AsyncClient]:
     """Authenticated as `admin`, which resolves to WILDCARD rather than to
     a literal `news.edit` — the case a naive membership test would miss."""
-    async for client in _client(_stub_user(("admin",))):
+    async for client in _client(stub_user(("admin",))):
         yield client
 
 
 @pytest_asyncio.fixture
-async def news_only_client() -> AsyncIterator[AsyncClient]:
-    """`news.edit`, but none of pagebuilder's permissions.
+async def author_client() -> AsyncIterator[AsyncClient]:
+    """`news.edit`, but not `news.publish`.
 
-    Everything that writes a page on the author's behalf has to refuse this
-    caller, or moving those writes server-side quietly widened what `news.edit`
-    grants.
+    Everything that puts an article in front of readers has to refuse this
+    caller, or owning the workflow quietly widened what `news.edit` grants.
     """
-    async for client in _client(_stub_user((ROLE_NEWS_ONLY,))):
+    async for client in _client(stub_user((ROLE_AUTHOR,))):
         yield client
 
 
 @pytest_asyncio.fixture
 async def viewer_client() -> AsyncIterator[AsyncClient]:
     """Authenticated but without `news.edit`."""
-    async for client in _client(_stub_user((ROLE_VIEWER,))):
+    async for client in _client(stub_user((ROLE_VIEWER,))):
         yield client
 
 
 @pytest_asyncio.fixture
 async def anon_client() -> AsyncIterator[AsyncClient]:
-    """No session at all — what the public feed block looks like."""
-    async for client in _client(None):
+    """No session at all — what an anonymous reader sees.
+
+    Mounts the public routes, unlike the authenticated fixtures: everything
+    this client is used for is on the reader's side of the app.
+    """
+    async for client in _client(None, mount_public=True):
+        yield client
+
+
+@pytest_asyncio.fixture
+async def editor_public_client() -> AsyncIterator[AsyncClient]:
+    """An editor, on an app that also mounts the public viewer.
+
+    The one shape neither half gives on its own: a published article whose
+    author has kept editing has to be read at the preview *and* at its public
+    URL, in the same database, to show that the two are serving different
+    versions. Every other fixture has one or the other.
+    """
+    async for client in _client(stub_user((ROLE_EDITOR,)), mount_public=True):
         yield client
 
 
@@ -248,37 +286,3 @@ async def bilingual_public_client(bilingual) -> AsyncIterator[AsyncClient]:
         yield client
 
 
-async def make_page(
-    db: AsyncSession,
-    *,
-    slug: str,
-    title: str = "A page",
-    status: PageStatus = PageStatus.PUBLISHED,
-    meta_description: str | None = None,
-    og_image: str | None = None,
-    locale: str | None = None,
-) -> Page:
-    """Insert a page for an article to hang off. Committed, so an API request
-    on another session sees it.
-
-    ``locale`` defaults to whatever the model's own default resolves to, which
-    on a monolingual site is the only language there is.
-    """
-    page = Page(
-        slug=slug,
-        title=title,
-        status=status,
-        draft_data={},
-        meta_description=meta_description,
-        og_image=og_image,
-        **({"locale": locale} if locale is not None else {}),
-    )
-    db.add(page)
-    await db.commit()
-    await db.refresh(page)
-    return page
-
-
-@pytest.fixture
-def make_page_factory():
-    return make_page

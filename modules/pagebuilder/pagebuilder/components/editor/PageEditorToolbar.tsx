@@ -6,6 +6,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 
 import type { PageDetail } from '../../utils/api';
 import { formatSaveLabel, type SaveState } from '../../utils/editorSnapshot';
+import { keys, useT } from '../../utils/i18n';
 import { slugify } from '../../utils/slugify';
 import { NoteDialog } from '../NoteDialog';
 import { ScheduledBadge } from '../ScheduledBadge';
@@ -69,6 +70,7 @@ export function PageEditorToolbar({
   onApprove,
   onReject,
 }: Props) {
+  const { t } = useT();
   const saveStateClass =
     saveState === 'error'
       ? 'text-xs text-destructive'
@@ -79,7 +81,7 @@ export function PageEditorToolbar({
   return (
     <div className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
       <Button variant="link" size="sm" onClick={() => router.visit('/pagebuilder')}>
-        ← All pages
+        {t(keys.pagebuilder.toolbar.back)}
       </Button>
       {/* Explicit widths, not min-w: Input's base class list carries `w-full`,
           which would stretch these across the row and wrap the toolbar onto
@@ -88,14 +90,14 @@ export function PageEditorToolbar({
         type="text"
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="Page title"
+        placeholder={t(keys.pagebuilder.toolbar.title_placeholder)}
         className="h-8 w-64 shrink-0 text-sm font-medium"
       />
       <Input
         type="text"
         value={effectiveSlug}
         onChange={(e) => onSlugChange(slugify(e.target.value))}
-        placeholder="slug"
+        placeholder={t(keys.pagebuilder.toolbar.slug_placeholder)}
         className="h-8 w-52 shrink-0 font-mono text-sm"
       />
       <StatusBadge status={status} />
@@ -117,17 +119,17 @@ export function PageEditorToolbar({
             well now, and opening something labelled SEO onto page settings is
             its own small lie. */}
         <Button variant="outline" size="sm" onClick={onToggleSettings}>
-          Settings
+          {t(keys.pagebuilder.toolbar.settings)}
         </Button>
         <Button variant="outline" size="sm" disabled={pageId === null} onClick={onToggleHistory}>
-          History ({revisionCount})
+          {t(keys.pagebuilder.toolbar.history, { count: revisionCount })}
         </Button>
         <Button variant="outline" size="sm" disabled={busy} onClick={onSave}>
-          Save draft
+          {t(keys.pagebuilder.toolbar.save_draft)}
         </Button>
         {status === 'published' && (
           <Button variant="outline" size="sm" disabled={busy} onClick={onUnpublish}>
-            Unpublish
+            {t(keys.pagebuilder.toolbar.unpublish)}
           </Button>
         )}
         {status === 'draft' && (
@@ -138,7 +140,7 @@ export function PageEditorToolbar({
             disabled={busy || pageId === null}
             onClick={onSubmitForReview}
           >
-            Submit for review
+            {t(keys.pagebuilder.toolbar.submit)}
           </Button>
         )}
         {status === 'submitted_for_review' && (
@@ -151,14 +153,14 @@ export function PageEditorToolbar({
                   className="border-destructive text-destructive hover:bg-destructive/10"
                   disabled={busy}
                 >
-                  Reject
+                  {t(keys.pagebuilder.toolbar.reject)}
                 </Button>
               }
-              title="Send this page back to draft?"
-              description="The reason reaches the editor in the page header and the revision history, so say what needs to change."
-              label="Reason for rejection"
-              placeholder="The hero image is still a placeholder."
-              submitLabel="Reject"
+              title={t(keys.pagebuilder.toolbar.reject_title)}
+              description={t(keys.pagebuilder.toolbar.reject_description)}
+              label={t(keys.pagebuilder.toolbar.reject_label)}
+              placeholder={t(keys.pagebuilder.toolbar.reject_placeholder)}
+              submitLabel={t(keys.pagebuilder.toolbar.reject)}
               required
               destructive
               onSubmit={onReject}
@@ -169,7 +171,7 @@ export function PageEditorToolbar({
               disabled={busy}
               onClick={onApprove}
             >
-              Approve
+              {t(keys.pagebuilder.toolbar.approve)}
             </Button>
           </>
         )}
@@ -178,20 +180,20 @@ export function PageEditorToolbar({
             would be asking about a revision that does not exist. */}
         {pageId === null ? (
           <Button size="sm" disabled={busy} onClick={() => void onPublish(null)}>
-            Publish
+            {t(keys.pagebuilder.toolbar.publish)}
           </Button>
         ) : (
           <NoteDialog
             trigger={
               <Button size="sm" disabled={busy}>
-                Publish
+                {t(keys.pagebuilder.toolbar.publish)}
               </Button>
             }
-            title="Publish this page?"
-            description="It goes live immediately. The note is recorded against the revision this publish creates, and is shown in the History panel."
-            label="Describe this publish"
-            placeholder="Rewrote the intro and swapped the hero image."
-            submitLabel="Publish"
+            title={t(keys.pagebuilder.toolbar.publish_title)}
+            description={t(keys.pagebuilder.toolbar.publish_description)}
+            label={t(keys.pagebuilder.toolbar.publish_label)}
+            placeholder={t(keys.pagebuilder.toolbar.publish_placeholder)}
+            submitLabel={t(keys.pagebuilder.toolbar.publish)}
             onSubmit={(note) => onPublish(note || null)}
           />
         )}
@@ -203,7 +205,7 @@ export function PageEditorToolbar({
             rel="noopener noreferrer"
             className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"
           >
-            View
+            {t(keys.pagebuilder.toolbar.view)}
           </a>
         )}
       </div>

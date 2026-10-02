@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from '@puckeditor/core';
+import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 
 export type GridWidgetProps = {
@@ -22,26 +23,26 @@ const GAP_CLASS: Record<GridWidgetProps['gap'], string> = {
 };
 
 export const GridWidget: ComponentConfig<GridWidgetProps> = {
-  label: 'Grid',
+  label: keys.pagebuilder.blocks.grid.label,
   fields: {
     columns: {
       type: 'select',
-      label: 'Columns',
+      label: keys.pagebuilder.blocks.grid.columns,
       options: [
-        { label: '1', value: '1' },
-        { label: '2', value: '2' },
-        { label: '3', value: '3' },
-        { label: '4', value: '4' },
+        { label: keys.pagebuilder.blocks.grid.columns_1, value: '1' },
+        { label: keys.pagebuilder.blocks.grid.columns_2, value: '2' },
+        { label: keys.pagebuilder.blocks.grid.columns_3, value: '3' },
+        { label: keys.pagebuilder.blocks.grid.columns_4, value: '4' },
       ],
     },
     gap: {
       type: 'select',
-      label: 'Gap',
+      label: keys.pagebuilder.blocks.common.gap,
       options: [
-        { label: 'None', value: 'none' },
-        { label: 'Small', value: 'sm' },
-        { label: 'Medium', value: 'md' },
-        { label: 'Large', value: 'lg' },
+        { label: keys.pagebuilder.blocks.common.gap_none, value: 'none' },
+        { label: keys.pagebuilder.blocks.common.gap_sm, value: 'sm' },
+        { label: keys.pagebuilder.blocks.common.gap_md, value: 'md' },
+        { label: keys.pagebuilder.blocks.common.gap_lg, value: 'lg' },
       ],
     },
     grid: { type: 'slot' },

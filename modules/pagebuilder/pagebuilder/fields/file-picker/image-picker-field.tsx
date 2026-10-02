@@ -1,5 +1,6 @@
 import type { CustomField } from "@puckeditor/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { keys, useT } from "../../utils/i18n";
 import { cn } from "../../utils/widgetUtils";
 import { FileGallery } from "./file-gallery";
 import type { FilePickerAdapter } from "./types";
@@ -14,7 +15,7 @@ import type { FilePickerAdapter } from "./types";
  */
 export function createImageField<T extends string | undefined = string>(
 	adapter: FilePickerAdapter,
-	label = "Image",
+	label: string = keys.pagebuilder.fields.image,
 ): CustomField<T> {
 	return {
 		type: "custom",
@@ -55,6 +56,7 @@ export function ImagePickerFieldRenderer({
 	testId,
 	disabled = false,
 }: ImagePickerFieldRendererProps) {
+	const { t } = useT();
 	const [galleryOpen, setGalleryOpen] = useState(false);
 	const [uploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function ImagePickerFieldRenderer({
 				onChange(valueMode === "id" ? result.id : result.url);
 			} catch (err) {
 				console.error("[ImagePicker] Upload failed:", err);
-				setError("Upload failed. Please try again.");
+				setError(t(keys.pagebuilder.picker.upload_failed));
 			} finally {
 				setUploading(false);
 				if (fileInputRef.current) fileInputRef.current.value = "";
@@ -110,7 +112,7 @@ export function ImagePickerFieldRenderer({
 			const file = e.dataTransfer.files?.[0];
 			if (!file) return;
 			if (!file.type.startsWith("image/")) {
-				setError("Only image files can be dropped here.");
+				setError(t(keys.pagebuilder.picker.not_an_image));
 				return;
 			}
 			void uploadFile(file);
@@ -151,7 +153,7 @@ export function ImagePickerFieldRenderer({
 					/>
 				) : (
 					<div className="w-full h-full flex items-center justify-center text-sm text-gray-400">
-						No image selected — or drag an image here
+						{t(keys.pagebuilder.picker.empty)}
 					</div>
 				)}
 			</div>
@@ -162,7 +164,9 @@ export function ImagePickerFieldRenderer({
 					disabled={uploading || disabled}
 					className="flex-1 px-3 py-1.5 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
 				>
-					{uploading ? "Uploading..." : "Upload"}
+					{uploading
+						? t(keys.pagebuilder.picker.uploading)
+						: t(keys.pagebuilder.picker.upload)}
 				</button>
 				<button
 					type="button"
@@ -170,7 +174,7 @@ export function ImagePickerFieldRenderer({
 					disabled={disabled}
 					className="flex-1 px-3 py-1.5 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
 				>
-					Browse
+					{t(keys.pagebuilder.picker.browse)}
 				</button>
 				{value && (
 					<button
@@ -182,7 +186,7 @@ export function ImagePickerFieldRenderer({
 						disabled={disabled}
 						className="px-3 py-1.5 text-sm rounded border bg-white hover:bg-gray-50 text-red-600 disabled:opacity-50"
 					>
-						Clear
+						{t(keys.pagebuilder.picker.clear)}
 					</button>
 				)}
 			</div>

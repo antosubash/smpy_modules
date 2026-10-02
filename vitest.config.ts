@@ -7,5 +7,10 @@ export default defineConfig({
   test: {
     include: ['modules/**/*.test.ts', 'modules/**/*.test.tsx'],
     environment: 'node',
+    // Modules translate their labels through `@simple-module-py/i18n`, which
+    // the host configures at boot and nothing configures in a test process.
+    // See the setup file for why an unconfigured instance would make every
+    // label assertion vacuous.
+    setupFiles: ['tests/vitest-i18n.ts'],
   },
 });

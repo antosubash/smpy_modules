@@ -15,6 +15,7 @@ import type React from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
 import { approvePage, type PageRead, rejectPage } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
@@ -34,6 +35,7 @@ interface Props {
  * the editor header + history panel).
  */
 export default function PendingReview() {
+  const { t } = useT();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { pages } = props;
   const defaultLocale = props.default_locale ?? 'en';
@@ -54,26 +56,28 @@ export default function PendingReview() {
 
   return (
     <PageShell
-      title="Pending review"
-      description="Pages submitted for approval."
+      title={t(keys.pagebuilder.pending.title)}
+      description={t(keys.pagebuilder.pending.description)}
       actions={
         <Button variant="outline" onClick={() => router.visit('/pagebuilder')}>
-          ← All pages
+          {t(keys.pagebuilder.pending.back)}
         </Button>
       }
     >
       {pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          No pages are awaiting review.
+          {t(keys.pagebuilder.pending.empty)}
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Submitted</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t(keys.pagebuilder.pending.column_title)}</TableHead>
+              <TableHead>{t(keys.pagebuilder.pending.column_slug)}</TableHead>
+              <TableHead>{t(keys.pagebuilder.pending.column_submitted)}</TableHead>
+              <TableHead className="text-right">
+                {t(keys.pagebuilder.pending.column_actions)}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -90,35 +94,32 @@ export default function PendingReview() {
                     size="sm"
                     onClick={() => router.visit(`/pagebuilder/${p.id}/edit`)}
                   >
-                    Review
+                    {t(keys.pagebuilder.pending.review)}
                   </Button>
                   <ConfirmDialog
                     trigger={
                       <Button variant="link" size="sm">
-                        Approve
+                        {t(keys.pagebuilder.pending.approve)}
                       </Button>
                     }
-                    title={`Publish "${p.title}"?`}
-                    description={`Approving publishes it immediately at ${publicPath(
-                      PUBLIC_PREFIX,
-                      p.slug,
-                      p.locale,
-                      defaultLocale,
-                    )}.`}
-                    confirmLabel="Approve"
+                    title={t(keys.pagebuilder.pending.approve_title, { title: p.title })}
+                    description={t(keys.pagebuilder.pending.approve_description, {
+                      url: publicPath(PUBLIC_PREFIX, p.slug, p.locale, defaultLocale),
+                    })}
+                    confirmLabel={t(keys.pagebuilder.pending.approve)}
                     onConfirm={() => handleApprove(p.id)}
                   />
                   <NoteDialog
                     trigger={
                       <Button variant="link" size="sm" className="text-destructive">
-                        Reject
+                        {t(keys.pagebuilder.pending.reject)}
                       </Button>
                     }
-                    title={`Reject "${p.title}"?`}
-                    description="It goes back to draft. The reason is shown to the editor in the page header and the revision history, so say what needs to change."
-                    label="Reason for rejection"
-                    placeholder="The hero image is still a placeholder."
-                    submitLabel="Reject"
+                    title={t(keys.pagebuilder.pending.reject_title, { title: p.title })}
+                    description={t(keys.pagebuilder.pending.reject_description)}
+                    label={t(keys.pagebuilder.pending.reject_label)}
+                    placeholder={t(keys.pagebuilder.pending.reject_placeholder)}
+                    submitLabel={t(keys.pagebuilder.pending.reject)}
                     required
                     destructive
                     onSubmit={(note) => handleReject(p.id, note)}

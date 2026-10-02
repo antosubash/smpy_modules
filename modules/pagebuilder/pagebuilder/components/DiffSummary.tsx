@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { RevisionDiff } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 interface Props {
   diff: RevisionDiff;
@@ -23,6 +24,7 @@ function renderValue(value: unknown): string {
  * both sides can move together.
  */
 export function DiffSummary({ diff }: Props): React.JSX.Element {
+  const { t } = useT();
   const { metadata, blocks } = diff;
   const metaKeys = Object.keys(metadata);
   const totalChanges =
@@ -34,7 +36,7 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
         className="mt-3 rounded border bg-card p-3 text-xs text-muted-foreground"
         data-testid="diff-summary"
       >
-        No changes between these revisions.
+        {t(keys.pagebuilder.diff.no_changes)}
       </div>
     );
   }
@@ -43,7 +45,7 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
     <div className="mt-3 space-y-2 rounded border bg-card p-3 text-xs" data-testid="diff-summary">
       {metaKeys.length > 0 && (
         <div>
-          <div className="font-semibold">Metadata</div>
+          <div className="font-semibold">{t(keys.pagebuilder.diff.metadata)}</div>
           <ul className="ml-3 list-disc">
             {metaKeys.map((key) => (
               <li key={key}>
@@ -59,7 +61,9 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
       )}
       {blocks.added.length > 0 && (
         <div>
-          <div className="font-semibold text-green-700">Added ({blocks.added.length})</div>
+          <div className="font-semibold text-green-700">
+            {t(keys.pagebuilder.diff.added, { count: blocks.added.length })}
+          </div>
           <ul className="ml-3 list-disc">
             {blocks.added.map((b) => (
               <li key={b.id}>
@@ -72,7 +76,9 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
       )}
       {blocks.removed.length > 0 && (
         <div>
-          <div className="font-semibold text-red-700">Removed ({blocks.removed.length})</div>
+          <div className="font-semibold text-red-700">
+            {t(keys.pagebuilder.diff.removed, { count: blocks.removed.length })}
+          </div>
           <ul className="ml-3 list-disc">
             {blocks.removed.map((b) => (
               <li key={b.id}>
@@ -85,7 +91,9 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
       )}
       {blocks.changed.length > 0 && (
         <div>
-          <div className="font-semibold text-amber-700">Changed ({blocks.changed.length})</div>
+          <div className="font-semibold text-amber-700">
+            {t(keys.pagebuilder.diff.changed, { count: blocks.changed.length })}
+          </div>
           <ul className="ml-3 list-disc">
             {blocks.changed.map((b) => (
               <li key={b.id}>
@@ -94,7 +102,8 @@ export function DiffSummary({ diff }: Props): React.JSX.Element {
                 {b.type_before && (
                   <span className="text-muted-foreground">
                     {' '}
-                    — was <span className="font-mono">{b.type_before}</span>
+                    {t(keys.pagebuilder.diff.was)}{' '}
+                    <span className="font-mono">{b.type_before}</span>
                   </span>
                 )}
                 {b.fields.length > 0 && <span>: {b.fields.join(', ')}</span>}

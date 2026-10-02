@@ -24,6 +24,12 @@ _log = logging.getLogger("simple_module.pagebuilder")
 # Paired with the news module's own group: the rail reads News / Site, so a
 # screen's section is visible before you click it.
 _PACKAGE = "pagebuilder"
+#: The prefix every key in ``pagebuilder/locales/*.json`` is registered under,
+#: so a console string is ``pagebuilder.<section>.<key>``. Deliberately the
+#: package name: the frontend derives the same prefix in
+#: ``pagebuilder/utils/i18n.ts``, and the two have to agree or every label in
+#: the editor renders as its own key.
+_LOCALE_NAMESPACE = _PACKAGE
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it is
 #: what guarantees ``app.state.settings.module_registry`` exists by the time
 #: ``register_settings`` runs — the host topo-sorts modules on this field.
@@ -178,6 +184,17 @@ class PagebuilderModule(ModuleBase):
         if settings.scheduler_enabled:
             self._scheduler.start(app, settings)
 
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the scheduler's polling task.
+
+        Not reached through a FastAPI ``shutdown`` event handler — the host
+        builds the app with a custom ``lifespan=``, which bypasses the
+        router's own event-handler list entirely. This hook is what the
+        host's lifespan actually calls on the way down, for every module, in
+        reverse start order.
+        """
+        await self._scheduler.stop()
+
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
 
@@ -230,6 +247,25 @@ class PagebuilderModule(ModuleBase):
             CsrfCookieMiddleware,
             admin_prefixes=(self.meta.route_prefix, self.meta.view_prefix),
         )
+
+    def locale_dirs(self) -> dict[str, Path]:
+        """Where the editor's own strings live, for the host's i18n registry.
+
+        ``importlib.resources.files`` rather than ``__file__``: the JSON ships
+        inside the wheel, so a host that pip-installed pagebuilder has to
+        resolve it through the package rather than off a source tree that isn't
+        there.
+
+        The directory sits beside :mod:`pagebuilder.locales`, which is a
+        different thing entirely — that one is the languages a *page* can be
+        authored in, this one is the language the *editor* speaks. They coexist
+        because the directory has no ``__init__.py``: an import of
+        ``pagebuilder.locales`` resolves the module, and this joins the path
+        without importing anything. Adding an ``__init__.py`` here would shadow
+        the module and take the public viewer down with it.
+        """
+        base = Path(str(importlib.resources.files(__package__) / "locales"))
+        return {_LOCALE_NAMESPACE: base}
 
     def static_mounts(self) -> dict[str, Path]:
         pkg_root = Path(str(importlib.resources.files("pagebuilder")))
