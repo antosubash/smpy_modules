@@ -83,6 +83,20 @@ def _models() -> Any:
     return NOT_TRASHED, Page, MediaAsset
 
 
+def _own_tenant(model: Any) -> Any:
+    """Pin a pagebuilder read to one tenant, whatever the request bound.
+
+    The framework filters these tables only when a tenant is bound; a host
+    with ``multi_tenant`` off binds none, and an unfiltered read would list
+    every tenant's pages. Pagebuilder runs such a host as its default tenant,
+    so that is the one searched.
+    """
+    from pagebuilder.tenancy import DEFAULT_TENANT
+    from simple_module_db.tenancy import current_tenant_id
+
+    return model.tenant_id == (current_tenant_id.get() or DEFAULT_TENANT)
+
+
 # ── Links into pagebuilder's own screens ──────────────────────────────
 # All three return "" when it is absent. The frontend renders a section's
 # "see all" only when it has somewhere to send you, so an empty string is a
@@ -134,6 +148,7 @@ async def search_pages(
 
     stmt = select(page).where(
         not_trashed,
+        _own_tenant(page),
         or_(
             page.title.ilike(pattern, escape="\\"),
             page.slug.ilike(pattern, escape="\\"),
@@ -169,6 +184,7 @@ async def search_media(
     from sqlalchemy import func, or_, select
 
     stmt = select(media_asset).where(
+        _own_tenant(media_asset),
         or_(
             media_asset.original_filename.ilike(pattern, escape="\\"),
             media_asset.filename.ilike(pattern, escape="\\"),
