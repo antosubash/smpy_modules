@@ -49,7 +49,9 @@ who has actually seen what they are publishing.
 MENU_GROUP: Final = "News"
 # Names from the framework's NavIcon map, which renders an unknown name as a
 # blank box: "newspaper", "tags" and "trash-2" are lucide icons it never
-# imported. scripts/tests/test_nav_icons.py holds every module to the map.
+# imported. scripts/tests/test_nav_icons.py checks the icon names modules
+# declare in Python against the map (runtime values, e.g. a record type's
+# icon, are not covered).
 MENU_ICON: Final = "scroll-text"
 MENU_ICON_CATEGORIES: Final = "tag"
 MENU_ICON_TRASH: Final = "trash"

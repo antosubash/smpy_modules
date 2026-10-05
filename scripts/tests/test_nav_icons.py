@@ -24,7 +24,7 @@ _INLINE = re.compile(r"""\bicon\s*=\s*["']([a-z0-9-]+)["']""")
 
 def _known_icons() -> set[str]:
     source = NAV_ICON.read_text(encoding="utf-8")
-    body = source.split("const ICON_MAP", 1)[1].split("};", 1)[0]
+    body = source.split("const ICON_MAP", 1)[1].split("} as const", 1)[0]
     return set(re.findall(r"""^\s*'?([a-z0-9-]+)'?\s*:""", body, re.MULTILINE))
 
 
@@ -43,10 +43,13 @@ def _module_icons() -> dict[str, set[str]]:
 @pytest.mark.skipif(not NAV_ICON.exists(), reason="frontend not installed")
 def test_every_module_icon_is_one_navicon_renders() -> None:
     known = _known_icons()
-    assert known, "could not parse NavIcon's ICON_MAP"
+    assert len(known) > 20, "could not parse NavIcon's ICON_MAP"
+    assert "search" in known
+    module_icons = _module_icons()
+    assert module_icons, "found no icon names in any module; the patterns are stale"
     unknown = {
         path: sorted(names - known)
-        for path, names in _module_icons().items()
+        for path, names in module_icons.items()
         if names - known
     }
     assert unknown == {}, f"icons NavIcon cannot render (blank in the sidebar): {unknown}"
