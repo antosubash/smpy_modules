@@ -195,7 +195,11 @@ async def test_mount_media_adopts_legacy_media_and_blobs(tmp_path: Path) -> None
         media_root=tmp_path / "media", snapshot_root=tmp_path / "snapshots"
     )
     (tmp_path / "media").mkdir()
-    (tmp_path / "media" / "old.png").write_bytes(b"x")
+    old, variant = "0123456789abcdef" * 2 + ".png", "0123456789abcdef" * 2 + "_w640.webp"
+    (tmp_path / "media" / old).write_bytes(b"x")
+    (tmp_path / "media" / variant).write_bytes(b"v")
+    (tmp_path / "media" / ".gitkeep").write_bytes(b"")
+    (tmp_path / "media" / "README").write_bytes(b"keep me")
     blobs = tmp_path / "snapshots" / "blobs"
     blobs.mkdir(parents=True)
     (blobs / ("a" * 64)).write_bytes(b"blob")
@@ -203,7 +207,11 @@ async def test_mount_media_adopts_legacy_media_and_blobs(tmp_path: Path) -> None
 
     await boot.mount_media(FastAPI(), settings)
 
-    assert (tmp_path / "media" / "default" / "old.png").is_file()
+    assert (tmp_path / "media" / "default" / old).is_file()
+    assert (tmp_path / "media" / "default" / variant).is_file()
+    # Not names pagebuilder generates: left where they were.
+    assert (tmp_path / "media" / ".gitkeep").is_file()
+    assert (tmp_path / "media" / "README").is_file()
     assert (blobs / "default" / ("a" * 64)).is_file()
     assert (blobs / ("b" * 64 + ".partial")).is_file()  # not a digest: untouched
 

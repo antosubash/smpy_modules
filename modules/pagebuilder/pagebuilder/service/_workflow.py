@@ -10,12 +10,39 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import HTTPException
+from sqlalchemy import ColumnElement, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.models import NOT_TRASHED, Page, PageStatus, RevisionEvent
 from pagebuilder.service._common import _UNSET, _normalize_to_utc, _Unset
 from pagebuilder.service._revisions import RevisionsMixin
+
+
+def publish_due(now: datetime) -> ColumnElement[bool]:
+    """Drafts whose ``publish_at`` has elapsed.
+
+    Shared with the scheduler's tenant scan so what it looks for cannot drift
+    from what :meth:`WorkflowMixin.process_due` flips. Trashed pages are
+    excluded: a binned page must not flip itself live on a schedule it was
+    carrying when it was binned.
+    """
+    return and_(
+        NOT_TRASHED,
+        Page.status == PageStatus.DRAFT,
+        Page.publish_at.is_not(None),  # type: ignore[union-attr]
+        Page.publish_at <= now,  # type: ignore[operator]
+    )
+
+
+def unpublish_due(now: datetime) -> ColumnElement[bool]:
+    """Published pages whose ``unpublish_at`` has elapsed."""
+    return and_(
+        NOT_TRASHED,
+        Page.status == PageStatus.PUBLISHED,
+        Page.unpublish_at.is_not(None),  # type: ignore[union-attr]
+        Page.unpublish_at <= now,  # type: ignore[operator]
+    )
 
 
 class WorkflowMixin(RevisionsMixin):
@@ -111,14 +138,7 @@ class WorkflowMixin(RevisionsMixin):
         flipped: list[Page] = []
 
         pub_due = await self.db.execute(
-            select(Page).where(
-                # A page in the trash must not flip itself live on a schedule
-                # it was carrying when it was binned.
-                NOT_TRASHED,
-                Page.status == PageStatus.DRAFT,
-                Page.publish_at.is_not(None),  # type: ignore[union-attr]
-                Page.publish_at <= now,  # type: ignore[operator]
-            )
+            select(Page).where(publish_due(now))
         )
         for page in pub_due.scalars().all():
             try:
@@ -128,12 +148,7 @@ class WorkflowMixin(RevisionsMixin):
                 continue
 
         unpub_due = await self.db.execute(
-            select(Page).where(
-                NOT_TRASHED,
-                Page.status == PageStatus.PUBLISHED,
-                Page.unpublish_at.is_not(None),  # type: ignore[union-attr]
-                Page.unpublish_at <= now,  # type: ignore[operator]
-            )
+            select(Page).where(unpublish_due(now))
         )
         for page in unpub_due.scalars().all():
             try:

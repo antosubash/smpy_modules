@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI
@@ -103,28 +103,11 @@ async def _due_tenants(factory: Any, now: datetime) -> list[str]:
     from sqlalchemy import or_
     from sqlmodel import select
 
-    from pagebuilder.models import NOT_TRASHED, Page, PageStatus
-    from pagebuilder.service._trash import RETENTION_DAYS
+    from pagebuilder.models import Page
+    from pagebuilder.service._trash import trash_expired
+    from pagebuilder.service._workflow import publish_due, unpublish_due
 
-    cutoff = now - timedelta(days=RETENTION_DAYS)
-    due = or_(
-        (
-            NOT_TRASHED
-            & (Page.status == PageStatus.DRAFT)
-            & Page.publish_at.is_not(None)  # type: ignore[union-attr]
-            & (Page.publish_at <= now)  # type: ignore[operator]
-        ),
-        (
-            NOT_TRASHED
-            & (Page.status == PageStatus.PUBLISHED)
-            & Page.unpublish_at.is_not(None)  # type: ignore[union-attr]
-            & (Page.unpublish_at <= now)  # type: ignore[operator]
-        ),
-        (
-            Page.deleted_at.is_not(None)  # type: ignore[union-attr]
-            & (Page.deleted_at < cutoff)  # type: ignore[operator]
-        ),
-    )
+    due = or_(publish_due(now), unpublish_due(now), trash_expired(now))
     with all_tenants():
         async with factory() as session:
             rows = await session.execute(select(Page.tenant_id).where(due).distinct())

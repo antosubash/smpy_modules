@@ -31,6 +31,7 @@ from pagebuilder import locales
 from pagebuilder.media_files import (
     MediaFiles,
     adopt_legacy_files,
+    is_generated_media_name,
     resolve_media_root,
     warn_on_orphaned_media,
 )
@@ -141,7 +142,7 @@ async def mount_media(app: FastAPI, settings: PagebuilderSettings) -> None:
     media_root = resolve_media_root(settings.media_root)
     media_root.mkdir(parents=True, exist_ok=True)
     _log.info("pagebuilder.media_root: %s", media_root)
-    adopt_legacy_files(media_root)
+    adopt_legacy_files(media_root, accept=is_generated_media_name)
     adopt_legacy_files(
         resolve_media_root(settings.snapshot_root) / BLOBS_DIR,
         accept=is_digest,

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -99,6 +100,16 @@ def legacy_media_url(prefix: str, filename: str) -> str:
     return f"{prefix.rstrip('/')}/{filename}"
 
 
+#: Names pagebuilder generates: ``uuid4().hex + ext`` and its
+#: ``<stem>_w<width>.webp`` variants. Anything else in ``media_root`` (a
+#: ``.gitkeep``, a README) was not ours to move.
+_GENERATED_MEDIA = re.compile(r"[0-9a-f]{32}(_w\d+)?\.[A-Za-z0-9]+")
+
+
+def is_generated_media_name(name: str) -> bool:
+    return _GENERATED_MEDIA.fullmatch(name) is not None
+
+
 def adopt_legacy_files(
     root: Path, *, accept: Callable[[str], bool] | None = None, label: str = "media"
 ) -> int:
@@ -122,7 +133,11 @@ def adopt_legacy_files(
         if target.exists():
             continue
         dest.mkdir(parents=True, exist_ok=True)
-        path.rename(target)
+        try:
+            path.rename(target)
+        except FileNotFoundError:
+            # Another worker booting at the same time moved it first.
+            continue
         moved += 1
     if moved:
         logger.info("pagebuilder.%s: moved %d legacy file(s) into %s", label, moved, dest)
