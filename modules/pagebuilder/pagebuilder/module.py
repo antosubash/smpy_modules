@@ -13,7 +13,7 @@ from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from pagebuilder import boot, locales
+from pagebuilder import boot, locales, tenancy
 from pagebuilder.scheduler import Scheduler
 from pagebuilder.settings import PagebuilderSettings
 
@@ -176,6 +176,9 @@ class PagebuilderModule(ModuleBase):
         where media is mounted. See :mod:`pagebuilder.boot` for why this is
         late rather than during app construction.
         """
+        # First: refuses a host pinned to another default tenant, and fixes
+        # the mode every request binds by, before anything touches the DB.
+        tenancy.configure(app)
         settings = self._live_settings(app)
         boot.exempt_public_routes(app, settings)
         boot.mount_public_routers(app, settings)

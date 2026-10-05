@@ -60,7 +60,8 @@ artifacts = ["pagebuilder/static/dist/**"]
 asyncio_mode = "auto"
 # `db_fixture` holds the bare-session fixture, `locale_fixture` the
 # multilingual app, and `snapshot_fixture` the session + settings pair the
-# snapshot layer's tests use. Registered here rather than imported from
+# snapshot layer's tests use, and `tenant_fixture` the autouse default-tenant
+# binding. Registered here rather than imported from
 # conftest.py, which sits exactly on the repo's 300-line cap.
 pythonpath = ["tests"]
-addopts = "-p db_fixture -p locale_fixture -p snapshot_fixture"
+addopts = "-p db_fixture -p locale_fixture -p snapshot_fixture -p tenant_fixture"

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column
 from sqlmodel import Field
 
 from pagebuilder.models._base import Base
 
 
-class Layout(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class Layout(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Singleton — :meth:`LayoutService.get` creates the row on first read."""
 
     __tablename__ = "pagebuilder_layout"
@@ -27,7 +27,7 @@ class Layout(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     )
 
 
-class LayoutRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class LayoutRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "pagebuilder_layout_revisions"
 
     id: int | None = Field(default=None, primary_key=True)

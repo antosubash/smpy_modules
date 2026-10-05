@@ -20,8 +20,8 @@ from pagebuilder.media_files import (
     count_missing_media_files,
     resolve_media_root,
 )
-from pagebuilder.models import Base, MediaAsset
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from pagebuilder.models import MediaAsset
+from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.asyncio
 
@@ -79,14 +79,9 @@ async def test_missing_file_is_a_plain_text_404(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-async def db_session(tmp_path: Path) -> AsyncSession:  # type: ignore[misc]
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
-    await engine.dispose()
+def db_session(db: AsyncSession) -> AsyncSession:
+    """``db_fixture``'s session: its listeners stamp each row's tenant."""
+    return db
 
 
 def _asset(filename: str, variants: dict | None = None) -> MediaAsset:

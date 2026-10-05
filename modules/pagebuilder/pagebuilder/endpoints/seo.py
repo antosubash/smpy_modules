@@ -19,6 +19,7 @@ from pagebuilder import locales, public_claims
 from pagebuilder.deps import get_settings
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.tenancy import bind_public
 
 seo_router = APIRouter()
 
@@ -71,7 +72,11 @@ def _alternate_links(alternates: list[tuple[str, str]]) -> str:
     return "".join(links)
 
 
-@seo_router.get("/sitemap.xml", response_class=Response)
+# Tenant-bound (first, before ``get_db``): a sitemap lists one site's pages.
+# robots.txt reads no rows, so it answers on any host, tenant or not.
+@seo_router.get(
+    "/sitemap.xml", response_class=Response, dependencies=[Depends(bind_public)]
+)
 async def sitemap(
     request: Request,
     db: AsyncSession = Depends(get_db),

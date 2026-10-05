@@ -10,8 +10,7 @@ from pagebuilder.media_images import sniff_content_type
 from pagebuilder.media_service import MediaService
 from pagebuilder.models import Base, MediaAsset  # noqa: F401 — register metadata
 from pagebuilder.settings import PagebuilderSettings
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.asyncio.session import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Real PNG header (8-byte signature) followed by an IHDR-ish chunk.
 _PNG_HEADER = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
@@ -62,14 +61,9 @@ def _make_upload(content: bytes, *, filename: str, content_type: str) -> UploadF
 
 
 @pytest.fixture
-async def db_session(tmp_path) -> AsyncSession:  # type: ignore[no-untyped-def]
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
-    await engine.dispose()
+def db_session(db: AsyncSession) -> AsyncSession:
+    """``db_fixture``'s session: its listeners stamp each row's tenant."""
+    return db
 
 
 @pytest.fixture

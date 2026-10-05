@@ -6,7 +6,7 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column, DateTime, Index, text
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
@@ -35,7 +35,7 @@ class ImportStatus(str, enum.Enum):  # noqa: UP042 — see PageStatus
     REJECTED = "rejected"
 
 
-class ContentSnapshot(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class ContentSnapshot(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """One captured state of the site's pagebuilder content.
 
     The documents live as JSON files under ``snapshot_root``; this row holds
@@ -62,7 +62,7 @@ class ContentSnapshot(Base, AuditMixin, table=True):  # ty: ignore[unsupported-b
     size_bytes: int = Field(default=0)
 
 
-class SnapshotMedia(Base, table=True):  # ty: ignore[unsupported-base]
+class SnapshotMedia(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """A blob this snapshot references.
 
     Reference-counted deletion reads this table alone: dropping a snapshot must
@@ -83,10 +83,10 @@ class SnapshotMedia(Base, table=True):  # ty: ignore[unsupported-base]
     folder: str | None = Field(default=None, max_length=300)
 
 
-class PendingImport(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class PendingImport(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """A staged restore waiting on an approver.
 
-    At most one row is ``PENDING`` at a time. A plan computed against content
+    At most one row per tenant is ``PENDING`` at a time. A plan computed against content
     that has since changed misrepresents what applying would do, and keeping the
     plan singular is the cheapest way to keep it honest.
     """
@@ -100,6 +100,7 @@ class PendingImport(Base, AuditMixin, table=True):  # ty: ignore[unsupported-bas
         # instead of silently succeeding.
         Index(
             "uq_pagebuilder_pending_imports_one_pending",
+            "tenant_id",
             "status",
             unique=True,
             sqlite_where=text("status = 'PENDING'"),

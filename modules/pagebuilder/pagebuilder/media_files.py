@@ -110,9 +110,16 @@ async def warn_on_orphaned_media(
     table doesn't exist yet on a fresh database) are logged at debug and
     never block startup.
     """
+    from simple_module_db import all_tenants
+
     try:
-        async with session_factory() as session:
-            missing = await count_missing_media_files(session, media_root)
+        # Deliberately cross-tenant: one scan at boot over every tenant's rows.
+        # Outside a request nothing is bound, and a strict host refuses an
+        # unscoped read. (Per-tenant media directories are not modelled here
+        # yet; every file still sits directly under ``media_root``.)
+        with all_tenants():
+            async with session_factory() as session:
+                missing = await count_missing_media_files(session, media_root)
     except Exception:  # pragma: no cover - defensive: never break boot
         logger.debug("pagebuilder.media integrity check skipped", exc_info=True)
         return 0

@@ -41,6 +41,10 @@ async def _page(db, slug: str, *, title: str | None = None, draft_data: dict | N
     from pagebuilder.models import Page, PageStatus
 
     page = Page(
+        # pagebuilder's tables are tenant-owned; news (and so this suite) is
+        # not tenant-aware yet, so the row is filed where a single-tenant host's
+        # pages live rather than stamped from a binding nothing here makes.
+        tenant_id="default",
         slug=slug,
         title=title or slug,
         status=PageStatus.PUBLISHED,

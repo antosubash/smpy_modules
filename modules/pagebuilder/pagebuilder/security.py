@@ -238,9 +238,18 @@ def build_admin_dependencies() -> list[Any]:
     Returned items are ``Depends(...)`` wrappers ready to be passed to
     ``APIRouter(dependencies=...)``. The dependency order matters: auth
     runs first so an unauthenticated request gets 401 (the more useful
-    error) before CSRF fails it with 403.
+    error) before CSRF fails it with 403, then the tenant binding (403
+    ``tenant_required`` without one). The binding has to precede ``get_db``,
+    which every router-level dependency does: the endpoint's own dependencies
+    are resolved after these, so ``get_db`` commits inside the tenant scope.
     """
-    return [Depends(require_user_if_configured), Depends(verify_csrf_if_configured)]
+    from pagebuilder.tenancy import bind_admin
+
+    return [
+        Depends(require_user_if_configured),
+        Depends(bind_admin),
+        Depends(verify_csrf_if_configured),
+    ]
 
 
 def build_view_dependencies() -> list[Any]:
@@ -251,4 +260,10 @@ def build_view_dependencies() -> list[Any]:
     GETs are safe methods, so verification is a no-op anyway).
     ``share_csrf_to_inertia`` already checks the flag itself.
     """
-    return [Depends(require_user_if_configured), Depends(share_csrf_to_inertia)]
+    from pagebuilder.tenancy import bind_admin
+
+    return [
+        Depends(require_user_if_configured),
+        Depends(bind_admin),
+        Depends(share_csrf_to_inertia),
+    ]

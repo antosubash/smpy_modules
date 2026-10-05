@@ -20,6 +20,7 @@ import asyncio
 import contextlib
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -52,33 +53,13 @@ class Scheduler:
         tick are logged and the loop continues; cancellation (shutdown) is
         propagated.
         """
-        from pagebuilder.service import PagesService
-
         factory = app.state.sm.db.session_factory
         interval = max(1, settings.scheduler_interval_seconds)
         while True:
             try:
                 await asyncio.sleep(interval)
-                async with factory() as session:
-                    try:
-                        service = PagesService(session)
-                        flipped = await service.process_due(datetime.now(UTC))
-                        # The trash promises to empty itself after the retention
-                        # window. Swept on the same tick as the flips rather than
-                        # only at startup, so the promise holds for a process that
-                        # stays up for months as well as one that restarts nightly.
-                        purged = await service.purge_expired()
-                        if flipped or purged:
-                            await session.commit()
-                            _log.info(
-                                "pagebuilder.scheduler.flipped",
-                                extra={"count": len(flipped), "purged": purged},
-                            )
-                        else:
-                            await session.rollback()
-                    except Exception:
-                        await session.rollback()
-                        raise
+                with _single_tenant_scope(app):
+                    await _tick(factory)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -111,3 +92,45 @@ class Scheduler:
             _log.exception("pagebuilder.scheduler.stop_failed")
         finally:
             self._task = None
+
+
+def _single_tenant_scope(app: FastAPI) -> contextlib.AbstractContextManager[object]:
+    """Bind :data:`~pagebuilder.tenancy.DEFAULT_TENANT` on a single-tenant host.
+
+    The tick runs outside any request, so nothing else binds a tenant, and the
+    revisions it writes need one. A multi-tenant host gets no binding here:
+    looping its tenants, one session each, is the scheduler's own job.
+    """
+    from simple_module_db import tenant_context
+
+    from pagebuilder import tenancy
+
+    if tenancy.mode_of(app) is tenancy.TenancyMode.SINGLE:
+        return tenant_context(tenancy.DEFAULT_TENANT)
+    return contextlib.nullcontext()
+
+
+async def _tick(factory: Any) -> None:
+    """One DB session: flip what is due, purge expired trash, commit or roll back."""
+    from pagebuilder.service import PagesService
+
+    async with factory() as session:
+        try:
+            service = PagesService(session)
+            flipped = await service.process_due(datetime.now(UTC))
+            # The trash promises to empty itself after the retention window.
+            # Swept on the same tick as the flips rather than only at startup,
+            # so the promise holds for a process that stays up for months as
+            # well as one that restarts nightly.
+            purged = await service.purge_expired()
+            if flipped or purged:
+                await session.commit()
+                _log.info(
+                    "pagebuilder.scheduler.flipped",
+                    extra={"count": len(flipped), "purged": purged},
+                )
+            else:
+                await session.rollback()
+        except Exception:
+            await session.rollback()
+            raise

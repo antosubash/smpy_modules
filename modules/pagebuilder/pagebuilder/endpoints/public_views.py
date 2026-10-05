@@ -28,6 +28,7 @@ from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.tenancy import bind_public
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -226,8 +227,12 @@ def locale_router(locale: str) -> APIRouter:
     reach the handler and have to be rejected there, and — worse — the public
     route registry exempts by string prefix, so the exemption would have to be
     widened to something that no longer describes what is public.
+
+    ``bind_public`` comes first so everything the viewer reads — redirects,
+    claims, layout, alternates — runs in the request's tenant, and a request
+    that resolved none gets the unknown-slug 404.
     """
-    router = APIRouter()
+    router = APIRouter(dependencies=[Depends(bind_public)])
 
     @router.get("/{slug}", response_model=None)
     async def public_view(
@@ -265,7 +270,7 @@ def default_locale_alias_router(settings: PagebuilderSettings) -> APIRouter:
     problem the whole prefix scheme exists to avoid. A 301 is the third option
     and the only good one.
     """
-    router = APIRouter()
+    router = APIRouter(dependencies=[Depends(bind_public)])
 
     @router.get("/{slug}", response_model=None)
     async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
