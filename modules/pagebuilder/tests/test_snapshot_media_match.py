@@ -18,7 +18,7 @@ def _sha(data: bytes) -> str:
 
 
 async def _add(snapshot_db, *, filename: str, original: str, data: bytes | None):
-    root = resolve_media_root(snapshot_db.settings.media_root)
+    root = resolve_media_root(snapshot_db.settings.media_root) / "default"
     root.mkdir(parents=True, exist_ok=True)
     if data is not None:
         (root / filename).write_bytes(data)

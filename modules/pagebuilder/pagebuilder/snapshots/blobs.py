@@ -4,6 +4,11 @@ Blobs are keyed by sha256 and shared by every snapshot that references them, so
 ten snapshots of a site whose photographs have not changed cost one copy of the
 photographs. Without that, each snapshot of a real site would duplicate its
 whole media library and the feature would be unusable on anything but a toy.
+
+Each tenant has its own store, ``<blobs root>/<tenant_id>/`` (issue #38).
+Sharing one would be unsafe rather than merely untidy: ``delete_unreferenced``
+keeps only what the *tenant-filtered* ``SnapshotMedia`` rows name, so it would
+delete every other tenant's blobs.
 """
 
 from __future__ import annotations
@@ -39,6 +44,17 @@ def _checked(sha256: str) -> str:
     if not is_digest(sha256):
         raise ValueError(f"not a sha256 digest: {sha256!r}")
     return sha256
+
+
+BLOBS_DIR = "blobs"
+"""The blob root's name under ``snapshot_root``."""
+
+
+def tenant_store(blobs_root: Path, tenant_id: str | None = None) -> BlobStore:
+    """The store of *tenant_id*, or of the bound tenant."""
+    from pagebuilder.media_files import tenant_media_dir
+
+    return BlobStore(tenant_media_dir(Path(blobs_root), tenant_id))
 
 
 class BlobStore:

@@ -41,7 +41,7 @@ def _tree(root: Path) -> dict[str, object]:
 
 async def _seed_rich_site(session, settings):
     """Pages with a parent, a redirect, media in content, and a layout."""
-    root = resolve_media_root(settings.media_root)
+    root = resolve_media_root(settings.media_root) / "default"
     root.mkdir(parents=True, exist_ok=True)
     (root / "uuid1.png").write_bytes(PNG)
     session.add(

@@ -94,7 +94,7 @@ async def test_upload_generates_webp_thumbnails(media_service: MediaService) -> 
     # 1500x1000 → aspect-preserving height at 640 width is round(640*1000/1500) = 427
     assert w640["height"] == 427
     # File actually exists on disk under the variant name.
-    variant_path = media_service.storage_root / w640["filename"]
+    variant_path = media_service.tenant_dir() / w640["filename"]
     assert variant_path.is_file()
     assert variant_path.stat().st_size > 0
 
@@ -123,7 +123,7 @@ async def test_animated_gif_skips_thumbnails(media_service: MediaService) -> Non
     assert asset.width == 10
     assert asset.height == 10
     # Original still saved.
-    assert (media_service.storage_root / asset.filename).is_file()
+    assert (media_service.tenant_dir() / asset.filename).is_file()
 
 
 async def test_to_read_exposes_variant_urls(media_service: MediaService) -> None:
@@ -146,10 +146,10 @@ async def test_delete_removes_variant_files(media_service: MediaService) -> None
     )
     asset = await media_service.upload(upload)
     variant_paths = [
-        media_service.storage_root / meta["filename"]
+        media_service.tenant_dir() / meta["filename"]
         for meta in asset.variants.values()
     ]
-    original_path = media_service.storage_root / asset.filename
+    original_path = media_service.tenant_dir() / asset.filename
     assert variant_paths and all(p.is_file() for p in variant_paths)
     assert asset.id is not None
     await media_service.delete(asset.id)

@@ -58,7 +58,8 @@ def _media_app(root: Path) -> FastAPI:
 
 
 async def test_served_file_gets_immutable_cache_control(tmp_path: Path) -> None:
-    (tmp_path / "photo.jpg").write_bytes(b"\xff\xd8jpeg")
+    (tmp_path / "default").mkdir()
+    (tmp_path / "default" / "photo.jpg").write_bytes(b"\xff\xd8jpeg")
     transport = ASGITransport(app=_media_app(tmp_path))
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/media/photo.jpg")
@@ -96,8 +97,8 @@ def _asset(filename: str, variants: dict | None = None) -> MediaAsset:
 
 async def test_counts_rows_whose_file_is_gone(db_session: AsyncSession, tmp_path: Path) -> None:
     root = tmp_path / "media"
-    root.mkdir()
-    (root / "present.jpg").write_bytes(b"ok")
+    (root / "default").mkdir(parents=True)
+    (root / "default" / "present.jpg").write_bytes(b"ok")
     db_session.add(_asset("present.jpg"))
     db_session.add(_asset("gone.jpg"))
     await db_session.commit()
@@ -109,8 +110,8 @@ async def test_a_missing_variant_counts_as_missing(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:
     root = tmp_path / "media"
-    root.mkdir()
-    (root / "photo.jpg").write_bytes(b"ok")
+    (root / "default").mkdir(parents=True)
+    (root / "default" / "photo.jpg").write_bytes(b"ok")
     db_session.add(
         _asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}})
     )
@@ -121,9 +122,9 @@ async def test_a_missing_variant_counts_as_missing(
 
 async def test_intact_library_counts_zero(db_session: AsyncSession, tmp_path: Path) -> None:
     root = tmp_path / "media"
-    root.mkdir()
-    (root / "photo.jpg").write_bytes(b"ok")
-    (root / "photo_w320.webp").write_bytes(b"ok")
+    (root / "default").mkdir(parents=True)
+    (root / "default" / "photo.jpg").write_bytes(b"ok")
+    (root / "default" / "photo_w320.webp").write_bytes(b"ok")
     db_session.add(
         _asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}})
     )

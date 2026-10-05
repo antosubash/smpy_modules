@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pagebuilder import media_usage
 from pagebuilder.contracts.schemas import (
     MediaAssetDetail,
+    MediaAssetRead,
     MediaAssetUpdate,
     MediaUsage,
 )
@@ -25,6 +26,12 @@ router = APIRouter(dependencies=[require_edit])
 
 #: Pages listed on the detail screen before it stops enumerating them.
 _USAGE_LIMIT = 20
+
+
+def _urls(media: MediaService, read: MediaAssetRead) -> list[str]:
+    """Every URL a page may reference this asset by: today's and the flat one
+    stored before per-tenant media (#38), which is still served."""
+    return [read.url, media.legacy_url_for(read.filename)]
 
 
 async def _load(media: MediaService, asset_id: int):
@@ -41,7 +48,7 @@ async def get_upload(
 ) -> MediaAssetDetail:
     asset = await _load(media, asset_id)
     read = media.to_read(asset)
-    usages, total = await media_usage.find(db, read.url, limit=_USAGE_LIMIT)
+    usages, total = await media_usage.find(db, _urls(media, read), limit=_USAGE_LIMIT)
     return MediaAssetDetail(
         asset=read,
         used_in=[MediaUsage(**vars(u)) for u in usages],
@@ -67,7 +74,7 @@ async def update_upload(
     await db.refresh(asset)
 
     read = media.to_read(asset)
-    usages, total = await media_usage.find(db, read.url, limit=_USAGE_LIMIT)
+    usages, total = await media_usage.find(db, _urls(media, read), limit=_USAGE_LIMIT)
     return MediaAssetDetail(
         asset=read,
         used_in=[MediaUsage(**vars(u)) for u in usages],
@@ -91,7 +98,7 @@ async def delete_if_unused(
     """
     asset = await _load(media, asset_id)
     read = media.to_read(asset)
-    usages, total = await media_usage.find(db, read.url, limit=_USAGE_LIMIT)
+    usages, total = await media_usage.find(db, _urls(media, read), limit=_USAGE_LIMIT)
     if total:
         where = ", ".join(u.title for u in usages[:3])
         more = f" and {total - 3} more" if total > 3 else ""

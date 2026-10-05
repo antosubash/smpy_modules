@@ -28,7 +28,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder.media_files import resolve_media_root
+from pagebuilder.media_files import resolve_media_root, tenant_media_dir
 from pagebuilder.models import MediaAsset
 from pagebuilder.settings import PagebuilderSettings
 
@@ -79,7 +79,8 @@ async def match_existing(
                 continue
             if candidate.id not in digests:
                 digests[candidate.id] = await asyncio.to_thread(
-                    _digest_file, root / candidate.filename
+                    _digest_file,
+                    tenant_media_dir(root, candidate.tenant_id) / candidate.filename,
                 )
             if digests[candidate.id] == wanted:
                 matched[bundle_name] = candidate
@@ -113,4 +114,4 @@ async def preview_urls(
     }
     service = MediaService(db, settings)
     matched = await match_existing(db, settings, index)
-    return {name: service.url_for(a.filename) for name, a in matched.items()}
+    return {name: service.url_for(a.filename, a.tenant_id) for name, a in matched.items()}
