@@ -89,12 +89,14 @@ def test_framework_pins_survive_a_real_bump():
     """Round-trip a real bump and restore, asserting the pins are unchanged."""
     manifest = REPO / "modules" / "pagebuilder" / "pyproject.toml"
     snapshot = {path: path.read_text() for path in _all_manifests()}
+    original = [str(d) for d in tomlkit.parse(snapshot[manifest])["project"]["dependencies"]]
     try:
         assert _run("9.9.9").returncode == 0
         bumped = tomlkit.parse(manifest.read_text())
         assert str(bumped["project"]["version"]) == "9.9.9"
         deps = [str(d) for d in bumped["project"]["dependencies"]]
-        assert "simple_module_core>=0.0.25,<0.1" in deps
+        assert deps == original
+        assert any(d.startswith("simple_module_core>=") for d in deps)
         assert not any("simple_module_core==" in d for d in deps)
     finally:
         for path, original in snapshot.items():
