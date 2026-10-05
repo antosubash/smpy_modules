@@ -132,4 +132,25 @@ test.describe('Media asset detail', () => {
     await expect(page).toHaveURL(/\/pagebuilder\/media$/);
     expect((await page.request.get(`/api/pagebuilder/uploads/${asset.id}`)).status()).toBe(404);
   });
+
+  // Tenancy (#38): files live under the tenant's directory. A single-tenant
+  // host is tenant "default", and URLs stored before the change (flat, no
+  // tenant segment) must keep serving and keep counting as usage.
+  test('is served under its tenant, and a legacy flat URL still works', async ({ page }) => {
+    await login(page);
+    const asset = await upload(page);
+    expect(asset.url).toMatch(/^\/media\/pagebuilder\/default\/[0-9a-f]{32}\.png$/);
+
+    const file = asset.url.split('/').pop() as string;
+    const tenantUrl = await page.request.get(asset.url);
+    expect(tenantUrl.status()).toBe(200);
+    const legacy = await page.request.get(`/media/pagebuilder/${file}`);
+    expect(legacy.status()).toBe(200);
+    expect(await legacy.body()).toEqual(await tenantUrl.body());
+    expect((await page.request.get(`/media/pagebuilder/elsewhere/${file}`)).status()).toBe(404);
+
+    await pageUsing(page, `/media/pagebuilder/${file}`, 'Uses the legacy URL');
+    await page.goto(`/pagebuilder/media/${asset.id}`);
+    await expect(page.getByTestId('media-usage')).toContainText('Uses the legacy URL');
+  });
 });
