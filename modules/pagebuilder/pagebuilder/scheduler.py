@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import FastAPI
@@ -58,8 +58,7 @@ class Scheduler:
         while True:
             try:
                 await asyncio.sleep(interval)
-                with _single_tenant_scope(app):
-                    await _tick(factory)
+                await _tick(factory)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -94,24 +93,64 @@ class Scheduler:
             self._task = None
 
 
-def _single_tenant_scope(app: FastAPI) -> contextlib.AbstractContextManager[object]:
-    """Bind :data:`~pagebuilder.tenancy.DEFAULT_TENANT` on a single-tenant host.
+async def _due_tenants(factory: Any, now: datetime) -> list[str]:
+    """Distinct tenants with a scheduled flip due or trash past retention.
 
-    The tick runs outside any request, so nothing else binds a tenant, and the
-    revisions it writes need one. A multi-tenant host gets no binding here:
-    looping its tenants, one session each, is the scheduler's own job.
+    Read unscoped on a session of its own, closed before any tenant's work
+    starts, so nothing read here is carried into a tenant's transaction.
     """
-    from simple_module_db import tenant_context
+    from simple_module_db import all_tenants
+    from sqlalchemy import or_
+    from sqlmodel import select
 
-    from pagebuilder import tenancy
+    from pagebuilder.models import NOT_TRASHED, Page, PageStatus
+    from pagebuilder.service._trash import RETENTION_DAYS
 
-    if tenancy.mode_of(app) is tenancy.TenancyMode.SINGLE:
-        return tenant_context(tenancy.DEFAULT_TENANT)
-    return contextlib.nullcontext()
+    cutoff = now - timedelta(days=RETENTION_DAYS)
+    due = or_(
+        (
+            NOT_TRASHED
+            & (Page.status == PageStatus.DRAFT)
+            & Page.publish_at.is_not(None)  # type: ignore[union-attr]
+            & (Page.publish_at <= now)  # type: ignore[operator]
+        ),
+        (
+            NOT_TRASHED
+            & (Page.status == PageStatus.PUBLISHED)
+            & Page.unpublish_at.is_not(None)  # type: ignore[union-attr]
+            & (Page.unpublish_at <= now)  # type: ignore[operator]
+        ),
+        (
+            Page.deleted_at.is_not(None)  # type: ignore[union-attr]
+            & (Page.deleted_at < cutoff)  # type: ignore[operator]
+        ),
+    )
+    with all_tenants():
+        async with factory() as session:
+            rows = await session.execute(select(Page.tenant_id).where(due).distinct())
+            return sorted({t for t in rows.scalars().all() if t})
 
 
 async def _tick(factory: Any) -> None:
-    """One DB session: flip what is due, purge expired trash, commit or roll back."""
+    """Find the tenants with work, then run each one in its own tenant context.
+
+    The tick runs outside any request, so nothing binds a tenant for it. One
+    code path for single- and multi-tenant hosts: a single-tenant host's rows
+    are all :data:`~pagebuilder.tenancy.DEFAULT_TENANT`. A tenant that fails is
+    logged and does not stop the rest.
+    """
+    from simple_module_db import tenant_context
+
+    for tenant_id in await _due_tenants(factory, datetime.now(UTC)):
+        try:
+            with tenant_context(tenant_id):
+                await _tick_tenant(factory)
+        except Exception:
+            _log.exception("pagebuilder.scheduler.tenant_failed tenant_id=%s", tenant_id)
+
+
+async def _tick_tenant(factory: Any) -> None:
+    """One fresh session in the bound tenant: flip what is due, purge expired trash."""
     from pagebuilder.service import PagesService
 
     async with factory() as session:

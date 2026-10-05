@@ -193,13 +193,3 @@ async def test_single_mode_routes_bind_the_default_tenant(authed_client):
 
 
 # --- outside a request --------------------------------------------------------
-
-
-@pytest.mark.unbound_tenant
-def test_scheduler_tick_binds_default_on_a_single_tenant_host():
-    from pagebuilder.scheduler import _single_tenant_scope
-
-    with _single_tenant_scope(FastAPI()):
-        assert current_tenant_id.get() == DEFAULT_TENANT
-    with _single_tenant_scope(_app()):
-        assert current_tenant_id.get() is None
