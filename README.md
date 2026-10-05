@@ -121,7 +121,7 @@ a release.
 ## Conventions
 
 - **Published modules pin the framework with ranges**
-  (`simple_module_core>=0.0.25,<0.1`); the host pins exactly. An `==` pin in a
+  (`simple_module_core>=0.0.35,<0.1`); the host pins exactly. An `==` pin in a
   module makes it uninstallable in any host running a newer framework.
 - **Migrations live in `host/migrations/versions/`**, never in a module.
 - **Every `.py`/`.ts`/`.tsx` file stays under 300 lines**, enforced by

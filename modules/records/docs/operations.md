@@ -49,7 +49,7 @@ view_prefix="/admin/records", depends_on=["Settings"],
 requires_framework=">=1.0,<2.0")`. It depends on the framework's **Settings**
 module so that `app.state.settings.module_registry` exists by the time
 `register_settings` runs. Python dependencies are declared with **ranges**
-(`simple_module_core>=0.0.25,<0.1` and the same for `db`, `hosting` and
+(`simple_module_core>=0.0.35,<0.1` and the same for `db`, `hosting` and
 `settings`), never exact pins.
 
 Then generate and apply the migration:
