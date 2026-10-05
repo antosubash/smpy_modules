@@ -54,7 +54,7 @@ def tenant_store(blobs_root: Path, tenant_id: str | None = None) -> BlobStore:
     """The store of *tenant_id*, or of the bound tenant."""
     from pagebuilder.media_files import tenant_media_dir
 
-    return BlobStore(tenant_media_dir(Path(blobs_root), tenant_id))
+    return BlobStore(tenant_media_dir(blobs_root, tenant_id))
 
 
 class BlobStore:

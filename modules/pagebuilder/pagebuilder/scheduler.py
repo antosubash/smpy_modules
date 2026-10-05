@@ -128,7 +128,7 @@ async def _due_tenants(factory: Any, now: datetime) -> list[str]:
     with all_tenants():
         async with factory() as session:
             rows = await session.execute(select(Page.tenant_id).where(due).distinct())
-            return sorted({t for t in rows.scalars().all() if t})
+            return sorted(rows.scalars().all())
 
 
 async def _tick(factory: Any) -> None:

@@ -114,7 +114,7 @@ def adopt_legacy_files(
     dest = root / DEFAULT_TENANT
     moved = 0
     for path in sorted(root.iterdir()):
-        if path.is_dir() or not path.is_file():
+        if not path.is_file():
             continue
         if accept is not None and not accept(path.name):
             continue
