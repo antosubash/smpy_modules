@@ -11,7 +11,7 @@ interface Props {
   category: CategoryRead;
   busy: boolean;
   dragging: boolean;
-  onSave: (id: number, name: string, slug: string) => void;
+  onSave: (id: number, name: string, slug: string) => Promise<boolean>;
   /** The delete control, supplied by the page so each row's dialog owns its
    *  own reassignment state instead of one shared across the list. */
   deleteSlot?: React.ReactNode;
@@ -55,10 +55,10 @@ export function CategoryRow({
     setEditing(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return;
-    onSave(category.id, name.trim(), slug.trim());
-    setEditing(false);
+    // Close only once the rename is written: a refused one keeps what was typed.
+    if (await onSave(category.id, name.trim(), slug.trim())) setEditing(false);
   };
 
   return (
