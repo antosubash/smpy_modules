@@ -22,7 +22,7 @@ root `.env` is the single source of truth (see CLAUDE.md).
 |---|---|
 | Migrations | `make migrate` (alembic `upgrade heads` — there are several heads) |
 | Full stack | `SM_USERS_BOOTSTRAP_EMAIL=<email> SM_USERS_BOOTSTRAP_PASSWORD=<pw> make dev` |
-| Second stack beside another (worktree) | prefix with `API_PORT=8010 UI_PORT=5060 SM_UI_PORT=5060 SM_VITE_DEV_URL=http://localhost:5060` |
+| Second stack beside another (worktree) | prefix with `API_PORT=8010 UI_PORT=5070 SM_UI_PORT=5070 SM_VITE_DEV_URL=http://localhost:5070` |
 | API only / UI only | `make dev-api` / `make dev-ui` |
 
 `make dev` runs `gen-pages`, then uvicorn on `API_PORT` (default 8000, `--reload`)
@@ -42,6 +42,8 @@ and Vite on `UI_PORT` (default 5050). Run it in the background and log to a file
 - Reset data: stop, delete `host/app.db`, `make migrate`.
 
 ## Gotchas
+- Never put the UI on 5060/5061: Chromium refuses them (`ERR_UNSAFE_PORT`) and the
+  app renders blank in Playwright. 5070 works.
 - Boot prints SM003/SM024 warnings for news/ai/records; they predate current work and
   are not failures.
 - Multi-tenancy is off in the demo host (news blocks it); everything runs as
