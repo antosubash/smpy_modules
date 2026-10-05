@@ -47,9 +47,12 @@ who has actually seen what they are publishing.
 # one "Content" group: which module a screen belongs to is then legible from
 # the sidebar as well as from the URL.
 MENU_GROUP: Final = "News"
-MENU_ICON: Final = "newspaper"
-MENU_ICON_CATEGORIES: Final = "tags"
-MENU_ICON_TRASH: Final = "trash-2"
+# Names from the framework's NavIcon map, which renders an unknown name as a
+# blank box: "newspaper", "tags" and "trash-2" are lucide icons it never
+# imported. scripts/tests/test_nav_icons.py holds every module to the map.
+MENU_ICON: Final = "scroll-text"
+MENU_ICON_CATEGORIES: Final = "tag"
+MENU_ICON_TRASH: Final = "trash"
 MENU_ICON_SEARCH: Final = "search"
 MENU_LABEL_SEARCH: Final = "Search everything"
 MENU_GROUP_SEARCH: Final = "Find"
