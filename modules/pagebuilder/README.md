@@ -257,6 +257,28 @@ inserted with and are then saved into the document, so translating them at
 render time would rewrite what a visitor is served in whatever language the
 author happened to be working in.
 
+## Multi-tenancy
+
+Every pagebuilder table is tenant-owned (the framework's `MultiTenantMixin`),
+so one host can run several sites. Slugs, redirects, media filenames and the
+one-pending-import rule are unique **per tenant**, and each tenant has its own
+site layout, media directory (`<media_root>/<tenant>/`) and snapshot blob store.
+
+Which tenant a request acts for depends on the host:
+
+- **Single-tenant** (`multi_tenant` off) — everything is tenant `"default"`,
+  where the migration also files every row that predates tenancy. A host that
+  pins `default_tenant` to anything else is refused at startup.
+- **Multi-tenant** (`multi_tenant` on) — the tenant the framework resolved.
+  With the `tenants` module, anonymous visitors are resolved by subdomain
+  (`subdomain_base`); members by their membership. A public page, sitemap or
+  media request with no tenant answers 404 — the same as an unknown slug — and
+  an editor with no tenant gets 403. Custom domains are not supported yet.
+
+The scheduler publishes due pages tenant by tenant, each in its own session.
+Requires framework `0.0.35` or later, and the host migration that adds
+`tenant_id` (`make migration` picks it up like any other model change).
+
 ## Content snapshots
 
 **Content › Import / Export** captures the site as a restore point. Every entry

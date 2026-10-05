@@ -29,13 +29,22 @@ tables on a real branch (`down_revision = None`), which nothing here produces
 yet. Upstream: antosubash/simple_module_python#333.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
-`(locale, slug)`, and a rename records a redirect scoped to that locale.
+`(tenant_id, locale, slug)`, and a rename records a redirect scoped to that locale.
 Moving a page between languages would strand its slug in the old one and
 orphan the redirect pointing at it, so there is no "change language" — there
 is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup, redirect and public claim takes a
 locale; adding one that does not is how `/de/p/x` starts serving the English
 page.
+
+**Every pagebuilder entry point binds a tenant (#38).** Its tables carry
+`MultiTenantMixin`, and the framework filters them only while a tenant is
+bound — on a host with `multi_tenant` off nothing is bound and a read is
+*unfiltered*. Routers get `tenancy.bind_admin`/`bind_public` (single-tenant
+host → `"default"`, multi → the resolved tenant, 404 for anonymous without
+one); the scheduler opens one session per tenant under `tenant_context`.
+Code outside pagebuilder that reads its tables (news' search) pins
+`tenant_id` itself.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
