@@ -25,14 +25,14 @@ const CONTENT_URL = '/pagebuilder/content';
  * previous state is one restore away. Demanding a typed phrase here would
  * overstate the risk, and a confirmation that overstates gets clicked through.
  */
-export default function ContentImportReview() {
+function ContentImportReview() {
   const { t } = useT();
   const { pending } = usePage<{ props: Props }>().props as unknown as Props;
   const [error, setError] = useState<string | null>(null);
 
   if (!pending) {
     return (
-      <AuthenticatedLayout>
+      <>
         <Head title={t(keys.pagebuilder.import_review.title)} />
         <PageShell
           title={t(keys.pagebuilder.import_review.title)}
@@ -47,7 +47,7 @@ export default function ContentImportReview() {
             </Button>
           </div>
         </PageShell>
-      </AuthenticatedLayout>
+      </>
     );
   }
 
@@ -70,7 +70,7 @@ export default function ContentImportReview() {
   };
 
   return (
-    <AuthenticatedLayout>
+    <>
       <Head title={t(keys.pagebuilder.import_review.title)} />
       <PageShell
         title={t(keys.pagebuilder.import_review.title)}
@@ -109,6 +109,9 @@ export default function ContentImportReview() {
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
         <ImportPlanSummary plan={pending.plan} />
       </PageShell>
-    </AuthenticatedLayout>
+    </>
   );
 }
+
+ContentImportReview.layout = [AuthenticatedLayout];
+export default ContentImportReview;
