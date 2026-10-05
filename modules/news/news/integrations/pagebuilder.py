@@ -83,18 +83,23 @@ def _models() -> Any:
     return NOT_TRASHED, Page, MediaAsset
 
 
-def _own_tenant(model: Any) -> Any:
-    """Pin a pagebuilder read to one tenant, whatever the request bound.
+def _search_tenant(db: AsyncSession) -> str | None:
+    """The one tenant a pagebuilder search may read, or ``None`` for none.
 
     The framework filters these tables only when a tenant is bound; a host
     with ``multi_tenant`` off binds none, and an unfiltered read would list
     every tenant's pages. Pagebuilder runs such a host as its default tenant,
-    so that is the one searched.
+    so that is the one searched. A strict (multi-tenant) session with no
+    tenant searches nothing — never the default tenant.
     """
     from pagebuilder.tenancy import DEFAULT_TENANT
+    from simple_module_db.query_filter import is_strict
     from simple_module_db.tenancy import current_tenant_id
 
-    return model.tenant_id == (current_tenant_id.get() or DEFAULT_TENANT)
+    tenant = current_tenant_id.get()
+    if tenant is not None:
+        return tenant
+    return None if is_strict(db.sync_session) else DEFAULT_TENANT
 
 
 # ── Links into pagebuilder's own screens ──────────────────────────────
@@ -143,12 +148,15 @@ async def search_pages(
     if models is None:
         return [], 0
     not_trashed, page, _ = models
+    tenant = _search_tenant(db)
+    if tenant is None:
+        return [], 0
 
     from sqlalchemy import Text, cast, func, or_, select
 
     stmt = select(page).where(
         not_trashed,
-        _own_tenant(page),
+        page.tenant_id == tenant,
         or_(
             page.title.ilike(pattern, escape="\\"),
             page.slug.ilike(pattern, escape="\\"),
@@ -180,11 +188,14 @@ async def search_media(
     if models is None:
         return [], 0
     _, _, media_asset = models
+    tenant = _search_tenant(db)
+    if tenant is None:
+        return [], 0
 
     from sqlalchemy import func, or_, select
 
     stmt = select(media_asset).where(
-        _own_tenant(media_asset),
+        media_asset.tenant_id == tenant,
         or_(
             media_asset.original_filename.ilike(pattern, escape="\\"),
             media_asset.filename.ilike(pattern, escape="\\"),

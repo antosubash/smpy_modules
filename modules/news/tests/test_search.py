@@ -282,3 +282,17 @@ async def test_another_tenants_page_is_not_searched(db) -> None:
 
     assert [p.title for p in hits] == ["Zircon ours"]
     assert total == 1
+
+
+@requires_pagebuilder
+async def test_a_strict_session_with_no_tenant_finds_nothing(db, db_state) -> None:
+    """Multi-tenant hosts are strict: no tenant bound must not mean "default"."""
+    await _page(db, "ours-quartz", title="Quartz ours")
+    db_state.tenant_strict = True
+    try:
+        hits, total = await pb.search_pages(db, "%quartz%", include_drafts=True, limit=10)
+    finally:
+        db_state.tenant_strict = False
+
+    assert hits == []
+    assert total == 0
