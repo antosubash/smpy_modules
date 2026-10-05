@@ -61,15 +61,9 @@ def _make_upload(content: bytes, *, filename: str, content_type: str) -> UploadF
 
 
 @pytest.fixture
-def db_session(db: AsyncSession) -> AsyncSession:
-    """``db_fixture``'s session: its listeners stamp each row's tenant."""
-    return db
-
-
-@pytest.fixture
-def media_service(db_session: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
+def media_service(db: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
     settings = PagebuilderSettings(media_root=tmp_path / "media")
-    return MediaService(db_session, settings)
+    return MediaService(db, settings)
 
 
 async def test_upload_rejects_declared_svg(media_service: MediaService) -> None:

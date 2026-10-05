@@ -6,13 +6,10 @@ suites; this file pins the pieces they stand on.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from types import SimpleNamespace
 
 import pytest
-from conftest import _build_app, _client_for
 from fastapi import FastAPI, HTTPException
-from httpx import AsyncClient
 from pagebuilder import tenancy
 from pagebuilder.module import PagebuilderModule
 from pagebuilder.tenancy import DEFAULT_TENANT, TenancyMode
@@ -22,6 +19,7 @@ from simple_module_core.diagnostics._tenancy import (
 )
 from simple_module_db import current_tenant_id
 from simple_module_hosting.middleware import TenantMiddleware
+from tenant_app import multi_client
 
 _TABLES = {
     "pagebuilder_pages",
@@ -138,33 +136,17 @@ async def test_bind_public_404s_without_a_tenant():
 # --- through real routes ------------------------------------------------------
 
 
-async def _multi_tenant_client(tmp_path, **kwargs) -> AsyncIterator[AsyncClient]:
-    """The suite's app turned multi-tenant after the fact: a resolving
-    ``TenantMiddleware`` with no resolver and no header resolves nobody, and the
-    database fails closed on an unscoped statement, as a ``multi_tenant`` host's
-    does. ``configure`` runs again because ``on_startup`` saw no middleware."""
-    app, cleanup = await _build_app(tmp_path, requires_auth=True, csrf_protect=False, **kwargs)
-    app.add_middleware(TenantMiddleware)
-    assert tenancy.configure(app) is TenancyMode.MULTI
-    app.state.sm.db.tenant_strict = True
-    try:
-        async with _client_for(app) as client:
-            yield client
-    finally:
-        await cleanup()
-
-
 @pytest.mark.unbound_tenant
 @pytest.mark.parametrize("path", ["/p/about", "/sitemap.xml"])
 async def test_public_route_without_tenant_is_404_not_500(tmp_path, path):
-    async for client in _multi_tenant_client(tmp_path, inject_user=False):
+    async for client in multi_client(tmp_path, inject_user=False):
         response = await client.get(path)
         assert response.status_code == 404, response.text
 
 
 @pytest.mark.unbound_tenant
 async def test_admin_without_tenant_is_403(tmp_path):
-    async for client in _multi_tenant_client(tmp_path, inject_user=True):
+    async for client in multi_client(tmp_path, inject_user=True):
         response = await client.get("/api/pagebuilder/pages")
         assert response.status_code == 403
         assert response.json()["detail"] == "tenant_required"
@@ -173,7 +155,7 @@ async def test_admin_without_tenant_is_403(tmp_path):
 @pytest.mark.unbound_tenant
 async def test_anonymous_admin_is_still_401(tmp_path):
     """The tenant check sits behind the auth check: 401 is the better answer."""
-    async for client in _multi_tenant_client(tmp_path, inject_user=False):
+    async for client in multi_client(tmp_path, inject_user=False):
         response = await client.get("/api/pagebuilder/pages")
         assert response.status_code == 401
 

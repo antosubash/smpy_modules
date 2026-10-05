@@ -50,5 +50,15 @@ async def multi_client(tmp_path, *, inject_user: bool = True) -> AsyncIterator[A
         await cleanup()
 
 
+async def create_page(client: AsyncClient, headers, slug: str, title: str, **extra) -> dict:
+    response = await client.post(
+        "/api/pagebuilder/pages",
+        json={"title": title, "slug": slug, "draft_data": {"content": []}, **extra},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def as_tenant(tenant: str) -> dict[str, str]:
     return {"x-tenant": tenant}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from tenant_app import as_tenant, multi_client
+from tenant_app import as_tenant, create_page, multi_client
 
 API = "/api/pagebuilder/pages"
 A, B = as_tenant("acme"), as_tenant("globex")
@@ -20,13 +20,7 @@ async def mt(tmp_path):
 
 
 async def _publish(client: AsyncClient, headers, slug: str, title: str) -> dict:
-    created = await client.post(
-        API,
-        json={"title": title, "slug": slug, "draft_data": {"content": []}},
-        headers=headers,
-    )
-    assert created.status_code == 201, created.text
-    page = created.json()
+    page = await create_page(client, headers, slug, title)
     done = await client.post(f"{API}/{page['id']}/publish", json={}, headers=headers)
     assert done.status_code == 200, done.text
     return page

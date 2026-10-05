@@ -31,6 +31,7 @@ from pagebuilder.tenancy import TenancyMode
 from pg_support import make_db_state
 from PIL import Image
 from simple_module_db import tenant_context
+from tenant_app import HeaderTenant
 
 PREFIX = "/media/pagebuilder"
 
@@ -124,27 +125,11 @@ async def test_capture_maps_both_urls_to_the_asset(db, tmp_path: Path) -> None:
 # --- the mount ----------------------------------------------------------------
 
 
-class _BindTenant:
-    """Stands in for ``TenantMiddleware``: binds the ``x-tenant`` header."""
-
-    def __init__(self, app) -> None:
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        headers = dict(scope.get("headers") or [])
-        tenant = headers.get(b"x-tenant")
-        if tenant is None:
-            await self.app(scope, receive, send)
-            return
-        with tenant_context(tenant.decode()):
-            await self.app(scope, receive, send)
-
-
 def _app(root: Path, mode: TenancyMode) -> FastAPI:
     app = FastAPI()
     app.state.pagebuilder = SimpleNamespace(tenancy=mode)
     app.mount(PREFIX, MediaFiles(directory=root), name="media")
-    app.add_middleware(_BindTenant)
+    app.add_middleware(HeaderTenant)
     return app
 
 

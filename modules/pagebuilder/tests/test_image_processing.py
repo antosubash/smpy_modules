@@ -55,20 +55,14 @@ def _make_upload(content: bytes, *, filename: str, content_type: str) -> UploadF
 
 
 @pytest.fixture
-def db_session(db: AsyncSession) -> AsyncSession:
-    """``db_fixture``'s session: its listeners stamp each row's tenant."""
-    return db
-
-
-@pytest.fixture
-def media_service(db_session: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
+def media_service(db: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         # Pick widths that exercise both "under source" and "over source"
         # branches given a 1500px-wide test fixture.
         media_thumbnail_widths=(320, 640, 1280, 1920),
     )
-    return MediaService(db_session, settings)
+    return MediaService(db, settings)
 
 
 async def test_upload_records_dimensions(media_service: MediaService) -> None:
@@ -159,13 +153,13 @@ async def test_delete_removes_variant_files(media_service: MediaService) -> None
 
 
 async def test_disabling_thumbnail_widths_skips_generation(
-    db_session: AsyncSession, tmp_path
+    db: AsyncSession, tmp_path
 ) -> None:
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         media_thumbnail_widths=(),
     )
-    service = MediaService(db_session, settings)
+    service = MediaService(db, settings)
     upload = _make_upload(
         _png_bytes(1024, 768), filename="hero.png", content_type="image/png"
     )

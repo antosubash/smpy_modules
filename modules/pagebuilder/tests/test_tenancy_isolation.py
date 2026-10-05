@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from tenant_app import as_tenant, multi_client
+from tenant_app import as_tenant, create_page, multi_client
 
 API = "/api/pagebuilder/pages"
 A, B = as_tenant("acme"), as_tenant("globex")
@@ -18,18 +18,8 @@ async def mt(tmp_path):
         yield client
 
 
-async def _create(client: AsyncClient, headers, slug="about", title="About", **extra) -> dict:
-    response = await client.post(
-        API,
-        json={"title": title, "slug": slug, "draft_data": {"content": []}, **extra},
-        headers=headers,
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
-
-
 async def test_a_page_is_invisible_to_the_other_tenant(mt: AsyncClient) -> None:
-    page = await _create(mt, A, slug="secret")
+    page = await create_page(mt, A, "secret", "About")
     url = f"{API}/{page['id']}"
     assert (await mt.get(url, headers=A)).status_code == 200
     assert (await mt.get(url, headers=B)).status_code == 404
@@ -40,7 +30,7 @@ async def test_a_page_is_invisible_to_the_other_tenant(mt: AsyncClient) -> None:
 
 
 async def test_the_other_tenant_cannot_change_or_delete_it(mt: AsyncClient) -> None:
-    page = await _create(mt, A, slug="secret", title="Mine")
+    page = await create_page(mt, A, slug="secret", title="Mine")
     url = f"{API}/{page['id']}"
     assert (await mt.put(url, json={"title": "Hacked"}, headers=B)).status_code == 404
     assert (await mt.post(f"{url}/publish", json={}, headers=B)).status_code == 404
@@ -51,8 +41,8 @@ async def test_the_other_tenant_cannot_change_or_delete_it(mt: AsyncClient) -> N
 
 
 async def test_same_locale_and_slug_in_both_tenants(mt: AsyncClient) -> None:
-    a = await _create(mt, A, slug="about", title="A about")
-    b = await _create(mt, B, slug="about", title="B about")
+    a = await create_page(mt, A, slug="about", title="A about")
+    b = await create_page(mt, B, slug="about", title="B about")
     assert a["id"] != b["id"]
     # ...but not twice in one tenant.
     again = await mt.post(
@@ -64,14 +54,14 @@ async def test_same_locale_and_slug_in_both_tenants(mt: AsyncClient) -> None:
 async def test_same_redirect_source_in_both_tenants(mt: AsyncClient) -> None:
     ids = {}
     for name, headers in (("a", A), ("b", B)):
-        page = await _create(mt, headers, slug="old", title=name)
+        page = await create_page(mt, headers, slug="old", title=name)
         await mt.post(f"{API}/{page['id']}/publish", json={}, headers=headers)
         renamed = await mt.put(f"{API}/{page['id']}", json={"slug": "new"}, headers=headers)
         assert renamed.status_code == 200, renamed.text
         ids[name] = page["id"]
     # Both tenants now hold a redirect from "old"; each can recycle the slug.
     for headers in (A, B):
-        await _create(mt, headers, slug="old", title="reused")
+        await create_page(mt, headers, slug="old", title="reused")
 
 
 async def test_each_tenant_gets_its_own_layout(mt: AsyncClient) -> None:
