@@ -135,4 +135,4 @@ export default function Search() {
   );
 }
 
-Search.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+Search.layout = [AuthenticatedLayout];

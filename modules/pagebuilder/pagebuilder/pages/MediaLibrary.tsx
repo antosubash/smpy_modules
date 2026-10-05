@@ -2,7 +2,6 @@ import { router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import type React from 'react';
 import {
   type ChangeEvent,
   type DragEvent,
@@ -254,4 +253,4 @@ export default function MediaLibrary() {
   );
 }
 
-MediaLibrary.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+MediaLibrary.layout = [AuthenticatedLayout];

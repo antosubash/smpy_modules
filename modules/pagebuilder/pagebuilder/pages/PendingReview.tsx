@@ -10,7 +10,6 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import type React from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
@@ -134,4 +133,4 @@ export default function PendingReview() {
   );
 }
 
-PendingReview.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+PendingReview.layout = [AuthenticatedLayout];

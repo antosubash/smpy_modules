@@ -2,7 +2,6 @@ import { Head, router } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type React from 'react';
 
 import { ConflictPanel } from '../components/ConflictPanel';
@@ -16,7 +15,7 @@ import { RecordForm } from '../components/RecordForm';
 import { RecordReferrers } from '../components/RecordReferrers';
 import { RecordRevisions } from '../components/RecordRevisions';
 import { RecordEditorHeaderBadges } from '../components/RecordStatusBadge';
-import { RecordsToaster } from '../components/RecordsToaster';
+import { RecordsLayout } from '../components/RecordsLayout';
 import { RecordTranslations } from '../components/RecordTranslations';
 import { TenantBadge } from '../components/TenantBadge';
 import { useRecordEditor } from '../hooks/useRecordEditor';
@@ -282,10 +281,5 @@ function RecordEditor({
   );
 }
 
-RecordEditor.layout = (page: React.ReactNode) => (
-  <AdminLayout>
-    {page}
-    <RecordsToaster />
-  </AdminLayout>
-);
+RecordEditor.layout = [RecordsLayout];
 export default RecordEditor;

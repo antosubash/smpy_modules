@@ -43,7 +43,7 @@ function fromSettings(s: AiSettingsOut): { chat: SlotValues; embedding: SlotValu
   };
 }
 
-export default function Settings() {
+function Settings() {
   const [loaded, setLoaded] = useState<AiSettingsOut | null>(null);
   const [chat, setChat] = useState<SlotValues>(emptySlot());
   const [embedding, setEmbedding] = useState<SlotValues>(emptySlot());
@@ -108,7 +108,7 @@ export default function Settings() {
     }, 'Test failed');
 
   return (
-    <AuthenticatedLayout>
+    <>
       <Head title="AI Settings" />
       <PageShell
         title="AI"
@@ -152,6 +152,9 @@ export default function Settings() {
           </div>
         )}
       </PageShell>
-    </AuthenticatedLayout>
+    </>
   );
 }
+
+Settings.layout = [AuthenticatedLayout];
+export default Settings;
