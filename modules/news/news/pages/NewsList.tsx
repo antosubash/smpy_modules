@@ -211,4 +211,4 @@ export default function NewsList() {
   );
 }
 
-NewsList.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+NewsList.layout = [AuthenticatedLayout];

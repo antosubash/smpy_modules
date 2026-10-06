@@ -147,4 +147,4 @@ export default function Trash() {
   );
 }
 
-Trash.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+Trash.layout = [AuthenticatedLayout];

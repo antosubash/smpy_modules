@@ -68,12 +68,17 @@ export function useTaxonomy() {
     [refresh],
   );
 
+  /** Resolves to whether the rename was written. The failure is already in
+   *  the banner; the row uses the result to stay in edit mode, so a refused
+   *  name (a duplicate, say) is still there to correct rather than discarded. */
   const saveCategory = useCallback(
-    (id: number, name: string, slug: string) => {
-      void run(() => updateCategory(id, { name, slug })).catch(() => {
-        // Already surfaced in the banner; the row is inline, so there is no
-        // dialog left open waiting on the rejection.
-      });
+    async (id: number, name: string, slug: string) => {
+      try {
+        await run(() => updateCategory(id, { name, slug }));
+        return true;
+      } catch {
+        return false;
+      }
     },
     [run],
   );

@@ -90,6 +90,29 @@ test.describe('News categories', () => {
     expect(((await listed.json()) as { total: number }).total).toBe(1);
   });
 
+  test('a refused rename keeps the row in edit mode with what was typed', async ({ page }) => {
+    const stamp = Date.now().toString(36);
+    const taken = `Taken ${stamp}`;
+    const mine = `Mine ${stamp}`;
+    for (const name of [taken, mine]) {
+      await page.getByLabel('New category name').fill(name);
+      await page.getByRole('button', { name: /^add$/i }).click();
+      await expect(categoryRow(page, name)).toBeVisible();
+    }
+
+    const row = categoryRow(page, mine);
+    await row.getByRole('button', { name: /^rename$/i }).click();
+    const input = row.getByLabel('Category name');
+    await input.fill(taken);
+    await row.getByRole('button', { name: /^save$/i }).click();
+
+    // QA found the row closed before the server answered, so the refusal
+    // threw away the typed name. It now stays open until a rename is written.
+    await expect(page.getByText(/already exists/i)).toBeVisible();
+    await expect(input).toHaveValue(taken);
+    await expect(row.getByRole('button', { name: /^save$/i })).toBeVisible();
+  });
+
   test('deleting a category moves its articles instead of deleting them', async ({ page }) => {
     const doomed = `Doomed ${Date.now().toString(36)}`;
     await makeArticle(page, doomed);

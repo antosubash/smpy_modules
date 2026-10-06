@@ -2,7 +2,7 @@
 
 The framework repo's version of this script rewrites every ``simple_module_*``
 requirement to ``==<version>``. Run here, that would turn
-``simple_module_core>=0.0.25,<0.1`` into ``==<this repo's version>`` — pinning
+``simple_module_core>=0.0.35,<0.1`` into ``==<this repo's version>`` — pinning
 the framework to a version that does not exist. These tests are the guard.
 """
 
@@ -94,7 +94,7 @@ def test_framework_pins_survive_a_real_bump():
         bumped = tomlkit.parse(manifest.read_text())
         assert str(bumped["project"]["version"]) == "9.9.9"
         deps = [str(d) for d in bumped["project"]["dependencies"]]
-        assert "simple_module_core>=0.0.25,<0.1" in deps
+        assert "simple_module_core>=0.0.35,<0.1" in deps
         assert not any("simple_module_core==" in d for d in deps)
     finally:
         for path, original in snapshot.items():

@@ -63,7 +63,7 @@ No API token exists anywhere — publishing authenticates over OIDC.
 
 It deliberately does **not** touch dependency specifiers. The framework repo's
 version of this script rewrites every `simple_module_*` requirement to
-`==<version>`; run here, that would turn `simple_module_core>=0.0.25,<0.1`
+`==<version>`; run here, that would turn `simple_module_core>=0.0.35,<0.1`
 into a pin on a *this-repo* version number that no framework release has.
 `scripts/tests/test_bump_version.py` guards it, and CI runs
 `--check-current` so drift between manifests fails the build.

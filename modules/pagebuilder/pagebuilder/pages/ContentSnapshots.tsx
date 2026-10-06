@@ -23,13 +23,13 @@ interface Props {
  * across module boundaries would restore things its owner never chose to
  * capture.
  */
-export default function ContentSnapshots() {
+function ContentSnapshots() {
   const { t } = useT();
   const { snapshots, pending } = usePage<{ props: Props }>().props as unknown as Props;
   const state = useSnapshots(snapshots, pending);
 
   return (
-    <AuthenticatedLayout>
+    <>
       <Head title={t(keys.pagebuilder.snapshots.title)} />
       <PageShell
         title={t(keys.pagebuilder.snapshots.title)}
@@ -79,6 +79,9 @@ export default function ContentSnapshots() {
           {t(keys.pagebuilder.snapshots.footnote)}
         </p>
       </PageShell>
-    </AuthenticatedLayout>
+    </>
   );
 }
+
+ContentSnapshots.layout = [AuthenticatedLayout];
+export default ContentSnapshots;

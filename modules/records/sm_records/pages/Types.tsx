@@ -11,11 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
-import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
-import type React from 'react';
 import { useMemo, useState } from 'react';
 
-import { RecordsToaster } from '../components/RecordsToaster';
+import { RecordsLayout } from '../components/RecordsLayout';
 import { TenantBadge } from '../components/TenantBadge';
 import { TypeCounts, TypeIdentity, TypeKey, TypesCardList } from '../components/TypesCardList';
 import { useIsNarrow } from '../hooks/useIsNarrow';
@@ -153,10 +151,5 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
   );
 }
 
-Types.layout = (page: React.ReactNode) => (
-  <AdminLayout>
-    {page}
-    <RecordsToaster />
-  </AdminLayout>
-);
+Types.layout = [RecordsLayout];
 export default Types;

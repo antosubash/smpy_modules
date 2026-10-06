@@ -223,4 +223,4 @@ export default function ArticleEditor() {
   );
 }
 
-ArticleEditor.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+ArticleEditor.layout = [AuthenticatedLayout];

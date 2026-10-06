@@ -180,4 +180,4 @@ export default function Categories() {
   );
 }
 
-Categories.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+Categories.layout = [AuthenticatedLayout];

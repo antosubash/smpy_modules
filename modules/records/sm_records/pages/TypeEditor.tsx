@@ -3,12 +3,10 @@ import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
-import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
-import type React from 'react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { RecordsToaster } from '../components/RecordsToaster';
+import { RecordsLayout } from '../components/RecordsLayout';
 import { TenantBadge } from '../components/TenantBadge';
 import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
 import { groupErrors } from '../components/typeeditor/errors';
@@ -270,10 +268,5 @@ function TypeEditor({
   );
 }
 
-TypeEditor.layout = (page: React.ReactNode) => (
-  <AdminLayout>
-    {page}
-    <RecordsToaster />
-  </AdminLayout>
-);
+TypeEditor.layout = [RecordsLayout];
 export default TypeEditor;

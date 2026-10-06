@@ -55,6 +55,8 @@ export function useRecordEditor(
   const [locale, setLocale] = useState(opts.defaultLocale);
   const [conflict, setConflict] = useState<RecordRead | null>(null);
   const [pending, setPending] = useState(false);
+  // Set synchronously: `pending` lands a render late, so rapid clicks pass it.
+  const inFlight = useRef(false);
   const form = useRecordForm(type, record, duplicateSource?.data ?? null);
 
   /** Unsaved work is the form's values *and* the envelope inputs around it —
@@ -133,6 +135,7 @@ export function useRecordEditor(
    *  is actually on — a plain re-press of Save would otherwise keep sending
    *  the stale `current.version` and 409 forever. */
   const save = async (overwriteVersion?: number) => {
+    if (inFlight.current) return;
     setConflict(null);
     const data = form.validateAndBuild();
     // Every schema field gets a client-side check; the envelope's one
@@ -164,6 +167,7 @@ export function useRecordEditor(
       position: positionValue,
       ...(opts.showLocalePicker ? { locale } : {}),
     };
+    inFlight.current = true;
     setPending(true);
     try {
       const expectedVersion = overwriteVersion ?? current?.version ?? 0;
@@ -175,6 +179,7 @@ export function useRecordEditor(
         // out (R12c). `allow` is a ref, so this takes effect immediately.
         allow();
         rememberCreated(saved.uuid);
+        // `inFlight` stays set: the visit mounts a fresh editor for the record.
         router.visit(`/admin/records/${type.key}/${saved.uuid}`);
         return;
       }
@@ -183,8 +188,10 @@ export function useRecordEditor(
       // what it actually stored — otherwise a server-derived slug doesn't
       // show until the next full reload.
       applyRestored(saved);
+      inFlight.current = false;
       toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
     } catch (err) {
+      inFlight.current = false;
       if (err instanceof ApiError && err.status === 409 && err.body?.current) {
         setConflict(err.body.current as RecordRead);
       } else if (err instanceof ApiError && err.status === 422 && err.body?.errors) {

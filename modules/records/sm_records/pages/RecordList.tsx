@@ -1,9 +1,7 @@
 import { Head, usePage } from '@inertiajs/react';
 import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
-import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
-import type React from 'react';
 
 import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
 import { FilterBar } from '../components/FilterBar';
@@ -14,7 +12,7 @@ import { RecordListBulk } from '../components/RecordListBulk';
 import { RecordListEmpty } from '../components/RecordListEmpty';
 import { RecordListFooter } from '../components/RecordListFooter';
 import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
-import { RecordsToaster } from '../components/RecordsToaster';
+import { RecordsLayout } from '../components/RecordsLayout';
 import { RecordTable } from '../components/RecordTable';
 import { useListColumns } from '../hooks/useListColumns';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
@@ -291,10 +289,5 @@ function RecordList({
   );
 }
 
-RecordList.layout = (page: React.ReactNode) => (
-  <AdminLayout>
-    {page}
-    <RecordsToaster />
-  </AdminLayout>
-);
+RecordList.layout = [RecordsLayout];
 export default RecordList;
