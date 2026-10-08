@@ -1,5 +1,7 @@
 /** fetch wrapper for the billing API: JSON in/out, CSRF header, readable errors. */
 
+import { keys, translate } from './i18n';
+
 const CSRF_HEADER = 'X-CSRF-Token';
 
 export class ApiError extends Error {
@@ -13,52 +15,66 @@ export class ApiError extends Error {
 }
 
 const MESSAGES: Record<string, string> = {
-  checkout_unavailable: 'Online payment is not set up for this site.',
-  plan_not_found: 'That plan is no longer available.',
-  plan_is_free: 'The free plan needs no checkout.',
-  interval_unavailable: 'That plan is not sold for this billing period.',
-  already_subscribed: 'You already have a subscription — change plan instead.',
-  already_on_plan: 'You are already on this plan.',
-  no_subscription: 'There is no paid subscription to change yet.',
-  no_customer: 'There is no billing account yet — subscribe to a plan first.',
-  tenant_owner_required: 'Only the organisation owner can change billing.',
-  tenant_required: 'Pick an organisation first.',
-  provider_error: 'The payment provider refused the request.',
-  provider_managed: 'Subscriptions are managed by Stripe; use Resync instead.',
-  no_provider_subscription: 'This tenant has no Stripe subscription to resync.',
-  tenant_not_found: 'That organisation no longer exists.',
-  paid_plan_needs_price: 'A paid plan needs at least one Stripe price ID.',
-  free_plan_has_price: 'Free plans have no Stripe price.',
-  free_plan_has_trial: 'Free plans have no trial.',
-  default_must_be_free: 'Only a free plan can be the default.',
-  default_required: 'Mark another free plan as default first.',
-  cannot_archive_default: 'The default plan cannot be archived.',
-  plan_key_taken: 'Another plan already uses that key.',
-  plan_key_immutable: 'A plan key cannot change once created.',
-  price_taken: 'Another plan already uses that Stripe price.',
-  price_not_found: 'Stripe has no price with that ID.',
-  invalid_return_url: 'The return URL must be an http(s) origin like https://app.example.com.',
+  checkout_unavailable: keys.billing.errors.checkout_unavailable,
+  plan_not_found: keys.billing.errors.plan_not_found,
+  plan_is_free: keys.billing.errors.plan_is_free,
+  interval_unavailable: keys.billing.errors.interval_unavailable,
+  already_subscribed: keys.billing.errors.already_subscribed,
+  already_on_plan: keys.billing.errors.already_on_plan,
+  no_subscription: keys.billing.errors.no_subscription,
+  no_customer: keys.billing.errors.no_customer,
+  tenant_owner_required: keys.billing.errors.tenant_owner_required,
+  tenant_required: keys.billing.errors.tenant_required,
+  provider_error: keys.billing.errors.provider_error,
+  provider_managed: keys.billing.errors.provider_managed,
+  no_provider_subscription: keys.billing.errors.no_provider_subscription,
+  tenant_not_found: keys.billing.errors.tenant_not_found,
+  paid_plan_needs_price: keys.billing.errors.paid_plan_needs_price,
+  free_plan_has_price: keys.billing.errors.free_plan_has_price,
+  free_plan_has_trial: keys.billing.errors.free_plan_has_trial,
+  default_must_be_free: keys.billing.errors.default_must_be_free,
+  default_required: keys.billing.errors.default_required,
+  cannot_archive_default: keys.billing.errors.cannot_archive_default,
+  plan_key_taken: keys.billing.errors.plan_key_taken,
+  plan_key_immutable: keys.billing.errors.plan_key_immutable,
+  price_taken: keys.billing.errors.price_taken,
+  price_not_found: keys.billing.errors.price_not_found,
+  invalid_return_url: keys.billing.errors.invalid_return_url,
 };
 
 export function describeError(detail: string, body: Record<string, unknown> = {}): string {
   if (detail === 'too_many_members') {
     const over = Number(body.used) - Number(body.limit);
-    return `That plan allows ${body.limit} seats and you use ${body.used} — remove ${over} first.`;
+    return translate(keys.billing.errors.too_many_members, {
+      limit: body.limit,
+      used: body.used,
+      over,
+    });
   }
   if (detail === 'validation_error' && typeof body.message === 'string') return body.message;
-  if (detail === 'price_mismatch') return `Stripe price ${body.price}: ${body.reason}.`;
+  if (detail === 'price_mismatch')
+    return translate(keys.billing.errors.price_mismatch, {
+      price: body.price,
+      reason: body.reason,
+    });
   if (detail === 'provider_error' && typeof body.message === 'string') {
-    return `${MESSAGES.provider_error} ${body.message}`;
+    return translate(keys.billing.errors.provider_error_detail, {
+      base: translate(MESSAGES.provider_error),
+      message: body.message,
+    });
   }
-  return MESSAGES[detail] ?? 'Something went wrong. Please try again.';
+  return translate(MESSAGES[detail] ?? keys.billing.errors.generic);
 }
 
 /** FastAPI's 422 body: `detail` is a list of `{loc, msg}`; show the first. */
 function validationMessage(items: unknown[]): string {
   const first = (items[0] ?? {}) as { loc?: unknown; msg?: unknown };
-  const msg = typeof first.msg === 'string' ? first.msg : 'Invalid input';
+  const msg =
+    typeof first.msg === 'string' ? first.msg : translate(keys.billing.errors.invalid_input);
   const field = Array.isArray(first.loc) ? first.loc[first.loc.length - 1] : undefined;
-  return field === undefined ? `${msg}.` : `${field}: ${msg}.`;
+  return field === undefined
+    ? translate(keys.billing.errors.validation_plain, { msg })
+    : translate(keys.billing.errors.validation_field, { field, msg });
 }
 
 export async function api<T>(

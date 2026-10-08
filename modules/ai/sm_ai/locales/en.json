@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "head_title": "AI Settings",
+    "title": "AI",
+    "description": "Connection settings for the chat and embedding providers every module shares.",
+    "loading": "Loading…",
+    "save": "Save",
+    "saved": "AI settings saved",
+    "save_failed": "Save failed",
+    "test_failed": "Test failed",
+    "error_with_reason": "{message}: {reason}"
+  },
+  "slots": {
+    "chat_title": "Chat",
+    "chat_description": "The model modules use for text generation.",
+    "embedding_title": "Embeddings",
+    "embedding_description": "Optional second endpoint for vector embeddings."
+  },
+  "card": {
+    "provider": "Provider",
+    "not_configured": "Not configured",
+    "unknown_provider": "{provider} (unknown provider)",
+    "pick_provider": "— pick a provider —",
+    "model": "Model",
+    "model_placeholder": "model name, no provider prefix",
+    "base_url_required": "Base URL (required)",
+    "base_url_optional": "Base URL (optional override)",
+    "base_url_placeholder_required": "http://your-server:8000/v1",
+    "base_url_placeholder_optional": "provider default",
+    "api_key": "API key",
+    "api_key_saved": "saved — leave blank to keep",
+    "api_key_unset": "not set",
+    "will_clear": "Will clear",
+    "clear": "Clear",
+    "vector_dimension": "Vector dimension",
+    "vector_dimension_hint": "Vector stores fix collection width to this — changing it means re-indexing.",
+    "test_connection": "Test connection",
+    "save_first": "Save your changes first — the test runs against saved settings.",
+    "test_ok": "OK — {model} ({latency} ms)"
+  },
+  "api": {
+    "request_failed": "Request failed ({status} {statusText})"
+  }
+}

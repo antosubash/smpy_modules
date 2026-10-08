@@ -12,7 +12,8 @@ import { AdminNav } from '../components/AdminNav';
 import { AssignDialog } from '../components/AssignDialog';
 import { SubscriptionsTable } from '../components/SubscriptionsTable';
 import { ADMIN_API, api } from '../utils/api';
-import { STATUS_LABEL } from '../utils/format';
+import { STATUSES, statusLabel } from '../utils/format';
+import { keys, useT } from '../utils/i18n';
 import type { AdminCommon, Plan, SubscriptionRow, SubscriptionStatus } from '../utils/types';
 
 interface Props extends AdminCommon {
@@ -24,6 +25,8 @@ interface Props extends AdminCommon {
 const VIEW_URL = '/admin/billing/subscriptions';
 
 function Subscriptions() {
+  const { t } = useT();
+  const c = keys.billing.subscriptions;
   const { rows, plans, status_filter, csrf_token, can_manage, checkout_available, provider } =
     usePage<{ props: Props }>().props as unknown as Props;
   const [assigning, setAssigning] = useState<SubscriptionRow | null>(null);
@@ -44,7 +47,7 @@ function Subscriptions() {
   const resync = (row: SubscriptionRow) =>
     run(async () => {
       await api(`${ADMIN_API}/subscriptions/${row.tenant_id}/resync`, csrf_token, { body: {} });
-      toast.success(`${row.tenant_name} resynced from Stripe`);
+      toast.success(t(c.resynced, { name: row.tenant_name }));
     });
 
   const assign = (planId: number, status: SubscriptionStatus) =>
@@ -53,7 +56,7 @@ function Subscriptions() {
       await api(`${ADMIN_API}/subscriptions/${assigning.tenant_id}/assign`, csrf_token, {
         body: { plan_id: planId, status },
       });
-      toast.success(`Plan assigned to ${assigning.tenant_name}`);
+      toast.success(t(c.assigned, { name: assigning.tenant_name }));
       setAssigning(null);
     });
 
@@ -62,29 +65,27 @@ function Subscriptions() {
 
   return (
     <>
-      <Head title="Billing subscriptions" />
+      <Head title={t(c.head_title)} />
       <PageShell
-        title="Billing"
+        title={t(keys.billing.page.title)}
         description={
-          checkout_available
-            ? 'Every organisation and its Stripe subscription.'
-            : `Provider: ${provider}. Assign plans by hand; nobody is charged.`
+          checkout_available ? t(c.description_stripe) : t(c.description_manual, { provider })
         }
       >
         <AdminNav active="subscriptions" />
         <div className="mb-4 flex max-w-xs items-center gap-2">
           <Label htmlFor="status-filter" className="shrink-0">
-            Status
+            {t(c.status)}
           </Label>
           <NativeSelect
             id="status-filter"
             value={status_filter}
             onChange={(e) => filter(e.target.value)}
           >
-            <NativeSelectOption value="">All</NativeSelectOption>
-            {(Object.keys(STATUS_LABEL) as SubscriptionStatus[]).map((s) => (
+            <NativeSelectOption value="">{t(c.all)}</NativeSelectOption>
+            {STATUSES.map((s) => (
               <NativeSelectOption key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {statusLabel(s)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -93,8 +94,8 @@ function Subscriptions() {
           {rows.length === 0 ? (
             <EmptyState
               icon={Building2}
-              title="No organisations"
-              description={status_filter ? 'None match this status.' : 'Nobody has signed up yet.'}
+              title={t(c.empty_title)}
+              description={status_filter ? t(c.empty_filtered) : t(c.empty_none)}
             />
           ) : (
             <SubscriptionsTable

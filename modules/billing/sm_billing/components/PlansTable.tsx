@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { priceLabel } from '../utils/format';
+import { keys, useT } from '../utils/i18n';
 import type { Plan } from '../utils/types';
 
 interface Props {
@@ -19,21 +20,23 @@ interface Props {
 }
 
 const MODEL: Record<Plan['pricing_model'], string> = {
-  free: 'Free',
-  flat: 'Flat',
-  per_seat: 'Per seat',
+  free: keys.billing.plans_table.model_free,
+  flat: keys.billing.plans_table.model_flat,
+  per_seat: keys.billing.plans_table.model_per_seat,
 };
 
 export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
+  const { t } = useT();
+  const c = keys.billing.plans_table;
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Plan</TableHead>
-          <TableHead>Pricing</TableHead>
-          <TableHead>Price</TableHead>
-          <TableHead>Seats</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+          <TableHead>{t(c.col_plan)}</TableHead>
+          <TableHead>{t(c.col_pricing)}</TableHead>
+          <TableHead>{t(c.col_price)}</TableHead>
+          <TableHead>{t(c.col_seats)}</TableHead>
+          <TableHead className="text-right">{t(c.col_actions)}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -42,29 +45,29 @@ export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
             <TableCell>
               <div className="flex flex-wrap items-center gap-2 font-medium">
                 {plan.name}
-                {plan.is_default && <Badge>Default</Badge>}
-                {!plan.is_public && <Badge variant="outline">Hidden</Badge>}
-                {plan.archived_at && <Badge variant="secondary">Archived</Badge>}
+                {plan.is_default && <Badge>{t(c.badge_default)}</Badge>}
+                {!plan.is_public && <Badge variant="outline">{t(c.badge_hidden)}</Badge>}
+                {plan.archived_at && <Badge variant="secondary">{t(c.badge_archived)}</Badge>}
               </div>
               <div className="font-mono text-xs text-muted-foreground">{plan.key}</div>
             </TableCell>
-            <TableCell>{MODEL[plan.pricing_model]}</TableCell>
+            <TableCell>{t(MODEL[plan.pricing_model])}</TableCell>
             <TableCell className="text-sm">
               {priceLabel(plan, 'month')}
               {plan.stripe_price_year && (
                 <div className="text-muted-foreground">{priceLabel(plan, 'year')}</div>
               )}
             </TableCell>
-            <TableCell>{plan.limits['tenants.seats'] ?? 'Unlimited'}</TableCell>
+            <TableCell>{plan.limits['tenants.seats'] ?? t(c.unlimited)}</TableCell>
             <TableCell className="text-right">
               {canManage && !plan.archived_at && (
                 <div className="flex justify-end gap-2">
                   <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>
-                    Edit
+                    {t(c.edit)}
                   </Button>
                   {!plan.is_default && (
                     <Button size="sm" variant="ghost" onClick={() => onArchive(plan)}>
-                      Archive
+                      {t(c.archive)}
                     </Button>
                   )}
                 </div>

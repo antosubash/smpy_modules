@@ -1,6 +1,7 @@
 {
   "extends": "@simple-module-py/tsconfig/base.json",
   "compilerOptions": {
+    "resolveJsonModule": true,
     "paths": {
       "@/*": ["./sm_billing/*"],
       "@simple-module-py/ui/*": ["../../packages/ui/src/*"]
