@@ -46,6 +46,8 @@ __all__ = [
     "resolve_admin",
     "resolve_public",
     "search_tenant",
+    "tenant_vary",
+    "vary_on_tenant",
 ]
 
 _log = logging.getLogger("simple_module.news")
@@ -119,7 +121,39 @@ def configure(app: Any) -> TenancyMode:
             "news: the host setting multi_tenant is on but the middleware stack has "
             "no TenantMiddleware, so news runs single-tenant. Restart to apply it"
         )
+    settings = getattr(getattr(app.state, _PACKAGE, None), "settings", None)
+    if mode is TenancyMode.MULTI and getattr(settings, "public_base_url", ""):
+        _log.warning(
+            "news: public_base_url is set on a multi-tenant host, so every "
+            "tenant's canonical, feed and sitemap links point at %s. Leave it "
+            "blank to build them from each request's host",
+            settings.public_base_url,
+        )
     return mode
+
+
+def tenant_vary(app: Any) -> tuple[str, ...]:
+    """The request headers that pick a public response's tenant.
+
+    ``SINGLE``: none. ``MULTI``: on the apex host the framework falls back to
+    a member's session (``Cookie``) or the configured tenant header, so the
+    same Host + URL answers with different tenants' content and a shared
+    cache has to key on them too.
+    """
+    if mode_of(app) is TenancyMode.SINGLE:
+        return ()
+    header = (getattr(_tenant_middleware(app), "kwargs", None) or {}).get("header")
+    return ("Cookie", header) if header else ("Cookie",)
+
+
+def vary_on_tenant(response: Any, app: Any) -> Any:
+    """Append :func:`tenant_vary` to *response*'s ``Vary``; a no-op in SINGLE."""
+    listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
+    seen = {f.lower() for f in listed}
+    added = [f for f in tenant_vary(app) if f.lower() not in seen]
+    if added:
+        response.headers["Vary"] = ", ".join(listed + added)
+    return response
 
 
 def mode_of(app: Any) -> TenancyMode:

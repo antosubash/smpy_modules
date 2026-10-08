@@ -17,6 +17,7 @@ from tenant_app import as_tenant, create_article, multi_client, publish
 
 A, B = as_tenant("acme"), as_tenant("globex")
 NEWS = "/news"
+INERTIA = {"X-Inertia": "true"}
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.unbound_tenant]
 
@@ -79,3 +80,67 @@ async def test_anonymous_api_read_scoped(anon: AsyncClient) -> None:
         assert in_a.status_code == 200, in_a.text
     listed = (await anon.get(PUBLIC_READ_PREFIXES[0], headers=A)).json()["items"]
     assert [a["slug"] for a in listed] == ["acme-only"]
+
+
+async def test_public_archives_list_only_the_bound_tenant(anon: AsyncClient) -> None:
+    with tenant_context("acme"):
+        async with anon.db_state.session_factory() as db:
+            await make_article(db, slug="acme-sport", category="Sport", author="Jane Roe")
+    for path in (f"{NEWS}/category/Sport", f"{NEWS}/author/jane-roe"):
+        in_b = await anon.get(path, headers={**INERTIA, **B})
+        assert in_b.status_code == 200, (path, in_b.text)
+        assert in_b.json()["props"]["items"] == [], path
+        in_a = await anon.get(path, headers={**INERTIA, **A})
+        assert [i["slug"] for i in in_a.json()["props"]["items"]] == ["acme-sport"], path
+
+
+def _vary(response) -> list[str]:
+    """The distinct Vary fields: Starlette's ``SessionMiddleware`` appends
+    ``Cookie`` without checking whether it is already listed."""
+    fields = (v.strip() for v in response.headers.get("vary", "").split(","))
+    return list(dict.fromkeys(f for f in fields if f))
+
+
+async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> None:
+    """On the apex host the tenant can come from a member's session, so a
+    shared cache keyed on Host + URL alone could hand one tenant's page to
+    another tenant's reader."""
+    await _live(mt, A, "hello", "Hello A")
+    for path in (
+        f"{NEWS}/hello",
+        f"{NEWS}/category/Sport",
+        f"{NEWS}/feed.xml",
+        f"{NEWS}/sitemap.xml",
+    ):
+        response = await mt.get(path, headers=A)
+        assert response.status_code == 200, (path, response.text)
+        assert response.headers["cache-control"].startswith("public"), path
+        assert "Cookie" in _vary(response), (path, response.headers.get("vary"))
+    article = await mt.get(f"{NEWS}/hello", headers=A)
+    assert _vary(article) == ["X-Inertia", "Cookie"]
+    cached = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": article.headers["etag"]})
+    assert cached.status_code == 304
+    assert _vary(cached) == ["X-Inertia", "Cookie"]
+
+
+async def test_single_mode_vary_is_unchanged(anon_client: AsyncClient) -> None:
+    """A single-tenant host picks no tenant per request: news adds nothing.
+
+    The ``Cookie`` on the Inertia pages is Starlette's ``SessionMiddleware``,
+    which varies on it whenever a render touched the session."""
+    with tenant_context("default"):
+        async with anon_client.db_state.session_factory() as db:
+            await make_article(db, slug="hello", category="Sport")
+    article = await anon_client.get(f"{NEWS}/hello")
+    assert article.headers.get("vary") == "X-Inertia, Cookie"
+    revalidate = {"If-None-Match": article.headers["etag"]}
+    cached = await anon_client.get(f"{NEWS}/hello", headers=revalidate)
+    assert (cached.status_code, cached.headers.get("vary")) == (304, "X-Inertia")
+    for path, vary in (
+        (f"{NEWS}/category/Sport", "Cookie"),
+        (f"{NEWS}/feed.xml", None),
+        (f"{NEWS}/sitemap.xml", None),
+    ):
+        response = await anon_client.get(path)
+        assert response.status_code == 200, (path, response.text)
+        assert response.headers.get("vary") == vary, path

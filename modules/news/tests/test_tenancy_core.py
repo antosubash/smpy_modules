@@ -113,3 +113,32 @@ def test_search_tenant_falls_back_to_default():
     assert tenancy.search_tenant() == "default"
     with tenant_context("acme"):
         assert tenancy.search_tenant() == "acme"
+
+
+def test_tenant_vary_is_empty_on_a_single_tenant_host():
+    assert tenancy.tenant_vary(FastAPI()) == ()
+    assert tenancy.tenant_vary(_app(fixed=DEFAULT_TENANT)) == ()
+
+
+def test_tenant_vary_names_cookie_and_the_configured_header():
+    assert tenancy.tenant_vary(_app()) == ("Cookie",)
+    assert tenancy.tenant_vary(_app(header="X-Tenant-ID")) == ("Cookie", "X-Tenant-ID")
+
+
+def _with_base_url(app: FastAPI, url: str) -> FastAPI:
+    app.state.news = SimpleNamespace(settings=SimpleNamespace(public_base_url=url))
+    return app
+
+
+def test_configure_warns_about_a_host_wide_base_url_in_multi_mode(caplog):
+    with caplog.at_level("WARNING", logger="simple_module.news"):
+        tenancy.configure(_with_base_url(_app(), "https://a.example"))
+    assert "public_base_url" in caplog.text
+
+
+@pytest.mark.parametrize(("multi", "url"), [(False, "https://a.example"), (True, "")])
+def test_configure_is_quiet_about_the_base_url_otherwise(caplog, multi, url):
+    app = _with_base_url(_app() if multi else FastAPI(), url)
+    with caplog.at_level("WARNING", logger="simple_module.news"):
+        tenancy.configure(app)
+    assert "public_base_url" not in caplog.text

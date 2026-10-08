@@ -89,6 +89,7 @@ def missed_window(now: datetime) -> ColumnElement[bool]:
 
 def any_due(now: datetime) -> ColumnElement[bool]:
     """Everything ``process_due`` would act on: the one definition of "due"."""
+    # missed_window is subsumed by publish_due; listed so the three cases read off.
     return or_(publish_due(now), unpublish_due(now), missed_window(now))
 
 

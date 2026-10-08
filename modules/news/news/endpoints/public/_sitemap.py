@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import locales
 from news.authors import slug_for as author_slug
-from news.endpoints.public._urls import cache_control, public_base_url
+from news.endpoints.public._urls import apply_cache, public_base_url
 from news.models import (
     NOT_TRASHED,
     ArticleStatus,
@@ -230,14 +230,14 @@ def sitemap_router() -> APIRouter:
             + "</url>"
             for slug, locale, updated_at in await sitemap_entries(db)
         ]
-        return Response(
+        sitemap = Response(
             content=(
                 '<?xml version="1.0" encoding="UTF-8"?>'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
                 f"{''.join(urls)}</urlset>"
             ),
             media_type="application/xml",
-            headers={"Cache-Control": cache_control(settings)},
         )
+        return apply_cache(sitemap, request, settings)
 
     return router

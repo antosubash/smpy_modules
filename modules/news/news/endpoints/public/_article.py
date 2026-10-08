@@ -29,7 +29,7 @@ from news.content import ArticlesService
 from news.endpoints.public._render import render_article
 from news.endpoints.public._urls import (
     absolute_article,
-    cache_control,
+    apply_cache,
     etag_for,
     public_base_url,
 )
@@ -127,13 +127,11 @@ def article_router(locale: str) -> APIRouter:
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
         etag = etag_for(article.id or 0, article.updated_at, variant)
-        control = cache_control(settings)
-
         def apply_headers(response: Response) -> Response:
             response.headers["ETag"] = etag
             # The same URL serves two representations; see `etag_for`.
             response.headers["Vary"] = "X-Inertia"
-            response.headers["Cache-Control"] = control
+            apply_cache(response, request, settings)
             # Which language was served, for caches and for anything reading
             # the response without parsing the body.
             response.headers["Content-Language"] = locale
