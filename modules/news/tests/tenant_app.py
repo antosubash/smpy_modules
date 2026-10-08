@@ -77,3 +77,11 @@ async def create_article(
 async def publish(client: AsyncClient, headers: dict[str, str], article_id: int) -> None:
     response = await client.post(f"{ARTICLES}/{article_id}/publish", headers=headers)
     assert response.status_code == 200, response.text
+
+
+async def create_published(
+    client: AsyncClient, headers: dict[str, str], slug: str, title: str, **extra: Any
+) -> dict:
+    article = await create_article(client, headers, slug, title, **extra)
+    await publish(client, headers, article["id"])
+    return article

@@ -13,7 +13,7 @@ from httpx import AsyncClient
 from news.constants import PUBLIC_READ_PREFIXES
 from simple_module_db import tenant_context
 from stub_auth import stub_user
-from tenant_app import as_tenant, create_article, multi_client, publish
+from tenant_app import as_tenant, create_published, multi_client
 
 A, B = as_tenant("acme"), as_tenant("globex")
 NEWS = "/news"
@@ -34,14 +34,8 @@ async def anon():
         yield client
 
 
-async def _live(client: AsyncClient, headers, slug: str, title: str) -> dict:
-    article = await create_article(client, headers, slug, title)
-    await publish(client, headers, article["id"])
-    return article
-
-
 async def test_public_article_per_tenant(mt: AsyncClient) -> None:
-    await _live(mt, A, "hello", "Hello A")
+    await create_published(mt, A, "hello", "Hello A")
     assert (await mt.get(f"{NEWS}/hello", headers=A)).status_code == 200
     assert (await mt.get(f"{NEWS}/hello", headers=B)).status_code == 404
     unbound = await mt.get(f"{NEWS}/hello")
@@ -50,15 +44,15 @@ async def test_public_article_per_tenant(mt: AsyncClient) -> None:
 
 
 async def test_same_slug_serves_each_tenants_own_article(mt: AsyncClient) -> None:
-    await _live(mt, A, "about", "About Acme")
-    await _live(mt, B, "about", "About Globex")
+    await create_published(mt, A, "about", "About Acme")
+    await create_published(mt, B, "about", "About Globex")
     assert "About Acme" in (await mt.get(f"{NEWS}/about", headers=A)).text
     assert "About Globex" in (await mt.get(f"{NEWS}/about", headers=B)).text
 
 
 async def test_feed_and_sitemap_per_tenant(mt: AsyncClient) -> None:
-    await _live(mt, A, "alpha-story", "Alpha story")
-    await _live(mt, B, "beta-story", "Beta story")
+    await create_published(mt, A, "alpha-story", "Alpha story")
+    await create_published(mt, B, "beta-story", "Beta story")
     for path in (f"{NEWS}/feed.xml", f"{NEWS}/sitemap.xml"):
         a = await mt.get(path, headers=A)
         b = await mt.get(path, headers=B)
@@ -105,7 +99,7 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
     """On the apex host the tenant can come from a member's session, so a
     shared cache keyed on Host + URL alone could hand one tenant's page to
     another tenant's reader."""
-    await _live(mt, A, "hello", "Hello A")
+    await create_published(mt, A, "hello", "Hello A")
     for path in (
         f"{NEWS}/hello",
         f"{NEWS}/category/Sport",

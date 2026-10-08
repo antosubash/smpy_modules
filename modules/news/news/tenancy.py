@@ -32,7 +32,7 @@ from enum import StrEnum
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
-from simple_module_db import is_valid_tenant_id, tenant_context
+from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
 
 __all__ = [
     "DEFAULT_TENANT",
@@ -214,6 +214,4 @@ def search_tenant() -> str:
     """The tenant a cross-module read runs in: the bound one, else the
     single-tenant host's. A host with multi_tenant off binds none, and
     an unfiltered read there would be every tenant's rows."""
-    from simple_module_db import current_tenant_id
-
     return current_tenant_id.get() or DEFAULT_TENANT

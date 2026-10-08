@@ -15,6 +15,7 @@ models cannot drift apart.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sqlite3
 import subprocess
@@ -78,20 +79,14 @@ def _ok(db: Path, *args: str) -> None:
 
 
 def _execute(db: Path, script: str) -> None:
-    con = sqlite3.connect(db)
-    try:
+    with contextlib.closing(sqlite3.connect(db)) as con:
         con.executescript(script)
         con.commit()
-    finally:
-        con.close()
 
 
 def _query(db: Path, sql: str) -> list[tuple]:
-    con = sqlite3.connect(db)
-    try:
+    with contextlib.closing(sqlite3.connect(db)) as con:
         return con.execute(sql).fetchall()
-    finally:
-        con.close()
 
 
 @pytest.fixture(scope="module")

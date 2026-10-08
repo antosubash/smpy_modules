@@ -12,7 +12,14 @@ import pytest
 from conftest import ROLE_EDITOR
 from httpx import AsyncClient
 from stub_auth import stub_user
-from tenant_app import ARTICLES, as_tenant, create_article, multi_client, publish
+from tenant_app import (
+    ARTICLES,
+    as_tenant,
+    create_article,
+    create_published,
+    multi_client,
+    publish,
+)
 
 A, B = as_tenant("acme"), as_tenant("globex")
 CATEGORIES = "/api/news/taxonomy/categories"
@@ -31,6 +38,14 @@ async def _category(client: AsyncClient, headers, name: str) -> dict:
     response = await client.post(CATEGORIES, json={"name": name}, headers=headers)
     assert response.status_code == 201, response.text
     return response.json()
+
+
+async def _items(client: AsyncClient, url: str, headers) -> list[dict]:
+    return (await client.get(url, headers=headers)).json()["items"]
+
+
+def _named(items: list[dict]) -> list[str]:
+    return [c["name"] for c in items if c["id"]]
 
 
 async def _tags(client: AsyncClient, headers, article_id: int, tags: list[str]) -> None:
@@ -53,7 +68,7 @@ async def test_tenant_cannot_see_or_edit_other_tenants_article(mt: AsyncClient) 
     assert listed.json()["items"] == []
     kept = await mt.get(f"{url}/detail", headers=A)
     assert kept.json()["title"] == "Mine"
-    assert [a["slug"] for a in (await mt.get(ARTICLES, headers=A)).json()["items"]] == ["secret"]
+    assert [a["slug"] for a in await _items(mt, ARTICLES, A)] == ["secret"]
 
 
 async def test_same_slugs_in_two_tenants(mt: AsyncClient) -> None:
@@ -62,8 +77,7 @@ async def test_same_slugs_in_two_tenants(mt: AsyncClient) -> None:
         await _category(mt, headers, "Sport")
         tag = await mt.post(TAGS, json={"name": "Local"}, headers=headers)
         assert tag.status_code == 201, tag.text
-        article = await create_article(mt, headers, "old", f"{name} old")
-        await publish(mt, headers, article["id"])
+        article = await create_published(mt, headers, "old", f"{name} old")
         ids[name] = article["id"]
     # ...but not twice in one tenant.
     again = await mt.post(ARTICLES, json={"title": "x", "slug": "old"}, headers=A)
@@ -102,7 +116,7 @@ async def test_category_rename_stays_in_tenant(mt: AsyncClient) -> None:
 
     b_article = await mt.get(f"{ARTICLES}/{in_b['id']}/detail", headers=B)
     assert b_article.json()["category"] == "Sport"
-    b_names = [c["name"] for c in (await mt.get(CATEGORIES, headers=B)).json()["items"]]
+    b_names = [c["name"] for c in await _items(mt, CATEGORIES, B)]
     assert "Sport" in b_names and "Football" not in b_names
 
 
@@ -125,7 +139,7 @@ async def test_reorder_and_tag_counts_read_back_per_tenant(mt: AsyncClient) -> N
     for headers in (A, B):
         await _category(mt, headers, "Sport")
         await _category(mt, headers, "Arts")
-    b_items = (await mt.get(CATEGORIES, headers=B)).json()["items"]
+    b_items = await _items(mt, CATEGORIES, B)
     b_ids = {c["name"]: c["id"] for c in b_items if c["id"]}
     reordered = await mt.post(
         f"{CATEGORIES}/reorder",
@@ -141,17 +155,14 @@ async def test_reorder_and_tag_counts_read_back_per_tenant(mt: AsyncClient) -> N
     b1 = await create_article(mt, B, "b1", "B1")
     await _tags(mt, B, b1["id"], ["Rare"])
 
-    def named(items):
-        return [c["name"] for c in items if c["id"]]
-
-    assert named((await mt.get(CATEGORIES, headers=A)).json()["items"]) == ["Sport", "Arts"]
-    assert named((await mt.get(CATEGORIES, headers=B)).json()["items"]) == ["Arts", "Sport"]
+    assert _named(await _items(mt, CATEGORIES, A)) == ["Sport", "Arts"]
+    assert _named(await _items(mt, CATEGORIES, B)) == ["Arts", "Sport"]
 
     def counts(items):
         return {t["name"]: t["article_count"] for t in items}
 
-    assert counts((await mt.get(TAGS, headers=A)).json()["items"]) == {"Local": 2, "Rare": 1}
-    assert counts((await mt.get(TAGS, headers=B)).json()["items"]) == {"Rare": 1}
+    assert counts(await _items(mt, TAGS, A)) == {"Local": 2, "Rare": 1}
+    assert counts(await _items(mt, TAGS, B)) == {"Rare": 1}
 
 
 async def test_reorder_cannot_reach_other_tenants_ids(mt: AsyncClient) -> None:
@@ -163,8 +174,7 @@ async def test_reorder_cannot_reach_other_tenants_ids(mt: AsyncClient) -> None:
         f"{CATEGORIES}/reorder", json={"ordered_ids": [arts["id"], sport["id"]]}, headers=B
     )
     assert hijack.status_code == 204, hijack.text
-    items = (await mt.get(CATEGORIES, headers=A)).json()["items"]
-    assert [c["name"] for c in items if c["id"]] == ["Sport", "Arts"]
+    assert _named(await _items(mt, CATEGORIES, A)) == ["Sport", "Arts"]
 
 
 async def test_tag_merge_stays_in_tenant(mt: AsyncClient) -> None:
@@ -172,7 +182,7 @@ async def test_tag_merge_stays_in_tenant(mt: AsyncClient) -> None:
     await _tags(mt, A, a1["id"], ["Town", "City"])
     b1 = await create_article(mt, B, "b1", "B1")
     await _tags(mt, B, b1["id"], ["Town", "City"])
-    a_tags = {t["name"]: t["id"] for t in (await mt.get(TAGS, headers=A)).json()["items"]}
+    a_tags = {t["name"]: t["id"] for t in await _items(mt, TAGS, A)}
 
     merged = await mt.post(
         f"{TAGS}/{a_tags['City']}/merge", json={"source_id": a_tags["Town"]}, headers=A

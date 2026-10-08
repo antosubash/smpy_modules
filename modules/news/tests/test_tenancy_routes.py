@@ -18,9 +18,6 @@ from news.settings import active
 from news.tenancy import bind_admin, bind_public
 from stub_auth import stub_user
 
-#: Routes that read no rows. Every news route reads some, so: none.
-ALLOW_UNBOUND: set[str] = set()
-
 
 def _calls(dep: Dependant) -> Iterator[object]:
     for sub in dep.dependencies:
@@ -63,11 +60,8 @@ async def test_every_news_route_binds_a_tenant(bilingual) -> None:
             f"/de{public}",
             f"/en{public}",
         )
-        routes = [
-            r
-            for r in _api_routes(app.routes)
-            if r.path not in ALLOW_UNBOUND and r.path.startswith(prefixes)
-        ]
+        # Every news route reads rows, so none is allow-listed as unbound.
+        routes = [r for r in _api_routes(app.routes) if r.path.startswith(prefixes)]
         paths = {r.path for r in routes}
         assert f"{public}/{{slug}}" in paths, "public viewer not mounted"
         assert f"/de{public}/{{slug}}" in paths, "second language not mounted"
