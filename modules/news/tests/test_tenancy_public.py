@@ -140,7 +140,7 @@ async def test_single_mode_vary_is_unchanged(anon_client: AsyncClient) -> None:
         assert response.headers.get("vary") == vary, path
 
 
-def test_public_api_cache_varies_on_the_configured_tenant_header() -> None:
+async def test_public_api_cache_varies_on_the_configured_tenant_header() -> None:
     """The feed block's anonymous reads are ``public`` too: a tenant picked by
     header has to be in their ``Vary``, not only ``Cookie``."""
     from types import SimpleNamespace
