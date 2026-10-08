@@ -45,6 +45,8 @@ __all__ = [
     "mode_of",
     "resolve_admin",
     "resolve_public",
+    "tenant_vary",
+    "vary_on_tenant",
 ]
 
 _log = logging.getLogger("simple_module.pagebuilder")
@@ -117,6 +119,30 @@ def configure(app: Any) -> TenancyMode:
             "no TenantMiddleware, so pagebuilder runs single-tenant. Restart to apply it"
         )
     return mode
+
+
+def tenant_vary(app: Any) -> tuple[str, ...]:
+    """The request headers that pick a public response's tenant.
+
+    ``SINGLE``: none. ``MULTI``: on the apex host the framework falls back to
+    a member's session (``Cookie``) or the configured tenant header, so the
+    same Host + URL answers with different tenants' content and a shared
+    cache has to key on them too.
+    """
+    if mode_of(app) is TenancyMode.SINGLE:
+        return ()
+    header = (getattr(_tenant_middleware(app), "kwargs", None) or {}).get("header")
+    return ("Cookie", header) if header else ("Cookie",)
+
+
+def vary_on_tenant(response: Any, app: Any) -> Any:
+    """Append :func:`tenant_vary` to *response*'s ``Vary``; a no-op in SINGLE."""
+    listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
+    seen = {f.lower() for f in listed}
+    added = [f for f in tenant_vary(app) if f.lower() not in seen]
+    if added:
+        response.headers["Vary"] = ", ".join(listed + added)
+    return response
 
 
 def mode_of(app: Any) -> TenancyMode:

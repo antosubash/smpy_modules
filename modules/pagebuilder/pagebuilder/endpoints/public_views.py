@@ -28,7 +28,7 @@ from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-from pagebuilder.tenancy import bind_public
+from pagebuilder.tenancy import bind_public, vary_on_tenant
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -181,6 +181,8 @@ async def render_public_page(
     def apply_headers(response: Response) -> Response:
         response.headers["ETag"] = etag
         response.headers["Vary"] = "X-Inertia"
+        # On a multi-tenant host the tenant can come from the session, not the Host.
+        vary_on_tenant(response, request.app)
         response.headers["Cache-Control"] = cache_control
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
