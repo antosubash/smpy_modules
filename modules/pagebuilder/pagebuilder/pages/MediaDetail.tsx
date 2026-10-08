@@ -190,4 +190,4 @@ export default function MediaDetail() {
   );
 }
 
-MediaDetail.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+MediaDetail.layout = [AuthenticatedLayout];

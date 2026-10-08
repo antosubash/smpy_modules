@@ -12,8 +12,8 @@ development app that mounts them; it is never published.
 ## Rules that are easy to get wrong
 
 **Pin policy differs by role.** Published modules depend on the framework with
-*ranges* (`simple_module_core>=0.0.25,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.25`). Never give a published module an `==` pin —
+*ranges* (`simple_module_core>=0.0.35,<0.1`). The host pins *exactly*
+(`simple_module_hosting==0.0.35`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules

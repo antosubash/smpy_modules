@@ -19,6 +19,11 @@ test.describe('News admin', () => {
     // "News" is the sidebar *group* now, holding Articles and Categories —
     // the rail splits by section rather than lumping both modules under
     // "Content". The link to click is therefore the leaf, not the group.
+    // Each leaf draws its icon. NavIcon renders a name it does not know as an
+    // empty box, which is how News once shipped three blank icons.
+    for (const name of ['Articles', 'Categories', 'Search everything']) {
+      await expect(page.getByRole('link', { name, exact: true }).locator('svg')).toHaveCount(1);
+    }
     await page.getByRole('link', { name: 'Articles', exact: true }).click();
     await expect(page).toHaveURL(/\/news\/?$/);
     await expect(page.getByRole('heading', { name: 'News', level: 1 })).toBeVisible();

@@ -15,10 +15,8 @@ dependencies = [
     "simple_module_hosting>=0.0.35,<0.1",
     "simple_module_inertia>=0.0.35,<0.1",
     # This module's settings live in the DB-backed settings store, so
-    # ``register_settings`` imports ``settings.registration``. Floor verified:
-    # ``register_module_settings`` and ``apply_changes_and_reload`` both exist
-    # at 0.0.25.
-    "simple_module_settings>=0.0.25,<0.1",
+    # ``register_settings`` imports ``settings.registration``.
+    "simple_module_settings>=0.0.35,<0.1",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
     "sqlmodel>=0.0.21",
@@ -32,7 +30,7 @@ Repository = "https://github.com/antosubash/simple_module_python_modules"
 pagebuilder = "pagebuilder.module:PagebuilderModule"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.25,<0.1"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

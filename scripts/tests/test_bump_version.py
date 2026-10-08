@@ -2,7 +2,7 @@
 
 The framework repo's version of this script rewrites every ``simple_module_*``
 requirement to ``==<version>``. Run here, that would turn
-``simple_module_core>=0.0.25,<0.1`` into ``==<this repo's version>`` — pinning
+``simple_module_core>=0.0.35,<0.1`` into ``==<this repo's version>`` — pinning
 the framework to a version that does not exist. These tests are the guard.
 """
 

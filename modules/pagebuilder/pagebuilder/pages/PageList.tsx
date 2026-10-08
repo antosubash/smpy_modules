@@ -9,7 +9,6 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
-import type React from 'react';
 import { toast } from 'sonner';
 import { NewPageDialog } from '../components/NewPageDialog';
 import { type BoardStage, PageBoard } from '../components/PageBoard';
@@ -259,4 +258,4 @@ export default function PageList() {
   );
 }
 
-PageList.layout = (page: React.ReactNode) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+PageList.layout = [AuthenticatedLayout];

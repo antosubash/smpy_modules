@@ -53,9 +53,9 @@ Pin the framework with **ranges**, never `==`:
 
 ```toml
 dependencies = [
-    "simple_module_core>=0.0.25,<0.1",
-    "simple_module_db>=0.0.25,<0.1",
-    "simple_module_hosting>=0.0.25,<0.1",
+    "simple_module_core>=0.0.35,<0.1",
+    "simple_module_db>=0.0.35,<0.1",
+    "simple_module_hosting>=0.0.35,<0.1",
 ]
 ```
 
