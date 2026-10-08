@@ -1,9 +1,10 @@
 """Translating media URLs to and from the portable ``asset://`` sentinel.
 
-A media URL is ``{media_url_prefix}/{filename}`` where the filename is a UUID
-assigned at upload — host-local by construction. Capture therefore replaces
-every such URL with ``asset://<bundle name>``, and restore puts back whatever
-URL the file was given on *this* host.
+A media URL is ``{media_url_prefix}/{tenant_id}/{filename}`` (or, in content
+saved before per-tenant media, the flat ``{media_url_prefix}/{filename}``)
+where the filename is a UUID assigned at upload — host-local by construction.
+Capture therefore replaces every such URL with ``asset://<bundle name>``, and
+restore puts back whatever URL the file was given on *this* host.
 
 Only URLs that resolve to a row in the media library are rewritten: the
 mapping is built from the media table rather than guessed from string shape,

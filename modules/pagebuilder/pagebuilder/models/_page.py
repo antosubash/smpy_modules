@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column, DateTime, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
@@ -43,7 +43,7 @@ class RevisionEvent(str, enum.Enum):  # noqa: UP042  — see PageStatus above
     REJECT = "reject"
 
 
-class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class Page(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """A page composed in the visual editor."""
 
     __tablename__ = "pagebuilder_pages"
@@ -53,27 +53,35 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
         # /de/p/about are two documents at two addresses, and forcing the
         # German one to pick a different word would make the URL a workaround
         # for a schema decision. Replaces the single-column unique index the
-        # slug column carried before there was such a thing as a locale.
-        Index("ix_pagebuilder_pages_locale_slug", "locale", "slug", unique=True),
+        # slug column carried before there was such a thing as a locale. And
+        # per tenant: each tenant is its own site, with its own /p/about.
+        Index(
+            "ix_pagebuilder_pages_tenant_locale_slug",
+            "tenant_id",
+            "locale",
+            "slug",
+            unique=True,
+        ),
         # One page per language per group. Without it a second "add German"
         # click — a double submit, a stale tab — produces two German siblings
         # and every alternates list starts contradicting itself.
         Index(
-            "ix_pagebuilder_pages_group_locale",
+            "ix_pagebuilder_pages_tenant_group_locale",
+            "tenant_id",
             "translation_group",
             "locale",
             unique=True,
         ),
     )
-    # Neither column carries its own index: both composites lead with the one
-    # a single-column lookup would want, so a "locale = ?" or
-    # "translation_group = ?" scan already has one to use and a second would
-    # only cost writes.
+    # Neither column carries its own index: both composites lead with the
+    # tenant every statement filters on, followed by the column a lookup would
+    # want, so a "locale = ?" or "translation_group = ?" scan already has one
+    # to use and a second would only cost writes.
 
     id: int | None = Field(default=None, primary_key=True)
     slug: str = Field(max_length=200)
-    """The page's address within its language. Unique per ``locale``, not
-    globally — see ``__table_args__``."""
+    """The page's address within its language. Unique per tenant and
+    ``locale``, not globally — see ``__table_args__``."""
 
     locale: str = Field(
         default_factory=locales.default,
@@ -224,7 +232,7 @@ class Page(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
         return self.deleted_at is not None
 
 
-class PageRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class PageRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Append-only audit row written on every status transition.
 
     ``Page.rejection_note`` mirrors the most recent ``REJECT`` row's

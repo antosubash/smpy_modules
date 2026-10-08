@@ -28,8 +28,15 @@ import logging
 from fastapi import FastAPI
 
 from pagebuilder import locales
-from pagebuilder.media_files import MediaFiles, resolve_media_root, warn_on_orphaned_media
+from pagebuilder.media_files import (
+    MediaFiles,
+    adopt_legacy_files,
+    is_generated_media_name,
+    resolve_media_root,
+    warn_on_orphaned_media,
+)
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.blobs import BLOBS_DIR, is_digest
 
 _log = logging.getLogger("simple_module.pagebuilder")
 
@@ -126,10 +133,21 @@ def mount_public_routers(app: FastAPI, settings: PagebuilderSettings) -> None:
 
 
 async def mount_media(app: FastAPI, settings: PagebuilderSettings) -> None:
-    """Serve uploaded files from ``{media_url_prefix}/{filename}``."""
+    """Serve uploaded files from ``{media_url_prefix}/{tenant_id}/{filename}``.
+
+    Files (and snapshot blobs) written before per-tenant storage sit directly
+    under their root; they are moved into the default tenant's directory
+    first, so the orphan scan below and every later read find them (#38).
+    """
     media_root = resolve_media_root(settings.media_root)
     media_root.mkdir(parents=True, exist_ok=True)
     _log.info("pagebuilder.media_root: %s", media_root)
+    adopt_legacy_files(media_root, accept=is_generated_media_name)
+    adopt_legacy_files(
+        resolve_media_root(settings.snapshot_root) / BLOBS_DIR,
+        accept=is_digest,
+        label="snapshot_blobs",
+    )
     app.mount(
         settings.media_url_prefix,
         MediaFiles(directory=media_root),

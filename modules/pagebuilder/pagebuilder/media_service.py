@@ -1,12 +1,12 @@
 """Storage + DB operations for uploaded media assets.
 
 Files live on the local filesystem under
-:attr:`PagebuilderSettings.media_root` and are served via a StaticFiles
-mount registered in :meth:`PagebuilderModule.on_startup`. The DB row
+``<PagebuilderSettings.media_root>/<tenant_id>/`` and are served via a
+StaticFiles mount registered in :meth:`PagebuilderModule.on_startup`. The DB row
 holds the sanitized filename, original name, content-type, byte size,
 intrinsic dimensions, and a ``variants`` map of server-generated
 thumbnails. Public URLs are derived as
-``f"{settings.media_url_prefix}/{filename}"``.
+``f"{settings.media_url_prefix}/{tenant_id}/{filename}"``.
 
 Filename sanitising, content sniffing, and thumbnail generation live in
 :mod:`pagebuilder.media_images`.
@@ -24,7 +24,12 @@ from sqlmodel import select
 
 from pagebuilder import media_queries
 from pagebuilder.contracts.schemas import MediaAssetRead, MediaAssetVariant
-from pagebuilder.media_files import resolve_media_root
+from pagebuilder.media_files import (
+    legacy_media_url,
+    media_url,
+    resolve_media_root,
+    tenant_media_dir,
+)
 from pagebuilder.media_images import (
     CONTENT_TYPE_EXTENSIONS,
     SNIFF_BYTES,
@@ -54,14 +59,23 @@ class MediaService:
         # reads must never resolve to different directories (issue #14).
         return resolve_media_root(self.settings.media_root)
 
-    def url_for(self, filename: str) -> str:
-        return f"{self.settings.media_url_prefix.rstrip('/')}/{filename}"
+    def tenant_dir(self, tenant_id: str | None = None) -> Path:
+        """The directory one tenant's files live in (the bound one by default)."""
+        return tenant_media_dir(self.storage_root, tenant_id)
+
+    def url_for(self, filename: str, tenant_id: str | None = None) -> str:
+        return media_url(self.settings.media_url_prefix, filename, tenant_id)
+
+    def legacy_url_for(self, filename: str) -> str:
+        """The flat URL content stored before per-tenant media (still served)."""
+        return legacy_media_url(self.settings.media_url_prefix, filename)
 
     def to_read(self, asset: MediaAsset) -> MediaAssetRead:
+        tenant = asset.tenant_id
         variants = {
             key: MediaAssetVariant(
                 filename=meta["filename"],
-                url=self.url_for(meta["filename"]),
+                url=self.url_for(meta["filename"], tenant),
                 content_type=meta["content_type"],
                 width=meta["width"],
                 height=meta.get("height"),
@@ -75,7 +89,7 @@ class MediaService:
             original_filename=asset.original_filename,
             content_type=asset.content_type,
             size_bytes=asset.size_bytes,
-            url=self.url_for(asset.filename),
+            url=self.url_for(asset.filename, tenant),
             width=asset.width,
             height=asset.height,
             folder=asset.folder,
@@ -161,7 +175,7 @@ class MediaService:
         ext = CONTENT_TYPE_EXTENSIONS.get(content_type) or safe_extension(original)
         filename = f"{uuid.uuid4().hex}{ext}"
 
-        root = self.storage_root
+        root = self.tenant_dir()
         root.mkdir(parents=True, exist_ok=True)
         target = root / filename
 
@@ -217,7 +231,7 @@ class MediaService:
 
     async def delete(self, asset_id: int) -> None:
         asset = await self.get_asset(asset_id)
-        root = self.storage_root
+        root = self.tenant_dir(asset.tenant_id)
         (root / asset.filename).unlink(missing_ok=True)
         for meta in (asset.variants or {}).values():
             if isinstance(meta, dict):

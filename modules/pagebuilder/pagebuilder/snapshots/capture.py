@@ -25,7 +25,12 @@ from sqlmodel import select
 
 from pagebuilder import locales
 from pagebuilder.layout_service import LayoutService
-from pagebuilder.media_files import resolve_media_root
+from pagebuilder.media_files import (
+    legacy_media_url,
+    media_url,
+    resolve_media_root,
+    tenant_media_dir,
+)
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageRedirect
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import bundle_names, to_sentinels
@@ -99,7 +104,7 @@ async def _media_maps(
     result = await db.execute(select(MediaAsset).order_by(MediaAsset.id.asc()))
     assets = list(result.scalars().all())
     names = bundle_names([(a.id, a.original_filename) for a in assets if a.id])
-    prefix = settings.media_url_prefix.rstrip("/")
+    prefix = settings.media_url_prefix
     root = resolve_media_root(settings.media_root)
 
     url_to_name: dict[str, str] = {}
@@ -108,10 +113,13 @@ async def _media_maps(
     for asset in assets:
         if not asset.id:
             continue
-        if not (root / asset.filename).is_file():
+        if not (tenant_media_dir(root, asset.tenant_id) / asset.filename).is_file():
             missing.append(asset.original_filename)
             continue
-        url_to_name[f"{prefix}/{asset.filename}"] = names[asset.id]
+        # Both URLs the file is served at: content saved before per-tenant
+        # media (#38) still carries the flat one.
+        url_to_name[media_url(prefix, asset.filename, asset.tenant_id)] = names[asset.id]
+        url_to_name[legacy_media_url(prefix, asset.filename)] = names[asset.id]
         present.append((asset, names[asset.id]))
     return url_to_name, present, missing
 
@@ -211,7 +219,7 @@ def _capture_media(
     total = 0
 
     for asset, bundle_name in assets:
-        source = root / asset.filename
+        source = tenant_media_dir(root, asset.tenant_id) / asset.filename
         if not source.is_file():
             missing.append(asset.original_filename)
             continue

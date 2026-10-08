@@ -13,6 +13,7 @@ image that nobody notices until someone looks.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import Text, cast, func, or_, select
@@ -59,8 +60,13 @@ def _references(column, needle: str):
     return cast(column, Text).like(f"%{_like_literal(needle)}%", escape="\\")
 
 
-async def find(db: AsyncSession, url: str, *, limit: int = 20) -> tuple[list[Usage], int]:
-    """Pages referencing ``url``. Returns (first ``limit``, total).
+async def find(
+    db: AsyncSession, url: str | Sequence[str], *, limit: int = 20
+) -> tuple[list[Usage], int]:
+    """Pages referencing ``url`` (or any of several). Returns (first ``limit``, total).
+
+    Several because one asset has two live URLs since #38: the per-tenant one
+    it is served at now, and the flat one content stored before still carries.
 
     Matching is on the URL rather than the filename: a filename like ``2.jpg``
     would match half the library by substring, while the URL is unique to the
@@ -70,12 +76,13 @@ async def find(db: AsyncSession, url: str, *, limit: int = 20) -> tuple[list[Usa
     only by one is, for the purposes of "can I delete this", unused — and
     blocking on a page nobody can see would be impossible to act on.
     """
-    if not url:
+    urls = [u for u in ([url] if isinstance(url, str) else url) if u]
+    if not urls:
         return [], 0
 
     matches = or_(
-        _references(Page.draft_data, url),
-        _references(Page.published_data, url),
+        *(_references(Page.draft_data, u) for u in urls),
+        *(_references(Page.published_data, u) for u in urls),
     )
     base = select(Page).where(NOT_TRASHED, matches)
 
@@ -84,9 +91,8 @@ async def find(db: AsyncSession, url: str, *, limit: int = 20) -> tuple[list[Usa
 
     usages = []
     for page in rows:
-        in_published = bool(
-            page.published_data and url in str(page.published_data)
-        )
+        published = str(page.published_data) if page.published_data else ""
+        in_published = any(u in published for u in urls)
         usages.append(
             Usage(
                 page_id=page.id or 0,

@@ -83,7 +83,7 @@ async def test_capture_rewrites_media_urls_to_sentinels(snapshot_db, tmp_path):
     from pagebuilder.media_files import resolve_media_root
 
     session = snapshot_db.session
-    root = resolve_media_root(snapshot_db.settings.media_root)
+    root = resolve_media_root(snapshot_db.settings.media_root) / "default"
     root.mkdir(parents=True, exist_ok=True)
     (root / "uuid1.jpg").write_bytes(b"image-bytes")
     session.add(
@@ -208,7 +208,7 @@ async def test_og_image_travels_as_a_sentinel(snapshot_db, tmp_path):
     reported, because it was never treated as an asset reference.
     """
     session = snapshot_db.session
-    root = snapshot_db.settings.media_root
+    root = snapshot_db.settings.media_root / "default"
     root.mkdir(parents=True, exist_ok=True)
     (root / "uuid1.jpg").write_bytes(b"image-bytes")
     session.add(

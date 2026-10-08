@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, Column
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
+from sqlalchemy import JSON, Column, Index
 from sqlmodel import Field
 
 from pagebuilder.models._base import Base
 
 
-class MediaAsset(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class MediaAsset(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """An uploaded media file stored on local disk.
 
     The bytes themselves live under :attr:`PagebuilderSettings.media_root`;
@@ -26,9 +26,20 @@ class MediaAsset(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     """
 
     __tablename__ = "pagebuilder_media"
+    # Unique per tenant: each tenant's files sit in their own directory, so a
+    # name only has to be free there. No separate ``filename`` index — every
+    # lookup is tenant-filtered, and this one leads with the tenant.
+    __table_args__ = (
+        Index(
+            "uq_pagebuilder_media_tenant_filename",
+            "tenant_id",
+            "filename",
+            unique=True,
+        ),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    filename: str = Field(max_length=300, unique=True, index=True)
+    filename: str = Field(max_length=300)
     original_filename: str = Field(max_length=300)
     content_type: str = Field(max_length=120)
     size_bytes: int = Field(default=0)

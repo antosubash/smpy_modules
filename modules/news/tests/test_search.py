@@ -37,10 +37,15 @@ async def _article(db, slug: str, *, category: str = "", title: str | None = Non
     )
 
 
-async def _page(db, slug: str, *, title: str | None = None, draft_data: dict | None = None):
+async def _page(db, slug: str, *, title: str | None = None, draft_data: dict | None = None,
+                tenant: str = "default"):
     from pagebuilder.models import Page, PageStatus
 
     page = Page(
+        # pagebuilder's tables are tenant-owned; news (and so this suite) is
+        # not tenant-aware yet, so the row is filed where a single-tenant host's
+        # pages live rather than stamped from a binding nothing here makes.
+        tenant_id=tenant,
         slug=slug,
         title=title or slug,
         status=PageStatus.PUBLISHED,
@@ -264,3 +269,30 @@ class TestItAgreesWithTheArticleList:
         results = await search_service.search(db, "mixed canopy")
 
         assert [hit.title for hit in results.articles] == ["bodied"]
+
+
+@requires_pagebuilder
+async def test_another_tenants_page_is_not_searched(db) -> None:
+    """With no tenant bound, pagebuilder's tables are not filtered at all; the
+    search pins itself to the default tenant rather than listing every one."""
+    await _page(db, "ours-zircon", title="Zircon ours")
+    await _page(db, "theirs-zircon", title="Zircon theirs", tenant="other")
+
+    hits, total = await pb.search_pages(db, "%zircon%", include_drafts=True, limit=10)
+
+    assert [p.title for p in hits] == ["Zircon ours"]
+    assert total == 1
+
+
+@requires_pagebuilder
+async def test_a_strict_session_with_no_tenant_finds_nothing(db, db_state) -> None:
+    """Multi-tenant hosts are strict: no tenant bound must not mean "default"."""
+    await _page(db, "ours-quartz", title="Quartz ours")
+    db_state.tenant_strict = True
+    try:
+        hits, total = await pb.search_pages(db, "%quartz%", include_drafts=True, limit=10)
+    finally:
+        db_state.tenant_strict = False
+
+    assert hits == []
+    assert total == 0

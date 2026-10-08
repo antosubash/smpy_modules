@@ -83,6 +83,22 @@ def _models() -> Any:
     return NOT_TRASHED, Page, MediaAsset
 
 
+def _search_tenant() -> str:
+    """The one tenant a pagebuilder search may read.
+
+    The framework filters these tables only when a tenant is bound; a host
+    with ``multi_tenant`` off binds none, and an unfiltered read would list
+    every tenant's pages. Pagebuilder runs such a host as its default tenant,
+    so that is the one searched. A strict (multi-tenant) session with no
+    tenant is caught by the framework (``MissingTenantError``) at execution,
+    which the callers turn into an empty result.
+    """
+    from pagebuilder.tenancy import DEFAULT_TENANT
+    from simple_module_db import current_tenant_id
+
+    return current_tenant_id.get() or DEFAULT_TENANT
+
+
 # ── Links into pagebuilder's own screens ──────────────────────────────
 # All three return "" when it is absent. The frontend renders a section's
 # "see all" only when it has somewhere to send you, so an empty string is a
@@ -129,11 +145,14 @@ async def search_pages(
     if models is None:
         return [], 0
     not_trashed, page, _ = models
+    tenant = _search_tenant()
 
+    from simple_module_db import MissingTenantError
     from sqlalchemy import Text, cast, func, or_, select
 
     stmt = select(page).where(
         not_trashed,
+        page.tenant_id == tenant,
         or_(
             page.title.ilike(pattern, escape="\\"),
             page.slug.ilike(pattern, escape="\\"),
@@ -148,12 +167,15 @@ async def search_pages(
     if not include_drafts:
         stmt = stmt.where(page.status == "published")
 
-    total = int(
-        await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    )
-    rows = (
-        await db.execute(stmt.order_by(page.id.desc()).limit(limit))
-    ).scalars()
+    try:
+        total = int(
+            await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        )
+        rows = (
+            await db.execute(stmt.order_by(page.id.desc()).limit(limit))
+        ).scalars()
+    except MissingTenantError:
+        return [], 0
     return list(rows), total
 
 
@@ -165,19 +187,25 @@ async def search_media(
     if models is None:
         return [], 0
     _, _, media_asset = models
+    tenant = _search_tenant()
 
+    from simple_module_db import MissingTenantError
     from sqlalchemy import func, or_, select
 
     stmt = select(media_asset).where(
+        media_asset.tenant_id == tenant,
         or_(
             media_asset.original_filename.ilike(pattern, escape="\\"),
             media_asset.filename.ilike(pattern, escape="\\"),
         )
     )
-    total = int(
-        await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    )
-    rows = (
-        await db.execute(stmt.order_by(media_asset.id.desc()).limit(limit))
-    ).scalars()
+    try:
+        total = int(
+            await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        )
+        rows = (
+            await db.execute(stmt.order_by(media_asset.id.desc()).limit(limit))
+        ).scalars()
+    except MissingTenantError:
+        return [], 0
     return list(rows), total

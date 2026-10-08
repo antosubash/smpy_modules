@@ -35,14 +35,13 @@ from pagebuilder.models import (
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.apply import apply_bundle
 from pagebuilder.snapshots.archive import BundleError, read_zip, write_zip
-from pagebuilder.snapshots.blobs import BlobStore
+from pagebuilder.snapshots.blobs import BLOBS_DIR, BlobStore, tenant_store
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME, is_readable
 from pagebuilder.snapshots.media_match import preview_urls
 from pagebuilder.snapshots.plan import build_plan
 
 _SNAPSHOTS_DIR = "snapshots"
-_BLOBS_DIR = "blobs"
 _PRE_RESTORE_NOTE = "Automatic snapshot taken before restoring"
 
 
@@ -59,7 +58,7 @@ class SnapshotService:
 
     @property
     def blobs(self) -> BlobStore:
-        return BlobStore(self.root / _BLOBS_DIR)
+        return tenant_store(self.root / BLOBS_DIR)
 
     def dir_for(self, snapshot_id: int) -> Path:
         return self.root / _SNAPSHOTS_DIR / str(snapshot_id)

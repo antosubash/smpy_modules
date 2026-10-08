@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
@@ -9,7 +10,7 @@ from pagebuilder import locales
 from pagebuilder.models._base import Base
 
 
-class PageRedirect(Base, table=True):  # ty: ignore[unsupported-base]
+class PageRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """An old slug that should now send visitors to a page's current one.
 
     Written whenever a slug changes, because the old URL is already out in the
@@ -17,15 +18,17 @@ class PageRedirect(Base, table=True):  # ty: ignore[unsupported-base]
     index that has not recrawled. Losing it silently turns an edit into a broken
     link that nobody notices until traffic drops.
 
-    ``(locale, from_slug)`` is unique: one old address resolves to exactly one
-    page, and the row is replaced rather than duplicated when a slug is reused.
+    ``(tenant_id, locale, from_slug)`` is unique: one old address resolves to
+    exactly one page of that tenant's site, and the row is replaced rather than
+    duplicated when a slug is reused.
     """
 
     __tablename__ = "pagebuilder_page_redirects"
 
     __table_args__ = (
         Index(
-            "ix_pagebuilder_page_redirects_locale_from_slug",
+            "ix_pagebuilder_page_redirects_tenant_locale_from_slug",
+            "tenant_id",
             "locale",
             "from_slug",
             unique=True,

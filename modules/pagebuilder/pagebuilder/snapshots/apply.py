@@ -83,7 +83,7 @@ async def _restore_media(
             asset = await service.upload(upload, folder=entry.get("folder"))
             uploaded[entry["sha256"]] = asset
             added += 1
-        name_to_url[bundle_name] = service.url_for(asset.filename)
+        name_to_url[bundle_name] = service.url_for(asset.filename, asset.tenant_id)
     return name_to_url, added
 
 

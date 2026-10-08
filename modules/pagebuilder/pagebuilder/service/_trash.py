@@ -22,6 +22,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
+from sqlalchemy import ColumnElement, and_
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,19 @@ from pagebuilder.models import Page, PageRevision, PageStatus
 
 #: How long a trashed page is recoverable before the sweep removes it.
 RETENTION_DAYS = 30
+
+
+def trash_expired(now: datetime) -> ColumnElement[bool]:
+    """Trashed pages past the retention window as of *now*.
+
+    Shared with the scheduler's tenant scan so what it looks for cannot drift
+    from what :meth:`TrashMixin.purge_expired` removes.
+    """
+    cutoff = now - timedelta(days=RETENTION_DAYS)
+    return and_(
+        Page.deleted_at.is_not(None),  # type: ignore[union-attr]
+        Page.deleted_at < cutoff,  # type: ignore[operator]
+    )
 
 
 class TrashMixin:
@@ -153,12 +167,8 @@ class TrashMixin:
         that stays up for months. Each page goes through ``purge``, so the
         cascade and the ``PageDeleted`` event are identical to a manual one.
         """
-        cutoff = (now or datetime.now(UTC)) - timedelta(days=RETENTION_DAYS)
         result = await self.db.execute(
-            select(Page.id).where(
-                Page.deleted_at.is_not(None),  # type: ignore[union-attr]
-                Page.deleted_at < cutoff,  # type: ignore[operator]
-            )
+            select(Page.id).where(trash_expired(now or datetime.now(UTC)))
         )
         expired = list(result.scalars().all())
         for page_id in expired:

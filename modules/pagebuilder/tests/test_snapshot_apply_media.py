@@ -59,7 +59,7 @@ async def test_two_assets_sharing_a_filename_stay_two_files(snapshot_db, tmp_pat
     """
     session, settings = snapshot_db.session, snapshot_db.settings
     blobs = BlobStore(tmp_path / "blobs")
-    root = resolve_media_root(settings.media_root)
+    root = resolve_media_root(settings.media_root) / "default"
     root.mkdir(parents=True, exist_ok=True)
 
     for name, data in (("uuid1.png", PNG), ("uuid2.png", PNG_RED_2X2)):

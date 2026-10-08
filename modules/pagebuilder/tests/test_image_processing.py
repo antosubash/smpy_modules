@@ -12,11 +12,9 @@ import io
 import pytest
 from fastapi import UploadFile
 from pagebuilder.media_service import MediaService
-from pagebuilder.models import Base
 from pagebuilder.settings import PagebuilderSettings
 from PIL import Image
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.asyncio.session import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _png_bytes(width: int, height: int) -> bytes:
@@ -57,25 +55,14 @@ def _make_upload(content: bytes, *, filename: str, content_type: str) -> UploadF
 
 
 @pytest.fixture
-async def db_session(tmp_path) -> AsyncSession:  # type: ignore[no-untyped-def]
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
-    await engine.dispose()
-
-
-@pytest.fixture
-def media_service(db_session: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
+def media_service(db: AsyncSession, tmp_path) -> MediaService:  # type: ignore[no-untyped-def]
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         # Pick widths that exercise both "under source" and "over source"
         # branches given a 1500px-wide test fixture.
         media_thumbnail_widths=(320, 640, 1280, 1920),
     )
-    return MediaService(db_session, settings)
+    return MediaService(db, settings)
 
 
 async def test_upload_records_dimensions(media_service: MediaService) -> None:
@@ -101,7 +88,7 @@ async def test_upload_generates_webp_thumbnails(media_service: MediaService) -> 
     # 1500x1000 → aspect-preserving height at 640 width is round(640*1000/1500) = 427
     assert w640["height"] == 427
     # File actually exists on disk under the variant name.
-    variant_path = media_service.storage_root / w640["filename"]
+    variant_path = media_service.tenant_dir() / w640["filename"]
     assert variant_path.is_file()
     assert variant_path.stat().st_size > 0
 
@@ -130,7 +117,7 @@ async def test_animated_gif_skips_thumbnails(media_service: MediaService) -> Non
     assert asset.width == 10
     assert asset.height == 10
     # Original still saved.
-    assert (media_service.storage_root / asset.filename).is_file()
+    assert (media_service.tenant_dir() / asset.filename).is_file()
 
 
 async def test_to_read_exposes_variant_urls(media_service: MediaService) -> None:
@@ -153,10 +140,10 @@ async def test_delete_removes_variant_files(media_service: MediaService) -> None
     )
     asset = await media_service.upload(upload)
     variant_paths = [
-        media_service.storage_root / meta["filename"]
+        media_service.tenant_dir() / meta["filename"]
         for meta in asset.variants.values()
     ]
-    original_path = media_service.storage_root / asset.filename
+    original_path = media_service.tenant_dir() / asset.filename
     assert variant_paths and all(p.is_file() for p in variant_paths)
     assert asset.id is not None
     await media_service.delete(asset.id)
@@ -166,13 +153,13 @@ async def test_delete_removes_variant_files(media_service: MediaService) -> None
 
 
 async def test_disabling_thumbnail_widths_skips_generation(
-    db_session: AsyncSession, tmp_path
+    db: AsyncSession, tmp_path
 ) -> None:
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         media_thumbnail_widths=(),
     )
-    service = MediaService(db_session, settings)
+    service = MediaService(db, settings)
     upload = _make_upload(
         _png_bytes(1024, 768), filename="hero.png", content_type="image/png"
     )
