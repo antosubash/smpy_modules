@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
@@ -10,7 +11,7 @@ from news.constants import MAX_LOCALE_LEN, MAX_SLUG_LEN
 from news.models._base import ARTICLE_TABLE, Base
 
 
-class NewsArticleRedirect(Base, table=True):  # ty: ignore[unsupported-base]
+class NewsArticleRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """An old slug that should now send readers to an article's current one.
 
     Written whenever a slug changes, because the old URL is already out in the
@@ -18,7 +19,7 @@ class NewsArticleRedirect(Base, table=True):  # ty: ignore[unsupported-base]
     index that has not recrawled. Losing it silently turns an edit into a broken
     link that nobody notices until traffic drops.
 
-    ``(locale, from_slug)`` is unique: one old address resolves to exactly one
+    ``(tenant_id, locale, from_slug)`` is unique: one old address resolves to exactly one
     article, and the row is replaced rather than duplicated when a slug is
     reused.
     """
@@ -27,7 +28,8 @@ class NewsArticleRedirect(Base, table=True):  # ty: ignore[unsupported-base]
 
     __table_args__ = (
         Index(
-            "ix_news_article_redirects_locale_from_slug",
+            "ix_news_article_redirects_tenant_locale_from_slug",
+            "tenant_id",
             "locale",
             "from_slug",
             unique=True,

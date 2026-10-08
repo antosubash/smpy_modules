@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column, DateTime, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
@@ -59,33 +59,33 @@ class ArticleStatus(str, enum.Enum):  # noqa: UP042
     PUBLISHED = "published"
 
 
-class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class NewsArticle(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """An article: its body, its language, its address, and how it lists."""
 
     __tablename__ = ARTICLE_TABLE
 
     __table_args__ = (
-        # Slugs are unique *per language*, not globally: /news/budget and
-        # /de/news/budget are two articles at two addresses, and forcing the
-        # German one to pick a different word would make the URL a workaround
-        # for a schema decision. Replaces the single-column unique index the
-        # slug column carried before there was such a thing as a locale.
-        Index("ix_news_articles_locale_slug", "locale", "slug", unique=True),
-        # One article per language per group. Without it a second "add German"
-        # click — a double submit, a stale tab — produces two German siblings
-        # and every alternates list starts contradicting itself.
+        # Slugs are unique per tenant and language, not globally:
+        # /news/budget and /de/news/budget are two articles at two addresses.
         Index(
-            "ix_news_articles_group_locale",
+            "ix_news_articles_tenant_locale_slug",
+            "tenant_id",
+            "locale",
+            "slug",
+            unique=True,
+        ),
+        # One article per language per group, per tenant. Without it a double
+        # submit of "add German" yields two German siblings.
+        Index(
+            "ix_news_articles_tenant_group_locale",
+            "tenant_id",
             "translation_group",
             "locale",
             unique=True,
         ),
     )
-    # Neither column carries its own index: both composites lead with the one
-    # a single-column lookup would want, so a "locale = ?" or
-    # "translation_group = ?" scan already has one to use and a second would
-    # only cost writes. Same shape as ``pagebuilder_pages``, deliberately — a
-    # host running both should not find two spellings of one idea.
+    # Neither column carries its own index: both composites lead with
+    # ``tenant_id`` and cover the lookups. Same shape as ``pagebuilder_pages``.
 
     id: int | None = Field(default=None, primary_key=True)
 
@@ -93,7 +93,7 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     slug: str = Field(max_length=MAX_SLUG_LEN)
     """The article's address within its language.
 
-    Unique per ``locale``, not globally — see ``__table_args__``. When the slug
+    Unique per tenant and ``locale``, not globally — see ``__table_args__``. When the slug
     changes a :class:`NewsArticleRedirect` is written, because the old URL is
     already in bookmarks and in a search index that has not recrawled; that
     redirect is scoped to this article's locale for the same reason the index
@@ -251,7 +251,6 @@ class NewsArticle(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     @property
     def has_published(self) -> bool:
         return self.published_data is not None
-
 
     publish_at: datetime | None = Field(
         default=None,
