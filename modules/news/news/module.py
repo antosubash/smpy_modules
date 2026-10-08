@@ -209,7 +209,13 @@ class NewsModule(ModuleBase):
         no foreign row whose disappearance could orphan it, and nothing to
         reconcile after the fact.
         """
+        from news import tenancy
         from news.endpoints.views import admin_router
+
+        # Single- or multi-tenant, read once off the built middleware stack,
+        # before anything below can touch a news table. Also refuses a host
+        # pinned to a tenant other than the one the migration backfilled.
+        tenancy.configure(app)
 
         # Which languages this site publishes in, before anything reads them.
         boot.publish_locales(app)

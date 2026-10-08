@@ -17,8 +17,9 @@ from news.endpoints.api._deps import may_see_drafts
 from news.endpoints.public._render import render_article
 from news.models import ArticleStatus, NewsArticle
 from news.settings import active, public_article_path
+from news.tenancy import bind_admin
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(bind_admin)])
 
 
 def _locale_props() -> dict:
@@ -39,7 +40,7 @@ def _locale_props() -> dict:
     return {"locales": list(locales.supported()), "default_locale": locales.default()}
 
 
-admin_router = APIRouter()
+admin_router = APIRouter(dependencies=[Depends(bind_admin)])
 """Routes mounted at the app root rather than under ``VIEW_PREFIX``.
 
 The search screen spans articles, pages and media, so filing it under ``/news``

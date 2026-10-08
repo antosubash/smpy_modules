@@ -35,6 +35,7 @@ from news.endpoints.public._urls import (
 )
 from news.safe_url import canonical_or_none
 from news.settings import NewsSettings, active, public_article_path
+from news.tenancy import bind_public
 
 
 async def alternates(
@@ -175,8 +176,11 @@ def default_locale_alias_router(prefix: str) -> APIRouter:
     will anything that builds URLs by pasting a locale in front. Serving the
     article at both would put one document at two addresses; 404ing would be
     correct and useless. A 301 is the third option and the only good one.
+
+    Bound like every public router although it reads no rows: it costs nothing,
+    and the route guard then needs no exception a later edit could outgrow.
     """
-    router = APIRouter()
+    router = APIRouter(dependencies=[Depends(bind_public)])
 
     @router.get("/{slug}", response_model=None)
     async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
