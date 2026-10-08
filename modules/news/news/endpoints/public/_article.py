@@ -24,7 +24,7 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import locales, redirects, service
+from news import locales, redirects, service, tenancy
 from news.content import ArticlesService
 from news.endpoints.public._render import render_article
 from news.endpoints.public._urls import (
@@ -120,13 +120,17 @@ def article_router(locale: str) -> APIRouter:
             # "where did my page go" with someone else's article.
             moved = await redirects.resolve(db, slug, locale)
             if moved is not None:
-                return RedirectResponse(
-                    public_article_path(moved, locale), status_code=301
+                # A 301 is cacheable by default, and the redirect table is per
+                # tenant: key it on whatever picks the tenant, like the page.
+                return tenancy.vary_on_tenant(
+                    RedirectResponse(public_article_path(moved, locale), status_code=301),
+                    request.app,
                 )
             raise HTTPException(status_code=404, detail="Article not found")
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
         etag = etag_for(article.id or 0, article.updated_at, variant)
+
         def apply_headers(response: Response) -> Response:
             response.headers["ETag"] = etag
             # The same URL serves two representations; see `etag_for`.

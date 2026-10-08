@@ -138,3 +138,19 @@ async def test_single_mode_vary_is_unchanged(anon_client: AsyncClient) -> None:
         response = await anon_client.get(path)
         assert response.status_code == 200, (path, response.text)
         assert response.headers.get("vary") == vary, path
+
+
+def test_public_api_cache_varies_on_the_configured_tenant_header() -> None:
+    """The feed block's anonymous reads are ``public`` too: a tenant picked by
+    header has to be in their ``Vary``, not only ``Cookie``."""
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI, Response
+    from news.endpoints.api._deps import cache
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    app = FastAPI()
+    app.add_middleware(TenantMiddleware, header="X-Tenant-ID")
+    response = Response()
+    cache(response, SimpleNamespace(app=app), include_drafts=False)
+    assert _vary(response) == ["Cookie", "X-Tenant-ID"]

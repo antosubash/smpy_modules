@@ -167,7 +167,8 @@ async def render_public_page(
             # the exact thing recording a redirect exists to prevent.
             claimed = await public_claims.claimed_url(db, moved_to, active)
             target = claimed or locales.public_path(prefix, moved_to, active)
-            return RedirectResponse(target, status_code=301)
+            # A 301 is cacheable by default; key it on what picks the tenant.
+            return vary_on_tenant(RedirectResponse(target, status_code=301), request.app)
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
