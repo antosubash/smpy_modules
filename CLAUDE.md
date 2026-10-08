@@ -37,12 +37,14 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 locale; adding one that does not is how `/de/p/x` starts serving the English
 page.
 
-**Every pagebuilder entry point binds a tenant (#38).** Its tables carry
+**Every pagebuilder and news entry point binds a tenant (#38).** Their tables carry
 `MultiTenantMixin`, and the framework filters them only while a tenant is
 bound — on a host with `multi_tenant` off nothing is bound and a read is
 *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public` (single-tenant
 host → `"default"`, multi → the resolved tenant, 404 for anonymous without
 one); the scheduler opens one session per tenant under `tenant_context`.
+News has its own copy, `news.tenancy` (admin with no tenant in multi mode →
+403 `tenant_required`), and its scheduler ticks per tenant the same way.
 Code outside pagebuilder that reads its tables (news' search) pins
 `tenant_id` itself.
 
@@ -155,9 +157,9 @@ venv and back. Neither touches a tracked file.
   publishes, the other what the console speaks.
 - **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
   repo is canonical; that one is frozen.
-- **The demo host is single-tenant.** `billing`'s tenant screens need
-  `SM_MULTI_TENANT=true`, but `news`' startup reconcile does not yet run under
-  strict tenant isolation, so the host can't turn it on with News enabled.
-  The billing tenant e2e spec is opt-in for that reason
-  (`E2E_MULTI_TENANT=1` + `SM_MODULES_ENABLED` without News — see the spec's
-  header). Making news tenant-aware unblocks it.
+- **The demo host defaults to single-tenant.** Every module is tenant-aware,
+  so `SM_MULTI_TENANT=true` boots with all of them enabled. The multi-tenant
+  e2e specs (`billing-tenant`, `news-tenant`) are opt-in with
+  `E2E_MULTI_TENANT=1` and run in their own CI job, `E2E (multi-tenant)`;
+  `start-test-server.sh` sets `tenants.subdomain_base=localhost` for that run,
+  so `<org-slug>.localhost` addresses an organisation's public site.
