@@ -272,6 +272,7 @@ class TestItAgreesWithTheArticleList:
 
 
 @requires_pagebuilder
+@pytest.mark.unbound_tenant
 async def test_another_tenants_page_is_not_searched(db) -> None:
     """With no tenant bound, pagebuilder's tables are not filtered at all; the
     search pins itself to the default tenant rather than listing every one."""
@@ -285,6 +286,7 @@ async def test_another_tenants_page_is_not_searched(db) -> None:
 
 
 @requires_pagebuilder
+@pytest.mark.unbound_tenant
 async def test_a_strict_session_with_no_tenant_finds_nothing(db, db_state) -> None:
     """Multi-tenant hosts are strict: no tenant bound must not mean "default"."""
     await _page(db, "ours-quartz", title="Quartz ours")

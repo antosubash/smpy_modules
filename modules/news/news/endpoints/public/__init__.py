@@ -22,18 +22,21 @@ catch-all.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from news import locales
 from news.endpoints.public._article import article_router, default_locale_alias_router
 from news.endpoints.public._feeds import feed_router
 from news.endpoints.public._index import index_router
 from news.endpoints.public._sitemap import sitemap_entries, sitemap_router
+from news.tenancy import bind_public
 
 
 def public_router(locale: str) -> APIRouter:
     """Everything one language serves, ready to mount under its own prefix."""
-    router = APIRouter()
+    # Bound once for the whole language — the sitemap included — so every route
+    # under it runs in the request's tenant, and one with none is a 404.
+    router = APIRouter(dependencies=[Depends(bind_public)])
     # Fixed paths first...
     router.include_router(feed_router(locale))
     if locales.is_default(locale):

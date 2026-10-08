@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news import constants, locales, service
 from news.endpoints.public import _head
 from news.endpoints.public._lang import set_html_lang
-from news.endpoints.public._urls import absolute, listing_cache_control
+from news.endpoints.public._urls import absolute, apply_cache
 from news.settings import NewsSettings, active, public_feed_path
 
 PAGE_SIZE = 12
@@ -243,6 +243,6 @@ async def render_archive(
             robots=SEARCH_ROBOTS if query else None,
         ),
     )
-    response.headers["Cache-Control"] = listing_cache_control(settings)
+    apply_cache(response, request, settings, listing=True)
     response.headers["Content-Language"] = locale
     return response

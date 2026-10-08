@@ -28,7 +28,7 @@ from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-from pagebuilder.tenancy import bind_public
+from pagebuilder.tenancy import bind_public, vary_on_tenant
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -167,7 +167,8 @@ async def render_public_page(
             # the exact thing recording a redirect exists to prevent.
             claimed = await public_claims.claimed_url(db, moved_to, active)
             target = claimed or locales.public_path(prefix, moved_to, active)
-            return RedirectResponse(target, status_code=301)
+            # A 301 is cacheable by default; key it on what picks the tenant.
+            return vary_on_tenant(RedirectResponse(target, status_code=301), request.app)
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
@@ -181,6 +182,8 @@ async def render_public_page(
     def apply_headers(response: Response) -> Response:
         response.headers["ETag"] = etag
         response.headers["Vary"] = "X-Inertia"
+        # On a multi-tenant host the tenant can come from the session, not the Host.
+        vary_on_tenant(response, request.app)
         response.headers["Cache-Control"] = cache_control
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.

@@ -46,7 +46,7 @@ At <https://pypi.org/manage/account/publishing/>, add a pending publisher:
 |---|---|
 | PyPI project name | `simple_module_<name>` |
 | Owner | `antosubash` |
-| Repository name | `simple_module_python_modules` |
+| Repository name | `smpy_modules` |
 | Workflow filename | `release.yml` |
 | Environment | `pypi` |
 

@@ -351,6 +351,90 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  e2e-multi-tenant:
+    name: E2E (multi-tenant)
+    runs-on: ubuntu-latest
+    # Two specs against a host with SM_MULTI_TENANT=true and every module
+    # enabled. Most of the budget is setup and the webServer boot.
+    timeout-minutes: 20
+    env:
+      E2E_MULTI_TENANT: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+
+      - name: Sync Python workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Install npm workspace
+        run: npm ci
+
+      - name: Sync module JS deps into host
+        run: make sync-module-deps
+
+      - name: Generate pages manifest
+        run: make gen-pages
+
+      # Cache Chromium + system deps between runs so we don't redownload
+      # ~290 MB every PR push. Key on the Playwright version so a bump
+      # invalidates the cache automatically.
+      - name: Resolve Playwright version
+        id: pw-version
+        run: |
+          v=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      # Step-level timeout so a hung mirror / stalled apt can't sit for
+      # the full job budget. 8 min is comfortably above the normal ~2 min
+      # cold install but well below `timeout-minutes` at the job level.
+      - name: Install Playwright browsers
+        timeout-minutes: 8
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            # Browsers cached — only refresh OS-level deps (fast).
+            npx playwright install-deps chromium
+          else
+            npx playwright install chromium --with-deps
+          fi
+
+      # The opt-in specs that need an active organisation. The default `e2e`
+      # job runs single-tenant and skips them.
+      - name: Run multi-tenant Playwright tests
+        run: npm run test:e2e -- billing-tenant news-tenant
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-multi-tenant
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   lint-js:
     name: Lint (biome)
     runs-on: ubuntu-latest

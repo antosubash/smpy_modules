@@ -72,6 +72,9 @@ class NewsSettings(BaseSettings):
     Empty means "derive it from the inbound request", which is right for local
     development and wrong behind a proxy that rewrites the Host header. A
     deployment knows its own public name; this is where it says so.
+
+    Host-wide, not per tenant: leave it blank on a multi-tenant host, and links
+    then follow each request's host (startup warns when it is set there).
     """
 
     site_name: str = ""
