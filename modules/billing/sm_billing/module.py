@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import importlib.resources
 import logging
 import weakref
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from simple_module_core import ModuleBase, ModuleMeta
@@ -43,6 +45,17 @@ class BillingModule(ModuleBase):
         # package version (0.0.x) — this range is correct as written.
         requires_framework=">=1.0,<2.0",
     )
+
+    def locale_dirs(self) -> dict[str, Path]:
+        """Where the console's own strings live, for the host's i18n registry.
+
+        ``importlib.resources.files`` rather than ``__file__``: the JSON ships
+        inside the wheel (hatch packages every file under ``sm_billing``), so a
+        host that pip-installed billing resolves it through the package. The
+        directory has no ``__init__.py``; it is joined, never imported.
+        """
+        base = Path(str(importlib.resources.files(__package__) / "locales"))
+        return {c.LOCALE_NAMESPACE: base}
 
     def register_settings(self, app: FastAPI) -> None:
         from sm_billing import crypto

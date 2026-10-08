@@ -11,6 +11,7 @@ import { AdminNav } from '../components/AdminNav';
 import { PlanEditor } from '../components/PlanEditor';
 import { PlansTable } from '../components/PlansTable';
 import { ADMIN_API, api } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import { type PlanForm, planPayload } from '../utils/plan-form';
 import type { AdminCommon, Plan } from '../utils/types';
 
@@ -20,6 +21,8 @@ interface Props extends AdminCommon {
 }
 
 function Plans() {
+  const { t } = useT();
+  const c = keys.billing.plans;
   const { plans, known_limit_keys, csrf_token, can_manage } = usePage<{ props: Props }>()
     .props as unknown as Props;
   const [editing, setEditing] = useState<Plan | null>(null);
@@ -63,7 +66,7 @@ function Plans() {
       } else {
         await api(`${ADMIN_API}/plans`, csrf_token, { body });
       }
-      toast.success(editing ? 'Plan saved' : 'Plan created');
+      toast.success(editing ? t(c.saved) : t(c.created));
       setEditorOpen(false);
     }, setSaveError);
 
@@ -71,20 +74,20 @@ function Plans() {
     run(async () => {
       if (!archiving) return;
       await api(`${ADMIN_API}/plans/${archiving.id}/archive`, csrf_token, { body: {} });
-      toast.success(`${archiving.name} archived`);
+      toast.success(t(c.archived, { name: archiving.name }));
       setArchiving(null);
     });
 
   return (
     <>
-      <Head title="Billing plans" />
+      <Head title={t(c.head_title)} />
       <PageShell
-        title="Billing"
-        description="Plans decide each organisation's limits; Stripe prices decide what they pay."
+        title={t(keys.billing.page.title)}
+        description={t(c.description)}
         actions={
           can_manage ? (
             <Button onClick={() => open(null)}>
-              <Plus aria-hidden="true" /> New plan
+              <Plus aria-hidden="true" /> {t(c.new_plan)}
             </Button>
           ) : undefined
         }
@@ -107,10 +110,10 @@ function Plans() {
         open={archiving !== null}
         onOpenChange={(o) => !o && setArchiving(null)}
         icon={Archive}
-        title={`Archive ${archiving?.name ?? ''}?`}
-        description="Tenants already on it keep it; it disappears from the plan picker."
-        confirmLabel="Archive"
-        cancelLabel="Cancel"
+        title={t(c.archive_title, { name: archiving?.name ?? '' })}
+        description={t(c.archive_description)}
+        confirmLabel={t(c.archive)}
+        cancelLabel={t(c.cancel)}
         busy={busy}
         onConfirm={archive}
       />

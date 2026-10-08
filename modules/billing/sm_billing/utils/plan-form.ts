@@ -1,3 +1,4 @@
+import { keys, translate } from './i18n';
 import type { Plan, PricingModel } from './types';
 
 /** The plan editor's state: amounts as decimal strings, limits as rows. */
@@ -139,37 +140,32 @@ const amountOk = (text: string) =>
   !text.trim() || (AMOUNT_RE.test(text.trim()) && (toMinor(text) ?? 0) <= MAX_MINOR);
 
 function validatePrice(form: PlanForm): string | null {
-  const amounts = [
-    ['Monthly', form.amount_month],
-    ['Yearly', form.amount_year],
-  ] as const;
-  for (const [label, amount] of amounts) {
-    if (!amountOk(amount)) {
-      return `${label} amount must be a number from 0 to 20,000,000 with at most two decimals.`;
-    }
-  }
+  const f = keys.billing.plan_form;
+  if (!amountOk(form.amount_month)) return translate(f.amount_monthly_invalid);
+  if (!amountOk(form.amount_year)) return translate(f.amount_yearly_invalid);
   const trial = form.trial_days.trim() || '0';
   if (!WHOLE_RE.test(trial) || Number(trial) > MAX_TRIAL_DAYS) {
-    return `Trial days must be a whole number from 0 to ${MAX_TRIAL_DAYS}.`;
+    return translate(f.trial_invalid, { max: MAX_TRIAL_DAYS });
   }
   if (!form.stripe_price_month.trim() && !form.stripe_price_year.trim()) {
-    return 'A paid plan needs at least one Stripe price ID.';
+    return translate(f.price_required);
   }
-  if (form.is_default) return 'Only a free plan can be the default.';
+  if (form.is_default) return translate(f.default_must_be_free);
   return null;
 }
 
 function validateLimits(form: PlanForm): string | null {
+  const f = keys.billing.plan_form;
   const seen = new Set<string>();
   for (const row of form.limits) {
     const key = row.key.trim();
     const value = row.value.trim();
     if (!key && !value) continue;
-    if (!LIMIT_KEY_RE.test(key)) return `"${row.key}" is not a valid limit key.`;
-    if (seen.has(key)) return `Limit '${key}' is listed twice.`;
+    if (!LIMIT_KEY_RE.test(key)) return translate(f.limit_key_invalid, { key: row.key });
+    if (seen.has(key)) return translate(f.limit_duplicate, { key });
     seen.add(key);
     if (!WHOLE_RE.test(value) || Number(value) > MAX_LIMIT) {
-      return `Limit "${key}" must be a whole number from 0 to 2,000,000,000.`;
+      return translate(f.limit_value_invalid, { key });
     }
   }
   return null;
@@ -177,28 +173,29 @@ function validateLimits(form: PlanForm): string | null {
 
 /** The first problem with the form, or null. Mirrors the server's invariants. */
 export function validatePlanForm(form: PlanForm): string | null {
+  const f = keys.billing.plan_form;
   if (!KEY_RE.test(form.key.trim())) {
-    return 'The key must be 1-64 lowercase letters, digits, "-" or "_".';
+    return translate(f.key_invalid);
   }
-  if (!form.name.trim()) return 'Give the plan a name.';
-  if (form.name.trim().length > MAX_NAME) return `The name is at most ${MAX_NAME} characters.`;
+  if (!form.name.trim()) return translate(f.name_required);
+  if (form.name.trim().length > MAX_NAME) return translate(f.name_too_long, { max: MAX_NAME });
   if (form.description.trim().length > MAX_DESCRIPTION) {
-    return `The description is at most ${MAX_DESCRIPTION} characters.`;
+    return translate(f.description_too_long, { max: MAX_DESCRIPTION });
   }
-  if (!/^[a-zA-Z]{3}$/.test(form.currency.trim())) return 'Currency is a 3-letter code.';
+  if (!/^[a-zA-Z]{3}$/.test(form.currency.trim())) return translate(f.currency_invalid);
   if (form.pricing_model !== 'free') {
     const problem = validatePrice(form);
     if (problem) return problem;
   }
   const sort = form.sort_order.trim() || '0';
   if (!INT_RE.test(sort) || Math.abs(Number(sort)) > MAX_SORT) {
-    return 'Sort order must be a whole number from -1,000,000 to 1,000,000.';
+    return translate(f.sort_invalid);
   }
   const limitProblem = validateLimits(form);
   if (limitProblem) return limitProblem;
   const badFeature = parseFeatures(form.features).find((f) => !FEATURE_RE.test(f));
   if (badFeature !== undefined) {
-    return `Feature "${badFeature}" is not valid: use lowercase letters, digits, ".", "_" or "-".`;
+    return translate(f.feature_invalid, { feature: badFeature });
   }
   return null;
 }

@@ -119,11 +119,13 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n — done except `ai` and `billing`.** news, pagebuilder and records
-  all ship `locales/en.json` and route every string through `t()`; `ai` and
-  `billing` still have hardcoded English TSX. news and pagebuilder call
+- **UI i18n — done in every module.** All five ship `locales/en.json` and
+  route every string through `t()`. news, pagebuilder, ai and billing call
   `t(keys.<module>.<section>.<key>)`; records passes string keys with a
-  `defaultValue`, which `tsc` cannot check against its catalogue.
+  `defaultValue`, which `tsc` cannot check against its catalogue. The
+  catalogue's namespace is the `modules/<name>` directory, not the package
+  (`sm_billing` registers as `billing`) — `tests/vitest-i18n.ts` keys on the
+  same name.
 
   **The trap, if you add a module.** The framework generates the `keys` object
   and the `t()` key union into `packages/i18n/src`, from the merged registry of

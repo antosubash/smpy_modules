@@ -14,6 +14,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import type React from 'react';
 import { useEffect, useState } from 'react';
+import { keys, useT } from '../utils/i18n';
 import {
   emptyPlanForm,
   formFromPlan,
@@ -55,6 +56,8 @@ export function PlanEditor({
   onOpenChange,
   onSave,
 }: Props) {
+  const { t } = useT();
+  const c = keys.billing.plan_editor;
   const [form, setForm] = useState<PlanForm>(emptyPlanForm());
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -83,16 +86,16 @@ export function PlanEditor({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <form onSubmit={submit} className="space-y-5">
           <DialogHeader>
-            <DialogTitle>{plan ? `Edit ${plan.name}` : 'New plan'}</DialogTitle>
-            <DialogDescription>
-              Limits and features decide what a tenant may do; Stripe prices decide what they pay.
-            </DialogDescription>
+            <DialogTitle>
+              {plan ? t(c.title_edit, { name: plan.name }) : t(c.title_new)}
+            </DialogTitle>
+            <DialogDescription>{t(c.description)}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="plan-key" label="Key">
+            <Field id="plan-key" label={t(c.key)}>
               <Input id="plan-key" value={form.key} onChange={text('key')} disabled={!!plan} />
             </Field>
-            <Field id="plan-name" label="Name">
+            <Field id="plan-name" label={t(c.name)}>
               <Input
                 id="plan-name"
                 value={form.name}
@@ -100,7 +103,7 @@ export function PlanEditor({
                 onChange={text('name')}
               />
             </Field>
-            <Field id="plan-model" label="Pricing">
+            <Field id="plan-model" label={t(c.pricing)}>
               <NativeSelect
                 id="plan-model"
                 value={form.pricing_model}
@@ -108,17 +111,17 @@ export function PlanEditor({
                   setForm((f) => withPricingModel(f, e.target.value as PricingModel))
                 }
               >
-                <NativeSelectOption value="free">Free</NativeSelectOption>
-                <NativeSelectOption value="flat">Flat price</NativeSelectOption>
-                <NativeSelectOption value="per_seat">Per seat</NativeSelectOption>
+                <NativeSelectOption value="free">{t(c.model_free)}</NativeSelectOption>
+                <NativeSelectOption value="flat">{t(c.model_flat)}</NativeSelectOption>
+                <NativeSelectOption value="per_seat">{t(c.model_per_seat)}</NativeSelectOption>
               </NativeSelect>
             </Field>
-            <Field id="plan-currency" label="Currency">
+            <Field id="plan-currency" label={t(c.currency)}>
               <Input id="plan-currency" value={form.currency} onChange={text('currency')} />
             </Field>
             {paid && (
               <>
-                <Field id="plan-price-m" label="Stripe price ID (monthly)">
+                <Field id="plan-price-m" label={t(c.price_month)}>
                   <Input
                     id="plan-price-m"
                     placeholder="price_…"
@@ -126,14 +129,14 @@ export function PlanEditor({
                     onChange={text('stripe_price_month')}
                   />
                 </Field>
-                <Field id="plan-amount-m" label="Monthly amount (display)">
+                <Field id="plan-amount-m" label={t(c.amount_month)}>
                   <Input
                     id="plan-amount-m"
                     value={form.amount_month}
                     onChange={text('amount_month')}
                   />
                 </Field>
-                <Field id="plan-price-y" label="Stripe price ID (yearly)">
+                <Field id="plan-price-y" label={t(c.price_year)}>
                   <Input
                     id="plan-price-y"
                     placeholder="price_…"
@@ -141,23 +144,23 @@ export function PlanEditor({
                     onChange={text('stripe_price_year')}
                   />
                 </Field>
-                <Field id="plan-amount-y" label="Yearly amount (display)">
+                <Field id="plan-amount-y" label={t(c.amount_year)}>
                   <Input
                     id="plan-amount-y"
                     value={form.amount_year}
                     onChange={text('amount_year')}
                   />
                 </Field>
-                <Field id="plan-trial" label="Trial days">
+                <Field id="plan-trial" label={t(c.trial_days)}>
                   <Input id="plan-trial" value={form.trial_days} onChange={text('trial_days')} />
                 </Field>
               </>
             )}
-            <Field id="plan-order" label="Sort order">
+            <Field id="plan-order" label={t(c.sort_order)}>
               <Input id="plan-order" value={form.sort_order} onChange={text('sort_order')} />
             </Field>
           </div>
-          <Field id="plan-description" label="Description">
+          <Field id="plan-description" label={t(c.description_label)}>
             <Textarea
               id="plan-description"
               value={form.description}
@@ -166,14 +169,14 @@ export function PlanEditor({
             />
           </Field>
           <div className="space-y-1.5">
-            <Label>Limits</Label>
+            <Label>{t(c.limits)}</Label>
             <LimitRows
               rows={form.limits}
               knownKeys={knownKeys}
               onChange={(r) => set('limits', r)}
             />
           </div>
-          <Field id="plan-features" label="Features (comma separated)">
+          <Field id="plan-features" label={t(c.features)}>
             <Input id="plan-features" value={form.features} onChange={text('features')} />
           </Field>
           <div className="flex flex-wrap gap-6">
@@ -182,7 +185,7 @@ export function PlanEditor({
                 checked={form.is_public}
                 onCheckedChange={(v) => set('is_public', v === true)}
               />
-              Shown to tenants
+              {t(c.is_public)}
             </Label>
             <Label className="flex items-center gap-2">
               <Checkbox
@@ -190,7 +193,7 @@ export function PlanEditor({
                 disabled={paid}
                 onCheckedChange={(v) => set('is_default', v === true)}
               />
-              Default plan for new organisations
+              {t(c.is_default)}
             </Label>
           </div>
           {(error ?? serverError) && (
@@ -200,10 +203,10 @@ export function PlanEditor({
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t(c.cancel)}
             </Button>
             <Button type="submit" disabled={busy}>
-              {plan ? 'Save plan' : 'Create plan'}
+              {plan ? t(c.save) : t(c.create)}
             </Button>
           </DialogFooter>
         </form>

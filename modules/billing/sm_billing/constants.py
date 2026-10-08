@@ -11,6 +11,8 @@ from typing import Final
 
 PACKAGE: Final = "sm_billing"
 MODULE_NAME: Final = "Billing"
+# Prefix the console's strings are registered under: ``billing.<section>.<key>``.
+LOCALE_NAMESPACE: Final = "billing"
 
 ROUTE_PREFIX_API: Final = "/api/billing"
 VIEW_PREFIX: Final = "/billing"
