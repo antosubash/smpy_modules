@@ -25,12 +25,33 @@ import asyncio
 import logging
 from contextlib import suppress
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import FastAPI
 
 from news.settings import NewsSettings
 
 logger = logging.getLogger("simple_module.news.scheduler")
+
+
+async def _due_tenants(factory: Any, now: datetime) -> list[str]:
+    """Distinct tenants with a scheduled flip due or a missed window to retire.
+
+    Read unscoped on a session of its own, closed before any tenant's work
+    starts, so nothing read here is carried into a tenant's transaction.
+    """
+    from simple_module_db import all_tenants
+    from sqlalchemy import select
+
+    from news.content._claims import any_due
+    from news.models import NewsArticle
+
+    with all_tenants():
+        async with factory() as session:
+            rows = await session.execute(
+                select(NewsArticle.tenant_id).where(any_due(now)).distinct()
+            )
+            return sorted(rows.scalars().all())
 
 
 class Scheduler:
@@ -68,8 +89,26 @@ class Scheduler:
             except Exception:
                 logger.exception("news.scheduler.tick_failed")
 
-    async def tick(self, factory) -> None:
-        """One pass: flip what is due, in one short session.
+    async def tick(self, factory: Any) -> None:
+        """Find the tenants with work, then run each in its own tenant context.
+
+        The tick runs outside any request, so nothing binds a tenant for it, and
+        the claim sweep in :mod:`news.content._claims` only sees the bound one.
+        One code path for single- and multi-tenant hosts: a single-tenant host's
+        rows are all :data:`~news.tenancy.DEFAULT_TENANT`. A tenant that fails
+        is logged and does not stop the rest.
+        """
+        from simple_module_db import tenant_context
+
+        for tenant_id in await _due_tenants(factory, datetime.now(UTC)):
+            try:
+                with tenant_context(tenant_id):
+                    await self._tick_tenant(factory)
+            except Exception:
+                logger.exception("news.scheduler.tenant_failed", extra={"tenant_id": tenant_id})
+
+    async def _tick_tenant(self, factory: Any) -> None:
+        """One pass in the bound tenant: flip what is due, in one short session.
 
         Always committed, never only when something flipped. ``process_due``
         also writes without flipping — it retires a draft whose whole window
