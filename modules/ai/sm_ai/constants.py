@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import Final
 
 PACKAGE: Final = "sm_ai"
+# Namespace the console strings in ``locales/en.json`` are registered under.
+LOCALE_NAMESPACE: Final = "ai"
 MODULE_NAME: Final = "Ai"
 
 ROUTE_PREFIX_API: Final = "/api/ai"

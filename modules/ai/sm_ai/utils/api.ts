@@ -1,5 +1,7 @@
 /** Client for the AI settings API. */
 
+import { keys, translate } from './i18n';
+
 export type AiSettingsOut = {
   chat_providers: string[];
   embedding_providers: string[];
@@ -64,7 +66,12 @@ async function errorFrom(response: Response): Promise<Error> {
   } catch {
     // Not JSON — fall through to the status line rather than echo markup.
   }
-  return new Error(`Request failed (${response.status} ${response.statusText})`.trim());
+  return new Error(
+    translate(keys.ai.api.request_failed, {
+      status: response.status,
+      statusText: response.statusText,
+    }).trim(),
+  );
 }
 
 async function checkedJson<T>(response: Response): Promise<T> {

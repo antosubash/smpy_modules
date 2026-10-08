@@ -14,6 +14,7 @@ import {
   type TestResult,
   testSlot,
 } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 
 const emptySlot = (): SlotValues => ({
   provider: '',
@@ -44,6 +45,7 @@ function fromSettings(s: AiSettingsOut): { chat: SlotValues; embedding: SlotValu
 }
 
 function Settings() {
+  const { t } = useT();
   const [loaded, setLoaded] = useState<AiSettingsOut | null>(null);
   const [chat, setChat] = useState<SlotValues>(emptySlot());
   const [embedding, setEmbedding] = useState<SlotValues>(emptySlot());
@@ -72,7 +74,12 @@ function Settings() {
     try {
       await work();
     } catch (err) {
-      toast.error(`${errorMsg}: ${(err as Error).message}`);
+      toast.error(
+        t(keys.ai.settings.error_with_reason, {
+          message: errorMsg,
+          reason: (err as Error).message,
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -84,8 +91,8 @@ function Settings() {
       // Results describe the previous configuration — drop them.
       setChatTest(null);
       setEmbeddingTest(null);
-      toast.success('AI settings saved');
-    }, 'Save failed');
+      toast.success(t(keys.ai.settings.saved));
+    }, t(keys.ai.settings.save_failed));
 
   // The probe runs against *saved* settings; testing with unsaved edits
   // would report on the old configuration and mislead either way.
@@ -105,22 +112,21 @@ function Settings() {
     run(async () => {
       const result = await testSlot(slot);
       (slot === 'chat' ? setChatTest : setEmbeddingTest)(result);
-    }, 'Test failed');
+    }, t(keys.ai.settings.test_failed));
 
   return (
     <>
-      <Head title="AI Settings" />
-      <PageShell
-        title="AI"
-        description="Connection settings for the chat and embedding providers every module shares."
-      >
+      <Head title={t(keys.ai.settings.head_title)} />
+      <PageShell title={t(keys.ai.settings.title)} description={t(keys.ai.settings.description)}>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {!loaded && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!loaded && !error && (
+          <p className="text-sm text-muted-foreground">{t(keys.ai.settings.loading)}</p>
+        )}
         {loaded && savedSlots && (
           <div className="space-y-6">
             <SlotCard
-              title="Chat"
-              description="The model modules use for text generation."
+              title={t(keys.ai.slots.chat_title)}
+              description={t(keys.ai.slots.chat_description)}
               idPrefix="ai-chat"
               providers={loaded.chat_providers}
               optionalSlot={false}
@@ -133,8 +139,8 @@ function Settings() {
               onTest={() => test('chat')}
             />
             <SlotCard
-              title="Embeddings"
-              description="Optional second endpoint for vector embeddings."
+              title={t(keys.ai.slots.embedding_title)}
+              description={t(keys.ai.slots.embedding_description)}
               idPrefix="ai-embedding"
               providers={loaded.embedding_providers}
               optionalSlot={true}
@@ -147,7 +153,7 @@ function Settings() {
               onTest={() => test('embedding')}
             />
             <Button type="button" disabled={busy} onClick={save}>
-              Save
+              {t(keys.ai.settings.save)}
             </Button>
           </div>
         )}
