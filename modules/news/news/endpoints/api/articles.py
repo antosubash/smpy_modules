@@ -108,13 +108,13 @@ async def list_articles(
         # question's answer to a client that asked for the trash. Not a 403
         # either: this route is anonymously readable, and refusing would
         # confirm the bin has something in it.
-        cache(response, include_drafts=False)
+        cache(response, request, include_drafts=False)
         return ArticleListResponse(items=[], total=0)
     if blank_filter(group) or blank_filter(locale):
         # A filter supplied as nothing narrows to nothing. The reasoning is
         # on `blank_filter`, because that is the part that must not be
         # simplified away.
-        cache(response, include_drafts=may_draft)
+        cache(response, request, include_drafts=may_draft)
         return ArticleListResponse(items=[], total=0)
     items, total = await service.list_articles(
         db,
@@ -144,7 +144,7 @@ async def list_articles(
         if category
         else None
     )
-    cache(response, include_drafts=may_draft)
+    cache(response, request, include_drafts=may_draft)
     return ArticleListResponse(
         items=items,
         total=total,
@@ -166,7 +166,7 @@ async def list_categories(
     """
     include_drafts = may_see_drafts(request)
     items = await service.list_categories(db, include_drafts=include_drafts)
-    cache(response, include_drafts=include_drafts)
+    cache(response, request, include_drafts=include_drafts)
     return CategoryListResponse(items=items)
 
 

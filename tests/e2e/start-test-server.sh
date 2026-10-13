@@ -95,4 +95,13 @@ uv run python scripts/set_setting.py sm_records \
   max_count 32 \
   preview_sync_limit 3
 
+# Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
+# the tenant from the host, so `<slug>.localhost` addresses an organisation's
+# public site the way an anonymous visitor would reach it. A spec names the
+# subdomain in the Host header; plain `localhost` matches no tenant, so every
+# other request resolves exactly as it did before.
+if [[ "${SM_MULTI_TENANT:-}" == "true" ]]; then
+  uv run python scripts/set_setting.py tenants subdomain_base localhost
+fi
+
 exec make dev

@@ -11,8 +11,9 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 
-from fastapi import Request
+from fastapi import Request, Response
 
+from news import tenancy
 from news.settings import NewsSettings, public_article_path
 
 
@@ -80,3 +81,20 @@ def listing_cache_control(settings: NewsSettings) -> str:
     too long for the other.
     """
     return f"public, max-age={min(settings.public_cache_max_age, 60)}"
+
+
+def apply_cache(
+    response: Response, request: Request, settings: NewsSettings, *, listing: bool = False
+) -> Response:
+    """Mark a public response shared-cacheable — keyed on whatever picks its tenant.
+
+    On a multi-tenant host the tenant can come from the reader's session rather
+    than the Host, so ``public`` alone would let a shared cache hand one
+    tenant's page to another's reader; :func:`news.tenancy.vary_on_tenant` adds
+    the fields that tell them apart. A single-tenant host gets no ``Vary``
+    from here.
+    """
+    response.headers["Cache-Control"] = (
+        listing_cache_control(settings) if listing else cache_control(settings)
+    )
+    return tenancy.vary_on_tenant(response, request.app)

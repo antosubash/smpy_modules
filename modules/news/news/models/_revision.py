@@ -11,7 +11,7 @@ from __future__ import annotations
 import enum
 from typing import Any
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
@@ -40,7 +40,7 @@ class RevisionEvent(str, enum.Enum):  # noqa: UP042
     REJECT = "reject"
 
 
-class NewsArticleRevision(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class NewsArticleRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Append-only audit row written on every status transition.
 
     ``NewsArticle.rejection_note`` mirrors the most recent ``REJECT`` row's

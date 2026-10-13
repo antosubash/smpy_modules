@@ -15,7 +15,7 @@ from simple_module_hosting.permissions import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import locales, service, tag_service
+from news import locales, service, tag_service, tenancy
 from news.constants import (
     PERM_EDIT,
     PERM_PUBLISH,
@@ -122,7 +122,7 @@ def blank_filter(value: str | None) -> bool:
     return value is not None and not value.strip()
 
 
-def cache(response: Response, *, include_drafts: bool) -> None:
+def cache(response: Response, request: Request, *, include_drafts: bool) -> None:
     """Let a shared cache hold the public answer, and never the editor's.
 
     The feed block runs on every public page carrying it, so an uncacheable
@@ -135,11 +135,15 @@ def cache(response: Response, *, include_drafts: bool) -> None:
     identical for both, so without it a proxy that stored the anonymous answer
     would go on serving it to an editor for the whole max-age — the admin list
     losing its drafts, and a just-created article, for up to a minute.
+
+    On a multi-tenant host the tenant header (when one is configured) picks the
+    tenant too, so it joins the ``Vary`` list.
     """
     response.headers["Cache-Control"] = (
         PRIVATE_CACHE_CONTROL if include_drafts else PUBLIC_CACHE_CONTROL
     )
     response.headers["Vary"] = "Cookie"
+    tenancy.vary_on_tenant(response, request.app)
 
 
 async def read_one(db: AsyncSession, article_id: int) -> ArticleRead:

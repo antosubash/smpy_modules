@@ -76,6 +76,43 @@ async def test_sitemap_lists_only_the_bound_tenant(mt: AsyncClient) -> None:
     assert "/p/beta" in b.text and "/p/alpha" not in b.text
 
 
+def _vary(response) -> list[str]:
+    """The distinct Vary fields: Starlette's ``SessionMiddleware`` appends
+    ``Cookie`` without checking whether it is already listed."""
+    fields = (v.strip() for v in response.headers.get("vary", "").split(","))
+    return list(dict.fromkeys(f for f in fields if f))
+
+
+@pytest.mark.unbound_tenant
+async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> None:
+    """The apex host can take the tenant from a member's session, so a shared
+    cache keyed on Host + URL alone could serve one tenant's page to another."""
+    await _publish(mt, A, "about", "About Acme")
+    page = await mt.get("/p/about", headers=A)
+    assert page.status_code == 200, page.text
+    assert _vary(page) == ["X-Inertia", "Cookie"]
+    cached = await mt.get("/p/about", headers={**A, "If-None-Match": page.headers["etag"]})
+    assert cached.status_code == 304
+    assert _vary(cached) == ["X-Inertia", "Cookie"]
+    sitemap = await mt.get("/sitemap.xml", headers=A)
+    assert sitemap.status_code == 200
+    assert sitemap.headers["cache-control"].startswith("public")
+    assert _vary(sitemap) == ["Cookie"]
+
+
+async def test_single_mode_vary_is_unchanged(authed_client: AsyncClient) -> None:
+    created = await authed_client.post(API, json={"title": "Hi", "slug": "hi", "draft_data": {}})
+    assert created.status_code == 201, created.text
+    await authed_client.post(f"{API}/{created.json()['id']}/publish", json={})
+    page = await authed_client.get("/p/hi")
+    assert page.status_code == 200, page.text
+    # ``Cookie`` here is SessionMiddleware's (the render read the session).
+    assert page.headers["vary"] == "X-Inertia, Cookie"
+    cached = await authed_client.get("/p/hi", headers={"If-None-Match": page.headers["etag"]})
+    assert (cached.status_code, cached.headers.get("vary")) == (304, "X-Inertia")
+    assert (await authed_client.get("/sitemap.xml")).headers.get("vary") is None
+
+
 async def test_single_mode_stamps_the_default_tenant(authed_client: AsyncClient, db) -> None:
     created = await authed_client.post(API, json={"title": "Hi", "slug": "hi", "draft_data": {}})
     assert created.status_code == 201, created.text

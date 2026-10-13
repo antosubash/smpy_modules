@@ -56,11 +56,41 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import ColumnElement, and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
+
+
+def due(column: InstrumentedAttribute, status: ArticleStatus, now: datetime) -> ColumnElement[bool]:
+    """``column`` is set and has passed, on a live article in ``status``."""
+    return and_(NOT_TRASHED, NewsArticle.status == status, column.is_not(None), column <= now)
+
+
+def publish_due(now: datetime) -> ColumnElement[bool]:
+    """A draft whose ``publish_at`` has passed."""
+    return due(NewsArticle.publish_at, ArticleStatus.DRAFT, now)
+
+
+def unpublish_due(now: datetime) -> ColumnElement[bool]:
+    """A published article whose ``unpublish_at`` has passed."""
+    return due(NewsArticle.unpublish_at, ArticleStatus.PUBLISHED, now)
+
+
+def missed_window(now: datetime) -> ColumnElement[bool]:
+    """A draft whose publish *and* unpublish times have both passed."""
+    return and_(
+        publish_due(now),
+        NewsArticle.unpublish_at.is_not(None),
+        NewsArticle.unpublish_at <= now,
+    )
+
+
+def any_due(now: datetime) -> ColumnElement[bool]:
+    """Everything ``process_due`` would act on: the one definition of "due"."""
+    # missed_window is subsumed by publish_due; listed so the three cases read off.
+    return or_(publish_due(now), unpublish_due(now), missed_window(now))
 
 
 async def retire_missed_windows(db: AsyncSession, now: datetime) -> int:
@@ -78,14 +108,7 @@ async def retire_missed_windows(db: AsyncSession, now: datetime) -> int:
     """
     result = await db.execute(
         update(NewsArticle)
-        .where(
-            NOT_TRASHED,
-            NewsArticle.status == ArticleStatus.DRAFT,
-            NewsArticle.publish_at.is_not(None),
-            NewsArticle.publish_at <= now,
-            NewsArticle.unpublish_at.is_not(None),
-            NewsArticle.unpublish_at <= now,
-        )
+        .where(missed_window(now))
         .values(publish_at=None, unpublish_at=None)
         .execution_options(synchronize_session=False)
     )
@@ -109,12 +132,7 @@ async def due_candidates(
     """
     rows = await db.execute(
         select(NewsArticle.id, column)
-        .where(
-            NOT_TRASHED,
-            NewsArticle.status == status,
-            column.is_not(None),
-            column <= now,
-        )
+        .where(due(column, status, now))
         # Ordered by id so that when a tick claims more than one row, every
         # replica takes its row locks in the same order. Without this, two
         # replicas whose queries happen to scan in different orders can claim
@@ -156,10 +174,7 @@ async def claim(
         update(NewsArticle)
         .where(
             NewsArticle.id == article_id,
-            NOT_TRASHED,
-            NewsArticle.status == status,
-            column.is_not(None),
-            column <= now,
+            due(column, status, now),
         )
         .values({column: None})
         .execution_options(synchronize_session=False)

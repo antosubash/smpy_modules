@@ -39,17 +39,17 @@ def _slug_for(name: str) -> str:
 async def list_tags(db: AsyncSession) -> list[TagRead]:
     """Every tag with its usage count, most-used first.
 
-    An outer join, so a tag used nowhere still lists — those are exactly the
-    rows the screen fades and offers to merge away.
+    A correlated count rather than an outer join: the tenant filter lands in the
+    ``WHERE`` of an ORM-entity join, which would drop the unused tags (no join
+    row, so no ``tenant_id``) this listing exists to show.
     """
-    rows = (
-        await db.execute(
-            select(NewsTag, func.count(NewsArticleTag.article_id))
-            .outerjoin(NewsArticleTag, NewsArticleTag.tag_id == NewsTag.id)
-            .group_by(NewsTag.id)
-            .order_by(func.count(NewsArticleTag.article_id).desc(), NewsTag.name)
-        )
-    ).all()
+    used = (
+        select(func.count(NewsArticleTag.article_id))
+        .where(NewsArticleTag.tag_id == NewsTag.id)
+        .correlate(NewsTag)
+        .scalar_subquery()
+    )
+    rows = (await db.execute(select(NewsTag, used).order_by(used.desc(), NewsTag.name))).all()
     return [
         TagRead(id=tag.id or 0, name=tag.name, slug=tag.slug, article_count=int(count))
         for tag, count in rows

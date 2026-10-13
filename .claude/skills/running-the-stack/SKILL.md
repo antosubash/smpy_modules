@@ -46,8 +46,10 @@ and Vite on `UI_PORT` (default 5050). Run it in the background and log to a file
   app renders blank in Playwright. 5070 works.
 - Boot prints SM003/SM024 warnings for news/ai/records; they predate current work and
   are not failures.
-- Multi-tenancy is off in the demo host (news blocks it); everything runs as
-  tenant `"default"`. Billing tenant screens need `SM_MULTI_TENANT=true` without News.
+- Multi-tenancy is off in the demo host by default; everything runs as tenant
+  `"default"`. Billing tenant screens need `SM_MULTI_TENANT=true` (all modules can
+  stay enabled). Multi-tenant e2e: `E2E_MULTI_TENANT=1 npx playwright test
+  billing-tenant news-tenant`.
 
 ## Tests
 - Python: `make test-py`, or `cd modules/<name> && uv run pytest -q`.

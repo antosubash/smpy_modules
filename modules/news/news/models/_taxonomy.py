@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from simple_module_db.mixins import AuditMixin
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
+from sqlalchemy import Index
 from sqlmodel import Field
 
 from news.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
 from news.models._base import ARTICLE_TABLE, Base
 
 
-class NewsCategory(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class NewsCategory(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Display metadata for a category name that articles already carry.
 
     Deliberately *not* a foreign key from ``NewsArticle``. ``category`` is a
@@ -28,13 +29,17 @@ class NewsCategory(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base
     """
 
     __tablename__ = "news_categories"
+    __table_args__ = (
+        Index("uq_news_categories_tenant_name", "tenant_id", "name", unique=True),
+        Index("uq_news_categories_tenant_slug", "tenant_id", "slug", unique=True),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
 
-    name: str = Field(max_length=MAX_CATEGORY_LEN, index=True, unique=True)
+    name: str = Field(max_length=MAX_CATEGORY_LEN, index=True)
     """Display name, and the value stored in ``NewsArticle.category``."""
 
-    slug: str = Field(max_length=MAX_CATEGORY_LEN, index=True, unique=True)
+    slug: str = Field(max_length=MAX_CATEGORY_LEN, index=True)
     """URL segment for ``/news?category=<slug>``.
 
     Kept distinct from the name so renaming a category for display does not
@@ -45,18 +50,22 @@ class NewsCategory(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base
     """Order in the public filter bar. Drag-to-reorder writes this."""
 
 
-class NewsTag(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
+class NewsTag(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """A freeform label. Many per article, created while writing."""
 
     __tablename__ = "news_tags"
+    __table_args__ = (
+        Index("uq_news_tags_tenant_name", "tenant_id", "name", unique=True),
+        Index("uq_news_tags_tenant_slug", "tenant_id", "slug", unique=True),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
 
-    name: str = Field(max_length=MAX_TAG_LEN, index=True, unique=True)
-    slug: str = Field(max_length=MAX_TAG_LEN, index=True, unique=True)
+    name: str = Field(max_length=MAX_TAG_LEN, index=True)
+    slug: str = Field(max_length=MAX_TAG_LEN, index=True)
 
 
-class NewsArticleTag(Base, table=True):  # ty: ignore[unsupported-base]
+class NewsArticleTag(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     """Join row between an article and a tag.
 
     A composite primary key rather than a surrogate id: the pair *is* the

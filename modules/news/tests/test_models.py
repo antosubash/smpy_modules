@@ -76,7 +76,8 @@ def test_one_article_per_slug_per_language() -> None:
     documents, and forcing the German one to pick a different word would make
     the URL a workaround for a schema decision.
     """
-    assert unique_index(NewsArticle.__table__, "ix_news_articles_locale_slug") == (
+    assert unique_index(NewsArticle.__table__, "ix_news_articles_tenant_locale_slug") == (
+        "tenant_id",
         "locale",
         "slug",
     )
@@ -87,7 +88,10 @@ def test_one_article_per_language_per_translation_group() -> None:
     # Without it a second "add German" click — a double submit, a stale tab —
     # produces two German siblings and every alternates list starts
     # contradicting itself.
-    assert unique_index(NewsArticle.__table__, "ix_news_articles_group_locale") == (
+    assert unique_index(
+        NewsArticle.__table__, "ix_news_articles_tenant_group_locale"
+    ) == (
+        "tenant_id",
         "translation_group",
         "locale",
     )
@@ -148,8 +152,8 @@ def test_an_old_slug_resolves_to_exactly_one_article_per_language() -> None:
     # languages can legitimately have retired the same word, and a global
     # unique index would make the second rename collide with the first.
     assert unique_index(
-        NewsArticleRedirect.__table__, "ix_news_article_redirects_locale_from_slug"
-    ) == ("locale", "from_slug")
+        NewsArticleRedirect.__table__, "ix_news_article_redirects_tenant_locale_from_slug"
+    ) == ("tenant_id", "locale", "from_slug")
     assert NewsArticleRedirect.__table__.columns["from_slug"].unique is not True
 
 

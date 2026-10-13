@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news import service
 from news.endpoints.public._urls import (
     absolute,
-    listing_cache_control,
+    apply_cache,
     public_base_url,
 )
 from news.naive_utc import as_utc
@@ -102,7 +102,7 @@ def feed_router(locale: str) -> APIRouter:
         title = settings.site_name or "News"
         index_url = absolute(request, settings, public_index_path(locale=locale))
         self_url = absolute(request, settings, public_feed_path(locale))
-        return Response(
+        feed = Response(
             content=(
                 '<?xml version="1.0" encoding="UTF-8"?>'
                 '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">'
@@ -121,7 +121,7 @@ def feed_router(locale: str) -> APIRouter:
                 "</channel></rss>"
             ),
             media_type="application/rss+xml",
-            headers={"Cache-Control": listing_cache_control(settings)},
         )
+        return apply_cache(feed, request, settings, listing=True)
 
     return router

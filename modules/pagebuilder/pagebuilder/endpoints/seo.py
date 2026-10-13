@@ -19,7 +19,7 @@ from pagebuilder import locales, public_claims
 from pagebuilder.deps import get_settings
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-from pagebuilder.tenancy import bind_public
+from pagebuilder.tenancy import bind_public, vary_on_tenant
 
 seo_router = APIRouter()
 
@@ -137,11 +137,13 @@ async def sitemap(
         + ("\n" if entries else "")
         + "</urlset>\n"
     )
-    return Response(
+    response = Response(
         content=body,
         media_type="application/xml",
         headers={"Cache-Control": f"public, max-age={settings.seo_cache_max_age}"},
     )
+    # Tenant-bound: on a multi-tenant host the session can pick the tenant.
+    return vary_on_tenant(response, request.app)
 
 
 @seo_router.get("/robots.txt", response_class=Response)

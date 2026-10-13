@@ -9,13 +9,10 @@ import { login } from './helpers';
  *   organisation's billing page shows it → inviting a second member is
  *   refused by the tenants module with the plan's limit → "unpaid" suspends.
  *
- * Needs an active organisation, so it only runs with multi-tenancy on. News is
- * left out because its startup reconcile does not yet run under strict
- * tenant isolation (the framework's module-adoption work, not billing's):
+ * Needs an active organisation, so it only runs with multi-tenancy on, with
+ * every module enabled (CI's `E2E (multi-tenant)` job):
  *
- *   E2E_MULTI_TENANT=1 SM_MODULES_ENABLED='["Ai","Auth","Billing","Branding",
- *     "Dashboard","FileStorage","PageBuilder","Permissions","Records","Settings",
- *     "Tenants","Users"]' npx playwright test billing-tenant
+ *   E2E_MULTI_TENANT=1 npx playwright test billing-tenant
  */
 
 test.skip(!process.env.E2E_MULTI_TENANT, 'needs E2E_MULTI_TENANT=1 (multi-tenant host)');

@@ -63,6 +63,10 @@ packages = ["news"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# `tenant_fixture` is the autouse default-tenant binding, registered as a
+# plugin rather than imported from conftest.py.
+pythonpath = ["tests"]
+addopts = "-p tenant_fixture"
 
 # Resolve the sibling module from the workspace during development. This is
 # tool config, so the published wheel still carries the range above.

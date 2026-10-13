@@ -24,17 +24,18 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import locales, redirects, service
+from news import locales, redirects, service, tenancy
 from news.content import ArticlesService
 from news.endpoints.public._render import render_article
 from news.endpoints.public._urls import (
     absolute_article,
-    cache_control,
+    apply_cache,
     etag_for,
     public_base_url,
 )
 from news.safe_url import canonical_or_none
 from news.settings import NewsSettings, active, public_article_path
+from news.tenancy import bind_public
 
 
 async def alternates(
@@ -119,20 +120,22 @@ def article_router(locale: str) -> APIRouter:
             # "where did my page go" with someone else's article.
             moved = await redirects.resolve(db, slug, locale)
             if moved is not None:
-                return RedirectResponse(
-                    public_article_path(moved, locale), status_code=301
+                # A 301 is cacheable by default, and the redirect table is per
+                # tenant: key it on whatever picks the tenant, like the page.
+                return tenancy.vary_on_tenant(
+                    RedirectResponse(public_article_path(moved, locale), status_code=301),
+                    request.app,
                 )
             raise HTTPException(status_code=404, detail="Article not found")
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
         etag = etag_for(article.id or 0, article.updated_at, variant)
-        control = cache_control(settings)
 
         def apply_headers(response: Response) -> Response:
             response.headers["ETag"] = etag
             # The same URL serves two representations; see `etag_for`.
             response.headers["Vary"] = "X-Inertia"
-            response.headers["Cache-Control"] = control
+            apply_cache(response, request, settings)
             # Which language was served, for caches and for anything reading
             # the response without parsing the body.
             response.headers["Content-Language"] = locale
@@ -175,8 +178,11 @@ def default_locale_alias_router(prefix: str) -> APIRouter:
     will anything that builds URLs by pasting a locale in front. Serving the
     article at both would put one document at two addresses; 404ing would be
     correct and useless. A 301 is the third option and the only good one.
+
+    Bound like every public router although it reads no rows: it costs nothing,
+    and the route guard then needs no exception a later edit could outgrow.
     """
-    router = APIRouter()
+    router = APIRouter(dependencies=[Depends(bind_public)])
 
     @router.get("/{slug}", response_model=None)
     async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
