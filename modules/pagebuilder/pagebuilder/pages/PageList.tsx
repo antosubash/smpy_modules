@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
@@ -136,7 +136,9 @@ export default function PageList() {
       title={t(keys.pagebuilder.pages.title)}
       description={t(keys.pagebuilder.pages.description)}
       actions={
-        <>
+        // PageShell's action row does not wrap, and six buttons are wider
+        // than a phone: at 390px the page scrolled sideways by 281px (#59).
+        <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
           <Button variant="outline" onClick={() => go({ view: boardView ? 'list' : 'board' })}>
             {boardView ? t(keys.pagebuilder.pages.list_view) : t(keys.pagebuilder.pages.board_view)}
           </Button>
@@ -153,9 +155,10 @@ export default function PageList() {
             {t(keys.pagebuilder.pages.media_library)}
           </Button>
           <NewPageDialog locales={locales} defaultLocale={defaultLocale} />
-        </>
+        </div>
       }
     >
+      <Head title={t(keys.pagebuilder.pages.title)} />
       {/* Hidden only on a genuinely empty site: with no pages at all there is
           nothing to search, and the controls would just be noise above the
           "create your first one" prompt. */}

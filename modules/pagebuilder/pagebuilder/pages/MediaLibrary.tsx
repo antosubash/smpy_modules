@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
@@ -191,6 +191,7 @@ export default function MediaLibrary() {
       maxWidth="full"
       actions={<MediaHeader fileInputRef={fileInputRef} onFilesSelected={onFileInputChange} />}
     >
+      <Head title={t(keys.pagebuilder.media.title)} />
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <MediaFolderSidebar
           folders={folders}

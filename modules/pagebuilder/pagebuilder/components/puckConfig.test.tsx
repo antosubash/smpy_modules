@@ -4,7 +4,7 @@ import { translate } from '../utils/i18n';
 import { type AnyBlock, registerPuckBlocks, resetBlockRegistry } from './blockRegistry';
 import { getLayoutPuckConfig } from './layoutPuckConfig';
 import { localizeConfig } from './localizeConfig';
-import { getPuckConfig } from './puckConfig';
+import { getPuckConfig, withRootTitle } from './puckConfig';
 
 const stub = { render: () => null } as unknown as AnyBlock;
 
@@ -137,5 +137,17 @@ describe('getLayoutPuckConfig', () => {
   it('includes a registration that opts into the layout', () => {
     registerPuckBlocks({ blocks: { Banner: stub }, layout: true });
     expect(Object.keys(getLayoutPuckConfig().components)).toContain('Banner');
+  });
+});
+
+describe('withRootTitle', () => {
+  it('defaults the root title to the page’s own, not "Untitled page"', () => {
+    const config = withRootTitle(getPuckConfig(), 'About us');
+    expect(config.root?.defaultProps).toEqual({ title: 'About us', width: 'contained' });
+  });
+
+  it('leaves the config alone when the page has no title yet', () => {
+    const base = getPuckConfig();
+    expect(withRootTitle(base, null)).toBe(base);
   });
 });
