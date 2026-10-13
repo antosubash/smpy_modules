@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_records"
-version = "0.0.8"
+version = "0.0.9"
 description = "Generic structured content: admin-defined record types stored as JSON documents with typed SQL indexes (YesSql-style document/index split)"
 requires-python = ">=3.12"
 readme = "README.md"

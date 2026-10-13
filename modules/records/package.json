@@ -1,6 +1,6 @@
 {
   "name": "@simple-module-py/records",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "description": "Frontend assets for the Records module",
   "peerDependencies": {

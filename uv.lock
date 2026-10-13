@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1775,7 +1775,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-ai"
-version = "0.0.7"
+version = "0.0.8"
 source = { editable = "modules/ai" }
 dependencies = [
     { name = "cryptography" },
@@ -1827,7 +1827,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-billing"
-version = "0.0.7"
+version = "0.0.8"
 source = { editable = "modules/billing" }
 dependencies = [
     { name = "cryptography" },
@@ -2002,7 +2002,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-news"
-version = "0.0.7"
+version = "0.0.8"
 source = { editable = "modules/news" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -2042,7 +2042,7 @@ provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-pagebuilder"
-version = "0.0.7"
+version = "0.0.8"
 source = { editable = "modules/pagebuilder" }
 dependencies = [
     { name = "pillow" },
@@ -2097,7 +2097,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-python-modules"
-version = "0.0.7"
+version = "0.0.8"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -2122,7 +2122,7 @@ dev = [
 
 [[package]]
 name = "simple-module-records"
-version = "0.0.7"
+version = "0.0.8"
 source = { editable = "modules/records" }
 dependencies = [
     { name = "pydantic-settings" },
