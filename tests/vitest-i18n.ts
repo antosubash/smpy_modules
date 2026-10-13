@@ -38,11 +38,12 @@ function directories(path: string): string[] {
 
 const messages: Record<string, string> = {};
 
-for (const moduleDir of directories(MODULES)) {
-  // The namespace is the *package* directory — the same name
-  // `ModuleBase.locale_dirs()` registers the catalogue under.
-  for (const namespace of directories(join(MODULES, moduleDir))) {
-    const file = join(MODULES, moduleDir, namespace, 'locales', 'en.json');
+for (const namespace of directories(MODULES)) {
+  // The namespace is the *module* directory (`modules/<name>`), the same name
+  // every `locale_dirs()` registers its catalogue under — not the package
+  // directory, which differs for the `sm_*` packages (`sm_billing` → `billing`).
+  for (const pkg of directories(join(MODULES, namespace))) {
+    const file = join(MODULES, namespace, pkg, 'locales', 'en.json');
     try {
       flatten(JSON.parse(readFileSync(file, 'utf-8')), namespace, messages);
     } catch {

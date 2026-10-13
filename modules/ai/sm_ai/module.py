@@ -9,7 +9,9 @@ migrations: configuration lives in the shared settings store.
 from __future__ import annotations
 
 import importlib.metadata
+import importlib.resources
 import weakref
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
@@ -66,6 +68,11 @@ class AiModule(ModuleBase):
             return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
 
         crypto.set_secret_provider(_live_secret)
+
+    def locale_dirs(self) -> dict[str, Path]:
+        """Console strings, resolved through the package so a wheel install works."""
+        base = Path(str(importlib.resources.files(__package__) / "locales"))
+        return {constants.LOCALE_NAMESPACE: base}
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(constants.MODULE_NAME, [constants.PERM_MANAGE])

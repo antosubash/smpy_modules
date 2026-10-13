@@ -1,11 +1,16 @@
 import { Link } from '@inertiajs/react';
 import { Toaster } from '@simple-module-py/ui/components/ui/sonner';
 import { cn } from '@simple-module-py/ui/lib/utils';
+import { keys, useT } from '../utils/i18n';
 
 const TABS = [
-  { key: 'subscriptions', label: 'Subscriptions', href: '/admin/billing/subscriptions' },
-  { key: 'plans', label: 'Plans', href: '/admin/billing/plans' },
-  { key: 'connection', label: 'Stripe connection', href: '/admin/billing/connection' },
+  {
+    key: 'subscriptions',
+    label: keys.billing.nav.subscriptions,
+    href: '/admin/billing/subscriptions',
+  },
+  { key: 'plans', label: keys.billing.nav.plans, href: '/admin/billing/plans' },
+  { key: 'connection', label: keys.billing.nav.connection, href: '/admin/billing/connection' },
 ] as const;
 
 export type AdminTab = (typeof TABS)[number]['key'];
@@ -19,9 +24,10 @@ export type AdminTab = (typeof TABS)[number]['key'];
  * nav, which makes it the one place that guarantees the outlet exists.
  */
 export function AdminNav({ active }: { active: AdminTab }) {
+  const { t } = useT();
   return (
     <>
-      <nav aria-label="Billing administration" className="mb-4 flex gap-1 border-b">
+      <nav aria-label={t(keys.billing.nav.aria_label)} className="mb-4 flex gap-1 border-b">
         {TABS.map((tab) => (
           <Link
             key={tab.key}
@@ -34,7 +40,7 @@ export function AdminNav({ active }: { active: AdminTab }) {
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {tab.label}
+            {t(tab.label)}
           </Link>
         ))}
       </nav>

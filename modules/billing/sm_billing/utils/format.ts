@@ -1,3 +1,4 @@
+import { keys, translate } from './i18n';
 import type { Interval, Plan, Status, SubscriptionStatus } from './types';
 
 /** Minor units → localized currency string; '' when there is no amount. */
@@ -19,14 +20,23 @@ export function priceFor(plan: Plan, interval: Interval): string | null {
 }
 
 export function priceLabel(plan: Plan, interval: Interval, locale?: string): string {
-  if (plan.pricing_model === 'free') return 'Free';
+  const p = keys.billing.price;
+  if (plan.pricing_model === 'free') return translate(p.free);
   if (!priceFor(plan, interval)) {
-    return interval === 'month' ? 'Not available monthly' : 'Not available yearly';
+    return translate(interval === 'month' ? p.unavailable_month : p.unavailable_year);
   }
   const amount = interval === 'month' ? plan.amount_month : plan.amount_year;
-  const money = formatMoney(amount, plan.currency, locale) || 'Paid';
-  const seat = plan.pricing_model === 'per_seat' ? ' / seat' : '';
-  return `${money}${seat} / ${interval}`;
+  const money = formatMoney(amount, plan.currency, locale) || translate(p.paid);
+  const perSeat = plan.pricing_model === 'per_seat';
+  const key =
+    interval === 'month'
+      ? perSeat
+        ? p.seat_month
+        : p.flat_month
+      : perSeat
+        ? p.seat_year
+        : p.flat_year;
+  return translate(key, { money });
 }
 
 const LIVE: ReadonlyArray<SubscriptionStatus> = ['active', 'trialing', 'past_due'];
@@ -77,15 +87,25 @@ export function statusTone(status: SubscriptionStatus | null): BadgeTone {
   }
 }
 
-export const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  trialing: 'Trial',
-  active: 'Active',
-  past_due: 'Payment failed',
-  unpaid: 'Unpaid',
-  canceled: 'Canceled',
-  incomplete: 'Incomplete',
+/** Every subscription status, in the order the pickers list them. */
+export const STATUSES: ReadonlyArray<SubscriptionStatus> = [
+  'trialing',
+  'active',
+  'past_due',
+  'unpaid',
+  'canceled',
+  'incomplete',
+];
+
+const STATUS_KEY: Record<SubscriptionStatus, string> = {
+  trialing: keys.billing.status.trialing,
+  active: keys.billing.status.active,
+  past_due: keys.billing.status.past_due,
+  unpaid: keys.billing.status.unpaid,
+  canceled: keys.billing.status.canceled,
+  incomplete: keys.billing.status.incomplete,
 };
 
 export function statusLabel(status: SubscriptionStatus | null): string {
-  return status ? STATUS_LABEL[status] : 'No subscription';
+  return translate(status ? STATUS_KEY[status] : keys.billing.status.none);
 }

@@ -13,6 +13,7 @@ import { PlanCard } from '../components/PlanCard';
 import { useCheckoutPolling } from '../hooks/useCheckoutPolling';
 import { api, BILLING_API } from '../utils/api';
 import { type PlanCta, planCta, priceLabel } from '../utils/format';
+import { keys, useT } from '../utils/i18n';
 import type { Interval, Plan, Status } from '../utils/types';
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
 }
 
 function Billing() {
+  const { t } = useT();
+  const c = keys.billing.page;
   const { status, plans, can_manage, restore, csrf_token, checkout } = usePage<{
     props: Props;
   }>().props as unknown as Props;
@@ -78,8 +81,8 @@ function Billing() {
       });
       toast.success(
         pending.cta === 'downgrade'
-          ? 'Your plan ends at the end of the billing period.'
-          : `Switched to ${pending.plan.name}.`,
+          ? t(c.toast_downgrade)
+          : t(c.toast_switched, { plan: pending.plan.name }),
       );
       setPending(null);
       reload();
@@ -87,41 +90,37 @@ function Billing() {
 
   return (
     <>
-      <Head title="Billing" />
-      <PageShell title="Billing" description="Your organisation's plan, seats and payment.">
+      <Head title={t(c.title)} />
+      <PageShell title={t(c.title)} description={t(c.description)}>
         <div className="space-y-8">
           {polling === 'waiting' && (
             <InlineBanner
               icon={Loader2}
-              title="Activating your subscription…"
-              description="Stripe confirmed the payment; this page updates once it reaches us."
+              title={t(c.activating_title)}
+              description={t(c.activating_description)}
             />
           )}
           {polling === 'timeout' && (
             <InlineBanner
               icon={Info}
               tone="warning"
-              title="Still waiting for Stripe"
-              description="Your payment went through, but the confirmation is late. Refresh in a minute."
+              title={t(c.waiting_title)}
+              description={t(c.waiting_description)}
             />
           )}
-          {checkout === 'cancel' && (
-            <InlineBanner icon={Info} title="Checkout cancelled — nothing was charged." />
-          )}
+          {checkout === 'cancel' && <InlineBanner icon={Info} title={t(c.cancelled)} />}
           {restore && (
             <InlineBanner
               icon={Lock}
               tone="warning"
-              title="This organisation is suspended for non-payment"
+              title={t(c.suspended_title)}
               description={
-                status.portal_available
-                  ? 'Update your payment method and settle any open invoice; access returns as soon as Stripe confirms the payment.'
-                  : 'Contact the site administrator to restore access.'
+                status.portal_available ? t(c.suspended_portal) : t(c.suspended_no_portal)
               }
               action={
                 status.portal_available ? (
                   <Button size="sm" onClick={openPortal} disabled={busy}>
-                    Pay now
+                    {t(c.pay_now)}
                   </Button>
                 ) : undefined
               }
@@ -136,28 +135,22 @@ function Billing() {
 
           <section className="space-y-4" hidden={restore}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Plans</h2>
+              <h2 className="text-lg font-semibold">{t(c.plans_heading)}</h2>
               {sellsYearly && (
                 <SegmentedControl
-                  aria-label="Billing period"
+                  aria-label={t(c.period_label)}
                   value={interval}
                   onChange={setBillingInterval}
                   options={[
-                    { value: 'month', label: 'Monthly' },
-                    { value: 'year', label: 'Yearly' },
+                    { value: 'month', label: t(c.monthly) },
+                    { value: 'year', label: t(c.yearly) },
                   ]}
                 />
               )}
             </div>
-            {!can_manage && (
-              <p className="text-sm text-muted-foreground">
-                Only the organisation owner can change the plan.
-              </p>
-            )}
+            {!can_manage && <p className="text-sm text-muted-foreground">{t(c.owner_only)}</p>}
             {!status.checkout_available && can_manage && (
-              <p className="text-sm text-muted-foreground">
-                Online payment is not set up here — contact the site administrator to change plan.
-              </p>
+              <p className="text-sm text-muted-foreground">{t(c.no_checkout)}</p>
             )}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((plan) => (
@@ -180,16 +173,19 @@ function Billing() {
         onOpenChange={(open) => !open && setPending(null)}
         tone="primary"
         icon={ArrowRightLeft}
-        title={pending?.cta === 'downgrade' ? 'Downgrade to the free plan?' : 'Change plan?'}
+        title={
+          pending?.cta === 'downgrade' ? t(c.confirm_downgrade_title) : t(c.confirm_change_title)
+        }
         description={
           pending?.cta === 'downgrade'
-            ? 'Your paid plan stays active until the end of the current period, then ends.'
-            : `You will be moved to ${pending?.plan.name} (${
-                pending ? priceLabel(pending.plan, interval) : ''
-              }). Stripe prorates the difference on your next invoice.`
+            ? t(c.confirm_downgrade_description)
+            : t(c.confirm_change_description, {
+                plan: pending?.plan.name ?? '',
+                price: pending ? priceLabel(pending.plan, interval) : '',
+              })
         }
-        confirmLabel={pending?.cta === 'downgrade' ? 'Downgrade' : 'Change plan'}
-        cancelLabel="Keep current plan"
+        confirmLabel={pending?.cta === 'downgrade' ? t(c.confirm_downgrade) : t(c.confirm_change)}
+        cancelLabel={t(c.keep_current)}
         busy={busy}
         onConfirm={confirmChange}
       />
