@@ -99,3 +99,28 @@ async def test_delete_page(authed_client: AsyncClient) -> None:
     assert (
         await authed_client.get(f"/api/pagebuilder/pages/{page['id']}")
     ).status_code == 404
+
+
+async def test_create_keeps_every_page_create_field(authed_client: AsyncClient) -> None:
+    # #65: create() dropped show_in_header_nav, show_in_footer and meta_title.
+    # Every value differs from its default, so a field create() forgets to
+    # copy reads back as the default and fails here.
+    sent = {
+        "title": "About",
+        "slug": "about",
+        "meta_title": "About us | Acme",
+        "meta_description": "Who we are",
+        "show_in_header_nav": True,
+        "show_in_footer": True,
+        "og_image": "/media/og.png",
+        "canonical_url": "https://example.com/about",
+        "index_in_search": False,
+        "is_template": True,
+    }
+    response = await authed_client.post(
+        "/api/pagebuilder/pages", json={**sent, "draft_data": {"content": []}}
+    )
+    assert response.status_code == 201, response.text
+    page_id = response.json()["id"]
+    stored = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}")).json()
+    assert {field: stored[field] for field in sent} == sent
