@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
@@ -63,6 +63,7 @@ export default function PendingReview() {
         </Button>
       }
     >
+      <Head title={t(keys.pagebuilder.pending.title)} />
       {pages.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           {t(keys.pagebuilder.pending.empty)}

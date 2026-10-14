@@ -86,6 +86,9 @@ export default function PageEditor() {
   const [showHistory, setShowHistory] = useState(false);
 
   const form = useEditorForm(page, defaultLocale);
+  // Trimmed: a whitespace-only title would otherwise leave the tab and
+  // Puck's header blank rather than falling back.
+  const displayTitle = form.title.trim() || t(keys.pagebuilder.editor.untitled);
   const isNarrow = useIsNarrow();
   // The palette's labels are written as catalogue keys — see `localizeConfig`
   // for why a module-scope block config cannot resolve them itself.
@@ -115,7 +118,7 @@ export default function PageEditor() {
           and the preview would show the framework's default action colour
           while the published page shows the configured one. */}
       <BrandingHead />
-      <Head title={form.title || t(keys.pagebuilder.editor.untitled)} />
+      <Head title={displayTitle} />
       <PageEditorToolbar
         pageId={form.pageId}
         title={form.title}
@@ -194,7 +197,7 @@ export default function PageEditor() {
             iframe={{ enabled: true }}
             // The toolbar's title is the page's; Puck's header would otherwise
             // show the document's root title, absent on seeded pages (#59).
-            headerTitle={form.title || t(keys.pagebuilder.editor.untitled)}
+            headerTitle={displayTitle}
             // Puck's header renders its own primary "Publish" alongside a copy of
             // the page title. Its Publish was wired to a draft save, so the app
             // showed two identical blue Publish buttons where the louder one did
