@@ -5,6 +5,8 @@ import {
   parseMarkdownBlocks,
 } from '../../../utils/markdown';
 import { cn } from '../../../utils/widgetUtils';
+import { HREF_SOURCE, IMAGE_SOURCE, renderInlineImage } from './inline-image';
+import { MarkdownList } from './markdown-list';
 
 // `[label](href)`. Split first, so a link's label can still carry the emphasis
 // markers the inline tokenizer understands ("[**Datenschutz**](/x)").
@@ -15,7 +17,14 @@ import { cn } from '../../../utils/widgetUtils';
 // leaking the remainder onto the page as stray literal text. Anything the
 // pattern can't parse falls through unchanged and renders as literal text, so
 // malformed input is always visible rather than dropped.
-const LINK_PATTERN = /(\[[^\]]+\]\((?:[^\s()]|\([^\s()]*\))+\))/g;
+//
+// Images (#66) split out the same way, a linked image `[![alt](src)](href)`
+// first: tried as a plain link, its label would end at the image's own `]`.
+const LINK_PATTERN = new RegExp(
+  String.raw`(\[${IMAGE_SOURCE}\]\(${HREF_SOURCE}\)|${IMAGE_SOURCE}|\[[^\]]+\]\(${HREF_SOURCE}\))`,
+  'g',
+);
+const LINKED_IMAGE = new RegExp(String.raw`^\[(${IMAGE_SOURCE})\]\((${HREF_SOURCE})\)$`);
 
 // `<strong>`'s UA default `font-weight: bolder` is RELATIVE — inside
 // `font-light` (300) copy it computes to 400 and the bold is invisible. An
@@ -135,6 +144,17 @@ function renderRichTextNodes(text: string, opts?: RichTextOptions): ReactNode[] 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     if (!part) continue;
+    const image = renderInlineImage(part, `i-${i}`);
+    if (image) {
+      out.push(image);
+      continue;
+    }
+    const linked = LINKED_IMAGE.exec(part);
+    const linkedImage = linked && renderInlineImage(linked[1], `i-${i}`);
+    if (linked && linkedImage && isSafeHref(linked[2])) {
+      out.push(linksAllowed ? anchor(linked[2], linkedImage, `l-${i}`) : linkedImage);
+      continue;
+    }
     const match = /^\[([^\]]+)\]\(((?:[^\s()]|\([^\s()]*\))+)\)$/.exec(part);
     if (match && isSafeHref(match[2])) {
       const [, label, href] = match;
@@ -145,24 +165,28 @@ function renderRichTextNodes(text: string, opts?: RichTextOptions): ReactNode[] 
         out.push(...renderEmphasis(label, `u-${i}`, opts));
         continue;
       }
-      // Scheme-relative `//host/...` is off-site too — it must get the
-      // same new-tab + noopener treatment as absolute http(s) links.
-      const external = /^(?:https?:)?\/\//.test(href);
-      out.push(
-        <a
-          key={`l-${i}`}
-          href={href}
-          className="underline underline-offset-2 text-[color:var(--pb-prose-link-color,inherit)]"
-          {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-        >
-          {renderEmphasis(label, `l-${i}`, opts)}
-        </a>,
-      );
+      out.push(anchor(href, renderEmphasis(label, `l-${i}`, opts), `l-${i}`));
       continue;
     }
     out.push(...renderEmphasis(part, `t-${i}`, opts));
   }
   return out;
+}
+
+function anchor(href: string, children: ReactNode, key: string): ReactNode {
+  // Scheme-relative `//host/...` is off-site too — it must get the
+  // same new-tab + noopener treatment as absolute http(s) links.
+  const external = /^(?:https?:)?\/\//.test(href);
+  return (
+    <a
+      key={key}
+      href={href}
+      className="underline underline-offset-2 text-[color:var(--pb-prose-link-color,inherit)]"
+      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
+      {children}
+    </a>
+  );
 }
 
 export type RichTextBlockProps = {
@@ -224,12 +248,11 @@ function renderWithSoftBreaks(text: string): ReactNode[] {
 function renderBlock(block: MarkdownBlock, key: number): ReactNode {
   if (block.type === 'ul') {
     return (
-      <ul key={key} className="list-disc pl-5 [&:not(:first-child)]:mt-3">
-        {block.items.map((li, j) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: list items are positional slices of the source text
-          <li key={j}>{renderRichText(li)}</li>
-        ))}
-      </ul>
+      <MarkdownList
+        key={key}
+        items={block.items}
+        className="list-disc pl-5 [&:not(:first-child)]:mt-3"
+      />
     );
   }
   return (
