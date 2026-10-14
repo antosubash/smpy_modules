@@ -40,6 +40,17 @@ describe('parseMarkdownBlocks lists', () => {
     });
   });
 
+  it('nests under a bullet that sits left of the first one', () => {
+    const [list] = parseMarkdownBlocks('  - a\n- b\n  - c');
+    expect(list).toEqual({
+      type: 'ul',
+      items: [
+        { text: 'a', children: [] },
+        { text: 'b', children: [{ text: 'c', children: [] }] },
+      ],
+    });
+  });
+
   it('starts a new list after a blank line', () => {
     expect(parseMarkdownBlocks('- a\n\n  - b').map((b) => b.type)).toEqual(['ul', 'ul']);
   });

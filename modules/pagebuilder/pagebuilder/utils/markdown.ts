@@ -56,6 +56,9 @@ export function parseMarkdownBlocks(
       listStack.pop();
     }
     const top = listStack[listStack.length - 1];
+    // A bullet left of the list's first one becomes the new outermost level,
+    // so a later indented bullet nests under it ("  - a\n- b\n  - c").
+    if (listStack.length === 1 && indent < top.indent) top.indent = indent;
     if (indent > top.indent) {
       // Deeper than its predecessor: a child of the bullet above it.
       const parent = top.items[top.items.length - 1];
