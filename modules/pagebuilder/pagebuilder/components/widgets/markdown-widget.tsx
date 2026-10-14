@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import { useMemo } from 'react';
 import { keys } from '../../utils/i18n';
 import { parseMarkdownBlocks as renderMarkdown } from '../../utils/markdown';
+import { MarkdownList } from './_internal/markdown-list';
 import { renderRichText } from './_internal/rich-text';
 
 export type MarkdownWidgetProps = {
@@ -128,13 +129,12 @@ function MarkdownRender({ content, width = 'auto', indent = 'none' }: MarkdownWi
             );
           if (block.type === 'ul')
             return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
-              <ul key={idx} className="list-disc list-inside space-y-1 mb-4">
-                {block.items.map((item, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
-                  <li key={i}>{renderInline(item)}</li>
-                ))}
-              </ul>
+              <MarkdownList
+                // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
+                key={idx}
+                items={block.items}
+                className="list-disc list-inside space-y-1 mb-4"
+              />
             );
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides

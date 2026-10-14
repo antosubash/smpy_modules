@@ -1,6 +1,12 @@
+/** A `- ` bullet; indenting a bullet under another nests it (#66). */
+export type MarkdownListItem = { text: string; children: MarkdownListItem[] };
+
 export type MarkdownBlock =
   | { type: 'h1' | 'h2' | 'h3' | 'p'; text: string }
-  | { type: 'ul'; items: string[] };
+  | { type: 'ul'; items: MarkdownListItem[] };
+
+// Leading whitespace, then `- `. A tab counts as four spaces.
+const BULLET = /^([ \t]*)- (.*)$/;
 
 export type ParseMarkdownBlocksOptions = {
   /**
@@ -22,7 +28,9 @@ export function parseMarkdownBlocks(
   const lines = content.split(/\r?\n/);
   const blocks: MarkdownBlock[] = [];
   let paragraph: string[] = [];
-  let listItems: string[] = [];
+  let listItems: MarkdownListItem[] = [];
+  // Open lists, outermost first, each with the indent its bullets sit at.
+  let listStack: { indent: number; items: MarkdownListItem[] }[] = [];
 
   const flushParagraph = () => {
     if (paragraph.length > 0) {
@@ -35,9 +43,31 @@ export function parseMarkdownBlocks(
       blocks.push({ type: 'ul', items: listItems });
       listItems = [];
     }
+    listStack = [];
+  };
+  const pushListItem = (indent: number, text: string) => {
+    const item: MarkdownListItem = { text, children: [] };
+    if (listStack.length === 0) {
+      listItems.push(item);
+      listStack = [{ indent, items: listItems }];
+      return;
+    }
+    while (listStack.length > 1 && indent < listStack[listStack.length - 1].indent) {
+      listStack.pop();
+    }
+    const top = listStack[listStack.length - 1];
+    if (indent > top.indent) {
+      // Deeper than its predecessor: a child of the bullet above it.
+      const parent = top.items[top.items.length - 1];
+      parent.children.push(item);
+      listStack.push({ indent, items: parent.children });
+    } else {
+      top.items.push(item);
+    }
   };
 
   for (const line of lines) {
+    const bullet = BULLET.exec(line);
     if (!line.trim()) {
       flushParagraph();
       flushList();
@@ -55,9 +85,9 @@ export function parseMarkdownBlocks(
       flushParagraph();
       flushList();
       blocks.push({ type: 'h1', text: line.slice(2) });
-    } else if (line.startsWith('- ')) {
+    } else if (bullet) {
       flushParagraph();
-      listItems.push(line.slice(2));
+      pushListItem(bullet[1].replaceAll('\t', '    ').length, bullet[2]);
     } else {
       flushList();
       paragraph.push(line.trim());
@@ -154,13 +184,20 @@ export function inlineMarkdownToHtml(text: string): string {
     .join('');
 }
 
+function listToHtml(items: MarkdownListItem[]): string {
+  const html = items
+    .map((item) => {
+      const nested = item.children.length > 0 ? listToHtml(item.children) : '';
+      return `<li>${inlineMarkdownToHtml(item.text)}${nested}</li>`;
+    })
+    .join('');
+  return `<ul>${html}</ul>`;
+}
+
 export function markdownToHtml(content: string): string {
   return parseMarkdownBlocks(content)
     .map((block) => {
-      if (block.type === 'ul') {
-        const items = block.items.map((item) => `<li>${inlineMarkdownToHtml(item)}</li>`).join('');
-        return `<ul>${items}</ul>`;
-      }
+      if (block.type === 'ul') return listToHtml(block.items);
       return `<${block.type}>${inlineMarkdownToHtml(block.text)}</${block.type}>`;
     })
     .join('\n');

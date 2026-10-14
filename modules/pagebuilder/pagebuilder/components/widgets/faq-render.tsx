@@ -7,6 +7,7 @@ import { parseMarkdownBlocks } from '../../utils/markdown';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { DisclosureChevron } from './_internal/disclosure-chevron';
+import { MarkdownList } from './_internal/markdown-list';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { eyebrowTextStyle } from './_shared';
 
@@ -59,13 +60,12 @@ function Answer({ text, inverse }: { text: string; inverse?: boolean }) {
     >
       {parseMarkdownBlocks(text || '').map((block, i) =>
         block.type === 'ul' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional slices of one string, re-derived each render
-          <ul key={i} className="list-disc pl-5 [&:not(:first-child)]:mt-3">
-            {block.items.map((li, j) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: list items are positional slices too
-              <li key={j}>{renderRichText(li)}</li>
-            ))}
-          </ul>
+          <MarkdownList
+            // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional slices of one string, re-derived each render
+            key={i}
+            items={block.items}
+            className="list-disc pl-5 [&:not(:first-child)]:mt-3"
+          />
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional slices of one string, re-derived each render
           <p key={i} className="[&:not(:first-child)]:mt-3">
