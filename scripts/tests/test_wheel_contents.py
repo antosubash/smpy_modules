@@ -21,7 +21,13 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-_TEST_IMPORT = re.compile(r"""from\s+['"](vitest|@testing-library/[^'"]+|happy-dom|jsdom)['"]""")
+# `from 'x'`, a bare side-effect `import 'x'`, and `require('x')`, with or
+# without a subpath (`vitest/config`).
+_TEST_IMPORT = re.compile(
+    r"""(?:\bfrom\s*|\bimport\s*|\brequire\(\s*)['"]"""
+    r"""(?:vitest|@testing-library/[^'"]+|happy-dom|jsdom)(?:/[^'"]*)?['"]"""
+)
+_FRONTEND_SOURCE = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 
 
 @pytest.fixture(scope="module")
@@ -44,7 +50,7 @@ def test_wheels_ship_no_frontend_test_code(wheels: list[Path]) -> None:
     for wheel in wheels:
         with zipfile.ZipFile(wheel) as archive:
             for name in archive.namelist():
-                if not name.endswith((".ts", ".tsx")):
+                if not name.endswith(_FRONTEND_SOURCE):
                     continue
                 source = archive.read(name).decode("utf-8", errors="ignore")
                 if ".test." in name or _TEST_IMPORT.search(source):

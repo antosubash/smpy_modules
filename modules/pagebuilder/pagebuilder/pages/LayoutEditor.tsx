@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BlockOutline } from '../components/editor/BlockOutline';
+import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { localizeConfig } from '../components/localizeConfig';
 import { useIsNarrow } from '../hooks/useIsNarrow';
@@ -18,12 +19,6 @@ import {
 } from '../utils/api';
 import { blockLabels, moveBlock, outlineOf } from '../utils/blockOutline';
 import { keys, useT } from '../utils/i18n';
-
-// Each Puck drew its own "Publish", and both saved the whole layout, header
-// and footer together, so the screen offered three buttons that did one thing
-// (#59). The toolbar's "Save layout" is the only save; as on the page editor,
-// Puck's header keeps its title, undo/redo and sidebar toggles.
-const NO_HEADER_ACTIONS = { headerActions: () => <></> };
 
 interface Props {
   layout: LayoutDetail;

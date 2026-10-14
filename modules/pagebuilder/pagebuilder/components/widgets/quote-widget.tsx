@@ -16,10 +16,12 @@ export type QuoteWidgetProps = {
 // a dark branded page would otherwise get dark-grey text on its own navy.
 // The tint is mixed from the accent, so it reads on either background.
 const FIGURE_STYLE: CSSProperties = {
-  borderColor: 'var(--pb-accent)',
-  backgroundColor: 'color-mix(in srgb, var(--pb-accent) 8%, transparent)',
+  borderColor: 'var(--pb-accent, var(--primary))',
+  backgroundColor: 'color-mix(in srgb, var(--pb-accent, var(--primary)) 8%, transparent)',
 };
-const CAPTION_STYLE: CSSProperties = { color: 'var(--pb-caption-color, var(--pb-body-color))' };
+const CAPTION_STYLE: CSSProperties = {
+  color: 'var(--pb-caption-color, var(--pb-body-color, var(--muted-foreground)))',
+};
 
 export const QuoteWidget: ComponentConfig<QuoteWidgetProps> = {
   label: keys.pagebuilder.blocks.quote.label,
@@ -52,7 +54,7 @@ export const QuoteWidget: ComponentConfig<QuoteWidgetProps> = {
     >
       <blockquote
         className="text-xl sm:text-2xl italic leading-relaxed"
-        style={{ color: 'var(--pb-heading-color)' }}
+        style={{ color: 'var(--pb-heading-color, var(--foreground))' }}
       >
         “{renderRichText(quote)}”
       </blockquote>

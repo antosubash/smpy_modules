@@ -5,6 +5,7 @@ import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useMemo, useState } from 'react';
 
 import { NarrowCanvas } from '../components/editor/NarrowCanvas';
+import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { PageInspectorDrawer } from '../components/editor/PageInspectorDrawer';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
@@ -204,7 +205,7 @@ export default function PageEditor() {
             // Note for anyone auditing selectors: Puck renders that button as a
             // <span>, not a <button>, so it never appeared in the accessibility
             // tree and the e2e suite could not have caught this.
-            overrides={{ headerActions: () => <></> }}
+            overrides={NO_HEADER_ACTIONS}
             onChange={form.setData}
           />
         )}
