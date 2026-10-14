@@ -35,6 +35,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sm_ai"]
+# Frontend test files and their helpers sit beside the source they test, so
+# `packages` would ship them. A host's Vite scans installed module source and
+# skips dependency pre-bundling when it meets an import it cannot resolve
+# (`vitest`), so none of them may reach the wheel (#63).
+exclude = [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/test-dom.tsx",
+    "**/*-test-support.ts",
+]
 
 # package.json lives at the module root so npm workspaces see it; copying it
 # into the package lets the host discover JS deps after a pip install. This

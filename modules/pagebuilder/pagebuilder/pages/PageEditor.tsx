@@ -1,16 +1,17 @@
 import { type Data, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
-import { usePage } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useMemo, useState } from 'react';
 
 import { NarrowCanvas } from '../components/editor/NarrowCanvas';
+import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
 import { PageInspectorDrawer } from '../components/editor/PageInspectorDrawer';
 import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
 import { localizeConfig, localizeViewports } from '../components/localizeConfig';
 import { migrateContent } from '../components/migrateContent';
-import { editorViewports, emptyData, getPuckConfig } from '../components/puckConfig';
+import { editorViewports, emptyData, getPuckConfig, withRootTitle } from '../components/puckConfig';
 import { useAutosave } from '../hooks/useAutosave';
 import { useEditorForm } from '../hooks/useEditorForm';
 import { useIsNarrow } from '../hooks/useIsNarrow';
@@ -85,10 +86,16 @@ export default function PageEditor() {
   const [showHistory, setShowHistory] = useState(false);
 
   const form = useEditorForm(page, defaultLocale);
+  // Trimmed: a whitespace-only title would otherwise leave the tab and
+  // Puck's header blank rather than falling back.
+  const displayTitle = form.title.trim() || t(keys.pagebuilder.editor.untitled);
   const isNarrow = useIsNarrow();
   // The palette's labels are written as catalogue keys — see `localizeConfig`
   // for why a module-scope block config cannot resolve them itself.
-  const config = useMemo(() => localizeConfig(getPuckConfig(), t), [t]);
+  const config = useMemo(
+    () => withRootTitle(localizeConfig(getPuckConfig(), t), page?.title),
+    [t, page?.title],
+  );
   const viewports = useMemo(() => localizeViewports(editorViewports, t), [t]);
 
   const { isDirty, saveState, lastSavedAt, autosaveError, markSaved } = useAutosave({
@@ -111,6 +118,7 @@ export default function PageEditor() {
           and the preview would show the framework's default action colour
           while the published page shows the configured one. */}
       <BrandingHead />
+      <Head title={displayTitle} />
       <PageEditorToolbar
         pageId={form.pageId}
         title={form.title}
@@ -187,6 +195,9 @@ export default function PageEditor() {
             data={form.data}
             viewports={viewports}
             iframe={{ enabled: true }}
+            // The toolbar's title is the page's; Puck's header would otherwise
+            // show the document's root title, absent on seeded pages (#59).
+            headerTitle={displayTitle}
             // Puck's header renders its own primary "Publish" alongside a copy of
             // the page title. Its Publish was wired to a draft save, so the app
             // showed two identical blue Publish buttons where the louder one did
@@ -197,7 +208,7 @@ export default function PageEditor() {
             // Note for anyone auditing selectors: Puck renders that button as a
             // <span>, not a <button>, so it never appeared in the accessibility
             // tree and the e2e suite could not have caught this.
-            overrides={{ headerActions: () => <></> }}
+            overrides={NO_HEADER_ACTIONS}
             onChange={form.setData}
           />
         )}

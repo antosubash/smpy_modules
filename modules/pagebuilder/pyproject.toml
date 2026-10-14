@@ -38,6 +38,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pagebuilder"]
+# Frontend test files and their helpers sit beside the source they test, so
+# `packages` would ship them. A host's Vite scans installed module source and
+# skips dependency pre-bundling when it meets an import it cannot resolve
+# (`vitest`), so none of them may reach the wheel (#63).
+exclude = [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/test-dom.tsx",
+    "**/*-test-support.ts",
+]
 # The built frontend bundle is gitignored, so hatchling's VCS-aware file
 # selection skips it. `artifacts` is the supported way to pull ignored build
 # output back in. A force-include can't be used here: it demands the path

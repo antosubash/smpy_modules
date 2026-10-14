@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
+import type { CSSProperties } from 'react';
 import { keys } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
@@ -8,6 +9,18 @@ export type QuoteWidgetProps = {
   author: string;
   source: string;
   align: 'left' | 'center';
+};
+
+// Colours come from the renderer's `--pb-*` tokens rather than a fixed palette,
+// so the quote follows the page's theme whether or not it toggles `.dark` —
+// a dark branded page would otherwise get dark-grey text on its own navy.
+// The tint is mixed from the accent, so it reads on either background.
+const FIGURE_STYLE: CSSProperties = {
+  borderColor: 'var(--pb-accent, var(--primary))',
+  backgroundColor: 'color-mix(in srgb, var(--pb-accent, var(--primary)) 8%, transparent)',
+};
+const CAPTION_STYLE: CSSProperties = {
+  color: 'var(--pb-caption-color, var(--pb-body-color, var(--muted-foreground)))',
 };
 
 export const QuoteWidget: ComponentConfig<QuoteWidgetProps> = {
@@ -34,15 +47,19 @@ export const QuoteWidget: ComponentConfig<QuoteWidgetProps> = {
   render: ({ quote, author, source, align }) => (
     <figure
       className={cn(
-        'max-w-3xl mx-auto px-4 py-10 border-l-4 border-primary-700 bg-primary-50/50 dark:bg-primary-950/30 rounded-r-lg',
+        'max-w-3xl mx-auto px-4 py-10 border-l-4 rounded-r-lg',
         align === 'center' ? 'text-center' : 'text-left',
       )}
+      style={FIGURE_STYLE}
     >
-      <blockquote className="text-xl sm:text-2xl italic text-gray-800 dark:text-gray-100 leading-relaxed">
+      <blockquote
+        className="text-xl sm:text-2xl italic leading-relaxed"
+        style={{ color: 'var(--pb-heading-color, var(--foreground))' }}
+      >
         “{renderRichText(quote)}”
       </blockquote>
       {(author || source) && (
-        <figcaption className="mt-4 text-gray-600 dark:text-gray-400">
+        <figcaption className="mt-4" style={CAPTION_STYLE}>
           {author && <span className="font-semibold">— {renderRichText(author)}</span>}
           {source && <span className="ml-2 text-sm">({renderRichText(source)})</span>}
         </figcaption>

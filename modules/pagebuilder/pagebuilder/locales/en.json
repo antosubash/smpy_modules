@@ -908,7 +908,8 @@
     "before": "Drop image files here to upload to"
   },
   "editor": {
-    "rejected": "Rejected:"
+    "rejected": "Rejected:",
+    "untitled": "Untitled page"
   },
   "errors": {
     "field_message": "{field}: {message}",

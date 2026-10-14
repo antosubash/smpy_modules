@@ -106,6 +106,20 @@ export function getPuckConfig(): PageConfig {
   return cachedConfig;
 }
 
+/**
+ * Seed the root `title` field from the page row (#59).
+ *
+ * Puck fills a missing root prop from `defaultProps`, so a document saved
+ * without `root.props.title` — every seeded one — opened as "Untitled page"
+ * even though the page has a title. Defaulting to the page's own title shows
+ * the right thing without rewriting a stored document nobody has edited.
+ */
+export function withRootTitle(config: PageConfig, title: string | null | undefined): PageConfig {
+  if (!title) return config;
+  const defaultProps = { ...config.root?.defaultProps, title } as PageRootProps;
+  return { ...config, root: { ...config.root, defaultProps } };
+}
+
 export const emptyData = {
   content: [],
   root: { props: { title: 'Untitled page', width: 'contained' } },

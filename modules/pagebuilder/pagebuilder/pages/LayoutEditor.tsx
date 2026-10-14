@@ -1,12 +1,13 @@
 import { type Data, Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
-import { router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useMemo, useState } from 'react';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BlockOutline } from '../components/editor/BlockOutline';
+import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { localizeConfig } from '../components/localizeConfig';
 import { useIsNarrow } from '../hooks/useIsNarrow';
@@ -92,6 +93,7 @@ export default function LayoutEditor() {
           step. Applying the class here would need the pack name threaded from
           the branding shared prop into both Puck instances. */}
       <BrandingHead />
+      <Head title={t(keys.pagebuilder.layout.title)} />
       <div className="border-b bg-background px-4 py-2 flex items-center gap-3 flex-wrap">
         <Button variant="link" size="sm" onClick={() => router.visit('/pagebuilder')}>
           {t(keys.pagebuilder.layout.back)}
@@ -207,10 +209,7 @@ export default function LayoutEditor() {
                 data={headerData}
                 iframe={{ enabled: false }}
                 onChange={setHeaderData}
-                onPublish={(d) => {
-                  setHeaderData(d);
-                  void handleSave();
-                }}
+                overrides={NO_HEADER_ACTIONS}
               />
             </div>
           </section>
@@ -224,10 +223,7 @@ export default function LayoutEditor() {
                 data={footerData}
                 iframe={{ enabled: false }}
                 onChange={setFooterData}
-                onPublish={(d) => {
-                  setFooterData(d);
-                  void handleSave();
-                }}
+                overrides={NO_HEADER_ACTIONS}
               />
             </div>
           </section>
