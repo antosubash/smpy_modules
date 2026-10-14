@@ -7,6 +7,7 @@ import { useId, useState } from 'react';
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
 import { SOCIAL_ICON_OPTIONS, SocialIcon, type SocialIconName } from './_shared';
+import { HeaderLocaleSwitcher, resolveCta, useIsSignedIn } from './site-header-account';
 import { DesktopNav, MobileNav, type SiteNavItem } from './site-header-nav';
 
 export interface UtilityLink {
@@ -24,6 +25,10 @@ export interface SiteHeaderWidgetProps {
   navItems: SiteNavItem[];
   ctaLabel: string;
   ctaHref: string;
+  /** Shown instead of the CTA once the visitor is signed in; empty keeps the CTA. */
+  signedInLabel?: string;
+  signedInHref?: string;
+  showLocaleSwitcher: boolean;
   sticky: boolean;
 }
 
@@ -54,11 +59,20 @@ export function SiteHeaderRender({
   homeHref,
   utilityLinks,
   navItems,
-  ctaLabel,
-  ctaHref,
+  ctaLabel: anonymousCtaLabel,
+  ctaHref: anonymousCtaHref,
+  signedInLabel,
+  signedInHref,
+  showLocaleSwitcher,
   sticky,
 }: SiteHeaderWidgetProps) {
   const { t } = useT();
+  const signedIn = useIsSignedIn();
+  const { label: ctaLabel, href: ctaHref } = resolveCta(
+    signedIn,
+    { label: anonymousCtaLabel, href: anonymousCtaHref },
+    { label: signedInLabel, href: signedInHref },
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileMenuId = useId();
 
@@ -86,6 +100,8 @@ export function SiteHeaderRender({
           </a>
 
           <DesktopNav items={navItems} />
+
+          <HeaderLocaleSwitcher show={showLocaleSwitcher} />
 
           {ctaLabel && (
             <a
@@ -187,6 +203,11 @@ export const SiteHeaderWidget: ComponentConfig<SiteHeaderWidgetProps> = {
     },
     ctaLabel: { type: 'text', label: keys.pagebuilder.blocks.site_header.cta_label },
     ctaHref: { type: 'text', label: keys.pagebuilder.blocks.site_header.cta_href },
+    signedInLabel: { type: 'text', label: keys.pagebuilder.blocks.site_header.signed_in_label },
+    signedInHref: { type: 'text', label: keys.pagebuilder.blocks.site_header.signed_in_href },
+    showLocaleSwitcher: createCheckboxField(
+      keys.pagebuilder.blocks.site_header.show_locale_switcher,
+    ),
     sticky: createCheckboxField(keys.pagebuilder.blocks.site_header.sticky),
   },
   defaultProps: {
@@ -200,6 +221,9 @@ export const SiteHeaderWidget: ComponentConfig<SiteHeaderWidgetProps> = {
     ],
     ctaLabel: '',
     ctaHref: '#',
+    signedInLabel: '',
+    signedInHref: '',
+    showLocaleSwitcher: false,
     sticky: true,
   },
   render: SiteHeaderRender,
