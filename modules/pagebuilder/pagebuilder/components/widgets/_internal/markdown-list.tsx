@@ -2,7 +2,10 @@ import type { MarkdownListItem } from '../../../utils/markdown';
 import { renderRichText } from './rich-text';
 
 // Nested levels switch to hollow bullets, the way browsers mark a second level.
-const NESTED_CLASS = 'list-[circle] pl-5 mt-1 space-y-1';
+// The marker position is inherited explicitly: preflight's `list-style: none`
+// resets it to `outside`, so under the Markdown widget's `list-inside` list
+// the nested markers hung back in line with their parent's.
+const NESTED_CLASS = 'list-[circle] [list-style-position:inherit] pl-5 mt-1 space-y-1';
 
 /**
  * A parsed `- ` list, nesting included (#66). The Markdown widget, FAQ answers
