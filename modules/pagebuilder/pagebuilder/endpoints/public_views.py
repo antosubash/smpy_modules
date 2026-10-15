@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pagebuilder import locales, public_claims, redirects, site_nav
 from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
+from pagebuilder.og_image import og_image
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.tenancy import bind_public, vary_on_tenant
@@ -216,7 +217,9 @@ async def render_public_page(
                 "title": (page.meta_title or "").strip() or page.title,
                 "data": page.published_data,
                 "meta_description": page.meta_description,
-                "og_image": page.og_image,
+                "og_image": og_image(
+                    page.og_image, page.published_data, _public_base_url(request, settings)
+                ),
                 "canonical_url": canonical,
                 "og_url": canonical,
                 "index_in_search": page.index_in_search,

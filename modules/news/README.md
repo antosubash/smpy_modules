@@ -18,6 +18,12 @@ is distinguishable from a contact page in a URL, a log line and an analytics
 report. The admin console is at `/admin/news`, not `/news`: one prefix cannot be
 both a reader-facing URL and a permission-gated console.
 
+**Full documentation** lives in [`docs/`](docs/index.md):
+[user guide](docs/user-guide.md) (the admin screens and what readers see),
+[API reference](docs/api-reference.md) (every route, permission and error),
+[operations](docs/operations.md) (install, settings, scheduler, tenancy,
+troubleshooting) and [architecture](docs/architecture.md).
+
 ## Installation
 
 ```bash
@@ -300,10 +306,11 @@ draft.
 
 ## Multilingual articles
 
-An article is a page, so its language is the page's language — configured in
-pagebuilder (its `content_locales` setting), not here, because a language
-news offered that pagebuilder did not would be one no article could be written
-in. Off by default: with one content locale every article URL is exactly what
+Every article carries its own language (`locale`), fixed for its lifetime, and
+shares a `translation_group` with its translations. The languages on offer are
+pagebuilder's `content_locales` (pages and articles share one list; without
+pagebuilder the site is monolingual) — see
+[docs/operations.md](docs/operations.md#content-languages). Off by default: with one content locale every article URL is exactly what
 it was.
 
 Articles in the default language keep `/news/{slug}`; every other language is
@@ -523,12 +530,8 @@ a document gets it in one action instead of clicking "add item" nine times.
 `blocks/lines.ts` is that parsing, in one place, so no two blocks can disagree
 about what a line means.
 
-Two things the palette deliberately does **not** have. **Charts** would mean
-shipping a charting library, and these blocks render on the public page of a
-host that may have installed nothing else — a table of the figures is the
-honest version. **A table of contents** would need a block to see its siblings,
-which Puck does not give a `render` function; the seam that would allow it is
-the same `metadata` one `Read next` uses, so it is possible, just not free.
+The palette also carries a **Chart** and a **Contents** (table of contents)
+block; [docs/user-guide.md](docs/user-guide.md) lists every block by group.
 
 ## Known gaps
 

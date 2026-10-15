@@ -1,7 +1,7 @@
 # Content snapshots — import / export with approval — design
 
 Date: 2026-08-28
-Status: approved pending review
+Status: implemented (pagebuilder `snapshots/`). Snapshots v2 — a "restored from snapshot" marker and a bundle format — is not built.
 
 ## Context
 

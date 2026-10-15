@@ -1,7 +1,7 @@
 # Billing module (`simple_module_billing`) — design
 
 Date: 2026-10-01
-Status: approved (sections 1–5 approved in brainstorming)
+Status: implemented in #46 — the module as built is documented in [`modules/billing/docs/`](../../../modules/billing/docs/index.md).
 
 ## Context
 

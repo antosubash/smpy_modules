@@ -39,8 +39,8 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
 
     Only the page's own language: a German page's header linking to the English
     "About" would drop a reader into the wrong language with no way back. The
-    href goes through the claims registry, so a page another module serves (a
-    news article) links to that module's address rather than to a ``/p/`` URL
+    href goes through the claims registry, so a page another module has claimed
+    links to that module's address rather than to a ``/p/`` URL
     that 404s.
     """
     result = await db.execute(
