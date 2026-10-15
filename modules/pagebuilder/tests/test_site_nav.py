@@ -25,7 +25,8 @@ def _no_leaked_claims():
 
 
 async def _page(client: AsyncClient, slug: str, *, publish: bool = True, **extra) -> int:
-    payload = {"title": slug.title(), "slug": slug, "draft_data": {"content": []}, **extra}
+    payload = {"title": slug.title(), "slug": slug, "draft_data": {"content": []}}
+    payload.update(extra)
     created = await client.post(API, json=payload)
     assert created.status_code == 201, created.text
     page_id = created.json()["id"]
@@ -56,6 +57,16 @@ async def test_flagged_published_pages_are_listed_by_title(authed_client: AsyncC
         {"label": "About", "href": "/p/about"},
         {"label": "Imprint", "href": "/p/imprint"},
     ]
+
+
+async def test_order_ignores_case(authed_client: AsyncClient) -> None:
+    await _page(authed_client, "home")
+    await _page(authed_client, "zulu", title="Zulu", show_in_footer=True)
+    await _page(authed_client, "apple", title="apple", show_in_footer=True)
+
+    footer = (await _props(authed_client))["site_nav"]["footer"]
+
+    assert [link["label"] for link in footer] == ["apple", "Zulu"]
 
 
 async def test_drafts_and_trashed_pages_are_left_out(authed_client: AsyncClient) -> None:

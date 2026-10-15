@@ -80,6 +80,11 @@ describe('flagged pages in the site footer', () => {
     expect(hrefs(out)).toEqual(['/', '/p/contact', '/p/imprint']);
   });
 
+  it('treat a trailing slash in the layout as the same page', () => {
+    const out = footer(NAV, { links: [{ label: 'Imprint', href: '/p/imprint/' }] });
+    expect(hrefs(out)).toEqual(['/', '/p/imprint/', '/p/contact']);
+  });
+
   it('show even when the layout has no links of its own', () => {
     expect(footer(NAV, { links: [] })).toContain('>Imprint<');
   });

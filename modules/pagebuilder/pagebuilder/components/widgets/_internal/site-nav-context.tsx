@@ -37,7 +37,13 @@ export function appendPages<T>(
   pages: SiteNavPage[],
   toLink: (page: SiteNavPage) => T,
 ): T[] {
-  const seen = new Set(linked);
-  const extra = pages.filter((page) => !seen.has(page.href)).map(toLink);
+  const seen = new Set([...linked].map(withoutTrailingSlash));
+  const extra = pages.filter((page) => !seen.has(withoutTrailingSlash(page.href))).map(toLink);
   return extra.length > 0 ? [...links, ...extra] : links;
+}
+
+// An author typing `/p/about/` in the layout means the page the server lists as
+// `/p/about`.
+function withoutTrailingSlash(href: string): string {
+  return href.length > 1 ? href.replace(/\/+$/, '') : href;
 }

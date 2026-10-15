@@ -129,6 +129,13 @@ describe('parseMarkdownBlocks numbered lists', () => {
     ]);
   });
 
+  it('keeps a wrapped line that starts with a year inside its paragraph', () => {
+    expect(parseMarkdownBlocks('We were founded in\n2019. Since then we grew.')).toEqual([
+      { type: 'p', text: 'We were founded in 2019. Since then we grew.' },
+    ]);
+    expect(parseMarkdownBlocks('Steps\n1. one\n2. two').map((b) => b.type)).toEqual(['p', 'ol']);
+  });
+
   it('leaves a number without a following space as a paragraph', () => {
     expect(parseMarkdownBlocks('2026.')[0]).toEqual({ type: 'p', text: '2026.' });
   });

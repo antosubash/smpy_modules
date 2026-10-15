@@ -17,10 +17,10 @@ both `<title>` and `og:title`. No frontend change.
 `show_in_header_nav` / `show_in_footer` were stored, edited and snapshotted, but
 nothing read them.
 
-- **Server** — `pagebuilder.site_nav.site_nav(db, settings, locale)` returns
+- **Server** — `pagebuilder.site_nav.site_nav(db, prefix, locale)` returns
   `{"header": [...], "footer": [...]}`, each entry `{"label": title, "href": path}`,
   for published, untrashed pages *in the page's locale* with the flag set, ordered
-  by title then id. The href goes through `public_claims.resolve` (one batched
+  by lower-cased title then id. The href goes through `public_claims.resolve` (one batched
   call), so a page another module has claimed links to the claimant's address,
   and otherwise through `locales.public_path`.
 - **Props** — `render_public_page` and the admin preview send it as `site_nav`.

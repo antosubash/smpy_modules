@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -31,7 +31,10 @@ class SiteNav(TypedDict):
 
 
 async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
-    """Flagged, published pages in ``locale``, ordered by title.
+    """Flagged, published pages in ``locale``, ordered by title, ignoring case.
+
+    ``lower()`` because SQLite and PostgreSQL disagree about where "about"
+    sorts against "Zebra", and the nav must read the same on both.
 
     Only the page's own language: a German page's header linking to the English
     "About" would drop a reader into the wrong language with no way back. The
@@ -47,7 +50,7 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
             Page.status == PageStatus.PUBLISHED,
             or_(Page.show_in_header_nav, Page.show_in_footer),
         )
-        .order_by(Page.title, Page.id)
+        .order_by(func.lower(Page.title), Page.id)
     )
     rows = result.all()
     claimed = await public_claims.resolve(db, [row.slug for row in rows], locale)
