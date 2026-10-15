@@ -85,7 +85,7 @@ export function DesktopNav({ items }: { items: SiteNavItem[] }) {
             key={index}
             href={item.href || '#'}
             title={item.label}
-            className={`max-w-[16rem] truncate ${LINK_CLASS}`}
+            className={`max-w-[16rem] truncate py-3 ${LINK_CLASS}`}
           >
             {item.label}
           </a>
