@@ -66,10 +66,7 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
         )}
       >
         {heading && (
-          <h2
-            className="max-w-full leading-[var(--pb-heading-leading,1.1)] [overflow-wrap:anywhere]"
-            style={headingStyle}
-          >
+          <h2 className="max-w-full leading-[var(--pb-heading-leading,1.1)]" style={headingStyle}>
             {renderRichText(heading)}
           </h2>
         )}
@@ -101,7 +98,7 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
     // prior layout.
     if (layout === 'split') {
       return (
-        <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] sm:px-6 lg:px-8">
+        <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] [overflow-wrap:anywhere] sm:px-6 lg:px-8">
           <div className="grid gap-6 md:grid-cols-[var(--pb-split-cols,1fr_2fr)] md:gap-x-[var(--pb-split-gap,1.5rem)]">
             {eyebrow && (
               <p
@@ -124,7 +121,8 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
     return (
       <section
         className={cn(
-          'container mx-auto px-4 py-[var(--pb-section-py,3rem)] max-w-4xl flex flex-col gap-4',
+          // A long URL is one unbreakable word; in any field it widened the page.
+          'container mx-auto px-4 py-[var(--pb-section-py,3rem)] max-w-4xl flex flex-col gap-4 [overflow-wrap:anywhere]',
           align === 'center' ? 'text-center' : 'text-left',
         )}
       >
