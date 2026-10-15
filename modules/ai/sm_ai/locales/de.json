@@ -39,7 +39,7 @@
     "test_ok": "OK – {model} ({latency} ms)",
     "load_models": "Modelle laden",
     "models_loaded": "Gefundene Modelle: {count} – wählen Sie eines im Feld „Modell“",
-    "models_truncated": "Die ersten {count} Modelle werden angezeigt – tippen Sie im Feld „Modell“, um sie einzugrenzen",
+    "models_truncated": "Die ersten {count} Modelle (alphabetisch) werden angezeigt – jeden anderen Modellnamen können Sie im Feld „Modell“ eingeben",
     "models_none": "Der Endpunkt listet für diesen Slot keine Modelle auf."
   },
   "api": {
