@@ -93,7 +93,7 @@ export function SiteHeaderRender({
       <UtilityBar links={utilityLinks} />
 
       <div className="border-b border-[color:var(--border,#e4e6e7)] bg-[var(--pb-surface,#fff)]">
-        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:h-[112px] lg:px-12">
+        <div className="mx-auto flex min-h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:min-h-[112px] lg:px-12 lg:py-4">
           <a
             href={homeHref || '/'}
             aria-label={logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
