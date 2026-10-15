@@ -15,7 +15,7 @@ rename models every few months.
 
 - **API.** `POST /api/ai/models` with `{"slot": "chat" | "embedding"}`,
   `ai.manage`, CSRF like the other writes. Returns
-  `{"ok": bool, "models": [str], "error": str}`, sorted and de-duplicated. A failure
+  `{"ok": bool, "models": [str], "truncated": bool, "error": str}`, sorted and de-duplicated. A failure
   of any kind is `ok: false` with the message, never a 500. That is the same
   contract as `POST /test`.
 - **Saved settings, like the test.** It uses the slot's *saved* provider, base
@@ -28,7 +28,7 @@ rename models every few months.
   - `anthropic`: `AsyncAnthropic(...).models.list()`.
   - `google`: `genai.Client(...).aio.models.list()`.
   - Each honours the slot's base URL and decrypted key. It shares the
-    validation path with `resolve._slot_inputs`, minus the model-name
+    validation path with `resolve.slot_inputs`, minus the model-name
     requirement, since a missing model name is the reason to ask.
 - **Bounded.** Wrapped in the same `TEST_TIMEOUT_SECONDS` and capped at 500 names.
 - **UI.** Each slot card gets a **Load models** button beside **Test

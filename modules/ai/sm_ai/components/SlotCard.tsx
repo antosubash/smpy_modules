@@ -64,6 +64,8 @@ export function SlotCard({
     if (!('model' in patch) && !('dim' in patch)) {
       request.current += 1;
       setModels(null);
+      // The dropped request no longer owns the button.
+      setLoading(false);
     }
     onChange({ ...values, ...patch });
   };
@@ -79,7 +81,7 @@ export function SlotCard({
         setModels({ ok: false, models: [], error: (err as Error).message });
       }
     } finally {
-      setLoading(false);
+      if (mine === request.current) setLoading(false);
     }
   };
 
