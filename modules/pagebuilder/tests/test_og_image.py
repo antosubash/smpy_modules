@@ -56,7 +56,8 @@ async def test_public_page_falls_back_to_its_first_image(authed_client: AsyncCli
     )
     assert created.status_code == 201, created.text
     page_id = created.json()["id"]
-    assert (await authed_client.post(f"/api/pagebuilder/pages/{page_id}/publish")).status_code == 200
+    published = await authed_client.post(f"/api/pagebuilder/pages/{page_id}/publish")
+    assert published.status_code == 200
 
     props = (await authed_client.get("/p/gallery", headers=INERTIA)).json()["props"]
 

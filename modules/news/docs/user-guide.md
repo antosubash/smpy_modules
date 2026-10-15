@@ -26,8 +26,9 @@ The header reads "{published} published · {draft} drafts · public at
   four counts do not add up to *All*.
 - **Filter by category** and, on a multilingual site, **Filter by language**.
 
-Undated articles sort first (they are work in progress), then pinned, then
-newest. Twenty load at a time; **Load more** fetches the next batch.
+Undated articles sort first (they are work in progress), then newest first.
+Pinning does not reorder this list: it only breaks a tie between two articles
+with the same display date (readers' archives put pinned articles first). Twenty load at a time; **Load more** fetches the next batch.
 
 Each row shows its status: **Published · {date}**, **Published · no date**,
 **Pending review**, **Draft · dated {date}** or **Draft · undated**. A live

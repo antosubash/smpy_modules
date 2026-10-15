@@ -40,8 +40,9 @@ those two prefixes, `GET` only) are open to anonymous callers, because the
 | `locale` | — | one language; an unconfigured value is ignored, a blank one returns nothing |
 | `translation_group` | — | one article and its translations; blank returns nothing |
 
-Order: pinned first, then newest display date, undated last (or first with
-`undated_first`), then id. Response:
+Order: pinned first, then newest display date, undated last, then id. With
+`undated_first` it is undated first, then newest display date, then pinned (a
+tie-break only), then id. Response:
 
 ```json
 {
