@@ -156,5 +156,28 @@ Request `{"slot": "chat"}` or `{"slot": "embedding"}`; any other slot is a
 
 Every failure returns `200` with `ok: false`: missing configuration, an
 unreadable key, a refused connection, an authentication error, or
-`"Timed out after 30s."`. The server logs the failure with its traceback at
-warning level.
+`"Timed out after 30s."`. The server logs a configuration or provider
+failure (an `AiError`, a refused connection, a provider error status) as one
+warning line, and anything else with its traceback, so a code defect stays
+distinguishable from a configuration problem.
+
+### `POST /api/ai/models`
+
+Request `{"slot": "chat"}` or `{"slot": "embedding"}`; any other slot is a
+`422`. Lists the model ids the slot's **saved** endpoint serves, through the
+provider's own SDK: `models.list()` for `openai` and `openai_compatible`, and
+for `anthropic`; for `google`, the models whose supported actions include
+`generateContent` (chat) or `embedContent` (embedding), without the `models/`
+prefix. The slot needs a provider, its key (or a base URL for
+`openai_compatible`) — but no model name, since finding one is the point.
+
+```json
+{"ok": true,  "models": ["llama-3-8b", "mistral-7b", "qwen-7b"], "truncated": false, "error": ""}
+{"ok": false, "models": [], "truncated": false, "error": "Connection error."}
+```
+
+Ids are sorted and de-duplicated. At most 500 are returned; `truncated` is
+`true` when the endpoint served more (the first 500 alphabetically). OpenAI's
+list carries no capability information, so an `openai`/`openai_compatible`
+embedding slot lists every model the endpoint serves. Failures follow the
+`/test` contract: `200` with `ok: false`, 30-second limit, same logging.
