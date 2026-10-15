@@ -160,7 +160,9 @@ function SplitFaq({
         >
           {renderRichText(eyebrow)}
         </p>
-        <div className="max-w-[var(--pb-split-content-max,none)]">
+        {/* min-w-0: a grid item's `min-width: auto` let a wide Markdown image
+            in an answer push the 2fr track past the coloured band. */}
+        <div className="min-w-0 max-w-[var(--pb-split-content-max,none)]">
           <div className="max-w-[var(--pb-faq-intro-max,none)]">
             {/* AccentText, not bare renderRichText: these are display headings
                 on `--pb-display-weight`, where a plain <strong>'s relative

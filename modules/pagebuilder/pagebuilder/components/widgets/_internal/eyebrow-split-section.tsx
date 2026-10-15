@@ -54,7 +54,7 @@ export function EyebrowSplitSection({
             {renderRichText(eyebrow)}
           </p>
         )}
-        <div className="max-w-[var(--pb-split-content-max,none)]">
+        <div className="min-w-0 max-w-[var(--pb-split-content-max,none)]">
           {/* AccentText, not bare renderRichText: this is a display heading on
 					    `--pb-display-weight`, where a plain <strong>'s relative `bolder`
 					    can compute to no visible change. */}

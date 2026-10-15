@@ -112,7 +112,7 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
                 {renderRichText(eyebrow)}
               </p>
             )}
-            <div className={eyebrow ? undefined : 'md:col-span-2'}>{content}</div>
+            <div className={cn('min-w-0', !eyebrow && 'md:col-span-2')}>{content}</div>
           </div>
         </section>
       );

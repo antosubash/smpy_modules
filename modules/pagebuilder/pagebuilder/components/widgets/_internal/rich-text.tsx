@@ -25,6 +25,7 @@ const LINK_PATTERN = new RegExp(
   'g',
 );
 const LINKED_IMAGE = new RegExp(String.raw`^\[(${IMAGE_SOURCE})\]\((${HREF_SOURCE})\)$`);
+const LINK = new RegExp(String.raw`^\[([^\]]+)\]\((${HREF_SOURCE})\)$`);
 
 // `<strong>`'s UA default `font-weight: bolder` is RELATIVE — inside
 // `font-light` (300) copy it computes to 400 and the bold is invisible. An
@@ -155,7 +156,7 @@ function renderRichTextNodes(text: string, opts?: RichTextOptions): ReactNode[] 
       out.push(linksAllowed ? anchor(linked[2], linkedImage, `l-${i}`) : linkedImage);
       continue;
     }
-    const match = /^\[([^\]]+)\]\(((?:[^\s()]|\([^\s()]*\))+)\)$/.exec(part);
+    const match = LINK.exec(part);
     if (match && isSafeHref(match[2])) {
       const [, label, href] = match;
       // Inside an `<a>`/`<button>`/`<summary>` an anchor can't be nested, so
