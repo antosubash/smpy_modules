@@ -88,7 +88,9 @@ export function CategoryRow({
         ⠿
       </span>
 
-      <div className="min-w-0 flex-1">
+      {/* min-w-[10rem] below sm: the name keeps room and the actions wrap
+          under it, instead of the name shrinking to "Q…". */}
+      <div className="min-w-[10rem] flex-1 sm:min-w-0">
         {editing ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <Input
