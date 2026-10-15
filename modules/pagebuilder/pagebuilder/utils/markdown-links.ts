@@ -5,9 +5,9 @@
 // A link href or image src: ONE level of balanced parentheses, so Wikipedia's
 // `..._(disambiguation)` survives. A naive `[^)]+` stops at the first `)`,
 // truncating the URL and leaking the remainder onto the page as stray text.
-export const HREF_SOURCE = String.raw`(?:[^\s()]|\([^\s()]*\))+`;
+const HREF_SOURCE = String.raw`(?:[^\s()]|\([^\s()]*\))+`;
 /** `![alt](src)` — the alt may be empty, as a decorative logo's is. */
-export const IMAGE_SOURCE = String.raw`!\[[^\]]*\]\(${HREF_SOURCE}\)`;
+const IMAGE_SOURCE = String.raw`!\[[^\]]*\]\(${HREF_SOURCE}\)`;
 
 // Split first, so a link's label can still carry the emphasis markers the
 // inline tokenizer understands ("[**Datenschutz**](/x)"). Anything the pattern
@@ -37,10 +37,7 @@ const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
  * visible rather than executable.
  */
 export function isSafeHref(href: string): boolean {
-  if (CONTROL_CHAR.test(href)) return false;
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(href);
-  if (!scheme) return true;
-  return ['http', 'https', 'mailto', 'tel'].includes(scheme[1].toLowerCase());
+  return hasAllowedScheme(href, ['http', 'https', 'mailto', 'tel']);
 }
 
 /**
@@ -49,9 +46,14 @@ export function isSafeHref(href: string): boolean {
  * way an unsafe link href does.
  */
 export function isSafeImageSrc(src: string): boolean {
-  if (CONTROL_CHAR.test(src)) return false;
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(src);
-  return !scheme || ['http', 'https'].includes(scheme[1].toLowerCase());
+  return hasAllowedScheme(src, ['http', 'https']);
+}
+
+/** Scheme-less, or one of `schemes`; never a URL with a control character. */
+function hasAllowedScheme(url: string, schemes: string[]): boolean {
+  if (CONTROL_CHAR.test(url)) return false;
+  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(url);
+  return !scheme || schemes.includes(scheme[1].toLowerCase());
 }
 
 export type LinkSegment =

@@ -22,7 +22,7 @@ export function SiteNavProvider({ nav, children }: { nav?: SiteNav | null; child
 }
 
 export function useSiteNavPages(slot: keyof SiteNav): SiteNavPage[] {
-  return useContext(SiteNavContext)[slot] ?? [];
+  return useContext(SiteNavContext)[slot];
 }
 
 /**

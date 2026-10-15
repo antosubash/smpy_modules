@@ -1,4 +1,4 @@
-import type { MarkdownList as MarkdownListBlock } from '../../../utils/markdown';
+import { childList, type MarkdownList as MarkdownListBlock } from '../../../utils/markdown';
 import { cn } from '../../../utils/widgetUtils';
 import { renderRichText } from './rich-text';
 
@@ -37,11 +37,7 @@ export function MarkdownList({
         <li key={i}>
           {renderRichText(item.text)}
           {item.children.length > 0 && (
-            <MarkdownList
-              list={{ type: item.childrenOrdered ? 'ol' : 'ul', items: item.children }}
-              className={NESTED_CLASS}
-              nested
-            />
+            <MarkdownList list={childList(item)} className={NESTED_CLASS} nested />
           )}
         </li>
       ))}

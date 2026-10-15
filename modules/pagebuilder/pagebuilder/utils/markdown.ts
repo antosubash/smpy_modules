@@ -239,13 +239,15 @@ export function inlineMarkdownToHtml(text: string): string {
     .join('');
 }
 
+/** An item's nested list, which takes the kind of its first child. */
+export function childList(item: MarkdownListItem): MarkdownList {
+  return { type: item.childrenOrdered ? 'ol' : 'ul', items: item.children };
+}
+
 function listToHtml(list: MarkdownList): string {
   const html = list.items
     .map((item) => {
-      const nested =
-        item.children.length > 0
-          ? listToHtml({ type: item.childrenOrdered ? 'ol' : 'ul', items: item.children })
-          : '';
+      const nested = item.children.length > 0 ? listToHtml(childList(item)) : '';
       return `<li>${inlineMarkdownToHtml(item.text)}${nested}</li>`;
     })
     .join('');

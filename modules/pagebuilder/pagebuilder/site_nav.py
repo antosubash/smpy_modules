@@ -10,8 +10,6 @@ editor, and the flag stops adding a second copy.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import TypedDict
 
 from sqlalchemy import or_
@@ -65,13 +63,3 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
             nav["footer"].append(link)
     return nav
 
-
-def nav_stamp(nav: SiteNav) -> str:
-    """A short digest of ``nav`` for the public page's ETag.
-
-    Flagging, renaming or publishing *another* page changes this page's chrome
-    while neither its own ``updated_at`` nor the layout's moves, so without this
-    a browser holding the page would keep the old header until the page itself
-    was edited.
-    """
-    return hashlib.sha1(json.dumps(nav, sort_keys=True).encode()).hexdigest()[:16]

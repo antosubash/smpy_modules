@@ -15,6 +15,7 @@ rewriting an address that already exists.
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -53,8 +54,9 @@ def _etag_for(
     with a full page or Inertia's JSON, and a shared tag lets a browser holding
     the page get a 304 for the JSON request and hand Inertia cached HTML.
 
-    ``nav`` is :func:`pagebuilder.site_nav.nav_stamp` — the flagged pages in
-    the chrome, which change without this page or the layout changing.
+    ``nav`` is the serialised :func:`pagebuilder.site_nav.site_nav` list. Flagging,
+    renaming or publishing *another* page changes this page's chrome while neither
+    its own ``updated_at`` nor the layout's moves.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
     layout_stamp = (
@@ -180,7 +182,7 @@ async def render_public_page(
     nav = await site_nav.site_nav(db, settings.public_route_prefix, page.locale)
     variant = "inertia" if request.headers.get("x-inertia") else "html"
     etag = _etag_for(
-        page.id or 0, page.updated_at, layout.updated_at, variant, site_nav.nav_stamp(nav)
+        page.id or 0, page.updated_at, layout.updated_at, variant, json.dumps(nav, sort_keys=True)
     )
     cache_parts = [f"max-age={settings.public_cache_max_age}"]
     if settings.public_cache_swr > 0:
