@@ -8,6 +8,13 @@ The module owns **connection** configuration — provider, endpoint, key, model
 name. Consuming modules own **behaviour** — agents, prompts, temperature,
 retries, streaming.
 
+**Full documentation** lives in [`docs/`](docs/index.md):
+[user guide](docs/user-guide.md) (the AI settings page),
+[API reference](docs/api-reference.md) (the `sm_ai.contracts` API and the HTTP
+routes), [operations](docs/operations.md) (install, settings and `SM_AI_*`
+env fallback, key rotation, troubleshooting) and
+[architecture](docs/architecture.md).
+
 ## Install
 
 ```bash

@@ -1,7 +1,7 @@
 # `records` — a generic structured-content module
 
 **Date:** 2026-09-19
-**Status:** design (proposed — not yet implemented)
+**Status:** implemented — shipped in #37 (Phases 1–5). This is the design as proposed; the module as built is documented in [`modules/records/docs/`](../../modules/records/docs/index.md), which wins where the two differ.
 **Repo:** `smpy_modules` (a distributable add-on, published as `simple_module_records`)
 **Prior art this follows:** [YesSql](https://github.com/sebastienros/yessql) and the
 content layer Orchard Core builds on it.
