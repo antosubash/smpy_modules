@@ -85,6 +85,9 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
       >
         <Input
           id={TAG_INPUT_ID}
+          // min-w-0: a flex item's min-content width otherwise keeps the
+          // input full-size and pushes the button past a phone's edge.
+          className="min-w-0"
           aria-label={t(keys.news.tags.find_or_create)}
           placeholder={t(keys.news.tags.find_or_create)}
           value={draft}
