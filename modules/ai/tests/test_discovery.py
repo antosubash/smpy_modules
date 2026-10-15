@@ -217,6 +217,19 @@ class TestProbeLogging:
         assert body["ok"] is False
         assert all(record.exc_info is None for record in caplog.records)
 
+    async def test_unreadable_key_logs_one_line(self, client, monkeypatch, caplog):
+        from sm_ai.contracts.errors import AiKeyUnreadableError
+
+        async def unreadable(settings, slot):
+            raise AiKeyUnreadableError("chat_api_key")
+
+        monkeypatch.setattr(discovery, "list_models", unreadable)
+        _install()
+        with caplog.at_level(logging.WARNING, logger="sm_ai.endpoints.api"):
+            await client.post("/api/ai/models", json={"slot": "chat"})
+        [record] = caplog.records
+        assert record.exc_info is None
+
     async def test_unexpected_error_keeps_the_traceback(self, client, monkeypatch, caplog):
         async def broken(settings, slot):
             raise AttributeError("SDK changed")

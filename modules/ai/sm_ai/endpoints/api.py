@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 from simple_module_hosting.permissions import RequiresPermission
 
 from sm_ai import constants, services
-from sm_ai.contracts.errors import AiNotConfiguredError
+from sm_ai.contracts.errors import AiError
 from sm_ai.contracts.schemas import (
     AiModelsResult,
     AiSettingsOut,
@@ -119,7 +119,7 @@ def _log_probe_failure(what: str, slot: str, exc: Exception) -> None:
     Anything else may be a real defect — a pydantic-ai or SDK API change — and
     keeps the traceback, without which it would read like a config problem.
     """
-    if isinstance(exc, (AiNotConfiguredError, *_provider_errors())):
+    if isinstance(exc, (AiError, *_provider_errors())):
         logger.warning("AI %s %s failed: %s", slot, what, exc)
     else:
         logger.warning("AI %s %s failed", slot, what, exc_info=exc)

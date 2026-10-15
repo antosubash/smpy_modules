@@ -68,7 +68,7 @@ test.describe('AI settings', () => {
     await page.getByRole('button', { name: 'Load models' }).first().click();
     const result = page.getByTestId('ai-chat-models-result');
     await expect(result).toBeVisible({ timeout: 45_000 });
-    await expect(result).not.toContainText('models —');
+    await expect(result).not.toContainText('Models found');
     // A failed listing offers no suggestions; the field stays free text.
     await expect(page.locator('#ai-chat-model')).not.toHaveAttribute('list', /.+/);
   });
