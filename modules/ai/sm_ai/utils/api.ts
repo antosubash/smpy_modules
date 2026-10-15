@@ -23,6 +23,12 @@ export type TestResult = {
   error: string;
 };
 
+export type ModelsResult = {
+  ok: boolean;
+  models: string[];
+  error: string;
+};
+
 export type SlotValues = {
   provider: string;
   model: string;
@@ -113,6 +119,18 @@ export async function saveSettings(
 export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> {
   return checkedJson(
     await fetch(`${BASE}/test`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+      body: JSON.stringify({ slot }),
+    }),
+  );
+}
+
+/** The model ids the slot's *saved* endpoint serves. Failure is `ok: false`. */
+export async function listModels(slot: 'chat' | 'embedding'): Promise<ModelsResult> {
+  return checkedJson(
+    await fetch(`${BASE}/models`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', ...csrfHeader() },

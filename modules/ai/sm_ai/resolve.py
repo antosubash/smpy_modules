@@ -19,11 +19,13 @@ if TYPE_CHECKING:
 
     from sm_ai.settings import AiSettings
 
-def _slot_inputs(
+def slot_inputs(
     settings: AiSettings,
     slot: str,
     allowed: tuple[str, ...],
     model_override: str | None = None,
+    *,
+    require_model: bool = True,
 ) -> tuple[str, str, str, str]:
     """Validate one slot's settings; returns (provider_id, model, key, base_url).
 
@@ -46,7 +48,8 @@ def _slot_inputs(
         )
         raise AiNotConfiguredError(f"{slot}_provider", hint)
     model = (model_override or getattr(settings, f"{slot}_model")).strip()
-    if not model:
+    # Discovery asks precisely because the model is missing or unknown.
+    if not model and require_model:
         raise AiNotConfiguredError(f"{slot}_model")
 
     key = crypto.decrypt_value(getattr(settings, f"{slot}_api_key"), f"{slot}_api_key")
@@ -71,7 +74,7 @@ def build_chat_model(settings: AiSettings, model_name: str | None = None) -> Mod
     ``model_name`` overrides the configured name for same-endpoint
     multi-model setups (e.g. a vision and a text model on one vLLM server).
     """
-    provider_id, name, key, base_url = _slot_inputs(
+    provider_id, name, key, base_url = slot_inputs(
         settings, constants.SLOT_CHAT, constants.CHAT_PROVIDERS, model_name
     )
 
@@ -107,7 +110,7 @@ def build_embedder(settings: AiSettings) -> Embedder:
     """A ready ``Embedder`` for the configured embedding slot."""
     from pydantic_ai import Embedder
 
-    provider_id, name, key, base_url = _slot_inputs(
+    provider_id, name, key, base_url = slot_inputs(
         settings, constants.SLOT_EMBEDDING, constants.EMBEDDING_PROVIDERS
     )
 

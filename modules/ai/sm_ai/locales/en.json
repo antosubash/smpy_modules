@@ -36,7 +36,10 @@
     "vector_dimension_hint": "Vector stores fix collection width to this — changing it means re-indexing.",
     "test_connection": "Test connection",
     "save_first": "Save your changes first — the test runs against saved settings.",
-    "test_ok": "OK — {model} ({latency} ms)"
+    "test_ok": "OK — {model} ({latency} ms)",
+    "load_models": "Load models",
+    "models_loaded": "{count} models — pick one in the Model field",
+    "models_none": "The endpoint lists no models for this slot."
   },
   "api": {
     "request_failed": "Request failed ({status} {statusText})"

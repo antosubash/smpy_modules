@@ -111,6 +111,14 @@ class AiTestRequest(SQLModel):
         return value
 
 
+class AiModelsResult(SQLModel):
+    """What a slot's endpoint serves. Failure is a result, never a 500."""
+
+    ok: bool
+    models: list[str] = []
+    error: str = ""
+
+
 class AiTestResult(SQLModel):
     """Outcome of one test call. Failure is a result, never a 500."""
 

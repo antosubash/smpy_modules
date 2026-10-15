@@ -9,7 +9,9 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 
-import type { SlotValues, TestResult } from '../utils/api';
+import { useId, useState } from 'react';
+
+import type { ModelsResult, SlotValues, TestResult } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 
 const OPENAI_COMPATIBLE = 'openai_compatible';
@@ -27,6 +29,7 @@ export function SlotCard({
   testResult,
   onChange,
   onTest,
+  onLoadModels,
 }: {
   title: string;
   description: string;
@@ -42,11 +45,27 @@ export function SlotCard({
   testResult: TestResult | null;
   onChange: (next: SlotValues) => void;
   onTest: () => void;
+  /** Lists what the *saved* endpoint serves; failure is `ok: false`. */
+  onLoadModels: () => Promise<ModelsResult>;
 }) {
   const { t } = useT();
   const c = keys.ai.card;
   const set = (patch: Partial<SlotValues>) => onChange({ ...values, ...patch });
   const needsUrl = values.provider === OPENAI_COMPATIBLE;
+  const listId = useId();
+  const [models, setModels] = useState<ModelsResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadModels = async () => {
+    setLoading(true);
+    try {
+      setModels(await onLoadModels());
+    } catch (err) {
+      setModels({ ok: false, models: [], error: (err as Error).message });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Card>
@@ -92,7 +111,17 @@ export function SlotCard({
             onChange={(e) => set({ model: e.target.value })}
             placeholder={t(c.model_placeholder)}
             disabled={busy}
+            // Suggestions, not a select: a model the server does not list (an
+            // alias, a just-deployed one) must still be enterable.
+            list={models?.ok ? listId : undefined}
           />
+          {models?.ok && (
+            <datalist id={listId}>
+              {models.models.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-url`}>
@@ -145,7 +174,7 @@ export function SlotCard({
             <p className="text-xs text-muted-foreground">{t(c.vector_dimension_hint)}</p>
           </div>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="outline"
@@ -154,6 +183,15 @@ export function SlotCard({
             onClick={onTest}
           >
             {t(c.test_connection)}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy || dirty || loading}
+            onClick={loadModels}
+          >
+            {t(c.load_models)}
           </Button>
           {dirty && <span className="text-xs text-muted-foreground">{t(c.save_first)}</span>}
           {!dirty && testResult && (
@@ -167,6 +205,18 @@ export function SlotCard({
             </span>
           )}
         </div>
+        {!dirty && models && (
+          <p
+            data-testid={`${idPrefix}-models-result`}
+            className={models.ok ? 'text-xs text-muted-foreground' : 'text-sm text-destructive'}
+          >
+            {!models.ok
+              ? models.error
+              : models.models.length > 0
+                ? t(c.models_loaded, { count: models.models.length })
+                : t(c.models_none)}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
