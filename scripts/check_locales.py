@@ -67,11 +67,9 @@ def check_dir(locales: Path) -> list[str]:
 
 
 def discover(root: Path) -> list[Path]:
-    return sorted(
-        path
-        for path in (root / "modules").glob("*/*/locales")
-        if path.is_dir() and "node_modules" not in path.parts
-    )
+    """Every module's catalogues, plus the host's vendored ``packages/*/locales``."""
+    found = [*(root / "modules").glob("*/*/locales"), *(root / "packages").glob("*/locales")]
+    return sorted(path for path in found if path.is_dir() and "node_modules" not in path.parts)
 
 
 def main(argv: list[str] | None = None) -> int:

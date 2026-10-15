@@ -50,4 +50,21 @@ test.describe('Console in German', () => {
     await page.goto('/pagebuilder/');
     await expect(page.getByRole('heading', { name: 'Pages', exact: true })).toBeVisible();
   });
+  test('the header language switcher changes the console language', async ({ page, context }) => {
+    // Start from English: the beforeEach cookie is German.
+    await context.addCookies([
+      { name: 'locale', value: 'en', url: new URL('/', page.url()).toString() },
+    ]);
+    await page.goto('/pagebuilder/');
+    await expect(page.getByRole('heading', { name: 'Pages', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Change language' }).first().click();
+    await page.getByRole('menuitem', { name: /Deutsch/ }).click();
+
+    // Back on the same screen, now in German — and it stays German.
+    await expect(page).toHaveURL(/\/pagebuilder\/$/);
+    await expect(page.getByRole('heading', { name: 'Seiten', exact: true })).toBeVisible();
+    await page.goto('/ai/');
+    await expect(page.getByRole('heading', { name: 'KI', exact: true })).toBeVisible();
+  });
 });
