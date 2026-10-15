@@ -70,15 +70,8 @@ async def test_connection(data: AiTestRequest) -> AiTestResult:
             else:
                 label = settings.embedding_model
                 await resolve.build_embedder(settings).embed_query(constants.TEST_PROMPT)
-    except TimeoutError:
-        return AiTestResult(
-            ok=False,
-            model=label,
-            error=f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s.",
-        )
     except Exception as exc:  # a failed probe is a result, not a bug
-        _log_probe_failure("test probe", data.slot, exc)
-        return AiTestResult(ok=False, model=label, error=str(exc) or type(exc).__name__)
+        return AiTestResult(ok=False, model=label, error=_probe_error("test probe", data.slot, exc))
     return AiTestResult(
         ok=True, model=label, latency_ms=int((time.monotonic() - started) * 1000)
     )
@@ -96,18 +89,25 @@ async def list_models(data: AiTestRequest) -> AiModelsResult:
     try:
         async with asyncio.timeout(constants.TEST_TIMEOUT_SECONDS):
             models = await discovery.list_models(services.current_settings(), data.slot)
-    except TimeoutError:
-        return AiModelsResult(
-            ok=False, error=f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s."
-        )
     except Exception as exc:
-        _log_probe_failure("model listing", data.slot, exc)
-        return AiModelsResult(ok=False, error=str(exc) or type(exc).__name__)
+        return AiModelsResult(ok=False, error=_probe_error("model listing", data.slot, exc))
     return AiModelsResult(
         ok=True,
         models=models[: discovery.MAX_MODELS],
         truncated=len(models) > discovery.MAX_MODELS,
     )
+
+
+def _probe_error(what: str, slot: str, exc: Exception) -> str:
+    """The message a failed probe shows on the card, logged on the way.
+
+    A timeout is our own deadline, not the provider's failure, so it is not
+    logged at all.
+    """
+    if isinstance(exc, TimeoutError):
+        return f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s."
+    _log_probe_failure(what, slot, exc)
+    return str(exc) or type(exc).__name__
 
 
 def _log_probe_failure(what: str, slot: str, exc: Exception) -> None:

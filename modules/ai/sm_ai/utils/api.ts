@@ -118,9 +118,10 @@ export async function saveSettings(
   );
 }
 
-export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> {
+/** A slot action against the *saved* settings. Failure is `ok: false`, not a throw. */
+async function postSlot<T>(path: string, slot: 'chat' | 'embedding'): Promise<T> {
   return checkedJson(
-    await fetch(`${BASE}/test`, {
+    await fetch(`${BASE}/${path}`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', ...csrfHeader() },
@@ -129,14 +130,11 @@ export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> 
   );
 }
 
-/** The model ids the slot's *saved* endpoint serves. Failure is `ok: false`. */
+export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> {
+  return postSlot('test', slot);
+}
+
+/** The model ids the slot's *saved* endpoint serves. */
 export async function listModels(slot: 'chat' | 'embedding'): Promise<ModelsResult> {
-  return checkedJson(
-    await fetch(`${BASE}/models`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
-      body: JSON.stringify({ slot }),
-    }),
-  );
+  return postSlot('models', slot);
 }
