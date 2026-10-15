@@ -25,9 +25,10 @@ def first_image(data: Any) -> str | None:
             if isinstance(src, str) and src.strip():
                 return src.strip()
         children = [data.get(key) for key in _ORDER]
-        if "type" not in data:
-            # A zones map or a block's props: any value may hold blocks (slots
-            # live under arbitrary prop names, and inside array items).
+        if not ("type" in data and "props" in data):
+            # Not a block, so a zones map or a block's props: any value may hold
+            # blocks (slots live under arbitrary prop names, and inside array
+            # items). A props dict can itself have a ``type`` key.
             children += [value for key, value in data.items() if key not in _ORDER]
     elif isinstance(data, list):
         children = data

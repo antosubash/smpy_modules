@@ -30,6 +30,11 @@ def test_first_image_reads_legacy_zones_and_ignores_blank_src() -> None:
     assert first_image(data) == "/media/zone.png"
 
 
+def test_props_with_a_type_key_are_still_walked() -> None:
+    block = {"type": "ListWidget", "props": {"type": "grid", "items": [_image("/media/slot.png")]}}
+    assert first_image({"content": [block]}) == "/media/slot.png"
+
+
 def test_no_image_is_none() -> None:
     assert first_image({"content": [{"type": "Hero", "props": {"image": "/x.png"}}]}) is None
     assert og_image(None, {}, "https://site.example") is None
