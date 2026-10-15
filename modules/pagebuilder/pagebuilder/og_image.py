@@ -11,6 +11,11 @@ from __future__ import annotations
 
 from typing import Any
 
+# Visited first and in this order, whatever order the stored JSON keeps its
+# keys in: Postgres JSONB sorts them shortest-first, which would put legacy
+# zones ahead of the page's own content.
+_ORDER = ("content", "props", "zones")
+
 
 def first_image(data: Any) -> str | None:
     """The ``src`` of the first Image block in a Puck document, if any."""
@@ -19,23 +24,19 @@ def first_image(data: Any) -> str | None:
             src = (data.get("props") or {}).get("src")
             if isinstance(src, str) and src.strip():
                 return src.strip()
-        for key in ("content", "props", "zones"):
-            found = first_image(data.get(key))
-            if found:
-                return found
+        children = [data.get(key) for key in _ORDER]
         if "type" not in data:
-            # A zones map or a block's props: every value may hold blocks.
-            for key, value in data.items():
-                if key in ("content", "props", "zones"):
-                    continue
-                found = first_image(value)
-                if found:
-                    return found
+            # A zones map or a block's props: any value may hold blocks (slots
+            # live under arbitrary prop names, and inside array items).
+            children += [value for key, value in data.items() if key not in _ORDER]
     elif isinstance(data, list):
-        for item in data:
-            found = first_image(item)
-            if found:
-                return found
+        children = data
+    else:
+        return None
+    for child in children:
+        found = first_image(child)
+        if found:
+            return found
     return None
 
 
@@ -48,4 +49,4 @@ def og_image(explicit: str | None, data: Any, base_url: str) -> str | None:
     src = (explicit or "").strip() or first_image(data)
     if src and src.startswith("/") and not src.startswith("//"):
         return f"{base_url}{src}"
-    return src or None
+    return src
