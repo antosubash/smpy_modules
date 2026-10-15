@@ -85,6 +85,11 @@ describe('flagged pages in the site footer', () => {
     expect(hrefs(out)).toEqual(['/', '/p/imprint/', '/p/contact']);
   });
 
+  it('tolerate a saved layout link with no href', () => {
+    const links = [{ label: 'Blank' }] as unknown as SiteFooterWidgetProps['links'];
+    expect(footer(NAV, { links })).toContain('>Imprint<');
+  });
+
   it('show even when the layout has no links of its own', () => {
     expect(footer(NAV, { links: [] })).toContain('>Imprint<');
   });

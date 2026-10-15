@@ -103,7 +103,7 @@ export function parseMarkdownBlocks(
     // As in CommonMark, only `1.` may interrupt a paragraph: a wrapped line that
     // happens to start with a year ("…founded in\n2019. Since then…") is prose.
     const numbered = bullet ? null : NUMBERED.exec(line);
-    const startsList = numbered && (paragraph.length === 0 || Number(numbered[2]) === 1);
+    const startsList = !!numbered && (paragraph.length === 0 || Number(numbered[2]) === 1);
     if (!line.trim()) {
       flushParagraph();
       flushList();

@@ -44,6 +44,9 @@ export function appendPages<T>(
 
 // An author typing `/p/about/` in the layout means the page the server lists as
 // `/p/about`.
-function withoutTrailingSlash(href: string): string {
+// Saved layouts can carry a missing href (the widgets guard `link.href || '#'`),
+// so tolerate it instead of throwing during render.
+function withoutTrailingSlash(href: string | undefined): string {
+  if (!href) return '';
   return href.length > 1 ? href.replace(/\/+$/, '') : href;
 }

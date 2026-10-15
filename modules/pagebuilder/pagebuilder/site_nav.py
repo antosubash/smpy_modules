@@ -33,8 +33,9 @@ class SiteNav(TypedDict):
 async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
     """Flagged, published pages in ``locale``, ordered by title, ignoring case.
 
-    ``lower()`` because SQLite and PostgreSQL disagree about where "about"
-    sorts against "Zebra", and the nav must read the same on both.
+    ``lower()`` so "about" and "Zebra" sort alphabetically on SQLite and
+    PostgreSQL alike. Accented or punctuated titles can still follow each
+    database's collation.
 
     Only the page's own language: a German page's header linking to the English
     "About" would drop a reader into the wrong language with no way back. The
