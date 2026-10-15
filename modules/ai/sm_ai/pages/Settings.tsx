@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { SlotCard } from '../components/SlotCard';
 import {
   type AiSettingsOut,
+  listModels,
   loadSettings,
   type SlotValues,
   saveSettings,
@@ -137,6 +138,7 @@ function Settings() {
               testResult={chatTest}
               onChange={setChat}
               onTest={() => test('chat')}
+              onLoadModels={() => listModels('chat')}
             />
             <SlotCard
               title={t(keys.ai.slots.embedding_title)}
@@ -151,6 +153,7 @@ function Settings() {
               testResult={embeddingTest}
               onChange={setEmbedding}
               onTest={() => test('embedding')}
+              onLoadModels={() => listModels('embedding')}
             />
             <Button type="button" disabled={busy} onClick={save}>
               {t(keys.ai.settings.save)}

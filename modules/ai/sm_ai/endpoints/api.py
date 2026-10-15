@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import time
 
@@ -10,7 +11,9 @@ from fastapi import APIRouter, Depends
 from simple_module_hosting.permissions import RequiresPermission
 
 from sm_ai import constants, services
+from sm_ai.contracts.errors import AiError
 from sm_ai.contracts.schemas import (
+    AiModelsResult,
     AiSettingsOut,
     AiSettingsUpdate,
     AiTestRequest,
@@ -68,18 +71,70 @@ async def test_connection(data: AiTestRequest) -> AiTestResult:
             else:
                 label = settings.embedding_model
                 await resolve.build_embedder(settings).embed_query(constants.TEST_PROMPT)
-    except TimeoutError:
-        return AiTestResult(
-            ok=False,
-            model=label,
-            error=f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s.",
-        )
     except Exception as exc:  # a failed probe is a result, not a bug
-        # ... but log it server-side with the traceback: without this an
-        # actual code defect (e.g. a pydantic-ai API change) is
-        # indistinguishable from a config problem in the inline error string.
-        logger.warning("AI %s test probe failed", data.slot, exc_info=exc)
-        return AiTestResult(ok=False, model=label, error=str(exc) or type(exc).__name__)
+        return AiTestResult(ok=False, model=label, error=_probe_error("test probe", data.slot, exc))
     return AiTestResult(
         ok=True, model=label, latency_ms=int((time.monotonic() - started) * 1000)
     )
+
+
+@router.post("/models", response_model=AiModelsResult, dependencies=[_MANAGE])
+async def list_models(data: AiTestRequest) -> AiModelsResult:
+    """The model ids the slot's *saved* endpoint serves, for the model field.
+
+    Same contract as the test probe: any failure is ``ok: false`` with the
+    message, so a wrong URL or key reads as a result on the card.
+    """
+    from sm_ai import discovery
+
+    try:
+        async with asyncio.timeout(constants.TEST_TIMEOUT_SECONDS):
+            models = await discovery.list_models(services.current_settings(), data.slot)
+    except Exception as exc:
+        return AiModelsResult(ok=False, error=_probe_error("model listing", data.slot, exc))
+    return AiModelsResult(
+        ok=True,
+        models=models[: discovery.MAX_MODELS],
+        truncated=len(models) > discovery.MAX_MODELS,
+    )
+
+
+def _probe_error(what: str, slot: str, exc: Exception) -> str:
+    """The message a failed probe shows on the card, logged on the way.
+
+    A timeout is our own deadline, not the provider's failure, so it is not
+    logged at all.
+    """
+    if isinstance(exc, TimeoutError):
+        return f"Timed out after {constants.TEST_TIMEOUT_SECONDS}s."
+    _log_probe_failure(what, slot, exc)
+    return str(exc) or type(exc).__name__
+
+
+def _log_probe_failure(what: str, slot: str, exc: Exception) -> None:
+    """One line for an expected failure, a traceback for anything else.
+
+    An unreachable server, a refused key or a provider's error status is a
+    configuration problem the card already shows; its stack frames are noise.
+    Anything else may be a real defect — a pydantic-ai or SDK API change — and
+    keeps the traceback, without which it would read like a config problem.
+    """
+    if isinstance(exc, (AiError, *_provider_errors())):
+        logger.warning("AI %s %s failed: %s", slot, what, exc)
+    else:
+        logger.warning("AI %s %s failed", slot, what, exc_info=exc)
+
+
+@functools.cache
+def _provider_errors() -> tuple[type[BaseException], ...]:
+    """Exception types that mean "the provider said no", imported lazily."""
+    import httpx
+    from anthropic import APIError as AnthropicError
+    from google.genai.errors import APIError as GoogleError
+    from openai import APIError as OpenAIError
+
+    # ModelAPIError, not just ModelHTTPError: pydantic-ai wraps a refused
+    # connection in the former, and that is the commonest failure of all.
+    from pydantic_ai.exceptions import ModelAPIError
+
+    return (httpx.HTTPError, OpenAIError, AnthropicError, GoogleError, ModelAPIError)

@@ -73,6 +73,7 @@ the change up on restart.
 | `GET /ai/` | admin settings page |
 | `GET`/`PUT /api/ai/settings` | read (secrets masked) / update |
 | `POST /api/ai/test` | probe the chat or embedding slot |
+| `POST /api/ai/models` | list the model ids the slot's saved endpoint serves (first 500, sorted) |
 
 Writes require an `X-CSRF-Token` header bound to the session (the admin page
 sends it automatically; the token is mirrored to the `sm_ai_csrf` cookie).

@@ -58,4 +58,18 @@ test.describe('AI settings', () => {
     await expect(page.getByTestId('ai-chat-test-result')).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId('ai-chat-test-result')).not.toContainText('OK —');
   });
+
+  test('load models reports an unreachable endpoint inline', async ({ page }) => {
+    await page.locator('#ai-chat-provider').selectOption('openai_compatible');
+    await page.locator('#ai-chat-model').fill('some-model');
+    await page.locator('#ai-chat-url').fill('http://127.0.0.1:1/v1');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('AI settings saved')).toBeVisible();
+    await page.getByRole('button', { name: 'Load models' }).first().click();
+    const result = page.getByTestId('ai-chat-models-result');
+    await expect(result).toBeVisible({ timeout: 45_000 });
+    await expect(result).not.toContainText('Models found');
+    // A failed listing offers no suggestions; the field stays free text.
+    await expect(page.locator('#ai-chat-model')).not.toHaveAttribute('list', /.+/);
+  });
 });

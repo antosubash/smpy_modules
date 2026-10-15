@@ -23,6 +23,14 @@ export type TestResult = {
   error: string;
 };
 
+export type ModelsResult = {
+  ok: boolean;
+  models: string[];
+  /** More were served than the API returns; the list is the first of them. */
+  truncated?: boolean;
+  error: string;
+};
+
 export type SlotValues = {
   provider: string;
   model: string;
@@ -110,13 +118,23 @@ export async function saveSettings(
   );
 }
 
-export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> {
+/** A slot action against the *saved* settings. Failure is `ok: false`, not a throw. */
+async function postSlot<T>(path: string, slot: 'chat' | 'embedding'): Promise<T> {
   return checkedJson(
-    await fetch(`${BASE}/test`, {
+    await fetch(`${BASE}/${path}`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       body: JSON.stringify({ slot }),
     }),
   );
+}
+
+export async function testSlot(slot: 'chat' | 'embedding'): Promise<TestResult> {
+  return postSlot('test', slot);
+}
+
+/** The model ids the slot's *saved* endpoint serves. */
+export async function listModels(slot: 'chat' | 'embedding'): Promise<ModelsResult> {
+  return postSlot('models', slot);
 }
