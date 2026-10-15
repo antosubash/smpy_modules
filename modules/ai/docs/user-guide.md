@@ -86,6 +86,20 @@ single word: ok"; Embeddings embeds the same text.
 Run **Test connection** after every change. The modules that use AI only
 discover a bad key or URL when they make their own call.
 
+## Load models
+
+Beside **Test connection**, **Load models** asks the slot's *saved* endpoint
+which models it serves and offers them as suggestions in the **Model** field.
+The field stays free text, so a model the server does not list (an alias) can
+still be typed.
+
+- Like the test, the button is disabled while the card has unsaved edits.
+- Success shows **Models found: `<n>` — pick one in the Model field**; above
+  500 models it shows the first 500 alphabetically and says so.
+- Failure shows the error in red, the same way a failed test does.
+- Changing the provider, URL or key clears the suggestions, since they
+  described the old endpoint.
+
 ## "The stored key … cannot be decrypted"
 
 This message, in a test result or from a module, means the server's

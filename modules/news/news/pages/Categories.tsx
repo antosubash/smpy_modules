@@ -103,6 +103,7 @@ export default function Categories() {
           }}
         >
           <Input
+            className="min-w-0"
             aria-label={t(keys.news.categories.new_label)}
             placeholder={t(keys.news.categories.new_placeholder)}
             value={draftName}
@@ -118,7 +119,7 @@ export default function Categories() {
       <Head title={t(keys.news.categories.title)} />
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* No heading of its own: PageShell already renders "Categories" as
             the page h1, and a second one only duplicates the accessible name. */}
         <section className="space-y-3">

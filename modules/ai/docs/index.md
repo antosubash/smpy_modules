@@ -59,5 +59,6 @@ with a key derived from `SM_SECRET_KEY` and stored as `enc:v1:…`. Consumers
 call `sm_ai.contracts.resolve_model()` or `resolve_embedder()`, which build a
 fresh Pydantic AI object from the current settings on every call. They make no
 network request; a wrong key or URL fails in the consumer's own call. The only
-time the module itself calls a provider is the **Test connection** button.
+times the module itself calls a provider are the **Test connection** and
+**Load models** buttons.
 Every route requires the `ai.manage` permission.

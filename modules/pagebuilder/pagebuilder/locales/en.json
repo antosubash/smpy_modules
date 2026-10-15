@@ -147,11 +147,15 @@
       "slides_image_url": "Image URL"
     },
     "categories": {
+      "actions": "Actions",
       "chrome": "Site chrome",
       "collections": "Collections",
       "forms": "Forms",
       "interactive": "Interactive",
+      "layout": "Layout",
+      "media": "Media",
       "sections": "Sections",
+      "typography": "Typography",
       "utility": "Utility"
     },
     "centered_hero": {
@@ -577,6 +581,8 @@
       "privacy_text": "Consent text (*word* links to the privacy link)"
     },
     "page": {
+      "title": "Title",
+      "width": "Width",
       "width_contained": "Contained",
       "width_full": "Full width"
     },
@@ -1375,5 +1381,12 @@
     "submitted": "Submitted for review.",
     "unpublish_failed": "Unpublish failed",
     "unpublished": "Unpublished."
+  },
+  "menu": {
+    "pages": "Pages",
+    "layout": "Site layout",
+    "media": "Media library",
+    "import_export": "Import / Export",
+    "group_site": "Site"
   }
 }

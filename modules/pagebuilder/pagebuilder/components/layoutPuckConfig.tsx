@@ -37,16 +37,19 @@ export function getLayoutPuckConfig(): Config {
       title: keys.pagebuilder.blocks.categories.chrome,
       components: ['SiteHeader', 'SiteFooter'],
     },
-    typography: { components: ['Heading', 'Text'] },
-    media: { components: ['Image'] },
-    actions: { components: ['Button'] },
+    typography: {
+      title: keys.pagebuilder.blocks.categories.typography,
+      components: ['Heading', 'Text'],
+    },
+    media: { title: keys.pagebuilder.blocks.categories.media, components: ['Image'] },
+    actions: { title: keys.pagebuilder.blocks.categories.actions, components: ['Button'] },
     // The partner strip under the GCA footer is this widget rather than markup
     // baked into SiteFooter, so an author can reorder or drop it.
     collections: {
       title: keys.pagebuilder.blocks.categories.collections,
       components: ['LogoCloud'],
     },
-    layout: { components: ['Spacer', 'Divider'] },
+    layout: { title: keys.pagebuilder.blocks.categories.layout, components: ['Spacer', 'Divider'] },
     // Offered in the site-layout editor before the palette was curated, so a
     // header or footer saved back then may contain one. Kept registered — Puck
     // renders nothing at all for a type its config doesn't know, with no error

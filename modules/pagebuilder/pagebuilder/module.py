@@ -36,6 +36,8 @@ _LOCALE_NAMESPACE = _PACKAGE
 _MODULE_SETTINGS = "Settings"
 
 _MENU_GROUP = "Site"
+#: Catalogue keys under this module's namespace (`pagebuilder.menu.*`).
+_MENU_KEY = f"{_LOCALE_NAMESPACE}.menu"
 _URL_PAGES = "/pagebuilder/"
 _URL_LAYOUT = "/pagebuilder/layout"
 _URL_MEDIA = "/pagebuilder/media"
@@ -118,35 +120,43 @@ class PagebuilderModule(ModuleBase):
             [
                 MenuItem(
                     label="Pages",
+                    label_key=f"{_MENU_KEY}.pages",
                     url=_URL_PAGES,
                     icon=_ICON_PAGES,
                     order=200,
                     section=MenuSection.SIDEBAR,
                     group=_MENU_GROUP,
+                    group_key=f"{_MENU_KEY}.group_site",
                 ),
                 MenuItem(
                     label="Site layout",
+                    label_key=f"{_MENU_KEY}.layout",
                     url=_URL_LAYOUT,
                     icon=_ICON_LAYOUT,
                     order=210,
                     section=MenuSection.SIDEBAR,
                     group=_MENU_GROUP,
+                    group_key=f"{_MENU_KEY}.group_site",
                 ),
                 MenuItem(
                     label="Media library",
+                    label_key=f"{_MENU_KEY}.media",
                     url=_URL_MEDIA,
                     icon=_ICON_MEDIA,
                     order=220,
                     section=MenuSection.SIDEBAR,
                     group=_MENU_GROUP,
+                    group_key=f"{_MENU_KEY}.group_site",
                 ),
                 MenuItem(
                     label="Import / Export",
+                    label_key=f"{_MENU_KEY}.import_export",
                     url=_URL_CONTENT,
                     icon=_ICON_CONTENT,
                     order=230,
                     section=MenuSection.SIDEBAR,
                     group=_MENU_GROUP,
+                    group_key=f"{_MENU_KEY}.group_site",
                 ),
             ]
         )

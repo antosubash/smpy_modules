@@ -44,5 +44,8 @@
   },
   "api": {
     "request_failed": "Request failed ({status} {statusText})"
+  },
+  "menu": {
+    "ai": "AI"
   }
 }

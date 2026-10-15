@@ -157,12 +157,10 @@ async function loadTypes() {
 }
 
 export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
-  // The block's own name in Puck's block palette — module-scope, evaluated
-  // before i18n is configured (see `buildBaseFields`'s comment), and Puck
-  // has no per-render hook for a `ComponentConfig`'s own `label` the way
-  // `resolveFields` gives one for field labels. Left English (L2's accepted
-  // gap), same reasoning as `BASE_FIELDS` below.
-  label: 'Records list (live, from a Record Type)',
+  // The block's own name in Puck's block palette. Module-scope, so it holds
+  // the catalogue *key*: pagebuilder's localizeConfig resolves every palette
+  // label through the catalogue when the editor mounts, as news' blocks do.
+  label: 'records.widget.block_label',
   fields: BASE_FIELDS,
   defaultProps: {
     typeKey: '',

@@ -48,7 +48,11 @@ describe('the ai catalogue', () => {
     // Call sites alias a section (`const c = keys.ai.card;`) as well as
     // spelling the full path, so match either `keys.ai.<s>.<n>` or `.<n>`
     // reached through the section alias.
+    // `menu.*` is read on the server — each MenuItem's label_key/group_key
+    // in module.py — not by any .tsx; host/tests/test_menu_labels.py checks
+    // every one of those resolves.
     const orphans = Object.keys(CATALOGUE).filter((key) => {
+      if (key.startsWith('menu.')) return false;
       const [section, name] = key.split('.');
       return !(
         SOURCE.includes(`keys.ai.${key}`) ||

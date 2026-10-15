@@ -104,6 +104,7 @@ lint:
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
 	uv run python scripts/check_file_size.py
+	uv run python scripts/check_locales.py
 	uv run python scripts/bump_version.py --check-current
 
 env:

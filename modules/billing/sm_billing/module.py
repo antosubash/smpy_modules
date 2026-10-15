@@ -99,6 +99,7 @@ class BillingModule(ModuleBase):
             [
                 MenuItem(
                     label=c.MENU_LABEL,
+                    label_key=c.MENU_LABEL_KEY,
                     url=c.MENU_URL,
                     icon=c.MENU_ICON,
                     order=c.MENU_ORDER,
@@ -107,6 +108,7 @@ class BillingModule(ModuleBase):
                 ),
                 MenuItem(
                     label=c.ADMIN_MENU_LABEL,
+                    label_key=c.MENU_LABEL_KEY,
                     url=c.ADMIN_MENU_URL,
                     icon=c.MENU_ICON,
                     order=c.MENU_ORDER,

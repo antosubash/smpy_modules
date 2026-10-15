@@ -72,7 +72,9 @@ export function CategoryRow({
       onDragEnd={managed ? onDragEnd : undefined}
       data-testid="category-row"
       data-category={category.name}
-      className={`flex items-start gap-3 rounded-lg border bg-card p-3 ${
+      // Wraps below `sm`: the actions drop under the name instead of pushing
+      // the row (and the page) wider than a phone screen.
+      className={`flex flex-wrap items-start gap-3 rounded-lg border bg-card p-3 sm:flex-nowrap ${
         dragging ? 'opacity-50' : ''
       } ${category.is_system ? 'border-dashed' : ''}`}
     >
@@ -86,7 +88,9 @@ export function CategoryRow({
         ⠿
       </span>
 
-      <div className="min-w-0 flex-1">
+      {/* min-w-[10rem] below sm: the name keeps room and the actions wrap
+          under it, instead of the name shrinking to "Q…". */}
+      <div className="min-w-[10rem] flex-1 sm:min-w-0">
         {editing ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <Input
@@ -119,7 +123,7 @@ export function CategoryRow({
         {countLabel}
       </Badge>
 
-      <div className="flex shrink-0 gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         {editing ? (
           <>
             <Button type="button" size="sm" disabled={busy || !name.trim()} onClick={save}>

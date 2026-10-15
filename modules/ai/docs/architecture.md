@@ -64,10 +64,14 @@ Provider membership is checked at resolve time, not save time, so an admin
 can save a half-configured slot. The update DTO does validate provider names
 and forbids a blank chat model.
 
-The only provider call the module makes itself is `POST /api/ai/test`
-(`endpoints/api.py`). It takes one settings snapshot, so the reported model
-always matches the configuration being tested, and turns every exception into
-`ok: false`.
+The module calls a provider itself in two places only, both admin buttons in
+`endpoints/api.py`. `POST /api/ai/test` takes one settings snapshot, so the
+reported model always matches the configuration being tested. `POST
+/api/ai/models` lists the saved endpoint's models through the provider SDK
+(`discovery.py`, which reuses `resolve.slot_inputs` without the model-name
+requirement). Both turn every exception into `ok: false` and log a
+configuration or provider failure as one line, anything else with its
+traceback.
 
 ## Keys
 

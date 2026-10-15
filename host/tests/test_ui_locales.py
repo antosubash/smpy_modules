@@ -48,8 +48,9 @@ def test_every_ui_key_the_package_uses_is_in_the_catalog():
     assert sorted(used - known) == []
 
 
-def test_every_locale_has_the_same_keys():
-    assert _catalog("es") == _catalog("en")
+@pytest.mark.parametrize("locale", ["es", "de"])
+def test_every_locale_has_the_same_keys(locale):
+    assert _catalog(locale) == _catalog("en")
 
 
 def test_the_host_serves_the_ui_namespace():

@@ -14,7 +14,8 @@ import { RecordsListBlock } from './components/widget/RecordsListBlock';
 
 registerPuckBlocks({
   blocks: { RecordsList: RecordsListBlock },
-  category: { key: 'data', title: 'Data' },
+  // A catalogue key, resolved by pagebuilder's localizeConfig at render.
+  category: { key: 'data', title: 'records.widget.palette_group' },
   // Page-only: a live records table in the site header or footer would
   // repeat, unfiltered, on every page of the site.
 });

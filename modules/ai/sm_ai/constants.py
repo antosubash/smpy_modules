@@ -16,7 +16,10 @@ MODULE_NAME: Final = "Ai"
 ROUTE_PREFIX_API: Final = "/api/ai"
 VIEW_PREFIX: Final = "/ai"
 MENU_URL: Final = f"{VIEW_PREFIX}/"
+MENU_LABEL: Final = "AI"
+MENU_LABEL_KEY: Final = "ai.menu.ai"
 MENU_GROUP: Final = "Administration"
+MENU_GROUP_KEY: Final = "ui.nav.admin"  # the shared header, not an ai.* key
 MENU_ICON: Final = "sparkles"
 MENU_ORDER: Final = 116  # just after Branding's 115
 
