@@ -48,4 +48,10 @@ describe('isSafeHref / isSafeImageSrc', () => {
     expect(['/a.png', 'a.png', 'http://x/a.png'].every(isSafeImageSrc)).toBe(true);
     expect(isSafeImageSrc('mailto:a@b')).toBe(false);
   });
+
+  it('rejects a control character browsers would strip in front of a scheme', () => {
+    expect(isSafeHref('\u0001javascript:alert(1)')).toBe(false);
+    expect(isSafeHref('/x\u007f')).toBe(false);
+    expect(isSafeImageSrc('\u001fjavascript:x')).toBe(false);
+  });
 });

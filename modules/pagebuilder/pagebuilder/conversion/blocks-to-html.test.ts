@@ -67,6 +67,7 @@ describe('blocksToHtml', () => {
     const md = (content: string) => blocksToHtml([b('Markdown', { content })]).html;
     expect(md('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>');
     expect(md('![x](data:image/png,x)')).toBe('<p>![x](data:image/png,x)</p>');
+    expect(md('[x](\u0001javascript:alert(1))')).not.toContain('<a');
   });
 
   it('converts a numbered list', () => {

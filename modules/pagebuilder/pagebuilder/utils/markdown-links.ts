@@ -24,6 +24,12 @@ const IMAGE = new RegExp(String.raw`^!\[([^\]]*)\]\((${HREF_SOURCE})\)$`);
 const LINKED_IMAGE = new RegExp(String.raw`^\[(${IMAGE_SOURCE})\]\((${HREF_SOURCE})\)$`);
 const LINK = new RegExp(String.raw`^\[([^\]]+)\]\((${HREF_SOURCE})\)$`);
 
+// Browsers strip leading C0 controls and spaces from a URL, so
+// "\x01javascript:…" has no scheme to the check below but runs as one once
+// it is an href. A URL with a control character in it is never legitimate.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
+const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
+
 /**
  * Editor copy is not fully trusted (ContentEditors can write these fields),
  * so only well-known schemes and scheme-less (relative / anchor) hrefs become
@@ -31,6 +37,7 @@ const LINK = new RegExp(String.raw`^\[([^\]]+)\]\((${HREF_SOURCE})\)$`);
  * visible rather than executable.
  */
 export function isSafeHref(href: string): boolean {
+  if (CONTROL_CHAR.test(href)) return false;
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(href);
   if (!scheme) return true;
   return ['http', 'https', 'mailto', 'tel'].includes(scheme[1].toLowerCase());
@@ -42,6 +49,7 @@ export function isSafeHref(href: string): boolean {
  * way an unsafe link href does.
  */
 export function isSafeImageSrc(src: string): boolean {
+  if (CONTROL_CHAR.test(src)) return false;
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(src);
   return !scheme || ['http', 'https'].includes(scheme[1].toLowerCase());
 }
