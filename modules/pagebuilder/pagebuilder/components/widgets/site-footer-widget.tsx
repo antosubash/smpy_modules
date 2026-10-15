@@ -9,6 +9,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 
 export interface SiteFooterLink {
   label: string;
@@ -27,10 +28,17 @@ export function SiteFooterRender({
   logoUrl,
   logoAlt,
   homeHref,
-  links,
+  links: layoutLinks,
   note,
 }: SiteFooterWidgetProps) {
   const { t } = useT();
+  // Pages flagged "show in footer" follow the layout's own links.
+  const links = appendPages(
+    layoutLinks,
+    layoutLinks.map((link) => link.href),
+    useSiteNavPages('footer'),
+    (page) => page,
+  );
   return (
     <div className="gca-display bg-primary-800 px-6 py-16 text-white lg:py-20">
       <div className="mx-auto flex max-w-[1440px] flex-col items-center gap-10 lg:gap-16">

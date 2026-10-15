@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 import { SOCIAL_ICON_OPTIONS, SocialIcon, type SocialIconName } from './_shared';
 import { HeaderLocaleSwitcher, resolveCta, useIsSignedIn } from './site-header-account';
 import { DesktopNav, MobileNav, type SiteNavItem } from './site-header-nav';
@@ -58,7 +59,7 @@ export function SiteHeaderRender({
   logoAlt,
   homeHref,
   utilityLinks,
-  navItems,
+  navItems: layoutNavItems,
   ctaLabel: anonymousCtaLabel,
   ctaHref: anonymousCtaHref,
   signedInLabel,
@@ -67,6 +68,13 @@ export function SiteHeaderRender({
   sticky,
 }: SiteHeaderWidgetProps) {
   const { t } = useT();
+  // Pages flagged "show in header nav" follow the layout's own entries.
+  const navItems = appendPages(
+    layoutNavItems,
+    layoutNavItems.flatMap((item) => [item.href, ...(item.children ?? []).map((c) => c.href)]),
+    useSiteNavPages('header'),
+    (page): SiteNavItem => ({ ...page, children: [] }),
+  );
   const signedIn = useIsSignedIn();
   const { label: ctaLabel, href: ctaHref } = resolveCta(
     signedIn,

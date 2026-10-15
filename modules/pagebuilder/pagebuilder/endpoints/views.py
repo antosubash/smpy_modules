@@ -17,7 +17,7 @@ from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import board as board_query
-from pagebuilder import locales
+from pagebuilder import locales, site_nav
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
@@ -218,7 +218,7 @@ async def admin_preview(
     return await inertia.render(
         _PAGE_PUBLIC,
         {
-            "title": page.title,
+            "title": page.meta_title or page.title,
             "data": page.draft_data or {},
             "meta_description": page.meta_description,
             "og_image": page.og_image,
@@ -233,6 +233,9 @@ async def admin_preview(
             # live URLs on a page that is deliberately noindex.
             "locale": page.locale,
             **public_layout_props(layout),
+            "site_nav": await site_nav.site_nav(
+                db, settings.public_route_prefix, page.locale
+            ),
         },
     )
 
