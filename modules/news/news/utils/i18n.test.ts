@@ -86,7 +86,12 @@ describe('the news catalogue', () => {
     // A plural entry is reached through its stem, which is what `t(key,
     // {count})` takes — `_one` is never named at a call site.
     const referenced = referencedKeys();
-    const orphans = CATALOGUE.filter((key) => !referenced.has(stem(key)));
+    // `menu.*` is read on the server — each MenuItem's label_key/group_key
+    // in module.py — not by any .tsx; host/tests/test_menu_labels.py checks
+    // every one of those resolves.
+    const orphans = CATALOGUE.filter(
+      (key) => !key.startsWith('menu.') && !referenced.has(stem(key)),
+    );
     expect(orphans).toEqual([]);
   });
 
