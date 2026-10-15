@@ -73,16 +73,6 @@ class TestListModels:
         with pytest.raises(AiNotConfiguredError):
             await discovery.list_models(settings, constants.SLOT_CHAT)
 
-    async def test_capped(self, monkeypatch):
-        async def fake(key, base_url):
-            return [f"m{i:04}" for i in range(discovery.MAX_MODELS + 50)]
-
-        monkeypatch.setattr(discovery, "_anthropic", fake)
-        settings = _install(chat_api_key=crypto.encrypt_value("sk"))
-        assert len(await discovery.list_models(settings, constants.SLOT_CHAT)) == (
-            discovery.MAX_MODELS
-        )
-
     async def test_openai_sdk_is_called_with_the_slot(self, monkeypatch):
         import openai
 
@@ -91,9 +81,7 @@ class TestListModels:
         class FakeClient:
             def __init__(self, api_key, base_url):
                 made.update(api_key=api_key, base_url=base_url)
-                self.models = SimpleNamespace(
-                    list=lambda: _aiter([SimpleNamespace(id="gpt-x")])
-                )
+                self.models = SimpleNamespace(list=lambda: _aiter([SimpleNamespace(id="gpt-x")]))
 
             async def close(self):
                 made["closed"] = True
@@ -120,9 +108,12 @@ class TestListModels:
         async def listing():
             return _aiter(models)
 
+        async def _noop():
+            pass
+
         class FakeClient:
             def __init__(self, api_key, http_options):
-                self.aio = SimpleNamespace(models=SimpleNamespace(list=listing))
+                self.aio = SimpleNamespace(models=SimpleNamespace(list=listing), aclose=_noop)
 
         monkeypatch.setattr(genai, "Client", FakeClient)
         key = crypto.encrypt_value("g")
@@ -144,7 +135,17 @@ class TestModelsEndpoint:
         _install()
         res = await client.post("/api/ai/models", json={"slot": constants.SLOT_CHAT})
         assert res.status_code == 200
-        assert res.json() == {"ok": True, "models": ["one", "two"], "error": ""}
+        assert res.json() == {"ok": True, "models": ["one", "two"], "truncated": False, "error": ""}
+
+    async def test_capped_and_says_so(self, client, monkeypatch):
+        async def fake(key, base_url):
+            return [f"m{i:04}" for i in range(discovery.MAX_MODELS + 50)]
+
+        monkeypatch.setattr(discovery, "_anthropic", fake)
+        _install(chat_api_key=crypto.encrypt_value("sk"))
+        body = (await client.post("/api/ai/models", json={"slot": "chat"})).json()
+        assert len(body["models"]) == discovery.MAX_MODELS
+        assert body["truncated"] is True
 
     async def test_unconfigured_slot_is_a_result(self, client):
         _install()
@@ -189,7 +190,12 @@ class TestProbeLogging:
         _install()
         with caplog.at_level(logging.WARNING, logger="sm_ai.endpoints.api"):
             body = (await client.post("/api/ai/models", json={"slot": "chat"})).json()
-        assert body == {"ok": False, "models": [], "error": "connection refused"}
+        assert body == {
+            "ok": False,
+            "models": [],
+            "truncated": False,
+            "error": "connection refused",
+        }
         [record] = caplog.records
         assert record.exc_info is None
 

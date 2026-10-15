@@ -103,7 +103,11 @@ async def list_models(data: AiTestRequest) -> AiModelsResult:
     except Exception as exc:
         _log_probe_failure("model listing", data.slot, exc)
         return AiModelsResult(ok=False, error=str(exc) or type(exc).__name__)
-    return AiModelsResult(ok=True, models=models)
+    return AiModelsResult(
+        ok=True,
+        models=models[: discovery.MAX_MODELS],
+        truncated=len(models) > discovery.MAX_MODELS,
+    )
 
 
 def _log_probe_failure(what: str, slot: str, exc: Exception) -> None:

@@ -116,6 +116,8 @@ class AiModelsResult(SQLModel):
 
     ok: bool
     models: list[str] = []
+    truncated: bool = False
+    """More models were served than ``discovery.MAX_MODELS``; the rest are cut."""
     error: str = ""
 
 

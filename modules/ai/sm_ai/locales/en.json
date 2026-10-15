@@ -38,7 +38,8 @@
     "save_first": "Save your changes first — the test runs against saved settings.",
     "test_ok": "OK — {model} ({latency} ms)",
     "load_models": "Load models",
-    "models_loaded": "{count} models — pick one in the Model field",
+    "models_loaded": "Models found: {count} — pick one in the Model field",
+    "models_truncated": "Showing the first {count} models — type to narrow them in the Model field",
     "models_none": "The endpoint lists no models for this slot."
   },
   "api": {

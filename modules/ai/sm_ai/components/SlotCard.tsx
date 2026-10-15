@@ -9,7 +9,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import type { ModelsResult, SlotValues, TestResult } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
@@ -50,18 +50,34 @@ export function SlotCard({
 }) {
   const { t } = useT();
   const c = keys.ai.card;
-  const set = (patch: Partial<SlotValues>) => onChange({ ...values, ...patch });
   const needsUrl = values.provider === OPENAI_COMPATIBLE;
   const listId = useId();
   const [models, setModels] = useState<ModelsResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // Bumped by every edit that invalidates a list, so a response still in
+  // flight when the admin changes the endpoint is dropped, not shown.
+  const request = useRef(0);
+  // A list describes the endpoint it was fetched from, so editing the provider,
+  // URL or key invalidates it. Typing in the model field must not: that is
+  // what the suggestions are for.
+  const set = (patch: Partial<SlotValues>) => {
+    if (!('model' in patch) && !('dim' in patch)) {
+      request.current += 1;
+      setModels(null);
+    }
+    onChange({ ...values, ...patch });
+  };
 
   const loadModels = async () => {
+    const mine = ++request.current;
     setLoading(true);
     try {
-      setModels(await onLoadModels());
+      const result = await onLoadModels();
+      if (mine === request.current) setModels(result);
     } catch (err) {
-      setModels({ ok: false, models: [], error: (err as Error).message });
+      if (mine === request.current) {
+        setModels({ ok: false, models: [], error: (err as Error).message });
+      }
     } finally {
       setLoading(false);
     }
@@ -213,7 +229,9 @@ export function SlotCard({
             {!models.ok
               ? models.error
               : models.models.length > 0
-                ? t(c.models_loaded, { count: models.models.length })
+                ? t(models.truncated ? c.models_truncated : c.models_loaded, {
+                    count: models.models.length,
+                  })
                 : t(c.models_none)}
           </p>
         )}

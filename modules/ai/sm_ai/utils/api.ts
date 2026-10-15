@@ -26,6 +26,8 @@ export type TestResult = {
 export type ModelsResult = {
   ok: boolean;
   models: string[];
+  /** More were served than the API returns; the list is the first of them. */
+  truncated?: boolean;
   error: string;
 };
 

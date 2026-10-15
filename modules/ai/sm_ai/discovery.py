@@ -28,7 +28,9 @@ _GOOGLE_ACTION = {
 
 
 async def list_models(settings: AiSettings, slot: str) -> list[str]:
-    """Model ids for ``slot``, sorted and de-duplicated, at most ``MAX_MODELS``.
+    """Model ids for ``slot``, sorted and de-duplicated — every one of them.
+
+    The endpoint applies ``MAX_MODELS`` so it can say that it did.
 
     Raises ``AiNotConfiguredError`` for a slot that cannot be reached at all
     (no provider, no key, no URL) and whatever the SDK raises for a failed call
@@ -46,7 +48,7 @@ async def list_models(settings: AiSettings, slot: str) -> list[str]:
         names = await _anthropic(key, base_url)
     else:
         names = await _google(key, base_url, _GOOGLE_ACTION[slot])
-    return sorted({name for name in names if name})[:MAX_MODELS]
+    return sorted({name for name in names if name})
 
 
 async def _openai(key: str, base_url: str) -> list[str]:
@@ -76,10 +78,12 @@ async def _google(key: str, base_url: str, action: str) -> list[str]:
     options = types.HttpOptions(base_url=base_url) if base_url else None
     client = genai.Client(api_key=key, http_options=options)
     names: list[str] = []
-    async for model in await client.aio.models.list():
-        if action not in (model.supported_actions or []):
-            continue
-        # The API names models "models/gemini-…"; pydantic-ai takes the bare id.
-        name = model.name or ""
-        names.append(name.removeprefix(_GOOGLE_PREFIX))
+    try:
+        async for model in await client.aio.models.list():
+            if action not in (model.supported_actions or []):
+                continue
+            # The API names models "models/gemini-…"; pydantic-ai takes the bare id.
+            names.append((model.name or "").removeprefix(_GOOGLE_PREFIX))
+    finally:
+        await client.aio.aclose()
     return names

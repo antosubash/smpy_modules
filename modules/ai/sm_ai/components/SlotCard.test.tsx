@@ -69,7 +69,7 @@ describe('SlotCard — Load models', () => {
       'b',
     ]);
     expect(host?.querySelector('[data-testid="chat-models-result"]')?.textContent).toContain(
-      '2 models',
+      'Models found: 2',
     );
   });
 
