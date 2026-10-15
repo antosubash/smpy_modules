@@ -1,7 +1,7 @@
 # AI base module (`simple_module_ai`) — design
 
 Date: 2026-08-19
-Status: approved pending review
+Status: implemented — the module as built is documented in [`modules/ai/docs/`](../../../modules/ai/docs/index.md).
 
 ## Context
 

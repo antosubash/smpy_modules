@@ -18,6 +18,10 @@ const CONTENT = [
   '  - Acme',
   '    - EU office',
   '- Silver',
+  '',
+  '3. Plan',
+  '4. Build',
+  '   - Test',
 ].join('\n');
 
 test.describe('Pagebuilder Markdown seeded through the API', () => {
@@ -72,6 +76,50 @@ test.describe('Pagebuilder Markdown seeded through the API', () => {
     await expect(main.locator('li > ul > li', { hasText: 'Acme' })).toBeVisible();
     await expect(main.locator('li > ul > li > ul > li')).toHaveText('EU office');
 
+    // Numbered items, keeping the first number, with a bullet nested inside.
+    const ordered = main.locator('ol');
+    await expect(ordered).toHaveAttribute('start', '3');
+    await expect(ordered.locator('> li')).toHaveCount(2);
+    await expect(ordered.locator('li > ul > li')).toHaveText('Test');
+
     await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
+  });
+  test('a blank Social image falls back to the first Image block, sent absolute', async ({
+    page,
+  }) => {
+    const slug = uniqueSlug('og-fallback');
+    const headers = await csrfHeader(page);
+    const created = await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: {
+        title: `Gallery ${slug}`,
+        slug,
+        draft_data: {
+          root: { props: {} },
+          content: [
+            { type: 'Heading', props: { id: 'h', text: 'Gallery', level: 'h1', align: 'left' } },
+            { type: 'Image', props: { id: 'i', src: '/media/og-first.png', alt: 'First' } },
+            { type: 'Image', props: { id: 'j', src: '/media/og-second.png', alt: 'Second' } },
+          ],
+          zones: {},
+        },
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const { id } = await created.json();
+    const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers });
+    expect(published.ok(), await published.text()).toBe(true);
+
+    try {
+      await page.goto(`/p/${slug}`);
+      const ogImage = page.locator('meta[property="og:image"]');
+      await expect(ogImage).toHaveAttribute('content', /^https?:\/\/[^/]+\/media\/og-first\.png$/);
+      await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+        'content',
+        'summary_large_image',
+      );
+    } finally {
+      await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
+    }
   });
 });

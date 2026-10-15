@@ -15,6 +15,7 @@ rewriting an address that already exists.
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -23,9 +24,10 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import locales, public_claims, redirects
+from pagebuilder import locales, public_claims, redirects, site_nav
 from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
+from pagebuilder.og_image import og_image
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.tenancy import bind_public, vary_on_tenant
@@ -38,6 +40,7 @@ def _etag_for(
     updated_at: datetime | None,
     layout_updated_at: datetime | None = None,
     variant: str = "html",
+    nav: str = "",
 ) -> str:
     """Stable, short ETag derived from page identity + last-modified time.
 
@@ -51,12 +54,17 @@ def _etag_for(
     ``variant`` names the representation ("html" or "inertia"): one URL answers
     with a full page or Inertia's JSON, and a shared tag lets a browser holding
     the page get a 304 for the JSON request and hand Inertia cached HTML.
+
+    ``nav`` is the serialised :func:`pagebuilder.site_nav.site_nav` list. Flagging,
+    renaming or publishing *another* page changes this page's chrome while neither
+    its own ``updated_at`` nor the layout's moves.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
     layout_stamp = (
         layout_updated_at.isoformat() if layout_updated_at is not None else ""
     )
-    digest = hashlib.sha1(f"{page_id}:{stamp}:{layout_stamp}:{variant}".encode()).hexdigest()[:16]
+    key = f"{page_id}:{stamp}:{layout_stamp}:{variant}:{nav}"
+    digest = hashlib.sha1(key.encode()).hexdigest()[:16]
     return f'W/"{digest}"'
 
 
@@ -172,8 +180,11 @@ async def render_public_page(
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
+    nav = await site_nav.site_nav(db, settings.public_route_prefix, page.locale)
     variant = "inertia" if request.headers.get("x-inertia") else "html"
-    etag = _etag_for(page.id or 0, page.updated_at, layout.updated_at, variant)
+    etag = _etag_for(
+        page.id or 0, page.updated_at, layout.updated_at, variant, json.dumps(nav, sort_keys=True)
+    )
     cache_parts = [f"max-age={settings.public_cache_max_age}"]
     if settings.public_cache_swr > 0:
         cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
@@ -202,10 +213,13 @@ async def render_public_page(
         await inertia.render(
             _PAGE_PUBLIC,
             {
-                "title": page.title,
+                # The SEO panel promises "blank uses the page title".
+                "title": (page.meta_title or "").strip() or page.title,
                 "data": page.published_data,
                 "meta_description": page.meta_description,
-                "og_image": page.og_image,
+                "og_image": og_image(
+                    page.og_image, page.published_data, _public_base_url(request, settings)
+                ),
                 "canonical_url": canonical,
                 "og_url": canonical,
                 "index_in_search": page.index_in_search,
@@ -217,6 +231,7 @@ async def render_public_page(
                     db, request, settings, page.translation_group
                 ),
                 **public_layout_props(layout),
+                "site_nav": nav,
             },
         )
     )

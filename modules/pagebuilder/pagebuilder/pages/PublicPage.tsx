@@ -6,6 +6,7 @@ import type { SharedProps } from '@simple-module-py/ui/types';
 import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { migrateContent } from '../components/migrateContent';
 import { getPuckConfig } from '../components/puckConfig';
+import { type SiteNav, SiteNavProvider } from '../components/widgets/_internal/site-nav-context';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {
@@ -30,6 +31,8 @@ interface Props {
   alternates?: Alternate[];
   layout_header?: Record<string, unknown> | null;
   layout_footer?: Record<string, unknown> | null;
+  /** Pages flagged for the header / footer nav, in this page's language. */
+  site_nav?: SiteNav | null;
 }
 
 // Inline JSON-LD as a string requires the document to be safe to embed
@@ -59,6 +62,7 @@ export default function PublicPage({
   alternates = [],
   layout_header,
   layout_footer,
+  site_nav,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   // The design pack is a site-wide branding setting: one site, one look. Its
@@ -127,25 +131,27 @@ export default function PublicPage({
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
         )}
       </Head>
-      {layout_header && (
-        <header data-testid="site-header">
-          <Render
-            config={layoutConfig}
-            data={migrateContent(layout_header as unknown as Data, layoutConfig)}
-          />
-        </header>
-      )}
-      <main>
-        <Render config={pageConfig} data={migrateContent(data as unknown as Data, pageConfig)} />
-      </main>
-      {layout_footer && (
-        <footer data-testid="site-footer">
-          <Render
-            config={layoutConfig}
-            data={migrateContent(layout_footer as unknown as Data, layoutConfig)}
-          />
-        </footer>
-      )}
+      <SiteNavProvider nav={site_nav}>
+        {layout_header && (
+          <header data-testid="site-header">
+            <Render
+              config={layoutConfig}
+              data={migrateContent(layout_header as unknown as Data, layoutConfig)}
+            />
+          </header>
+        )}
+        <main>
+          <Render config={pageConfig} data={migrateContent(data as unknown as Data, pageConfig)} />
+        </main>
+        {layout_footer && (
+          <footer data-testid="site-footer">
+            <Render
+              config={layoutConfig}
+              data={migrateContent(layout_footer as unknown as Data, layoutConfig)}
+            />
+          </footer>
+        )}
+      </SiteNavProvider>
     </div>
   );
 }

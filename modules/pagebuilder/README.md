@@ -26,6 +26,13 @@ at `/p/{slug}`.
 - **Content snapshots** — capture the whole site, download or upload it as a
   `.zip`, and restore behind an approval gate. See below.
 
+**Full documentation** lives in [`docs/`](docs/index.md):
+[user guide](docs/user-guide.md) (the editor, workflow, layout, media and
+snapshots screens), [API reference](docs/api-reference.md) (every
+`/api/pagebuilder` route, public claims, errors), [operations](docs/operations.md)
+(install, settings, languages, tenancy, troubleshooting) and
+[architecture](docs/architecture.md).
+
 ## Installation
 
 ```bash
@@ -107,8 +114,10 @@ make migrate
 ```
 
 Add `branch_labels = ("pagebuilder",)` to that first generated revision so the
-module can later be removed on its own with
-`alembic downgrade pagebuilder@base`.
+revision can be named. That does **not** make `alembic downgrade
+pagebuilder@base` remove pagebuilder alone: autogenerate chains every revision
+off the current head, so the command walks everything beneath it
+(antosubash/simple_module_python#333).
 
 ## Permissions
 

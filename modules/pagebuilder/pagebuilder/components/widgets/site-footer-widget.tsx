@@ -9,6 +9,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 
 export interface SiteFooterLink {
   label: string;
@@ -27,10 +28,17 @@ export function SiteFooterRender({
   logoUrl,
   logoAlt,
   homeHref,
-  links,
+  links: layoutLinks,
   note,
 }: SiteFooterWidgetProps) {
   const { t } = useT();
+  // Pages flagged "show in footer" follow the layout's own links.
+  const links = appendPages(
+    layoutLinks,
+    layoutLinks.map((link) => link.href),
+    useSiteNavPages('footer'),
+    (page) => page,
+  );
   return (
     <div className="gca-display bg-primary-800 px-6 py-16 text-white lg:py-20">
       <div className="mx-auto flex max-w-[1440px] flex-col items-center gap-10 lg:gap-16">
@@ -60,7 +68,7 @@ export function SiteFooterRender({
                 // The hover tint is a design-pack detail, not the brand action
                 // colour — it has to read against the dark block, which the
                 // configured brand colour is not guaranteed to do.
-                className="text-[18px] font-semibold text-white/90 transition-colors hover:text-[color:var(--pb-footer-link-hover,#ffffff)]"
+                className="max-w-full text-[18px] font-semibold text-white/90 [overflow-wrap:anywhere] transition-colors hover:text-[color:var(--pb-footer-link-hover,#ffffff)]"
               >
                 {link.label}
               </a>

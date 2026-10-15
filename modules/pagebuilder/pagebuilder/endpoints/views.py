@@ -17,7 +17,7 @@ from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import board as board_query
-from pagebuilder import locales
+from pagebuilder import locales, site_nav
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
@@ -33,6 +33,7 @@ from pagebuilder.deps import get_media_service, get_settings
 from pagebuilder.endpoints import content_views
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.media_service import MediaService
+from pagebuilder.og_image import og_image
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
 
@@ -218,10 +219,11 @@ async def admin_preview(
     return await inertia.render(
         _PAGE_PUBLIC,
         {
-            "title": page.title,
+            "title": (page.meta_title or "").strip() or page.title,
             "data": page.draft_data or {},
             "meta_description": page.meta_description,
-            "og_image": page.og_image,
+            # Relative is fine here: a preview is noindex and never shared.
+            "og_image": og_image(page.og_image, page.draft_data, ""),
             "canonical_url": None,
             "og_url": None,
             "index_in_search": False,
@@ -233,6 +235,9 @@ async def admin_preview(
             # live URLs on a page that is deliberately noindex.
             "locale": page.locale,
             **public_layout_props(layout),
+            "site_nav": await site_nav.site_nav(
+                db, settings.public_route_prefix, page.locale
+            ),
         },
     )
 

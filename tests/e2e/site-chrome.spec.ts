@@ -162,6 +162,53 @@ test.describe('Site header and footer', () => {
     await expect(page.getByTestId('site-header')).toHaveCSS('position', 'static');
   });
 
+  test('a page flagged for the nav joins the header and footer', async ({ page }) => {
+    await login(page);
+    await putLayout(page, HEADER, FOOTER);
+    const slug = uniqueSlug('e2e-flagged');
+    const title = `Flagged ${slug.slice(-6)}`;
+    const created = await page.request.post('/api/pagebuilder/pages', {
+      headers: await csrfHeader(page),
+      data: {
+        title,
+        slug,
+        meta_title: `${title} | Search title`,
+        show_in_header_nav: true,
+        show_in_footer: true,
+        draft_data: { root: { props: {} }, content: [], zones: {} },
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+    const { id } = await created.json();
+    const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
+      headers: await csrfHeader(page),
+      data: {},
+    });
+    expect(published.ok()).toBeTruthy();
+
+    try {
+      await page.goto(`${publicPath}?cb=${slug}`);
+      // After the layout's own entries, linking to the page's public address.
+      const headerLink = page
+        .getByTestId('site-header')
+        .getByRole('navigation')
+        .first()
+        .getByRole('link', { name: title });
+      await expect(headerLink).toHaveAttribute('href', `/p/${slug}`);
+      await expect(
+        page.getByTestId('site-footer').getByRole('link', { name: title }),
+      ).toBeVisible();
+
+      // Its own page is titled with the SEO title, not the page title.
+      await page.goto(`/p/${slug}`);
+      await expect(page).toHaveTitle(new RegExp(`^${title} \\| Search title`));
+    } finally {
+      await page.request.delete(`/api/pagebuilder/pages/${id}`, {
+        headers: await csrfHeader(page),
+      });
+    }
+  });
+
   test('the site chrome widgets are offered in the layout editor only', async ({ page }) => {
     await login(page);
 
