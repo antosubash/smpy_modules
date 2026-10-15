@@ -66,7 +66,10 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
         )}
       >
         {heading && (
-          <h2 className="leading-[var(--pb-heading-leading,1.1)]" style={headingStyle}>
+          <h2
+            className="max-w-full leading-[var(--pb-heading-leading,1.1)] [overflow-wrap:anywhere]"
+            style={headingStyle}
+          >
             {renderRichText(heading)}
           </h2>
         )}

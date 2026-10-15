@@ -51,9 +51,13 @@ Rejected: removing the flags (the UI and API already carry them), and a separate
   pure `utils/markdown-links.ts` shared by `rich-text.tsx` and
   `inlineMarkdownToHtml`, with the same safety rules: unsafe hrefs and image
   sources stay literal text.
-- **Long words wrap**: rich text blocks and the Markdown widget get
-  `break-words`, so a long URL in a DefinitionList or Section intro wraps
-  instead of widening the page.
+- **Long words wrap**: rich text blocks, Section intro headings and
+  DefinitionList rows get `overflow-wrap: anywhere` (`break-words` does not
+  lower min-content width, so it fails in an `items-start` column), so a long
+  URL wraps instead of widening the page.
+- **The header nav wraps**: flagged pages can add any number of entries with
+  any title, so the desktop nav wraps and truncates each label at 16rem, and
+  footer links wrap anywhere.
 
 ## Testing
 

@@ -127,6 +127,13 @@ async def test_title_falls_back_to_the_page_title(authed_client: AsyncClient) ->
     assert (await _props(authed_client))["title"] == "Home"
 
 
+async def test_a_blank_meta_title_falls_back(authed_client: AsyncClient) -> None:
+    """The API stores what it is sent; "   " must not become an empty <title>."""
+    await _page(authed_client, "home", meta_title="   ")
+
+    assert (await _props(authed_client))["title"] == "Home"
+
+
 async def test_preview_carries_meta_title_and_nav(authed_client: AsyncClient) -> None:
     page_id = await _page(authed_client, "home", publish=False, meta_title="Draft title")
     await _page(authed_client, "about", show_in_header_nav=True)

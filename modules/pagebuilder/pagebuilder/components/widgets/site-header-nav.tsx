@@ -67,7 +67,10 @@ export function DesktopNav({ items }: { items: SiteNavItem[] }) {
   return (
     <nav
       aria-label={t(keys.pagebuilder.blocks.site_header.nav_aria)}
-      className="hidden items-center gap-8 lg:flex"
+      // Wraps, and each label truncates: flagged pages can add any number of
+      // entries with any title, and a single row of them ran under the CTA
+      // and scrolled the whole page sideways.
+      className="hidden min-w-0 flex-1 flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 lg:flex"
     >
       {items.map((item, index) =>
         isNavGroup(item) ? (
@@ -77,8 +80,13 @@ export function DesktopNav({ items }: { items: SiteNavItem[] }) {
           // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
           <Dropdown key={index} item={item} />
         ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
-          <a key={index} href={item.href || '#'} className={LINK_CLASS}>
+          <a
+            // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
+            key={index}
+            href={item.href || '#'}
+            title={item.label}
+            className={`max-w-[16rem] truncate ${LINK_CLASS}`}
+          >
             {item.label}
           </a>
         ),

@@ -170,9 +170,11 @@ export function RichTextBlock({ text, className, style }: RichTextBlockProps): R
   const blocks = parseMarkdownBlocks(text ?? '', { softBreaks: true });
   if (blocks.length === 0) return null;
   const only = blocks.length === 1 ? blocks[0] : undefined;
-  // `break-words`: a long URL is one unbreakable word, and in a narrow column
-  // (DefinitionList, Section intro) it widened the page instead of wrapping.
-  const wrapperClass = cn('break-words', className);
+  // A long URL is one unbreakable word, and in a narrow column (DefinitionList,
+  // Section intro) it widened the page instead of wrapping. `anywhere`, not
+  // `break-word`: only it lowers the min-content width, which is what an
+  // `items-start` flex column or a grid track sizes a child to.
+  const wrapperClass = cn('[overflow-wrap:anywhere]', className);
   if (only && only.type === 'p') {
     return (
       <p className={wrapperClass} style={style}>

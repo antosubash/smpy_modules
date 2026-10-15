@@ -68,7 +68,7 @@ export function SiteFooterRender({
                 // The hover tint is a design-pack detail, not the brand action
                 // colour — it has to read against the dark block, which the
                 // configured brand colour is not guaranteed to do.
-                className="text-[18px] font-semibold text-white/90 transition-colors hover:text-[color:var(--pb-footer-link-hover,#ffffff)]"
+                className="max-w-full text-[18px] font-semibold text-white/90 [overflow-wrap:anywhere] transition-colors hover:text-[color:var(--pb-footer-link-hover,#ffffff)]"
               >
                 {link.label}
               </a>

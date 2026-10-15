@@ -97,6 +97,7 @@ export function SiteHeaderRender({
           <a
             href={homeHref || '/'}
             aria-label={logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
+            className="shrink-0"
           >
             {logoUrl ? (
               <img src={logoUrl} alt={logoAlt} className="h-10 w-auto lg:h-16" />
@@ -114,7 +115,7 @@ export function SiteHeaderRender({
           {ctaLabel && (
             <a
               href={ctaHref || '#'}
-              className="hidden rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
+              className="hidden shrink-0 whitespace-nowrap rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
             >
               {ctaLabel}
             </a>

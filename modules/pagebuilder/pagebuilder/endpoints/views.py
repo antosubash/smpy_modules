@@ -218,7 +218,7 @@ async def admin_preview(
     return await inertia.render(
         _PAGE_PUBLIC,
         {
-            "title": page.meta_title or page.title,
+            "title": (page.meta_title or "").strip() or page.title,
             "data": page.draft_data or {},
             "meta_description": page.meta_description,
             "og_image": page.og_image,

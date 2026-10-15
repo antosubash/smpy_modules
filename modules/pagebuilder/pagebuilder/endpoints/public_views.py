@@ -213,7 +213,7 @@ async def render_public_page(
             _PAGE_PUBLIC,
             {
                 # The SEO panel promises "blank uses the page title".
-                "title": page.meta_title or page.title,
+                "title": (page.meta_title or "").strip() or page.title,
                 "data": page.published_data,
                 "meta_description": page.meta_description,
                 "og_image": page.og_image,

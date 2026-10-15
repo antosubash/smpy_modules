@@ -9,8 +9,8 @@ const html = (text: string, className?: string) =>
 describe('RichTextBlock', () => {
   it('lets a long unbroken word wrap, alone or among blocks', () => {
     const url = `https://example.com/${'x'.repeat(120)}`;
-    expect(html(url, 'text-sm')).toMatch(/^<p class="break-words text-sm">/);
-    expect(html(`${url}\n\n- a`)).toMatch(/^<div class="break-words">/);
+    expect(html(url, 'text-sm')).toMatch(/^<p class="\[overflow-wrap:anywhere\] text-sm">/);
+    expect(html(`${url}\n\n- a`)).toMatch(/^<div class="\[overflow-wrap:anywhere\]">/);
   });
 
   it('renders a numbered list with decimal markers', () => {

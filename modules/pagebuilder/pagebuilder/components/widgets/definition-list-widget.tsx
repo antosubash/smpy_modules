@@ -121,7 +121,7 @@ export const DefinitionListWidget: ComponentConfig<DefinitionListWidgetProps> = 
             {...(idx === 0 ? { open: true } : {})}
           >
             <summary
-              className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-lg font-semibold"
+              className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-lg font-semibold [overflow-wrap:anywhere]"
               style={{ color: 'var(--pb-heading-color)' }}
             >
               {/* Inside <summary>: emphasis only — a nested anchor here
