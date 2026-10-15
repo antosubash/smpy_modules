@@ -18,6 +18,10 @@ const CONTENT = [
   '  - Acme',
   '    - EU office',
   '- Silver',
+  '',
+  '3. Plan',
+  '4. Build',
+  '   - Test',
 ].join('\n');
 
 test.describe('Pagebuilder Markdown seeded through the API', () => {
@@ -71,6 +75,12 @@ test.describe('Pagebuilder Markdown seeded through the API', () => {
 
     await expect(main.locator('li > ul > li', { hasText: 'Acme' })).toBeVisible();
     await expect(main.locator('li > ul > li > ul > li')).toHaveText('EU office');
+
+    // Numbered items, keeping the first number, with a bullet nested inside.
+    const ordered = main.locator('ol');
+    await expect(ordered).toHaveAttribute('start', '3');
+    await expect(ordered.locator('> li')).toHaveCount(2);
+    await expect(ordered.locator('li > ul > li')).toHaveText('Test');
 
     await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
   });
