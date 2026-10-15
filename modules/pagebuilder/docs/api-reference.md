@@ -183,7 +183,7 @@ adds `total`.
             "url": "/media/pagebuilder/default/3f…a1.jpg", "width": 2400,
             "height": 1600, "folder": "marketing/heros", "alt_text": "",
             "caption": "", "credit": "",
-            "variants": {"640": {"filename": "…", "url": "…", "content_type": "image/webp",
+            "variants": {"w640": {"filename": "…", "url": "…", "content_type": "image/webp",
                                  "width": 640, "height": 427, "size_bytes": 31022}},
             "created_at": "…"}],
  "next_cursor": 3, "folders": ["marketing/heros"], "total": null}

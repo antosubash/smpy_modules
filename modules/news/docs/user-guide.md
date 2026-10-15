@@ -135,8 +135,8 @@ into the draft. It does not publish.
 
 ### Deleting
 
-At the bottom: **Move article to trash** for `news.edit`, or **Delete
-article** (permanent) for `news.publish`.
+At the bottom: **Move article to trash** if you hold `news.edit` only, or
+**Delete article** (permanent) instead if you also hold `news.publish`.
 
 ## The body canvas (`/admin/news/articles/{id}/body`)
 
@@ -171,8 +171,9 @@ articles to** another category or **Uncategorised**; no article is deleted.
 **Uncategorised** is a system row that cannot be renamed or deleted. A
 category typed on an article but never added here shows with **Add to list**.
 
-**Tags** on the same screen: **Find or create a tag**, rename, delete (the
-articles keep everything else), or select two and **Merge**.
+**Tags** on the same screen: **Find or create a tag**, or select two chips and
+**Merge** (the second one selected is folded into the first and removed).
+Renaming and deleting a tag are API-only (see the API reference).
 
 ## Trash (`/admin/news/trash`)
 

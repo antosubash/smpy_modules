@@ -41,7 +41,7 @@ troubleshooting table that starts from the symptom.
 
 ### [architecture.md](architecture.md) — for maintainers
 
-The five tables, the draft/published split, the workflow as a table, how
+The six tables, the draft/published split, the workflow as a table, how
 scheduling claims rows, how tenancy is bound at every entry point, the single
 seam to pagebuilder, and a file map.
 

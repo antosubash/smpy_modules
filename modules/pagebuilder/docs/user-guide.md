@@ -17,7 +17,8 @@ an error rather than being hidden.
 
 ## Pages (`/pagebuilder/`)
 
-The list shows **Title**, **Slug**, **Language**, **Status** and **Updated**, with
+The list shows **Title**, **Slug**, **Language** (multilingual sites only), **Status**
+and **Updated**, with
 **Search pages** (title or slug), a status filter (**All**, **Drafts**,
 **Published**, **In review**) and, on a multilingual site, a language filter
 (**All languages**). **Board view** groups the same pages into **Draft**,
@@ -52,25 +53,27 @@ The toolbar's buttons follow the page's status:
 | Status | Buttons |
 |---|---|
 | Draft | **Submit for review**, **Publish** |
-| Submitted for review | **Reject**, **Approve** |
+| Submitted for review | **Reject**, **Approve**, **Publish** |
 | Published | **Unpublish**, **Publish** (publishes the current draft over the live copy), **View** |
 
+The toolbar also has **Settings** (opens the inspector below) and **History (n)**.
 **Publish** asks for an optional note (**Describe this publish**), recorded on the
 revision. **Reject** requires a **Reason for rejection**; the editor sees it in
 the page header (**Rejected:** …) and in the history. **Approve** publishes
 immediately. On a narrow screen the canvas is read-only: you can still
-**Preview the draft**, reorder blocks in the **Outline**, and publish.
+**Preview the draft**, reorder blocks in the **Outline**, schedule and publish.
 
-The page menu also offers **Duplicate page** (a draft copy at `<slug>-copy`) and
-**Save as template**, which offers the page under **Start from** in **New page**.
+The **page** tab of the inspector also offers **Duplicate page** (a draft copy at
+`<slug>-copy`), **Save as template**, which offers the page under **Start from**
+in **New page**, and **Delete page**.
 
-The inspector has three tabs:
+**Settings** opens the inspector, which has up to three tabs:
 
 - **page** — **Title**, **URL**, **Parent page**, **Navigation** (**Show in
-  header nav**, **Show in footer**), **Visibility** (**Allow indexing**) and the
-  **Schedule**.
-- **SEO** — see [SEO](#seo) below.
-- **languages** — the page's translations; see [Languages](#languages).
+  header nav**, **Show in footer**), **Visibility** (**Allow indexing**).
+- **SEO** — see [SEO](#seo) below; it also holds the **Schedule**.
+- **languages** — the page's translations, shown only on a multilingual site; see
+  [Languages](#languages).
 
 ### Lifecycle
 
@@ -91,7 +94,8 @@ draft ──Publish──▶ published          (publish is allowed from any sta
 
 ### Scheduling
 
-In **Schedule**, **Publish at** auto-publishes a *draft* at that time, and
+In **Schedule** (on the **SEO** tab; **Save schedule** or **Clear** applies it),
+**Publish at** auto-publishes a *draft* at that time, and
 **Unpublish at** reverts a *published* page to draft. Either, both (a bounded
 campaign) or neither; **Unpublish time must be after publish time.** Each is
 cleared when it fires, and a manual **Publish** or **Unpublish** clears the
@@ -262,8 +266,8 @@ The **Markdown** block renders a small, safe subset:
 - `# `, `## `, `### ` headings (one level per line);
 - paragraphs separated by a blank line;
 - `- ` bullets and `1. ` / `1) ` numbered lists; indenting an item nests it
-  under the one above (a tab counts as four spaces); a numbered list keeps its
-  starting number (`3.` starts at 3); switching between `-` and `1.` at the top
+  under the one above (a tab counts as four spaces); a top-level numbered list
+  keeps its starting number (`3.` starts at 3), a nested one always starts at 1; switching between `-` and `1.` at the top
   level starts a new list; only `1.` can interrupt a paragraph, so a wrapped line
   starting "2019. …" stays prose;
 - `**bold**`, `*italic*`, `***both***` and `` `code` ``;

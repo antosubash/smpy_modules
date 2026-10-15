@@ -33,7 +33,7 @@ those two prefixes, `GET` only) are open to anonymous callers, because the
 | `category` | — | category name or slug |
 | `tag` | — | tag slug or name |
 | `q` | — | matches headline, slug, summary (excerpt) and tags — not the body |
-| `status` | — | `draft`, `published` or `undated` (no display date). Ignored for non-editors. |
+| `status` | — | `draft`, `published` or `undated` (no display date). An unknown value is ignored; a non-editor asking for `draft` gets an empty list. |
 | `in_feed` | `false` | only articles with `show_in_feed` on |
 | `undated_first` | `false` | undated before dated (the admin list's order) |
 | `trashed` | `false` | the trash instead; empty for non-editors |
@@ -259,4 +259,5 @@ with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 | 422 | `The address needs at least one letter or number.` | category slug |
 | 404 | `Cannot reassign to '…': no such category.` | category delete |
 | 400 | `Cannot merge a tag into itself.` | tag merge |
+| 409 | `A tag named '…' already exists.` | tag rename |
 | 404 | `Revision not found` / `Category not found.` / `Tag not found.` | |

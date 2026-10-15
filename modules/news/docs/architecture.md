@@ -69,7 +69,7 @@ approve.
 | `submit_for_review` | `draft` | `submitted_for_review` | `submit` | — |
 | `approve` | `submitted_for_review` | `published` | `approve` | snapshot; clears `publish_at` and an elapsed `unpublish_at` |
 | `reject` | `submitted_for_review` | `draft` | `reject` (note) | sets `rejection_note`; clears `publish_at` |
-| `publish` | any | `published` | `publish` | snapshot; no-op if already live and identical |
+| `publish` | any | `published` | `publish` | snapshot; no-op if already live, identical and nothing scheduled |
 | `unpublish` | `published` | `draft` | `unpublish` | clears both schedule times |
 | `trash` / `restore` | — | unchanged | none | `deleted_at`; restore clears elapsed schedule times |
 | `purge` | trashed only (endpoint) | deleted | — | removes redirects, revisions, tag links |

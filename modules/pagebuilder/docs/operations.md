@@ -191,7 +191,7 @@ the other leaves pages pointing at missing images.
 | Admin API 403 `tenant_required` | multi-tenant host, no organisation selected | Select an organisation / use its subdomain |
 | Every POST 403 `Invalid or missing CSRF token` | client not sending `X-CSRF-Token` | Read the token from the `csrf.token` prop or the `pagebuilder_csrf` cookie |
 | Images 404 on public pages | `media_root` differs between processes, or files not deployed | Compare the logged `pagebuilder.media_root`; set an absolute path or `SM_PROJECT_ROOT` |
-| Upload 415 | type not allowed, or contents don't match the extension/declared type | Re-export the image; add the type to `media_allowed_content_types` |
+| Upload 415 | type not allowed, or contents don't match the declared type | Re-export the image; add the type to `media_allowed_content_types` |
 | Canonical or sitemap URLs show an internal host | proxy rewrites `Host` | Set `public_base_url` |
 | Scheduled page did not publish | scheduler off, page not a draft, or page in trash | `scheduler_enabled`; the page's status; publish manually |
 | Pages published twice / duplicate revisions | two schedulers racing | Turn `scheduler_enabled` off where an external worker runs |
