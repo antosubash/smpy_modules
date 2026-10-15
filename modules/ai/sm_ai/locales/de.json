@@ -1,0 +1,48 @@
+{
+  "settings": {
+    "head_title": "KI-Einstellungen",
+    "title": "KI",
+    "description": "Verbindungseinstellungen für die Chat- und Embedding-Anbieter, die alle Module gemeinsam nutzen.",
+    "loading": "Wird geladen …",
+    "save": "Speichern",
+    "saved": "KI-Einstellungen gespeichert",
+    "save_failed": "Speichern fehlgeschlagen",
+    "test_failed": "Test fehlgeschlagen",
+    "error_with_reason": "{message}: {reason}"
+  },
+  "slots": {
+    "chat_title": "Chat",
+    "chat_description": "Das Modell, das Module für die Textgenerierung verwenden.",
+    "embedding_title": "Embeddings",
+    "embedding_description": "Optionaler zweiter Endpunkt für Vektor-Embeddings."
+  },
+  "card": {
+    "provider": "Anbieter",
+    "not_configured": "Nicht konfiguriert",
+    "unknown_provider": "{provider} (unbekannter Anbieter)",
+    "pick_provider": "— Anbieter auswählen —",
+    "model": "Modell",
+    "model_placeholder": "Modellname, ohne Anbieterpräfix",
+    "base_url_required": "Basis-URL (erforderlich)",
+    "base_url_optional": "Basis-URL (optionale Überschreibung)",
+    "base_url_placeholder_required": "http://your-server:8000/v1",
+    "base_url_placeholder_optional": "Standard des Anbieters",
+    "api_key": "API-Schlüssel",
+    "api_key_saved": "gespeichert – leer lassen, um ihn beizubehalten",
+    "api_key_unset": "nicht gesetzt",
+    "will_clear": "Wird entfernt",
+    "clear": "Entfernen",
+    "vector_dimension": "Vektordimension",
+    "vector_dimension_hint": "Vektorspeicher legen die Breite der Sammlung darauf fest – eine Änderung bedeutet eine Neuindizierung.",
+    "test_connection": "Verbindung testen",
+    "save_first": "Speichern Sie zuerst Ihre Änderungen – der Test läuft gegen die gespeicherten Einstellungen.",
+    "test_ok": "OK – {model} ({latency} ms)",
+    "load_models": "Modelle laden",
+    "models_loaded": "Gefundene Modelle: {count} – wählen Sie eines im Feld „Modell“",
+    "models_truncated": "Die ersten {count} Modelle werden angezeigt – tippen Sie im Feld „Modell“, um sie einzugrenzen",
+    "models_none": "Der Endpunkt listet für diesen Slot keine Modelle auf."
+  },
+  "api": {
+    "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})"
+  }
+}

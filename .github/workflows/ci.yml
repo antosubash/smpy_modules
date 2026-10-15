@@ -495,6 +495,11 @@ jobs:
       - name: File size
         run: uv run python scripts/check_file_size.py
 
+      # Every translated console catalogue has exactly en.json's keys and
+      # placeholders, so a renamed English key cannot strand its translations.
+      - name: Locale catalogues
+        run: uv run python scripts/check_locales.py
+
       # Guards the lockstep invariant: every publishable manifest carries the
       # same version as the repo root.
       - name: Version sync

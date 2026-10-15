@@ -121,8 +121,13 @@ venv and back. Neither touches a tracked file.
 
 ## Known deferred work
 
-- **UI i18n — done in every module.** All five ship `locales/en.json` and
-  route every string through `t()`. news, pagebuilder, ai and billing call
+- **UI i18n — done in every module, in English and German.** All five ship
+  `locales/en.json` and `locales/de.json` and route every string through
+  `t()`. `scripts/check_locales.py` (in `make lint` and CI) fails when a
+  translation's key tree or placeholders drift from `en.json` — add a key to
+  every catalogue at once. The demo host speaks both
+  (`SM_I18N_SUPPORTED_LOCALES` in `.env.example`; the `locale` cookie picks
+  one); the framework's own screens ship English only and fall back to it. news, pagebuilder, ai and billing call
   `t(keys.<module>.<section>.<key>)`; records passes string keys with a
   `defaultValue`, which `tsc` cannot check against its catalogue. The
   catalogue's namespace is the `modules/<name>` directory, not the package
