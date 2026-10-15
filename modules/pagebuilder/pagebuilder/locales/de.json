@@ -31,7 +31,7 @@
     "saved_toast": "Gespeichert",
     "saving": "Wird gespeichert …",
     "title": "Medium",
-    "unsaved": "Ungespeicherte Änderungen"
+    "unsaved": "Nicht gespeicherte Änderungen"
   },
   "autosave": {
     "failed": "Speichern fehlgeschlagen",
@@ -39,7 +39,7 @@
     "saved": "Gespeichert",
     "saved_at": "Gespeichert um {time}",
     "saving": "Wird gespeichert …",
-    "unsaved": "Ungespeicherte Änderungen"
+    "unsaved": "Nicht gespeicherte Änderungen"
   },
   "badge": {
     "scheduled_publish": "Veröffentlichung geplant",
@@ -308,7 +308,7 @@
       "variant_divider": "Zeilen mit Trennlinie"
     },
     "feature_card": {
-      "eyebrow": "Dachzeile-Label",
+      "eyebrow": "Dachzeilen-Label",
       "image_url": "Bild-URL",
       "label": "Feature-Karte (Bild + Text)",
       "link_href": "Link-URL",
@@ -878,12 +878,12 @@
     "in_days_other": "in {count} T.",
     "publish": "Veröffentlichen",
     "publish_now": "Jetzt veröffentlichen",
-    "publishes": "wird veröffentlicht {when} · {relative}",
+    "publishes": "Veröffentlichung {when} · {relative}",
     "today": "heute",
     "unpublish": "Veröffentlichung zurückziehen",
     "unpublish_description": "antwortet sofort mit 404. Ihr Inhalt bleibt erhalten – die Seite wird ein Entwurf, den Sie erneut veröffentlichen können.",
     "unpublish_title": "„{title}“ offline nehmen?",
-    "untitled": "Unbenannte Seite",
+    "untitled": "Seite ohne Titel",
     "view": "Ansehen"
   },
   "confirm": {
@@ -912,7 +912,7 @@
   },
   "editor": {
     "rejected": "Abgelehnt:",
-    "untitled": "Unbenannte Seite"
+    "untitled": "Seite ohne Titel"
   },
   "errors": {
     "field_message": "{field}: {message}",
@@ -1209,11 +1209,11 @@
   },
   "seo": {
     "allow_indexing": "Suchmaschinen erlauben, diese Seite zu indexieren",
-    "allow_indexing_help_after": "und aus der Sitemap auszuschließen.",
+    "allow_indexing_help_after": "zu senden und die Seite aus der Sitemap auszuschließen.",
     "allow_indexing_help_before": "Deaktivieren, um",
     "as_it_appears": "So erscheint es",
     "canonical": "Kanonische URL",
-    "canonical_help": "Überschreiben, wenn diese Seite Inhalte duplizieren, die anderswo gehostet werden.",
+    "canonical_help": "Überschreiben, wenn diese Seite Inhalte dupliziert, die anderswo gehostet werden.",
     "canonical_placeholder": "Standardmäßig die eigene URL dieser Seite.",
     "json_ld": "Strukturierte Daten (JSON-LD)",
     "json_ld_help_after": ". Leer lassen, um sie wegzulassen.",
@@ -1228,17 +1228,17 @@
     "no_description": "Keine Meta-Beschreibung – Suchmaschinen erzeugen selbst eine aus der Seite.",
     "no_social_image": "Kein Social-Bild – es wird ersatzweise das erste Bild der Seite verwendet",
     "social_image": "Social-Bild",
-    "social_image_help_after": " oder leer lassen, um ersatzweise das erste Bild der Seite zu verwenden.",
+    "social_image_help_after": " ein oder lassen Sie das Feld leer, um ersatzweise das erste Bild der Seite zu verwenden.",
     "social_image_help_before": "1200×630. Fügen Sie eine URL aus der",
     "social_image_help_link": "Mediathek",
     "social_image_placeholder": "https://… oder /media/pagebuilder/…",
-    "untitled_page": "Unbenannte Seite",
+    "untitled_page": "Seite ohne Titel",
     "untitled_slug": "ohne-titel"
   },
   "settings": {
     "allow_indexing": "Indexierung erlauben",
-    "indexing_help_after": "und entfernt die Seite aus der Sitemap. Ob sie überhaupt öffentlich ist, bestimmt der Veröffentlichungsstatus in der Werkzeugleiste.",
-    "indexing_help_before": "Deaktiviert erzeugt",
+    "indexing_help_after": "gesendet und die Seite aus der Sitemap entfernt. Ob sie überhaupt öffentlich ist, bestimmt der Veröffentlichungsstatus in der Werkzeugleiste.",
+    "indexing_help_before": "Wenn deaktiviert, wird",
     "nav_help": "Die Reihenfolge wird im Layout-Editor der Website festgelegt.",
     "navigation": "Navigation",
     "parent": "Übergeordnete Seite",
@@ -1304,13 +1304,13 @@
     "address_before": "Sie wird erreichbar sein unter",
     "cancel": "Abbrechen",
     "checking": "Es wird geprüft, welche Sprachen frei sind …",
-    "copy_help": "Eine Übersetzung ersetzt die Wörter, nicht das Layout. Deaktivieren Sie dies, um mit einer leeren Seite zu beginnen.",
+    "copy_help": "Beim Übersetzen werden die Wörter ersetzt, nicht das Layout. Deaktivieren Sie dies, um stattdessen mit einer leeren Seite zu beginnen.",
     "copy_label": "Inhalt dieser Seite kopieren",
     "create": "Erstellen und Editor öffnen",
     "creating": "Wird erstellt …",
     "description": "Erstellt eine Kopie dieser Seite in einer anderen Sprache. Sie erhält eine eigene Adresse, einen eigenen Entwurf und eine eigene Freigabe – ihre Veröffentlichung veröffentlicht nie diese Seite.",
     "language": "Sprache",
-    "none_left": "Diese Seite existiert bereits in jeder Sprache, in der die Website veröffentlicht.",
+    "none_left": "Diese Seite existiert bereits in allen Sprachen, in denen die Website Inhalte veröffentlicht.",
     "title": "„{title}“ übersetzen",
     "trigger": "Übersetzen"
   },
@@ -1347,7 +1347,7 @@
     "restored_description": "Die Seite ist als Entwurf zurück. Veröffentlichen Sie sie, wenn Sie bereit sind.",
     "title": "Papierkorb",
     "tomorrow": "wird morgen entfernt",
-    "untitled": "Unbenannte Seite"
+    "untitled": "Seite ohne Titel"
   },
   "upload": {
     "dismiss": "Ausblenden",

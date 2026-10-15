@@ -16,7 +16,7 @@
     "no_checkout": "Online-Zahlung ist hier nicht eingerichtet – wenden Sie sich an den Website-Administrator, um den Tarif zu ändern.",
     "activating_title": "Ihr Abonnement wird aktiviert …",
     "activating_description": "Stripe hat die Zahlung bestätigt; diese Seite wird aktualisiert, sobald die Bestätigung bei uns eintrifft.",
-    "waiting_title": "Warten auf Stripe",
+    "waiting_title": "Noch keine Bestätigung von Stripe",
     "waiting_description": "Ihre Zahlung wurde durchgeführt, aber die Bestätigung verzögert sich. Laden Sie die Seite in einer Minute neu.",
     "cancelled": "Bezahlvorgang abgebrochen – es wurde nichts abgebucht.",
     "suspended_title": "Diese Organisation ist wegen ausbleibender Zahlung gesperrt",
@@ -155,10 +155,10 @@
     "price_required": "Ein kostenpflichtiger Tarif benötigt mindestens eine Stripe-Preis-ID.",
     "default_must_be_free": "Nur ein kostenloser Tarif kann der Standard sein.",
     "sort_invalid": "Die Sortierreihenfolge muss eine ganze Zahl von -1.000.000 bis 1.000.000 sein.",
-    "limit_key_invalid": "\"{key}\" ist kein gültiger Limit-Schlüssel.",
-    "limit_duplicate": "Das Limit '{key}' ist doppelt aufgeführt.",
-    "limit_value_invalid": "Das Limit \"{key}\" muss eine ganze Zahl von 0 bis 2.000.000.000 sein.",
-    "feature_invalid": "Die Funktion \"{feature}\" ist ungültig: Verwenden Sie Kleinbuchstaben, Ziffern, \".\", \"_\" oder \"-\"."
+    "limit_key_invalid": "„{key}“ ist kein gültiger Limit-Schlüssel.",
+    "limit_duplicate": "Das Limit „{key}“ ist doppelt aufgeführt.",
+    "limit_value_invalid": "Das Limit „{key}“ muss eine ganze Zahl von 0 bis 2.000.000.000 sein.",
+    "feature_invalid": "Die Funktion „{feature}“ ist ungültig: Verwenden Sie Kleinbuchstaben, Ziffern, \".\", \"_\" oder \"-\"."
   },
   "subscriptions": {
     "head_title": "Abrechnungsabonnements",
@@ -167,10 +167,10 @@
     "status": "Status",
     "all": "Alle",
     "empty_title": "Keine Organisationen",
-    "empty_filtered": "Keine passt zu diesem Status.",
+    "empty_filtered": "Keine Organisation hat diesen Status.",
     "empty_none": "Noch hat sich niemand registriert.",
     "resynced": "{name} wurde mit Stripe neu synchronisiert",
-    "assigned": "Tarif {name} zugewiesen"
+    "assigned": "{name} wurde ein Tarif zugewiesen"
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
@@ -212,7 +212,7 @@
     "webhook_secret": "Webhook-Signaturgeheimnis (whsec_…)",
     "show": "Anzeigen",
     "hide": "Verbergen",
-    "stored_placeholder": "Gespeichert – leer lassen, um ihn beizubehalten",
+    "stored_placeholder": "Gespeichert – leer lassen, um den Wert beizubehalten",
     "not_set": "Nicht gesetzt",
     "remove_stored": "Gespeicherten Wert entfernen",
     "return_url": "Ursprung der Rückkehr-URL",

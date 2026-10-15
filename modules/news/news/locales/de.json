@@ -13,8 +13,8 @@
     "no_match_published_filter": "Keine veröffentlichten Artikel passen zu diesem Filter",
     "no_match_undated_query": "Keine Artikel ohne Datum passen zu „{query}“",
     "no_match_undated_filter": "Keine Artikel ohne Datum passen zu diesem Filter",
-    "across_statuses_one": "{count} Artikel passt über alle Status hinweg. Erweitern Sie den Filter oder löschen Sie die Suche.",
-    "across_statuses_other": "{count} Artikel passen über alle Status hinweg. Erweitern Sie den Filter oder löschen Sie die Suche.",
+    "across_statuses_one": "{count} Treffer in allen Status. Erweitern Sie den Filter oder setzen Sie die Suche zurück.",
+    "across_statuses_other": "{count} Treffer in allen Status. Erweitern Sie den Filter oder setzen Sie die Suche zurück.",
     "nothing_in_archive": "Im Archiv gibt es keine Treffer. Versuchen Sie eine kürzere Suche.",
     "search_all_statuses": "In allen Status suchen",
     "clear": "Zurücksetzen",
@@ -42,7 +42,7 @@
     "uncategorised": "Ohne Kategorie",
     "save": "Speichern",
     "cancel": "Abbrechen",
-    "edit_category_and_date": "{value} — Kategorie und Datum bearbeiten",
+    "edit_category_and_date": "{value} – Kategorie und Datum bearbeiten",
     "no_date": "kein Datum",
     "status_published_dated": "Veröffentlicht · {when}",
     "status_published_undated": "Veröffentlicht · ohne Datum",
@@ -60,7 +60,7 @@
     "delete_description": "Der Artikel und sein Inhalt werden entfernt, und seine öffentliche URL funktioniert nicht mehr. Das lässt sich hier nicht rückgängig machen.",
     "delete_confirm": "Löschen",
     "trash_title": "„{title}“ in den Papierkorb verschieben?",
-    "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus dieser Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war — das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
+    "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus dieser Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war – das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
     "trash_confirm": "In den Papierkorb verschieben"
   },
   "new_article": {
@@ -76,7 +76,7 @@
     "category_label": "Kategorie",
     "category_none": "Ohne Kategorie",
     "date_label": "Anzeigedatum",
-    "date_help": "Das am Artikel angezeigte Datum — es plant keine Veröffentlichung. Wenn Sie es löschen, gilt der Artikel als laufende Arbeit ohne Datum.",
+    "date_help": "Das am Artikel angezeigte Datum – es plant keine Veröffentlichung. Wenn Sie es löschen, gilt der Artikel als laufende Arbeit ohne Datum.",
     "empty_response": "Der Server hat den Artikel erstellt, aber nichts zurückgegeben.",
     "cancel": "Abbrechen",
     "creating": "Wird erstellt …",
@@ -99,14 +99,14 @@
     "view_live": "Live ansehen",
     "publish_now": "Jetzt veröffentlichen",
     "body_card_title": "Der Inhalt hat eine eigene Arbeitsfläche",
-    "body_card_description": "Blöcke, Autospeichern und Versionsverlauf finden Sie dort. Diese Ansicht verwaltet alles andere — Kategorie, Schlagwörter, Anzeigedatum, Autorenzeile und das Verhalten des Artikels in Feeds.",
+    "body_card_description": "Blöcke, Autospeichern und Versionsverlauf finden Sie dort. Diese Ansicht verwaltet alles andere – Kategorie, Schlagwörter, Anzeigedatum, Autorenzeile und das Verhalten des Artikels in Feeds.",
     "edit_body": "Inhalt bearbeiten",
     "delete_title": "„{title}“ löschen?",
     "delete_description": "Der Artikel, sein Inhalt und seine Schlagwörter werden entfernt, und seine öffentliche URL funktioniert nicht mehr. Das lässt sich hier nicht rückgängig machen.",
     "delete_confirm": "Löschen",
     "delete_trigger": "Artikel löschen",
     "trash_title": "„{title}“ in den Papierkorb verschieben?",
-    "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus der Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war — das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
+    "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus der Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war – das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
     "trash_confirm": "In den Papierkorb verschieben",
     "trash_trigger": "Artikel in den Papierkorb verschieben",
     "aside_heading": "Artikel",
@@ -122,13 +122,13 @@
     "headline_required": "Ein Artikel benötigt eine Überschrift.",
     "url_label": "URL",
     "slug_invalid": "Kleinbuchstaben, Zahlen und Bindestriche, beginnend mit einem Buchstaben oder einer Zahl.",
-    "slug_help": "Eine Änderung verschiebt den Artikel. Die alte Adresse funktioniert weiter — beim Umbenennen wird eine Weiterleitung angelegt, denn sie steckt bereits in Lesezeichen und in einem Suchindex, der noch nicht neu erfasst wurde.",
+    "slug_help": "Eine Änderung verschiebt den Artikel. Die alte Adresse funktioniert weiter – beim Umbenennen wird eine Weiterleitung angelegt, denn sie steckt bereits in Lesezeichen und in einem Suchindex, der noch nicht neu erfasst wurde.",
     "category_label": "Kategorie",
     "category_none": "Ohne Kategorie",
     "tags_label": "Schlagwörter",
     "date_label": "Anzeigedatum",
     "time_label": "Uhrzeit",
-    "date_help_future": "Das Datum, das Lesern angezeigt wird. Es veröffentlicht nichts — verwenden Sie dafür „Veröffentlichen am“.",
+    "date_help_future": "Das Datum, das Lesern angezeigt wird. Es veröffentlicht nichts – verwenden Sie dafür „Veröffentlichen am“.",
     "date_help_past": "Wenn Sie das Datum löschen, gilt der Artikel als laufende Arbeit ohne Datum und wird oben in der Liste einsortiert.",
     "author_label": "Autor",
     "author_placeholder": "Autorenzeile",
@@ -140,12 +140,12 @@
   },
   "review": {
     "heading": "Prüfung",
-    "with_reviewer": "Liegt bei einem Prüfer. Falls er zurückgeschickt wird, sehen Sie hier die Notiz.",
-    "submitted": "Zur Prüfung eingereicht. Die Freigabe veröffentlicht den Artikel in derselben Aktion, lesen Sie ihn also vorher so, wie ihn ein Leser sieht.",
+    "with_reviewer": "Liegt bei einer prüfenden Person. Falls der Artikel zurückgeschickt wird, sehen Sie hier deren Notiz.",
+    "submitted": "Zur Prüfung eingereicht. Die Freigabe veröffentlicht den Artikel im selben Schritt – lesen Sie ihn also vorher so, wie ihn Leser sehen werden.",
     "approve": "Freigeben",
     "send_back": "Zurückschicken",
-    "can_publish": "Sie können direkt veröffentlichen. Beim Einreichen landet der Artikel stattdessen bei einem anderen Prüfer.",
-    "hand_over": "Übergeben Sie ihn an jemanden, der ihn veröffentlichen darf.",
+    "can_publish": "Sie können direkt veröffentlichen. Wenn Sie stattdessen einreichen, landet der Artikel bei einer anderen prüfenden Person.",
+    "hand_over": "Übergeben Sie den Artikel an jemanden, der ihn veröffentlichen darf.",
     "submit": "Zur Prüfung einreichen",
     "approved_toast": "Freigegeben und veröffentlicht",
     "submitted_toast": "Zur Prüfung eingereicht",
@@ -169,7 +169,7 @@
     "saved": "Gespeichert",
     "publish_at_label": "Veröffentlichen am",
     "unpublish_at_label": "Zurückziehen am",
-    "help": "Beides ist optional, und das Leeren eines Werts bricht ihn ab. Der Artikel wechselt innerhalb einer Minute nach der gesetzten Zeit den Zustand, nicht auf die Sekunde genau.",
+    "help": "Beide Angaben sind optional; wenn Sie eine leeren, wird sie aufgehoben. Der Artikel wechselt seinen Zustand innerhalb einer Minute nach der festgelegten Zeit, nicht exakt zu diesem Zeitpunkt.",
     "save": "Planung speichern",
     "saved_toast": "Planung gespeichert"
   },
@@ -184,7 +184,7 @@
     "image_help": "Das Bild, das eine Linkvorschau zeigt, und das Titelbild am Anfang des Artikels.",
     "canonical_label": "Kanonische URL",
     "canonical_placeholder": "Leer lassen, um die eigene Adresse dieses Artikels zu verwenden",
-    "canonical_help": "Nur für einen Artikel, der anderswo erneut veröffentlicht wurde — sie verweist Suchmaschinen auf das Original statt auf diese Kopie.",
+    "canonical_help": "Nur für einen Artikel, der anderswo erneut veröffentlicht wurde – sie verweist Suchmaschinen auf das Original statt auf diese Kopie.",
     "index_label": "Indexierung durch Suchmaschinen erlauben",
     "index_help": "Ist die Option aus, wird {directive} gesendet und der Artikel aus der Sitemap entfernt. Er bleibt für alle mit dem Link lesbar.",
     "save": "Sucheinstellungen speichern",
@@ -202,7 +202,7 @@
     "restore_description": "Der Inhalt, an dem Sie arbeiten, wird durch den zu diesem Zeitpunkt gespeicherten ersetzt. Alles, was seitdem geschrieben wurde, geht verloren, sofern es nicht selbst hier erfasst wurde.",
     "restore_confirm": "Wiederherstellen",
     "restore_trigger": "Diese Version wiederherstellen",
-    "restored_toast": "Entwurf wiederhergestellt — öffnen Sie die Arbeitsfläche des Inhalts erneut, um ihn zu sehen"
+    "restored_toast": "Entwurf wiederhergestellt – öffnen Sie die Arbeitsfläche des Inhalts erneut, um ihn zu sehen"
   },
   "translations": {
     "heading": "Sprachen",
@@ -222,7 +222,7 @@
     "add_placeholder": "hinzufügen …"
   },
   "body": {
-    "title": "{title} — Inhalt",
+    "title": "{title} – Inhalt",
     "fallback_title": "Artikelinhalt",
     "back": "← Artikel",
     "loading": "Wird geladen …",
@@ -231,11 +231,11 @@
     "unsaved": "Nicht gespeicherte Änderungen",
     "saved": "Gespeichert",
     "save_draft": "Entwurf speichern",
-    "update_published": "Veröffentlichte Version aktualisieren",
+    "update_published": "Veröffentlichung aktualisieren",
     "reload": "Neu laden",
     "publish": "Veröffentlichen",
     "sent_back": "Zurückgeschickt:",
-    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten. Überschrift, URL und Veröffentlichungsdatum gehören zum Artikel — bearbeiten Sie sie in der Artikelansicht."
+    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten. Überschrift, URL und Veröffentlichungsdatum gehören zum Artikel – bearbeiten Sie sie in der Artikelansicht."
   },
   "categories": {
     "title": "Kategorien",
@@ -245,7 +245,7 @@
     "add": "Hinzufügen",
     "loading": "Kategorien werden geladen",
     "delete": "Löschen",
-    "help": "Ziehen Sie Kategorien, um die Reihenfolge in der öffentlichen /news-Filterleiste zu ändern. Beim Löschen werden Sie gefragt, wohin die Artikel kommen — es wird nichts mitgelöscht.",
+    "help": "Ziehen Sie Kategorien, um die Reihenfolge in der öffentlichen /news-Filterleiste zu ändern. Beim Löschen werden Sie gefragt, wohin die Artikel kommen – es wird nichts mitgelöscht.",
     "drag": "Zum Neuanordnen ziehen",
     "name_label": "Kategoriename",
     "slug_label": "Kategorie-Slug",
@@ -258,8 +258,8 @@
     "adopt": "Zur Liste hinzufügen",
     "delete_title": "„{name}“ löschen?",
     "delete_empty": "Die Kategorie ist leer, daher wird nichts verschoben. Im öffentlichen Filter entfällt ein Eintrag.",
-    "delete_moving_one": "{count} Artikel wird nach {destination} verschoben. Mit der Kategorie wird nichts gelöscht — die Artikel behalten Inhalt, Slug und Datum.",
-    "delete_moving_other": "{count} Artikel werden nach {destination} verschoben. Mit der Kategorie wird nichts gelöscht — die Artikel behalten Inhalt, Slug und Datum.",
+    "delete_moving_one": "{count} Artikel wird nach {destination} verschoben. Mit der Kategorie wird nichts gelöscht – die Artikel behalten Inhalt, Slug und Datum.",
+    "delete_moving_other": "{count} Artikel werden nach {destination} verschoben. Mit der Kategorie wird nichts gelöscht – die Artikel behalten Inhalt, Slug und Datum.",
     "delete_confirm": "Kategorie löschen",
     "reassign_label": "Artikel verschieben nach",
     "uncategorised": "Ohne Kategorie"
@@ -289,7 +289,7 @@
   },
   "search": {
     "title": "Suche",
-    "description": "Überschriften, Slugs, Fließtext, Kategorien, Schlagwörter und Dateinamen — in Artikeln, Seiten und Medien.",
+    "description": "Überschriften, Slugs, Fließtext, Kategorien, Schlagwörter und Dateinamen – in Artikeln, Seiten und Medien.",
     "input_label": "Alles durchsuchen",
     "section_legend": "Nach Bereich filtern",
     "filter_all": "Alles",
@@ -297,10 +297,10 @@
     "filter_pages": "Seiten",
     "filter_media": "Medien",
     "prompt_title": "Zum Suchen eingeben",
-    "prompt_description": "Derselbe Index, den die Listen Artikel und Seiten verwenden — diese beschränken sich auf ihren eigenen Bereich, diese Suche nicht.",
+    "prompt_description": "Derselbe Index, den die Listen „Artikel“ und „Seiten“ verwenden – diese beschränken sich auf ihren eigenen Bereich, diese Suche nicht.",
     "searching": "Suche läuft",
     "no_match_title": "Nichts passt zu „{query}“",
-    "no_match_description": "Versuchen Sie eine kürzere Suche — sie durchsucht Überschriften, Slugs, Fließtext, Kategorien, Schlagwörter und Dateinamen.",
+    "no_match_description": "Versuchen Sie eine kürzere Suche – sie durchsucht Überschriften, Slugs, Fließtext, Kategorien, Schlagwörter und Dateinamen.",
     "section_results": "Ergebnisse: {label}",
     "section_heading": "{label} · {total}",
     "untitled": "Ohne Titel",
@@ -329,7 +329,7 @@
     "search_placeholder": "Artikel durchsuchen",
     "search_placeholder_narrowed": "In {heading} suchen",
     "search_submit": "Suchen",
-    "title_with_query": "{query} — {heading}",
+    "title_with_query": "{query} – {heading}",
     "no_match": "Nichts passt zu „{query}“.",
     "no_match_narrowed": "In {heading} passt nichts zu „{query}“.",
     "show_all": "Alle Artikel anzeigen",
@@ -364,7 +364,7 @@
     },
     "categories": {
       "text": "Text",
-      "asides": "Abgesetzt",
+      "asides": "Hervorhebungen",
       "media": "Medien",
       "data": "Daten",
       "layout": "Layout"
@@ -393,7 +393,7 @@
     "qanda": {
       "label": "Fragen & Antworten",
       "title": "Wer antwortet (optional)",
-      "items": "Eine pro Zeile — „Frage | Antwort“"
+      "items": "Eine pro Zeile – „Frage | Antwort“"
     },
     "list": {
       "label": "Liste",
@@ -418,11 +418,11 @@
     },
     "definitions": {
       "label": "Definitionen",
-      "items": "Eine pro Zeile — „Begriff | Bedeutung“"
+      "items": "Eine pro Zeile – „Begriff | Bedeutung“"
     },
     "sources": {
       "label": "Quellen",
-      "items": "Eine pro Zeile — „Was es ist | https://…“"
+      "items": "Eine pro Zeile – „Was es ist | https://…“"
     },
     "related": {
       "label": "Weiterlesen",
@@ -444,17 +444,17 @@
     },
     "gallery": {
       "label": "Galerie",
-      "images": "Eine pro Zeile — „https://… | Alternativtext | Bildunterschrift“",
+      "images": "Eine pro Zeile – „https://… | Alternativtext | Bildunterschrift“",
       "columns": "Spalten",
       "columns_2": "Zwei",
       "columns_3": "Drei"
     },
     "comparison": {
       "label": "Vorher / Nachher",
-      "before_url": "Vorher — Bild-URL",
-      "before_label": "Vorher — Bezeichnung",
-      "after_url": "Nachher — Bild-URL",
-      "after_label": "Nachher — Bezeichnung"
+      "before_url": "Vorher – Bild-URL",
+      "before_label": "Vorher – Bezeichnung",
+      "after_url": "Nachher – Bild-URL",
+      "after_label": "Nachher – Bezeichnung"
     },
     "video": {
       "label": "Videodatei",
@@ -477,7 +477,7 @@
     },
     "table": {
       "label": "Tabelle",
-      "rows": "Eine Zeile pro Zeile, Zellen durch | getrennt",
+      "rows": "Eine Tabellenzeile pro Zeile, Zellen durch | getrennt",
       "header": "Erste Zeile",
       "header_is_header": "Ist eine Kopfzeile",
       "header_is_data": "Enthält Daten"
@@ -487,14 +487,14 @@
       "kind": "Form",
       "kind_bar": "Balken (Vergleich)",
       "kind_line": "Linie (zeitlicher Verlauf)",
-      "series": "Eine pro Zeile — „2019 | 4.100“",
+      "series": "Eine pro Zeile – „2019 | 4.100“",
       "figures": "Zahlen",
       "column_label": "Bezeichnung",
       "column_value": "Wert"
     },
     "facts": {
       "label": "Kennzahlen",
-      "items": "Eine pro Zeile — „21 | Sensoren installiert“"
+      "items": "Eine pro Zeile – „21 | Sensoren installiert“"
     },
     "code": {
       "label": "Code",
@@ -503,10 +503,10 @@
     },
     "timeline": {
       "label": "Zeitleiste",
-      "items": "Eine pro Zeile — „Wann | Was geschah“"
+      "items": "Eine pro Zeile – „Wann | Was geschah“"
     },
     "divider": {
-      "label": "Trenner",
+      "label": "Trennlinie",
       "style_rule": "Linie",
       "style_asterism": "Sternchen",
       "spacing": "Abstand",
@@ -518,7 +518,7 @@
     }
   },
   "feed": {
-    "label": "News-Feed (aktuelle Artikel)",
+    "label": "News-Feed (veröffentlichte Artikel)",
     "palette_group": "Feeds",
     "title": "Überschrift",
     "category": "Kategoriefilter (leer = alle)",

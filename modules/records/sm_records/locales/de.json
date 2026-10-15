@@ -1,7 +1,7 @@
 {
   "common": {
     "loading": "Wird geladen …",
-    "unsaved_changes": "Sie haben ungespeicherte Änderungen. Seite verlassen und die Änderungen verwerfen?",
+    "unsaved_changes": "Sie haben nicht gespeicherte Änderungen. Seite verlassen und die Änderungen verwerfen?",
     "tenant_badge": "Mandant: {tenant}"
   },
   "types": {
@@ -75,7 +75,7 @@
     "list_status_cursor_end": "Nach der vorherigen Seite folgen keine weiteren Datensätze",
     "page_info": "{start}–{end} von {total} werden angezeigt",
     "page_info_capped": "{start}–{end} von {count}+ werden angezeigt",
-    "page_info_capped_help": "Mehr als {count} Datensätze passen; die Zählung endet bei {count}.",
+    "page_info_capped_help": "Mehr als {count} Datensätze treffen zu; die Zählung endet bei {count}.",
     "filter_field": "Feld",
     "filter_op": "Bedingung",
     "filter_value": "Wert",
@@ -107,7 +107,7 @@
     "empty": "Nichts verweist auf diesen Datensatz.",
     "trashed": "Im Papierkorb",
     "load_more": "Mehr laden",
-    "hidden_note": "Einige Verweisende sind für Sie nicht sichtbar.",
+    "hidden_note": "Einige verweisende Datensätze sind für Sie nicht sichtbar.",
     "on_delete": {
       "restrict": "Verhindern",
       "set_null": "Auf leer setzen",
@@ -159,8 +159,8 @@
     "done_cascaded_other": "{count} verknüpfte Datensätze wurden mit entfernt.",
     "refused_one": "{count} von {total} Datensätzen konnte nicht geändert werden, daher wurde nichts geändert.",
     "refused_other": "{count} von {total} Datensätzen konnten nicht geändert werden, daher wurde nichts geändert.",
-    "deselect_failing_one": "Den fehlgeschlagenen {count} abwählen",
-    "deselect_failing_other": "Die {count} fehlgeschlagenen abwählen",
+    "deselect_failing_one": "{count} fehlgeschlagenen Datensatz abwählen",
+    "deselect_failing_other": "Die {count} fehlgeschlagenen Datensätze abwählen",
     "dismiss": "Schließen",
     "empty_trash": "Papierkorb leeren",
     "confirm_empty_trash_one": "Den {count} Datensatz im Papierkorb endgültig löschen? Dies kann nicht rückgängig gemacht werden.",
@@ -213,7 +213,7 @@
     "move_up": "{label} nach oben verschieben",
     "move_down": "{label} nach unten verschieben",
     "cap_reached": "Höchstens {max} Feldspalten – blenden Sie eine aus, um eine andere anzuzeigen.",
-    "help_link": "Ihre Auswahl wird in den Link dieser Seite geschrieben (?columns=), sodass das Teilen des Links diese Spalten mitteilt.",
+    "help_link": "Ihre Auswahl wird in den Link dieser Seite geschrieben (?columns=) – wer den Link teilt, teilt also auch diese Spalten.",
     "help_saved": "Dieser Browser merkt sie sich außerdem als Ihre Vorgabe für diesen Typ. Ein Link, der eigene Spalten nennt, hat Vorrang vor dieser Vorgabe.",
     "help_export": "Der Export enthält immer alle Felder, unabhängig davon, was hier angezeigt wird.",
     "reset": "Auf Standard zurücksetzen",
@@ -265,7 +265,7 @@
     "reload": "Neu laden",
     "overwrite": "Trotzdem überschreiben",
     "server_version": "Aktuell auf dem Server",
-    "your_version": "Ihre ungespeicherte Version",
+    "your_version": "Ihre nicht gespeicherte Version",
     "deleted_badge": "Gelöscht",
     "restore": "Wiederherstellen",
     "purge": "Endgültig löschen",
@@ -424,7 +424,7 @@
     "conflict_help": "Jemand anderes hat seit dem Öffnen eine Änderung an diesem Typ gespeichert. Laden Sie neu, um die aktuelle Version zu sehen, und wenden Sie Ihre Änderungen dann erneut an.",
     "conflict_server_label": "Aktuelle Bezeichnung auf dem Server",
     "danger_zone": "Gefahrenbereich",
-    "delete_help": "Löscht diesen Typ und alle dazu gespeicherten Datensätze, einschließlich des Papierkorbs. Dies kann nicht rückgängig gemacht werden.",
+    "delete_help": "Löscht diesen Typ und alle dazu gespeicherten Datensätze, einschließlich derer im Papierkorb. Dies kann nicht rückgängig gemacht werden.",
     "delete_type": "Diesen Typ löschen",
     "delete_confirm_description_one": "Dadurch werden „{label}“ und sein {count} Datensatz (aktiv und im Papierkorb) endgültig gelöscht. Geben Sie zur Bestätigung {count} ein.",
     "delete_confirm_description_other": "Dadurch werden „{label}“ und seine {count} Datensätze (aktiv und im Papierkorb) endgültig gelöscht. Geben Sie zur Bestätigung {count} ein.",
@@ -455,7 +455,7 @@
       "choice_removed": "Auswahlmöglichkeit entfernt",
       "options_changed": "Optionen geändert",
       "label_changed": "Bezeichnung geändert",
-      "display_field_changed": "Titelfeld der Anzeige geändert – der Titel jedes Datensatzes wird neu berechnet"
+      "display_field_changed": "Anzeigefeld geändert – der Titel jedes Datensatzes wird neu berechnet"
     },
     "preview": {
       "button": "Änderungen in der Vorschau anzeigen",
@@ -465,7 +465,7 @@
       "expired": "Die Vorschau ist abgelaufen; zeigen Sie sie erneut an.",
       "retry": "Vorschau erneut anzeigen",
       "check_button": "Datensätze prüfen",
-      "check_help": "„Datensätze prüfen“ führt denselben Testlauf gegen das Schema aus, genau wie es gespeichert ist, und markiert die fehlschlagenden Datensätze, damit die Liste sie anzeigen kann. „Änderungen in der Vorschau anzeigen“ schreibt nichts.",
+      "check_help": "„Datensätze prüfen“ führt denselben Testlauf mit dem Schema in seiner gespeicherten Form aus und markiert die fehlschlagenden Datensätze, damit die Liste sie anzeigen kann. „Änderungen in der Vorschau anzeigen“ schreibt nichts.",
       "check_title": "Datensätze gegen das gespeicherte Schema geprüft",
       "check_worklist": "Markierte Datensätze anzeigen",
       "report_marked_note_one": "{count} Datensatz ist als ungültig markiert, einschließlich solcher im Papierkorb.",
@@ -651,8 +651,8 @@
     "field_fields": "Anzuzeigende Felder (zusätzlich zum Titel)",
     "field_filter": "Filter (z. B. status:eq:paid – ein Term, nur indizierte Felder)",
     "field_sort": "Sortierung (z. B. -published_at für neueste zuerst)",
-    "field_locale": "Gebietsschema (leer = Standard-Inhaltsgebietsschema)",
-    "field_tenant": "Mandant (nur bei Mandanten-Hosts – leer verwendet den Host-Standard)",
+    "field_locale": "Sprache (leer = Standardsprache der Inhalte)",
+    "field_tenant": "Mandant (nur bei mandantenfähigen Hosts – leer = Standard des Hosts)",
     "field_limit": "Anzahl",
     "field_layout": "Layout",
     "layout_list": "Liste",
