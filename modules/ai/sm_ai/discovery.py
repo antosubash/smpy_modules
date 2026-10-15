@@ -46,8 +46,10 @@ async def list_models(settings: AiSettings, slot: str) -> list[str]:
         names = await _openai(key, base_url)
     elif provider_id == constants.PROVIDER_ANTHROPIC:
         names = await _anthropic(key, base_url)
-    else:
+    elif provider_id == constants.PROVIDER_GOOGLE:
         names = await _google(key, base_url, _GOOGLE_ACTION[slot])
+    else:  # slot_inputs admits only the providers above; a new one must say how it lists
+        raise NotImplementedError(f"Model listing is not implemented for {provider_id!r}.")
     return sorted({name for name in names if name})
 
 

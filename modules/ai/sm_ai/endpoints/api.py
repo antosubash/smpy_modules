@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import time
 
@@ -124,6 +125,7 @@ def _log_probe_failure(what: str, slot: str, exc: Exception) -> None:
         logger.warning("AI %s %s failed", slot, what, exc_info=exc)
 
 
+@functools.cache
 def _provider_errors() -> tuple[type[BaseException], ...]:
     """Exception types that mean "the provider said no", imported lazily."""
     import httpx
