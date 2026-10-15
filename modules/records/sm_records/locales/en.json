@@ -698,5 +698,9 @@
     "upload_failed": "Couldn't upload the file: {message}",
     "upload_progress_label": "Upload progress",
     "uploading": "Uploading {name}… {percent}"
+  },
+  "menu": {
+    "all_types": "All record types",
+    "group_records": "Records"
   }
 }

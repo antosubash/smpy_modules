@@ -253,5 +253,8 @@
     "price_taken": "Ein anderer Tarif verwendet diesen Stripe-Preis bereits.",
     "price_not_found": "Stripe kennt keinen Preis mit dieser ID.",
     "invalid_return_url": "Die Rückkehr-URL muss ein http(s)-Ursprung wie https://app.example.com sein."
+  },
+  "menu": {
+    "billing": "Abrechnung"
   }
 }

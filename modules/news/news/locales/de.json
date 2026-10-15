@@ -546,5 +546,13 @@
   },
   "public_switch": {
     "label": "Diesen Artikel in einer anderen Sprache lesen"
+  },
+  "menu": {
+    "articles": "Artikel",
+    "categories": "Kategorien",
+    "trash": "Papierkorb",
+    "search": "Alles durchsuchen",
+    "group_news": "News",
+    "group_find": "Finden"
   }
 }

@@ -1381,5 +1381,12 @@
     "submitted": "Zur Prüfung eingereicht.",
     "unpublish_failed": "Zurückziehen fehlgeschlagen",
     "unpublished": "Veröffentlichung zurückgezogen."
+  },
+  "menu": {
+    "pages": "Seiten",
+    "layout": "Website-Layout",
+    "media": "Mediathek",
+    "import_export": "Import / Export",
+    "group_site": "Website"
   }
 }

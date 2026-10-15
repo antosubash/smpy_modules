@@ -67,6 +67,14 @@ ADMIN_SEARCH_URL: Final = f"{ADMIN_SEARCH_PREFIX}/search"
 MENU_LABEL_ARTICLES: Final = "Articles"
 MENU_LABEL_CATEGORIES: Final = "Categories"
 MENU_LABEL_TRASH: Final = "Trash"
+# Catalogue keys for the labels above, in this module's `news` namespace;
+# resolved server-side, falling back to the literal when a key has no entry.
+MENU_LABEL_KEY_ARTICLES: Final = "news.menu.articles"
+MENU_LABEL_KEY_CATEGORIES: Final = "news.menu.categories"
+MENU_LABEL_KEY_TRASH: Final = "news.menu.trash"
+MENU_LABEL_KEY_SEARCH: Final = "news.menu.search"
+MENU_GROUP_KEY: Final = "news.menu.group_news"
+MENU_GROUP_KEY_SEARCH: Final = "news.menu.group_find"
 
 # Modules this one depends on. PageBuilder is deliberately absent: it was here
 # while an article *was* a page, and a ``depends_on`` entry is a hard one — it

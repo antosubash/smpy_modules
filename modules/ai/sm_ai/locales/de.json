@@ -44,5 +44,8 @@
   },
   "api": {
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})"
+  },
+  "menu": {
+    "ai": "KI"
   }
 }

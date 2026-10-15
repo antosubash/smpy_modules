@@ -43,6 +43,7 @@ _PAGE_CONNECTION: Final = f"{MODULE_NAME}/Connection"
 
 # ── Menu ─────────────────────────────────────────────────────────────
 MENU_LABEL: Final = "Billing"
+MENU_LABEL_KEY: Final = "billing.menu.billing"
 MENU_URL: Final = f"{VIEW_PREFIX}/"
 MENU_ICON: Final = "credit-card"
 MENU_ORDER: Final = 95  # just after Organisations (90)

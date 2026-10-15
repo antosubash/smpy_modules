@@ -25,6 +25,9 @@ VIEW_PREFIX: Final = "/admin/records"
 MENU_URL: Final = f"{VIEW_PREFIX}/"
 MENU_ICON: Final = "database"
 MENU_ORDER: Final = 300
+MENU_LABEL: Final = "All record types"
+MENU_LABEL_KEY: Final = "records.menu.all_types"
+MENU_GROUP_KEY_TYPES: Final = "records.menu.group_records"
 
 MENU_GROUP_TYPES: Final = "Records"
 """Sidebar group for both the hub entry (:func:`sm_records.module.

@@ -126,12 +126,14 @@ class RecordsModule(ModuleBase):
         # entry.
         registry.add(
             MenuItem(
-                label="All record types",
+                label=constants.MENU_LABEL,
+                label_key=constants.MENU_LABEL_KEY,
                 url=constants.MENU_URL,
                 icon=constants.MENU_ICON,
                 order=constants.MENU_ORDER,
                 section=MenuSection.ADMIN_SIDEBAR,
                 group=constants.MENU_GROUP_TYPES,
+                group_key=constants.MENU_GROUP_KEY_TYPES,
             )
         )
         # Kept, because a type opting into its own entry (``show_in_menu``) is

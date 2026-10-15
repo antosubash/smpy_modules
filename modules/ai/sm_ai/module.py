@@ -80,12 +80,14 @@ class AiModule(ModuleBase):
     def register_menu_items(self, registry: MenuRegistry) -> None:
         registry.add(
             MenuItem(
-                label="AI",
+                label=constants.MENU_LABEL,
+                label_key=constants.MENU_LABEL_KEY,
                 url=constants.MENU_URL,
                 icon=constants.MENU_ICON,
                 order=constants.MENU_ORDER,
                 section=MenuSection.SIDEBAR,
                 group=constants.MENU_GROUP,
+                group_key=constants.MENU_GROUP_KEY,
                 roles=["admin"],
             )
         )

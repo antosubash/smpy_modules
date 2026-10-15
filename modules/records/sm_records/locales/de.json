@@ -698,5 +698,9 @@
     "upload_failed": "Die Datei konnte nicht hochgeladen werden: {message}",
     "upload_progress_label": "Upload-Fortschritt",
     "uploading": "{name} wird hochgeladen … {percent}"
+  },
+  "menu": {
+    "all_types": "Alle Datensatztypen",
+    "group_records": "Datensätze"
   }
 }

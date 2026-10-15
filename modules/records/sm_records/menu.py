@@ -127,6 +127,7 @@ def type_menu_items(types: Sequence[MenuType]) -> list[MenuItem]:
             order=constants.MENU_ORDER_TYPE,
             section=MenuSection.ADMIN_SIDEBAR,
             group=constants.MENU_GROUP_TYPES,
+            group_key=constants.MENU_GROUP_KEY_TYPES,
             roles=list(rtype.allowed_roles or []),
         )
         for rtype in ordered

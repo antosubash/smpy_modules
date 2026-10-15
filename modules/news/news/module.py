@@ -142,17 +142,21 @@ class NewsModule(ModuleBase):
             [
                 MenuItem(
                     label=constants.MENU_LABEL_ARTICLES,
+                    label_key=constants.MENU_LABEL_KEY_ARTICLES,
                     url=constants.MENU_URL,
                     icon=constants.MENU_ICON,
                     order=100,
                     group=constants.MENU_GROUP,
+                    group_key=constants.MENU_GROUP_KEY,
                 ),
                 MenuItem(
                     label=constants.MENU_LABEL_CATEGORIES,
+                    label_key=constants.MENU_LABEL_KEY_CATEGORIES,
                     url=constants.MENU_URL_CATEGORIES,
                     icon=constants.MENU_ICON_CATEGORIES,
                     order=110,
                     group=constants.MENU_GROUP,
+                    group_key=constants.MENU_GROUP_KEY,
                 ),
                 # In the rail rather than behind a filter on the list: a trashed
                 # article keeps its slug claimed, so an author who bins one and
@@ -160,20 +164,24 @@ class NewsModule(ModuleBase):
                 # taken by something they cannot see.
                 MenuItem(
                     label=constants.MENU_LABEL_TRASH,
+                    label_key=constants.MENU_LABEL_KEY_TRASH,
                     url=constants.MENU_URL_TRASH,
                     icon=constants.MENU_ICON_TRASH,
                     order=120,
                     group=constants.MENU_GROUP,
+                    group_key=constants.MENU_GROUP_KEY,
                 ),
                 # Its own group: where pagebuilder is installed the screen
                 # searches pages and media as well, so listing it under News
                 # would say something untrue about what it covers.
                 MenuItem(
                     label=constants.MENU_LABEL_SEARCH,
+                    label_key=constants.MENU_LABEL_KEY_SEARCH,
                     url=constants.ADMIN_SEARCH_URL,
                     icon=constants.MENU_ICON_SEARCH,
                     order=10,
                     group=constants.MENU_GROUP_SEARCH,
+                    group_key=constants.MENU_GROUP_KEY_SEARCH,
                 ),
             ]
         )
