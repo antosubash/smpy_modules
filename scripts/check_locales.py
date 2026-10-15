@@ -40,11 +40,9 @@ def compare(en: object, other: object, where: str) -> list[str]:
     if not isinstance(other, str):
         return [f"{where}: expected a string"]
     errors = []
-    if sorted(PLACEHOLDER.findall(str(en))) != sorted(PLACEHOLDER.findall(other)):
-        errors.append(
-            f"{where}: placeholders {PLACEHOLDER.findall(str(en))} "
-            f"!= {PLACEHOLDER.findall(other)}"
-        )
+    expected, found = PLACEHOLDER.findall(str(en)), PLACEHOLDER.findall(other)
+    if sorted(expected) != sorted(found):
+        errors.append(f"{where}: placeholders {expected} != {found}")
     if str(en).strip() and not other.strip():
         errors.append(f"{where}: blank translation")
     return errors

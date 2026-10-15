@@ -35,7 +35,6 @@ test.describe('Console in German', () => {
     await page.goto('/pagebuilder/new');
     // Labels hold catalogue keys and are resolved at render (localizeConfig),
     // so this proves the German catalogue reaches Puck's palette too.
-    await expect(page.locator('[class*="DrawerItem-name"]').first()).toBeVisible();
     await expect(
       page
         .locator('[class*="DrawerItem-name"]')
