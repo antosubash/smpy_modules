@@ -33,7 +33,9 @@ export function EyebrowSplitSection({
   children,
 }: EyebrowSplitSectionProps) {
   return (
-    <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] sm:px-6 lg:px-8">
+    // `overflow-wrap: anywhere` for every text field below: a long URL is one
+    // unbreakable word, and in a grid track it widened the whole page.
+    <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] [overflow-wrap:anywhere] sm:px-6 lg:px-8">
       <div
         className={cn(
           'grid gap-8 lg:grid-cols-[var(--pb-split-cols,1fr_2fr)] lg:gap-[var(--pb-split-gap,3rem)]',
@@ -54,7 +56,7 @@ export function EyebrowSplitSection({
             {renderRichText(eyebrow)}
           </p>
         )}
-        <div className="min-w-0 max-w-[var(--pb-split-content-max,none)] [overflow-wrap:anywhere]">
+        <div className="min-w-0 max-w-[var(--pb-split-content-max,none)]">
           {/* AccentText, not bare renderRichText: this is a display heading on
 					    `--pb-display-weight`, where a plain <strong>'s relative `bolder`
 					    can compute to no visible change. */}

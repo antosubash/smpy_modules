@@ -136,7 +136,9 @@ function SplitFaq({
   const muted = surface === 'muted';
   const inverse = !!surfaceColor;
   return (
-    <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] sm:px-6 lg:px-8">
+    // `overflow-wrap: anywhere` for every text field below: a long URL is one
+    // unbreakable word, and in a grid track it widened the whole page.
+    <section className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] [overflow-wrap:anywhere] sm:px-6 lg:px-8">
       <div
         className={cn(
           'grid gap-8 lg:grid-cols-[var(--pb-split-cols,1fr_2fr)] lg:gap-[var(--pb-split-gap,3rem)]',
@@ -225,7 +227,7 @@ export function FaqRender({
   // hero already supplies the title, so this is usually just the list).
   if (variant === 'divider') {
     return (
-      <section className="container mx-auto max-w-3xl px-4 py-[var(--pb-section-py,3rem)] sm:px-6 lg:px-8">
+      <section className="container mx-auto max-w-3xl px-4 py-[var(--pb-section-py,3rem)] [overflow-wrap:anywhere] sm:px-6 lg:px-8">
         {title && (
           <h2 className="mb-8 leading-tight" style={HEADING_STYLE}>
             <AccentText text={title} />
@@ -237,7 +239,7 @@ export function FaqRender({
   }
 
   return (
-    <div className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] max-w-3xl">
+    <div className="container mx-auto px-4 py-[var(--pb-section-py,3rem)] max-w-3xl [overflow-wrap:anywhere]">
       {title && (
         <h2 className="text-3xl sm:text-4xl lg:text-5xl text-center mb-10" style={DISPLAY_STYLE}>
           <AccentText text={title} />
