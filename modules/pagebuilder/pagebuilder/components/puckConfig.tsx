@@ -39,9 +39,10 @@ type PageConfig = Config<{ components: CatalogProps; root: PageRootProps }>;
 export const basePageConfig: PageConfig = {
   root: {
     fields: {
-      title: { type: 'text' },
+      title: { type: 'text', label: keys.pagebuilder.blocks.page.title },
       width: {
         type: 'radio',
+        label: keys.pagebuilder.blocks.page.width,
         options: [
           { label: keys.pagebuilder.blocks.page.width_contained, value: 'contained' },
           { label: keys.pagebuilder.blocks.page.width_full, value: 'full' },

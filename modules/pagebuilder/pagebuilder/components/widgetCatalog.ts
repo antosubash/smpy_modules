@@ -160,13 +160,19 @@ type CatalogCategory = {
 
 export const catalogCategories: Record<string, CatalogCategory> = {
   typography: {
+    title: keys.pagebuilder.blocks.categories.typography,
     components: ['Heading', 'Text', 'Markdown', 'ProseSection', 'Quote', 'List', 'DefinitionList'],
   },
-  media: { components: ['Image', 'Gallery', 'Carousel', 'Video', 'Iframe'] },
+  media: {
+    title: keys.pagebuilder.blocks.categories.media,
+    components: ['Image', 'Gallery', 'Carousel', 'Video', 'Iframe'],
+  },
   actions: {
+    title: keys.pagebuilder.blocks.categories.actions,
     components: ['Button', 'SimpleActionList', 'ColoredActionList', 'AppStoreBadges'],
   },
   layout: {
+    title: keys.pagebuilder.blocks.categories.layout,
     components: ['Columns', 'Container', 'Row', 'Column', 'Grid', 'Spacer', 'Divider'],
   },
   sections: {

@@ -67,7 +67,8 @@ export function SnapshotList({
               {missing && <p className="text-xs text-amber-700">{missing}</p>}
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            {/* Wraps: three German labels do not fit beside each other at phone width. */}
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" asChild>
                 <a href={downloadUrl(snapshot.id)}>{t(keys.pagebuilder.snapshot_list.download)}</a>
               </Button>

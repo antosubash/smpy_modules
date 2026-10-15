@@ -147,11 +147,15 @@
       "slides_image_url": "Bild-URL"
     },
     "categories": {
+      "actions": "Aktionen",
       "chrome": "Website-Rahmen",
       "collections": "Sammlungen",
       "forms": "Formulare",
       "interactive": "Interaktiv",
+      "layout": "Layout",
+      "media": "Medien",
       "sections": "Abschnitte",
+      "typography": "Typografie",
       "utility": "Hilfsblöcke"
     },
     "centered_hero": {
@@ -577,6 +581,8 @@
       "privacy_text": "Einwilligungstext (*Wort* verlinkt auf den Datenschutz-Link)"
     },
     "page": {
+      "title": "Titel",
+      "width": "Breite",
       "width_contained": "Begrenzt",
       "width_full": "Volle Breite"
     },
