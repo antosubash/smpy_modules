@@ -45,7 +45,15 @@ async def test_an_unsupported_locale_sets_nothing() -> None:
 
 
 @pytest.mark.parametrize(
-    "referer", ["https://evil.example/x", "//evil.example/x", "javascript:alert(1)", None]
+    "referer",
+    [
+        "https://evil.example/x",
+        "//evil.example/x",
+        "javascript:alert(1)",
+        "http://test/\\evil.example",
+        "/\\evil.example",
+        None,
+    ],
 )
 async def test_it_never_redirects_off_site(referer: str | None) -> None:
     response = await _switch("de", referer)

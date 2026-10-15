@@ -50,6 +50,7 @@ def _back(request: Request) -> str:
     if referer.netloc and referer.netloc != request.url.netloc:
         return "/"
     path = referer.path or "/"
-    if not path.startswith("/") or path.startswith("//"):
+    # Browsers read a backslash as a slash, so "/\\host" is "//host" to them.
+    if not path.startswith("/") or path.startswith("//") or "\\" in path:
         return "/"
     return f"{path}?{referer.query}" if referer.query else path
