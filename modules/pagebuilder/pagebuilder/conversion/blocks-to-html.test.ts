@@ -49,6 +49,33 @@ describe('blocksToHtml', () => {
     expect(blocksToHtml([b('Markdown', { content: '# T' })]).html).toBe('<h1>T</h1>');
   });
 
+  it('keeps links and images rather than printing their markup', () => {
+    const md = (content: string) => blocksToHtml([b('Markdown', { content })]).html;
+    expect(md('See [**the** docs](/d?a=1&b="2")')).toBe(
+      '<p>See <a href="/d?a=1&amp;b=&quot;2&quot;"><strong>the</strong> docs</a></p>',
+    );
+    expect(md('![A <logo>](/a.png)')).toBe('<p><img src="/a.png" alt="A &lt;logo&gt;"></p>');
+    expect(md('[![A](/a.png)](https://a.example)')).toBe(
+      '<p><a href="https://a.example"><img src="/a.png" alt="A"></a></p>',
+    );
+    expect(blocksToHtml([b('Text', { text: 'a [x](/y) b' })]).html).toBe(
+      '<p>a <a href="/y">x</a> b</p>',
+    );
+  });
+
+  it('leaves an unsafe link or image as literal text, as the page does', () => {
+    const md = (content: string) => blocksToHtml([b('Markdown', { content })]).html;
+    expect(md('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>');
+    expect(md('![x](data:image/png,x)')).toBe('<p>![x](data:image/png,x)</p>');
+    expect(md('[x](\u0001javascript:alert(1))')).not.toContain('<a');
+  });
+
+  it('converts a numbered list', () => {
+    expect(blocksToHtml([b('Markdown', { content: '2. b\n3. c' })]).html).toBe(
+      '<ol start="2"><li>b</li><li>c</li></ol>',
+    );
+  });
+
   it('converts images, escaping the alt and carrying known dimensions', () => {
     expect(blocksToHtml([b('Image', { src: '/a.png', alt: 'an "image"' })]).html).toBe(
       '<img src="/a.png" alt="an &quot;image&quot;">',

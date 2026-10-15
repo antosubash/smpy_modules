@@ -66,3 +66,21 @@ describe('MarkdownWidget nested lists', () => {
     );
   });
 });
+
+describe('MarkdownWidget numbered lists', () => {
+  it('renders `1.` lines as a decimal <ol>', () => {
+    const out = html('1. One\n2. Two');
+    expect(out).toMatch(/<ol class="[^"]*list-decimal[^"]*"><li>One<\/li><li>Two<\/li><\/ol>/);
+    expect(out).not.toContain('list-disc');
+    expect(out).not.toContain('start=');
+  });
+
+  it('carries a first number other than 1 as start', () => {
+    expect(html('3. Three\n4. Four')).toMatch(/<ol [^>]*start="3"/);
+  });
+
+  it('nests a numbered list under a bullet with decimal markers', () => {
+    const out = html('- Steps\n  1. First');
+    expect(out).toMatch(/<li>Steps<ol class="[^"]*list-decimal[^"]*"><li>First<\/li><\/ol>/);
+  });
+});

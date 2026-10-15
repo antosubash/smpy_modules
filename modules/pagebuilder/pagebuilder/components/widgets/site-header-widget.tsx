@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 import { SOCIAL_ICON_OPTIONS, SocialIcon, type SocialIconName } from './_shared';
 import { HeaderLocaleSwitcher, resolveCta, useIsSignedIn } from './site-header-account';
 import { DesktopNav, MobileNav, type SiteNavItem } from './site-header-nav';
@@ -58,7 +59,7 @@ export function SiteHeaderRender({
   logoAlt,
   homeHref,
   utilityLinks,
-  navItems,
+  navItems: layoutNavItems,
   ctaLabel: anonymousCtaLabel,
   ctaHref: anonymousCtaHref,
   signedInLabel,
@@ -67,6 +68,13 @@ export function SiteHeaderRender({
   sticky,
 }: SiteHeaderWidgetProps) {
   const { t } = useT();
+  // Pages flagged "show in header nav" follow the layout's own entries.
+  const navItems = appendPages(
+    layoutNavItems,
+    layoutNavItems.flatMap((item) => [item.href, ...(item.children ?? []).map((c) => c.href)]),
+    useSiteNavPages('header'),
+    (page): SiteNavItem => ({ ...page, children: [] }),
+  );
   const signedIn = useIsSignedIn();
   const { label: ctaLabel, href: ctaHref } = resolveCta(
     signedIn,
@@ -85,10 +93,11 @@ export function SiteHeaderRender({
       <UtilityBar links={utilityLinks} />
 
       <div className="border-b border-[color:var(--border,#e4e6e7)] bg-[var(--pb-surface,#fff)]">
-        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:h-[112px] lg:px-12">
+        <div className="mx-auto flex min-h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:min-h-[112px] lg:px-12 lg:py-4">
           <a
             href={homeHref || '/'}
             aria-label={logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
+            className="shrink-0"
           >
             {logoUrl ? (
               <img src={logoUrl} alt={logoAlt} className="h-10 w-auto lg:h-16" />
@@ -106,7 +115,7 @@ export function SiteHeaderRender({
           {ctaLabel && (
             <a
               href={ctaHref || '#'}
-              className="hidden rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
+              className="hidden shrink-0 whitespace-nowrap rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
             >
               {ctaLabel}
             </a>
