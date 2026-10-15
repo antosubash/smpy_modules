@@ -47,7 +47,7 @@ const HEADING_STYLE: CSSProperties = {
   fontSize: 'var(--pb-heading-md, clamp(1.875rem, 1.3rem + 2.2vw, 3rem))',
 };
 
-/** An answer is light markdown: links, `- ` bullets and `**bold**`. */
+/** An answer is light markdown: links, `- ` / `1. ` lists and `**bold**`. */
 function Answer({ text, inverse }: { text: string; inverse?: boolean }) {
   return (
     <div
@@ -59,12 +59,12 @@ function Answer({ text, inverse }: { text: string; inverse?: boolean }) {
       }
     >
       {parseMarkdownBlocks(text || '').map((block, i) =>
-        block.type === 'ul' ? (
+        block.type === 'ul' || block.type === 'ol' ? (
           <MarkdownList
             // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional slices of one string, re-derived each render
             key={i}
-            items={block.items}
-            className="list-disc pl-5 [&:not(:first-child)]:mt-3"
+            list={block}
+            className="pl-5 [&:not(:first-child)]:mt-3"
           />
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional slices of one string, re-derived each render

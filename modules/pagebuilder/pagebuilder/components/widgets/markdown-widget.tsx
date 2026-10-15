@@ -127,13 +127,13 @@ function MarkdownRender({ content, width = 'auto', indent = 'none' }: MarkdownWi
                 {renderInline(block.text)}
               </h3>
             );
-          if (block.type === 'ul')
+          if (block.type === 'ul' || block.type === 'ol')
             return (
               <MarkdownList
                 // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
                 key={idx}
-                items={block.items}
-                className="list-disc list-inside space-y-1 mb-4"
+                list={block}
+                className="list-inside space-y-1 mb-4"
               />
             );
           return (

@@ -4,9 +4,9 @@ import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import type { SharedProps } from '@simple-module-py/ui/types';
 
 import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
-import { type SiteNav, SiteNavProvider } from '../components/widgets/_internal/site-nav-context';
 import { migrateContent } from '../components/migrateContent';
 import { getPuckConfig } from '../components/puckConfig';
+import { type SiteNav, SiteNavProvider } from '../components/widgets/_internal/site-nav-context';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {

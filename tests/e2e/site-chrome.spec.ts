@@ -195,7 +195,9 @@ test.describe('Site header and footer', () => {
         .first()
         .getByRole('link', { name: title });
       await expect(headerLink).toHaveAttribute('href', `/p/${slug}`);
-      await expect(page.getByTestId('site-footer').getByRole('link', { name: title })).toBeVisible();
+      await expect(
+        page.getByTestId('site-footer').getByRole('link', { name: title }),
+      ).toBeVisible();
 
       // Its own page is titled with the SEO title, not the page title.
       await page.goto(`/p/${slug}`);

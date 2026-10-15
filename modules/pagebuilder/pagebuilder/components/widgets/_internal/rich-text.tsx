@@ -4,28 +4,10 @@ import {
   parseInlineTokens,
   parseMarkdownBlocks,
 } from '../../../utils/markdown';
+import { splitLinks } from '../../../utils/markdown-links';
 import { cn } from '../../../utils/widgetUtils';
-import { HREF_SOURCE, IMAGE_SOURCE, renderInlineImage } from './inline-image';
+import { renderInlineImage } from './inline-image';
 import { MarkdownList } from './markdown-list';
-
-// `[label](href)`. Split first, so a link's label can still carry the emphasis
-// markers the inline tokenizer understands ("[**Datenschutz**](/x)").
-//
-// The href allows ONE level of balanced parentheses, because a naive `[^)]+`
-// stops at the first `)` and silently truncates URLs that legitimately contain
-// them (Wikipedia's `..._(disambiguation)`), producing a broken href AND
-// leaking the remainder onto the page as stray literal text. Anything the
-// pattern can't parse falls through unchanged and renders as literal text, so
-// malformed input is always visible rather than dropped.
-//
-// Images (#66) split out the same way, a linked image `[![alt](src)](href)`
-// first: tried as a plain link, its label would end at the image's own `]`.
-const LINK_PATTERN = new RegExp(
-  String.raw`(\[${IMAGE_SOURCE}\]\(${HREF_SOURCE}\)|${IMAGE_SOURCE}|\[[^\]]+\]\(${HREF_SOURCE}\))`,
-  'g',
-);
-const LINKED_IMAGE = new RegExp(String.raw`^\[(${IMAGE_SOURCE})\]\((${HREF_SOURCE})\)$`);
-const LINK = new RegExp(String.raw`^\[([^\]]+)\]\((${HREF_SOURCE})\)$`);
 
 // `<strong>`'s UA default `font-weight: bolder` is RELATIVE — inside
 // `font-light` (300) copy it computes to 400 and the bold is invisible. An
@@ -96,18 +78,6 @@ function renderEmphasis(text: string, keyPrefix: string, opts?: RichTextOptions)
 }
 
 /**
- * Editor copy is not fully trusted (ContentEditors can write these fields),
- * so only well-known schemes and scheme-less (relative / anchor) hrefs become
- * anchors — `javascript:` & co. fall through and render as literal text,
- * visible rather than executable.
- */
-function isSafeHref(href: string): boolean {
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(href);
-  if (!scheme) return true;
-  return ['http', 'https', 'mailto', 'tel'].includes(scheme[1].toLowerCase());
-}
-
-/**
  * Inline markdown → ReactNodes, with links.
  *
  * The shared `parseInlineTokens` covers emphasis/code only, so `[x](y)` used to
@@ -140,38 +110,21 @@ function collapse(nodes: ReactNode[]): ReactNode[] {
 
 function renderRichTextNodes(text: string, opts?: RichTextOptions): ReactNode[] {
   const linksAllowed = opts?.allowLinks !== false;
-  const out: ReactNode[] = [];
-  const parts = text.split(LINK_PATTERN);
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (!part) continue;
-    const image = renderInlineImage(part, `i-${i}`);
-    if (image) {
-      out.push(image);
-      continue;
+  return splitLinks(text).flatMap((segment, i): ReactNode[] => {
+    if (segment.type === 'image') return [renderInlineImage(segment, `i-${i}`)];
+    if (segment.type === 'linkedImage') {
+      const image = renderInlineImage(segment, `i-${i}`);
+      return [linksAllowed ? anchor(segment.href, image, `l-${i}`) : image];
     }
-    const linked = LINKED_IMAGE.exec(part);
-    const linkedImage = linked && renderInlineImage(linked[1], `i-${i}`);
-    if (linked && linkedImage && isSafeHref(linked[2])) {
-      out.push(linksAllowed ? anchor(linked[2], linkedImage, `l-${i}`) : linkedImage);
-      continue;
-    }
-    const match = LINK.exec(part);
-    if (match && isSafeHref(match[2])) {
-      const [, label, href] = match;
+    if (segment.type === 'link') {
       // Inside an `<a>`/`<button>`/`<summary>` an anchor can't be nested, so
       // keep the label (emphasis and all) and drop the href — showing the
       // raw `[label](href)` markup reads as broken copy to editors.
-      if (!linksAllowed) {
-        out.push(...renderEmphasis(label, `u-${i}`, opts));
-        continue;
-      }
-      out.push(anchor(href, renderEmphasis(label, `l-${i}`, opts), `l-${i}`));
-      continue;
+      if (!linksAllowed) return renderEmphasis(segment.label, `u-${i}`, opts);
+      return [anchor(segment.href, renderEmphasis(segment.label, `l-${i}`, opts), `l-${i}`)];
     }
-    out.push(...renderEmphasis(part, `t-${i}`, opts));
-  }
-  return out;
+    return renderEmphasis(segment.text, `t-${i}`, opts);
+  });
 }
 
 function anchor(href: string, children: ReactNode, key: string): ReactNode {
@@ -198,7 +151,7 @@ export type RichTextBlockProps = {
 
 /**
  * Block-level light markdown for `textarea` widget fields: blank-line
- * paragraphs, `- ` bullet lists, and everything `renderRichText` does inline.
+ * paragraphs, `- ` / `1. ` lists, and everything `renderRichText` does inline.
  *
  * Single-paragraph content (the common case) renders the same `<p>` the
  * widget rendered before — zero DOM/visual change for plain text. Multi-block
@@ -217,15 +170,18 @@ export function RichTextBlock({ text, className, style }: RichTextBlockProps): R
   const blocks = parseMarkdownBlocks(text ?? '', { softBreaks: true });
   if (blocks.length === 0) return null;
   const only = blocks.length === 1 ? blocks[0] : undefined;
+  // `break-words`: a long URL is one unbreakable word, and in a narrow column
+  // (DefinitionList, Section intro) it widened the page instead of wrapping.
+  const wrapperClass = cn('break-words', className);
   if (only && only.type === 'p') {
     return (
-      <p className={className} style={style}>
+      <p className={wrapperClass} style={style}>
         {renderWithSoftBreaks(only.text)}
       </p>
     );
   }
   return (
-    <div className={className} style={style}>
+    <div className={wrapperClass} style={style}>
       {blocks.map((block, i) => renderBlock(block, i))}
     </div>
   );
@@ -247,14 +203,8 @@ function renderWithSoftBreaks(text: string): ReactNode[] {
 }
 
 function renderBlock(block: MarkdownBlock, key: number): ReactNode {
-  if (block.type === 'ul') {
-    return (
-      <MarkdownList
-        key={key}
-        items={block.items}
-        className="list-disc pl-5 [&:not(:first-child)]:mt-3"
-      />
-    );
+  if (block.type === 'ul' || block.type === 'ol') {
+    return <MarkdownList key={key} list={block} className="pl-5 [&:not(:first-child)]:mt-3" />;
   }
   return (
     <p
