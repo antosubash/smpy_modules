@@ -55,7 +55,8 @@ describe('SiteHeader locale switcher', () => {
   it('sits in one actions group with the CTA and menu button (#74)', () => {
     document.body.innerHTML = render({ showLocaleSwitcher: true });
     const row = document.querySelector('[data-pb-header-actions]')?.parentElement;
-    const actions = row?.querySelector(':scope > [data-pb-header-actions]');
+    const actions = row?.lastElementChild;
+    expect(actions?.hasAttribute('data-pb-header-actions')).toBe(true);
     // Logo, nav, actions: a fourth child would let justify-between float it.
     expect(row?.children).toHaveLength(3);
     expect(actions?.querySelector('form[action="/i18n/set-locale"]')).not.toBeNull();
