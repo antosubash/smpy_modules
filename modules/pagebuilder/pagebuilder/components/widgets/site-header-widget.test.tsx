@@ -52,6 +52,18 @@ describe('SiteHeader locale switcher', () => {
     expect(render({ showLocaleSwitcher: true })).not.toContain('>EN<');
   });
 
+  it('sits in one actions group with the CTA and menu button (#74)', () => {
+    document.body.innerHTML = render({ showLocaleSwitcher: true });
+    const row = document.querySelector('[data-pb-header-actions]')?.parentElement;
+    const actions = row?.lastElementChild;
+    expect(actions?.hasAttribute('data-pb-header-actions')).toBe(true);
+    // Logo, nav, actions: a fourth child would let justify-between float it.
+    expect(row?.children).toHaveLength(3);
+    expect(actions?.querySelector('form[action="/i18n/set-locale"]')).not.toBeNull();
+    expect(actions?.querySelector('a[href="/users/login"]')).not.toBeNull();
+    expect(actions?.querySelector('button[aria-controls]')).not.toBeNull();
+  });
+
   it('exposes the toggle as an editor field defaulting to off', () => {
     expect(SiteHeaderWidget.fields).toHaveProperty('showLocaleSwitcher');
     expect(SiteHeaderWidget.defaultProps?.showLocaleSwitcher).toBe(false);
