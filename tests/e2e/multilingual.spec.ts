@@ -46,7 +46,12 @@ function doc(heading: string, body: string) {
  * the chrome is the thing this test is comparing across languages, so it has
  * to be this file's own precondition, not another file's leftover.
  */
-async function putLayout(page: Page, headers: Record<string, string>, chrome: boolean) {
+async function putLayout(
+  page: Page,
+  headers: Record<string, string>,
+  chrome: boolean,
+  switcher = false,
+) {
   // An empty `content` is how a slot reads as unset — `public_layout_props`
   // drops the wrapper entirely rather than render an empty <header>.
   const slot = (block: unknown) => ({
@@ -68,6 +73,7 @@ async function putLayout(page: Page, headers: Record<string, string>, chrome: bo
           navItems: [{ label: 'Atlas', href: '/p/atlas', children: [] }],
           ctaLabel: 'Contact us',
           ctaHref: '/p/contact',
+          showLocaleSwitcher: switcher,
           sticky: false,
         },
       }),
@@ -155,6 +161,41 @@ test.describe('Multilingual pages', () => {
     expect(deMain.tree).toEqual(enMain.tree);
     expect(deMain.width).toBe(enMain.width);
     expect(deMain.left).toBe(enMain.left);
+  });
+
+  test('the header language switcher sits beside the CTA, not mid-row (#74)', async ({ page }) => {
+    await login(page);
+    const headers = await csrfHeader(page);
+    await putLayout(page, headers, true, true);
+    const slug = uniqueSlug('e2e-switch');
+    const created = await (
+      await page.request.post('/api/pagebuilder/pages', {
+        headers,
+        data: { title: 'Switcher', slug, draft_data: doc('Switcher', 'Body.') },
+      })
+    ).json();
+    await page.request.post(`/api/pagebuilder/pages/${created.id}/publish`, { headers, data: {} });
+
+    const header = page.getByTestId('site-header');
+    const switcher = header.getByRole('button', { name: 'Change language' });
+    // Distance from the switcher's right edge to the next control's left edge.
+    const gapTo = async (next: ReturnType<Page['locator']>) => {
+      const a = await switcher.boundingBox();
+      const b = await next.boundingBox();
+      if (!a || !b) throw new Error('header control not laid out');
+      return b.x - (a.x + a.width);
+    };
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/p/${slug}`);
+    const gapToCta = await gapTo(header.getByRole('link', { name: 'Contact us' }));
+    expect(gapToCta).toBeGreaterThanOrEqual(0);
+    expect(gapToCta).toBeLessThanOrEqual(24);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const gapToMenu = await gapTo(header.getByRole('button', { name: 'Open menu' }));
+    expect(gapToMenu).toBeGreaterThanOrEqual(0);
+    expect(gapToMenu).toBeLessThanOrEqual(24);
   });
 
   test('each language advertises the other, and the default keeps its address', async ({
