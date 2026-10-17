@@ -46,7 +46,7 @@ export function HeaderLocaleSwitcher({ show }: { show: boolean }) {
   const multiple = useHasMultipleLocales();
   if (!show || !multiple) return null;
   return (
-    <div className="ml-auto mr-2 flex items-center lg:ml-0 lg:mr-0">
+    <div className="flex items-center">
       <LocaleSwitcher />
     </div>
   );

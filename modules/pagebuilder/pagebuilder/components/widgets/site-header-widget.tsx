@@ -110,31 +110,35 @@ export function SiteHeaderRender({
 
           <DesktopNav items={navItems} />
 
-          <HeaderLocaleSwitcher show={showLocaleSwitcher} />
+          {/* One group, so the row keeps three items (logo, nav, actions) and
+              `justify-between` cannot float the switcher between nav and CTA. */}
+          <div data-pb-header-actions className="flex shrink-0 items-center gap-3">
+            <HeaderLocaleSwitcher show={showLocaleSwitcher} />
 
-          {ctaLabel && (
-            <a
-              href={ctaHref || '#'}
-              className="hidden shrink-0 whitespace-nowrap rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
+            {ctaLabel && (
+              <a
+                href={ctaHref || '#'}
+                className="hidden shrink-0 whitespace-nowrap rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
+              >
+                {ctaLabel}
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setMobileOpen((open) => !open)}
+              aria-label={
+                mobileOpen
+                  ? t(keys.pagebuilder.blocks.site_header.close_menu)
+                  : t(keys.pagebuilder.blocks.site_header.open_menu)
+              }
+              aria-expanded={mobileOpen}
+              aria-controls={mobileMenuId}
+              className="-mr-2 inline-flex size-10 items-center justify-center rounded-md text-primary-800 transition-colors hover:text-primary-900 lg:hidden"
             >
-              {ctaLabel}
-            </a>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setMobileOpen((open) => !open)}
-            aria-label={
-              mobileOpen
-                ? t(keys.pagebuilder.blocks.site_header.close_menu)
-                : t(keys.pagebuilder.blocks.site_header.open_menu)
-            }
-            aria-expanded={mobileOpen}
-            aria-controls={mobileMenuId}
-            className="-mr-2 inline-flex size-10 items-center justify-center rounded-md text-primary-800 transition-colors hover:text-primary-900 lg:hidden"
-          >
-            {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
-          </button>
+              {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
+            </button>
+          </div>
         </div>
       </div>
 
