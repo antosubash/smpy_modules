@@ -44,7 +44,7 @@ def reset() -> None:
     """Drop the installed instance and the lazy cache (tests only)."""
     global _current
     _current = None
-    worker_settings.invalidate()
+    worker_settings.reset()
 
 
 def invalidate() -> None:

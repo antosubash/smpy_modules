@@ -187,6 +187,72 @@ class TestCache:
         assert len(calls) == 1
 
 
+class TestResilience:
+    """A worker outlives database blips; none may pin it to the wrong settings."""
+
+    def test_a_fallback_is_retried_soon_not_kept_for_the_ttl(self, monkeypatch, tmp_path):
+        path = tmp_path / "later.db"
+        monkeypatch.setenv("SM_DATABASE_URL", f"sqlite+aiosqlite:///{path}")
+        monkeypatch.setattr(constants, "LAZY_SETTINGS_RETRY_SECONDS", 0.0)
+        monkeypatch.setenv("SM_AI_CHAT_MODEL", "from-env")
+        assert resolve_model().model_name == "from-env"  # no database yet
+
+        engine = create_engine(f"sqlite:///{path}")
+        Setting.__table__.create(engine)
+        _put(engine, "sm_ai.chat_model", "from-db")
+        engine.dispose()
+        assert resolve_model().model_name == "from-db"  # the 60s TTL did not apply
+
+    def test_a_missing_sqlite_file_is_not_created(self, monkeypatch, tmp_path):
+        path = tmp_path / "never.db"
+        monkeypatch.setenv("SM_DATABASE_URL", f"sqlite+aiosqlite:///{path}")
+        resolve_model()
+        assert not path.exists()
+
+    def test_the_warning_is_logged_once_per_outage(self, monkeypatch, tmp_path, caplog):
+        monkeypatch.setenv("SM_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/gone.db")
+        monkeypatch.setattr(constants, "LAZY_SETTINGS_RETRY_SECONDS", 0.0)
+        for _ in range(3):
+            resolve_model()
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+
+    def test_a_hung_read_is_bounded(self, db, monkeypatch):
+        async def hang(_url):
+            await asyncio.sleep(30)
+
+        monkeypatch.setattr(worker_settings, "_read", hang)
+        monkeypatch.setattr(constants, "LAZY_SETTINGS_READ_TIMEOUT_SECONDS", 0.1)
+        monkeypatch.setenv("SM_AI_CHAT_MODEL", "from-env")
+        assert _task().model_name == "from-env"
+
+    def test_a_stale_snapshot_is_served_while_another_thread_refreshes(self, db, monkeypatch):
+        _put(db, "sm_ai.chat_model", "first")
+        monkeypatch.setattr(constants, "LAZY_SETTINGS_TTL_SECONDS", 0.0)
+        assert resolve_model().model_name == "first"  # cached, already stale
+        _put(db, "sm_ai.chat_model", "second")
+
+        assert worker_settings._refresh.acquire(blocking=False)  # someone is reading
+        try:
+            assert resolve_model().model_name == "first"  # served stale, did not block
+        finally:
+            worker_settings._refresh.release()
+        assert resolve_model().model_name == "second"
+
+    def test_the_snapshot_repr_hides_the_secret(self, db):
+        _put(db, "host.secret_key", DB_SECRET)
+        services.current_settings()
+        assert DB_SECRET not in repr(worker_settings._snapshot)
+
+    def test_a_forked_child_starts_with_free_locks_and_no_cache(self, db):
+        services.current_settings()
+        worker_settings._refresh.acquire()  # the parent forked mid-refresh
+        worker_settings._after_fork_in_child()
+        assert worker_settings._snapshot is None
+        assert worker_settings._refresh.acquire(blocking=False)
+        worker_settings._refresh.release()
+
+
 class TestWebHostUnchanged:
     def test_installed_holder_is_used_and_db_never_read(self, monkeypatch):
         def boom():
