@@ -2,7 +2,7 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 import { Menu, X } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
@@ -82,7 +82,19 @@ export function SiteHeaderRender({
     { label: signedInLabel, href: signedInHref },
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuId = useId();
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMobileOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [mobileOpen]);
 
   return (
     // The public page wraps this slot in its own <header>, which is exactly as
@@ -125,6 +137,7 @@ export function SiteHeaderRender({
             )}
 
             <button
+              ref={menuButtonRef}
               type="button"
               onClick={() => setMobileOpen((open) => !open)}
               aria-label={
@@ -134,7 +147,7 @@ export function SiteHeaderRender({
               }
               aria-expanded={mobileOpen}
               aria-controls={mobileMenuId}
-              className="-mr-2 inline-flex size-10 items-center justify-center rounded-md text-primary-800 transition-colors hover:text-primary-900 lg:hidden"
+              className="-mr-2 inline-flex size-11 items-center justify-center rounded-md text-primary-800 transition-colors hover:text-primary-900 lg:hidden"
             >
               {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
             </button>
