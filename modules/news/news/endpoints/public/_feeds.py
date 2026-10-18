@@ -40,7 +40,7 @@ def feed_router(locale: str) -> APIRouter:
     """The recent archive in one language, as RSS 2.0."""
     router = APIRouter()
 
-    @router.get("/feed.xml", response_model=None)
+    @router.api_route("/feed.xml", methods=["GET", "HEAD"], response_model=None)
     async def article_feed(
         request: Request, db: AsyncSession = Depends(get_db)
     ) -> Response:

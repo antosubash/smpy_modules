@@ -95,7 +95,7 @@ def article_router(locale: str) -> APIRouter:
     """
     router = APIRouter()
 
-    @router.get("/{slug}", response_model=None)
+    @router.api_route("/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def public_article(
         slug: str,
         request: Request,
@@ -184,7 +184,7 @@ def default_locale_alias_router(prefix: str) -> APIRouter:
     """
     router = APIRouter(dependencies=[Depends(bind_public)])
 
-    @router.get("/{slug}", response_model=None)
+    @router.api_route("/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
         return RedirectResponse(f"{prefix.rstrip('/')}/{slug}", status_code=301)
 

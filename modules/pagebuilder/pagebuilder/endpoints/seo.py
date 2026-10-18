@@ -74,8 +74,9 @@ def _alternate_links(alternates: list[tuple[str, str]]) -> str:
 
 # Tenant-bound (first, before ``get_db``): a sitemap lists one site's pages.
 # robots.txt reads no rows, so it answers on any host, tenant or not.
-@seo_router.get(
-    "/sitemap.xml", response_class=Response, dependencies=[Depends(bind_public)]
+@seo_router.api_route(
+    "/sitemap.xml", methods=["GET", "HEAD"],
+    response_class=Response, dependencies=[Depends(bind_public)]
 )
 async def sitemap(
     request: Request,
@@ -146,7 +147,7 @@ async def sitemap(
     return vary_on_tenant(response, request.app)
 
 
-@seo_router.get("/robots.txt", response_class=Response)
+@seo_router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=Response)
 async def robots(
     request: Request,
     settings: PagebuilderSettings = Depends(get_settings),
