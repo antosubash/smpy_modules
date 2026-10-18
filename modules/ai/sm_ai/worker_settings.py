@@ -105,12 +105,14 @@ def _hydrate() -> tuple[AiSettings, str]:
         with ThreadPoolExecutor(max_workers=1) as pool:
             settings, stored = pool.submit(lambda: asyncio.run(_read(boot.database_url))).result()
         return settings, explicit or stored
-    except Exception:
+    except Exception as exc:
         # Unreachable or unmigrated database: the web lifespan's hydrate step
-        # falls back the same way. Env and defaults still apply.
+        # falls back the same way. Env and defaults still apply. Only the error
+        # type is logged: a driver's message or traceback can carry the
+        # connection URL, credentials included.
         logger.warning(
-            "AI settings: database read failed; using SM_AI_* env and defaults",
-            exc_info=True,
+            "AI settings: database read failed (%s); using SM_AI_* env and defaults",
+            type(exc).__name__,
         )
         return AiSettings(), explicit
 

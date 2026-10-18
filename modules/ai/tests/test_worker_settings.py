@@ -144,6 +144,19 @@ class TestEnvOnlySettings:
         assert _task().model_name == "from-env"
         assert "database read failed" in caplog.text
 
+    def test_the_fallback_warning_never_carries_the_database_url(self, monkeypatch, caplog):
+        # A refused connection: drivers put host, user — sometimes the whole
+        # URL — in the message and the traceback. None of it may reach a log.
+        url = "postgresql+asyncpg://admin:hunter2-secret@127.0.0.1:1/ai"
+        monkeypatch.setenv("SM_DATABASE_URL", url)
+
+        _task()
+
+        assert "database read failed" in caplog.text
+        assert "hunter2-secret" not in caplog.text
+        assert "admin" not in caplog.text
+        assert all(record.exc_info is None for record in caplog.records)
+
 
 class TestCache:
     def test_cached_until_invalidated(self, db):
