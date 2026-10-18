@@ -209,6 +209,40 @@ test.describe('Site header and footer', () => {
     }
   });
 
+  test('the mobile menu closes on Escape and both header controls have 44px targets', async ({
+    page,
+  }) => {
+    await login(page);
+    const headerWithSwitcher = structuredClone(HEADER);
+    headerWithSwitcher.content[0].props.showLocaleSwitcher = true;
+    await putLayout(page, headerWithSwitcher, FOOTER);
+    try {
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`${publicPath}?cb=mobile-${width}`);
+        const header = page.getByTestId('site-header');
+        const menu = header.locator('button[aria-controls]');
+        const locale = header.getByRole('button', { name: 'Change language' });
+        for (const control of [menu, locale]) {
+          const box = await control.boundingBox();
+          expect(box?.width).toBeGreaterThanOrEqual(44);
+          expect(box?.height).toBeGreaterThanOrEqual(44);
+        }
+
+        await menu.click();
+        const mobileNav = header.getByRole('navigation', { name: 'Main' });
+        await expect(menu).toHaveAttribute('aria-expanded', 'true');
+        await mobileNav.getByRole('link', { name: 'Atlas' }).focus();
+        await page.keyboard.press('Escape');
+        await expect(mobileNav).toHaveCount(0);
+        await expect(menu).toHaveAttribute('aria-expanded', 'false');
+        await expect(menu).toBeFocused();
+      }
+    } finally {
+      await putLayout(page, HEADER, FOOTER);
+    }
+  });
+
   test('the site chrome widgets are offered in the layout editor only', async ({ page }) => {
     await login(page);
 

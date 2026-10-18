@@ -47,7 +47,7 @@ export function HeaderLocaleSwitcher({ show }: { show: boolean }) {
   if (!show || !multiple) return null;
   return (
     <div className="flex items-center">
-      <LocaleSwitcher />
+      <LocaleSwitcher className="min-h-11 min-w-11" />
     </div>
   );
 }
