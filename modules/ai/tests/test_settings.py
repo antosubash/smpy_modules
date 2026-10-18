@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from sm_ai import services
-from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.settings import AiSettings
 
 
@@ -46,10 +45,11 @@ class TestEnvSeeding:
 
 
 class TestHolder:
-    def test_current_settings_before_install_raises(self):
-        with pytest.raises(AiNotConfiguredError) as exc:
-            services.current_settings()
-        assert exc.value.field == "module"
+    def test_current_settings_without_install_hydrates_lazily(self, monkeypatch):
+        # No host registered the module (a Celery worker, #100): settings come
+        # from the store/env instead of raising — see test_worker_settings.
+        monkeypatch.setattr(services.worker_settings, "load", lambda: AiSettings(chat_model="lazy"))
+        assert services.current_settings().chat_model == "lazy"
 
     def test_install_then_read(self):
         installed = services.install(services.AiServices(settings=AiSettings()))
@@ -61,6 +61,8 @@ class TestHolder:
         installed = services.install(services.AiServices(settings=AiSettings()))
         installed.settings = AiSettings(chat_model="swapped")
         assert services.current_settings().chat_model == "swapped"
+
+
 class TestReadDto:
     def test_out_normalizes_env_seeded_provider_case(self):
         # SM_AI_CHAT_PROVIDER=Anthropic works at runtime (resolve.py lowers

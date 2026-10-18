@@ -51,8 +51,20 @@ sm_ai.contracts.resolve_model() ─► services.current_settings()
 The factory stores **the same instance** in `app.state.sm_ai` and in the
 module-global holder. Hydration and hot reload assign `.settings` on that
 object, so `sm_ai.contracts` always sees the current values. Consumers never
-touch `app.state` or pass a session. Before a host has registered the module,
-`current_settings()` raises `AiNotConfiguredError("module")`.
+touch `app.state` or pass a session.
+
+A process that never registered the module — a Celery worker, a script — has
+an empty holder. There `current_settings()` hydrates lazily through
+`worker_settings.py` (#100): the framework's `hydrate_settings` over a
+`SettingsStore` on a short-lived engine for `SM_DATABASE_URL`, so the
+precedence is the web lifespan's (DB row, then `SM_AI_*` env / `.env`, then the
+default). It also installs a secret provider resolving the secret the web app
+encrypts under: explicit `SM_SECRET_KEY`, else the stored `host.secret_key`.
+Framework 0.0.35's `SettingsReloaded` only travels the web process's in-memory
+bus, so the worker caches for `LAZY_SETTINGS_TTL_SECONDS` (60 s) and
+`services.invalidate()` forces a re-read. An unreachable or unmigrated
+database falls back to env and defaults with a warning, as the lifespan's
+hydrate step does.
 
 `resolve.py` is pure construction with no I/O, and nothing is cached. A new
 model or embedder is built on every call: construction is cheap,
@@ -177,6 +189,7 @@ async def index(chunks: list[str]) -> None:
 | `module.py` | framework hooks: settings registration, secret provider, permission, menu, routes, middleware |
 | `settings.py` | `AiSettings`: the nine fields and the `SM_AI_` env fallback |
 | `services.py` | `AiServices` and the module-global holder |
+| `worker_settings.py` | lazy, TTL-cached hydration where no host registered the module (workers) |
 | `resolve.py` | slot validation and model / embedder construction |
 | `crypto.py` | `enc:v1:` Fernet layer |
 | `service.py`, `deps.py` | read with secrets masked; build and apply changes |
