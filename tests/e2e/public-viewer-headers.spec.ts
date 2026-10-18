@@ -16,7 +16,7 @@ test.describe('Public viewer headers', () => {
     await login(page);
   });
 
-  test('published /p/{slug} emits ETag, Cache-Control, and CSP', async ({ page }) => {
+  test('published /p/{slug} emits ETag, Cache-Control, and CSP', async ({ browser, page }) => {
     const slug = uniqueSlug('hdr');
     await page.goto('/pagebuilder/new');
     await page.getByPlaceholder('Page title').fill(`Headers ${slug}`);
@@ -34,10 +34,21 @@ test.describe('Public viewer headers', () => {
     expect(etag, 'ETag header missing').toBeTruthy();
     expect(etag).toMatch(/^W\/".+"$/);
 
-    const cacheControl = headers['cache-control'];
+    // Signed in: the page carries this user, so no shared cache may keep it (#94).
+    expect(headers['cache-control']).toBe('private, no-cache');
+
+    // Anonymous: shared-cacheable, keyed on what picks the language and the session.
+    const anon = await browser.newContext();
+    const anonymous = await anon.request.get(new URL(`/p/${slug}`, page.url()).toString());
+    expect(anonymous.status()).toBe(200);
+    const cacheControl = anonymous.headers()['cache-control'];
     expect(cacheControl).toContain('public');
     expect(cacheControl).toMatch(/max-age=\d+/);
     expect(cacheControl).toMatch(/stale-while-revalidate=\d+/);
+    expect(anonymous.headers().vary).toMatch(/Cookie/);
+    expect(anonymous.headers().vary).toMatch(/Accept-Language/);
+    expect(anonymous.headers().etag).not.toBe(etag);
+    await anon.close();
 
     // CSP header is injected for every published response; the host
     // overrides the default in dev to widen connect-src for Vite, so we

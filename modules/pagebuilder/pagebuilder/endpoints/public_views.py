@@ -14,9 +14,7 @@ rewriting an address that already exists.
 
 from __future__ import annotations
 
-import hashlib
 import json
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -24,7 +22,7 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import locales, public_claims, redirects, site_nav
+from pagebuilder import locales, public_cache, public_claims, redirects, site_nav
 from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.og_image import og_image
@@ -33,39 +31,6 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.tenancy import bind_public, vary_on_tenant
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
-
-
-def _etag_for(
-    page_id: int,
-    updated_at: datetime | None,
-    layout_updated_at: datetime | None = None,
-    variant: str = "html",
-    nav: str = "",
-) -> str:
-    """Stable, short ETag derived from page identity + last-modified time.
-
-    ``layout_updated_at`` participates so a site-wide header / footer
-    edit invalidates every page's cached chrome — without it, clients
-    keep serving stale layout from cache until the page itself changes.
-
-    The locale needs no place in the digest: a page belongs to exactly one
-    language, so ``page_id`` already names it.
-
-    ``variant`` names the representation ("html" or "inertia"): one URL answers
-    with a full page or Inertia's JSON, and a shared tag lets a browser holding
-    the page get a 304 for the JSON request and hand Inertia cached HTML.
-
-    ``nav`` is the serialised :func:`pagebuilder.site_nav.site_nav` list. Flagging,
-    renaming or publishing *another* page changes this page's chrome while neither
-    its own ``updated_at`` nor the layout's moves.
-    """
-    stamp = updated_at.isoformat() if updated_at is not None else ""
-    layout_stamp = (
-        layout_updated_at.isoformat() if layout_updated_at is not None else ""
-    )
-    key = f"{page_id}:{stamp}:{layout_stamp}:{variant}:{nav}"
-    digest = hashlib.sha1(key.encode()).hexdigest()[:16]
-    return f'W/"{digest}"'
 
 
 def _public_base_url(request: Request, settings: PagebuilderSettings) -> str:
@@ -182,17 +147,20 @@ async def render_public_page(
     layout = await LayoutService(db).get()
     nav = await site_nav.site_nav(db, settings.public_route_prefix, page.locale)
     variant = "inertia" if request.headers.get("x-inertia") else "html"
-    etag = _etag_for(
-        page.id or 0, page.updated_at, layout.updated_at, variant, json.dumps(nav, sort_keys=True)
+    etag = public_cache.etag_for(
+        page.id or 0,
+        page.updated_at,
+        layout.updated_at,
+        variant,
+        json.dumps(nav, sort_keys=True),
+        public_cache.viewer_key(request),
     )
-    cache_parts = [f"max-age={settings.public_cache_max_age}"]
-    if settings.public_cache_swr > 0:
-        cache_parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
-    cache_control = "public, " + ", ".join(cache_parts)
+    # Signed-in or not, and in which UI language, decide the bytes (#94).
+    cache_control = public_cache.cache_control(request, settings)
 
     def apply_headers(response: Response) -> Response:
         response.headers["ETag"] = etag
-        response.headers["Vary"] = "X-Inertia"
+        response.headers["Vary"] = public_cache.VARY
         # On a multi-tenant host the tenant can come from the session, not the Host.
         vary_on_tenant(response, request.app)
         response.headers["Cache-Control"] = cache_control

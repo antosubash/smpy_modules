@@ -183,7 +183,8 @@ test.describe('News — the full editorial workflow', () => {
     const served = await page.request.get(url);
     expect(served.status()).toBe(200);
     expect(served.headers().etag).toBeTruthy();
-    expect(served.headers()['cache-control']).toContain('public');
+    // Signed in, so the copy is this reader's alone (#94).
+    expect(served.headers()['cache-control']).toBe('private, no-cache');
     expect(await served.text()).toContain(lead);
 
     // A conditional request short-circuits on the same ETag.

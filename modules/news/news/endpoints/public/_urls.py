@@ -16,8 +16,16 @@ from fastapi import Request, Response
 from news import tenancy
 from news.settings import NewsSettings, public_article_path
 
+#: What a rendered page varies on besides the URL: the representation, and the
+#: viewer — the ``locale`` cookie or ``Accept-Language`` picks the chrome's
+#: language, and the session decides who is signed in (#94).
+PER_VIEWER_VARY = ("X-Inertia", "Cookie", "Accept-Language")
+SIGNED_IN_CACHE_CONTROL = "private, no-cache"
 
-def etag_for(article_id: int, updated_at: datetime | None, variant: str = "html") -> str:
+
+def etag_for(
+    article_id: int, updated_at: datetime | None, variant: str = "html", viewer: str = ""
+) -> str:
     """Stable, short ETag derived from identity + last-modified time.
 
     Deliberately not a hash of the payload: the body is the biggest column in
@@ -28,10 +36,33 @@ def etag_for(article_id: int, updated_at: datetime | None, variant: str = "html"
     page or, for an in-app visit, Inertia's JSON; sharing a tag let a browser
     holding the page revalidate the JSON request, get a 304, and hand Inertia
     the cached HTML instead.
+
+    ``viewer`` is :func:`viewer_key`, so a revalidation only 304s against a
+    response built for the same UI language and the same signed-in user.
     """
     stamp = updated_at.isoformat() if updated_at is not None else ""
-    digest = hashlib.sha1(f"{article_id}:{stamp}:{variant}".encode()).hexdigest()[:16]
+    key = f"{article_id}:{stamp}:{variant}:{viewer}"
+    digest = hashlib.sha1(key.encode()).hexdigest()[:16]
     return f'W/"{digest}"'
+
+
+def viewer_key(request: Request) -> str:
+    """UI language + who is signed in — never the raw user identifier.
+
+    A rendered page carries Inertia's shared props (``auth.user`` among them)
+    and chrome in the visitor's language, so both are part of what was served.
+    """
+    user = getattr(request.state, "user", None)
+    if user is None:
+        who = "anon"
+    else:
+        ident = next(
+            (v for a in ("id", "sub", "email") if (v := getattr(user, a, None)) not in (None, "")),
+            None,
+        )
+        raw = str(ident) if ident is not None else repr(user)
+        who = "u:" + hashlib.sha1(raw.encode()).hexdigest()[:12]
+    return f"{getattr(request.state, 'locale', None) or ''}:{who}"
 
 
 def public_base_url(request: Request, settings: NewsSettings) -> str:
@@ -84,7 +115,12 @@ def listing_cache_control(settings: NewsSettings) -> str:
 
 
 def apply_cache(
-    response: Response, request: Request, settings: NewsSettings, *, listing: bool = False
+    response: Response,
+    request: Request,
+    settings: NewsSettings,
+    *,
+    listing: bool = False,
+    per_viewer: bool = False,
 ) -> Response:
     """Mark a public response shared-cacheable — keyed on whatever picks its tenant.
 
@@ -93,8 +129,21 @@ def apply_cache(
     tenant's page to another's reader; :func:`news.tenancy.vary_on_tenant` adds
     the fields that tell them apart. A single-tenant host gets no ``Vary``
     from here.
+
+    ``per_viewer`` is for a rendered page (article, archive) rather than a feed
+    or sitemap: it differs by visitor, so a signed-in reader's copy is
+    ``private, no-cache`` and every copy varies on :data:`PER_VIEWER_VARY` (#94).
     """
-    response.headers["Cache-Control"] = (
-        listing_cache_control(settings) if listing else cache_control(settings)
-    )
+    if per_viewer and getattr(request.state, "user", None) is not None:
+        response.headers["Cache-Control"] = SIGNED_IN_CACHE_CONTROL
+    else:
+        response.headers["Cache-Control"] = (
+            listing_cache_control(settings) if listing else cache_control(settings)
+        )
+    if per_viewer:
+        listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
+        seen = {f.lower() for f in listed}
+        response.headers["Vary"] = ", ".join(
+            listed + [f for f in PER_VIEWER_VARY if f.lower() not in seen]
+        )
     return tenancy.vary_on_tenant(response, request.app)

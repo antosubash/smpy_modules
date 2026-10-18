@@ -53,9 +53,8 @@ async def test_published_page_renders_with_headers(authed_client: AsyncClient) -
     response = await authed_client.get("/p/hello", headers=_INERTIA_HEADERS)
     assert response.status_code == 200
     assert response.headers.get("ETag", "").startswith('W/"')
-    cache_control = response.headers["Cache-Control"]
-    assert "public" in cache_control
-    assert "max-age=" in cache_control
+    # Signed in, so private (#94); the anonymous policy is in test_public_cache.py.
+    assert response.headers["Cache-Control"] == "private, no-cache"
     assert response.headers.get("Content-Security-Policy", "").startswith("default-src 'self'")
 
 

@@ -36,7 +36,8 @@ test.describe('News — the public article address', () => {
     // They are asserted here precisely because a second viewer is exactly the
     // thing the old hand-off existed to avoid — if it drifts, it drifts here.
     expect(served.headers().etag).toBeTruthy();
-    expect(served.headers()['cache-control']).toContain('public');
+    // Signed in, so the copy is this reader's alone (#94).
+    expect(served.headers()['cache-control']).toBe('private, no-cache');
     expect(await served.text()).toContain('Read me at the news address.');
 
     // A conditional request short-circuits.
@@ -104,6 +105,10 @@ test.describe('News — the public article address', () => {
       maxRedirects: 0,
     });
     expect(response.status()).toBe(200);
+    // Anonymous, so shared caches may keep it — but only per viewer (#94).
+    expect(response.headers()['cache-control']).toMatch(/^public, max-age=\d+/);
+    expect(response.headers().vary).toMatch(/Cookie/);
+    expect(response.headers().vary).toMatch(/Accept-Language/);
     await anon.close();
   });
 });
