@@ -88,10 +88,12 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
     """The apex host can take the tenant from a member's session, so a shared
     cache keyed on Host + URL alone could serve one tenant's page to another."""
     await _publish(mt, A, "about", "About Acme")
-    page = await mt.get("/p/about", headers=A)
+    # A visitor: a signed-in copy is never cached at all (#94).
+    visitor = {**A, "X-Test-Anonymous": "1"}
+    page = await mt.get("/p/about", headers=visitor)
     assert page.status_code == 200, page.text
     assert _vary(page) == ["X-Inertia", "Cookie", "Accept-Language"]
-    cached = await mt.get("/p/about", headers={**A, "If-None-Match": page.headers["etag"]})
+    cached = await mt.get("/p/about", headers={**visitor, "If-None-Match": page.headers["etag"]})
     assert cached.status_code == 304
     assert _vary(cached) == ["X-Inertia", "Cookie", "Accept-Language"]
     sitemap = await mt.get("/sitemap.xml", headers=A)
@@ -104,11 +106,13 @@ async def test_single_mode_vary_adds_no_tenant_field(authed_client: AsyncClient)
     created = await authed_client.post(API, json={"title": "Hi", "slug": "hi", "draft_data": {}})
     assert created.status_code == 201, created.text
     await authed_client.post(f"{API}/{created.json()['id']}/publish", json={})
-    page = await authed_client.get("/p/hi")
+    visitor = {"X-Test-Anonymous": "1"}
+    page = await authed_client.get("/p/hi", headers=visitor)
     assert page.status_code == 200, page.text
     # The viewer's own Vary (#94), on the 200 and the 304 alike; nothing for the tenant.
     assert _vary(page) == ["X-Inertia", "Cookie", "Accept-Language"]
-    cached = await authed_client.get("/p/hi", headers={"If-None-Match": page.headers["etag"]})
+    revalidate = {**visitor, "If-None-Match": page.headers["etag"]}
+    cached = await authed_client.get("/p/hi", headers=revalidate)
     assert cached.status_code == 304
     assert _vary(cached) == ["X-Inertia", "Cookie", "Accept-Language"]
     assert (await authed_client.get("/sitemap.xml")).headers.get("vary") is None

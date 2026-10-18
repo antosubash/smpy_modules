@@ -155,11 +155,14 @@ async def render_public_page(
         json.dumps(nav, sort_keys=True),
         public_cache.viewer_key(request),
     )
-    # Signed-in or not, and in which UI language, decide the bytes (#94).
+    # Signed-in or not, and in which UI language, decide the bytes (#94). A
+    # signed-in page is never kept, so it gets no validator and no 304.
     cache_control = public_cache.cache_control(request, settings)
+    signed_in = public_cache.signed_in(request)
 
     def apply_headers(response: Response) -> Response:
-        response.headers["ETag"] = etag
+        if not signed_in:
+            response.headers["ETag"] = etag
         response.headers["Vary"] = public_cache.VARY
         # On a multi-tenant host the tenant can come from the session, not the Host.
         vary_on_tenant(response, request.app)
@@ -171,7 +174,7 @@ async def render_public_page(
             response.headers["Content-Security-Policy"] = settings.public_csp
         return response
 
-    if request.headers.get("if-none-match") == etag:
+    if not signed_in and request.headers.get("if-none-match") == etag:
         return apply_headers(Response(status_code=304))
 
     canonical = page.canonical_url or _absolute_page_url(

@@ -30,24 +30,21 @@ test.describe('Public viewer headers', () => {
     expect(response.status()).toBe(200);
     const headers = response.headers();
 
-    const etag = headers['etag'];
-    expect(etag, 'ETag header missing').toBeTruthy();
-    expect(etag).toMatch(/^W\/".+"$/);
-
-    // Signed in: the page carries this user, so no shared cache may keep it (#94).
-    expect(headers['cache-control']).toBe('private, no-cache');
+    // Signed in: the page carries this user, so it is kept nowhere (#94).
+    expect(headers['cache-control']).toBe('private, no-store');
+    expect(headers['etag']).toBeUndefined();
 
     // Anonymous: shared-cacheable, keyed on what picks the language and the session.
     const anon = await browser.newContext();
     const anonymous = await anon.request.get(new URL(`/p/${slug}`, page.url()).toString());
     expect(anonymous.status()).toBe(200);
+    expect(anonymous.headers().etag, 'ETag header missing').toMatch(/^W\/".+"$/);
     const cacheControl = anonymous.headers()['cache-control'];
     expect(cacheControl).toContain('public');
     expect(cacheControl).toMatch(/max-age=\d+/);
     expect(cacheControl).toMatch(/stale-while-revalidate=\d+/);
     expect(anonymous.headers().vary).toMatch(/Cookie/);
     expect(anonymous.headers().vary).toMatch(/Accept-Language/);
-    expect(anonymous.headers().etag).not.toBe(etag);
     await anon.close();
 
     // CSP header is injected for every published response; the host
@@ -69,7 +66,7 @@ test.describe('Public viewer headers', () => {
     );
   });
 
-  test('conditional GET with If-None-Match returns 304', async ({ page }) => {
+  test('conditional GET with If-None-Match returns 304', async ({ browser, page }) => {
     const slug = uniqueSlug('304');
     await page.goto('/pagebuilder/new');
     await page.getByPlaceholder('Page title').fill(`Cond ${slug}`);
@@ -79,17 +76,19 @@ test.describe('Public viewer headers', () => {
     await publishWithNote(page);
     await expect(page.getByText('Published.')).toBeVisible();
 
-    const first = await page.request.get(`/p/${slug}`);
+    // A visitor: only an anonymous copy carries a validator (#94).
+    const anon = await browser.newContext();
+    const url = new URL(`/p/${slug}`, page.url()).toString();
+    const first = await anon.request.get(url);
     expect(first.status()).toBe(200);
     const etag = first.headers()['etag'];
     expect(etag).toBeTruthy();
 
-    const second = await page.request.get(`/p/${slug}`, {
-      headers: { 'if-none-match': etag },
-    });
+    const second = await anon.request.get(url, { headers: { 'if-none-match': etag } });
     expect(second.status()).toBe(304);
     // ETag must round-trip on the 304 so caches can keep their entry.
     expect(second.headers()['etag']).toBe(etag);
+    await anon.close();
 
     // Cleanup.
     // Teardown deletes through the table, so ask for it —

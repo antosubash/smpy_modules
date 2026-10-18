@@ -113,11 +113,11 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
         assert response.headers["cache-control"].startswith(policy), path
         assert "Cookie" in _vary(response), (path, response.headers.get("vary"))
     article = await mt.get(f"{NEWS}/hello", headers=A)
-    per_viewer = ["X-Inertia", "Cookie", "Accept-Language"]
-    assert _vary(article) == per_viewer
-    cached = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": article.headers["etag"]})
-    assert cached.status_code == 304
-    assert _vary(cached) == per_viewer
+    assert _vary(article) == ["X-Inertia", "Cookie", "Accept-Language"]
+    # Signed in, so there is no tag to revalidate: a stale one gets a full render.
+    assert "etag" not in article.headers
+    stale = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": 'W/"stale"'})
+    assert stale.status_code == 200
 
 
 async def test_single_mode_vary_adds_no_tenant_field(anon_client: AsyncClient) -> None:

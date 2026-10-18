@@ -20,7 +20,13 @@ from news.settings import NewsSettings, public_article_path
 #: viewer — the ``locale`` cookie or ``Accept-Language`` picks the chrome's
 #: language, and the session decides who is signed in (#94).
 PER_VIEWER_VARY = ("X-Inertia", "Cookie", "Accept-Language")
-SIGNED_IN_CACHE_CONTROL = "private, no-cache"
+#: A signed-in copy embeds the user's name, roles and menus, so it is never kept
+#: and never 304'd: an ETag over the user's id would vouch for stale roles.
+SIGNED_IN_CACHE_CONTROL = "private, no-store"
+
+
+def signed_in(request: Request) -> bool:
+    return getattr(request.state, "user", None) is not None
 
 
 def etag_for(
@@ -132,9 +138,9 @@ def apply_cache(
 
     ``per_viewer`` is for a rendered page (article, archive) rather than a feed
     or sitemap: it differs by visitor, so a signed-in reader's copy is
-    ``private, no-cache`` and every copy varies on :data:`PER_VIEWER_VARY` (#94).
+    ``private, no-store`` and every copy varies on :data:`PER_VIEWER_VARY` (#94).
     """
-    if per_viewer and getattr(request.state, "user", None) is not None:
+    if per_viewer and signed_in(request):
         response.headers["Cache-Control"] = SIGNED_IN_CACHE_CONTROL
     else:
         response.headers["Cache-Control"] = (

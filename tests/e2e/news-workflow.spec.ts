@@ -176,22 +176,28 @@ test.describe('News — the full editorial workflow', () => {
     expect((await approved.json()).status).toBe('published');
   });
 
-  test('the article serves at its own address, with its own headers', async ({ page }) => {
+  test('the article serves at its own address, with its own headers', async ({ browser, page }) => {
     await login(page);
     const url = `/news/${slug}`;
 
-    const served = await page.request.get(url);
+    // Signed in, so the copy is this reader's alone and kept nowhere (#94).
+    const own = await page.request.get(url);
+    expect(own.status()).toBe(200);
+    expect(own.headers()['cache-control']).toBe('private, no-store');
+    expect(await own.text()).toContain(lead);
+
+    // A visitor's copy is cacheable, and a conditional request short-circuits.
+    const anon = await browser.newContext();
+    const absolute = new URL(url, page.url()).toString();
+    const served = await anon.request.get(absolute);
     expect(served.status()).toBe(200);
     expect(served.headers().etag).toBeTruthy();
-    // Signed in, so the copy is this reader's alone (#94).
-    expect(served.headers()['cache-control']).toBe('private, no-cache');
-    expect(await served.text()).toContain(lead);
-
-    // A conditional request short-circuits on the same ETag.
-    const conditional = await page.request.get(url, {
+    expect(served.headers()['cache-control']).toContain('public');
+    const conditional = await anon.request.get(absolute, {
       headers: { 'If-None-Match': served.headers().etag },
     });
     expect(conditional.status()).toBe(304);
+    await anon.close();
 
     // The address the article was created at still answers, one hop away.
     const moved = await page.request.get(`/news/${firstSlug}`, { maxRedirects: 0 });

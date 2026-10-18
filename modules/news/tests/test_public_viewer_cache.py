@@ -43,22 +43,29 @@ async def test_the_viewer_key_does_not_carry_the_user_id() -> None:
     assert "alice" not in viewer_key(_request(user=SimpleNamespace(id="alice@x.org")))  # type: ignore[arg-type]
 
 
-async def test_a_signed_in_reader_gets_a_private_article(editor_public_client) -> None:
+async def test_a_signed_in_article_is_never_kept_or_revalidated(editor_public_client) -> None:
+    """It embeds the reader's name, roles and menus, which an ETag over their id
+    would vouch for after they changed — so: no ETag, no 304, no-store."""
     await _seed(editor_public_client)
     response = await editor_public_client.get(f"{NEWS}/hello")
     assert response.status_code == 200, response.text
-    assert response.headers["cache-control"] == "private, no-cache"
-    again = await editor_public_client.get(
-        f"{NEWS}/hello", headers={"If-None-Match": response.headers["etag"]}
-    )
-    assert (again.status_code, again.headers["cache-control"]) == (304, "private, no-cache")
+    assert response.headers["cache-control"] == "private, no-store"
+    assert "etag" not in response.headers
 
 
 async def test_a_signed_in_reader_gets_a_private_archive(editor_public_client) -> None:
     await _seed(editor_public_client)
     response = await editor_public_client.get(f"{NEWS}/category/Sport")
     assert response.status_code == 200, response.text
-    assert response.headers["cache-control"] == "private, no-cache"
+    assert response.headers["cache-control"] == "private, no-store"
+
+
+async def test_an_anonymous_article_still_revalidates(anon_client) -> None:
+    await _seed(anon_client)
+    first = await anon_client.get(f"{NEWS}/hello")
+    again = await anon_client.get(f"{NEWS}/hello", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304
+    assert again.headers["cache-control"].startswith("public, max-age=")
 
 
 async def test_an_anonymous_reader_still_gets_public_pages(anon_client) -> None:

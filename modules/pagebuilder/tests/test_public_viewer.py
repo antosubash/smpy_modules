@@ -15,6 +15,8 @@ pytestmark = pytest.mark.asyncio
 
 
 _INERTIA_HEADERS = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+# A visitor, on the admin-authed app: only an anonymous copy is cacheable (#94).
+_ANON = {"X-Test-Anonymous": "1"}
 
 
 async def _create_published(client: AsyncClient, slug: str = "hello") -> int:
@@ -50,11 +52,10 @@ async def test_missing_slug_returns_404(authed_client: AsyncClient) -> None:
 
 async def test_published_page_renders_with_headers(authed_client: AsyncClient) -> None:
     await _create_published(authed_client)
-    response = await authed_client.get("/p/hello", headers=_INERTIA_HEADERS)
+    response = await authed_client.get("/p/hello", headers={**_INERTIA_HEADERS, **_ANON})
     assert response.status_code == 200
     assert response.headers.get("ETag", "").startswith('W/"')
-    # Signed in, so private (#94); the anonymous policy is in test_public_cache.py.
-    assert response.headers["Cache-Control"] == "private, no-cache"
+    assert response.headers["Cache-Control"].startswith("public, max-age=")
     assert response.headers.get("Content-Security-Policy", "").startswith("default-src 'self'")
 
 
@@ -67,12 +68,12 @@ async def test_published_page_unpublishes_to_404(authed_client: AsyncClient) -> 
 
 async def test_if_none_match_returns_304(authed_client: AsyncClient) -> None:
     await _create_published(authed_client)
-    first = await authed_client.get("/p/hello", headers=_INERTIA_HEADERS)
+    first = await authed_client.get("/p/hello", headers={**_INERTIA_HEADERS, **_ANON})
     etag = first.headers["ETag"]
 
     second = await authed_client.get(
         "/p/hello",
-        headers={**_INERTIA_HEADERS, "If-None-Match": etag},
+        headers={**_INERTIA_HEADERS, **_ANON, "If-None-Match": etag},
     )
     assert second.status_code == 304
     assert second.headers["ETag"] == etag
@@ -84,12 +85,12 @@ async def test_the_page_etag_does_not_validate_an_in_app_visit(
     """A browser holding the full page must not get a 304 for Inertia's JSON:
     it would hand Inertia the cached HTML and the visit would fail."""
     await _create_published(authed_client)
-    page = await authed_client.get("/p/hello")
+    page = await authed_client.get("/p/hello", headers=_ANON)
     assert "X-Inertia" in page.headers["Vary"]
 
     visit = await authed_client.get(
         "/p/hello",
-        headers={**_INERTIA_HEADERS, "If-None-Match": page.headers["ETag"]},
+        headers={**_INERTIA_HEADERS, **_ANON, "If-None-Match": page.headers["ETag"]},
     )
 
     assert visit.status_code == 200

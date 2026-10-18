@@ -50,7 +50,7 @@ def test_the_viewer_key_does_not_leak_the_user_id() -> None:
 
 def test_a_signed_in_response_is_private() -> None:
     policy = cache_control(_request(user=SimpleNamespace(id=7)), PagebuilderSettings())  # type: ignore[arg-type]
-    assert policy == "private, no-cache"
+    assert policy == "private, no-store"
 
 
 def test_an_anonymous_response_stays_public() -> None:
@@ -69,18 +69,21 @@ async def _publish(client: AsyncClient, slug: str = "hello") -> None:
     assert published.status_code == 200, published.text
 
 
-@pytest.mark.asyncio
-async def test_a_signed_in_visitor_gets_a_private_response(authed_client: AsyncClient) -> None:
-    await _publish(authed_client)
-    response = await authed_client.get("/p/hello")
-    assert response.status_code == 200
-    assert response.headers["Cache-Control"] == "private, no-cache"
-    assert "public" not in response.headers["Cache-Control"]
-
-
 # conftest's stub auth leaves a request with this header signed out, so one app
 # can publish as an admin and then be read by an anonymous visitor.
 _ANON = {"X-Test-Anonymous": "1"}
+
+
+@pytest.mark.asyncio
+async def test_a_signed_in_visitor_gets_an_unstorable_response(
+    authed_client: AsyncClient,
+) -> None:
+    """It embeds the user's name, roles and menus: kept nowhere, validated by nothing."""
+    await _publish(authed_client)
+    response = await authed_client.get("/p/hello")
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "private, no-store"
+    assert "etag" not in response.headers
 
 
 @pytest.mark.asyncio
@@ -96,22 +99,25 @@ async def test_an_anonymous_visitor_gets_a_public_response_that_varies(
 
 
 @pytest.mark.asyncio
-async def test_a_signed_in_etag_never_validates_an_anonymous_request(
-    authed_client: AsyncClient,
-) -> None:
+async def test_a_signed_in_request_is_never_answered_304(authed_client: AsyncClient) -> None:
+    """Not even with the tag an anonymous copy of the page carries: the signed-in
+    render differs (and the user's roles may have changed since any earlier one)."""
     await _publish(authed_client)
-    signed_in = await authed_client.get("/p/hello")
-    anonymous = await authed_client.get(
-        "/p/hello", headers={**_ANON, "If-None-Match": signed_in.headers["ETag"]}
+    anonymous = await authed_client.get("/p/hello", headers=_ANON)
+    signed_in = await authed_client.get(
+        "/p/hello", headers={"If-None-Match": anonymous.headers["ETag"]}
     )
-    assert anonymous.status_code == 200
-    assert anonymous.headers["ETag"] != signed_in.headers["ETag"]
+    assert signed_in.status_code == 200
+    assert signed_in.headers["Cache-Control"] == "private, no-store"
 
 
 @pytest.mark.asyncio
-async def test_a_304_keeps_the_viewer_policy(authed_client: AsyncClient) -> None:
+async def test_an_anonymous_304_keeps_the_public_policy(authed_client: AsyncClient) -> None:
     await _publish(authed_client)
-    first = await authed_client.get("/p/hello")
-    again = await authed_client.get("/p/hello", headers={"If-None-Match": first.headers["ETag"]})
+    first = await authed_client.get("/p/hello", headers=_ANON)
+    again = await authed_client.get(
+        "/p/hello", headers={**_ANON, "If-None-Match": first.headers["ETag"]}
+    )
     assert again.status_code == 304
-    assert again.headers["Cache-Control"] == "private, no-cache"
+    assert again.headers["Cache-Control"].startswith("public, max-age=")
+    assert again.headers["ETag"] == first.headers["ETag"]

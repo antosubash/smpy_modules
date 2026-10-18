@@ -7,16 +7,20 @@ rendered in the visitor's UI language (the ``locale`` cookie, else
 So two visitors on one URL can be owed different bytes, and the headers have to
 say so:
 
-* **Signed in** → ``private, no-cache``. No shared cache may store it, and the
-  browser revalidates every time, so signing out (or in as someone else) is
-  seen on the next load rather than a minute later.
+* **Signed in** → ``private, no-store``, with no ETag and never a 304. The page
+  embeds the user's name, roles, permissions and menus; an ETag over their id
+  would 304 a copy whose roles have since changed, and a digest of all of that
+  is the render itself. Nothing is kept, so nothing goes stale — which is also
+  what the framework already does to every Inertia response.
 * **Anonymous** → ``public`` with the configured ``max-age`` and
   ``stale-while-revalidate``, as before.
 * ``Vary`` names ``Cookie`` and ``Accept-Language``: a cache must not answer a
   visitor who switched language, or signed in, from an entry stored for one who
   had not.
 * The ETag digests the viewer too (UI language + who is signed in), so a
-  revalidation can only 304 against a response built for the same viewer.
+  revalidation can only 304 against a response built for the same viewer —
+  in practice an anonymous one in the same language, since a signed-in
+  response carries no ETag to revalidate.
 """
 
 from __future__ import annotations
@@ -29,7 +33,12 @@ from fastapi import Request
 from pagebuilder.settings import PagebuilderSettings
 
 VARY = "X-Inertia, Cookie, Accept-Language"
-SIGNED_IN_CACHE_CONTROL = "private, no-cache"
+SIGNED_IN_CACHE_CONTROL = "private, no-store"
+
+
+def signed_in(request: Request) -> bool:
+    """Whether the response carries a user — and so may be neither kept nor 304'd."""
+    return getattr(request.state, "user", None) is not None
 
 
 def etag_for(
@@ -90,7 +99,7 @@ def viewer_key(request: Request) -> str:
 
 
 def cache_control(request: Request, settings: PagebuilderSettings) -> str:
-    if getattr(request.state, "user", None) is not None:
+    if signed_in(request):
         return SIGNED_IN_CACHE_CONTROL
     parts = [f"max-age={settings.public_cache_max_age}"]
     if settings.public_cache_swr > 0:
