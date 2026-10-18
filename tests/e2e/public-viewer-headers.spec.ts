@@ -91,4 +91,36 @@ test.describe('Public viewer headers', () => {
       page.locator('tr', { hasText: `Cond ${slug}` }).getByRole('button', { name: /^delete$/i }),
     );
   });
+
+  test('anonymous HEAD answers like GET without a body (#76)', async ({ page, request }) => {
+    const slug = uniqueSlug('head');
+    await page.goto('/pagebuilder/new');
+    await page.getByPlaceholder('Page title').fill(`Head ${slug}`);
+    await page.getByPlaceholder('slug').fill(slug);
+    await page.getByRole('button', { name: /save draft/i }).click();
+    await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
+    await publishWithNote(page);
+    await expect(page.getByText('Published.')).toBeVisible();
+
+    // `request` carries no session: this is what a link checker or uptime
+    // probe sees, so it goes through the auth middleware's public exemption.
+    const get = await request.get(`/p/${slug}`, { maxRedirects: 0 });
+    const head = await request.head(`/p/${slug}`, { maxRedirects: 0 });
+    expect(get.status()).toBe(200);
+    expect(head.status()).toBe(200);
+    expect((await head.body()).length).toBe(0);
+    expect(head.headers()['etag']).toBe(get.headers()['etag']);
+    expect(head.headers()['cache-control']).toBe(get.headers()['cache-control']);
+
+    expect((await request.head(`/p/${slug}-missing`, { maxRedirects: 0 })).status()).toBe(404);
+    for (const path of ['/sitemap.xml', '/robots.txt']) {
+      expect((await request.head(path, { maxRedirects: 0 })).status(), path).toBe(200);
+    }
+
+    await page.goto(`/pagebuilder/?view=list&search=${slug}`);
+    await clickAndConfirm(
+      page,
+      page.locator('tr', { hasText: `Head ${slug}` }).getByRole('button', { name: /^delete$/i }),
+    );
+  });
 });

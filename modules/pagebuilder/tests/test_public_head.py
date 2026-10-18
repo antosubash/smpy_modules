@@ -9,10 +9,15 @@ INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 async def _publish(client: AsyncClient, locale: str) -> int:
-    created = await client.post(API, json={
-        "title": "Hello", "slug": "hello", "locale": locale,
-        "draft_data": {"content": []},
-    })
+    created = await client.post(
+        API,
+        json={
+            "title": "Hello",
+            "slug": "hello",
+            "locale": locale,
+            "draft_data": {"content": []},
+        },
+    )
     assert created.status_code == 201, created.text
     page_id = created.json()["id"]
     published = await client.post(f"{API}/{page_id}/publish")
@@ -32,8 +37,13 @@ async def test_head_published_and_conditional(
     assert head.status_code == get.status_code == 200
     assert head.content == b""
     for name in (
-        "etag", "cache-control", "vary", "content-language",
-        "content-security-policy", "content-type", "content-length",
+        "etag",
+        "cache-control",
+        "vary",
+        "content-language",
+        "content-security-policy",
+        "content-type",
+        "content-length",
     ):
         assert head.headers[name] == get.headers[name]
     conditional = {**headers, "If-None-Match": get.headers["etag"]}
@@ -54,9 +64,7 @@ async def test_head_missing(bilingual_client: AsyncClient, prefix: str) -> None:
 
 
 @pytest.mark.parametrize("locale,prefix", [("en", "/p"), ("de", "/de/p")])
-async def test_head_renamed(
-    bilingual_client: AsyncClient, locale: str, prefix: str
-) -> None:
+async def test_head_renamed(bilingual_client: AsyncClient, locale: str, prefix: str) -> None:
     page_id = await _publish(bilingual_client, locale)
     renamed = await bilingual_client.put(f"{API}/{page_id}", json={"slug": "renamed"})
     assert renamed.status_code == 200
