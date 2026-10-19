@@ -926,7 +926,7 @@
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
     "upload_failed": "Hochladen fehlgeschlagen ({status})",
-    "upload_failed_invalid": "Hochladen fehlgeschlagen: {details}",
+    "upload_failed_invalid": "Der Server hat das Hochladen als unvollständig oder ungültig abgelehnt.",
     "upload_forbidden": "Sie haben keine Berechtigung zum Hochladen von Dateien.",
     "upload_network": "Netzwerkfehler beim Hochladen",
     "upload_toast_batch": "{count} Dateien konnten nicht hochgeladen werden.",

@@ -1,6 +1,7 @@
 import type { CustomField } from "@puckeditor/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { keys, useT } from "../../utils/i18n";
+import { UploadError } from "../../utils/uploadError";
 import { cn } from "../../utils/widgetUtils";
 import { FileGallery } from "./file-gallery";
 import type { FilePickerAdapter } from "./types";
@@ -78,7 +79,14 @@ export function ImagePickerFieldRenderer({
 				onChange(valueMode === "id" ? result.id : result.url);
 			} catch (err) {
 				console.error("[ImagePicker] Upload failed:", err);
-				setError(t(keys.pagebuilder.picker.upload_failed));
+				// Only an UploadError carries a translated, user-facing reason
+				// (too large, wrong type, …); anything else may be browser or
+				// server English, so it gets the generic sentence.
+				setError(
+					err instanceof UploadError
+						? err.message
+						: t(keys.pagebuilder.picker.upload_failed),
+				);
 			} finally {
 				setUploading(false);
 				if (fileInputRef.current) fileInputRef.current.value = "";

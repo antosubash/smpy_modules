@@ -1,6 +1,5 @@
 /** Media library calls, upload progress, and srcset helpers. */
 
-import { keys, translate } from './i18n';
 import { BASE, CSRF_COOKIE, readCookie, request } from './request';
 import type {
   MediaAssetDetail,
@@ -9,7 +8,7 @@ import type {
   MediaListResponse,
   UploadMediaOptions,
 } from './types';
-import { uploadErrorMessage } from './uploadError';
+import { uploadNetworkError, uploadRejected } from './uploadError';
 
 function buildMediaQuery(params: MediaListQuery | undefined): string {
   if (!params) return '';
@@ -41,14 +40,16 @@ export const uploadMedia = (
   if (folder !== undefined && folder !== null && folder !== '') {
     body.append('folder', folder);
   }
-  // XHR (not fetch) is used here purely for the upload-progress event;
-  // fetch streams uploads in some browsers but exposes no progress
-  // callback. Everything else (CSRF header, cookies, error shape)
-  // mirrors the shared `request` helper.
-  if (!onProgress) {
-    return request<MediaAssetRead>('/uploads', { method: 'POST', body, signal });
-  }
+  // XHR (not fetch), so there is an upload-progress event; fetch exposes no
+  // progress callback. Every upload takes this one path, with or without
+  // `onProgress`, so a rejection reads the same from the media library and
+  // from a block's image field: a translated `UploadError`, never the
+  // server's English `detail` or the browser's own network-error text.
   return new Promise<MediaAssetRead>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${BASE}/uploads`);
     xhr.withCredentials = true;
@@ -56,29 +57,25 @@ export const uploadMedia = (
     const token = readCookie(CSRF_COOKIE);
     if (token) xhr.setRequestHeader('X-CSRF-Token', token);
     xhr.setRequestHeader('Accept', 'application/json');
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(e.loaded, e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText) as MediaAssetRead);
-        } catch (err) {
-          reject(err);
-        }
-      } else {
-        reject(new Error(uploadErrorMessage(xhr.status, xhr.responseText)));
-      }
-    };
-    xhr.onerror = () => reject(new Error(translate(keys.pagebuilder.errors.upload_network)));
-    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
-    if (signal) {
-      if (signal.aborted) {
-        xhr.abort();
-      } else {
-        signal.addEventListener('abort', () => xhr.abort(), { once: true });
-      }
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
     }
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(uploadRejected(xhr.status));
+        return;
+      }
+      try {
+        resolve(JSON.parse(xhr.responseText) as MediaAssetRead);
+      } catch {
+        reject(uploadRejected(xhr.status));
+      }
+    };
+    xhr.onerror = () => reject(uploadNetworkError());
+    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
     xhr.send(body);
   });
 };

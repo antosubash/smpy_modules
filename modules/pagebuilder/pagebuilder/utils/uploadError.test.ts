@@ -1,44 +1,51 @@
 import { describe, expect, it } from 'vitest';
 
 import en from '../locales/en.json';
-import { uploadErrorMessage } from './uploadError';
-
-const RAW = '{"detail":"File contents do not match an allowed image format"}';
+import { UploadError, uploadErrorMessage, uploadNetworkError, uploadRejected } from './uploadError';
 
 describe('uploadErrorMessage', () => {
   it('maps 415 to a translated sentence, not the response body', () => {
-    const message = uploadErrorMessage(415, RAW);
+    const message = uploadErrorMessage(415);
     expect(message).toBe(en.errors.upload_unsupported);
-    expect(message).not.toContain('{');
     expect(message).not.toContain('415');
   });
 
   it('maps 413 to the too-large message', () => {
-    expect(uploadErrorMessage(413, '{"detail":"File exceeds 10485760 bytes"}')).toBe(
-      en.errors.upload_too_large,
-    );
+    expect(uploadErrorMessage(413)).toBe(en.errors.upload_too_large);
   });
 
   it('maps 401 and 403 to the permission message', () => {
-    expect(uploadErrorMessage(403, '')).toBe(en.errors.upload_forbidden);
-    expect(uploadErrorMessage(401, '')).toBe(en.errors.upload_forbidden);
+    expect(uploadErrorMessage(403)).toBe(en.errors.upload_forbidden);
+    expect(uploadErrorMessage(401)).toBe(en.errors.upload_forbidden);
   });
 
-  it('turns a 422 detail list into field messages', () => {
-    const body = JSON.stringify({
-      detail: [{ loc: ['body', 'folder'], msg: 'Field required', type: 'missing' }],
-    });
-    expect(uploadErrorMessage(422, body)).toBe('Upload failed: folder: Field required');
+  it('maps 422 to the translated validation sentence, with no server prose', () => {
+    // The server's Pydantic `msg` ("Field required") is English in every
+    // console language, so it is never part of the message.
+    const message = uploadErrorMessage(422);
+    expect(message).toBe(en.errors.upload_failed_invalid);
+    expect(message).not.toContain('Field required');
+    expect(message).not.toContain('{');
   });
 
-  it('falls back to the generic message for a 422 without a list', () => {
-    expect(uploadErrorMessage(422, '{"detail":"Folder path is too long"}')).toBe(
-      'Upload failed (422)',
-    );
+  it('falls back to the generic message with the status otherwise', () => {
+    expect(uploadErrorMessage(500)).toBe('Upload failed (500)');
+    expect(uploadErrorMessage(502)).toBe('Upload failed (502)');
+  });
+});
+
+describe('UploadError factories', () => {
+  it('carries the status and the translated message', () => {
+    const err = uploadRejected(415);
+    expect(err).toBeInstanceOf(UploadError);
+    expect(err.status).toBe(415);
+    expect(err.message).toBe(en.errors.upload_unsupported);
   });
 
-  it('never echoes a non-JSON body', () => {
-    expect(uploadErrorMessage(500, '<!DOCTYPE html><html>boom</html>')).toBe('Upload failed (500)');
-    expect(uploadErrorMessage(502, 'Bad Gateway')).toBe('Upload failed (502)');
+  it('uses the translated network message, not the browser text', () => {
+    const err = uploadNetworkError();
+    expect(err).toBeInstanceOf(UploadError);
+    expect(err.status).toBeNull();
+    expect(err.message).toBe(en.errors.upload_network);
   });
 });
