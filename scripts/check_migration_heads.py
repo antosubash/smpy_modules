@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"One migration head: {found[0]}")
         return 0
     print(f"Expected one migration head, found {len(found)}: {', '.join(sorted(found))}")
-    if found:
+    if len(found) > 1:
         print(
             "Add an empty merge revision from the repo root:\n"
             '  uv run --project host alembic -c host/alembic.ini merge heads -m "merge heads"'

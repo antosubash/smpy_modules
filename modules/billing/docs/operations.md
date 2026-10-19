@@ -22,7 +22,7 @@
 
    ```bash
    make migration msg="billing"
-   make migrate          # alembic upgrade heads — one head per branch label
+   make migrate          # alembic upgrade heads (the history has a single head)
    ```
 
    The `billing` branch label names the revision; it does **not** make
