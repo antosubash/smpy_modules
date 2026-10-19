@@ -13,7 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants, events
+from sm_records import constants
 from sm_records.contracts.schemas import (
     RecordCreate,
     RecordPage,
@@ -160,7 +160,6 @@ async def create_record(
         actor=who,
         locale=body.locale,
     )
-    events.publish(request, events.created(rtype, record))
     return record_read(rtype, record)
 
 
@@ -229,9 +228,6 @@ async def update_record(
         )
         raise ValidationFailed(problem, [{"field": constants.LOCALE_PARAM, "message": problem}])
     record = await record_service.get_record(db, rtype, uuid)
-    # Read before the write: ``update_record`` mutates the instance, so
-    # afterwards there is only one status left to compare against.
-    was = record.status.value
     updated = await record_service.update_record(
         db,
         rtype,
@@ -244,5 +240,4 @@ async def update_record(
         position=body.position,
         actor=who,
     )
-    events.publish(request, events.updated(rtype, updated, status_before=was))
     return record_read(rtype, updated)

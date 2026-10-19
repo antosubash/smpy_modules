@@ -132,8 +132,15 @@ async def type_written(
     settings: RecordsSettings,
 ) -> TypeRead:
     """What every edit of a type row does last: the event, the deferred
-    reindex if one is pending, and the fresh ``TypeRead``."""
-    events.publish(request, events.type_changed(updated, before))
+    reindex if one is pending, and the fresh ``TypeRead``.
+
+    The one event still emitted from an endpoint: ``update_type``,
+    ``schema_change.apply`` and ``schema_change.rollback`` all end here, and no
+    path outside a request writes a type's schema. It goes through the same
+    ``on_commit`` queue as the rest (:mod:`sm_records.events`), so it is
+    published when the request commits — still ahead of the reindex, which
+    stays on :mod:`sm_records.deferred`."""
+    events.emit(db, events.type_changed(updated, before))
     _schedule_reindex_if_pending(request, updated, settings)
     return type_read(updated, *await type_service.record_counts(db, updated))
 
@@ -263,11 +270,7 @@ async def delete_type(
     """
     check_type_roles(request, rtype)
     shown = rtype.show_in_menu
-    key = rtype.key
-    purged = await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
-    # ``key`` before the call, the rows out of it: afterwards the type row is
-    # gone, and ``RecordPurged`` is the one event nothing can be looked up for.
-    events.publish(request, *events.type_deleted(key, purged))
+    await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
     # Read before the delete: afterwards the row is gone and the attribute is
     # a question about an expired instance.
     if shown:

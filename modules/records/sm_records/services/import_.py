@@ -47,6 +47,7 @@ from typing import NoReturn
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.contracts.io import (
     ERROR_CAP,
     ImportFormat,
@@ -121,7 +122,10 @@ async def _write(
         }
         if options.on_error is OnError.ABORT:
             try:
-                result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+                # ``held``: the row's event is built once ``write_row`` has
+                # re-stamped the uuid the file chose (:mod:`sm_records.events`).
+                with events.held(db):
+                    result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
             except RecordsError as exc:
                 raise _RowWriteError(plan.row.number, plan.row.uuid, exc) from exc
             counts[result] += 1
@@ -133,8 +137,11 @@ async def _write(
             # a rollback, and rolling the *outer* transaction back would take
             # every valid row with it — which is ``abort``'s behaviour, not
             # this one's.
-            async with db.begin_nested():
-                result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
+            # ``held`` outside it: a row whose savepoint rolls back announces
+            # nothing, though ``create_record`` had already emitted for it.
+            with events.held(db):
+                async with db.begin_nested():
+                    result, row_record = await write_row(db, rtype, plan.row, plan.record, **kwargs)
             counts[result] += 1
             if written is not None:
                 written.append((result, row_record))
@@ -212,10 +219,10 @@ async def import_records(
 
     ``written`` is an optional sink the caller passes to learn *which* records
     each row wrote: ``("created" | "updated", record)`` in file order, only
-    for rows that actually wrote. The report's counts cannot answer that, and
-    the endpoint needs it to publish one domain event per record rather than
-    one per file (:mod:`sm_records.events`). A dry run appends nothing,
-    because it wrote nothing.
+    for rows that actually wrote. The report's counts cannot answer that. The
+    domain events do not come from here: ``create_record``/``update_record``
+    emit one per written row (:mod:`sm_records.events`). A dry run appends
+    nothing, because it wrote nothing.
     """
     started = perf_counter()
     defs = _payload.field_defs(rtype)

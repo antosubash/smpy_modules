@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records._text import has_nul
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
@@ -239,8 +240,8 @@ async def delete_type(
     the operator the number this check will actually compare against.
 
     Returns one :class:`~sm_records.services._common.PurgedRecord` per record
-    it purged, for the ``RecordPurged`` events the endpoint publishes — the one
-    event whose subject no subscriber can read back. Identity only (``uuid``,
+    it purged, and emits a ``RecordPurged`` for each — the one event whose
+    subject no subscriber can read back — then ``RecordTypeDeleted``. Identity only (``uuid``,
     ``locale``, ``translation_group``), because the purge itself is set-based
     and never instantiates the rows: see :func:`purge_type_records`.
     """
@@ -259,6 +260,7 @@ async def delete_type(
         raise ReferencedByOthers(
             f"type {rtype.key!r} is the target of a relation on {referring}", referring
         )
+    key = rtype.key
     purged = await purge_type_records(db, rtype)
     # Explicit, not via the FK's ON DELETE CASCADE: SQLite leaves foreign keys
     # unenforced unless the pragma is on, so the cascade would clean up on
@@ -272,4 +274,5 @@ async def delete_type(
     )
     await db.delete(rtype)
     await db.flush()
+    events.emit(db, *events.type_deleted(key, purged))
     return purged

@@ -28,6 +28,7 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 from sm_records import cli_io
 from sm_records._cross_tenant import TenantCounts, tenant_counts
@@ -46,6 +47,7 @@ async def seed(
     seed_value: int,
     reset: bool,
     tenant: str = DEFAULT_TENANT,
+    bus: Any = None,
 ) -> SeedSummary:
     """Create the demo types (if missing) and write ``records`` records.
 
@@ -65,7 +67,7 @@ async def seed(
         settings = await load_settings(db_state)
         with tenant_scope(tenant):
             summary = await seed_database(
-                db_state, settings, records=records, seed=seed_value, reset=reset
+                db_state, settings, records=records, seed=seed_value, reset=reset, bus=bus
             )
         print(
             f"records seed: {summary.total} record(s) in tenant {tenant!r} in "

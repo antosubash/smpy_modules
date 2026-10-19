@@ -21,7 +21,7 @@ from simple_module_db import get_db
 from simple_module_hosting.permissions import RequiresPermission
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants
+from sm_records import constants, events
 from sm_records._grammar import (
     MAX_PAGE,
     PageCursor,
@@ -78,8 +78,14 @@ async def request_db(request: Request, db: AsyncSession = Depends(get_db)) -> As
     request-scoped session accessor. ``get_db`` is still the dependency doing
     the work, and FastAPI caches it per request, so a route mixing
     ``Depends(get_db)`` and ``Depends(request_db)`` gets one session, not two.
+
+    It is also where the session learns the app's event bus, which the services
+    emit to once it commits (:mod:`sm_records.events`). A harness with no
+    ``app.state.sm.event_bus`` gets a session that publishes nothing.
     """
     request.scope[REQUEST_SESSION_KEY] = db
+    bus = getattr(getattr(request.app.state, "sm", None), "event_bus", None)
+    events.attach(db, bus)
     return db
 
 

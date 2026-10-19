@@ -208,9 +208,8 @@ async def write_row(
     """Write one row and say what it did and to which record.
 
     ``("created" | "updated", record)`` — the row for the sake of
-    ``services.import_.import_records``'s optional sink, which the endpoint
-    turns into one domain event per written row (:mod:`sm_records.events`).
-    A count could not: an event names a record.
+    ``services.import_.import_records``'s optional sink. A count could not:
+    a caller wants to know which records.
 
     Through ``create_record``/``update_record`` and never a bulk insert.
     Everything those do is load-bearing for a *file* too, and more so: the

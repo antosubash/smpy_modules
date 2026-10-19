@@ -16,6 +16,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.index._reduce_write import apply_delta, drop_type_rows
 from sm_records.index.reindex import reindex_record
 from sm_records.models import Record, RecordType, RevisionEvent, tables_for
@@ -77,10 +78,10 @@ async def soft_delete_record(
     """Trash a record, honouring the ``on_delete`` of everything pointing at it.
 
     Returns every ``(record, type)`` pair it trashed, the one named included —
-    the plan, after it has been applied. The endpoint publishes one
-    ``RecordTrashed`` per pair (:mod:`sm_records.events`), and it is the only
-    place that knows which records a cascade reached: they belong to types the
-    URL never mentioned, so nothing downstream could reconstruct the list.
+    the plan, after it has been applied — and emits one ``RecordTrashed`` per
+    pair (:mod:`sm_records.events`). This is the only place that knows which
+    records a cascade reached: they belong to types the URL never mentioned, so
+    nothing downstream could reconstruct the list.
 
     Plan, then apply. The whole referrer graph is walked first and *every*
     ``restrict`` in it collected — not only the ones one level down — before a
@@ -116,6 +117,7 @@ async def soft_delete_record(
         await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
     for doomed, doomed_type in trash:
         await _trash(db, doomed, doomed_type, actor=actor, settings=settings)
+    events.emit(db, *events.trashed(rtype, record, trash))
     return list(trash)
 
 
@@ -156,6 +158,7 @@ async def restore_record(
     # No ``previous``: a trashed record is not counted, so to a reduce index a
     # restore is an *arrival* — +1, the mirror of ``_trash``'s decrement.
     await reindex_record(db, record, rtype, resolve_type_id=await type_resolver(db))
+    events.emit(db, events.restored(rtype, record))
     return record
 
 
@@ -168,6 +171,9 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     """
     if not record.is_deleted:
         raise Conflict(f"record {record.uuid} must be in the trash before it can be purged")
+    # Built before the purge: afterwards the row is expunged and the uuid it
+    # names is the one thing a subscriber cannot look up any more.
+    purged = events.purged(rtype, record)
     # **No reduce delta**: the record was decremented when it was trashed, and
     # the refusal above guarantees only a trashed record reaches here, so a
     # second decrement would take the group below the truth (Phase 5 §5.2).
@@ -175,6 +181,7 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     # A core statement does not touch the identity map, so the instance still
     # holding the deleted row is detached by hand.
     db.expunge(record)
+    events.emit(db, purged)
 
 
 async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[PurgedRecord]:

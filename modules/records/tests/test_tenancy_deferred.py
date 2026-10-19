@@ -206,14 +206,18 @@ async def test_events_carry_the_tenant_and_the_subscriber_runs_bound(guarded, fi
     bus.subscribe(RecordCreated, subscriber)
     bus.subscribe(RecordTypeDeleted, subscriber)
 
-    async def publish(request: Request) -> None:
-        events.publish(
-            request,
-            events.created(acme, record),
-            *events.type_deleted("product", [record]),
-        )
-
-    await _serve(_app(guarded, bus), "acme", publish)
+    # Queued bound to acme, committed with nothing bound — the shape of a
+    # callback that runs after the request's own binding has gone.
+    async with guarded.session_factory() as session:
+        events.attach(session, bus)
+        with tenant_scope("acme"):
+            events.emit(
+                session,
+                events.created(acme, record),
+                *events.type_deleted("product", [record]),
+            )
+        assert current_tenant_id.get() is None
+        await events.commit(session)
 
     assert [(type(e).__name__, e.tenant_id, bound, n) for e, bound, n in seen] == [
         ("RecordCreated", "acme", "acme", 1),

@@ -53,6 +53,7 @@ from collections.abc import Sequence
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.contracts.bulk import BulkAction, BulkFailure, BulkReport, BulkResult
 from sm_records.models import RecordType
 
@@ -93,6 +94,26 @@ def _failure(uuid: str, exc: RecordsError) -> BulkFailure:
     return BulkFailure(uuid=uuid, status=exc.status_code, message=exc.detail)
 
 
+def _events_for(action: BulkAction, rtype: RecordType, change: Change) -> list[object]:
+    """The events one turn's change publishes.
+
+    A trash yields one per record it reached, cascade included, exactly as
+    ``DELETE /records/{uuid}`` does; everything else yields one — except a
+    turn that found nothing to do, which yields none: a publish of an already
+    published record wrote nothing, and an event for it would tell every
+    subscriber a record changed when its own history says it did not.
+    """
+    if change.unchanged:
+        return []
+    if action is BulkAction.TRASH:
+        return list(events.trashed(rtype, change.record, change.cascade))
+    if action is BulkAction.RESTORE:
+        return [events.restored(rtype, change.record)]
+    if action is BulkAction.PURGE:
+        return [events.purged(rtype, change.record)]
+    return [events.updated(rtype, change.record, status_before=change.status_before or "")]
+
+
 async def apply_bulk(
     db: AsyncSession,
     rtype: RecordType,
@@ -107,7 +128,9 @@ async def apply_bulk(
     """Apply ``action`` to every record in ``uuids``, or to none of them.
 
     Returns the result and one :class:`Change` per record, in the order the
-    caller named them, for the endpoint to publish events from. Raises
+    caller named them, and emits the batch's events from those changes — the
+    single-record services' own are muted, because a turn attributes a
+    cascade differently (see :func:`_events_for`). Raises
     :class:`~sm_records.services.errors.BulkRefused` — with a report naming
     every uuid that refused and why — if any of them did.
 
@@ -130,36 +153,38 @@ async def apply_bulk(
     # Before the first savepoint, and load-bearing twice over — see the module
     # docstring's third paragraph.
     await lock_type(db, rtype)
-    for uuid in wanted:
-        try:
-            # See the module docstring: the savepoint is what lets the pass
-            # continue after a refusal so the report can name all of them.
-            async with db.begin_nested():
-                changes.append(
-                    await apply_one(
-                        db,
-                        rtype,
-                        uuid,
-                        action=action,
-                        expected=versions.get(uuid),
-                        settings=settings,
-                        actor=actor,
-                        roles=roles,
-                        named=named,
-                        trashed=trashed,
+    with events.muted(db):
+        for uuid in wanted:
+            try:
+                # See the module docstring: the savepoint is what lets the pass
+                # continue after a refusal so the report can name all of them.
+                async with db.begin_nested():
+                    changes.append(
+                        await apply_one(
+                            db,
+                            rtype,
+                            uuid,
+                            action=action,
+                            expected=versions.get(uuid),
+                            settings=settings,
+                            actor=actor,
+                            roles=roles,
+                            named=named,
+                            trashed=trashed,
+                        )
                     )
-                )
-        except RecordsError as exc:
-            failures.append(_failure(uuid, exc))
-            # Rolling the savepoint back expires whatever the refused record's
-            # attempt touched inside it — on SQLite that includes the type row,
-            # which ``_prepare``'s own ``lock_type`` writes to. Reload it here,
-            # inside the greenlet, rather than leave the next record's turn (or
-            # the endpoint's event, which reads ``rtype.key``) to a lazy load
-            # that has none. ``services.import_`` does the same after its own
-            # per-row savepoint, for the same reason.
-            if inspect(rtype).expired_attributes:
-                await db.refresh(rtype)
+            except RecordsError as exc:
+                failures.append(_failure(uuid, exc))
+                # Rolling the savepoint back expires whatever the refused
+                # record's attempt touched inside it — on SQLite that includes
+                # the type row, which ``_prepare``'s own ``lock_type`` writes
+                # to. Reload it here, inside the greenlet, rather than leave the
+                # next record's turn (or the events below, which read
+                # ``rtype.key``) to a lazy load that has none.
+                # ``services.import_`` does the same after its own per-row
+                # savepoint, for the same reason.
+                if inspect(rtype).expired_attributes:
+                    await db.refresh(rtype)
     if failures:
         raise BulkRefused(
             BulkReport(action=action, requested=len(wanted), failed=failures),
@@ -173,6 +198,7 @@ async def apply_bulk(
     # ``_bulk_turn.apply_one``. ``requested`` still equals ``changed +
     # unchanged``, because a batch with a refusal in it answers no result.
     unchanged = sum(1 for change in changes if change.unchanged)
+    events.emit(db, *[event for change in changes for event in _events_for(action, rtype, change)])
     return (
         BulkResult(
             action=action,

@@ -129,6 +129,23 @@ async def test_a_refused_write_publishes_nothing(client, note, bus):
     assert bus.seen == []
 
 
+async def test_a_request_that_fails_after_the_write_publishes_nothing(
+    client, note, bus, monkeypatch
+):
+    """The service has already queued its ``RecordCreated`` when the endpoint
+    refuses; the error route's rollback has to take the event with it."""
+    from sm_records.endpoints.api import records as records_endpoint
+    from sm_records.services.errors import Conflict
+
+    def refuse(*_args, **_kwargs):
+        raise Conflict("refused after the write")
+
+    monkeypatch.setattr(records_endpoint, "record_read", refuse)
+    resp = await client.post(API, json={"data": {"title": "Gone"}}, headers=roles(ADMIN))
+    assert resp.status_code == 409
+    assert bus.seen == []
+
+
 async def test_publishing_is_a_no_op_without_a_bus(client, note, bus):
     """A host that never wired one — or a harness that mounted the routers by
     hand — must still serve the write."""

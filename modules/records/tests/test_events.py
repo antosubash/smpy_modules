@@ -2,12 +2,13 @@
 
 Two things are asserted about each one: the payload — identifiers plus the few
 fields a subscriber can act on without a second query — and the *timing*. The
-timing is the harder half and the reason this module publishes through
-:mod:`sm_records.deferred` rather than inline: a handler that fires inside the
-request's transaction sees a write that may still roll back, and reading the
-record back from any other session would not find it at all. So the recorder
-in ``tests/events_harness.py`` opens a session of its own per event and asserts
-the write is already visible from it, which is only true after the commit.
+timing is the harder half and the reason this module publishes through the
+session's ``on_commit`` queue (:mod:`sm_records.events`) rather than inline: a
+handler that fires inside the request's transaction sees a write that may still
+roll back, and reading the record back from any other session would not find
+it at all. So the recorder in ``tests/events_harness.py`` opens a session of its
+own per event and asserts the write is already visible from it, which is only
+true after the commit.
 
 The bus is the framework's (``simple_module_core.events``), reached where
 production reaches it: ``request.app.state.sm.event_bus``, which

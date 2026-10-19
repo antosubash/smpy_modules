@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from sm_records import events
 from sm_records.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.contracts.io import ImportFormat, ImportMode, ImportReport, OnError
 from sm_records.services import export as export_service
@@ -115,8 +116,15 @@ async def import_command(
     force: bool,
     apply: bool,
     tenant: str = DEFAULT_TENANT,
+    bus: Any = None,
 ) -> ImportReport:
-    """Import one file into ``tenant``. Writes nothing unless ``apply``."""
+    """Import one file into ``tenant``. Writes nothing unless ``apply``.
+
+    ``bus`` gets one ``RecordCreated``/``RecordUpdated`` per written row once
+    the import commits — a caller running this in-process with a host's
+    ``app.state.sm.event_bus`` reaches that host's subscribers. Without one (the
+    standalone ``python -m`` process has no host) nothing is published.
+    """
     text = Path(path).read_text(encoding="utf-8-sig")
     fmt = ImportFormat.CSV if path.lower().endswith(".csv") else ImportFormat.JSON
     options = import_service.ImportOptions(
@@ -129,6 +137,7 @@ async def import_command(
     async with connected(database_url) as db_state:
         with tenant_scope(tenant):
             async with db_state.session_factory() as session:
+                events.attach(session, bus)
                 settings = await load_settings(db_state)
                 rtype = await get_type(session, type_key)
                 try:
@@ -136,17 +145,19 @@ async def import_command(
                         session, rtype, text, fmt=fmt, options=options, settings=settings
                     )
                 except ImportRefused as exc:
-                    await session.rollback()
+                    await events.rollback(session)
                     _print_report(type_key, exc.report)
                     raise SystemExit(1) from exc
                 if apply:
-                    # The one commit in this module — see the docstring. A dry
-                    # run rolls back instead, because the validation pass reads
-                    # and a session left open on a read transaction is a lock
-                    # held for no reason.
-                    await session.commit()
+                    # The one commit in this module — see the docstring — and
+                    # through ``events.commit``, which publishes what the rows
+                    # queued: a bare ``commit()`` neither runs nor clears it. A
+                    # dry run rolls back instead, because the validation pass
+                    # reads and a session left open on a read transaction is a
+                    # lock held for no reason.
+                    await events.commit(session)
                 else:
-                    await session.rollback()
+                    await events.rollback(session)
             _print_report(type_key, report)
             return report
 

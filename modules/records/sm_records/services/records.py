@@ -17,11 +17,13 @@ having in front of you while reading it:
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records._text import has_nul
 from sm_records.index.providers import TypeIndex
 from sm_records.index.reduce import snapshot
@@ -180,6 +182,8 @@ async def create_record(
     # ``fresh``: the row was inserted by the flush above, so it cannot own
     # index rows yet and the writer's six-table delete pass is skipped.
     await write_index(db, record, rtype, resolve_type_id=TypeIndex(types), fresh=True)
+    # A builder, so an importer's ``held`` builds it after re-stamping the uuid.
+    events.emit(db, partial(events.created, rtype, record))
     return record
 
 
@@ -234,6 +238,7 @@ async def update_record(
     # ``write_index`` runs ``record.data`` is already the new value. This is
     # the one place the old payload still exists.
     previous_data = dict(record.data or {})
+    status_before = record.status.value
     own_group = record.translation_group
     defs, values, stored, types = await _prepare(
         db, rtype, data, settings, record.id, own_group, previous=previous_data
@@ -275,4 +280,5 @@ async def update_record(
         resolve_type_id=TypeIndex(types),
         previous=snapshot(record, previous_data),
     )
+    events.emit(db, partial(events.updated, rtype, record, status_before=status_before))
     return record

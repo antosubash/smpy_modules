@@ -16,7 +16,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.schemas import RecordRead, record_read
 from sm_records.deps import (
     actor,
@@ -54,10 +53,9 @@ async def delete_record(
     # ``roles`` and not only ``check_type_roles``: the delete may cascade into
     # — or rewrite — records of types this URL never names, and design §10's
     # narrowing has to reach those too. See ``services._lifecycle``.
-    cascade = await record_service.soft_delete_record(
+    await record_service.soft_delete_record(
         db, rtype, record, actor=who, settings=settings, roles=caller_roles(request)
     )
-    events.publish(request, *events.trashed(rtype, record, cascade))
 
 
 @router.post("/records/{uuid}/restore", response_model=RecordRead, dependencies=[require_edit])
@@ -72,7 +70,6 @@ async def restore_record(
     check_type_roles(request, rtype)
     record = await record_service.get_deleted_record(db, rtype, uuid)
     restored = await record_service.restore_record(db, rtype, record, settings=settings, actor=who)
-    events.publish(request, events.restored(rtype, restored))
     return record_read(rtype, restored)
 
 
@@ -85,8 +82,4 @@ async def purge_record(
 ) -> None:
     check_type_roles(request, rtype)
     record = await record_service.get_deleted_record(db, rtype, uuid)
-    # Built before the purge: afterwards the row is expunged and the uuid it
-    # names is the one thing a subscriber cannot look up any more.
-    purged = events.purged(rtype, record)
     await record_service.hard_delete_record(db, rtype, record)
-    events.publish(request, purged)
