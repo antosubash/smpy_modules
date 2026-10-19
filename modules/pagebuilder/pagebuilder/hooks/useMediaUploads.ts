@@ -2,6 +2,7 @@
 
 import { router } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 
 import type { UploadItem } from '../components/media/types';
 import { type MediaAssetRead, uploadMedia } from '../utils/api';
@@ -44,6 +45,7 @@ export function useMediaUploads({ uploadFolder, onUploaded, setMessage }: Params
       // drop; the per-file progress bar is what makes this feel fast.
       void (async () => {
         let succeeded = 0;
+        const failures: { name: string; message: string }[] = [];
         for (const item of items) {
           setUploads((prev) =>
             prev.map((u) => (u.id === item.id ? { ...u, status: 'uploading' } : u)),
@@ -65,24 +67,29 @@ export function useMediaUploads({ uploadFolder, onUploaded, setMessage }: Params
             onUploaded(asset);
             succeeded += 1;
           } catch (e) {
+            const message =
+              e instanceof Error ? e.message : translate(keys.pagebuilder.bundle.upload_failed);
+            failures.push({ name: item.file.name, message });
             setUploads((prev) =>
-              prev.map((u) =>
-                u.id === item.id
-                  ? {
-                      ...u,
-                      status: 'error',
-                      error:
-                        e instanceof Error
-                          ? e.message
-                          : translate(keys.pagebuilder.bundle.upload_failed),
-                    }
-                  : u,
-              ),
+              prev.map((u) => (u.id === item.id ? { ...u, status: 'error', error: message } : u)),
             );
           }
         }
+        // One toast per batch: a 50-file drop of the wrong type is one problem.
+        if (failures.length === 1) {
+          toast.error(
+            translate(keys.pagebuilder.errors.upload_toast_single, {
+              name: failures[0].name,
+              message: failures[0].message,
+            }),
+          );
+        } else if (failures.length > 1) {
+          toast.error(
+            translate(keys.pagebuilder.errors.upload_toast_batch, { count: failures.length }),
+          );
+        }
         if (succeeded > 0) {
-          setMessage(`Uploaded ${succeeded} file${succeeded === 1 ? '' : 's'}.`);
+          setMessage(translate(keys.pagebuilder.media.uploaded, { count: succeeded }));
           // Best-effort: also re-sync via Inertia so the SSR props
           // reflect the new state on next reload.
           router.reload({ only: ['initial'] });
