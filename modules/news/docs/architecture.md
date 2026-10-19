@@ -15,7 +15,7 @@ neighbour reached through exactly two files:
 |---|---|
 | `integrations/pagebuilder.py` | `available()`; Pages and Media search sections; "see all" links into `/pagebuilder/…` |
 | `integrations/locales.py` | borrowing pagebuilder's `content_locales` / `default_content_locale` |
-| `puck-blocks.ts` + `components/NewsFeed.tsx` (frontend) | registering the **News feed** block in pagebuilder's palette |
+| `pagebuilder-blocks.ts` + `components/NewsFeed.tsx` (frontend) | registering the **News feed** block in pagebuilder's palette |
 
 Every Python import of `pagebuilder` is deferred into a function and guarded,
 so importing news (or its migrations) never imports it — `test_module.py`
@@ -167,4 +167,4 @@ block's are resolved by pagebuilder's own `localizeConfig`, hence the
 | `integrations/` | the only pagebuilder seam |
 | `endpoints/api/`, `endpoints/views.py`, `endpoints/public/` | JSON API, admin screens, reader routes |
 | `pages/`, `components/`, `hooks/`, `utils/` | React screens (only real Inertia pages under `pages/`) |
-| `puck-blocks.ts` | News feed block registration (needs pagebuilder) |
+| `pagebuilder-blocks.ts` | News feed block registration (needs pagebuilder; loaded only by pagebuilder's `puck-blocks.ts`) |

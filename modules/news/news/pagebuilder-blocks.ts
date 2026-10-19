@@ -9,15 +9,21 @@
  * the split was for. `test_module.py` guards the equivalent rule on the Python
  * side; here the rule is short enough to keep by reading.
  *
- * The registration itself is guarded because the neighbour may be absent at
- * *runtime*: the host globs every module's `puck-blocks.ts` eagerly at app
- * start, and a throw here would take down the whole bundle's init rather than
- * quietly leaving one block unregistered.
+ * This is deliberately *not* named `puck-blocks.ts`. The host globs every
+ * module's `puck-blocks.ts` eagerly, so a file by that name is built into every
+ * host, and a bundler cannot make a static import conditional — a host without
+ * pagebuilder would fail to resolve the import below. Instead pagebuilder's own
+ * `puck-blocks.ts` globs every sibling package's `pagebuilder-blocks.ts`. The file
+ * is therefore reachable only from a build that includes pagebuilder; on any
+ * other host it is simply never imported (a glob that matches nothing is not an
+ * error), and no block-glob exclusion is needed.
  *
- * A bundler cannot make a static import conditional, so on a host that installs
- * neither the npm package nor the wheel this file has nothing to resolve. That
- * is why `@simple-module-py/pagebuilder` is an *optional* peer dependency: npm
- * will not demand it, and a host without it simply does not ship this block.
+ * The registration itself is guarded because it runs eagerly at app start, and
+ * a throw here would take down the whole bundle's init rather than quietly
+ * leaving one block unregistered.
+ *
+ * `@simple-module-py/pagebuilder` is an *optional* peer dependency, so npm does
+ * not demand it of a host that never installs it.
  */
 
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';

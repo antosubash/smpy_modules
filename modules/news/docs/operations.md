@@ -62,12 +62,15 @@ at `0.0.x`.
 
 Without the extra, news never imports pagebuilder (every import sits behind
 `news/integrations/pagebuilder.py` and is deferred), the extra search sections
-are simply absent, and articles publish in one language. **Frontend caveat:**
-`news/puck-blocks.ts` and `components/NewsFeed.tsx` import
-`@simple-module-py/pagebuilder` at build time (a declared *optional* peer
-dependency). A host without pagebuilder must leave `puck-blocks.ts` out of its
-block glob (`host/client_app/blocks.ts` in this repo); every other screen
-builds without it.
+are simply absent, and articles publish in one language. **Frontend:** the feed block's registration lives in
+`news/pagebuilder-blocks.ts` (with `components/NewsFeed.tsx`), the only files
+that import `@simple-module-py/pagebuilder` (a declared *optional* peer
+dependency). The host's block glob matches `puck-blocks.ts`, which news does
+not ship; pagebuilder's own `puck-blocks.ts` globs every sibling's
+`pagebuilder-blocks.ts`. On a host without pagebuilder nothing imports those
+files, so news builds with no exclusion to configure. The registration needs a
+pagebuilder that ships that glob (the release after 0.0.11); on an older one
+the page editor simply has no news feed block.
 
 ## Settings
 
@@ -168,7 +171,7 @@ Slugs, categories, tags and redirects are unique per tenant.
 | "This article already has a de translation (check the trash)" | a draft or trashed sibling in that language exists | Open it from **Languages**, or purge it. |
 | Saving says "This article was changed somewhere else" | another tab or person saved first | Reload and redo the change. |
 | News feed block labels show as `news.feed.…` keys | pagebuilder older than 0.0.8 | Upgrade pagebuilder. |
-| Frontend build fails resolving `@simple-module-py/pagebuilder` | host without pagebuilder globs `puck-blocks.ts` | Exclude news' `puck-blocks.ts` from the block glob. |
+| Frontend build fails resolving `@simple-module-py/pagebuilder` | a hand-written import of news' `pagebuilder-blocks.ts` on a host without pagebuilder | Do not import it; pagebuilder's `puck-blocks.ts` loads it only when pagebuilder is installed. |
 | Search everything shows no Pages / Media | pagebuilder not installed | Expected. |
 
 ## Data and deletion

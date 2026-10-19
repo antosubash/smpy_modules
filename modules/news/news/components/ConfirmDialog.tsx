@@ -22,7 +22,7 @@ import { keys, useT } from '../utils/i18n';
  * News used to import this — and two other components — from a module it
  * required anyway. It does not require that module any more (see
  * `news/integrations/pagebuilder.py`), and a screen every host sees cannot
- * depend on a package only some hosts install. Only `puck-blocks.ts` and the
+ * depend on a package only some hosts install. Only `pagebuilder-blocks.ts` and the
  * feed block it registers may reach across, because those *are* the
  * integration.
  *

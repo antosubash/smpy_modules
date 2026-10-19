@@ -62,22 +62,20 @@ without it `available()` is `False` and the extra sections are simply absent.
 `test_module.py` spawns a subprocess to prove that importing news never imports
 pagebuilder.
 
-**One caveat, on the frontend.** A bundler resolves imports statically, and that
-includes *dynamic* ones — Rollup errors on an unresolvable `import()` exactly as
-it does on a static `import`, so the `try`/`catch` around it never runs and no
-amount of guarding inside this module makes the dependency conditional. So
-`news/puck-blocks.ts` — and the `NewsFeed` component it pulls in — genuinely do
-import `@simple-module-py/pagebuilder` at build time. They are the only two
-files in this module's frontend that do, and `@simple-module-py/pagebuilder` is
-declared an *optional* peer dependency so npm does not demand it. A host that
-installs news without pagebuilder should exclude `puck-blocks.ts` from its block
-glob (see `host/client_app/blocks.ts`); there is no feed block to register
-without the palette it registers into. Every other screen — the list, both
-editors, the public viewer — builds and runs with the package absent.
-
-The real fix belongs to the framework rather than here: `gen-pages` already
-emits the page globs, and could emit the block imports too, skipping a module
-whose optional peers do not resolve — once, for every host and every module.
+**On the frontend** the same rule holds, by a different mechanism. A bundler
+resolves imports statically, and that includes *dynamic* ones — Rollup errors on
+an unresolvable `import()` exactly as it does on a static `import`, so no
+`try`/`catch` makes the dependency conditional. What can be conditional is
+*whether a file is reached at all*. News' feed-block registration is therefore
+`news/pagebuilder-blocks.ts` — deliberately not `puck-blocks.ts`, the name the
+host globs eagerly — and it is imported only by pagebuilder's own
+`puck-blocks.ts`, which globs every installed module's `pagebuilder-blocks.ts`.
+That file and the `NewsFeed` component it pulls in are the only two in this
+module that import `@simple-module-py/pagebuilder` (declared an *optional* peer
+dependency). A host without pagebuilder never builds them, and needs no
+exclusion in `host/client_app/blocks.ts`. Every other screen — the list, both
+editors, the public viewer — builds and runs with the package absent. The block
+needs a pagebuilder that ships that glob (the release after 0.0.11).
 
 ## Usage
 
@@ -367,8 +365,8 @@ Two things stay literal on purpose. A block's `defaultProps` are the seed
 translating them at render time would rewrite what a reader is served. And
 Puck's block labels are catalogue *keys* in the config constant, resolved by
 `localizeConfig` inside the screen that mounts the editor — a module-scope
-config cannot call a hook, and `puck-blocks.ts` is imported before the app has
-rendered anything.
+config cannot call a hook, and `pagebuilder-blocks.ts` is imported before the
+app has rendered anything.
 
 **The feed block is localized by its neighbour.** `NewsFeed` lands in
 *pagebuilder's* palette, not this module's, so the resolver is pagebuilder's

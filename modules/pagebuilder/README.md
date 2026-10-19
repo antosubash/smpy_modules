@@ -73,8 +73,13 @@ two revisions and restore either one as a draft.
 ## Contributing blocks from another module
 
 A module ships Puck blocks by calling `registerPuckBlocks` from its
-`puck-blocks.ts`; the host imports every module's registration eagerly at app
-start, so the registry is populated before the first render.
+`pagebuilder-blocks.ts`. Pagebuilder's own `puck-blocks.ts` globs every installed
+module's `pagebuilder-blocks.ts`, and the host imports that eagerly at app
+start, so the registry is populated before the first render. The contributing
+file is reached only through pagebuilder, so a host that never installs
+pagebuilder never builds it. (A file named `puck-blocks.ts` in a contributing
+module is still globbed by the host directly, so it must not import pagebuilder
+if the module is meant to work without it.)
 
 Because registration is eager, a block that statically imports a heavy render
 component puts that component's whole dependency graph in the entry chunk —
