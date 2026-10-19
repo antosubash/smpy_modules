@@ -61,6 +61,13 @@ make migrate
 
 ### Optional integrations
 
+- **`pagebuilder`** — optional; records installs, serves and builds without it.
+  Install `simple_module_records[pagebuilder]` for the **Records list** block.
+  This requires `simple_module_pagebuilder>=0.0.12,<0.1`: pagebuilder's own
+  `puck-blocks.ts` loads `sm_records/pagebuilder-blocks.ts` starting in 0.0.12.
+  Older versions silently omit the block from the palette. Do not import the
+  registration file directly from the host.
+
 - **`permissions`** — when the host installs the framework's `permissions`
   plugin, this module resolves permissions through it, so per-user direct
   grants work. Without it, the roles-only checker in

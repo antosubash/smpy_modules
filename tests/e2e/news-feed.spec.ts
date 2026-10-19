@@ -47,7 +47,11 @@ async function publishArticle(page: Page, category: string): Promise<string> {
   return slug;
 }
 
-async function publishFeedPage(page: Page, category: string): Promise<string> {
+async function publishFeedPage(
+  page: Page,
+  category: string,
+  overrides: Record<string, unknown> = {},
+): Promise<string> {
   const headers = await csrfHeader(page);
   const slug = uniqueSlug('e2e-feed');
   const created = await page.request.post('/api/pagebuilder/pages', {
@@ -68,6 +72,7 @@ async function publishFeedPage(page: Page, category: string): Promise<string> {
               columns: '4',
               viewAllLabel: '',
               viewAllHref: '',
+              ...overrides,
             },
           },
         ],
@@ -154,5 +159,40 @@ test.describe('News feed block', () => {
       anon.getByRole('link', { name: new RegExp(`Article ${articleSlug}`) }),
     ).toBeVisible();
     await anon.close();
+  });
+
+  test('a stored fractional limit still renders the feed (#141)', async ({ page }) => {
+    // Pages saved before the clamp hold whatever the number field let through;
+    // `limit=4.5` is a 422 from the API, which used to empty the feed.
+    await login(page);
+    const articleSlug = await publishArticle(page, 'Updates');
+    const feedSlug = await publishFeedPage(page, '', { limit: 4.5 });
+
+    const request = page.waitForRequest((r) => r.url().includes('/api/news/articles?'));
+    await page.goto(`/p/${feedSlug}`);
+    expect(new URL((await request).url()).searchParams.get('limit')).toBe('4');
+    await expect(
+      page.getByRole('link', { name: new RegExp(`Article ${articleSlug}`) }),
+    ).toBeVisible();
+  });
+
+  test('links "view all" only to a safe URL (#141)', async ({ page }) => {
+    await login(page);
+    await publishArticle(page, 'Updates');
+    const safe = await publishFeedPage(page, '', {
+      viewAllLabel: 'All news',
+      viewAllHref: './news',
+    });
+    const unsafe = await publishFeedPage(page, '', {
+      viewAllLabel: 'All news',
+      viewAllHref: 'javascript:alert(1)',
+    });
+
+    await page.goto(`/p/${safe}`);
+    await expect(page.getByRole('link', { name: 'All news' })).toHaveAttribute('href', './news');
+
+    await page.goto(`/p/${unsafe}`);
+    await expect(page.getByRole('heading', { name: 'Latest' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'All news' })).toHaveCount(0);
   });
 });

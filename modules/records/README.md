@@ -296,11 +296,12 @@ picture a visitor could load — see [Showing records on a page](#showing-record
 
 ### Showing records on a page
 
-When `simple_module_pagebuilder` is also installed, this module contributes a
-**Records list** block to its Puck editor palette (category **Data**),
-registered through `puck-blocks.ts` — records knows about pagebuilder,
-pagebuilder does not know about records. (News' `NewsFeed` block registers
-through `pagebuilder-blocks.ts` instead, which only pagebuilder loads.)
+Pagebuilder is optional: records installs and builds without it. Install
+`simple_module_records[pagebuilder]` to add **Records list** to the Puck editor
+palette (category **Data**). The block requires pagebuilder **>=0.0.12,<0.1**.
+It registers through `sm_records/pagebuilder-blocks.ts`, which only
+pagebuilder's own `puck-blocks.ts` loads. As with news' `NewsFeed`, records
+knows about pagebuilder; pagebuilder does not know about records.
 
 Drop the block on a page and pick:
 
