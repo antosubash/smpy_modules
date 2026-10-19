@@ -100,44 +100,48 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
     shared cache keyed on Host + URL alone could hand one tenant's page to
     another tenant's reader."""
     await create_published(mt, A, "hello", "Hello A")
-    for path in (
-        f"{NEWS}/hello",
-        f"{NEWS}/category/Sport",
-        f"{NEWS}/feed.xml",
-        f"{NEWS}/sitemap.xml",
+    # ``mt`` is a signed-in editor: the rendered pages are theirs alone (#94),
+    # the feed and the sitemap are the same for everyone.
+    for path, policy in (
+        (f"{NEWS}/hello", "private"),
+        (f"{NEWS}/category/Sport", "private"),
+        (f"{NEWS}/feed.xml", "public"),
+        (f"{NEWS}/sitemap.xml", "public"),
     ):
         response = await mt.get(path, headers=A)
         assert response.status_code == 200, (path, response.text)
-        assert response.headers["cache-control"].startswith("public"), path
+        assert response.headers["cache-control"].startswith(policy), path
         assert "Cookie" in _vary(response), (path, response.headers.get("vary"))
     article = await mt.get(f"{NEWS}/hello", headers=A)
-    assert _vary(article) == ["X-Inertia", "Cookie"]
-    cached = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": article.headers["etag"]})
-    assert cached.status_code == 304
-    assert _vary(cached) == ["X-Inertia", "Cookie"]
+    assert _vary(article) == ["X-Inertia", "Cookie", "Accept-Language"]
+    # Signed in, so there is no tag to revalidate: a stale one gets a full render.
+    assert "etag" not in article.headers
+    stale = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": 'W/"stale"'})
+    assert stale.status_code == 200
 
 
-async def test_single_mode_vary_is_unchanged(anon_client: AsyncClient) -> None:
-    """A single-tenant host picks no tenant per request: news adds nothing.
+async def test_single_mode_vary_adds_no_tenant_field(anon_client: AsyncClient) -> None:
+    """A single-tenant host picks no tenant per request: news adds nothing for it.
 
-    The ``Cookie`` on the Inertia pages is Starlette's ``SessionMiddleware``,
-    which varies on it whenever a render touched the session."""
+    The rendered pages still vary on the viewer (#94) — on the 200 and the 304
+    alike. The feed and the sitemap are the same for everyone, so they don't."""
     with tenant_context("default"):
         async with anon_client.db_state.session_factory() as db:
             await make_article(db, slug="hello", category="Sport")
+    per_viewer = ["X-Inertia", "Cookie", "Accept-Language"]
     article = await anon_client.get(f"{NEWS}/hello")
-    assert article.headers.get("vary") == "X-Inertia, Cookie"
+    assert _vary(article) == per_viewer
     revalidate = {"If-None-Match": article.headers["etag"]}
     cached = await anon_client.get(f"{NEWS}/hello", headers=revalidate)
-    assert (cached.status_code, cached.headers.get("vary")) == (304, "X-Inertia")
-    for path, vary in (
-        (f"{NEWS}/category/Sport", "Cookie"),
-        (f"{NEWS}/feed.xml", None),
-        (f"{NEWS}/sitemap.xml", None),
-    ):
+    assert cached.status_code == 304
+    assert _vary(cached) == per_viewer
+    archive = await anon_client.get(f"{NEWS}/category/Sport")
+    assert archive.status_code == 200, archive.text
+    assert _vary(archive) == per_viewer
+    for path in (f"{NEWS}/feed.xml", f"{NEWS}/sitemap.xml"):
         response = await anon_client.get(path)
         assert response.status_code == 200, (path, response.text)
-        assert response.headers.get("vary") == vary, path
+        assert response.headers.get("vary") is None, path
 
 
 async def test_public_api_cache_varies_on_the_configured_tenant_header() -> None:

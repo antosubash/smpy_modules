@@ -95,7 +95,8 @@ class _StubAuthMiddleware(BaseHTTPMiddleware):
         self._user = user
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        request.state.user = self._user
+        if "x-test-anonymous" not in request.headers:
+            request.state.user = self._user
         return await call_next(request)
 
 

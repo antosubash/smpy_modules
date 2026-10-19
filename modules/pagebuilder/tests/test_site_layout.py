@@ -233,7 +233,9 @@ async def test_layout_edit_invalidates_page_etag(
     """Layout changes must bust the page ETag — otherwise clients keep
     serving stale chrome from cache."""
     page = await _publish_page(authed_client)
-    first = await authed_client.get(f"/p/{page['slug']}")
+    # Read as a visitor: only an anonymous copy carries an ETag (#94).
+    anon = {"X-Test-Anonymous": "1"}
+    first = await authed_client.get(f"/p/{page['slug']}", headers=anon)
     etag_before = first.headers.get("etag")
     assert etag_before
 
@@ -241,7 +243,7 @@ async def test_layout_edit_invalidates_page_etag(
         "/api/pagebuilder/layout",
         json={"header_data": _HEADER_DATA},
     )
-    second = await authed_client.get(f"/p/{page['slug']}")
+    second = await authed_client.get(f"/p/{page['slug']}", headers=anon)
     etag_after = second.headers.get("etag")
     assert etag_after and etag_after != etag_before
 

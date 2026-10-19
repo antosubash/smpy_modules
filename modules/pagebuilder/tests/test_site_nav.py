@@ -106,11 +106,13 @@ async def test_only_the_pages_own_language_is_listed(bilingual_client: AsyncClie
 
 async def test_flagging_another_page_changes_the_etag(authed_client: AsyncClient) -> None:
     """The chrome changed while neither this page nor the layout did."""
+    # Read as a visitor: only an anonymous copy carries an ETag (#94).
+    anon = {"X-Test-Anonymous": "1"}
     await _page(authed_client, "home")
-    before = (await authed_client.get("/p/home")).headers["etag"]
+    before = (await authed_client.get("/p/home", headers=anon)).headers["etag"]
 
     await _page(authed_client, "about", show_in_header_nav=True)
-    after = (await authed_client.get("/p/home")).headers["etag"]
+    after = (await authed_client.get("/p/home", headers=anon)).headers["etag"]
 
     assert before != after
 
