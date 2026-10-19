@@ -268,7 +268,9 @@ A `media` field stores one file. When the host also installs the framework's
 `file_storage` module, the editor shows it as a **picker**: the chosen file as
 a thumbnail (images) or a file chip (name, size, type), **Replace…** and
 **Remove**, and a **Choose file…** dialog that browses the media library page
-by page, filters the page by name, and uploads a new file in place (with a
+by page, filters by name (server-side when the media API's list route declares
+`q`, as file_storage's does from framework 0.0.36; otherwise the loaded page),
+and uploads a new file in place (with a
 progress bar; the upload is picked as soon as it lands). The record list shows
 the type's first `media` field as a thumbnail column by default — an ordinary
 column the **Columns** menu can hide or move.
@@ -551,7 +553,9 @@ Three static permissions, registered at boot and visible in the role editor:
 
 Record Types are created at runtime, after the database is open, but
 `register_permissions` runs at app construction, before it — so **per-type
-permissions cannot be framework permissions**. Each `RecordType` instead
+permissions are not framework permissions**. (Framework 0.0.36 added runtime
+permission sources, `PermissionRegistry.add_source`, which would make them
+possible; records has not adopted it.) Each `RecordType` instead
 carries its own `allowed_roles`, narrowing which roles may write records of
 that type on top of the static `records.edit`/`records.manage_types`
 permission; an empty list means "any role holding the static permission".
@@ -597,7 +601,11 @@ somewhere they are not.
 **This is an honest limitation, not an oversight: per-type `allowed_roles`
 are invisible in the framework's role editor.** An admin editing roles sees
 only the three coarse permissions above and has no way to discover, from that
-screen, that a given type is further restricted to specific roles.
+screen, that a given type is further restricted to specific roles. Framework
+0.0.36 can list such permissions there (a *source*, registered with
+`registry.add_source(name, provider)`, returns keys or `(key, label)` pairs
+from an in-memory cache, and `invalidate_source` refreshes it), but records
+does not use it yet.
 
 ## Multi-tenancy
 
@@ -607,7 +615,7 @@ turn on inside this module itself.
 
 **Single-tenant host (the default, and every existing install).** No
 `SM_MULTI_TENANT`, or `SM_MULTI_TENANT=false`. Nothing changes: every row is
-in the tenant `default`, a user's `tenant_id` and an `X-Tenant-ID` header are
+in the tenant `default`, a user's memberships and an `X-Tenant-ID` header are
 both ignored, and the module behaves exactly as it did before tenancy
 existed. The one thing to check before upgrading past the tenancy migration
 is below.
@@ -617,23 +625,27 @@ anonymous readers or API clients need to name a tenant, then **restart** —
 the middleware stack is built once at boot, so an edit of the DB-hydrated
 setting alone does not install `TenantMiddleware`. From there:
 
-- **Assign every user a tenant by hand.** `UserCreate`/`UserUpdate` have no
-  `tenant_id` field and there is no UI for it yet — upstream
-  [#360](https://github.com/antosubash/simple_module_python/issues/360) — so
-  it is SQL: `UPDATE users_user SET tenant_id = 'acme' WHERE email = '...'`.
-  **Give legacy users `tenant_id = 'default'`** to keep them seeing the rows
-  that existed before the migration. A user's tenant travels in their session
-  cookie, so the change is invisible until they **log out and back in**
-  (upstream [#362](https://github.com/antosubash/simple_module_python/issues/362)).
-- A user with no tenant — the bootstrap admin included — gets `403` with
+- **Make every user a member of an organisation.** On framework 0.0.36 a user
+  has no tenant column (`users_user.tenant_id` was dropped, upstream
+  [#381](https://github.com/antosubash/simple_module_python/issues/381)): they
+  belong to tenants through `tenants_membership`, managed by the
+  `simple_module_tenants` module at `/tenants/` (create an organisation, invite
+  by email, switch). A membership change applies on the user's next request, no
+  re-login. The tenant records binds is the organisation's generated `id`, so
+  legacy rows in `default` belong to no organisation — see
+  [Assigning tenants to users](docs/operations.md#assigning-tenants-to-users)
+  before switching a populated install.
+- A user with no active tenant (no membership) — the bootstrap admin included — gets `403` with
   `"code": "tenant_required"` on every records admin screen, even with a
   header sent: records never guesses. The `admin_header_tenant` setting
   (default off) lets a user holding `admin` with no tenant of their own act
   in the tenant their `X-Tenant-ID` header names — **from an API or headless
   client that can send that header, only**. The browser admin screens never
   send it, so for such a user every screen stays `403` with the setting on;
-  the fix for a person working in the browser is to assign them a tenant.
-- Anonymous readers and headless clients name their tenant with that header;
+  the fix for a person working in the browser is to make them a member of an
+  organisation.
+- Anonymous readers and headless clients name their tenant with that header
+  (or, where the tenants module's `subdomain_base` is set, by subdomain);
   with none, the public API answers its ordinary `404`, the same one an
   unknown type gets. The pagebuilder `RecordsList` block's **Tenant** field
   always sends the literal header `X-Tenant-ID`, whatever `SM_TENANT_HEADER`

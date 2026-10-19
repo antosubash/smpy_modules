@@ -62,6 +62,18 @@ test.describe('Console in German', () => {
     ).toBeVisible();
   });
 
+  test('the console chrome reads German too', async ({ page }) => {
+    // The chrome is the framework's `ui` namespace, translated by the host's
+    // `host/locales/overrides/de.json`: a key missing there renders raw.
+    await page.goto('/admin/records');
+    // Tab only once the page has rendered, or it lands before the link exists.
+    await expect(page.getByText('Datensatztypen', { exact: true }).first()).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Zum Inhalt springen' })).toBeFocused();
+    await expect(page.getByText('Zugriff', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/\bui\.[a-z_]+\.[a-z_]+/);
+  });
+
   test('switching back to English restores the English screens', async ({ page, context }) => {
     await context.addCookies([
       { name: 'locale', value: 'en', url: new URL('/', page.url()).toString() },

@@ -113,7 +113,7 @@ async def record_or_trash(request: Request, db: AsyncSession, rtype: RecordType,
     try:
         return await record_service.get_record(db, rtype, uuid)
     except NotFound:
-        if not await has_edit_permission(request, db):
+        if not await has_edit_permission(request):
             raise
         return await record_service.get_deleted_record(db, rtype, uuid)
 

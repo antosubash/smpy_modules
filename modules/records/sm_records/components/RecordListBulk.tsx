@@ -22,7 +22,7 @@ import { RecordBulkToolbar } from './RecordBulkToolbar';
  * nothing to act on, and the toast that announces a success has to outlive
  * the reload that empties the list — otherwise the one action that leaves no
  * rows behind is the one that announces nothing. It does: the `<Toaster>` is
- * mounted once, in the layout (`RecordsToaster`), outside the part of the
+ * mounted once, in the layout (`AdminLayout`), outside the part of the
  * tree a partial reload swaps.
  */
 export function RecordListBulk({

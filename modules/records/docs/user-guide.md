@@ -277,7 +277,8 @@ editor and read the type's definition, whatever Allowed roles says. A manager
 locked out of the screen that edits Allowed roles would be a one-way door.
 
 > **Two honest limitations.** Per-type Allowed roles are invisible in the
-> framework's role editor: an administrator editing roles sees only the three
+> framework's role editor (framework 0.0.36 can show runtime permissions there;
+> records does not use that yet): an administrator editing roles sees only the three
 > coarse permissions and has no way to discover from that screen that a type is
 > further restricted. And a schema **preview** (below) lists up to ten failing
 > records by title, and is gated on `records.manage_types` rather than on the
