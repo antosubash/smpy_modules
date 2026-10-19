@@ -17,18 +17,16 @@ from simple_module_hosting.permissions import resolve_permissions
 from starlette.middleware.base import BaseHTTPMiddleware
 
 try:
-    # Only present when the host also installs ``permissions`` — see
-    # ``sm_records.deps``'s fallback import for why ``records`` cannot
-    # require it. When it *is* installed (as in this repo's dev venv),
-    # ``deps.RequiresPermission`` resolves to ``permissions.deps``'s version,
+    # Only present when the host also installs ``permissions``, which
+    # ``records`` cannot require (a published module can't depend on another
+    # plugin). When it *is* installed (as in this repo's dev venv), its
+    # per-user grants are consulted by the hosting ``RequiresPermission``
+    # that ``sm_records.deps`` uses (a grant source, since framework 0.0.36),
     # which (a) needs a real UUID for ``request.state.user.id`` rather than
-    # this harness's plain ``"test:<roles>"`` string, and (b) queries
-    # ``permissions_user_permission`` directly rather than falling back to
-    # the role map when ``request.state.resolved_permissions`` is unset — so
-    # both have to be provided here for the harness to behave like the real
-    # request pipeline (``AuthMiddleware`` sets ``resolved_permissions``;
-    # real user ids are UUIDs). Its table is created by
-    # ``tests.pg_support.make_db_state``.
+    # this harness's plain ``"test:<roles>"`` string, and (b) reads
+    # ``permissions_user_permission`` — so both have to be provided here for
+    # the harness to behave like the real request pipeline (real user ids
+    # are UUIDs). Its table is created by ``tests.pg_support.make_db_state``.
     import permissions.models  # noqa: F401
 
     _PERMISSIONS_INSTALLED = True

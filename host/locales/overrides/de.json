@@ -1,0 +1,76 @@
+{
+  "ui": {
+    "errors": {
+      "generic_title": "Etwas ist schiefgelaufen",
+      "generic_description": "Auf der Seite ist ein unerwarteter Fehler aufgetreten. Laden Sie sie neu oder kehren Sie zur Startseite zurück.",
+      "reload_button": "Seite neu laden",
+      "go_home_button": "Zur Startseite"
+    },
+    "nav": {
+      "admin": "Administration"
+    },
+    "switcher": {
+      "label": "Sprache ändern",
+      "single_locale": "Nur {locale} ist aktiviert"
+    },
+    "topbar": {
+      "log_out": "Abmelden"
+    },
+    "relative_time": {
+      "unknown": "unbekannt",
+      "just_now": "gerade eben",
+      "seconds_ago": "vor {count} s",
+      "minutes_ago": "vor {count} min",
+      "hours_ago": "vor {count} h",
+      "days_ago": "vor {count} T.",
+      "months_ago": "vor {count} Mon.",
+      "months_ago_one": "vor {count} Mon.",
+      "months_ago_other": "vor {count} Mon.",
+      "years_ago": "vor {count} J.",
+      "years_ago_one": "vor {count} J.",
+      "years_ago_other": "vor {count} J.",
+      "in_minutes": "in {count} min",
+      "in_hours": "in {count} h",
+      "in_days": "in {count} T.",
+      "expired": "abgelaufen"
+    },
+    "nav_groups": {
+      "access": "Zugriff",
+      "appearance": "Darstellung",
+      "content": "Inhalte",
+      "system": "System",
+      "navigation": "Navigation",
+      "account": "Konto"
+    },
+    "command_palette": {
+      "trigger": "Suche",
+      "title": "Suche",
+      "description": "Springen Sie zu jeder Seite, auf die Sie Zugriff haben.",
+      "placeholder": "Springen zu …",
+      "empty": "Nichts gefunden."
+    },
+    "admin": {
+      "panel_badge": "Adminbereich",
+      "back_to_app": "Zurück zur App"
+    },
+    "sidebar": {
+      "open": "Seitenleiste öffnen",
+      "close": "Seitenleiste schließen",
+      "back": "Zurück",
+      "skip_to_content": "Zum Inhalt springen"
+    },
+    "public_nav": {
+      "docs": "Dokumentation",
+      "modules": "Module",
+      "github": "GitHub",
+      "open_dashboard": "Dashboard öffnen",
+      "sign_in": "Anmelden",
+      "open_menu": "Menü öffnen",
+      "close_menu": "Menü schließen"
+    },
+    "demo": {
+      "banner_read_only": "Demomodus – Sie sind mit einem gemeinsamen Konto angemeldet, Änderungen werden nicht gespeichert.",
+      "banner_writable": "Demomodus – Sie sind mit einem gemeinsamen Konto angemeldet, das alle Besucher dieser Seite nutzen."
+    }
+  }
+}

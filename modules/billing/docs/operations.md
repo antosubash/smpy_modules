@@ -7,7 +7,7 @@
 
    ```toml
    dependencies = [
-       "simple_module_tenants==0.0.35",
+       "simple_module_tenants==0.0.36",
        "simple_module_billing",
    ]
    ```
@@ -28,7 +28,8 @@
    The `billing` branch label names the revision; it does **not** make
    `alembic downgrade billing@base` remove billing alone. Autogenerate chains
    every revision off the current head, so that command walks everything
-   beneath it (antosubash/simple_module_python#333).
+   beneath it. Upstream #333 was closed in 0.0.36 as a docs correction, not a
+   behaviour change (antosubash/simple_module_python#333).
 4. Start the app. On every startup billing seeds a free **Free** plan if no
    default plan exists, builds the configured provider, and installs itself as
    `app.state.tenants.entitlements`.

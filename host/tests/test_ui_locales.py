@@ -1,8 +1,10 @@
-"""The vendored ``ui`` catalog covers what the installed ``ui`` package renders.
+"""The admin chrome speaks every language the demo host does.
 
-``packages/ui/locales/`` is copied from the framework (see its README) because
-the published package does not ship it. A framework upgrade that adds a label
-would otherwise reach the admin chrome as a raw ``ui.…`` key, unnoticed.
+Framework 0.0.36 ships the ``ui`` catalogue inside ``simple_module_hosting``
+(``ui_locales/``), English and Spanish only. German comes from this host's
+``host/locales/overrides/de.json`` (see the README there). A framework upgrade
+that adds a ``ui`` label would otherwise reach a German console as English,
+unnoticed.
 """
 
 from __future__ import annotations
@@ -12,25 +14,32 @@ import re
 from pathlib import Path
 
 import pytest
+import simple_module_hosting
 from simple_module_hosting import Settings
 from simple_module_hosting.i18n_manifest import build_i18n_registry
 
 ROOT = Path(__file__).resolve().parents[2]
-CATALOG = ROOT / "packages" / "ui" / "locales"
+UI_CATALOG = Path(simple_module_hosting.__file__).resolve().parent / "ui_locales"
+GERMAN = ROOT / "host" / "locales" / "overrides" / "de.json"
 UI_SRC = ROOT / "node_modules" / "@simple-module-py" / "ui" / "src"
 KEY_USE = re.compile(r"keys\.ui\.([A-Za-z0-9_.]+)")
+PLACEHOLDER = re.compile(r"\{\{?\s*(\w+)\s*\}?\}")
 
 
-def _flatten(tree: dict, prefix: str = "") -> set[str]:
-    out: set[str] = set()
+def _flatten(tree: dict, prefix: str = "") -> dict[str, str]:
+    out: dict[str, str] = {}
     for key, value in tree.items():
         path = f"{prefix}{key}"
-        out |= _flatten(value, f"{path}.") if isinstance(value, dict) else {path}
+        out |= _flatten(value, f"{path}.") if isinstance(value, dict) else {path: value}
     return out
 
 
-def _catalog(locale: str) -> set[str]:
-    return _flatten(json.loads((CATALOG / f"{locale}.json").read_text()))
+def _english() -> dict[str, str]:
+    return _flatten(json.loads((UI_CATALOG / "en.json").read_text()))
+
+
+def _german() -> dict[str, str]:
+    return _flatten(json.loads(GERMAN.read_text())["ui"])
 
 
 def test_every_ui_key_the_package_uses_is_in_the_catalog():
@@ -44,15 +53,29 @@ def test_every_ui_key_the_package_uses_is_in_the_catalog():
     }
     assert used, "the ui package uses no keys.ui.* — has its i18n moved?"
     # A plural key is used by its stem and stored with ``_one``/``_other``.
-    known = {re.sub(r"_(zero|one|two|few|many|other)$", "", k) for k in _catalog("en")}
+    known = {re.sub(r"_(zero|one|two|few|many|other)$", "", k) for k in _english()}
     assert sorted(used - known) == []
 
 
-@pytest.mark.parametrize("locale", ["es", "de"])
-def test_every_locale_has_the_same_keys(locale):
-    assert _catalog(locale) == _catalog("en")
+def test_german_covers_exactly_the_framework_catalog():
+    english, german = _english(), _german()
+    assert sorted(english.keys() - german.keys()) == [], "untranslated ui keys"
+    assert sorted(german.keys() - english.keys()) == [], "keys the framework no longer has"
 
 
-def test_the_host_serves_the_ui_namespace():
-    registry, _ = build_i18n_registry(Settings(), [], ROOT)
+def test_german_keeps_every_placeholder():
+    english, german = _english(), _german()
+    drift = {
+        key: text
+        for key, text in german.items()
+        if set(PLACEHOLDER.findall(text)) != set(PLACEHOLDER.findall(english.get(key, "")))
+    }
+    assert drift == {}
+
+
+def test_the_host_serves_the_ui_namespace_in_german():
+    settings = Settings(i18n_supported_locales=["en", "de"])
+    registry, _ = build_i18n_registry(settings, [], ROOT)
     assert registry.messages("en").get("ui.sidebar.open") == "Open sidebar"
+    assert registry.messages("de").get("ui.sidebar.open") == "Seitenleiste öffnen"
+    assert registry.unknown_override_keys == {}

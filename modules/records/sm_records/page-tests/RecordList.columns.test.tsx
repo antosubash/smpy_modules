@@ -25,7 +25,6 @@ vi.mock('../components/RecordIoMenu', () => ({
     return null;
   },
 }));
-vi.mock('../components/RecordsToaster', () => ({ RecordsToaster: () => null }));
 // i18next is unconfigured under vitest and returns templates verbatim; the
 // notice names the dropped keys only through interpolation.
 vi.mock('@simple-module-py/i18n', () => {

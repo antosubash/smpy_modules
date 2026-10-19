@@ -274,7 +274,7 @@ at the next restart. Records reads the mode off the built stack, not the
 setting, and logs a warning at boot when the setting says multi-tenant but
 the stack has no `TenantMiddleware` (an edit made since the last restart).
 
-A multi-tenant host on framework 0.0.35 runs **strict**: a query on a
+A multi-tenant host on framework 0.0.35 or later runs **strict**: a query on a
 tenant-owned table with no tenant bound raises `MissingTenantError` instead
 of reading every tenant. Records binds a tenant on every path it owns and runs
 its deliberate cross-tenant reads (the boot-time locale check,
@@ -294,41 +294,64 @@ if you have not already upgraded past that revision.
 
 ### Assigning tenants to users
 
-The framework has no tenant concept beyond a nullable `users_user.tenant_id`,
-and no UI or API to set it (`UserCreate`/`UserUpdate` carry no `tenant_id`
-field, and `create_admin` takes none) — upstream
-[#360](https://github.com/antosubash/simple_module_python/issues/360). Until
-that lands, assign it by hand:
+Since framework 0.0.36 there is no per-user tenant to assign. The legacy
+`users_user.tenant_id` column was dropped (upstream
+[#381](https://github.com/antosubash/simple_module_python/issues/381); this
+host's revision is `5b210e4cf54f`), and `UserCreate`/`UserUpdate`/`create_admin`
+never gained a `tenant_id`. A user belongs to a tenant through a row in
+`tenants_membership`, which the framework's `simple_module_tenants` module
+owns. A multi-tenant host needs that module (billing already depends on it): it
+registers the resolver that picks a signed-in user's tenant, and without it
+records finds no tenant for anybody and answers `403 tenant_required` on every
+admin screen.
 
-```sql
-UPDATE users_user SET tenant_id = 'acme' WHERE email = 'someone@acme.example';
-```
+To give someone access:
 
-**Give every legacy user `tenant_id = 'default'`** — that is the tenant every
-pre-migration row was backfilled into, so a user left with no tenant, the
-bootstrap admin included, is refused with `403 tenant_required` on every
-records admin screen rather than shown `default`'s data by accident. Records
-never falls back to a guessed tenant.
+1. **An organisation has to exist.** Any signed-in user can create one at
+   `/tenants/` (`POST /api/tenants/`) while the tenants module's
+   `allow_self_service` setting is on; the creator becomes its `owner`.
+   Platform admins see every organisation at `/admin/tenants/`.
+2. **Add the user by invitation.** An owner or admin of the organisation opens
+   `/tenants/members` (`POST /api/tenants/current/invitations`) and invites the
+   user's email address; the user signs in with that address and accepts
+   (`/tenants/invitations/accept?token=`). 0.0.36 has no route that adds an
+   existing user to an organisation directly, and no SQL is needed.
+3. **No re-login.** The active tenant is resolved on every request from the
+   user's memberships (framework
+   [#362](https://github.com/antosubash/simple_module_python/issues/362) is
+   moot: `UserContext` no longer carries a tenant of its own), so a membership
+   change applies on the next request. A user in several organisations chooses
+   the active one at `/tenants/` (`POST /api/tenants/{id}/switch`); the browser
+   admin screens work in whichever is active.
 
-**The change is invisible until the user logs out and back in.** A signed-in
-user's tenant is cached in their session cookie
-(`UserContext`, upstream [#362](https://github.com/antosubash/simple_module_python/issues/362)),
-so a SQL `UPDATE` takes effect on their next login, not their next request.
+**The tenant records sees is the organisation's `id`, not its slug.**
+`tenants_tenant.id` is generated (32 characters), and every `tenant_id` column
+in this module holds that value. The `default` tenant that the tenancy
+migration backfilled into is therefore not an organisation: nobody can be made
+a member of it through the tenants module, and a new organisation starts with
+no records. Moving legacy data into an organisation (re-stamping `tenant_id`
+on the `records_*` tables to the organisation's id, or inserting a
+`tenants_tenant` row whose id is `default`) is a one-off operator task that
+neither records nor this documentation has tested; do it on a copy first. A
+single-tenant host is unaffected: it keeps running in `default`.
 
-An `admin` with no tenant of their own can be let act in whatever tenant a
-request's `X-Tenant-ID` header names, instead of being refused — the
-`admin_header_tenant` setting (default off; see [Settings](#settings)). A
-user who *does* have a tenant always gets that one; the header never
+A user with no membership, the bootstrap admin included, is refused with
+`403 tenant_required` on every records admin screen rather than shown another
+tenant's data by accident. Records never falls back to a guessed tenant.
+
+An `admin` with no membership can be let act in whatever tenant a request's
+`X-Tenant-ID` header names, instead of being refused — the
+`admin_header_tenant` setting (default off; see [Settings](#settings)). A user
+who *does* have an active tenant always gets that one; the header never
 overrides it.
 
 **The setting serves API and headless clients only** — a script, `curl`, an
 integration that sends `X-Tenant-ID` on every request. The browser admin
 screens never send the header (neither Inertia visits nor the pages' own
-`fetch` calls do; only the public widget does), so a tenant-less user who
-opens `/admin/records` in a browser gets `403 tenant_required` on every
-screen **with the setting on or off**. There is no tenant switcher. For a
-person working in the browser the fix is to **assign the user a tenant**
-(above), and log them out and back in.
+`fetch` calls do; only the public widget does), so a user without a
+membership who opens `/admin/records` in a browser gets `403 tenant_required`
+on every screen **with the setting on or off**. For a person working in the
+browser the fix is to make them a member of an organisation (above).
 
 ### Anonymous and headless reads
 
@@ -347,8 +370,9 @@ header triggers a CORS preflight the same-origin case never sees. See
 
 **Single → multi.** Existing data stays exactly where it is, in `default`.
 [Assigning tenants to users](#assigning-tenants-to-users) above decides who
-sees it from that point on; nobody is refused access to `default`'s rows
-until their own row gets a *different* tenant.
+sees it from that point on. On a host that was never multi-tenant, `default`
+is not an organisation, so nobody can be made a member of it; see the note on
+legacy data there before flipping the switch.
 
 **Multi → single.** Only `default` is visible again: every request binds to
 it, so another tenant's types and records are untouched on disk but
@@ -372,7 +396,10 @@ tenancy:
   record types" hub entry only; per-type sidebar entries would leak one
   tenant's type labels to every other tenant, because the framework's menu
   registry is one process-wide list built before the request's tenant is
-  known (upstream [#340](https://github.com/antosubash/simple_module_python/issues/340)).
+  known. Framework 0.0.36 now has a per-request menu provider for exactly this
+  (upstream [#340](https://github.com/antosubash/simple_module_python/issues/340),
+  `MenuRegistry.add_provider`); records has not adopted it yet, so the limitation
+  stands.
 
 ### Upstream issues this works around
 
@@ -493,26 +520,39 @@ media_api_prefix names one` — set the prefix to choose.
 with `GET {p}/files` (`file_storage.download`) and uploads with
 `POST {p}/upload` (`file_storage.upload`); a user with `records.edit` but not
 those sees the library's own refusal in the picker. `file_storage` maps both
-to the `user` role by default. The list is every file in the library, not
-only the caller's — that is how `file_storage` answers it.
+to the `user` role by default. The list is every file the tenant's library
+holds, not only the caller's — on a single-tenant host, every file.
 
-**What the stock `file_storage` API cannot do**, and what the picker does
-instead (to be filed upstream):
+**What the `file_storage` API offers, and what the picker uses.** Framework
+0.0.36 (PR #410, upstream #352) extended the list route and added thumbnails
+and public files:
 
-- *No search.* `GET /files` takes only `page` and `per_page`
-  (`file_storage/endpoints/api.py:72`–`83`, `service.py:143`–`164`). The
-  picker's search box filters the page it has loaded and says so. A media API
-  whose list route declares a `q` or `search` parameter is detected and
-  searched server-side instead.
-- *No content-type filter and no thumbnails.* A list of files is every kind of
-  file, and an image thumbnail is the full file (`GET /files/{id}/download`,
-  `endpoints/api.py:121`–`155`) loaded lazily — fine for a page of 24 photos,
-  wasteful for camera originals.
-- *No anonymous download.* `file_storage` registers no public route
-  (`module.py` overrides no `register_public_routes`) and its download
-  requires `file_storage.download` (`endpoints/api.py:121`–`125`). So the
-  **Records list** page block renders nothing for a `media` field, and the
-  anonymous read API's `media_url_template` is always `null`.
+- *Search.* `GET /files` now takes `q` (a case-insensitive substring of the
+  filename), `content_type` (an exact type, or a family ending in `/` such as
+  `image/`) and `sort` (`created_at`, `-created_at`, `name`, `-name`, `size`,
+  `-size`). Because the route declares `q`, the picker's detection finds it
+  and searches **server-side** with no change here. A media API whose list
+  route declares neither `q` nor `search` still gets the old behaviour: the
+  search box filters the page it has loaded and says so.
+- *Content-type filter and thumbnails: not used.* The picker sends neither
+  `content_type` nor `sort`, and still loads the full file
+  (`GET /files/{id}/download`) as an image preview, lazily. 0.0.36 serves
+  `GET /files/{id}/thumbnail?w=` (WebP, widths snapped to 64 to 1024), which
+  would fix that for a page of camera originals. Records has not adopted it.
+- *Anonymous download: opt-in, not used.* A file is private unless uploaded
+  with `public=true` (or `PATCH /files/{id}`), and a public file is served to
+  anyone at `/api/file-storage/public/{id}[/{filename}]` (and
+  `/public/{id}/thumbnail`). The download route records builds its URL from,
+  `/files/{id}/download`, is still authenticated and still needs
+  `file_storage.download`. So the **Records list** page block still renders
+  nothing for a `media` field, and the anonymous read API's
+  `media_url_template` is still always `null`.
+- *Tenant-scoped.* `StoredFile` is tenant-scoped in 0.0.36 (PR #393), so on a
+  multi-tenant host the picker lists the active tenant's files only, and a
+  file id from another tenant answers `404` at the download and metadata
+  routes. Records itself never looks a `media` value up (it only bounds the
+  string at 500 characters), so it will still *store* another tenant's id; the
+  editor shows **File missing** for it.
 
 The stable identifier is fine: `StoredFileOut.id` is a UUID primary key
 (`contracts/schemas.py:17`, `models.py:28`), and a deleted file is a
@@ -594,7 +634,7 @@ default      5       5000          0
 
 Read-only. It lists every tenant that holds at least one Record Type, with its
 live and trashed record counts. Records never creates a tenant: one exists
-once a user's `tenant_id`, an `X-Tenant-ID` header or `--tenant` names it and
+once an organisation's `id`, an `X-Tenant-ID` header or `--tenant` names it and
 something is written there. So this command is the only list of tenants the
 module has. On a single-tenant host, a tenant other than `default` means rows
 the host cannot serve. The health check reports them too
@@ -939,8 +979,14 @@ records: could not read the sidebar types; keeping the previous entries
 ```
 
 **This is the only place the module reaches into framework internals** — the
-registry has no remove and no dynamic provider hook. Upstream:
-[#340](https://github.com/antosubash/simple_module_python/issues/340).
+registry has no remove and no dynamic provider hook. Framework 0.0.36 added
+both (upstream [#340](https://github.com/antosubash/simple_module_python/issues/340)):
+`MenuRegistry.remove(predicate)` for static items, and
+`MenuRegistry.add_provider(fn)` from `register_menu_items`, where
+`fn(request)` returns the items for that request (sync or async) and runs after
+auth and tenant resolution, so a per-tenant sidebar becomes possible. Records
+has **not** adopted it: the splice above is still what runs, and moving to a
+provider is separate work.
 
 ---
 
@@ -1168,12 +1214,20 @@ cd modules/records && RECORDS_PERF_N=20000 ../../.venv/bin/python -m pytest -q -
 Filed against
 [antosubash/simple_module_python](https://github.com/antosubash/simple_module_python).
 
-**Status as of framework 0.0.35** (the host's pin since this upgrade). Fixed
-upstream: #332, #343, #355, #356, #357, #358, #359, #363, #364, #365, #366
-(and #335, #336, #339 through `hard_delete`, `mark_written` and SQLite's WAL,
-`busy_timeout` and `foreign_keys=ON`). Closed without a fix: #360, #361, #362
-— their rows below still describe today's behaviour. Still open: #333, #334,
-#337, #338, #340, #341, #342, #367, #369. What records changed in response:
+**Status as of framework 0.0.36** (the host's pin since this upgrade). Fixed
+upstream: #332, #337 (0.0.36, PR #398: one `RequiresPermission`, honouring
+direct user grants), #338 (0.0.36: `SidebarLayout` mounts the `<Toaster>`),
+#341 (0.0.36, PR #400: skip link), #342 (0.0.36, PR #406: autogenerated
+revisions are portable to Postgres; this host's hand-corrected revisions stay
+as they are), #343, #355, #356, #357, #358, #359, #363, #364, #365, #366, #367
+(0.0.36: the tenant source is recorded and `Vary` set), #369 (0.0.35), and
+#335, #336, #339 through `hard_delete`, `mark_written` and SQLite's WAL,
+`busy_timeout` and `foreign_keys=ON`. Available but not adopted by records:
+#334 (runtime permission sources) and #340 (menu providers), both PR #407.
+Closed as a docs correction only: #333. Closed as not planned, with the problem
+solved by the tenants module and the 0.0.36 tenancy adoption: #360, #361, #362
+(their rows below say what changed). Records has not revisited the
+workarounds the fixes make redundant; the rows say which. What records changed in response:
 
 * `read_all` (health, the CLI's enumeration, the reindex runner, the boot-time
   locale check) runs under the framework's `all_tenants()` waiver — without
@@ -1193,16 +1247,16 @@ single-tenant host and the CLI, which do not run strict.
 | Issue | What it is | What records does about it |
 |---|---|---|
 | [#332](https://github.com/antosubash/simple_module_python/issues/332) | Soft-delete and tenant filters are skipped for selects that name no mapper (`select(func.count())`) — a [comment](https://github.com/antosubash/simple_module_python/issues/332#issuecomment-5794906795) measures the same gap's breadth: join targets, `exists()`/`in_()` subqueries, `update()`/`delete()`, and an already-loaded `session.get()` | Every count selects `func.count(Record.id)` over the mapped entity, never `count()` over a bare `select_from`; every other shape in the comment gets an explicit `tenant_id == bound_tenant()` predicate (design §E), checked by a statement census that runs over the whole suite on PostgreSQL |
-| [#333](https://github.com/antosubash/simple_module_python/issues/333) | `alembic downgrade <label>@base` walks the whole revision chain | The README and [Migrations](#the-recordsbase-caveat) above say what the label actually buys, and how to drop the tables instead |
-| [#334](https://github.com/antosubash/simple_module_python/issues/334) | No runtime permission source for resources defined after boot | Per-type access is `RecordType.allowed_roles`, not a framework permission — which is why it is invisible in the role editor |
+| [#333](https://github.com/antosubash/simple_module_python/issues/333) | `alembic downgrade <label>@base` walks the whole revision chain | Closed upstream on 2026-10-07 as a documentation correction (0.0.36, PR #403): the framework's docs no longer claim a per-module rollback, and the behaviour is unchanged. The README and [Migrations](#the-recordsbase-caveat) above say what the label actually buys, and how to drop the tables instead |
+| [#334](https://github.com/antosubash/simple_module_python/issues/334) | No runtime permission source for resources defined after boot | Per-type access is `RecordType.allowed_roles`, not a framework permission — which is why it is invisible in the role editor. Framework 0.0.36 (PR #407) adds `PermissionRegistry.add_source(name, provider)` and `invalidate_source(name)`: a sync provider over an in-memory cache returns keys or `(key, label)` pairs, shown in the role editor and enforced by `RequiresPermission`. Records has not adopted it |
 | [#335](https://github.com/antosubash/simple_module_python/issues/335) | No supported way to hard-delete a `SoftDeleteMixin` row | A purge goes through the module's own `hard_delete_record`, which issues core DML rather than `session.delete()` |
 | [#336](https://github.com/antosubash/simple_module_python/issues/336) | `get_db` auto-commit ignores core DML, so a request whose only write is `session.execute(update(...))` is rolled back | `services._common.mark_written` sets the flag the framework's `after_flush` listener would have set |
-| [#337](https://github.com/antosubash/simple_module_python/issues/337) | Two `RequiresPermission` classes; the hosting one silently ignores per-user grants | `deps.py` prefers `permissions.deps.RequiresPermission` when the `permissions` plugin is installed, and falls back to the hosting one when it is not |
-| [#338](https://github.com/antosubash/simple_module_python/issues/338) | `AdminLayout` mounts no `<Toaster>`, so `toast.*()` is swallowed on every admin page | The module ships its own `RecordsToaster` and mounts it on its screens |
+| [#337](https://github.com/antosubash/simple_module_python/issues/337) | Two `RequiresPermission` classes; the hosting one silently ignores per-user grants | Fixed in 0.0.36: the hosting checker honours direct grants, and `permissions.deps` re-exports it. `deps.py` now uses it alone; its old preference for the `permissions` class called it with that class's 0.0.35 signature and broke every records route on 0.0.36 |
+| [#338](https://github.com/antosubash/simple_module_python/issues/338) | `AdminLayout` mounts no `<Toaster>`, so `toast.*()` is swallowed on every admin page | Fixed in 0.0.36 (`SidebarLayout` mounts one). The module's own `RecordsToaster` is removed: with both mounted, every toast showed twice |
 | [#339](https://github.com/antosubash/simple_module_python/issues/339) | The SQLite engine is left at driver defaults: rollback journal, implicit 5 s busy timeout, foreign keys **off** — a [comment](https://github.com/antosubash/simple_module_python/issues/339#issuecomment-5795747765) adds that the tenancy migration's composite `(type_id, tenant_id)` FK is therefore unenforced on a SQLite host | `on_delete` is enforced in the application rather than by FK cascades, and the reindex runner retries a short bounded backoff on `database is locked`; the composite type FK is proven only by tests that turn `PRAGMA foreign_keys=ON` themselves — a SQLite production host gets no such guarantee |
-| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically — a [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | `sm_records.menu.sync_type_menu` splices the registry's item list by object identity — one function, the module's only reach into framework internals; on a multi-tenant host it syncs no per-type items at all rather than leak one tenant's labels to another ([The sidebar sync](#the-sidebar-sync)) |
-| [#341](https://github.com/antosubash/simple_module_python/issues/341) | `AdminLayout`/`SidebarLayout` have no skip link, and five chrome tab stops precede the first page control | Not worked around; the module's own per-type sidebar entries add to the count. Fixing it belongs upstream |
-| [#342](https://github.com/antosubash/simple_module_python/issues/342) | Migrations autogenerated on SQLite are not portable to Postgres (boolean defaults as `text('0')`, expression indexes invisible, enum types left behind on downgrade), and every check reports them clean | This host's revisions were corrected by hand (`ed06f4584f6b`, `4cf1b4c9f8f9`, `b98d8185ecef`, `d2b7a1c4e905`); see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 2 |
+| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically — a [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | `sm_records.menu.sync_type_menu` splices the registry's item list by object identity — one function, the module's only reach into framework internals; on a multi-tenant host it syncs no per-type items at all rather than leak one tenant's labels to another ([The sidebar sync](#the-sidebar-sync)). Framework 0.0.36 (PR #407) adds `MenuRegistry.add_provider(fn)` (`fn(request)` returns items per request, after tenant resolution) and `MenuRegistry.remove(predicate)`. Records has not adopted it |
+| [#341](https://github.com/antosubash/simple_module_python/issues/341) | `AdminLayout`/`SidebarLayout` have no skip link, and five chrome tab stops precede the first page control | Fixed in 0.0.36 (PR #400): `SidebarLayout`, and so `AdminLayout`, renders a "skip to content" link to `#main` ahead of the chrome. Nothing to work around; the module's own per-type sidebar entries still add tab stops before the page |
+| [#342](https://github.com/antosubash/simple_module_python/issues/342) | Migrations autogenerated on SQLite are not portable to Postgres (boolean defaults as `text('0')`, expression indexes invisible, enum types left behind on downgrade), and every check reports them clean | This host's revisions were corrected by hand (`ed06f4584f6b`, `4cf1b4c9f8f9`, `b98d8185ecef`, `d2b7a1c4e905`); see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 2 (fixed upstream in 0.0.36 for new revisions; existing ones are unchanged) |
 | [#343](https://github.com/antosubash/simple_module_python/issues/343) | `simple_module_test` fixtures hard-code in-memory SQLite, so a module suite cannot run on Postgres | The repo-root `tests/pg_support.py` and `SM_TEST_DATABASE_URL` do it for `records`, `pagebuilder` and `news`; see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 3 and § 13 |
 
 ### Filed for `MultiTenantMixin`/`TenantMiddleware` (#355–#367)
@@ -1219,10 +1273,10 @@ this module.
 | [#357](https://github.com/antosubash/simple_module_python/issues/357) | `MultiTenantMixin`: bulk `insert()` is not stamped with `tenant_id` | Records never bulk-inserts an owned (mixin) table — only the derived index/reduce tables, which carry no `tenant_id` column at all (design §B) |
 | [#358](https://github.com/antosubash/simple_module_python/issues/358) | `TenantMiddleware`: the header chooses the tenant for *any* authenticated user with no tenant of their own | `resolve_admin` ignores the header for a signed-in user and answers `403 tenant_required`, unless the operator turned the module's own `admin_header_tenant` setting on for `admin` users |
 | [#359](https://github.com/antosubash/simple_module_python/issues/359) | No default-tenant setting or `tenant_scope` helper for `MultiTenantMixin` | `sm_records.tenancy.DEFAULT_TENANT` (a constant, not a setting — see design §A.3) and `tenant_scope()` (always resets, refuses re-binding to a different tenant) are the module's own |
-| [#360](https://github.com/antosubash/simple_module_python/issues/360) | `users`: no tenant management — `UserCreate`/`UserUpdate` and `create_admin` have no `tenant_id` | Not worked around; operators assign `users_user.tenant_id` by SQL — see [Assigning tenants to users](#assigning-tenants-to-users) |
-| [#361](https://github.com/antosubash/simple_module_python/issues/361) | `file_storage`: `StoredFile` is not tenant-scoped | Not worked around; a `media` field's stored file id from one tenant is silently accepted by another. Records does not own `file_storage` |
-| [#362](https://github.com/antosubash/simple_module_python/issues/362) | `users`: a tenant change is invisible until re-login, because `UserContext` is cached in the session | Documented as an operator step — see [Assigning tenants to users](#assigning-tenants-to-users) |
-| [#363](https://github.com/antosubash/simple_module_python/issues/363) | `TenantMiddleware`: anonymous tenant resolution is header-only, with no pluggable resolvers (path, host) | Matches how `bind_public` already resolves; documented as a limitation for hosts that would rather not use a header |
+| [#360](https://github.com/antosubash/simple_module_python/issues/360) | `users`: no tenant management — `UserCreate`/`UserUpdate` and `create_admin` have no `tenant_id` | Closed upstream as not planned (the premise predates the tenants module). 0.0.36 retires `users_user.tenant_id` (#381); membership is managed by the `tenants` module, so there is nothing to assign by SQL — see [Assigning tenants to users](#assigning-tenants-to-users) |
+| [#361](https://github.com/antosubash/simple_module_python/issues/361) | `file_storage`: `StoredFile` is not tenant-scoped | Closed upstream as not planned, but 0.0.36 does scope `StoredFile` (PR #393: `MultiTenantMixin`, ids from another tenant `404`, listings count the active tenant only). Records stores a `media` value as a string of at most 500 characters and never looks the file up, so it still accepts another tenant's id; the picker and the download URL go through `file_storage`, which now answers `404` for it |
+| [#362](https://github.com/antosubash/simple_module_python/issues/362) | `users`: a tenant change is invisible until re-login, because `UserContext` is cached in the session | Gone in 0.0.36: `UserContext` no longer carries a tenant of its own, the active tenant is resolved per request from `tenants_membership`, and a membership change applies on the next request (upstream test `test_membership_changes.py`) — see [Assigning tenants to users](#assigning-tenants-to-users) |
+| [#363](https://github.com/antosubash/simple_module_python/issues/363) | `TenantMiddleware`: anonymous tenant resolution is header-only, with no pluggable resolvers (path, host) | Fixed in 0.0.35 by the `tenants` module's resolver, which also resolves by subdomain (`subdomain_base` setting) for anonymous visitors on public routes. `bind_public` reads the tenant the middleware bound, so a subdomain works without a change here; the header still works where no subdomain is configured |
 | [#364](https://github.com/antosubash/simple_module_python/issues/364) | `hosting`: module middleware runs outside `Tenant`, so deferred work (and this module's own menu sync) loses the tenant | `deferred.defer()` captures `bound_tenant()` when a job is queued and re-binds it around the drain, which runs after the request's own binding has been reset (design §A.5) |
 | [#365](https://github.com/antosubash/simple_module_python/issues/365) | `simple_module_db`: no `tenant_scope` helper, so `current_tenant_id` hygiene (always reset, never a bare `set()`) is every caller's problem | `tenancy.tenant_scope()` is the module's own, and is the only place `sm_records` sets the contextvar |
 | [#366](https://github.com/antosubash/simple_module_python/issues/366) | `TenantMiddleware` binds the header value unvalidated — an over-long or malformed value becomes an unhandled `500` on write | `bind_public`/`resolve_admin` validate against `TENANT_RE` (`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,49}$`) and treat a value that fails it as *no tenant*, never as a query |

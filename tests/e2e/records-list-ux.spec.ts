@@ -181,7 +181,7 @@ test.describe('Records — list UX', () => {
     await dialog.getByRole('button', { name: 'Move to Trash' }).click();
 
     // The toast survives the visit back to the list the delete triggers —
-    // `RecordsToaster` is mounted by the layout both screens share.
+    // the `<Toaster>` is mounted by the layout both screens share.
     await expect(page).toHaveURL(new RegExp(`/admin/records/${key}`));
     await expect(page.getByText('Moved to the Trash')).toBeVisible();
     await expect.poll(() => rowTitles(page)).toEqual([]);

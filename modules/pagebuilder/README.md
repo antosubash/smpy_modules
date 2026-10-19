@@ -116,7 +116,8 @@ make migrate
 Add `branch_labels = ("pagebuilder",)` to that first generated revision so the
 revision can be named. That does **not** make `alembic downgrade
 pagebuilder@base` remove pagebuilder alone: autogenerate chains every revision
-off the current head, so the command walks everything beneath it
+off the current head, so the command walks everything beneath it. Upstream
+#333 was closed in 0.0.36 as a docs correction, not a behaviour change
 (antosubash/simple_module_python#333).
 
 ## Permissions
