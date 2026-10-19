@@ -9,6 +9,7 @@ import type {
   MediaListResponse,
   UploadMediaOptions,
 } from './types';
+import { uploadErrorMessage } from './uploadError';
 
 function buildMediaQuery(params: MediaListQuery | undefined): string {
   if (!params) return '';
@@ -66,14 +67,7 @@ export const uploadMedia = (
           reject(err);
         }
       } else {
-        reject(
-          new Error(
-            translate(keys.pagebuilder.errors.upload_failed, {
-              status: xhr.status,
-              detail: xhr.responseText,
-            }),
-          ),
-        );
+        reject(new Error(uploadErrorMessage(xhr.status, xhr.responseText)));
       }
     };
     xhr.onerror = () => reject(new Error(translate(keys.pagebuilder.errors.upload_network)));
