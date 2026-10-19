@@ -13,6 +13,18 @@ PACKAGE: Final = "sm_ai"
 LOCALE_NAMESPACE: Final = "ai"
 MODULE_NAME: Final = "Ai"
 
+# Outside the web host (a Celery worker) settings are hydrated lazily and
+# cached this long — framework 0.0.35 has no cross-process reload signal.
+LAZY_SETTINGS_TTL_SECONDS: Final = 60.0
+# How long an env/default fallback (database unreachable) is kept before retrying.
+LAZY_SETTINGS_RETRY_SECONDS: Final = 5.0
+# Upper bound on one worker-side settings read, connect included.
+LAZY_SETTINGS_READ_TIMEOUT_SECONDS: Final = 5.0
+# Where the host stores the secret it generated when SM_SECRET_KEY is unset
+# (``simple_module_hosting._secret_key``; both names are private there).
+HOST_SETTINGS_PACKAGE: Final = "host"
+HOST_SECRET_FIELD: Final = "secret_key"
+
 ROUTE_PREFIX_API: Final = "/api/ai"
 VIEW_PREFIX: Final = "/ai"
 MENU_URL: Final = f"{VIEW_PREFIX}/"

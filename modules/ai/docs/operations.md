@@ -106,11 +106,27 @@ restart. On a multi-worker deployment, restart the app after changing AI
 settings. (This comes from the framework's hot-reload design and applies to
 branding too.)
 
+### Background workers
+
+A Celery worker (or any process that imports a consumer without running the
+web host) reads the AI settings itself: the same settings table the web app
+uses, through `SM_DATABASE_URL`, with `SM_AI_*` env and the defaults beneath
+it. To decrypt stored keys it needs the web app's secret — the same
+`SM_SECRET_KEY`, or, when that is unset, read access to the `host.secret_key`
+row the web app generated. Settings are cached per worker process for 60
+seconds, so a save on the AI page reaches workers within a minute without a
+restart; `sm_ai.services.invalidate()` forces a re-read. If the database
+can't be read, the worker uses env and defaults for 5 seconds and then tries
+again; each read is capped at 5 seconds, and while one thread re-reads, the
+others keep the previous settings. A SQLite file that doesn't exist yet is
+never opened, so a worker can't create an empty one.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check / fix |
 |---|---|---|
-| A module fails with "AI is not configured: 'module' …" | the code runs outside a host with `simple_module_ai` installed, or before the host's settings are registered | Install the module in the host; don't resolve at import time. |
+| A worker logs "AI settings: database read failed (…)" — once per outage; the bracket names the error type only | `SM_DATABASE_URL` unset or unreachable in the worker, not migrated, or a SQLite path with no file | Give the worker the web app's `SM_DATABASE_URL`; env-only settings still apply meanwhile. |
+| A worker fails with "cannot be decrypted" but the web app works | the worker has a different `SM_SECRET_KEY` (or none and cannot read `host.secret_key`) | Give it the web app's secret. |
 | "'chat_api_key' is missing or invalid" | no key for a provider that needs one | Enter the key on the AI page. For a keyless local server, use `openai_compatible`. |
 | "'chat_base_url' … needs the server's /v1 URL" | `openai_compatible` without a base URL | Set the base URL, ending in `/v1`. |
 | "'embedding_provider' … not configured" | the embedding slot is empty | Configure **Embeddings**. |

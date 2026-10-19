@@ -64,7 +64,8 @@ Configure at `/ai/` (permission `ai.manage`) or seed via `SM_AI_*` env vars
 rest with a key derived from `SM_SECRET_KEY` — rotating that secret means
 re-entering provider keys (the old ciphertexts surface as unreadable). A
 settings save hot-reloads the worker that handled it; other workers pick
-the change up on restart.
+the change up on restart. Celery workers and scripts that never run the web
+host read the same settings themselves, re-reading at most once a minute.
 
 ## Routes
 
