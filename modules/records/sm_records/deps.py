@@ -43,12 +43,6 @@ from sm_records.settings import RecordsSettings
 # same class. Records used to import that module's checker to get the grants.
 
 
-async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
-    """Raise 401/403 unless the caller holds ``permission``. ``db`` is unused
-    since 0.0.36 (the grant sources need no session); callers still pass it."""
-    await RequiresPermission(permission)(request)
-
-
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))
 require_edit = Depends(RequiresPermission(constants.PERM_EDIT))
 require_manage_types = Depends(RequiresPermission(constants.PERM_MANAGE_TYPES))
@@ -165,7 +159,6 @@ def actor(request: Request) -> str | None:
 async def parse_trashed(
     request: Request,
     trashed: bool = Query(default=False),
-    db: AsyncSession = Depends(request_db),
 ) -> bool:
     """``?trashed=true`` lists the trash, and costs ``records.edit``.
 
@@ -176,33 +169,32 @@ async def parse_trashed(
     the query parameter, which ``RequiresPermission`` cannot see.
     """
     if trashed:
-        await _check_permission(request, db, constants.PERM_EDIT)
+        await RequiresPermission(constants.PERM_EDIT)(request)
     return trashed
 
 
-async def _holds(request: Request, db: AsyncSession, permission: str) -> bool:
+async def _holds(request: Request, permission: str) -> bool:
     """Whether the caller holds ``permission``, without raising."""
     try:
-        await _check_permission(request, db, permission)
+        await RequiresPermission(permission)(request)
     except HTTPException:
         return False
     return True
 
 
-async def has_edit_permission(request: Request, db: AsyncSession) -> bool:
+async def has_edit_permission(request: Request) -> bool:
     """Whether the caller holds ``records.edit``, without raising.
 
     Used where a soft-deleted record's visibility depends on the caller's
     permission rather than always 403ing or always allowing — see
     ``endpoints/views.py::record_edit``.
     """
-    return await _holds(request, db, constants.PERM_EDIT)
+    return await _holds(request, constants.PERM_EDIT)
 
 
 async def load_schema_type(
     request: Request,
     rtype: RecordType = Depends(load_type),
-    db: AsyncSession = Depends(request_db),
 ) -> RecordType:
     """:func:`load_type` for the three routes that serve a type's *definition*
     — ``GET /types/{key}``, ``…/revisions`` and ``…/export``.
@@ -221,7 +213,7 @@ async def load_schema_type(
     are the half that is not "about the schema rather than the records" at
     all, and the export is the same definition by another route.
     """
-    if await _holds(request, db, constants.PERM_MANAGE_TYPES):
+    if await _holds(request, constants.PERM_MANAGE_TYPES):
         return rtype
     check_type_roles(request, rtype)
     return rtype
