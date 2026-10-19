@@ -1,5 +1,6 @@
 /** Media library calls, upload progress, and srcset helpers. */
 
+import { keys, translate } from './i18n';
 import { BASE, CSRF_COOKIE, readCookie, request } from './request';
 import type {
   MediaAssetDetail,
@@ -8,7 +9,7 @@ import type {
   MediaListResponse,
   UploadMediaOptions,
 } from './types';
-import { uploadNetworkError, uploadRejected } from './uploadError';
+import { UploadError, uploadNetworkError, uploadRejected } from './uploadError';
 
 function buildMediaQuery(params: MediaListQuery | undefined): string {
   if (!params) return '';
@@ -70,12 +71,16 @@ export const uploadMedia = (
       try {
         resolve(JSON.parse(xhr.responseText) as MediaAssetRead);
       } catch {
-        reject(uploadRejected(xhr.status));
+        // A 2xx whose body is not the asset JSON (a proxy's HTML page, say):
+        // the status is not the problem, so do not report it as one.
+        reject(new UploadError(translate(keys.pagebuilder.bundle.upload_failed)));
       }
     };
     xhr.onerror = () => reject(uploadNetworkError());
     xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
-    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    const abortUpload = () => xhr.abort();
+    signal?.addEventListener('abort', abortUpload, { once: true });
+    xhr.onloadend = () => signal?.removeEventListener('abort', abortUpload);
     xhr.send(body);
   });
 };

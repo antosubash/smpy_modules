@@ -95,6 +95,13 @@ describe('uploadMedia', () => {
     await expect(uploadMedia(png())).resolves.toEqual({ id: 7, url: '/m/7.png' });
   });
 
+  it('maps a 2xx with a non-JSON body to the generic translated message', async () => {
+    FakeXhr.next = { status: 200, body: '<!DOCTYPE html><html>proxy</html>' };
+    const err = (await uploadMedia(png()).catch((e: unknown) => e)) as UploadError;
+    expect(err).toBeInstanceOf(UploadError);
+    expect(err.message).toBe(en.bundle.upload_failed);
+  });
+
   it('rejects an already-aborted signal without sending', async () => {
     const controller = new AbortController();
     controller.abort();

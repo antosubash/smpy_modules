@@ -92,7 +92,7 @@ export function ImagePickerFieldRenderer({
 				if (fileInputRef.current) fileInputRef.current.value = "";
 			}
 		},
-		[adapter, onChange, valueMode],
+		[adapter, onChange, valueMode, t],
 	);
 
 	// In "id" mode `value` is a bare file id, so the preview has to resolve it
