@@ -14,6 +14,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import type React from 'react';
 import { useEffect, useState } from 'react';
+import { clipName } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import {
   emptyPlanForm,
@@ -87,7 +88,7 @@ export function PlanEditor({
         <form onSubmit={submit} className="space-y-5">
           <DialogHeader>
             <DialogTitle>
-              {plan ? t(c.title_edit, { name: plan.name }) : t(c.title_new)}
+              {plan ? t(c.title_edit, { name: clipName(plan.name) }) : t(c.title_new)}
             </DialogTitle>
             <DialogDescription>{t(c.description)}</DialogDescription>
           </DialogHeader>

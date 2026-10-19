@@ -35,7 +35,9 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
           <TableHead>{t(c.col_status)}</TableHead>
           <TableHead>{t(c.col_members)}</TableHead>
           <TableHead>{t(c.col_period_end)}</TableHead>
-          <TableHead className="text-right">{t(c.col_actions)}</TableHead>
+          <TableHead className="sticky right-0 bg-background text-right">
+            {t(c.col_actions)}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -43,7 +45,9 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
           <TableRow key={row.tenant_id}>
             <TableCell>
               <div className="flex flex-wrap items-center gap-2 font-medium">
-                {row.tenant_name}
+                <span className="block max-w-32 truncate sm:max-w-64" title={row.tenant_name}>
+                  {row.tenant_name}
+                </span>
                 {row.tenant_status === 'suspended' && (
                   <Badge variant="destructive">
                     {row.suspended_by_billing ? t(c.suspended_unpaid) : t(c.suspended)}
@@ -53,7 +57,9 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
               <div className="font-mono text-xs text-muted-foreground">{row.tenant_slug}</div>
             </TableCell>
             <TableCell>
-              {row.plan_name}
+              <span className="block max-w-32 truncate sm:max-w-64" title={row.plan_name}>
+                {row.plan_name}
+              </span>
               {row.interval && (
                 <span className="text-muted-foreground">
                   {` · ${row.interval === 'month' ? t(c.interval_month) : t(c.interval_year)}`}
@@ -75,7 +81,7 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
               )}
             </TableCell>
             <TableCell>{formatDate(row.current_period_end) || '—'}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="sticky right-0 bg-background text-right">
               {canManage && mode === 'assign' && (
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => onAssign(row)}>
                   {t(c.assign_plan)}

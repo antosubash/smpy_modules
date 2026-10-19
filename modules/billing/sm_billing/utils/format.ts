@@ -1,6 +1,15 @@
 import { keys, translate } from './i18n';
 import type { Interval, Plan, Status, SubscriptionStatus } from './types';
 
+/**
+ * A name for a dialog title. A 120-character name with no break opportunity
+ * widens the dialog past the viewport and pushes its buttons off-screen; the
+ * full name stays in the table row (`title`) and the editor's Name field.
+ */
+export function clipName(name: string, max = 40): string {
+  return name.length > max ? `${name.slice(0, max - 1)}…` : name;
+}
+
 /** Minor units → localized currency string; '' when there is no amount. */
 export function formatMoney(minor: number | null, currency: string, locale?: string): string {
   if (minor === null || minor === undefined) return '';

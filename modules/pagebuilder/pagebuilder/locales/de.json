@@ -925,8 +925,14 @@
     "not_valid": "ist ungültig",
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
-    "upload_failed": "Anfrage fehlgeschlagen ({status}): {detail}",
-    "upload_network": "Netzwerkfehler beim Hochladen"
+    "upload_failed": "Hochladen fehlgeschlagen ({status})",
+    "upload_failed_invalid": "Der Server hat das Hochladen als unvollständig oder ungültig abgelehnt.",
+    "upload_forbidden": "Sie haben keine Berechtigung zum Hochladen von Dateien.",
+    "upload_network": "Netzwerkfehler beim Hochladen",
+    "upload_toast_batch": "{count} Dateien konnten nicht hochgeladen werden.",
+    "upload_toast_single": "{name} konnte nicht hochgeladen werden: {message}",
+    "upload_too_large": "Diese Datei ist zu groß zum Hochladen.",
+    "upload_unsupported": "Dieser Dateityp wird nicht unterstützt. Laden Sie ein gültiges Bild hoch."
   },
   "fields": {
     "image": "Bild"
@@ -1044,7 +1050,9 @@
     "load_more": "Mehr laden",
     "loading": "Wird geladen …",
     "title": "Mediathek",
-    "unfiled": "Nicht zugeordnet"
+    "unfiled": "Nicht zugeordnet",
+    "uploaded_one": "{count} Datei hochgeladen.",
+    "uploaded_other": "{count} Dateien hochgeladen."
   },
   "media_filters": {
     "max_kb": "Max. KB",

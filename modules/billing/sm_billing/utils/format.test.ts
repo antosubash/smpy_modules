@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, isActivated, planCta, priceLabel, statusTone } from './format';
+import { clipName, formatMoney, isActivated, planCta, priceLabel, statusTone } from './format';
 import type { Plan, Status } from './types';
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
@@ -121,5 +121,14 @@ describe('statusTone', () => {
     expect(statusTone('unpaid')).toBe('destructive');
     expect(statusTone('active')).toBe('default');
     expect(statusTone(null)).toBe('outline');
+  });
+});
+
+describe('clipName', () => {
+  it('leaves short names alone and clips long ones with an ellipsis', () => {
+    expect(clipName('Team')).toBe('Team');
+    const clipped = clipName('N'.repeat(120));
+    expect(clipped).toHaveLength(40);
+    expect(clipped.endsWith('…')).toBe(true);
   });
 });
