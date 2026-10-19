@@ -110,8 +110,10 @@ jobs:
           cache: npm
 
 
+      # `--locked` fails the release if uv.lock disagrees with the manifests,
+      # rather than building from a silently re-resolved set (#114).
       - name: Sync workspace
-        run: uv sync --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras
 
       - name: Bump versions (working tree only)
         env:
@@ -196,6 +198,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
         run: uv run python scripts/bump_version.py "$RELEASE_VERSION"
+
+      # The bump rewrites every workspace package's version, and uv.lock
+      # records them. Re-lock so the release commit carries a lockfile that
+      # matches its manifests; otherwise the next `uv sync --locked` in CI
+      # fails and every local `uv run` dirties the tree (#114). `git add -A`
+      # below commits it with the bump.
+      - name: Re-lock
+        run: uv lock
 
       - name: Commit and tag
         env:
