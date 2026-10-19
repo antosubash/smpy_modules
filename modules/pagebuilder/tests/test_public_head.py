@@ -6,6 +6,8 @@ from httpx import AsyncClient
 pytestmark = pytest.mark.asyncio
 API = "/api/pagebuilder/pages"
 INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+# A visitor, on the admin-authed app: only an anonymous copy has an ETag (#94).
+ANON = {"X-Test-Anonymous": "1"}
 
 
 async def _publish(client: AsyncClient, locale: str) -> int:
@@ -26,7 +28,7 @@ async def _publish(client: AsyncClient, locale: str) -> int:
 
 
 @pytest.mark.parametrize("locale,prefix", [("en", "/p"), ("de", "/de/p")])
-@pytest.mark.parametrize("headers", [{}, INERTIA])
+@pytest.mark.parametrize("headers", [ANON, {**INERTIA, **ANON}])
 async def test_head_published_and_conditional(
     bilingual_client: AsyncClient, locale: str, prefix: str, headers: dict
 ) -> None:
