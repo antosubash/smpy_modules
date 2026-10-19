@@ -86,7 +86,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `robots_enabled` ● | `true` | Serve `/robots.txt` |
 | `robots_body` | — | Replaces the default `User-agent: *` / `Allow: /` / `Sitemap:` body, e.g. to lock out crawlers on staging |
 | `seo_cache_max_age` | `300` | `max-age` on the sitemap and robots.txt |
-| `scheduler_enabled` ● | `true` | In-process scheduler; turn off if an external worker calls `PagesService.process_due`, or both will race |
+| `scheduler_enabled` ● | `true` | In-process scheduler; safe in every process (each page is claimed before it flips), turn off if you'd rather an external worker called `PagesService.process_due` |
 | `scheduler_interval_seconds` ● | `30` | Tick interval |
 
 Default `public_csp`:
@@ -161,9 +161,23 @@ work and, for each in its own session and tenant context, publishes drafts whose
 `publish_at` has passed, unpublishes pages whose `unpublish_at` has passed, and
 purges trashed pages older than 30 days. A failing tenant is logged
 (`pagebuilder.scheduler.tenant_failed`) and the others continue. A missed tick
-catches up on the next. Running more than one process with the scheduler on is
-safe only if they cannot double-publish; otherwise turn it off on all but one, or
-drive `process_due` from an external job.
+catches up on the next.
+
+Running it in several processes (`uvicorn -w N`, `replicas > 1`, or alongside
+an external job calling `process_due`) is safe: each due page is *claimed* with
+one conditional `UPDATE` that clears the timestamp it acts on, so whichever
+process runs second matches nothing and a page flips exactly once. A process
+that dies mid-tick rolls its claims back with its transaction, and the page is
+due again on the next tick anywhere. A page that cannot be flipped (it was
+purged in between) has its claim handed back for a later tick and is logged as
+`pagebuilder.scheduler.publish_failed` / `unpublish_failed` with its id.
+
+A draft whose `publish_at` *and* `unpublish_at` both passed while no scheduler
+was running is not published and taken down again: both times are cleared, the
+page stays a draft, and `pagebuilder.scheduler.window_missed` is logged.
+Publishing, approving or rejecting a page by hand likewise clears an
+`unpublish_at` that has already passed, so it does not take the page straight
+back down on the next tick; a future one is kept.
 
 ## Storage
 
@@ -193,8 +207,7 @@ the other leaves pages pointing at missing images.
 | Images 404 on public pages | `media_root` differs between processes, or files not deployed | Compare the logged `pagebuilder.media_root`; set an absolute path or `SM_PROJECT_ROOT` |
 | Upload 415 | type not allowed, or contents don't match the declared type | Re-export the image; add the type to `media_allowed_content_types` |
 | Canonical or sitemap URLs show an internal host | proxy rewrites `Host` | Set `public_base_url` |
-| Scheduled page did not publish | scheduler off, page not a draft, or page in trash | `scheduler_enabled`; the page's status; publish manually |
-| Pages published twice / duplicate revisions | two schedulers racing | Turn `scheduler_enabled` off where an external worker runs |
+| Scheduled page did not publish | scheduler off, page not a draft, page in trash, or its unpublish time had also passed | `scheduler_enabled`; the page's status; a `window_missed` / `publish_failed` log line; publish manually |
 | Embedded video or font blocked on public pages | `public_csp` | Widen it on the Settings screen (applies on save) |
 | Snapshot upload 413 / 422 | over a size cap, or not a valid bundle | Raise `snapshot_max_upload_bytes` / `snapshot_max_extracted_bytes`; the 422 message names the problem |
 | **Restore…** refused: "An import is already awaiting approval" | one staged restore at a time | Approve or reject the pending one at `/pagebuilder/content/review` |
