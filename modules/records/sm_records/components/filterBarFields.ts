@@ -22,24 +22,11 @@ export type FilterableField = {
   def?: FieldDef;
 };
 
-/** Labels for the filter grammar's operators. A plain `t()` call per op
- *  (rather than a module-scope `Record<FilterOp, string>`) so the strings
- *  stay reachable by `make ci-check-untranslated` — a config object is
- *  exactly the blind spot that check can't see through. */
+/** Labels for the filter grammar's operators. Indexing the `filters.op`
+ *  subtree with the `FilterOp` union only compiles while every operator has
+ *  a catalogue entry. */
 export function opLabel(t: Translate, op: FilterOp): string {
-  const labels: Record<FilterOp, string> = {
-    eq: keys.records.filters.op.eq,
-    ne: keys.records.filters.op.ne,
-    contains: keys.records.filters.op.contains,
-    starts_with: keys.records.filters.op.starts_with,
-    gt: keys.records.filters.op.gt,
-    gte: keys.records.filters.op.gte,
-    lt: keys.records.filters.op.lt,
-    lte: keys.records.filters.op.lte,
-    in: keys.records.filters.op.in,
-    is_null: keys.records.filters.op.is_null,
-  };
-  return t(labels[op]);
+  return t(keys.records.filters.op[op]);
 }
 
 /** The fixed columns every type can filter on regardless of its schema

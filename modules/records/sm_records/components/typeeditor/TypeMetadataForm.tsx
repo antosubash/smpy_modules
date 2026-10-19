@@ -242,12 +242,5 @@ export function TypeMetadataForm({
 /** The type key's inline refusals — the same set `rules.ts::keyValid`
  *  returns for a field key, worded for a type (R19). */
 function typeKeyError(t: Translate, code: KeyErrorCode, key: string): string {
-  const labels: Record<KeyErrorCode, string> = {
-    required: keys.records.type_editor.type_key_error.required,
-    reserved: keys.records.type_editor.type_key_error.reserved,
-    pattern: keys.records.type_editor.type_key_error.pattern,
-    too_long: keys.records.type_editor.type_key_error.too_long,
-    duplicate: keys.records.type_editor.type_key_error.duplicate,
-  };
-  return t(labels[code], { key, max: MAX_KEY_LEN });
+  return t(keys.records.type_editor.type_key_error[code], { key, max: MAX_KEY_LEN });
 }

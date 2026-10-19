@@ -51,11 +51,6 @@ export function isCursorRefusal(reason: string | undefined): boolean {
 
 /**
  * The sentence for a `?filter=`/`?sort=`/`?after=` term the server refused.
- *
- * Every branch keeps its own literal `t()` call (rather than a
- * `Record<FilterErrorReason, string>` built once) for the same reason
- * `FilterBar`'s `opLabel` does: an untranslated-string check can read a
- * `t()` call, not a string chosen out of a config object before one.
  */
 export function filterErrorMessage(t: Translate, reason: string | undefined): string {
   switch (filterErrorReasonKey(reason)) {

@@ -19,14 +19,7 @@ import {
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
 function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
-  const labels: Record<KeyError, string> = {
-    required: keys.records.type_editor.key_error.required,
-    reserved: keys.records.type_editor.key_error.reserved,
-    pattern: keys.records.type_editor.key_error.pattern,
-    too_long: keys.records.type_editor.key_error.too_long,
-    duplicate: keys.records.type_editor.key_error.duplicate,
-  };
-  return t(labels[code], { key, max: MAX_KEY_LEN });
+  return t(keys.records.type_editor.key_error[code], { key, max: MAX_KEY_LEN });
 }
 
 /**

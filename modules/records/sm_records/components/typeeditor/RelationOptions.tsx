@@ -5,12 +5,7 @@ import { keys, type Translate, useT } from '../../utils/i18n';
 import { RELATION_ON_DELETE, type RelationOnDelete, type TargetType } from './types';
 
 function onDeleteLabel(t: Translate, choice: RelationOnDelete): string {
-  const labels: Record<RelationOnDelete, string> = {
-    restrict: keys.records.type_editor.on_delete.restrict,
-    set_null: keys.records.type_editor.on_delete.set_null,
-    cascade: keys.records.type_editor.on_delete.cascade,
-  };
-  return t(labels[choice]);
+  return t(keys.records.type_editor.on_delete[choice]);
 }
 
 /** `relation`'s `options`: which type it points at, whether one record can
