@@ -950,8 +950,9 @@ matching preview, one sent with `rescan`, or one resolving orphaned keys with
 ## Domain events
 
 Every write above also publishes on the framework's event bus — in-process,
-after the request has committed, to whatever the host subscribed in its own
-`register_event_handlers`. They are not part of the HTTP contract and a host
+after the transaction has committed, to whatever the host subscribed in its own
+`register_event_handlers`. The same events come from writes outside a request
+(a CLI import, the seeder) when the caller hands those a bus. They are not part of the HTTP contract and a host
 that subscribes to nothing never notices them; they are listed here because
 they are the only way to observe a write without polling.
 

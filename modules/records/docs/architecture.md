@@ -322,13 +322,21 @@ of types the URL never named** (§9's `cascade`), and no subscriber could
 reconstruct which. **`RecordPurged` is the only event that has to be complete
 in itself**, because it is the only one whose subject cannot be read back.
 
-They are published **from the endpoint, after the commit**: services never
-import FastAPI and the bus arrives on `app.state`, so the seam is the one
-`menu.mark_dirty` already uses — and `sm_records/deferred.py` is what makes it
-after the commit, so a subscriber never sees an event for a write that rolled
-back. The drain runs after the request's tenant binding has been reset, so
-`defer()` captures the bound tenant when a job is queued and binds it again
-around the job. A handler therefore runs in the event's `tenant_id`. Bulk
+They are emitted **by the service that wrote, and published after the
+commit**. Every write path reaches the same services, so a CLI import, the
+seeder and an HTTP request all publish (GH #128 — publishing from the endpoints
+left the command line silent). The bus is not imported: it rides on the
+session (`events.attach`), which `deps.request_db` fills from `app.state` and a
+caller outside a request fills itself — `import_command(..., bus=)`,
+`seed_database(..., bus=)`. A session with no bus publishes nothing, which is
+what the standalone `python -m sm_records.cli` process gets: it has no host, so
+no subscriber. Events are queued on the framework's `on_commit`, so they run
+only after `finalize_session` commits and are dropped on rollback — which is
+why the CLI paths commit through `events.commit`, never a bare `commit()`.
+`events.held` lets an event through only if its savepoint survived (an
+import's `on_error=skip`), and a bulk action mutes the single-record services'
+events and emits its own. The tenant bound when an event is queued is bound
+again around the publish, so a handler runs in the event's `tenant_id`. Bulk
 paths emit per record: an import publishes one event per row that wrote (a dry
 run publishes none), a cascade one per record trashed, a type delete one
 `RecordPurged` per record and then the `RecordTypeDeleted`. A host
