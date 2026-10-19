@@ -11,6 +11,7 @@ import { AdminNav } from '../components/AdminNav';
 import { PlanEditor } from '../components/PlanEditor';
 import { PlansTable } from '../components/PlansTable';
 import { ADMIN_API, api } from '../utils/api';
+import { clipName } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import { type PlanForm, planPayload } from '../utils/plan-form';
 import type { AdminCommon, Plan } from '../utils/types';
@@ -110,7 +111,7 @@ function Plans() {
         open={archiving !== null}
         onOpenChange={(o) => !o && setArchiving(null)}
         icon={Archive}
-        title={t(c.archive_title, { name: archiving?.name ?? '' })}
+        title={t(c.archive_title, { name: clipName(archiving?.name ?? '') })}
         description={t(c.archive_description)}
         confirmLabel={t(c.archive)}
         cancelLabel={t(c.cancel)}
