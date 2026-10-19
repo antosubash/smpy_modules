@@ -6,9 +6,10 @@
  * dependency direction: the news module knows about pagebuilder, so pagebuilder
  * must not know about news.
  *
- * Registration is a side effect of importing a module's `puck-blocks.ts`. The
- * host imports them all eagerly at app start (see `host/client_app/blocks.ts`),
- * which is what guarantees the registry is populated before the first render.
+ * Registration is a side effect of importing a module's `pagebuilder-blocks.ts`,
+ * which pagebuilder's own `puck-blocks.ts` globs in. The host imports that
+ * eagerly at app start (see `host/client_app/blocks.ts`), which is what
+ * guarantees the registry is populated before the first render.
  */
 
 import type { ComponentConfig } from '@puckeditor/core';

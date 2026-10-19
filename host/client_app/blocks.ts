@@ -11,6 +11,10 @@
  * file is hand-written for the same reason styles.css's module imports are:
  * gen-pages emits page globs and @source entries, not block imports.
  *
+ * Pagebuilder's own `puck-blocks.ts` is one of these: it in turn globs every
+ * module's `pagebuilder-blocks.ts`, so blocks that depend on pagebuilder (news'
+ * NewsFeed) are built only when pagebuilder is. Nothing here needs excluding.
+ *
  * A glob that matches nothing is not an error, so this is harmless in a host
  * whose modules contribute no blocks.
  */

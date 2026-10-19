@@ -1,8 +1,10 @@
 /**
  * Registers this module's Puck blocks. Importing this file is the whole API —
  * the host globs every module's `puck-blocks.ts` eagerly at app start, before
- * anything renders. Mirrors `news`'s own `puck-blocks.ts`, named in the
- * design doc (§16) as the seam to copy for this exact integration.
+ * anything renders. Mirrors `news`'s `pagebuilder-blocks.ts` (formerly
+ * `puck-blocks.ts`), which now loads only through pagebuilder. Unlike news,
+ * this file is still globbed by the host directly, so it must not be built on
+ * a host without pagebuilder.
  *
  * This is what keeps the dependency pointing one way: records knows about
  * pagebuilder, and pagebuilder knows nothing about records.

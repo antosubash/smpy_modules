@@ -2,7 +2,7 @@
  * Resolve a Puck config's labels through the locale catalogue.
  *
  * The block configs are module-scope constants — Puck reads them, and
- * `puck-blocks.ts` hands one to a neighbouring module before the app has
+ * `pagebuilder-blocks.ts` hands one to a neighbouring module before the app has
  * rendered anything — so they cannot call `useT()` where their labels are
  * written. What they hold instead is the *key*, and this turns a config full
  * of keys into a config full of the viewer's language, once, inside the screen
