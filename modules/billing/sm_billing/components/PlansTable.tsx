@@ -36,7 +36,9 @@ export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
           <TableHead>{t(c.col_pricing)}</TableHead>
           <TableHead>{t(c.col_price)}</TableHead>
           <TableHead>{t(c.col_seats)}</TableHead>
-          <TableHead className="text-right">{t(c.col_actions)}</TableHead>
+          <TableHead className="sticky right-0 bg-background text-right">
+            {t(c.col_actions)}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -44,7 +46,9 @@ export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
           <TableRow key={plan.id} className={plan.archived_at ? 'opacity-60' : undefined}>
             <TableCell>
               <div className="flex flex-wrap items-center gap-2 font-medium">
-                {plan.name}
+                <span className="block max-w-32 truncate sm:max-w-64" title={plan.name}>
+                  {plan.name}
+                </span>
                 {plan.is_default && <Badge>{t(c.badge_default)}</Badge>}
                 {!plan.is_public && <Badge variant="outline">{t(c.badge_hidden)}</Badge>}
                 {plan.archived_at && <Badge variant="secondary">{t(c.badge_archived)}</Badge>}
@@ -59,7 +63,7 @@ export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
               )}
             </TableCell>
             <TableCell>{plan.limits['tenants.seats'] ?? t(c.unlimited)}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="sticky right-0 bg-background text-right">
               {canManage && !plan.archived_at && (
                 <div className="flex justify-end gap-2">
                   <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>

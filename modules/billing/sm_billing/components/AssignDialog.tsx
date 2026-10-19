@@ -10,7 +10,7 @@ import {
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
-import { STATUSES, statusLabel } from '../utils/format';
+import { clipName, STATUSES, statusLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import type { Plan, SubscriptionRow, SubscriptionStatus } from '../utils/types';
 
@@ -40,7 +40,7 @@ export function AssignDialog({ row, plans, busy, onClose, onAssign }: Props) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {t(keys.billing.assign.title, { name: row?.tenant_name ?? '' })}
+            {t(keys.billing.assign.title, { name: clipName(row?.tenant_name ?? '') })}
           </DialogTitle>
           <DialogDescription>{t(keys.billing.assign.description)}</DialogDescription>
         </DialogHeader>
