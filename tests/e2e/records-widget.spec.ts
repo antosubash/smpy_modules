@@ -11,7 +11,8 @@ import {
 
 /**
  * The `RecordsList` Puck block (design doc §16's deferred "natural
- * integration", with `news`'s `puck-blocks.ts` as the seam copied for it).
+ * integration", with `news`'s block registration — then `puck-blocks.ts`, now
+ * `pagebuilder-blocks.ts` — as the seam copied for it).
  *
  * Block scaffolding goes through the JSON APIs, exactly as
  * `image-block.spec.ts` builds its page content — Puck's drag-and-drop is

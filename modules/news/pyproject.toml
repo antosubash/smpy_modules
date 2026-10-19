@@ -46,7 +46,12 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
 # older neighbour nothing crashes, but every label in that block's palette
 # entry renders as its own dotted key, which is worse than the English it
 # replaced. The floor is what makes holding keys there safe.
-pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]
+#
+# Raised again to 0.0.12 (#77): news' block now registers from
+# ``pagebuilder-blocks.ts``, which only pagebuilder's own ``puck-blocks.ts``
+# globs in — added in 0.0.12. On an older neighbour nothing crashes, but the
+# NewsFeed block silently drops out of the palette.
+pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,10 @@
 /**
  * Register a Puck block whose render component loads on demand (issue #16).
  *
- * Block registration is eager by design — the host imports every module's
- * `puck-blocks.ts` before first render so the registry is populated when a
- * page reads the Puck config. But a registration that statically imports its
+ * Block registration is eager by design — every module's registration file
+ * (`pagebuilder-blocks.ts`, or a host-globbed `puck-blocks.ts`) is imported
+ * before first render so the registry is populated when a page reads the
+ * Puck config. But a registration that statically imports its
  * render component drags the component's whole dependency graph into the
  * entry chunk, on every page of the site. Measured on a consuming site, a
  * map block put maplibre-gl — 1 MB minified, 62% of the bundle — in front
