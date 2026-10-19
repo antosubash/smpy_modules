@@ -84,3 +84,25 @@ def test_news_borrow_follows_a_later_use() -> None:
         assert news_locales.supported() == ("en", "fr")
     finally:
         news_locales.reset()
+
+
+def test_the_fallback_is_not_rebuilt_per_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Building settings scans ``os.environ``; news' sitemap reads the
+    locales per article, so the unpublished fallback has to be cheap."""
+    locales._defaults()  # built at most once per process
+    built = []
+    real_init = PagebuilderSettings.__init__
+
+    def counting_init(self, *args, **kwargs):
+        built.append(1)
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(PagebuilderSettings, "__init__", counting_init)
+    for _ in range(100):
+        locales.supported()
+        locales.default()
+
+    assert built == []
+    assert locales._active is None
