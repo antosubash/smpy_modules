@@ -106,3 +106,27 @@ def test_the_fallback_is_not_rebuilt_per_read(
 
     assert built == []
     assert locales._active is None
+
+
+def test_startup_supersedes_the_pre_hydration_publish() -> None:
+    """``register_settings`` publishes the defaults for pre-boot writers; the
+    hydrated instance the host puts on ``app.state`` must replace them before
+    anything is served — ``_live_settings`` runs first in ``on_startup``."""
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI
+    from pagebuilder.module import PagebuilderModule
+    from settings.module_registry import ModuleSettingsRegistry
+
+    app = FastAPI()
+    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
+    module = PagebuilderModule()
+    module.register_settings(app)
+    assert locales.supported() == PagebuilderSettings().content_locales
+
+    app.state.pagebuilder.settings = PagebuilderSettings(
+        content_locales=("en", "de"), default_content_locale="en"
+    )
+    module._live_settings(app)
+
+    assert locales.supported() == ("en", "de")

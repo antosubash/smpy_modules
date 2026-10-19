@@ -54,6 +54,7 @@ def reset() -> None:
     global _active, _warned
     _active = None
     _warned = False
+    _defaults.cache_clear()
 
 
 def _settings() -> PagebuilderSettings:
@@ -65,8 +66,8 @@ def _settings() -> PagebuilderSettings:
     callers that can get here (news borrowing on a host that never registered
     pagebuilder, a script, a worker that skipped the module's hooks) are
     running hosts, and turning a wrong-language risk into a crash on every
-    article write is the worse failure. Logged once per unpublished stretch,
-    because news borrows on every call and would otherwise log per request.
+    article write is the worse failure. Logged once per process (``reset()`` re-arms
+    it), because news borrows on every call and would otherwise log per request.
     The fallback is never stored in ``_active``, so nothing early can stand in
     for the hydrated instance.
     """
