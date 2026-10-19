@@ -4,7 +4,10 @@ The fallback used to be cached for the life of the process, so one early call â€
 a script, a worker, a neighbour's startup hook running first â€” pinned the
 pydantic defaults and a later ``use()`` of the hydrated settings was ignored by
 nothing but luck. These pin that the fallback is never kept, and that reading it
-is loud. ``locale_fixture`` resets the module around every test.
+is loud. The module is reset around every test by the fixture below: the shared
+``locale_fixture`` plugin is only registered when pagebuilder's tests are the
+run's rootdir config, so a combined run with news' tests would otherwise leak
+``_warned`` between tests.
 """
 
 from __future__ import annotations
@@ -16,6 +19,13 @@ from pagebuilder import locales
 from pagebuilder.settings import PagebuilderSettings
 
 _LOGGER = "simple_module.pagebuilder"
+
+
+@pytest.fixture(autouse=True)
+def _reset_locales():
+    locales.reset()
+    yield
+    locales.reset()
 
 
 def test_a_later_use_takes_effect_after_an_early_call() -> None:
