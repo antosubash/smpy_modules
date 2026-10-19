@@ -57,8 +57,9 @@ PY
 esac
 
 # Migrations run from the repo root (alembic.ini resolves its script_location
-# relative to itself), and `heads` rather than `head` because pagebuilder's
-# first revision carries a branch label.
+# relative to itself). `make migrate` runs `upgrade heads`, which tolerates a
+# split history; the history itself is kept to one head by CI's
+# scripts/check_migration_heads.py (#107), so `head` and `heads` agree.
 make migrate
 
 # Two content locales, so the multilingual surface is exercised end to end
