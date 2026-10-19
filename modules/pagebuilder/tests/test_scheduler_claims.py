@@ -20,50 +20,31 @@ goes back with its transaction, and a refused transition hands its claim back.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
-from pagebuilder.models import Page, PageRevision, PageStatus, RevisionEvent
+from page_helpers import EARLIER, NOW, PUBLISH_CLAIM, make_page, publish_revisions
+from pagebuilder.models import Page, PageStatus
 from pagebuilder.service import PagesService
 from pagebuilder.service._claims import claim, due_candidates, release
 from pagebuilder.service._common import _normalize_to_utc
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
 
-NOW = datetime(2026, 8, 26, 9, 0, tzinfo=UTC)
-EARLIER = NOW - timedelta(hours=1)
 
-PUBLISH_CLAIM = {"column": Page.publish_at, "status": PageStatus.DRAFT}
 UNPUBLISH_CLAIM = {"column": Page.unpublish_at, "status": PageStatus.PUBLISHED}
 
 
-async def _page(db, slug: str, **fields) -> Page:
-    page = Page(title=slug, slug=slug, draft_data={"content": [slug]}, **fields)
-    db.add(page)
-    await db.flush()
-    await db.refresh(page)
-    return page
-
-
 async def _due_draft(db, slug: str) -> Page:
-    return await _page(db, slug, publish_at=EARLIER)
+    return await make_page(db, slug, publish_at=EARLIER)
 
 
 async def _stored_publish_at(db, page_id: int) -> datetime | None:
     """``publish_at`` as the *row* holds it, not as the session remembers it."""
     stored = await db.execute(select(Page.publish_at).where(Page.id == page_id))
     return _normalize_to_utc(stored.scalar_one())
-
-
-async def _publish_revisions(db, page_id: int) -> int:
-    total = await db.execute(
-        select(func.count())
-        .select_from(PageRevision)
-        .where(PageRevision.page_id == page_id, PageRevision.event == RevisionEvent.PUBLISH)
-    )
-    return total.scalar_one()
 
 
 class TestTheClaim:
@@ -105,7 +86,7 @@ class TestTheClaim:
     async def test_a_schedule_still_in_the_future_is_not_claimable(self, db) -> None:
         """The claim carries the due check, not just the identity — otherwise
         it would be a lock that publishes things early."""
-        page = await _page(db, "next-week", publish_at=NOW + timedelta(days=7))
+        page = await make_page(db, "next-week", publish_at=NOW + timedelta(days=7))
 
         assert await claim(db, page.id, now=NOW, **PUBLISH_CLAIM) is False
 
@@ -125,10 +106,10 @@ class TestTwoReplicas:
 
         # Without the claim the second replica went on to publish too.
         assert await claim(db, page.id, now=NOW, **PUBLISH_CLAIM) is False
-        assert await _publish_revisions(db, page.id) == 1
+        assert await publish_revisions(db, page.id) == 1
 
     async def test_the_loser_does_not_take_a_published_page_back_down(self, db) -> None:
-        page = await _page(
+        page = await make_page(
             db,
             "expiring",
             status=PageStatus.PUBLISHED,
@@ -161,7 +142,7 @@ class TestTwoReplicas:
 
         assert [p.id for p in await PagesService(db).process_due(NOW)] == [page.id]
         assert await PagesService(db).process_due(NOW) == []
-        assert await _publish_revisions(db, page.id) == 1
+        assert await publish_revisions(db, page.id) == 1
 
 
 class TestAnAbandonedClaim:

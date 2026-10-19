@@ -10,30 +10,21 @@ so, and that its claim is handed back so a later tick retries.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
+from page_helpers import EARLIER, NOW, make_page
 from pagebuilder.models import Page, PageStatus
 from pagebuilder.service import PagesService
 
 pytestmark = pytest.mark.asyncio
 
 LOGGER = "pagebuilder.service._workflow"
-NOW = datetime(2026, 8, 26, 9, 0, tzinfo=UTC)
-EARLIER = NOW - timedelta(hours=1)
-
-
-async def _page(db, slug: str, **fields) -> Page:
-    page = Page(title=slug, slug=slug, draft_data={"content": [slug]}, **fields)
-    db.add(page)
-    await db.flush()
-    await db.refresh(page)
-    return page
 
 
 async def _live(db, slug: str) -> Page:
-    return await _page(
+    return await make_page(
         db, slug, status=PageStatus.PUBLISHED, published_data={}, unpublish_at=EARLIER
     )
 
@@ -65,8 +56,8 @@ class TestABadRow:
     async def test_a_failing_publish_is_logged_and_the_tick_continues(
         self, db, caplog, monkeypatch
     ) -> None:
-        bad = await _page(db, "wont-go", publish_at=EARLIER)
-        good = await _page(db, "will-go", publish_at=EARLIER)
+        bad = await make_page(db, "wont-go", publish_at=EARLIER)
+        good = await make_page(db, "will-go", publish_at=EARLIER)
         _fail_on(monkeypatch, "publish", bad.id, detail="Page not found")
 
         with caplog.at_level(logging.WARNING, logger=LOGGER):
@@ -97,7 +88,7 @@ class TestABadRow:
 
     async def test_a_tick_with_nothing_wrong_stays_quiet(self, db, caplog) -> None:
         """Otherwise the warning is noise and gets filtered out again."""
-        await _page(db, "fine", publish_at=EARLIER)
+        await make_page(db, "fine", publish_at=EARLIER)
 
         with caplog.at_level(logging.WARNING, logger=LOGGER):
             await PagesService(db).process_due(NOW)
@@ -105,7 +96,7 @@ class TestABadRow:
         assert [r for r in caplog.records if r.name == LOGGER] == []
 
     async def test_a_retired_window_is_logged(self, db, caplog) -> None:
-        await _page(
+        await make_page(
             db, "missed", publish_at=EARLIER - timedelta(hours=1), unpublish_at=EARLIER
         )
 

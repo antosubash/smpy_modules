@@ -7,35 +7,25 @@ Split from ``test_scheduler_claims.py`` to keep both under the line cap.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import pytest
-from pagebuilder.models import Page, PageRevision, PageStatus, RevisionEvent
+from page_helpers import EARLIER, NOW, PUBLISH_CLAIM, make_page, publish_revisions
+from pagebuilder.models import Page, PageStatus
 from pagebuilder.service import PagesService
 from pagebuilder.service._claims import claim, due_candidates
 from pg_support import USING_POSTGRES, make_db_state
 from simple_module_db import tenant_context
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
 
-NOW = datetime(2026, 8, 26, 9, 0, tzinfo=UTC)
-EARLIER = NOW - timedelta(hours=1)
-PUBLISH_CLAIM = {"column": Page.publish_at, "status": PageStatus.DRAFT}
-
-
-async def _page(db, slug: str, **fields) -> Page:
-    page = Page(title=slug, slug=slug, draft_data={"content": [slug]}, **fields)
-    db.add(page)
-    await db.flush()
-    await db.refresh(page)
-    return page
 
 
 class TestChangedInTheGap:
     async def test_a_row_submitted_for_review_cannot_be_claimed(self, db) -> None:
         """Only a DRAFT auto-publishes; a submission belongs to the reviewer."""
-        page = await _page(db, "submitted", publish_at=EARLIER)
+        page = await make_page(db, "submitted", publish_at=EARLIER)
         await due_candidates(db, now=NOW, **PUBLISH_CLAIM)
 
         await PagesService(db).submit_for_review(page.id)
@@ -43,7 +33,7 @@ class TestChangedInTheGap:
         assert await claim(db, page.id, now=NOW, **PUBLISH_CLAIM) is False
 
     async def test_a_row_rescheduled_into_the_future_cannot_be_claimed(self, db) -> None:
-        page = await _page(db, "postponed", publish_at=EARLIER)
+        page = await make_page(db, "postponed", publish_at=EARLIER)
         await due_candidates(db, now=NOW, **PUBLISH_CLAIM)
 
         await PagesService(db).schedule(page.id, publish_at=NOW + timedelta(days=1))
@@ -53,7 +43,7 @@ class TestChangedInTheGap:
     async def test_a_draft_edited_in_the_gap_publishes_the_edit(self, db) -> None:
         """``publish`` reads the row after the claim, so it serves what the
         draft holds at that moment rather than what the shortlist saw."""
-        page = await _page(db, "edited", publish_at=EARLIER)
+        page = await make_page(db, "edited", publish_at=EARLIER)
         page.draft_data = {"content": ["edited"]}
         db.add(page)
         await db.flush()
@@ -66,7 +56,7 @@ class TestChangedInTheGap:
 
 class TestRetirement:
     async def test_a_window_closing_exactly_now_is_retired(self, db) -> None:
-        page = await _page(db, "exact", publish_at=EARLIER, unpublish_at=NOW)
+        page = await make_page(db, "exact", publish_at=EARLIER, unpublish_at=NOW)
 
         assert await PagesService(db).process_due(NOW) == []
 
@@ -78,8 +68,8 @@ class TestRetirement:
         """Retirement is a statement about drafts the scheduler would have
         published; a binned page and a submission were never going live."""
         service = PagesService(db)
-        binned = await _page(db, "binned", publish_at=EARLIER, unpublish_at=EARLIER)
-        submitted = await _page(db, "pending", publish_at=EARLIER, unpublish_at=EARLIER)
+        binned = await make_page(db, "binned", publish_at=EARLIER, unpublish_at=EARLIER)
+        submitted = await make_page(db, "pending", publish_at=EARLIER, unpublish_at=EARLIER)
         await service.delete(binned.id)
         await service.submit_for_review(submitted.id)
 
@@ -102,7 +92,7 @@ async def test_a_claim_cannot_reach_another_tenants_page() -> None:
     try:
         with tenant_context("acme"):
             async with state.session_factory() as db:
-                page_id = (await _page(db, "theirs", publish_at=EARLIER)).id
+                page_id = (await make_page(db, "theirs", publish_at=EARLIER)).id
                 await db.commit()
         with tenant_context("globex"):
             async with state.session_factory() as db:
@@ -129,7 +119,7 @@ async def test_two_concurrent_ticks_publish_once() -> None:
     factory = state.session_factory
     try:
         async with factory() as db:
-            page_id = (await _page(db, "stampede", publish_at=EARLIER)).id
+            page_id = (await make_page(db, "stampede", publish_at=EARLIER)).id
             await db.commit()
 
         async def tick() -> int:
@@ -140,14 +130,6 @@ async def test_two_concurrent_ticks_publish_once() -> None:
 
         assert sorted(await asyncio.gather(tick(), tick(), tick())) == [0, 0, 1]
         async with factory() as db:
-            total = await db.execute(
-                select(func.count())
-                .select_from(PageRevision)
-                .where(
-                    PageRevision.page_id == page_id,
-                    PageRevision.event == RevisionEvent.PUBLISH,
-                )
-            )
-            assert total.scalar_one() == 1
+            assert await publish_revisions(db, page_id) == 1
     finally:
         await state.engine.dispose()

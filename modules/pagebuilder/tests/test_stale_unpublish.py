@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from page_helpers import make_page
 from pagebuilder import scheduler
 from pagebuilder.models import Page, PageRevision, PageStatus
 from pagebuilder.service import PagesService
@@ -28,20 +29,12 @@ from sqlalchemy import func, select
 pytestmark = pytest.mark.asyncio
 
 
-async def _draft(db, slug: str, **fields) -> Page:
-    page = Page(title=slug, slug=slug, draft_data={"content": [slug]}, **fields)
-    db.add(page)
-    await db.flush()
-    await db.refresh(page)
-    return page
-
-
 def _ago(hours: int) -> datetime:
     return datetime.now(UTC) - timedelta(hours=hours)
 
 
 async def test_publishing_by_hand_clears_an_elapsed_unpublish_at(db) -> None:
-    page = await _draft(db, "stale-unpublish", unpublish_at=_ago(1))
+    page = await make_page(db, "stale-unpublish", unpublish_at=_ago(1))
 
     await PagesService(db).publish(page.id)
 
@@ -51,7 +44,7 @@ async def test_publishing_by_hand_clears_an_elapsed_unpublish_at(db) -> None:
 
 async def test_publishing_by_hand_keeps_a_future_unpublish_at(db) -> None:
     future = datetime.now(UTC) + timedelta(days=1)
-    page = await _draft(db, "future-unpublish", unpublish_at=future)
+    page = await make_page(db, "future-unpublish", unpublish_at=future)
 
     await PagesService(db).publish(page.id)
 
@@ -60,7 +53,7 @@ async def test_publishing_by_hand_keeps_a_future_unpublish_at(db) -> None:
 
 
 async def test_approving_clears_an_elapsed_unpublish_at(db) -> None:
-    page = await _draft(db, "approve-stale", unpublish_at=_ago(1))
+    page = await make_page(db, "approve-stale", unpublish_at=_ago(1))
     service = PagesService(db)
     await service.submit_for_review(page.id)
 
@@ -74,7 +67,7 @@ async def test_rejecting_clears_an_elapsed_unpublish_at_and_any_publish_at(db) -
     """A rejected page is a draft again — exactly what ``process_due`` looks
     for — so a ``publish_at`` set before submission would auto-publish the very
     page a reviewer just turned back."""
-    page = await _draft(db, "reject-stale", publish_at=_ago(2), unpublish_at=_ago(1))
+    page = await make_page(db, "reject-stale", publish_at=_ago(2), unpublish_at=_ago(1))
     service = PagesService(db)
     await service.submit_for_review(page.id)
 
@@ -86,8 +79,8 @@ async def test_rejecting_clears_an_elapsed_unpublish_at_and_any_publish_at(db) -
 
 async def test_a_window_that_passed_unseen_is_retired_not_published(db) -> None:
     now = datetime.now(UTC)
-    missed = await _draft(db, "missed", publish_at=_ago(3), unpublish_at=_ago(1))
-    still_open = await _draft(
+    missed = await make_page(db, "missed", publish_at=_ago(3), unpublish_at=_ago(1))
+    still_open = await make_page(
         db, "still-open", publish_at=_ago(3), unpublish_at=now + timedelta(hours=1)
     )
 
@@ -113,7 +106,7 @@ async def test_a_tick_that_flips_nothing_still_persists_a_retired_window() -> No
     try:
         async with factory() as db:
             page_id = (
-                await _draft(db, "missed-tick", publish_at=_ago(3), unpublish_at=_ago(1))
+                await make_page(db, "missed-tick", publish_at=_ago(3), unpublish_at=_ago(1))
             ).id
             await db.commit()
 
@@ -137,7 +130,7 @@ async def test_a_deadline_closing_during_a_slow_tick_survives_the_scheduled_publ
     tick it survives, and the next tick takes the page down."""
     tick_now = datetime.now(UTC) - timedelta(minutes=10)
     deadline = tick_now + timedelta(minutes=5)
-    page = await _draft(
+    page = await make_page(
         db, "slow-tick", publish_at=tick_now - timedelta(hours=1), unpublish_at=deadline
     )
     service = PagesService(db)

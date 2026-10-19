@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.models import Page, PageStatus, RevisionEvent
 from pagebuilder.service._claims import claim, due_candidates, release, retire_missed_windows
-from pagebuilder.service._common import _UNSET, _elapsed, _normalize_to_utc, _Unset
+from pagebuilder.service._common import _UNSET, _normalize_to_utc, _spend_schedule, _Unset
 from pagebuilder.service._revisions import RevisionsMixin
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,11 @@ class WorkflowMixin(RevisionsMixin):
         # A manual publish supersedes any pending auto-publish for the
         # same page; clearing it stops the scheduler from re-firing on
         # the next tick.
-        page.publish_at = None
         # A genuinely future ``unpublish_at`` is a real "take it down later"
         # instruction and survives. One that has already elapsed is a leftover
         # from a schedule this publish did not go through, and would take the
         # page straight back down on the next tick.
-        if _elapsed(page.unpublish_at, now or datetime.now(UTC)):
-            page.unpublish_at = None
+        _spend_schedule(page, now or datetime.now(UTC))
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.PUBLISH, note=note)
         await self.db.flush()
@@ -220,9 +218,7 @@ class WorkflowMixin(RevisionsMixin):
         page.rejection_note = None
         # Spent, exactly as in ``publish``: approving *is* publishing, so a
         # stale ``unpublish_at`` must not take the page straight back down.
-        page.publish_at = None
-        if _elapsed(page.unpublish_at, datetime.now(UTC)):
-            page.unpublish_at = None
+        _spend_schedule(page, datetime.now(UTC))
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.APPROVE, note=note)
         await self.db.flush()
@@ -249,9 +245,7 @@ class WorkflowMixin(RevisionsMixin):
         # for, so a stale ``publish_at`` would auto-publish the very page a
         # reviewer just turned back. An elapsed ``unpublish_at`` would sit
         # inert until a later publish, then take the page straight back down.
-        page.publish_at = None
-        if _elapsed(page.unpublish_at, datetime.now(UTC)):
-            page.unpublish_at = None
+        _spend_schedule(page, datetime.now(UTC))
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.REJECT, note=note)
         await self.db.flush()
