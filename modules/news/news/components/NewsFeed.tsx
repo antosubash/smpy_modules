@@ -129,7 +129,10 @@ export const NewsFeedBlock: ComponentConfig<NewsFeedProps> = {
     viewAllLabel: '',
     viewAllHref: '',
   },
-  // Normalises what the number field lets through (it has no integer step).
-  resolveData: ({ props }) => ({ props: { ...props, limit: clampFeedLimit(props.limit) } }),
+  // Normalises what the number field lets through (it has no integer step),
+  // once on load. Not per keystroke: clamping while the author types would
+  // snap a cleared field straight back to the default. The render clamps too.
+  resolveData: ({ props }, { trigger }) =>
+    trigger === 'load' ? { props: { ...props, limit: clampFeedLimit(props.limit) } } : { props },
   render: NewsFeedRender,
 };

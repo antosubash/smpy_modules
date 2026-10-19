@@ -20,6 +20,8 @@ describe('clampFeedLimit', () => {
     [undefined, 4],
     [null, 4],
     ['abc', 4],
+    ['', 4],
+    ['  ', 4],
   ])('%s -> %s', (input, expected) => {
     const out = clampFeedLimit(input);
     expect(out).toBe(expected);
