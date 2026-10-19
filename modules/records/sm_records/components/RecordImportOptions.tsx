@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
 import { Label } from '@simple-module-py/ui/components/ui/label';
@@ -8,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@simple-module-py/ui/components/ui/popover';
+import { keys, useT } from '../utils/i18n';
 
 import type { FieldDef } from '../utils/types';
 
@@ -59,36 +59,26 @@ export function RecordImportOptions({
           disabled={disabled}
           data-testid="records-import-options-trigger"
         >
-          {t('records.io.options', { defaultValue: 'Import options' })}
+          {t(keys.records.io.options)}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="records-import-mode">
-            {t('records.io.mode_label', { defaultValue: 'Mode' })}
-          </Label>
+          <Label htmlFor="records-import-mode">{t(keys.records.io.mode_label)}</Label>
           <NativeSelect
             id="records-import-mode"
             data-testid="records-import-mode"
             value={value.mode}
             onChange={(e) => onChange({ mode: e.target.value as ImportOptionsValue['mode'] })}
           >
-            <NativeSelectOption value="upsert">
-              {t('records.io.mode_upsert', { defaultValue: 'Create or update (upsert)' })}
-            </NativeSelectOption>
-            <NativeSelectOption value="create">
-              {t('records.io.mode_create', { defaultValue: 'Create only' })}
-            </NativeSelectOption>
-            <NativeSelectOption value="update">
-              {t('records.io.mode_update', { defaultValue: 'Update only' })}
-            </NativeSelectOption>
+            <NativeSelectOption value="upsert">{t(keys.records.io.mode_upsert)}</NativeSelectOption>
+            <NativeSelectOption value="create">{t(keys.records.io.mode_create)}</NativeSelectOption>
+            <NativeSelectOption value="update">{t(keys.records.io.mode_update)}</NativeSelectOption>
           </NativeSelect>
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="records-import-on-error">
-            {t('records.io.on_error_label', { defaultValue: 'If a row fails' })}
-          </Label>
+          <Label htmlFor="records-import-on-error">{t(keys.records.io.on_error_label)}</Label>
           <NativeSelect
             id="records-import-on-error"
             data-testid="records-import-on-error"
@@ -96,30 +86,22 @@ export function RecordImportOptions({
             onChange={(e) => onChange({ onError: e.target.value as ImportOptionsValue['onError'] })}
           >
             <NativeSelectOption value="abort">
-              {t('records.io.on_error_abort', { defaultValue: 'Stop and write nothing' })}
+              {t(keys.records.io.on_error_abort)}
             </NativeSelectOption>
-            <NativeSelectOption value="skip">
-              {t('records.io.on_error_skip', { defaultValue: 'Skip it and write the rest' })}
-            </NativeSelectOption>
+            <NativeSelectOption value="skip">{t(keys.records.io.on_error_skip)}</NativeSelectOption>
           </NativeSelect>
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="records-import-match-by">
-            {t('records.io.match_by_label', { defaultValue: 'Match existing records by' })}
-          </Label>
+          <Label htmlFor="records-import-match-by">{t(keys.records.io.match_by_label)}</Label>
           <NativeSelect
             id="records-import-match-by"
             data-testid="records-import-match-by"
             value={value.matchBy}
             onChange={(e) => onChange({ matchBy: e.target.value })}
           >
-            <NativeSelectOption value="uuid">
-              {t('records.io.match_by_uuid', { defaultValue: 'Record ID (uuid)' })}
-            </NativeSelectOption>
-            <NativeSelectOption value="slug">
-              {t('records.io.match_by_slug', { defaultValue: 'Slug' })}
-            </NativeSelectOption>
+            <NativeSelectOption value="uuid">{t(keys.records.io.match_by_uuid)}</NativeSelectOption>
+            <NativeSelectOption value="slug">{t(keys.records.io.match_by_slug)}</NativeSelectOption>
             {uniqueFields.map((field) => (
               <NativeSelectOption key={field.key} value={field.key}>
                 {field.label} ({field.key})
@@ -137,13 +119,9 @@ export function RecordImportOptions({
           />
           <div className="grid gap-1">
             <Label htmlFor="records-import-force" className="font-normal">
-              {t('records.io.force_label', { defaultValue: 'Overwrite unversioned rows' })}
+              {t(keys.records.io.force_label)}
             </Label>
-            <p className="text-xs text-muted-foreground">
-              {t('records.io.force_help', {
-                defaultValue: 'Overwrite records whose version the file does not carry.',
-              })}
-            </p>
+            <p className="text-xs text-muted-foreground">{t(keys.records.io.force_help)}</p>
           </div>
         </div>
       </PopoverContent>

@@ -11,7 +11,8 @@
  */
 
 import type { BulkAction } from './api-records';
-import type { Translate } from './translate';
+import type { Translate } from './i18n';
+import { keys } from './i18n';
 
 export type BulkActionCopy = {
   action: BulkAction;
@@ -33,20 +34,16 @@ export function bulkActions(t: Translate, { count, trashed }: { count: number; t
     return [
       {
         action: 'restore' as const,
-        label: t('records.bulk.restore', { defaultValue: 'Restore' }),
-        description: t('records.bulk.confirm_restore', {
+        label: t(keys.records.bulk.restore),
+        description: t(keys.records.bulk.confirm_restore, {
           count,
-          defaultValue: 'Restore {count} records from the Trash?',
-          defaultValue_one: 'Restore this record from the Trash?',
         }),
       },
       {
         action: 'purge' as const,
-        label: t('records.bulk.purge', { defaultValue: 'Delete permanently' }),
-        description: t('records.bulk.confirm_purge', {
+        label: t(keys.records.bulk.purge),
+        description: t(keys.records.bulk.confirm_purge, {
           count,
-          defaultValue: 'This cannot be undone. Delete {count} records permanently?',
-          defaultValue_one: 'This cannot be undone. Delete this record permanently?',
         }),
         destructive: true,
       },
@@ -55,32 +52,24 @@ export function bulkActions(t: Translate, { count, trashed }: { count: number; t
   return [
     {
       action: 'trash' as const,
-      label: t('records.bulk.trash', { defaultValue: 'Move to Trash' }),
-      description: t('records.bulk.confirm_trash', {
+      label: t(keys.records.bulk.trash),
+      description: t(keys.records.bulk.confirm_trash, {
         count,
-        defaultValue:
-          'Move {count} records to the Trash? You can restore them until they are deleted permanently.',
-        defaultValue_one:
-          'Move this record to the Trash? You can restore it until it is deleted permanently.',
       }),
       destructive: true,
     },
     {
       action: 'publish' as const,
-      label: t('records.bulk.publish', { defaultValue: 'Publish' }),
-      description: t('records.bulk.confirm_publish', {
+      label: t(keys.records.bulk.publish),
+      description: t(keys.records.bulk.confirm_publish, {
         count,
-        defaultValue: 'Publish {count} records?',
-        defaultValue_one: 'Publish this record?',
       }),
     },
     {
       action: 'unpublish' as const,
-      label: t('records.bulk.unpublish', { defaultValue: 'Unpublish' }),
-      description: t('records.bulk.confirm_unpublish', {
+      label: t(keys.records.bulk.unpublish),
+      description: t(keys.records.bulk.confirm_unpublish, {
         count,
-        defaultValue: 'Return {count} records to draft? They stop being served publicly.',
-        defaultValue_one: 'Return this record to draft? It stops being served publicly.',
       }),
     },
   ];
@@ -110,30 +99,20 @@ export function emptyTrashDescription(
 ): string {
   if (capped) {
     return filtered
-      ? t('records.bulk.confirm_empty_trash_filtered_capped', {
+      ? t(keys.records.bulk.confirm_empty_trash_filtered_capped, {
           count,
           key: typeKey,
-          defaultValue:
-            'This permanently deletes more than {count} trashed records matching this filter. Type {key} to confirm.',
         })
-      : t('records.bulk.confirm_empty_trash_capped', {
+      : t(keys.records.bulk.confirm_empty_trash_capped, {
           count,
           key: typeKey,
-          defaultValue:
-            'This permanently deletes more than {count} trashed records. Type {key} to confirm.',
         });
   }
   return filtered
-    ? t('records.bulk.confirm_empty_trash_filtered', {
+    ? t(keys.records.bulk.confirm_empty_trash_filtered, {
         count,
-        defaultValue:
-          'Delete the {count} trashed records matching this filter permanently? This cannot be undone.',
-        defaultValue_one:
-          'Delete the {count} trashed record matching this filter permanently? This cannot be undone.',
       })
-    : t('records.bulk.confirm_empty_trash', {
+    : t(keys.records.bulk.confirm_empty_trash, {
         count,
-        defaultValue: 'Delete all {count} trashed records permanently? This cannot be undone.',
-        defaultValue_one: 'Delete the {count} trashed record permanently? This cannot be undone.',
       });
 }

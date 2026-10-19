@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import { keys, useT } from '../../utils/i18n';
 
 const ID = 'type-editor-collection';
 
@@ -42,13 +42,11 @@ export function CollectionField({
 
   return (
     <div className="grid gap-1.5" data-testid="records-collection">
-      <Label htmlFor={ID}>
-        {t('records.type_editor.collection', { defaultValue: 'Collection' })}
-      </Label>
+      <Label htmlFor={ID}>{t(keys.records.type_editor.collection)}</Label>
       {isNew ? (
         <NativeSelect id={ID} value={value} onChange={(e) => onChange(e.target.value)}>
           <NativeSelectOption value="">
-            {t('records.type_editor.collection_shared', { defaultValue: 'Shared tables' })}
+            {t(keys.records.type_editor.collection_shared)}
           </NativeSelectOption>
           {collections.map((name) => (
             <NativeSelectOption key={name} value={name}>
@@ -61,13 +59,8 @@ export function CollectionField({
       )}
       <p className="text-sm text-muted-foreground">
         {isNew
-          ? t('records.type_editor.collection_help', {
-              defaultValue:
-                "Gives this type its own document and index tables. Chosen once — a type can't be moved between collections later.",
-            })
-          : t('records.type_editor.collection_immutable', {
-              defaultValue: "A type can't be moved between collections once it is created.",
-            })}
+          ? t(keys.records.type_editor.collection_help)
+          : t(keys.records.type_editor.collection_immutable)}
       </p>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>

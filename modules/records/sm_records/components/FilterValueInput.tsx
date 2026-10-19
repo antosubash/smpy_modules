@@ -1,11 +1,9 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
-
 import type { FilterKind } from '../utils/filters';
+import { keys, type Translate, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
-import type { Translate } from '../utils/translate';
 import type { FieldDef } from '../utils/types';
 import {
   choicesOf,
@@ -55,7 +53,7 @@ export function FilterValueInput({
   onChange: (next: string) => void;
 }) {
   const { t } = useT();
-  const label = t('records.records.filter_value', { defaultValue: 'Value' });
+  const label = t(keys.records.records.filter_value);
 
   if (kind === 'relation' && field) {
     const target = relationTarget(field);
@@ -98,11 +96,9 @@ function selectFor(
   if (kind === 'status') {
     return (
       <NativeSelect id={VALUE_ID} value={value} onChange={(e) => onChange(e.target.value)}>
-        <NativeSelectOption value="draft">
-          {t('records.records.draft', { defaultValue: 'Draft' })}
-        </NativeSelectOption>
+        <NativeSelectOption value="draft">{t(keys.records.records.draft)}</NativeSelectOption>
         <NativeSelectOption value="published">
-          {t('records.records.published', { defaultValue: 'Published' })}
+          {t(keys.records.records.published)}
         </NativeSelectOption>
       </NativeSelect>
     );
@@ -121,12 +117,8 @@ function selectFor(
   if (kind === 'boolean') {
     return (
       <NativeSelect id={VALUE_ID} value={value} onChange={(e) => onChange(e.target.value)}>
-        <NativeSelectOption value="true">
-          {t('records.fields.boolean_yes', { defaultValue: 'Yes' })}
-        </NativeSelectOption>
-        <NativeSelectOption value="false">
-          {t('records.fields.boolean_no', { defaultValue: 'No' })}
-        </NativeSelectOption>
+        <NativeSelectOption value="true">{t(keys.records.fields.boolean_yes)}</NativeSelectOption>
+        <NativeSelectOption value="false">{t(keys.records.fields.boolean_no)}</NativeSelectOption>
       </NativeSelect>
     );
   }

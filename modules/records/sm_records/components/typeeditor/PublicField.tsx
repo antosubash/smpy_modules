@@ -1,8 +1,8 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { useEffect, useRef, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 const ID = 'type-editor-is-public';
 
@@ -34,7 +34,7 @@ export function PublicField({
 }) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
-  const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
+  const none = t(keys.records.type_editor.pointer_none);
   const publicUrl = `${publicRoutePrefix}/${typeKey || none}`;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,13 +67,11 @@ export function PublicField({
           onCheckedChange={(checked) => onChange(checked === true)}
         />
         <Label htmlFor={ID} className="font-normal">
-          {t('records.type_editor.is_public', { defaultValue: 'Public' })}
+          {t(keys.records.type_editor.is_public)}
         </Label>
       </div>
       <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
-        {t('records.type_editor.is_public_help', {
-          defaultValue: "Exposes a read-only public API for this type's published records.",
-        })}
+        {t(keys.records.type_editor.is_public_help)}
       </p>
 
       {isPublic && (
@@ -82,15 +80,12 @@ export function PublicField({
             <code className="w-fit rounded-md border bg-muted px-2 py-1 text-sm">{publicUrl}</code>
             <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
               {copied
-                ? t('records.type_editor.public_url_copied', { defaultValue: 'Copied' })
-                : t('records.type_editor.public_url_copy', { defaultValue: 'Copy' })}
+                ? t(keys.records.type_editor.public_url_copied)
+                : t(keys.records.type_editor.public_url_copy)}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            {t('records.type_editor.is_public_url_help', {
-              defaultValue:
-                'Published records only, filterable only on indexed fields, and never expanded.',
-            })}
+            {t(keys.records.type_editor.is_public_url_help)}
           </p>
         </div>
       )}

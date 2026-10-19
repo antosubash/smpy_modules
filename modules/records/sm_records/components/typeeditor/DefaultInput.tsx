@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import { keys, useT } from '../../utils/i18n';
 
 import { isoToLocalInput, localInputToIso } from '../../utils/values';
 import { type Choice, DEFAULT_EDITABLE_TYPES } from './types';
@@ -35,12 +35,12 @@ export function DefaultInput({
 }) {
   const { t } = useT();
   const id = `field-row-${index}-default`;
-  const label = t('records.type_editor.default_label', { defaultValue: 'Default value' });
+  const label = t(keys.records.type_editor.default_label);
 
   if (!(DEFAULT_EDITABLE_TYPES as readonly string[]).includes(type)) return null;
 
   if (type === 'boolean' || type === 'select') {
-    const noDefault = t('records.type_editor.no_default', { defaultValue: 'No default' });
+    const noDefault = t(keys.records.type_editor.no_default);
     const current = value === null || value === undefined ? NULLABLE : String(value);
     return (
       <div className="grid gap-1.5">
@@ -60,10 +60,10 @@ export function DefaultInput({
           {type === 'boolean' ? (
             <>
               <NativeSelectOption value="true">
-                {t('records.type_editor.default_true', { defaultValue: 'True' })}
+                {t(keys.records.type_editor.default_true)}
               </NativeSelectOption>
               <NativeSelectOption value="false">
-                {t('records.type_editor.default_false', { defaultValue: 'False' })}
+                {t(keys.records.type_editor.default_false)}
               </NativeSelectOption>
             </>
           ) : (

@@ -1,7 +1,7 @@
 import { router } from '@inertiajs/react';
 import { purgedToast, restoredToast, trashToast } from '../components/trashToast';
 import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api-records';
-import type { Translate } from '../utils/translate';
+import type { Translate } from '../utils/i18n';
 import type { RecordRead } from '../utils/types';
 
 /**

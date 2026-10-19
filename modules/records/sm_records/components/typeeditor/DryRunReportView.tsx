@@ -1,6 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
-
 import { humanizeDryRunMessage } from '../../utils/dry-run-messages';
+import { keys, useT } from '../../utils/i18n';
 import type { DryRunReport } from '../../utils/types';
 import { OrphanedConflictsList } from './OrphanedConflictsList';
 
@@ -15,10 +14,9 @@ export function DryRunReportView({ report }: { report: DryRunReport }) {
   return (
     <div className="space-y-2 text-sm">
       <p>
-        {t('records.type_editor.preview.report_summary', {
+        {t(keys.records.type_editor.preview.report_summary, {
           checked: report.checked,
           failing: report.failing,
-          defaultValue: '{checked} records checked, {failing} would fail',
         })}
       </p>
       {report.sample.length > 0 && (

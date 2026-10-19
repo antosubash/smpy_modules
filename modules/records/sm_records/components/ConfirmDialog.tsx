@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +10,7 @@ import {
   AlertDialogTrigger,
 } from '@simple-module-py/ui/components/ui/alert-dialog';
 import { type ReactNode, useState } from 'react';
+import { keys, useT } from '../utils/i18n';
 
 /**
  * Confirm a consequential action (delete/restore/purge) without handing the
@@ -121,7 +121,7 @@ export function ConfirmDialog({
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>
-            {cancelLabel ?? t('records.editor.cancel', { defaultValue: 'Cancel' })}
+            {cancelLabel ?? t(keys.records.editor.cancel)}
           </AlertDialogCancel>
           <AlertDialogAction
             disabled={pending || confirmDisabled}
@@ -131,9 +131,7 @@ export function ConfirmDialog({
               void confirm();
             }}
           >
-            {pending
-              ? (pendingLabel ?? t('records.editor.saving', { defaultValue: 'Saving…' }))
-              : confirmLabel}
+            {pending ? (pendingLabel ?? t(keys.records.editor.saving)) : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

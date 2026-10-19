@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { login } from './helpers';
+import { apiCreateRecord, apiDeleteType, seedTextType } from './records-helpers';
 
 /**
  * The console in German. Every module ships a `de.json` beside its `en.json`;
@@ -29,6 +30,24 @@ test.describe('Console in German', () => {
     await page.goto('/ai/');
     await expect(page.getByRole('heading', { name: 'KI', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Verbindung testen' }).first()).toBeVisible();
+  });
+
+  test('the records filter operators read German', async ({ page }) => {
+    // Records call `t(keys.records…)` with no English `defaultValue` (#78),
+    // so a missing German entry would show English or the dotted key here.
+    const key = await seedTextType(page, 'deops', { field: 'name' });
+    // An empty list shows its empty state in place of the filter bar.
+    await apiCreateRecord(page, key, { data: { name: 'eins' } });
+    await page.goto(`/admin/records/${key}`);
+    await page.locator('#records-filter-field').selectOption('name');
+    await expect(page.locator('#records-filter-op').locator('option')).toHaveText([
+      'ist',
+      'ist nicht',
+      'enthält',
+      'beginnt mit',
+      'ist leer',
+    ]);
+    await apiDeleteType(page, key, 1);
   });
 
   test('a block palette label in the page editor reads German', async ({ page }) => {

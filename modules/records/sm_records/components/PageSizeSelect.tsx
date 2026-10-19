@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import { keys, useT } from '../utils/i18n';
 
 import { PAGE_SIZES } from '../utils/listing';
 
@@ -18,7 +18,7 @@ export function PageSizeSelect({
   return (
     <div className="flex items-center gap-2">
       <Label htmlFor="records-page-size" className="font-normal">
-        {t('records.records.page_size', { defaultValue: 'Per page' })}
+        {t(keys.records.records.page_size)}
       </Label>
       <NativeSelect
         id="records-page-size"

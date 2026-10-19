@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { humanizeDryRunMessage } from './dry-run-messages';
-
-function fakeT(_key: string, opts: { defaultValue: string }): string {
-  return opts.defaultValue;
-}
+import { englishText as fakeT } from './i18n';
 
 describe('humanizeDryRunMessage — U13a: a required-but-missing value reads as what it is', () => {
   it('rewrites pydantic\'s "Field required"', () => {

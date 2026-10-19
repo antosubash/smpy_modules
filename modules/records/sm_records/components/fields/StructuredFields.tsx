@@ -1,4 +1,4 @@
-import { useT } from '@simple-module-py/i18n';
+import { keys, useT } from '../../utils/i18n';
 
 import { type FieldComponentProps, FieldShell } from './FieldShell';
 import { TextAreaField } from './TextFields';
@@ -24,8 +24,7 @@ export function UnknownField({ field, value, error }: FieldComponentProps) {
   return (
     <FieldShell field={field} error={error}>
       <p className="text-sm text-muted-foreground">
-        {t('records.fields.unknown_type', {
-          defaultValue: 'This field type ({type}) is not editable in this version.',
+        {t(keys.records.fields.unknown_type, {
           type: field.type,
         })}
       </p>

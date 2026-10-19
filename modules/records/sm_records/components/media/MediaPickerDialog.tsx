@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Dialog,
@@ -11,6 +10,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import {
   listMediaFiles,
@@ -96,29 +96,23 @@ function PickerBody({
     list.status !== 'ready' || files.length > 0
       ? null
       : loaded > 0
-        ? t('records.media.no_matches_page', {
-            defaultValue: 'No files on this page match that name.',
-          })
+        ? t(keys.records.media.no_matches_page)
         : serverQuery
-          ? t('records.media.no_matches', { defaultValue: 'No files match that name.' })
+          ? t(keys.records.media.no_matches)
           : page > 1
-            ? t('records.media.no_more_files', { defaultValue: 'There are no more files.' })
-            : t('records.media.empty', {
-                defaultValue: 'The media library is empty. Upload a file to use it here.',
-              });
+            ? t(keys.records.media.no_more_files)
+            : t(keys.records.media.empty);
 
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="grid gap-1.5">
-          <Label htmlFor={SEARCH_ID}>
-            {t('records.media.search_label', { defaultValue: 'Search files' })}
-          </Label>
+          <Label htmlFor={SEARCH_ID}>{t(keys.records.media.search_label)}</Label>
           <Input
             id={SEARCH_ID}
             type="search"
             value={query}
-            placeholder={t('records.media.search_placeholder', { defaultValue: 'File name' })}
+            placeholder={t(keys.records.media.search_placeholder)}
             onChange={(event) => {
               setQuery(event.target.value);
               if (api.search_param) setPage(1);
@@ -129,24 +123,20 @@ function PickerBody({
       </div>
       {!api.search_param && (
         <p className="text-xs text-muted-foreground" data-testid="records-media-search-local">
-          {t('records.media.search_page_only', {
-            defaultValue:
-              "The media library can't search, so this only filters the files on the current page.",
-          })}
+          {t(keys.records.media.search_page_only)}
         </p>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto" data-testid="records-media-results">
         {list.status === 'loading' && (
           <p role="status" className="py-6 text-center text-sm text-muted-foreground">
-            {t('records.media.loading', { defaultValue: 'Loading files…' })}
+            {t(keys.records.media.loading)}
           </p>
         )}
         {list.status === 'error' && (
           <div role="alert" className="grid justify-items-start gap-2 py-4 text-sm">
             <p className="text-destructive">
-              {t('records.media.load_failed', {
-                defaultValue: "Couldn't load the media library: {message}",
+              {t(keys.records.media.load_failed, {
                 message: list.message,
               })}
             </p>
@@ -156,7 +146,7 @@ function PickerBody({
               size="sm"
               onClick={() => setAttempt((n) => n + 1)}
             >
-              {t('records.media.retry', { defaultValue: 'Try again' })}
+              {t(keys.records.media.retry)}
             </Button>
           </div>
         )}
@@ -176,7 +166,7 @@ function PickerBody({
       {list.status === 'ready' && pages > 1 && (
         <nav
           className="flex items-center justify-between gap-2 text-sm"
-          aria-label={t('records.media.pagination', { defaultValue: 'Media library pages' })}
+          aria-label={t(keys.records.media.pagination)}
         >
           <Button
             type="button"
@@ -185,11 +175,10 @@ function PickerBody({
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
           >
-            {t('records.media.previous', { defaultValue: 'Previous' })}
+            {t(keys.records.media.previous)}
           </Button>
           <span className="text-muted-foreground" data-testid="records-media-page">
-            {t('records.media.page_info', {
-              defaultValue: 'Page {page} of {pages}',
+            {t(keys.records.media.page_info, {
               page,
               pages,
             })}
@@ -201,7 +190,7 @@ function PickerBody({
             disabled={page >= pages}
             onClick={() => setPage(page + 1)}
           >
-            {t('records.media.next', { defaultValue: 'Next' })}
+            {t(keys.records.media.next)}
           </Button>
         </nav>
       )}
@@ -251,14 +240,8 @@ export function MediaPickerDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>
-            {t('records.media.dialog_title', { defaultValue: 'Choose a file' })}
-          </DialogTitle>
-          <DialogDescription>
-            {t('records.media.dialog_description', {
-              defaultValue: 'Pick a file from the media library, or upload a new one.',
-            })}
-          </DialogDescription>
+          <DialogTitle>{t(keys.records.media.dialog_title)}</DialogTitle>
+          <DialogDescription>{t(keys.records.media.dialog_description)}</DialogDescription>
         </DialogHeader>
         {open && (
           <PickerBody
@@ -272,7 +255,7 @@ export function MediaPickerDialog({
         )}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t('records.media.cancel', { defaultValue: 'Cancel' })}
+            {t(keys.records.media.cancel)}
           </Button>
         </DialogFooter>
       </DialogContent>

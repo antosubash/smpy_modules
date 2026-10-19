@@ -1,5 +1,4 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import {
   Table,
   TableBody,
@@ -10,6 +9,7 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { useIsNarrow } from '../hooks/useIsNarrow';
 import type { RecordSelection } from '../hooks/useRecordSelection';
+import { keys, useT } from '../utils/i18n';
 import {
   availableColumns,
   type ResolvedColumns,
@@ -40,13 +40,9 @@ function NoIndexedColumnsNotice({ typeKey }: { typeKey: string }) {
   const { t } = useT();
   return (
     <p className="mt-2 text-sm text-muted-foreground" data-testid="records-no-indexed-columns">
-      {t('records.records.no_indexed_columns', {
-        defaultValue: 'No fields are indexed, so only the title and status are shown.',
-      })}{' '}
+      {t(keys.records.records.no_indexed_columns)}{' '}
       <Link href={`/admin/records/types/${typeKey}`} className="underline">
-        {t('records.records.no_indexed_columns_link', {
-          defaultValue: 'Tick "Indexed" on a field to add a column.',
-        })}
+        {t(keys.records.records.no_indexed_columns_link)}
       </Link>
     </p>
   );
@@ -114,7 +110,7 @@ export function RecordTable({
   const showStatus = shown.some((column) => column.key === 'status');
   const noIndexedNotice =
     resolved.source === 'default' && !shown.some((column) => column.kind === 'field');
-  const titleLabel = t('records.records.display_title', { defaultValue: 'Title' });
+  const titleLabel = t(keys.records.records.display_title);
   // Over every column the type can show, as the Columns panel does, so a
   // declared "Status" never reads as the record's own (review 4, ux F3).
   const labels = columnLabels(t, availableColumns(type, showLocale), titleLabel);
@@ -162,9 +158,7 @@ export function RecordTable({
                 onSort={onSort}
               />
             ))}
-            <TableHead className="text-right">
-              {t('records.records.actions', { defaultValue: 'Actions' })}
-            </TableHead>
+            <TableHead className="text-right">{t(keys.records.records.actions)}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

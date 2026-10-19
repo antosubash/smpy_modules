@@ -4,17 +4,17 @@ import { toast } from 'sonner';
 
 import { ApiError } from '../utils/api';
 import { type BulkAction, type BulkReport, bulkRecords, emptyTrash } from '../utils/api-records';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate } from '../utils/i18n';
 
 /** What each action says when it worked. One key per action rather than a
  *  built string: a sentence assembled from a verb and a count is a sentence
  *  no translator can reorder. */
-const DONE: Record<BulkAction, [string, string]> = {
-  trash: ['records.bulk.done_trash', '{count} records moved to the Trash'],
-  restore: ['records.bulk.done_restore', '{count} records restored'],
-  purge: ['records.bulk.done_purge', '{count} records deleted permanently'],
-  publish: ['records.bulk.done_publish', '{count} records published'],
-  unpublish: ['records.bulk.done_unpublish', '{count} records returned to draft'],
+const DONE: Record<BulkAction, string> = {
+  trash: keys.records.bulk.done_trash,
+  restore: keys.records.bulk.done_restore,
+  purge: keys.records.bulk.done_purge,
+  publish: keys.records.bulk.done_publish,
+  unpublish: keys.records.bulk.done_unpublish,
 };
 
 /**
@@ -80,27 +80,24 @@ export function useBulkActions(
     setReport(null);
     try {
       const result = await bulkRecords(typeKey, action, uuids);
-      const [key, defaultValue] = DONE[action];
+      const key = DONE[action];
       // A batch of records that were all already published changed nothing,
       // and "0 records published" is not what to say about it. Its own
       // sentence rather than the action's with a zero in it.
       let message =
         result.changed === 0 && result.unchanged > 0
-          ? t('records.bulk.done_unchanged_only', {
+          ? t(keys.records.bulk.done_unchanged_only, {
               count: result.unchanged,
-              defaultValue: '{count} records were already in that state; nothing changed.',
             })
-          : t(key, { count: result.changed, defaultValue });
+          : t(key, { count: result.changed });
       if (result.changed > 0 && result.unchanged > 0) {
-        message = `${message} ${t('records.bulk.done_unchanged', {
+        message = `${message} ${t(keys.records.bulk.done_unchanged, {
           count: result.unchanged,
-          defaultValue: '{count} were already in that state.',
         })}`;
       }
       if (result.cascaded > 0) {
-        message = `${message} ${t('records.bulk.done_cascaded', {
+        message = `${message} ${t(keys.records.bulk.done_cascaded, {
           count: result.cascaded,
-          defaultValue: '{count} related records went with them.',
         })}`;
       }
       router.reload({ only: ['records'] });
@@ -127,11 +124,9 @@ export function useBulkActions(
         // the dialog is told the batch did nothing, not left with a panel
         // that appeared silently behind the dialog they just dismissed.
         setAnnouncement(
-          t('records.bulk.refused', {
+          t(keys.records.bulk.refused, {
             count: refusal.failed.length,
             total: refusal.requested,
-            defaultValue:
-              '{count} of {total} records could not be changed, so nothing was changed.',
           }),
         );
         return;
@@ -149,9 +144,8 @@ export function useBulkActions(
       router.reload({ only: ['records'] });
       onDone();
       toast.success(
-        t('records.bulk.done_empty_trash', {
+        t(keys.records.bulk.done_empty_trash, {
           count: result.purged,
-          defaultValue: '{count} records deleted permanently',
         }),
       );
     } finally {

@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { keys, useT } from '../utils/i18n';
 
 import type { RecordRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -49,8 +49,8 @@ export function RecordRowAction({
   // carries the record's title the same way the relation chips' own
   // "Remove {title}" button already does.
   if (trashed) {
-    const restoreLabel = t('records.editor.restore', { defaultValue: 'Restore' });
-    const purgeLabel = t('records.editor.purge', { defaultValue: 'Delete permanently' });
+    const restoreLabel = t(keys.records.editor.restore);
+    const purgeLabel = t(keys.records.editor.purge);
     return (
       <div className="flex justify-end gap-1">
         <ConfirmDialog
@@ -59,18 +59,15 @@ export function RecordRowAction({
               type="button"
               variant="ghost"
               size="sm"
-              aria-label={t('records.records.restore_named', {
+              aria-label={t(keys.records.records.restore_named, {
                 title,
-                defaultValue: 'Restore {title}',
               })}
             >
               {restoreLabel}
             </Button>
           }
           title={restoreLabel}
-          description={t('records.editor.confirm_restore', {
-            defaultValue: 'Restore this record?',
-          })}
+          description={t(keys.records.editor.confirm_restore)}
           confirmLabel={restoreLabel}
           onConfirm={() => onRestore(record)}
         />
@@ -81,18 +78,15 @@ export function RecordRowAction({
               variant="ghost"
               size="sm"
               className="text-destructive"
-              aria-label={t('records.records.purge_named', {
+              aria-label={t(keys.records.records.purge_named, {
                 title,
-                defaultValue: 'Delete {title} permanently',
               })}
             >
               {purgeLabel}
             </Button>
           }
           title={purgeLabel}
-          description={t('records.editor.confirm_purge', {
-            defaultValue: 'This cannot be undone. Delete this record permanently?',
-          })}
+          description={t(keys.records.editor.confirm_purge)}
           confirmLabel={purgeLabel}
           destructive
           onConfirm={() => onPurge(record)}
@@ -109,12 +103,11 @@ export function RecordRowAction({
           type="button"
           variant="ghost"
           size="sm"
-          aria-label={t('records.records.delete_named', {
+          aria-label={t(keys.records.records.delete_named, {
             title,
-            defaultValue: 'Delete {title}',
           })}
         >
-          {t('records.records.delete', { defaultValue: 'Delete' })}
+          {t(keys.records.records.delete)}
         </Button>
       }
       onConfirm={() => onDelete(record)}

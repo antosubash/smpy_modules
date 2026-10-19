@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
+import { keys, useT } from '../../utils/i18n';
 
 import { type FieldComponentProps, FieldShell, fieldInputId } from './FieldShell';
 
@@ -46,16 +46,10 @@ export function BooleanField({ field, value, onChange, error, disabled }: FieldC
           }}
         >
           {unset && (
-            <NativeSelectOption value="">
-              {t('records.fields.boolean_unset', { defaultValue: 'Not set' })}
-            </NativeSelectOption>
+            <NativeSelectOption value="">{t(keys.records.fields.boolean_unset)}</NativeSelectOption>
           )}
-          <NativeSelectOption value="true">
-            {t('records.fields.boolean_yes', { defaultValue: 'Yes' })}
-          </NativeSelectOption>
-          <NativeSelectOption value="false">
-            {t('records.fields.boolean_no', { defaultValue: 'No' })}
-          </NativeSelectOption>
+          <NativeSelectOption value="true">{t(keys.records.fields.boolean_yes)}</NativeSelectOption>
+          <NativeSelectOption value="false">{t(keys.records.fields.boolean_no)}</NativeSelectOption>
         </NativeSelect>
       </FieldShell>
     );
@@ -76,7 +70,7 @@ export function BooleanField({ field, value, onChange, error, disabled }: FieldC
             className="text-sm text-muted-foreground"
             data-testid={`records-unset-${field.key}`}
           >
-            {t('records.fields.boolean_unset', { defaultValue: 'Not set' })}
+            {t(keys.records.fields.boolean_unset)}
           </span>
         )}
       </div>

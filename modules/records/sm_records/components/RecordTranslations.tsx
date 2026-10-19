@@ -1,13 +1,11 @@
 import { router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
-
 import { createTranslation } from '../utils/api-history';
+import { keys, type Translate, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
-import type { Translate } from '../utils/translate';
 import type { RecordRead, TranslationRead } from '../utils/types';
 
 interface Props {
@@ -25,10 +23,10 @@ interface Props {
 function siblingSubtitle(t: Translate, sibling: TranslationRead): string {
   const state =
     sibling.status === 'published'
-      ? t('records.records.published', { defaultValue: 'Published' })
-      : t('records.records.draft', { defaultValue: 'Draft' });
+      ? t(keys.records.records.published)
+      : t(keys.records.records.draft);
   if (!sibling.is_deleted) return `${sibling.display_title} · ${state}`;
-  return `${sibling.display_title} · ${t('records.translations.trashed', { defaultValue: 'Trashed' })}`;
+  return `${sibling.display_title} · ${t(keys.records.translations.trashed)}`;
 }
 
 /**
@@ -60,9 +58,8 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
       // destination page's own header doesn't repeat back (it shows the
       // record's title, not "this is the German translation").
       toast.success(
-        t('records.translations.created', {
+        t(keys.records.translations.created, {
           locale: localeLabel(target),
-          defaultValue: '{locale} translation created',
         }),
       );
       // Straight into the new sibling: the next thing to do is translate it.
@@ -80,7 +77,7 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
   return (
     <div data-testid="records-translations">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {t('records.translations.title', { defaultValue: 'Languages' })}
+        {t(keys.records.translations.title)}
       </h2>
       <ul className="divide-y rounded-lg border bg-card text-sm">
         {locales.map((tag) => {
@@ -102,7 +99,7 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
               </span>
               {isCurrent ? (
                 <Badge variant="secondary" className="shrink-0">
-                  {t('records.translations.editing', { defaultValue: 'Editing' })}
+                  {t(keys.records.translations.editing)}
                 </Badge>
               ) : sibling ? (
                 <a
@@ -110,7 +107,7 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
                   href={`/admin/records/${typeKey}/${sibling.uuid}`}
                   data-testid={`records-translation-open-${tag}`}
                 >
-                  {t('records.translations.open', { defaultValue: 'Open' })}
+                  {t(keys.records.translations.open)}
                 </a>
               ) : (
                 <Button
@@ -122,8 +119,8 @@ export function RecordTranslations({ typeKey, record, locales, translations }: P
                   data-testid={`records-translation-add-${tag}`}
                 >
                   {busyLocale === tag
-                    ? t('records.translations.creating', { defaultValue: 'Creating…' })
-                    : t('records.translations.add', { defaultValue: 'Add translation' })}
+                    ? t(keys.records.translations.creating)
+                    : t(keys.records.translations.add)}
                 </Button>
               )}
             </li>

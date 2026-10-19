@@ -1,10 +1,9 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useRef } from 'react';
-import type { Translate } from '../../utils/translate';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { TenancyMode, ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
@@ -97,16 +96,14 @@ export function TypeMetadataForm({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="grid gap-1.5">
-        <Label htmlFor={ID.key}>{t('records.types.key', { defaultValue: 'Key' })}</Label>
+        <Label htmlFor={ID.key}>{t(keys.records.types.key)}</Label>
         {isNew ? (
           <>
             <Input
               id={ID.key}
               value={values.key}
               maxLength={MAX_KEY_LEN}
-              placeholder={t('records.type_editor.key_placeholder', {
-                defaultValue: 'blog_post',
-              })}
+              placeholder={t(keys.records.type_editor.key_placeholder)}
               onChange={(e) => {
                 keyTouched.current = true;
                 onChange({ key: e.target.value });
@@ -114,10 +111,7 @@ export function TypeMetadataForm({
               aria-invalid={!!localKeyError || !!fieldMessage(errors, 'key')}
             />
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.key_new_help', {
-                defaultValue:
-                  "Lowercase letters, numbers and underscores, starting with a letter. Chosen once — this can't be changed later.",
-              })}
+              {t(keys.records.type_editor.key_new_help)}
             </p>
             {localKeyError && (
               <p className="text-sm text-destructive" data-testid="records-type-key-error">
@@ -129,9 +123,7 @@ export function TypeMetadataForm({
           <>
             <Input id={ID.key} value={values.key} disabled readOnly />
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.key_immutable', {
-                defaultValue: "The key can't be changed once the type is created.",
-              })}
+              {t(keys.records.type_editor.key_immutable)}
             </p>
           </>
         )}
@@ -139,7 +131,7 @@ export function TypeMetadataForm({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor={ID.label}>{t('records.types.label', { defaultValue: 'Label' })}</Label>
+        <Label htmlFor={ID.label}>{t(keys.records.types.label)}</Label>
         <Input
           id={ID.label}
           value={values.label}
@@ -151,9 +143,7 @@ export function TypeMetadataForm({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor={ID.labelPlural}>
-          {t('records.types.label_plural', { defaultValue: 'Plural label' })}
-        </Label>
+        <Label htmlFor={ID.labelPlural}>{t(keys.records.types.label_plural)}</Label>
         <Input
           id={ID.labelPlural}
           value={values.labelPlural}
@@ -182,9 +172,7 @@ export function TypeMetadataForm({
       />
 
       <div className="grid gap-1.5 sm:col-span-2">
-        <Label htmlFor={ID.description}>
-          {t('records.types.description', { defaultValue: 'Description' })}
-        </Label>
+        <Label htmlFor={ID.description}>{t(keys.records.types.description)}</Label>
         <Textarea
           id={ID.description}
           value={values.description}
@@ -209,14 +197,12 @@ export function TypeMetadataForm({
           onCheckedChange={(checked) => onChange({ translatable: checked === true })}
         />
         <Label htmlFor={ID.translatable} className="font-normal">
-          {t('records.type_editor.translatable', { defaultValue: 'Translatable' })}
+          {t(keys.records.type_editor.translatable)}
         </Label>
       </div>
       <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
-        {t('records.type_editor.translatable_help', {
+        {t(keys.records.type_editor.translatable_help, {
           locales: contentLocales.join(', '),
-          defaultValue:
-            'Records can exist in several languages ({locales}); each translation is its own record with its own slug.',
         })}
       </p>
       {translatableError && (
@@ -237,7 +223,7 @@ export function TypeMetadataForm({
       />
 
       <div className="grid gap-1.5 sm:col-span-2">
-        <Label>{t('records.type_editor.allowed_roles', { defaultValue: 'Allowed roles' })}</Label>
+        <Label>{t(keys.records.type_editor.allowed_roles)}</Label>
         <RolesMultiSelect
           idPrefix="type-editor-role"
           roles={roles}
@@ -245,10 +231,7 @@ export function TypeMetadataForm({
           onChange={(next) => onChange({ allowedRoles: next })}
         />
         <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.allowed_roles_help', {
-            defaultValue:
-              "Leave empty so anyone who can view or edit records can work with this type's records. Selecting roles narrows viewing and editing of its records to those roles; managing the type itself is never narrowed.",
-          })}
+          {t(keys.records.type_editor.allowed_roles_help)}
         </p>
         <FieldError message={fieldMessage(errors, 'allowed_roles')} />
       </div>
@@ -259,17 +242,5 @@ export function TypeMetadataForm({
 /** The type key's inline refusals — the same set `rules.ts::keyValid`
  *  returns for a field key, worded for a type (R19). */
 function typeKeyError(t: Translate, code: KeyErrorCode, key: string): string {
-  const defaults = {
-    required: 'A key is required.',
-    reserved: '"{key}" is reserved by the module.',
-    pattern:
-      'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
-    too_long: 'Must be at most {max} characters.',
-    duplicate: 'Another type already uses this key.',
-  };
-  return t(`records.type_editor.type_key_error.${code}`, {
-    key,
-    max: MAX_KEY_LEN,
-    defaultValue: defaults[code],
-  });
+  return t(keys.records.type_editor.type_key_error[code], { key, max: MAX_KEY_LEN });
 }

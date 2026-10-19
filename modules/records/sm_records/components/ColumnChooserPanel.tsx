@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef } from 'react';
+import { keys, useT } from '../utils/i18n';
 
 import {
   type ListColumn,
@@ -59,11 +59,7 @@ export function ColumnChooserPanel({
 
   // The table's and the cards' own labels (`columnLabels`), so a declared
   // "Status" reads "Status (state)" in all three places.
-  const labels = columnLabels(
-    t,
-    available,
-    t('records.records.display_title', { defaultValue: 'Title' }),
-  );
+  const labels = columnLabels(t, available, t(keys.records.records.display_title));
   const chosen = new Set(chosenKeys);
   const hidden = available.filter((column) => !chosen.has(column.key));
   const fieldCount = resolved.columns.filter((column) => column.kind === 'field').length;
@@ -89,19 +85,17 @@ export function ColumnChooserPanel({
     <div className="grid gap-3 text-sm" data-testid="records-columns-panel">
       <div className="flex items-baseline justify-between gap-2">
         <p ref={heading} tabIndex={-1} className="font-medium outline-none">
-          {t('records.columns.title', { defaultValue: 'Columns' })}
+          {t(keys.records.columns.title)}
         </p>
         <p className="text-xs text-muted-foreground" data-testid="records-columns-count">
-          {t('records.columns.count', {
+          {t(keys.records.columns.count, {
             count: fieldCount,
             max: MAX_CHOSEN_COLUMNS,
-            defaultValue: '{count} of {max} field column',
-            defaultValue_other: '{count} of {max} field columns',
           })}
         </p>
       </div>
 
-      <ul aria-label={t('records.columns.shown', { defaultValue: 'Shown' })}>
+      <ul aria-label={t(keys.records.columns.shown)}>
         {resolved.columns.map((column, index) => (
           <ColumnOptionRow
             key={column.key}
@@ -120,9 +114,9 @@ export function ColumnChooserPanel({
       {hidden.length > 0 && (
         <div className="border-t pt-2">
           <p className="text-xs font-medium text-muted-foreground">
-            {t('records.columns.hidden', { defaultValue: 'Hidden' })}
+            {t(keys.records.columns.hidden)}
           </p>
-          <ul aria-label={t('records.columns.hidden', { defaultValue: 'Hidden' })}>
+          <ul aria-label={t(keys.records.columns.hidden)}>
             {hidden.map((column) => (
               <ColumnOptionRow
                 key={column.key}
@@ -142,31 +136,16 @@ export function ColumnChooserPanel({
 
       {atCap && (
         <p className="text-xs text-muted-foreground" data-testid="records-columns-cap">
-          {t('records.columns.cap_reached', {
+          {t(keys.records.columns.cap_reached, {
             max: MAX_CHOSEN_COLUMNS,
-            defaultValue: 'At most {max} field columns — hide one to show another.',
           })}
         </p>
       )}
 
       <div className="grid gap-1.5 border-t pt-2 text-xs text-muted-foreground">
-        <p>
-          {t('records.columns.help_link', {
-            defaultValue:
-              'Your choice is written into this page’s link (?columns=), so sharing the link shares these columns.',
-          })}
-        </p>
-        <p>
-          {t('records.columns.help_saved', {
-            defaultValue:
-              'This browser also remembers it as your default for this type. A link that names its own columns wins over that default.',
-          })}
-        </p>
-        <p>
-          {t('records.columns.help_export', {
-            defaultValue: 'Export always contains every field, whatever is shown here.',
-          })}
-        </p>
+        <p>{t(keys.records.columns.help_link)}</p>
+        <p>{t(keys.records.columns.help_saved)}</p>
+        <p>{t(keys.records.columns.help_export)}</p>
       </div>
 
       <Button
@@ -184,7 +163,7 @@ export function ColumnChooserPanel({
           onReset();
         }}
       >
-        {t('records.columns.reset', { defaultValue: 'Reset to default' })}
+        {t(keys.records.columns.reset)}
       </Button>
     </div>
   );

@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import { keys, useT } from '../../utils/i18n';
 
 import { choicesOf } from '../../utils/values';
 import { type FieldComponentProps, FieldShell, fieldInputId } from './FieldShell';
@@ -23,9 +23,7 @@ export function SelectField({ field, value, onChange, error, disabled }: FieldCo
         {/* Always offered, even on a required field: without it a required
             select silently submits its first choice for someone who never
             looked at it, which is worse than a validation message. */}
-        <NativeSelectOption value="">
-          {t('records.fields.choose', { defaultValue: '— choose —' })}
-        </NativeSelectOption>
+        <NativeSelectOption value="">{t(keys.records.fields.choose)}</NativeSelectOption>
         {choices.map((choice) => (
           <NativeSelectOption key={choice.value} value={choice.value}>
             {choice.label}
@@ -73,9 +71,7 @@ export function MultiSelectField({ field, value, onChange, error, disabled }: Fi
         className="grid gap-2 rounded-md border p-3"
       >
         {choices.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            {t('records.fields.no_choices', { defaultValue: 'This field has no choices yet.' })}
-          </p>
+          <p className="text-sm text-muted-foreground">{t(keys.records.fields.no_choices)}</p>
         )}
         {choices.map((choice, index) => {
           // Indexed, not `${groupId}-${choice.value}`: a choice value with a

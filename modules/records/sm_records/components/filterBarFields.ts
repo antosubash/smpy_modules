@@ -7,7 +7,7 @@
  */
 
 import type { FilterKind } from '../utils/filters';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate } from '../utils/i18n';
 import type { FieldDef, FilterOp } from '../utils/types';
 import { choicesOf } from '../utils/values';
 
@@ -22,24 +22,11 @@ export type FilterableField = {
   def?: FieldDef;
 };
 
-/** Labels for the filter grammar's operators. A plain `t()` call per op
- *  (rather than a module-scope `Record<FilterOp, string>`) so the strings
- *  stay reachable by `make ci-check-untranslated` — a config object is
- *  exactly the blind spot that check can't see through. */
+/** Labels for the filter grammar's operators. Indexing the `filters.op`
+ *  subtree with the `FilterOp` union only compiles while every operator has
+ *  a catalogue entry. */
 export function opLabel(t: Translate, op: FilterOp): string {
-  const defaults: Record<FilterOp, string> = {
-    eq: 'is',
-    ne: 'is not',
-    contains: 'contains',
-    starts_with: 'starts with',
-    gt: '>',
-    gte: '>=',
-    lt: '<',
-    lte: '<=',
-    in: 'is one of (comma-separated)',
-    is_null: 'is empty',
-  };
-  return t(`records.filters.op.${op}`, { defaultValue: defaults[op] });
+  return t(keys.records.filters.op[op]);
 }
 
 /** The fixed columns every type can filter on regardless of its schema
@@ -59,13 +46,13 @@ export function fixedFilterFields(t: Translate, locales: string[]): FilterableFi
       // `(type_id, display_title, id)` can answer (F9), and `contains`
       // — `ILIKE '%term%'` — is a read of every row of the type by
       // construction.
-      label: t('records.records.display_title', { defaultValue: 'Title' }),
+      label: t(keys.records.records.display_title),
       ops: ['starts_with', 'contains'],
       kind: 'text',
     },
     {
       key: 'status',
-      label: t('records.records.status', { defaultValue: 'Status' }),
+      label: t(keys.records.records.status),
       ops: ['eq'],
       kind: 'status',
     },
@@ -77,14 +64,14 @@ export function fixedFilterFields(t: Translate, locales: string[]): FilterableFi
   // `is_null` would be a second spelling of "No" in the same dropdown.
   fields.push({
     key: 'invalid',
-    label: t('records.records.invalid_filter', { defaultValue: 'Invalid' }),
+    label: t(keys.records.records.invalid_filter),
     ops: ['eq'],
     kind: 'boolean',
   });
   if (locales.length > 1) {
     fields.push({
       key: 'locale',
-      label: t('records.records.locale', { defaultValue: 'Language' }),
+      label: t(keys.records.records.locale),
       ops: ['eq'],
       kind: 'locale',
     });

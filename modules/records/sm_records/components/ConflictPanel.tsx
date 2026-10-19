@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
+import { keys, useT } from '../utils/i18n';
 
 import type { RecordRead } from '../utils/types';
 import { formatDateTime } from '../utils/values';
@@ -36,32 +36,25 @@ export function ConflictPanel({
         {/* A heading, so a screen reader navigating by heading finds the
             one panel on this page that must not be missed (R15). */}
         <CardTitle className="text-destructive" role="heading" aria-level={2}>
-          {t('records.editor.conflict_title', {
-            defaultValue: 'This record changed while you were editing',
-          })}
+          {t(keys.records.editor.conflict_title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {t('records.editor.conflict_help', {
-            defaultValue:
-              'Someone else saved a change to this record since you opened it. Reload to see the latest version, or overwrite it with what you have.',
-          })}
-        </p>
+        <p className="text-sm text-muted-foreground">{t(keys.records.editor.conflict_help)}</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">
-              {t('records.editor.server_version', { defaultValue: 'Current on the server' })}
+              {t(keys.records.editor.server_version)}
             </p>
             <p className="mt-1 font-medium">{current.display_title}</p>
             <p className="text-sm text-muted-foreground">
-              {t('records.records.updated_at', { defaultValue: 'Updated' })}:{' '}
+              {t(keys.records.records.updated_at)}:{' '}
               {formatDateTime(current.updated_at ?? current.created_at)}
             </p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">
-              {t('records.editor.your_version', { defaultValue: 'Your unsaved version' })}
+              {t(keys.records.editor.your_version)}
             </p>
             <pre className="mt-1 max-h-40 overflow-auto rounded-md border bg-muted p-2 text-xs">
               {yourData}
@@ -70,7 +63,7 @@ export function ConflictPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => onReload(current)}>
-            {t('records.editor.reload', { defaultValue: 'Reload' })}
+            {t(keys.records.editor.reload)}
           </Button>
           <Button
             type="button"
@@ -78,7 +71,7 @@ export function ConflictPanel({
             data-testid="records-conflict-overwrite"
             onClick={onOverwrite}
           >
-            {t('records.editor.overwrite', { defaultValue: 'Overwrite anyway' })}
+            {t(keys.records.editor.overwrite)}
           </Button>
         </div>
       </CardContent>

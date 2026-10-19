@@ -1,11 +1,9 @@
-import { useT } from '@simple-module-py/i18n';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
-
 import { fieldTypeName } from '../../utils/field-type-name';
-import type { Translate } from '../../utils/translate';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
@@ -21,19 +19,7 @@ import {
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
 function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
-  const defaults = {
-    required: 'A key is required.',
-    reserved: '"{key}" is reserved by the module: it names a column every record already has.',
-    pattern:
-      'Must start with a lowercase letter, and contain only lowercase letters, numbers and underscores.',
-    too_long: 'Must be at most {max} characters.',
-    duplicate: 'Another field already uses this key.',
-  };
-  return t(`records.type_editor.key_error.${code}`, {
-    key,
-    max: MAX_KEY_LEN,
-    defaultValue: defaults[code],
-  });
+  return t(keys.records.type_editor.key_error[code], { key, max: MAX_KEY_LEN });
 }
 
 /**
@@ -78,9 +64,7 @@ export function FieldRowBody({
     <div id={`${idBase}-body`} className="grid gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="grid gap-1.5">
-          <Label htmlFor={`${idBase}-key`}>
-            {t('records.type_editor.field_key', { defaultValue: 'Key' })}
-          </Label>
+          <Label htmlFor={`${idBase}-key`}>{t(keys.records.type_editor.field_key)}</Label>
           <Input
             id={`${idBase}-key`}
             value={field.key}
@@ -92,9 +76,7 @@ export function FieldRowBody({
           />
           {keyLocked && (
             <p className="text-xs text-muted-foreground">
-              {t('records.type_editor.field_key_locked', {
-                defaultValue: "Can't be changed after the field is created.",
-              })}
+              {t(keys.records.type_editor.field_key_locked)}
             </p>
           )}
           {keyError && (
@@ -106,9 +88,7 @@ export function FieldRowBody({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor={`${idBase}-type`}>
-            {t('records.type_editor.field_type', { defaultValue: 'Type' })}
-          </Label>
+          <Label htmlFor={`${idBase}-type`}>{t(keys.records.type_editor.field_type)}</Label>
           <NativeSelect
             id={`${idBase}-type`}
             value={field.type}
@@ -126,9 +106,7 @@ export function FieldRowBody({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor={`${idBase}-label`}>
-            {t('records.types.label', { defaultValue: 'Label' })}
-          </Label>
+          <Label htmlFor={`${idBase}-label`}>{t(keys.records.types.label)}</Label>
           <Input
             id={`${idBase}-label`}
             value={field.label}
@@ -148,7 +126,7 @@ export function FieldRowBody({
             onCheckedChange={(checked) => onPatch({ required: checked === true })}
           />
           <Label htmlFor={`${idBase}-required`} className="font-normal">
-            {t('records.type_editor.field_required', { defaultValue: 'Required' })}
+            {t(keys.records.type_editor.field_required)}
           </Label>
         </div>
         <div className="flex items-center gap-2">
@@ -160,7 +138,7 @@ export function FieldRowBody({
             onCheckedChange={(checked) => onPatch({ unique: checked === true })}
           />
           <Label htmlFor={`${idBase}-unique`} className="font-normal">
-            {t('records.type_editor.field_unique', { defaultValue: 'Unique' })}
+            {t(keys.records.type_editor.field_unique)}
           </Label>
         </div>
         <div className="flex items-center gap-2">
@@ -176,7 +154,7 @@ export function FieldRowBody({
             onCheckedChange={(checked) => onPatch({ indexed: checked === true })}
           />
           <Label htmlFor={`${idBase}-indexed`} className="font-normal">
-            {t('records.type_editor.field_indexed', { defaultValue: 'Indexed' })}
+            {t(keys.records.type_editor.field_indexed)}
           </Label>
         </div>
       </div>
@@ -188,10 +166,7 @@ export function FieldRowBody({
           columns clause literally true; the list's Columns menu can show
           any field, but only an indexed one sorts. */}
       <p id={`${idBase}-indexed-hint`} className="-mt-1 text-xs text-muted-foreground">
-        {t('records.type_editor.field_indexed_row_hint', {
-          defaultValue:
-            "Indexed fields can be filtered and sorted; the first four indexed fields are the list's default columns. Any field can be shown through the list's Columns menu.",
-        })}
+        {t(keys.records.type_editor.field_indexed_row_hint)}
       </p>
 
       {/* U19: "Unique" had no scope qualifier anywhere in the editor, and
@@ -204,17 +179,12 @@ export function FieldRowBody({
           own translation. */}
       {uniqueAllowed(field) && (
         <p id={`${idBase}-unique-hint`} className="-mt-1 text-xs text-muted-foreground">
-          {t('records.type_editor.field_unique_hint', {
-            defaultValue:
-              'Unique across every record of this type — except between translations of the same record, which may share this value.',
-          })}
+          {t(keys.records.type_editor.field_unique_hint)}
         </p>
       )}
 
       <div className="grid gap-1.5">
-        <Label htmlFor={`${idBase}-help`}>
-          {t('records.type_editor.field_help', { defaultValue: 'Help text' })}
-        </Label>
+        <Label htmlFor={`${idBase}-help`}>{t(keys.records.type_editor.field_help)}</Label>
         <Input
           id={`${idBase}-help`}
           value={field.help ?? ''}

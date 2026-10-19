@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import type { ReactElement, ReactNode } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { ExpandedRef, FieldDef } from '../../utils/types';
 
@@ -88,9 +88,7 @@ export function FieldShell({
             <span className="text-destructive" aria-hidden="true">
               {REQUIRED_MARK}
             </span>
-            <span className="sr-only">
-              {t('records.fields.required', { defaultValue: 'Required' })}
-            </span>
+            <span className="sr-only">{t(keys.records.fields.required)}</span>
           </>
         )}
       </Label>

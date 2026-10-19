@@ -13,14 +13,13 @@
  * any field where both have an opinion the 422's message is what shows.
  */
 
-import { useT } from '@simple-module-py/i18n';
 import { useCallback, useMemo, useRef, useState } from 'react';
-
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
+import { keys, useT } from '../utils/i18n';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
-import { buildValidator, type Translate } from '../utils/validation';
+import { buildValidator } from '../utils/validation';
 import { buildPayload, type FormValues, toFormValues } from '../utils/values';
 
 export function useRecordForm(
@@ -58,10 +57,7 @@ export function useRecordForm(
    *  re-rendered anything. */
   const firstInvalidRef = useRef<string | null>(null);
 
-  // `t` is cast rather than typed through i18next's own signature: calling it
-  // behind an alias makes tsc bail with "type instantiation is excessively
-  // deep". `Translate` in `utils/validation.ts` says why this is the bridge.
-  const validator = useMemo(() => buildValidator(t as unknown as Translate, fields), [t, fields]);
+  const validator = useMemo(() => buildValidator(t, fields), [t, fields]);
 
   const fieldKeys = useMemo(() => new Set(fields.map((field) => field.key)), [fields]);
 
@@ -184,7 +180,7 @@ export function useRecordForm(
     }
     const parsed = asObject(rawText);
     if (!parsed) {
-      setRawError(t('records.editor.invalid_json', { defaultValue: 'Invalid JSON' }));
+      setRawError(t(keys.records.editor.invalid_json));
       return;
     }
     setValues(toFormValues(fields, parsed));
@@ -204,7 +200,7 @@ export function useRecordForm(
     if (raw) {
       const parsed = asObject(rawText);
       if (!parsed) {
-        setRawError(t('records.editor.invalid_json', { defaultValue: 'Invalid JSON' }));
+        setRawError(t(keys.records.editor.invalid_json));
         return null;
       }
       setClientErrors({});

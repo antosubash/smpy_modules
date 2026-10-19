@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Popover,
@@ -6,6 +5,7 @@ import {
   PopoverTrigger,
 } from '@simple-module-py/ui/components/ui/popover';
 import { Columns3Icon } from 'lucide-react';
+import { keys, useT } from '../utils/i18n';
 
 import { type ListColumn, MAX_CHOSEN_COLUMNS, type ResolvedColumns } from '../utils/listing';
 import { ColumnChooserPanel } from './ColumnChooserPanel';
@@ -30,7 +30,7 @@ export function ColumnChooser({
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" data-testid="records-columns-button">
           <Columns3Icon className="size-4 opacity-60" aria-hidden="true" />
-          {t('records.columns.button', { defaultValue: 'Columns' })}
+          {t(keys.records.columns.button)}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -62,22 +62,17 @@ export function ColumnsNotice({ resolved }: { resolved: ResolvedColumns }) {
     >
       {resolved.unknown.length > 0 && (
         <p>
-          {t('records.columns.unknown', {
+          {t(keys.records.columns.unknown, {
             count: resolved.unknown.length,
             keys: resolved.unknown.join(', '),
-            defaultValue: 'Ignored a column this type doesn’t have: {keys}.',
-            defaultValue_other: 'Ignored {count} columns this type doesn’t have: {keys}.',
           })}
         </p>
       )}
       {resolved.truncated > 0 && (
         <p>
-          {t('records.columns.truncated', {
+          {t(keys.records.columns.truncated, {
             count: resolved.truncated,
             max: MAX_CHOSEN_COLUMNS,
-            defaultValue: 'Only {max} field columns can be shown; {count} more was left out.',
-            defaultValue_other:
-              'Only {max} field columns can be shown; {count} more were left out.',
           })}
         </p>
       )}

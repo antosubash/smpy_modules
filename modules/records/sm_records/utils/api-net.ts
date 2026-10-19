@@ -12,7 +12,7 @@
  * module should say twice, so neither lives in `api.ts` any more.
  */
 
-import { t } from '@simple-module-py/i18n';
+import { keys, translate } from './i18n';
 
 import type { ApiErrorBody } from './types';
 
@@ -21,15 +21,6 @@ const LOGIN_PATH = '/users/login';
 
 /** Long enough for the toast that says where you're going to be read. */
 const REDIRECT_DELAY_MS = 1200;
-
-/** `t` read inside the function, never at module scope, so a message follows
- *  the active locale rather than freezing against the boot one (CLAUDE.md
- *  § i18n) — and falls back to the literal when i18next isn't configured
- *  (unit tests, a failure before the app mounts). */
-export function translate(key: string, fallback: string): string {
-  const message = t(key, { defaultValue: fallback }) as unknown;
-  return typeof message === 'string' && message !== '' ? message : fallback;
-}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -69,10 +60,7 @@ export function messageFor(status: number, statusText: string, body: ApiErrorBod
   // nothing a person can act on. `handleUnauthorized` is what acts; this is
   // what it says while doing it (R12b).
   if (status === 401) {
-    return translate(
-      'records.errors.session_expired',
-      'Your session has expired. Taking you to the sign-in page — your changes are still on this page until you leave it.',
-    );
+    return translate(keys.records.errors.session_expired);
   }
   // U34: R12 covered the offline case (`OFFLINE_STATUS`) and 401 above; a
   // 5xx with no usable detail fell through to the raw status line —
@@ -85,10 +73,7 @@ export function messageFor(status: number, statusText: string, body: ApiErrorBod
   // purposes.
   const fallback =
     status >= 500
-      ? translate(
-          'records.errors.server_error',
-          "Something went wrong on the server. It's not clear whether your last change was saved — check before trying again.",
-        )
+      ? translate(keys.records.errors.server_error)
       : `Request failed (${status} ${statusText})`.trim();
   if (!body) return fallback;
   if (body.errors?.length) return summarizeErrors(body.errors);
@@ -126,12 +111,5 @@ export function handleUnauthorized(): void {
  *  `ApiError` it reaches every caller's existing branch and says the one
  *  thing that matters, which is that nothing was lost (R12a). */
 export function offlineError(): ApiError {
-  return new ApiError(
-    OFFLINE_STATUS,
-    null,
-    translate(
-      'records.errors.offline',
-      "Couldn't reach the server. Your changes are still on this page; try again.",
-    ),
-  );
+  return new ApiError(OFFLINE_STATUS, null, translate(keys.records.errors.offline));
 }

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { buildChanges, extraCreateFields, stripUids } from '../components/typeeditor/formHelpers';
 import type { EditableField, TypeMetadataValues } from '../components/typeeditor/types';
 import { ApiError, createType } from '../utils/api';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate } from '../utils/i18n';
 import type { TypeRead, ValidationError } from '../utils/types';
 import type { SchemaApplyBody, useSchemaApply } from './useSchemaApply';
 import type { useUnsavedGuard } from './useUnsavedGuard';
@@ -67,7 +67,7 @@ export function useTypeEditorSave({
         guard.allow();
         // U9: this landed on the saved editor with no confirmation at all —
         // the same pattern the record editor already got right (R22a).
-        toast.success(t('records.type_editor.created', { defaultValue: 'Type created' }));
+        toast.success(t(keys.records.type_editor.created));
         router.visit(`/admin/records/types/${created.key}`);
         return;
       }
@@ -77,7 +77,7 @@ export function useTypeEditorSave({
       if (Object.keys(changes).length === 0) {
         // Unreachable while Save is disabled on a clean draft (R22b), kept
         // as the honest answer rather than a green "Saved" for a no-op.
-        toast(t('records.type_editor.no_changes', { defaultValue: 'No changes to save' }));
+        toast(t(keys.records.type_editor.no_changes));
         return;
       }
       schemaApply.reset();

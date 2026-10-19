@@ -1,4 +1,4 @@
-import type { Translate } from '../utils/translate';
+import { keys, type Translate } from '../utils/i18n';
 import type { PagerParts, PagerProps } from './RecordPagination';
 
 /**
@@ -20,22 +20,16 @@ export function cursorPagerParts(
   if (stopped) return { testId: 'records-cursor-pager', info: null, actions: [] };
   return {
     testId: 'records-cursor-pager',
-    info: (
-      <p data-testid="records-page-cursor">
-        {t('records.records.cursor_info', {
-          defaultValue: 'The list continues in the same order from here, without page numbers.',
-        })}
-      </p>
-    ),
+    info: <p data-testid="records-page-cursor">{t(keys.records.records.cursor_info)}</p>,
     actions: [
       {
         key: 'first',
-        label: t('records.records.first_page', { defaultValue: 'First page' }),
+        label: t(keys.records.records.first_page),
         onPress: () => onGo(1),
       },
       {
         key: 'next',
-        label: t('records.records.next_page', { defaultValue: 'Next page' }),
+        label: t(keys.records.records.next_page),
         unavailable: nextCursor === null || onContinue === undefined,
         onPress: () => {
           if (nextCursor !== null) onContinue?.(nextCursor);

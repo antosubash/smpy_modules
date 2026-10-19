@@ -1,9 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { TableHead } from '@simple-module-py/ui/components/ui/table';
-
 import { disambiguateLabels } from '../utils/filters';
+import { keys, type Translate, useT } from '../utils/i18n';
 import type { EnvelopeColumnKey, ListColumn, ResolvedColumns, SortState } from '../utils/listing';
-import type { Translate } from '../utils/translate';
 import type { RecordRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
@@ -20,15 +18,15 @@ import { SortableHeader } from './SortableHeader';
 export function envelopeLabel(t: Translate, key: EnvelopeColumnKey): string {
   switch (key) {
     case 'status':
-      return t('records.records.status', { defaultValue: 'Status' });
+      return t(keys.records.records.status);
     case 'locale':
-      return t('records.records.locale', { defaultValue: 'Language' });
+      return t(keys.records.records.locale);
     case 'position':
-      return t('records.records.position', { defaultValue: 'Position' });
+      return t(keys.records.records.position);
     case 'published_at':
-      return t('records.records.published_at', { defaultValue: 'Published on' });
+      return t(keys.records.records.published_at);
     default:
-      return t('records.records.updated_at', { defaultValue: 'Updated' });
+      return t(keys.records.records.updated_at);
   }
 }
 
@@ -116,12 +114,7 @@ export function ColumnHeader({
   if (!field.indexed) {
     return (
       <TableHead data-testid="records-column-unsortable" data-column={field.key}>
-        <span
-          className="font-medium"
-          title={t('records.columns.not_sortable', {
-            defaultValue: "Not indexed, so this column can't be sorted or filtered.",
-          })}
-        >
+        <span className="font-medium" title={t(keys.records.columns.not_sortable)}>
           {label}
         </span>{' '}
         {/* Said on the page, not only in the hover title, which keyboard and
@@ -130,7 +123,7 @@ export function ColumnHeader({
           className="text-xs font-normal text-muted-foreground"
           data-testid="records-column-note"
         >
-          {t('records.columns.not_sortable_short', { defaultValue: 'not sortable' })}
+          {t(keys.records.columns.not_sortable_short)}
         </span>
       </TableHead>
     );

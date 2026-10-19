@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
+import { keys, useT } from '../../utils/i18n';
 
 import type { TenancyMode } from '../../utils/types';
 
@@ -51,10 +51,7 @@ export function SidebarField({
         className="text-sm text-muted-foreground sm:col-span-2"
         data-testid="records-show-in-menu-multi-note"
       >
-        {t('records.type_editor.show_in_menu_multi_note', {
-          defaultValue:
-            'Sidebar entries are per-install, not per-tenant, so this host shows only the "Records" hub. Every type stays reachable from there.',
-        })}
+        {t(keys.records.type_editor.show_in_menu_multi_note)}
       </p>
     );
   }
@@ -67,14 +64,12 @@ export function SidebarField({
           onCheckedChange={(checked) => onChange(checked === true)}
         />
         <Label htmlFor={ID} className="font-normal">
-          {t('records.type_editor.show_in_menu', { defaultValue: 'Show in sidebar' })}
+          {t(keys.records.type_editor.show_in_menu)}
         </Label>
       </div>
       <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
-        {t('records.type_editor.show_in_menu_help', {
+        {t(keys.records.type_editor.show_in_menu_help, {
           label_plural: labelPlural,
-          defaultValue:
-            'Adds {label_plural} to the admin sidebar, in its own Records group right after Content.',
         })}
       </p>
     </>

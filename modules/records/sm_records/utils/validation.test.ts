@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { englishText, type Translate } from './i18n';
 import type { FieldDef } from './types';
-import { buildValidator, type Translate } from './validation';
+import { buildValidator } from './validation';
 
 /** Returns the key, so a test asserts on the message's identity rather than
  *  on English copy that a translator is free to rewrite. */
@@ -194,9 +195,7 @@ describe('an unknown field type', () => {
 
 describe('interpolation', () => {
   it('passes the bound value to the translator', () => {
-    const interpolating: Translate = (_key, options) =>
-      String(options.defaultValue).replace('{min}', String(options.min));
-    const validator = buildValidator(interpolating, [
+    const validator = buildValidator(englishText, [
       field('text', { constraints: { min_length: 3 } }),
     ]);
     expect(validator({ f: 'ab' })).toEqual({ f: 'Must be at least 3 characters' });

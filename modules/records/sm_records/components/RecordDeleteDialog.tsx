@@ -1,9 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { type ReactNode, useState } from 'react';
-
 import { listReferrers } from '../utils/api-history';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate, useT } from '../utils/i18n';
 import type { ReferrerRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -42,9 +40,7 @@ export function DialogDescription({
   if (loading) {
     return (
       <span data-testid="records-delete-dialog-checking">
-        {t('records.records.delete_checking', {
-          defaultValue: 'Checking what references this record…',
-        })}
+        {t(keys.records.records.delete_checking)}
       </span>
     );
   }
@@ -56,10 +52,7 @@ export function DialogDescription({
   // dialog that said "Delete this record?" presented a safe, reversible
   // action as a one-way door — the module's safety net was invisible on the
   // one screen that should mention it.
-  return t('records.records.confirm_delete', {
-    defaultValue:
-      'Move this record to the Trash? You can restore it until it is deleted permanently.',
-  });
+  return t(keys.records.records.confirm_delete);
 }
 
 /** The consequences of deleting, when there are any worth naming — `null`
@@ -90,10 +83,8 @@ export function DialogDetails({
       {restrictors.length > 0 && (
         <>
           <p>
-            {t('records.records.delete_blocked', {
+            {t(keys.records.records.delete_blocked, {
               count: restrictors.length,
-              defaultValue: '{count} record will block this delete',
-              defaultValue_other: '{count} records will block this delete',
             })}
           </p>
           <ul className="list-disc space-y-1 pl-5">
@@ -103,29 +94,21 @@ export function DialogDetails({
               </li>
             ))}
           </ul>
-          <p>
-            {t('records.records.delete_blocked_help', {
-              defaultValue: 'Detach or change these references before deleting.',
-            })}
-          </p>
+          <p>{t(keys.records.records.delete_blocked_help)}</p>
         </>
       )}
       {restrictors.length === 0 && setNulls.length > 0 && (
         <p>
-          {t('records.records.delete_set_null', {
+          {t(keys.records.records.delete_set_null, {
             count: setNulls.length,
-            defaultValue: '{count} record will have this reference cleared',
-            defaultValue_other: '{count} records will have this reference cleared',
           })}
         </p>
       )}
       {restrictors.length === 0 && cascades.length > 0 && (
         <>
           <p>
-            {t('records.records.delete_cascade', {
+            {t(keys.records.records.delete_cascade, {
               count: cascades.length,
-              defaultValue: '{count} record will be deleted too',
-              defaultValue_other: '{count} records will be deleted too',
             })}
           </p>
           <ul className="list-disc space-y-1 pl-5">
@@ -196,7 +179,7 @@ export function RecordDeleteDialog({
   // said "Move this record to the Trash" — the one word the description
   // avoided was the one everything around it used. Say what actually
   // happens, consistently, once the dialog is open.
-  const moveToTrash = t('records.records.move_to_trash', { defaultValue: 'Move to Trash' });
+  const moveToTrash = t(keys.records.records.move_to_trash);
   return (
     <ConfirmDialog
       trigger={trigger}

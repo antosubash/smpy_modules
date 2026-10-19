@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { OFFLINE_STATUS } from './api-net';
+import { englishText as fakeT, keys } from './i18n';
 import {
   DEFAULT_MAX_IMPORT_BYTES,
   exportScopeLabel,
@@ -11,30 +12,6 @@ import {
   importRecords,
 } from './io';
 import type { FieldDef } from './types';
-
-/** A passthrough translator resolves every call to its English default —
- *  the same style `changeLabels.test.ts` uses — plus `{var}` interpolation,
- *  since `importOptionsSummary` builds its "match by" fragment from one. */
-function fakeT(_key: string, opts: { defaultValue: string } & Record<string, unknown>): string {
-  return opts.defaultValue.replace(/\{(\w+)\}/g, (_match, name) => String(opts[name] ?? ''));
-}
-
-/** `fakeT` above always resolves to the singular `defaultValue` — this
- *  picks `defaultValue_other` for a `count` other than one, the same
- *  i18next contract `RecordDeleteDialog.test.tsx`'s own stand-in mirrors. */
-function fakePluralT(
-  _key: string,
-  opts: { count?: number; defaultValue: string; defaultValue_other?: string } & Record<
-    string,
-    unknown
-  >,
-): string {
-  const template =
-    opts.count !== undefined && opts.count !== 1 && opts.defaultValue_other
-      ? opts.defaultValue_other
-      : opts.defaultValue;
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts[name] ?? ''));
-}
 
 function field(overrides: Partial<FieldDef> = {}): FieldDef {
   return {
@@ -96,13 +73,10 @@ describe('importOptionsSummary', () => {
     const calls: unknown[][] = [];
     const recordingT = (...args: unknown[]) => {
       calls.push(args);
-      return fakeT(args[0] as string, args[1] as { defaultValue: string });
+      return fakeT(args[0] as string, args[1] as Record<string, unknown>);
     };
     importOptionsSummary(recordingT, { mode: 'upsert', matchBy: 'uuid', force: false }, []);
-    expect(calls).toContainEqual([
-      'records.io.summary_match_by',
-      { label: 'Record ID (uuid)', defaultValue: 'match by {label}' },
-    ]);
+    expect(calls).toContainEqual([keys.records.io.summary_match_by, { label: 'Record ID (uuid)' }]);
   });
 });
 
@@ -185,13 +159,13 @@ describe('importApplyBlockedReason', () => {
   // U10: "row(s)" used to be the one un-pluralized noun in a round that
   // otherwise carries `_one`/`_other` throughout.
   it('declines "rows" by the total and "fix it/them" by the failed count', () => {
-    expect(importApplyBlockedReason(fakePluralT, report({ failed: 1, total: 3 }), 'abort')).toBe(
+    expect(importApplyBlockedReason(fakeT, report({ failed: 1, total: 3 }), 'abort')).toBe(
       '1 of 3 rows can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     );
-    expect(importApplyBlockedReason(fakePluralT, report({ failed: 2, total: 3 }), 'abort')).toBe(
+    expect(importApplyBlockedReason(fakeT, report({ failed: 2, total: 3 }), 'abort')).toBe(
       '2 of 3 rows can\'t be imported, so nothing will be written. Fix them and try again, or choose "Skip it and write the rest" under Import options.',
     );
-    expect(importApplyBlockedReason(fakePluralT, report({ failed: 1, total: 1 }), 'abort')).toBe(
+    expect(importApplyBlockedReason(fakeT, report({ failed: 1, total: 1 }), 'abort')).toBe(
       '1 of 1 row can\'t be imported, so nothing will be written. Fix it and try again, or choose "Skip it and write the rest" under Import options.',
     );
   });
@@ -200,22 +174,22 @@ describe('importApplyBlockedReason', () => {
 // U16: the export menu never disclosed how much a download actually covers.
 describe('exportScopeLabel', () => {
   it('names the trashed count when the list is showing the trash', () => {
-    expect(exportScopeLabel(fakePluralT, { trashed: true, filtered: false, count: 1 })).toBe(
+    expect(exportScopeLabel(fakeT, { trashed: true, filtered: false, count: 1 })).toBe(
       '1 trashed record',
     );
-    expect(exportScopeLabel(fakePluralT, { trashed: true, filtered: true, count: 3 })).toBe(
+    expect(exportScopeLabel(fakeT, { trashed: true, filtered: true, count: 3 })).toBe(
       '3 trashed records',
     );
   });
 
   it('names the filtered count when a filter is in force and the list is not trashed', () => {
-    expect(exportScopeLabel(fakePluralT, { trashed: false, filtered: true, count: 4 })).toBe(
+    expect(exportScopeLabel(fakeT, { trashed: false, filtered: true, count: 4 })).toBe(
       '4 filtered records',
     );
   });
 
   it('says "all N records" with no filter and no trash toggle', () => {
-    expect(exportScopeLabel(fakePluralT, { trashed: false, filtered: false, count: 181 })).toBe(
+    expect(exportScopeLabel(fakeT, { trashed: false, filtered: false, count: 181 })).toBe(
       'all 181 records',
     );
   });
@@ -223,12 +197,12 @@ describe('exportScopeLabel', () => {
   it('says "N+" under the count cap, as the footer does (review 4, ux F4)', () => {
     // `total` is `max_count` when `total_capped`; the file holds every row.
     const capped = (trashed: boolean, filtered: boolean) =>
-      exportScopeLabel(fakePluralT, { trashed, filtered, count: 32, capped: true });
+      exportScopeLabel(fakeT, { trashed, filtered, count: 32, capped: true });
     expect(capped(false, true)).toBe('32+ filtered records');
     expect(capped(true, false)).toBe('32+ trashed records');
     expect(capped(false, false)).toBe('all 32+ records');
     expect(
-      exportScopeLabel(fakePluralT, { trashed: false, filtered: true, count: 10000, capped: true }),
+      exportScopeLabel(fakeT, { trashed: false, filtered: true, count: 10000, capped: true }),
     ).toBe(`${(10000).toLocaleString()}+ filtered records`);
   });
 });

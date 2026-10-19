@@ -3,23 +3,23 @@
  * type editor's type select and the record list's column chooser.
  */
 
-import type { Translate } from './translate';
+import { keys, type Translate } from './i18n';
 
-const DEFAULTS: Record<string, string> = {
-  text: 'Text',
-  longtext: 'Long text',
-  number: 'Number',
-  integer: 'Whole number',
-  boolean: 'Yes / no',
-  date: 'Date',
-  datetime: 'Date and time',
-  select: 'Choice',
-  multiselect: 'Several choices',
-  email: 'Email address',
-  url: 'URL',
-  json: 'JSON',
-  media: 'Media',
-  relation: 'Link to a record',
+const NAME_KEYS: Record<string, string> = {
+  text: keys.records.type_editor.field_type_name.text,
+  longtext: keys.records.type_editor.field_type_name.longtext,
+  number: keys.records.type_editor.field_type_name.number,
+  integer: keys.records.type_editor.field_type_name.integer,
+  boolean: keys.records.type_editor.field_type_name.boolean,
+  date: keys.records.type_editor.field_type_name.date,
+  datetime: keys.records.type_editor.field_type_name.datetime,
+  select: keys.records.type_editor.field_type_name.select,
+  multiselect: keys.records.type_editor.field_type_name.multiselect,
+  email: keys.records.type_editor.field_type_name.email,
+  url: keys.records.type_editor.field_type_name.url,
+  json: keys.records.type_editor.field_type_name.json,
+  media: keys.records.type_editor.field_type_name.media,
+  relation: keys.records.type_editor.field_type_name.relation,
 };
 
 /** The field-type select used to show the wire value itself — `longtext`,
@@ -28,7 +28,6 @@ const DEFAULTS: Record<string, string> = {
  *  the catalog under `records.type_editor.field_type_name.*`. A type this
  *  build does not know reads as its wire value. */
 export function fieldTypeName(t: Translate, type: string): string {
-  return t(`records.type_editor.field_type_name.${type}`, {
-    defaultValue: DEFAULTS[type] ?? type,
-  });
+  const key = NAME_KEYS[type];
+  return key ? t(key) : type;
 }

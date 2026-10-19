@@ -6,19 +6,7 @@ import { click, mount } from '../test-dom';
 import { availableColumns, MAX_CHOSEN_COLUMNS, resolveListColumns } from '../utils/listing';
 import type { FieldDef } from '../utils/types';
 
-/** Just enough of i18next for the panel's interpolated strings — the real
- *  one is unconfigured under vitest and returns templates verbatim. */
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  const count = typeof opts?.count === 'number' ? opts.count : undefined;
-  const template =
-    count !== undefined && count !== 1 && typeof opts?.defaultValue_other === 'string'
-      ? opts.defaultValue_other
-      : ((opts?.defaultValue as string) ?? key);
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts?.[name] ?? ''));
-}
-vi.mock('@simple-module-py/i18n', () => ({ useT: () => ({ t: fakeT }) }));
-
-const { ColumnChooserPanel } = await import('./ColumnChooserPanel');
+import { ColumnChooserPanel } from './ColumnChooserPanel';
 
 function field(key: string, overrides: Partial<FieldDef> = {}): FieldDef {
   return {

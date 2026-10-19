@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { englishText as fakeT } from '../utils/i18n';
 
 const success = vi.fn();
 const error = vi.fn();
@@ -6,10 +7,6 @@ vi.mock('sonner', () => ({ toast: { success, error } }));
 vi.mock('@inertiajs/react', () => ({ Link: ({ children }: { children?: unknown }) => children }));
 
 const { trashToast, purgedToast } = await import('./trashToast');
-
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  return (opts?.defaultValue as string) ?? key;
-}
 
 /** The `action.onClick` sonner was handed, for the last toast raised. */
 function undoHandler(): () => void {

@@ -1,8 +1,6 @@
 import { Head, usePage } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import type { SharedProps } from '@simple-module-py/ui/types';
-
 import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
 import { FilterBar } from '../components/FilterBar';
 import { MediaApiProvider } from '../components/media/MediaApiContext';
@@ -18,6 +16,7 @@ import { useListColumns } from '../hooks/useListColumns';
 import { useRecordListMutations } from '../hooks/useRecordListMutations';
 import { useRecordListNav } from '../hooks/useRecordListNav';
 import { useRecordSelection } from '../hooks/useRecordSelection';
+import { useT } from '../utils/i18n';
 import {
   exportSearchParams,
   filterErrorMessage,

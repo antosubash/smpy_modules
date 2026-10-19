@@ -5,7 +5,8 @@
  * re-exports every name here, so no import site had to move.
  */
 
-import type { Translate } from './translate';
+import type { Translate } from './i18n';
+import { keys } from './i18n';
 
 /**
  * The `reason` values `record_list` (`endpoints/views.py`, via
@@ -50,49 +51,25 @@ export function isCursorRefusal(reason: string | undefined): boolean {
 
 /**
  * The sentence for a `?filter=`/`?sort=`/`?after=` term the server refused.
- *
- * Every branch keeps its own literal `t()` call (rather than a
- * `Record<FilterErrorReason, string>` built once) for the same reason
- * `FilterBar`'s `opLabel` does: an untranslated-string check can read a
- * `t()` call, not a string chosen out of a config object before one.
  */
 export function filterErrorMessage(t: Translate, reason: string | undefined): string {
   switch (filterErrorReasonKey(reason)) {
     case 'reindexing':
-      return t('records.list.filter_error.reindexing', {
-        defaultValue:
-          'That field is being reindexed right now and cannot be filtered on yet. Try again shortly.',
-      });
+      return t(keys.records.list.filter_error.reindexing);
     case 'unsupported_op':
-      return t('records.list.filter_error.unsupported_op', {
-        defaultValue: "That condition isn't supported for this field.",
-      });
+      return t(keys.records.list.filter_error.unsupported_op);
     case 'not_indexed':
-      return t('records.list.filter_error.not_indexed', {
-        defaultValue: "That field isn't indexed, so it can't be filtered or sorted on.",
-      });
+      return t(keys.records.list.filter_error.not_indexed);
     case 'unknown':
-      return t('records.list.filter_error.unknown', {
-        defaultValue: "That field doesn't exist on this record type.",
-      });
+      return t(keys.records.list.filter_error.unknown);
     case 'bad_value':
-      return t('records.list.filter_error.bad_value', {
-        defaultValue: "That value isn't valid for this field.",
-      });
+      return t(keys.records.list.filter_error.bad_value);
     case 'bad_cursor':
-      return t('records.list.filter_error.bad_cursor', {
-        defaultValue:
-          "This link can't continue the list: it was made for a different sort or view, or it has been changed. Go back to the first page.",
-      });
+      return t(keys.records.list.filter_error.bad_cursor);
     case 'page_and_after':
-      return t('records.list.filter_error.page_and_after', {
-        defaultValue:
-          'This link asks for a page number and a place in the list at once. Go back to the first page.',
-      });
+      return t(keys.records.list.filter_error.page_and_after);
     default:
-      return t('records.list.filter_error.generic', {
-        defaultValue: "That filter couldn't be applied.",
-      });
+      return t(keys.records.list.filter_error.generic);
   }
 }
 
@@ -114,30 +91,22 @@ export function listStatus(
 ): string {
   if (page === null && count === 0) {
     // Past the last row: nothing continues (review 4, ux F5).
-    return t('records.records.list_status_cursor_end', {
-      defaultValue: 'No more records after the previous page',
-    });
+    return t(keys.records.records.list_status_cursor_end);
   }
   if (page === null) {
-    return t('records.records.list_status_cursor', {
+    return t(keys.records.records.list_status_cursor, {
       count,
-      defaultValue: '{count} record, continuing in the same order',
-      defaultValue_other: '{count} records, continuing in the same order',
     });
   }
   if (capped) {
-    return t('records.records.list_status_uncounted', {
+    return t(keys.records.records.list_status_uncounted, {
       count,
       page,
-      defaultValue: '{count} record, page {page}',
-      defaultValue_other: '{count} records, page {page}',
     });
   }
-  return t('records.records.list_status', {
+  return t(keys.records.records.list_status, {
     count,
     page,
     pages,
-    defaultValue: '{count} record, page {page} of {pages}',
-    defaultValue_other: '{count} records, page {page} of {pages}',
   });
 }

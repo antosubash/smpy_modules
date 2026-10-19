@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { toast } from 'sonner';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate } from '../utils/i18n';
 
 /**
  * The confirmation a soft delete owes the person who confirmed it (UX-R8).
@@ -26,14 +26,14 @@ export function trashToast(
   t: Translate,
   { typeKey, onUndo }: { typeKey: string; onUndo: () => Promise<unknown> },
 ): void {
-  toast.success(t('records.records.trashed', { defaultValue: 'Moved to the Trash' }), {
+  toast.success(t(keys.records.records.trashed), {
     description: (
       <Link href={`/admin/records/${typeKey}?trashed=true`} className="underline">
-        {t('records.records.view_trash', { defaultValue: 'View trash' })}
+        {t(keys.records.records.view_trash)}
       </Link>
     ),
     action: {
-      label: t('records.records.undo', { defaultValue: 'Undo' }),
+      label: t(keys.records.records.undo),
       onClick: () => {
         void onUndo().catch((err: unknown) => {
           toast.error(err instanceof Error ? err.message : String(err));
@@ -47,7 +47,7 @@ export function trashToast(
  *  from the delete toast so the restore path in the editor (where the record
  *  is restored from its own screen, not from a toast) can use it too. */
 export function restoredToast(t: Translate): void {
-  toast.success(t('records.records.restored', { defaultValue: 'Record restored' }));
+  toast.success(t(keys.records.records.restored));
 }
 
 /** A third, irreversible outcome (U4/U9): unlike a soft delete, a purge has
@@ -57,5 +57,5 @@ export function restoredToast(t: Translate): void {
  *  feedback is the row disappearing from a table the operator may not be
  *  looking at. */
 export function purgedToast(t: Translate): void {
-  toast.success(t('records.records.purged', { defaultValue: 'Deleted permanently' }));
+  toast.success(t(keys.records.records.purged));
 }

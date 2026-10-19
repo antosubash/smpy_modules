@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
+import { keys, useT } from '../utils/i18n';
 import type { ValidationError } from '../utils/types';
 
 /**
@@ -30,11 +30,7 @@ export function InvalidNotice({ errors }: { errors: ValidationError[] }) {
       {/* A real `h2`, not a styled paragraph: the editor exposed exactly two
           headings before this pass, so a screen-reader user navigating by
           heading found nothing below the form (UX review R15). */}
-      <h2 className="font-medium text-destructive">
-        {t('records.editor.invalid.title', {
-          defaultValue: 'This record does not satisfy the current schema',
-        })}
-      </h2>
+      <h2 className="font-medium text-destructive">{t(keys.records.editor.invalid.title)}</h2>
       <ul className="mt-1 list-inside list-disc text-destructive">
         {errors.map((entry) => (
           <li key={`${entry.field}:${entry.message}`}>

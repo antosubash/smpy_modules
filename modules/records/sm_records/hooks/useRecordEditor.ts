@@ -1,14 +1,13 @@
 import { router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-
 import { ApiError } from '../utils/api';
 import { createRecord, updateRecord } from '../utils/api-records';
 import { conflictField, humanizeCollisionDetail } from '../utils/conflicts';
 import { rememberCreated, takeCreated } from '../utils/created-flag';
 import { type DuplicatePayload, rememberDuplicate, takeDuplicate } from '../utils/duplicate';
 import { firstErrorInDomOrder, focusInvalidInput } from '../utils/focus-invalid';
+import { keys, useT } from '../utils/i18n';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { parsePosition } from '../utils/values';
 import { useRecordForm } from './useRecordForm';
@@ -76,7 +75,7 @@ export function useRecordEditor(
   // that mounts the `<Toaster>`, and the old page's is gone by then.
   useEffect(() => {
     if (takeCreated(record?.uuid)) {
-      toast.success(t('records.editor.created', { defaultValue: 'Record created' }));
+      toast.success(t(keys.records.editor.created));
     }
   }, [record?.uuid, t]);
 
@@ -99,10 +98,7 @@ export function useRecordEditor(
    */
   const markCollision = (err: ApiError) => {
     const detail = typeof err.body?.detail === 'string' ? err.body.detail : err.message;
-    const inTrash = t('records.editor.unique_in_trash', {
-      defaultValue:
-        'A record with this value already exists — it may be in the Trash. Open the Trash and either restore it and change its value, or delete it permanently to release the value.',
-    });
+    const inTrash = t(keys.records.editor.unique_in_trash);
     const field = conflictField(
       detail,
       type.fields.map((one) => one.key),
@@ -119,12 +115,7 @@ export function useRecordEditor(
     // The slug field is the one collision an operator often never typed
     // into — it derives from Title by default — so naming *that* recovery
     // is what the generic "already taken" sentence is missing (U5).
-    const extra =
-      field === 'slug'
-        ? t('records.editor.slug_collision_help', {
-            defaultValue: ' Change the Title, or set a distinct Slug under Advanced.',
-          })
-        : '';
+    const extra = field === 'slug' ? t(keys.records.editor.slug_collision_help) : '';
     form.setServerErrors([{ field, message: `${humanDetail} ${inTrash}${extra}` }]);
     focusInvalidInput(field);
   };
@@ -146,9 +137,7 @@ export function useRecordEditor(
       form.setServerErrors([
         {
           field: 'position',
-          message: t('records.validation.position', {
-            defaultValue: 'Must be a whole number — use 0 for no particular order.',
-          }),
+          message: t(keys.records.validation.position),
         },
       ]);
     }
@@ -189,7 +178,7 @@ export function useRecordEditor(
       // show until the next full reload.
       applyRestored(saved);
       inFlight.current = false;
-      toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
+      toast.success(t(keys.records.editor.saved));
     } catch (err) {
       inFlight.current = false;
       if (err instanceof ApiError && err.status === 409 && err.body?.current) {

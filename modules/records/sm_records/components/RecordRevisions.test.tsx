@@ -1,13 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { englishText as fakeT } from '../utils/i18n';
 
 vi.mock('@inertiajs/react', () => ({ router: { reload: vi.fn() }, Link: () => null }));
 
 const { revisionEvent } = await import('./RecordRevisions');
-
-/** A passthrough translator — every call resolves to its English default. */
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  return (opts?.defaultValue as string) ?? key;
-}
 
 describe('revisionEvent — R11: a revision says what happened, not `update`', () => {
   it('names the four RevisionEvent values (models/_record.py)', () => {

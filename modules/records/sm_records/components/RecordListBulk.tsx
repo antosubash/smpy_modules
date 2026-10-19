@@ -1,7 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
-
 import { useBulkActions } from '../hooks/useBulkActions';
 import type { RecordSelection } from '../hooks/useRecordSelection';
+import { useT } from '../utils/i18n';
 import type { RecordRead } from '../utils/types';
 import { BulkRefusalReport } from './BulkRefusalReport';
 import { EmptyTrashButton } from './EmptyTrashButton';
