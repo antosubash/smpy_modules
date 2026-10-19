@@ -1,13 +1,13 @@
 """``pagebuilder.locales`` asked before anything was published (#129).
 
-The fallback used to be cached for the life of the process, so one early call —
-a script, a worker, a neighbour's startup hook running first — pinned the
-pydantic defaults and a later ``use()`` of the hydrated settings was ignored by
-nothing but luck. These pin that the fallback is never kept, and that reading it
-is loud. The module is reset around every test by the fixture below: the shared
-``locale_fixture`` plugin is only registered when pagebuilder's tests are the
-run's rootdir config, so a combined run with news' tests would otherwise leak
-``_warned`` between tests.
+The fallback used to be stored in ``_active`` for the life of the process, so
+one early call — a script, a worker, a neighbour's startup hook running first —
+made the pydantic defaults look like published settings, silently and with
+nothing logged. These pin that the fallback is never kept as the published
+instance, and that reading it is loud. The module is reset around every test
+by the fixture below: the shared ``locale_fixture`` plugin is only registered
+when pagebuilder's tests are the run's rootdir config, so a combined run with
+news' tests would otherwise leak ``_warned`` between tests.
 """
 
 from __future__ import annotations
