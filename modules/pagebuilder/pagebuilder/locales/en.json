@@ -925,8 +925,14 @@
     "not_valid": "is not valid",
     "request_failed": "Request failed ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
-    "upload_failed": "Request failed ({status}): {detail}",
-    "upload_network": "Network error during upload"
+    "upload_failed": "Upload failed ({status})",
+    "upload_failed_invalid": "The server rejected the upload as incomplete or invalid.",
+    "upload_forbidden": "You do not have permission to upload files.",
+    "upload_network": "Network error during upload",
+    "upload_toast_batch": "{count} files could not be uploaded.",
+    "upload_toast_single": "Could not upload {name}: {message}",
+    "upload_too_large": "This file is too large to upload.",
+    "upload_unsupported": "This file type is not supported. Upload a valid image."
   },
   "fields": {
     "image": "Image"
@@ -1044,7 +1050,9 @@
     "load_more": "Load more",
     "loading": "Loading…",
     "title": "Media library",
-    "unfiled": "Unfiled"
+    "unfiled": "Unfiled",
+    "uploaded_one": "Uploaded {count} file.",
+    "uploaded_other": "Uploaded {count} files."
   },
   "media_filters": {
     "max_kb": "Max KB",
