@@ -47,10 +47,10 @@ def _fail_on(monkeypatch, method: str, page_id: int, *, detail: str) -> None:
     """
     real = getattr(PagesService, method)
 
-    async def flaky(self, target_id: int, note: str | None = None):
+    async def flaky(self, target_id: int, note: str | None = None, **kw):
         if target_id == page_id:
             raise HTTPException(status_code=404, detail=detail)
-        return await real(self, target_id, note=note)
+        return await real(self, target_id, note=note, **kw)
 
     monkeypatch.setattr(PagesService, method, flaky)
 

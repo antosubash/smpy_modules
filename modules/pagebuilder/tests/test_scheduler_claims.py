@@ -201,11 +201,11 @@ class TestAReleasedClaim:
         real = PagesService.publish
         attempts: list[int] = []
 
-        async def flaky(self, target_id: int, note: str | None = None):
+        async def flaky(self, target_id: int, note: str | None = None, **kw):
             attempts.append(target_id)
             if len(attempts) == 1:
                 raise HTTPException(status_code=409, detail="not this time")
-            return await real(self, target_id, note=note)
+            return await real(self, target_id, note=note, **kw)
 
         monkeypatch.setattr(PagesService, "publish", flaky)
 

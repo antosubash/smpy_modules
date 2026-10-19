@@ -125,3 +125,28 @@ async def test_a_tick_that_flips_nothing_still_persists_a_retired_window() -> No
             assert row.publish_at is None and row.unpublish_at is None
     finally:
         await state.engine.dispose()
+
+
+async def test_a_deadline_closing_during_a_slow_tick_survives_the_scheduled_publish(
+    db,
+) -> None:
+    """The window was still open at the tick's ``now`` but has closed by the
+    wall clock when ``publish`` runs — a slow tick, or one queued behind another
+    replica's locks. Judged against the wall clock, the deadline read as a
+    leftover and was wiped, so the page stayed live forever. Judged against the
+    tick it survives, and the next tick takes the page down."""
+    tick_now = datetime.now(UTC) - timedelta(minutes=10)
+    deadline = tick_now + timedelta(minutes=5)
+    page = await _draft(
+        db, "slow-tick", publish_at=tick_now - timedelta(hours=1), unpublish_at=deadline
+    )
+    service = PagesService(db)
+
+    assert [p.id for p in await service.process_due(tick_now)] == [page.id]
+    await db.refresh(page)
+    assert page.status is PageStatus.PUBLISHED
+    assert _normalize_to_utc(page.unpublish_at) == deadline
+
+    assert [p.id for p in await service.process_due(datetime.now(UTC))] == [page.id]
+    await db.refresh(page)
+    assert page.status is PageStatus.DRAFT

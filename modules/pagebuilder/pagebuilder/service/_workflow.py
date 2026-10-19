@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from functools import partial
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +27,20 @@ class WorkflowMixin(RevisionsMixin):
 
     db: AsyncSession
 
-    async def publish(self, page_id: int, note: str | None = None) -> Page:
+    async def publish(
+        self, page_id: int, note: str | None = None, *, now: datetime | None = None
+    ) -> Page:
+        """Snapshot the draft and serve it.
+
+        ``now`` is the instant an elapsed ``unpublish_at`` is judged against:
+        the wall clock for a person pressing Publish, the tick's own ``now``
+        from :meth:`process_due`. The tick has already retired every window
+        that closed by its ``now``, so judging against the tick leaves any
+        other ``unpublish_at`` alone. Judged against the wall clock instead,
+        a deadline falling between the two (a slow tick, one queued behind
+        another replica's locks) would be wiped as a leftover and the page
+        would stay live forever.
+        """
         page = await self.get_page(page_id)
         page.published_data = page.draft_data
         page.status = PageStatus.PUBLISHED
@@ -39,7 +53,7 @@ class WorkflowMixin(RevisionsMixin):
         # instruction and survives. One that has already elapsed is a leftover
         # from a schedule this publish did not go through, and would take the
         # page straight back down on the next tick.
-        if _elapsed(page.unpublish_at, datetime.now(UTC)):
+        if _elapsed(page.unpublish_at, now or datetime.now(UTC)):
             page.unpublish_at = None
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.PUBLISH, note=note)
@@ -134,7 +148,8 @@ class WorkflowMixin(RevisionsMixin):
                 "publish",
                 Page.publish_at,
                 PageStatus.DRAFT,
-                self.publish,
+                # The tick's ``now``, not the wall clock: see ``publish``.
+                partial(self.publish, now=now),
                 "Auto-published on schedule",
             ),
             (
