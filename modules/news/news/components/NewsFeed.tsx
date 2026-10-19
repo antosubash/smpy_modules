@@ -7,6 +7,13 @@ import { useEffect, useState } from 'react';
 
 import { useContentLocale } from '../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../utils/api';
+import {
+  clampFeedLimit,
+  FEED_LIMIT_DEFAULT,
+  FEED_LIMIT_MAX,
+  FEED_LIMIT_MIN,
+  safeHref,
+} from '../utils/feedProps';
 import { keys } from '../utils/i18n';
 
 export interface NewsFeedProps {
@@ -45,18 +52,21 @@ export function NewsFeedRender({
   // on a page written in another is a mistake nothing would catch, and an
   // English card in a German list is worse than no card.
   const locale = useContentLocale();
+  // Stored props may predate the editor's constraints (`limit: 4.5` is a 422
+  // from the API, which the catch below would turn into a vanished feed).
+  const safeLimit = clampFeedLimit(limit);
 
   useEffect(() => {
     const controller = new AbortController();
     // `in_feed` is the block's own filter: an article can be published and
     // linked to without belonging in the chronological feed.
-    listArticles({ limit, category, locale, in_feed: true, signal: controller.signal })
+    listArticles({ limit: safeLimit, category, locale, in_feed: true, signal: controller.signal })
       .then((response) => setItems(response.items.map(toCard)))
       // An empty feed and a failed fetch look the same to a visitor on
       // purpose: a broken API must not put an error box on a public page.
       .catch(() => setItems([]));
     return () => controller.abort();
-  }, [limit, category, locale]);
+  }, [safeLimit, category, locale]);
 
   // Render nothing at all until the first response, and nothing when there
   // are no articles: a heading with an empty grid under it reads as a broken
@@ -68,7 +78,7 @@ export function NewsFeedRender({
     <ArticleCardsGrid
       title={title}
       viewAllLabel={viewAllLabel}
-      viewAllHref={viewAllHref}
+      viewAllHref={safeHref(viewAllHref)}
       columns={columns}
       items={items}
     />
@@ -93,7 +103,12 @@ export const NewsFeedBlock: ComponentConfig<NewsFeedProps> = {
   fields: {
     title: { type: 'text', label: keys.news.feed.title },
     category: { type: 'text', label: keys.news.feed.category },
-    limit: { type: 'number', label: keys.news.feed.limit, min: 1, max: 12 },
+    limit: {
+      type: 'number',
+      label: keys.news.feed.limit,
+      min: FEED_LIMIT_MIN,
+      max: FEED_LIMIT_MAX,
+    },
     columns: {
       type: 'select',
       label: keys.news.feed.columns,
@@ -109,10 +124,12 @@ export const NewsFeedBlock: ComponentConfig<NewsFeedProps> = {
   defaultProps: {
     title: 'Latest news',
     category: '',
-    limit: 4,
+    limit: FEED_LIMIT_DEFAULT,
     columns: '4',
     viewAllLabel: '',
     viewAllHref: '',
   },
+  // Normalises what the number field lets through (it has no integer step).
+  resolveData: ({ props }) => ({ props: { ...props, limit: clampFeedLimit(props.limit) } }),
   render: NewsFeedRender,
 };
