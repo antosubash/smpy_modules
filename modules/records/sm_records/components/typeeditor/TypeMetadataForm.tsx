@@ -94,7 +94,7 @@ export function TypeMetadataForm({
   };
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
       <div className="grid gap-1.5">
         <Label htmlFor={ID.key}>{t(keys.records.types.key)}</Label>
         {isNew ? (
@@ -113,6 +113,11 @@ export function TypeMetadataForm({
             <p className="text-sm text-muted-foreground">
               {t(keys.records.type_editor.key_new_help)}
             </p>
+            {!localKeyError && values.key.length >= MAX_KEY_LEN && (
+              <p className="text-sm text-muted-foreground" data-testid="records-type-key-limit">
+                {t(keys.records.type_editor.key_limit, { max: MAX_KEY_LEN })}
+              </p>
+            )}
             {localKeyError && (
               <p className="text-sm text-destructive" data-testid="records-type-key-error">
                 {typeKeyError(t, localKeyError, values.key)}

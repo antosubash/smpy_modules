@@ -109,7 +109,7 @@ function TypeEditor({
     t,
   });
 
-  const activeErrors = isNew ? createErrors : schemaApply.errors;
+  const activeErrors = isNew ? createErrors : [...createErrors, ...schemaApply.errors];
   // Three-way, not two: an error naming neither an input nor a row (a
   // `__root__` one) used to be handed to the field list and dropped there,
   // which is how a refused save came to change nothing at all (R6). `SaveBar`

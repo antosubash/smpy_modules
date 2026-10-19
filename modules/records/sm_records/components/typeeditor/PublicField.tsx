@@ -84,7 +84,7 @@ export function PublicField({
                 : t(keys.records.type_editor.public_url_copy)}
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="break-words text-sm text-muted-foreground">
             {t(keys.records.type_editor.is_public_url_help)}
           </p>
         </div>

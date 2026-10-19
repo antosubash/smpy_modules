@@ -50,6 +50,13 @@ export function useTypeEditorSave({
   const [translatableError, setTranslatableError] = useState<string | null>(null);
 
   const save = async () => {
+    // The server refuses a blank label too (422); saying so here spares the
+    // round trip and puts the message under the field.
+    if (!values.label.trim()) {
+      setCreateErrors([{ field: 'label', message: t(keys.records.type_editor.label_required) }]);
+      return;
+    }
+    setCreateErrors([]);
     setPending(true);
     setTranslatableError(null);
     let changedTranslatable = false;

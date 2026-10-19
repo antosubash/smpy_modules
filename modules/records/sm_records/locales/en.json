@@ -312,6 +312,8 @@
     "key_immutable": "The key can't be changed once the type is created.",
     "key_placeholder": "blog_post",
     "key_new_help": "Lowercase letters, numbers and underscores, starting with a letter. Chosen once — this can't be changed later.",
+    "key_limit": "Limit of {max} characters reached. Anything longer was cut off.",
+    "label_required": "A label is required.",
     "type_key_error": {
       "required": "A key is required.",
       "reserved": "\"{key}\" is reserved by the module.",

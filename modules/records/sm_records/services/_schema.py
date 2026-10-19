@@ -35,8 +35,15 @@ def check_type_text(values: dict[str, Any]) -> None:
     ``varchar`` and its ``allowed_roles`` to a JSON column, and Postgres
     refuses ``\x00`` in both from the driver: a 500 for a value that is simply
     not storable, where the rest of this module answers 422 and names the
-    field.
+    field. A blank ``label`` is refused for the same reason: it created a type
+    that listed as an empty row. Only the *input* paths call this, so stored
+    rows that predate the rule still read back.
     """
+    label = values.get("label")
+    if isinstance(label, str) and not label.strip():
+        raise ValidationFailed(
+            "label is required", [{"field": "label", "message": "label is required"}]
+        )
     for name in _TEXT_COLUMNS:
         if has_nul(values.get(name)):
             raise ValidationFailed(
