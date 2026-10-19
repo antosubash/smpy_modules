@@ -243,6 +243,6 @@ async def render_archive(
             robots=SEARCH_ROBOTS if query else None,
         ),
     )
-    apply_cache(response, request, settings, listing=True)
+    apply_cache(response, request, settings, listing=True, per_viewer=True)
     response.headers["Content-Language"] = locale
     return response

@@ -18,7 +18,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  * that news' own viewer carries everything the borrowed one used to.
  */
 test.describe('News — the public article address', () => {
-  test('serves at /news/{slug}, with the headers a public URL needs', async ({ page }) => {
+  test('serves at /news/{slug}, with the headers a public URL needs', async ({ browser, page }) => {
     await login(page);
     const { articleId, slug, url } = await seedArticle(page, {
       prefix: 'public-address',
@@ -30,20 +30,28 @@ test.describe('News — the public article address', () => {
 
     expect(url).toBe(`/news/${slug}`);
 
-    const served = await page.request.get(url);
-    expect(served.status()).toBe(200);
+    // Signed in, so the copy is this reader's alone and kept nowhere (#94).
+    const own = await page.request.get(url);
+    expect(own.status()).toBe(200);
+    expect(own.headers()['cache-control']).toBe('private, no-store');
+
     // News' own viewer now, so these are its headers rather than a neighbour's.
     // They are asserted here precisely because a second viewer is exactly the
     // thing the old hand-off existed to avoid — if it drifts, it drifts here.
+    const anon = await browser.newContext();
+    const absolute = new URL(url, page.url()).toString();
+    const served = await anon.request.get(absolute);
+    expect(served.status()).toBe(200);
     expect(served.headers().etag).toBeTruthy();
     expect(served.headers()['cache-control']).toContain('public');
     expect(await served.text()).toContain('Read me at the news address.');
 
     // A conditional request short-circuits.
-    const conditional = await page.request.get(url, {
+    const conditional = await anon.request.get(absolute, {
       headers: { 'If-None-Match': served.headers().etag },
     });
     expect(conditional.status()).toBe(304);
+    await anon.close();
 
     // And the article is not a page, so pagebuilder's prefix does not answer.
     const notAPage = await page.request.get(`/p/${slug}`, { maxRedirects: 0 });
@@ -104,6 +112,10 @@ test.describe('News — the public article address', () => {
       maxRedirects: 0,
     });
     expect(response.status()).toBe(200);
+    // Anonymous, so shared caches may keep it — but only per viewer (#94).
+    expect(response.headers()['cache-control']).toMatch(/^public, max-age=\d+/);
+    expect(response.headers().vary).toMatch(/Cookie/);
+    expect(response.headers().vary).toMatch(/Accept-Language/);
     await anon.close();
   });
 });
