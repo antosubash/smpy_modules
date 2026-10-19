@@ -150,6 +150,8 @@ def held(session: Any) -> Iterator[None]:
     bucket: list[Any] = []
     with _pushed(session, bucket):
         yield
+    if not session.info.get(_HELD_KEY) and session.info.get(BUS_KEY) is None:
+        return  # nobody to tell: skip building one event per imported row
     # Built here, not in ``emit``: an outer ``held`` must see finished events
     # of this block, not builders reading attributes a later block may change.
     emit(session, *[_build(item) for item in bucket])
