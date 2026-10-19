@@ -1,6 +1,6 @@
 import { router } from '@inertiajs/react';
-import { t } from '@simple-module-py/i18n';
 import { useEffect, useRef } from 'react';
+import { keys, translate } from '../utils/i18n';
 
 /**
  * Warn before leaving a page that holds unsaved edits (UX review R12c).
@@ -22,10 +22,7 @@ export function useUnsavedGuard(dirty: boolean): { allow: () => void } {
   dirtyRef.current = dirty;
 
   useEffect(() => {
-    const message = () =>
-      t('records.common.unsaved_changes', {
-        defaultValue: 'You have unsaved changes. Leave this page and lose them?',
-      });
+    const message = () => translate(keys.records.common.unsaved_changes);
     const offBefore = router.on('before', (event) => {
       if (!dirtyRef.current || allowRef.current) return;
       // Partial reloads (`only:` visits, e.g. the list's own filtering) stay

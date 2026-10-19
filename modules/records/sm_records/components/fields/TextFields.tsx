@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
+import { keys, useT } from '../../utils/i18n';
 
 import { type FieldComponentProps, FieldShell, fieldInputId } from './FieldShell';
 
@@ -105,12 +105,8 @@ export function MediaTextField(props: FieldComponentProps) {
     <InputField
       {...props}
       inputType="text"
-      helpFallback={t('records.fields.media_help', {
-        defaultValue: 'The media library id or the full URL of an uploaded file.',
-      })}
-      placeholder={t('records.fields.media_placeholder', {
-        defaultValue: 'media id or https://…',
-      })}
+      helpFallback={t(keys.records.fields.media_help)}
+      placeholder={t(keys.records.fields.media_placeholder)}
     />
   );
 }

@@ -133,9 +133,11 @@ venv and back. Neither touches a tracked file.
   framework modules' screens (users, settings, …) ship English only and fall
   back to it.
 
-  news, pagebuilder, ai and billing call
-  `t(keys.<module>.<section>.<key>)`; records passes string keys with a
-  `defaultValue`, which `tsc` cannot check against its catalogue. The
+  news, pagebuilder, ai, billing and records call
+  `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each
+  module's `utils/i18n.ts` supplies the English text from `en.json`. A
+  family of keys chosen at runtime (`filters.op.<op>`) is a
+  `Record<Union, string>` of `keys.…` leaves, not a template literal. The
   catalogue's namespace is the `modules/<name>` directory, not the package
   (`sm_billing` registers as `billing`) — `tests/vitest-i18n.ts` keys on the
   same name.

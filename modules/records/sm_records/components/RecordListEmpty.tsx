@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { keys, useT } from '../utils/i18n';
 
 /**
  * The record list with nothing in it — which is three different situations,
@@ -72,21 +72,17 @@ export function RecordListEmpty({
         <>
           <p data-testid="records-empty-cursor">
             {cursor === 'refused'
-              ? t('records.records.empty_cursor_refused', {
-                  defaultValue: 'Nothing to show — this link could not continue the list.',
-                })
-              : t('records.records.empty_cursor_end', {
-                  defaultValue: 'There are no more records after the previous page.',
-                })}
+              ? t(keys.records.records.empty_cursor_refused)
+              : t(keys.records.records.empty_cursor_end)}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onFirstPage}>
             {cursorClears
-              ? t('records.records.clear_filter_sort', { defaultValue: 'Clear filter and sort' })
-              : t('records.records.first_page', { defaultValue: 'First page' })}
+              ? t(keys.records.records.clear_filter_sort)
+              : t(keys.records.records.first_page)}
           </Button>
         </>
       ) : trashed ? (
-        <p>{t('records.trash.empty', { defaultValue: 'No trashed records' })}</p>
+        <p>{t(keys.records.trash.empty)}</p>
       ) : filtered ? (
         <>
           <p data-testid={errorMessage ? 'records-empty-filter-error' : 'records-empty-filtered'}>
@@ -94,30 +90,22 @@ export function RecordListEmpty({
               ? // U12: the reason itself is already on screen, in the amber
                 // banner above — repeating it here read as the same sentence
                 // twice, one above the other.
-                t('records.records.empty_filter_refused', {
-                  defaultValue: 'Nothing to show — the filter above could not be applied.',
-                })
-              : t('records.records.empty_filtered', {
-                  defaultValue: 'No records match this filter.',
-                })}
+                t(keys.records.records.empty_filter_refused)
+              : t(keys.records.records.empty_filtered)}
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onClear}>
-            {t('records.records.filter_clear', { defaultValue: 'Clear' })}
+            {t(keys.records.records.filter_clear)}
           </Button>
         </>
       ) : (
         <>
-          <p>{t('records.records.empty', { defaultValue: 'No records yet' })}</p>
+          <p>{t(keys.records.records.empty)}</p>
           <Button asChild size="sm" className="mt-4">
-            <Link href={`/admin/records/${typeKey}/new`}>
-              {t('records.records.new', { defaultValue: 'New record' })}
-            </Link>
+            <Link href={`/admin/records/${typeKey}/new`}>{t(keys.records.records.new)}</Link>
           </Button>
           {canImport && (
             <p className="mt-2 text-sm" data-testid="records-empty-import-hint">
-              {t('records.records.empty_import_hint', {
-                defaultValue: 'Adding several at once? Use Import in the toolbar above.',
-              })}
+              {t(keys.records.records.empty_import_hint)}
             </p>
           )}
         </>

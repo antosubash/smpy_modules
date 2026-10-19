@@ -1,7 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
-
 import type { LabelMap } from '../hooks/useRelationLabels';
+import { keys, useT } from '../utils/i18n';
 import type { RelationValue } from '../utils/values';
 
 /** A glyph, not copy — the accessible name is the translated `aria-label`. */
@@ -32,8 +31,8 @@ export function RelationChips({
 }) {
   const { t } = useT();
   if (selected.length === 0) return null;
-  const missingLabel = t('records.relation.missing', { defaultValue: 'Missing record' });
-  const restrictedLabel = t('records.relation.restricted', { defaultValue: 'Restricted' });
+  const missingLabel = t(keys.records.relation.missing);
+  const restrictedLabel = t(keys.records.relation.restricted);
   return (
     <div className="flex flex-wrap gap-2">
       {selected.map((ref) => {
@@ -56,9 +55,8 @@ export function RelationChips({
             <button
               type="button"
               disabled={disabled}
-              aria-label={t('records.relation.remove_named', {
+              aria-label={t(keys.records.relation.remove_named, {
                 title: chipText,
-                defaultValue: 'Remove {title}',
               })}
               className="ml-1 opacity-70 hover:opacity-100 disabled:opacity-40"
               onClick={() => onRemove(ref.uuid)}

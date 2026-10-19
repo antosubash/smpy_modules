@@ -1,7 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-
 import type { BulkReport } from '../utils/api-records';
+import { keys, useT } from '../utils/i18n';
 import { shortUuid } from '../utils/record-title';
 import type { RecordRead } from '../utils/types';
 
@@ -48,10 +47,9 @@ export function BulkRefusalReport({
       role="alert"
     >
       <p className="font-medium text-destructive">
-        {t('records.bulk.refused', {
+        {t(keys.records.bulk.refused, {
           count: report.failed.length,
           total: report.requested,
-          defaultValue: '{count} of {total} records could not be changed, so nothing was changed.',
         })}
       </p>
       <ul className="mt-2 space-y-1" data-testid="records-bulk-refusal-list">
@@ -81,13 +79,12 @@ export function BulkRefusalReport({
             onDismiss();
           }}
         >
-          {t('records.bulk.deselect_failing', {
+          {t(keys.records.bulk.deselect_failing, {
             count: report.failed.length,
-            defaultValue: 'Deselect the {count} that failed',
           })}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
-          {t('records.bulk.dismiss', { defaultValue: 'Dismiss' })}
+          {t(keys.records.bulk.dismiss)}
         </Button>
       </div>
     </div>

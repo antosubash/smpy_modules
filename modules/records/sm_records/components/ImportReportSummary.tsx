@@ -1,7 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
+import { keys, type Translate, useT } from '../utils/i18n';
 
 import type { ImportReport, ImportRowError } from '../utils/io';
-import type { Translate } from '../utils/translate';
 import { EMPTY_CELL } from '../utils/values';
 
 /** A version refusal is worded by `services/_import_rows.py` and always
@@ -35,20 +34,12 @@ function summaryText(t: Translate, report: ImportReport): string {
     count: report.total,
   };
   if (report.dry_run) {
-    return t('records.io.summary', {
+    return t(keys.records.io.summary, {
       ...vars,
-      defaultValue:
-        '{total} row: {created} to create, {updated} to update, {skipped} unchanged, {failed} failed',
-      defaultValue_other:
-        '{total} rows: {created} to create, {updated} to update, {skipped} unchanged, {failed} failed',
     });
   }
-  return t('records.io.summary_result', {
+  return t(keys.records.io.summary_result, {
     ...vars,
-    defaultValue:
-      '{total} row: {created} created, {updated} updated, {skipped} unchanged, {failed} failed',
-    defaultValue_other:
-      '{total} rows: {created} created, {updated} updated, {skipped} unchanged, {failed} failed',
   });
 }
 
@@ -70,20 +61,17 @@ export function ImportReportSummary({ report }: { report: ImportReport }) {
         // import endpoint to return them") explained the team's own backlog
         // to an operator rather than saying what they can actually rely on.
         <p className="text-muted-foreground" data-testid="records-import-titles-note">
-          {t('records.io.titles_unavailable', {
-            defaultValue: 'Rows are identified by number, not title.',
-          })}
+          {t(keys.records.io.titles_unavailable)}
         </p>
       )}
       {report.errors.length > 0 && (
         <ul className="max-h-60 space-y-1 overflow-y-auto rounded-lg border p-2">
           {report.errors.map((error) => (
             <li key={`${error.row}-${error.field ?? ''}-${error.message}`}>
-              {t('records.io.error_row', {
+              {t(keys.records.io.error_row, {
                 row: error.row,
                 field: error.field ?? EMPTY_CELL,
                 message: error.message,
-                defaultValue: 'Row {row} ({field}): {message}',
               })}
             </li>
           ))}
@@ -91,18 +79,11 @@ export function ImportReportSummary({ report }: { report: ImportReport }) {
       )}
       {hasForceableError(report.errors) && (
         <p className="text-muted-foreground" data-testid="records-import-force-hint">
-          {t('records.io.force_hint', {
-            defaultValue:
-              'These rows were refused because the file carries no version for a record that already exists — turn on "Overwrite unversioned rows" above and import again.',
-          })}
+          {t(keys.records.io.force_hint)}
         </p>
       )}
       {report.errors_truncated && (
-        <p className="text-muted-foreground">
-          {t('records.io.errors_truncated', {
-            defaultValue: 'Only the first errors are listed; fix these and try again.',
-          })}
-        </p>
+        <p className="text-muted-foreground">{t(keys.records.io.errors_truncated)}</p>
       )}
     </div>
   );

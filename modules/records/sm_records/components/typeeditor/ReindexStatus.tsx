@@ -1,9 +1,8 @@
 import { router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useState } from 'react';
-
 import { reindexType } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import type { TypeRead } from '../../utils/types';
 import { formatDateTime } from '../../utils/values';
 import { pendingEntries, shouldPoll } from './reindexPending';
@@ -59,24 +58,17 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
       className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-500/50 bg-blue-500/10 p-3 text-sm"
     >
       <div>
-        <p className="font-medium">
-          {t('records.type_editor.reindex.notice', {
-            defaultValue: 'Rebuilding the index for:',
-          })}
-        </p>
+        <p className="font-medium">{t(keys.records.type_editor.reindex.notice)}</p>
         <ul className="mt-1 space-y-0.5">
           {entries.map((entry) => (
             <li key={entry.key}>
-              {entry.wholeType
-                ? t('records.type_editor.reindex.whole_type', { defaultValue: 'Whole type' })
-                : entry.key}
+              {entry.wholeType ? t(keys.records.type_editor.reindex.whole_type) : entry.key}
               {' — '}
-              {t('records.type_editor.reindex.since', {
+              {t(keys.records.type_editor.reindex.since, {
                 // The raw ISO string used to be printed here while every
                 // other timestamp in the module goes through the viewer's
                 // own locale (R11).
                 time: formatDateTime(entry.since),
-                defaultValue: 'since {time}',
               })}
             </li>
           ))}
@@ -90,8 +82,8 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
         onClick={() => void triggerReindex()}
       >
         {pending
-          ? t('records.type_editor.reindex.scheduling', { defaultValue: 'Scheduling…' })
-          : t('records.type_editor.reindex.reindex_now', { defaultValue: 'Reindex now' })}
+          ? t(keys.records.type_editor.reindex.scheduling)
+          : t(keys.records.type_editor.reindex.reindex_now)}
       </Button>
     </div>
   );

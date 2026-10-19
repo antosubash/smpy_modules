@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
+import { keys, useT } from '../utils/i18n';
 
 import { normalizePublicPrefix } from '../utils/public-api';
 
@@ -48,7 +48,7 @@ export function RecordListPublicUrl({
 
   return (
     <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-      {t('records.records.public_url_label', { defaultValue: 'Public at' })}
+      {t(keys.records.records.public_url_label)}
       <code
         className="w-fit rounded-md border bg-muted px-2 py-0.5 text-xs"
         data-testid="records-list-public-url"
@@ -57,8 +57,8 @@ export function RecordListPublicUrl({
       </code>
       <Button type="button" variant="outline" size="xs" onClick={() => void copy()}>
         {copied
-          ? t('records.type_editor.public_url_copied', { defaultValue: 'Copied' })
-          : t('records.type_editor.public_url_copy', { defaultValue: 'Copy' })}
+          ? t(keys.records.type_editor.public_url_copied)
+          : t(keys.records.type_editor.public_url_copy)}
       </Button>
     </p>
   );

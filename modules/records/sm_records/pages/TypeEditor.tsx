@@ -1,11 +1,9 @@
 import { Head, router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-
 import { RecordsLayout } from '../components/RecordsLayout';
 import { TenantBadge } from '../components/TenantBadge';
 import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
@@ -33,6 +31,7 @@ import { useTypeImport } from '../hooks/useTypeImport';
 import { useTypeSync } from '../hooks/useTypeSync';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { updateType } from '../utils/api';
+import { keys, useT } from '../utils/i18n';
 import type { DryRunReport, TypeRead } from '../utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
@@ -75,7 +74,7 @@ function TypeEditor({
 
   const schemaApply = useSchemaApply((result) => {
     applySaved(result);
-    toast.success(t('records.editor.saved', { defaultValue: 'Saved' }));
+    toast.success(t(keys.records.editor.saved));
   });
 
   const attemptUpdate = useCallback(
@@ -144,9 +143,7 @@ function TypeEditor({
     schemaApply.reset();
   };
 
-  const title = isNew
-    ? t('records.type_editor.title_new', { defaultValue: 'New type' })
-    : (current?.label ?? '');
+  const title = isNew ? t(keys.records.type_editor.title_new) : (current?.label ?? '');
 
   return (
     <>
@@ -154,8 +151,7 @@ function TypeEditor({
         title={
           isNew
             ? title
-            : t('records.type_editor.title_edit', {
-                defaultValue: 'Edit {label}',
+            : t(keys.records.type_editor.title_edit, {
                 label: current?.label ?? '',
               })
         }
@@ -171,7 +167,7 @@ function TypeEditor({
               onImport={importDefinition}
             />
             <Button variant="outline" onClick={() => router.visit(TYPES_LIST_HREF)}>
-              {t('records.editor.cancel', { defaultValue: 'Cancel' })}
+              {t(keys.records.editor.cancel)}
             </Button>
           </>
         }
@@ -188,9 +184,7 @@ function TypeEditor({
 
           <Card>
             <CardHeader>
-              <CardTitle>
-                {t('records.type_editor.section_details', { defaultValue: 'Details' })}
-              </CardTitle>
+              <CardTitle>{t(keys.records.type_editor.section_details)}</CardTitle>
             </CardHeader>
             <CardContent>
               <TypeMetadataForm
@@ -257,7 +251,7 @@ function TypeEditor({
                 // U9: the module's most destructive action ended in silence —
                 // seven records and a schema gone, with a missing row in a
                 // table the operator may not be looking at as the only sign.
-                toast.success(t('records.type_editor.deleted', { defaultValue: 'Type deleted' }));
+                toast.success(t(keys.records.type_editor.deleted));
                 router.visit(TYPES_LIST_HREF);
               }}
             />

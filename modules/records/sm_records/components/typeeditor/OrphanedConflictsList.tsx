@@ -1,4 +1,4 @@
-import { useT } from '@simple-module-py/i18n';
+import { keys, useT } from '../../utils/i18n';
 
 /**
  * "{key}: {count} records still hold a removed value" — shared by
@@ -14,10 +14,9 @@ export function OrphanedConflictsList({ conflicts }: { conflicts: Record<string,
     <ul className="space-y-1 text-sm">
       {entries.map(([key, count]) => (
         <li key={key}>
-          {t('records.type_editor.preview.orphaned_conflict', {
+          {t(keys.records.type_editor.preview.orphaned_conflict, {
             key,
             count,
-            defaultValue: '{key}: {count} records still hold a removed value',
           })}
         </li>
       ))}

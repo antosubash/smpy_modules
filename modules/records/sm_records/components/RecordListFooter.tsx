@@ -1,4 +1,4 @@
-import { useT } from '@simple-module-py/i18n';
+import { useT } from '../utils/i18n';
 
 import { filterErrorMessage, type ListUrlChange, listStatus } from '../utils/listing';
 import type { RecordListPage } from '../utils/types';

@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
+import { keys, useT } from '../utils/i18n';
 
 /**
  * One row's tick box, and the header's "everything on this page" one.
@@ -32,9 +32,8 @@ export function RecordSelectCell({
     <Checkbox
       checked={checked}
       data-testid="records-select-row"
-      aria-label={t('records.bulk.select_record', {
+      aria-label={t(keys.records.bulk.select_record, {
         title,
-        defaultValue: 'Select {title}',
       })}
       onClick={(event) => onToggle(event.shiftKey)}
     />
@@ -57,9 +56,7 @@ export function RecordSelectAllCell({
     <Checkbox
       checked={indeterminate ? 'indeterminate' : checked}
       data-testid="records-select-all"
-      aria-label={t('records.bulk.select_all', {
-        defaultValue: 'Select every record on this page',
-      })}
+      aria-label={t(keys.records.bulk.select_all)}
       onCheckedChange={() => onToggle()}
     />
   );

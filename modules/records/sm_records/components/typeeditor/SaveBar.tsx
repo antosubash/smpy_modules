@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { keys, useT } from '../../utils/i18n';
 
 import type { ValidationError } from '../../utils/types';
 import { firstInvalidTarget, groupErrors, invalidFieldCount } from './errors';
@@ -91,13 +91,11 @@ export function SaveBar({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" disabled={pending || !dirty} onClick={onSave}>
-          {pending
-            ? t('records.editor.saving', { defaultValue: 'Saving…' })
-            : t('records.editor.save', { defaultValue: 'Save' })}
+          {pending ? t(keys.records.editor.saving) : t(keys.records.editor.save)}
         </Button>
         {!dirty && !pending && !isNew && (
           <span className="text-sm text-muted-foreground" data-testid="records-no-changes">
-            {t('records.type_editor.no_changes', { defaultValue: 'No changes to save' })}
+            {t(keys.records.type_editor.no_changes)}
           </span>
         )}
         {count > 0 && (
@@ -106,10 +104,8 @@ export function SaveBar({
             role="alert"
             data-testid="records-type-save-summary"
           >
-            {t('records.type_editor.fields_need_attention', {
+            {t(keys.records.type_editor.fields_need_attention, {
               count,
-              defaultValue: '{count} field needs attention',
-              defaultValue_other: '{count} fields need attention',
             })}
           </p>
         )}

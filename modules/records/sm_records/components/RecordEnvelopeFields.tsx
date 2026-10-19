@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
+import { keys, useT } from '../utils/i18n';
 
 import { localeLabel } from '../utils/locale';
 import type { RecordStatus, ValidationError } from '../utils/types';
@@ -61,7 +61,7 @@ export function RecordHeaderFields({
       {showLocale && (
         <div className="flex items-center gap-2">
           <Label htmlFor={LOCALE_ID} className="text-sm text-muted-foreground">
-            {t('records.editor.locale_label', { defaultValue: 'Language' })}
+            {t(keys.records.editor.locale_label)}
           </Label>
           <NativeSelect
             id={LOCALE_ID}
@@ -79,7 +79,7 @@ export function RecordHeaderFields({
       )}
       <div className="flex items-center gap-2">
         <Label htmlFor={STATUS_ID} className="text-sm text-muted-foreground">
-          {t('records.records.status', { defaultValue: 'Status' })}
+          {t(keys.records.records.status)}
         </Label>
         <NativeSelect
           id={STATUS_ID}
@@ -87,11 +87,9 @@ export function RecordHeaderFields({
           aria-invalid={!!statusError}
           onChange={(e) => onStatusChange(e.target.value as RecordStatus)}
         >
-          <NativeSelectOption value="draft">
-            {t('records.records.draft', { defaultValue: 'Draft' })}
-          </NativeSelectOption>
+          <NativeSelectOption value="draft">{t(keys.records.records.draft)}</NativeSelectOption>
           <NativeSelectOption value="published">
-            {t('records.records.published', { defaultValue: 'Published' })}
+            {t(keys.records.records.published)}
           </NativeSelectOption>
         </NativeSelect>
       </div>
@@ -141,13 +139,11 @@ export function RecordAdvancedFields({
   return (
     <details open={hasAdvancedError(envelope)} data-testid="records-advanced-fields">
       <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-        {t('records.editor.advanced', { defaultValue: 'Advanced' })}
+        {t(keys.records.editor.advanced)}
       </summary>
       <div className="mt-3 grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
-          <Label htmlFor={SLUG_ID}>
-            {t('records.editor.slug_label', { defaultValue: 'Slug' })}
-          </Label>
+          <Label htmlFor={SLUG_ID}>{t(keys.records.editor.slug_label)}</Label>
           <Input
             id={SLUG_ID}
             value={slug}
@@ -156,20 +152,15 @@ export function RecordAdvancedFields({
           />
           <p className="text-sm text-muted-foreground">
             {slugSourceLabel
-              ? t('records.editor.slug_help_derived', {
+              ? t(keys.records.editor.slug_help_derived, {
                   field: slugSourceLabel,
-                  defaultValue: 'Leave blank to derive it from {field}.',
                 })
-              : t('records.editor.slug_help', {
-                  defaultValue: 'The address this record gets in a public URL.',
-                })}
+              : t(keys.records.editor.slug_help)}
           </p>
           {slugError && <p className="text-sm text-destructive">{slugError}</p>}
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor={POSITION_ID}>
-            {t('records.editor.position_label', { defaultValue: 'Position' })}
-          </Label>
+          <Label htmlFor={POSITION_ID}>{t(keys.records.editor.position_label)}</Label>
           <Input
             id={POSITION_ID}
             type="number"
@@ -181,11 +172,7 @@ export function RecordAdvancedFields({
             aria-invalid={!!positionError}
             onChange={(e) => onPositionChange(e.target.value)}
           />
-          <p className="text-sm text-muted-foreground">
-            {t('records.editor.position_help', {
-              defaultValue: 'Orders this record in a public list. Leave it at 0 to sort by date.',
-            })}
-          </p>
+          <p className="text-sm text-muted-foreground">{t(keys.records.editor.position_help)}</p>
           {positionError && <p className="text-sm text-destructive">{positionError}</p>}
         </div>
       </div>

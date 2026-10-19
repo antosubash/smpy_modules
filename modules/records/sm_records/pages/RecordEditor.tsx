@@ -1,9 +1,7 @@
 import { Head, router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import type React from 'react';
-
 import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
@@ -20,6 +18,7 @@ import { RecordTranslations } from '../components/RecordTranslations';
 import { TenantBadge } from '../components/TenantBadge';
 import { useRecordEditor } from '../hooks/useRecordEditor';
 import { displayFieldKey } from '../utils/errors-display';
+import { keys, useT } from '../utils/i18n';
 import type { MediaApi } from '../utils/media-api';
 import { withCurrentPatched } from '../utils/record-types';
 import type { RecordRead, TenancyMode, TranslationRead, TypeRead } from '../utils/types';
@@ -113,19 +112,9 @@ function RecordEditor({
 
   return (
     <>
-      <Head
-        title={
-          isNew
-            ? t('records.editor.title_new', { defaultValue: 'New record' })
-            : t('records.editor.title_edit', { defaultValue: 'Edit record' })
-        }
-      />
+      <Head title={isNew ? t(keys.records.editor.title_new) : t(keys.records.editor.title_edit)} />
       <PageShell
-        title={
-          isNew
-            ? t('records.editor.title_new', { defaultValue: 'New record' })
-            : (current?.display_title ?? type.label)
-        }
+        title={isNew ? t(keys.records.editor.title_new) : (current?.display_title ?? type.label)}
         // U14: was plain text (`type.label`) — no way back to the list but
         // Cancel/Back. `description` is a plain `string` (framework), so the
         // link below takes its place instead.
@@ -144,7 +133,7 @@ function RecordEditor({
                 here: this is an ordinary Inertia visit, and `router.on(
                 'before')` sees it (R12c). */}
             <Button variant="outline" onClick={() => router.visit(backHref)}>
-              {t('records.editor.cancel', { defaultValue: 'Cancel' })}
+              {t(keys.records.editor.cancel)}
             </Button>
           </>
         }
@@ -205,23 +194,18 @@ function RecordEditor({
 
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium uppercase text-muted-foreground">
-              {t('records.editor.fields_heading', { defaultValue: 'Fields' })}
+              {t(keys.records.editor.fields_heading)}
             </h2>
             <Button type="button" variant="ghost" size="sm" onClick={form.toggleRaw}>
-              {form.raw
-                ? t('records.editor.use_form', { defaultValue: 'Back to the form' })
-                : t('records.editor.use_raw_json', { defaultValue: 'Advanced: edit raw JSON' })}
+              {form.raw ? t(keys.records.editor.use_form) : t(keys.records.editor.use_raw_json)}
             </Button>
           </div>
 
           {form.raw ? (
             <JsonField
               id={DATA_ID}
-              label={t('records.editor.data_label', { defaultValue: 'Data' })}
-              helpText={t('records.editor.data_help', {
-                defaultValue:
-                  "Raw JSON for this record's fields. Switching back re-fills the form from it.",
-              })}
+              label={t(keys.records.editor.data_label)}
+              helpText={t(keys.records.editor.data_help)}
               value={form.rawText}
               onChange={form.setRawText}
               error={form.rawError}

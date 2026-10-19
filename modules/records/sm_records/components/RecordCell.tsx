@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
+import { keys, useT } from '../utils/i18n';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import { EMPTY_CELL as DASH, formatCalendarDate, formatDateTime } from '../utils/values';
@@ -45,7 +45,7 @@ function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
   if (exp.restricted) {
     return (
       <span className="text-muted-foreground" data-testid="records-relation-restricted">
-        {t('records.relation.restricted', { defaultValue: 'Restricted' })}
+        {t(keys.records.relation.restricted)}
       </span>
     );
   }
@@ -53,12 +53,10 @@ function ExpandedRefChip({ ref: exp }: { ref: ExpandedRef }) {
     return (
       <span
         className="text-muted-foreground"
-        title={t('records.relation.deleted_title', {
-          defaultValue: 'The record this pointed at has been deleted.',
-        })}
+        title={t(keys.records.relation.deleted_title)}
         data-testid="records-relation-deleted"
       >
-        {t('records.relation.deleted', { defaultValue: 'Deleted' })} ({exp.uuid.slice(0, 8)})
+        {t(keys.records.relation.deleted)} ({exp.uuid.slice(0, 8)})
       </span>
     );
   }
@@ -119,14 +117,12 @@ export function RecordCell({
       return value ? (
         <span>
           <span aria-hidden="true">✓</span>
-          <span className="sr-only">
-            {t('records.fields.boolean_yes', { defaultValue: 'Yes' })}
-          </span>
+          <span className="sr-only">{t(keys.records.fields.boolean_yes)}</span>
         </span>
       ) : (
         <span className="text-muted-foreground">
           <span aria-hidden="true">–</span>
-          <span className="sr-only">{t('records.fields.boolean_no', { defaultValue: 'No' })}</span>
+          <span className="sr-only">{t(keys.records.fields.boolean_no)}</span>
         </span>
       );
 

@@ -3,7 +3,8 @@
  * cap when it learned about capped counts; `io.ts` re-exports it.
  */
 
-import type { Translate } from './translate';
+import type { Translate } from './i18n';
+import { keys } from './i18n';
 
 /**
  * U16: "Download CSV"/"Download JSON" disclosed nothing about *how much* —
@@ -30,35 +31,28 @@ export function exportScopeLabel(
   if (capped) {
     const total = `${count.toLocaleString()}+`;
     if (trashed) {
-      return t('records.io.scope_trashed_capped', {
+      return t(keys.records.io.scope_trashed_capped, {
         total,
-        defaultValue: '{total} trashed records',
       });
     }
     if (filtered) {
-      return t('records.io.scope_filtered_capped', {
+      return t(keys.records.io.scope_filtered_capped, {
         total,
-        defaultValue: '{total} filtered records',
       });
     }
-    return t('records.io.scope_all_capped', { total, defaultValue: 'all {total} records' });
+    return t(keys.records.io.scope_all_capped, { total });
   }
   if (trashed) {
-    return t('records.io.scope_trashed', {
+    return t(keys.records.io.scope_trashed, {
       count,
-      defaultValue: '{count} trashed record',
-      defaultValue_other: '{count} trashed records',
     });
   }
   if (filtered) {
-    return t('records.io.scope_filtered', {
+    return t(keys.records.io.scope_filtered, {
       count,
-      defaultValue: '{count} filtered record',
-      defaultValue_other: '{count} filtered records',
     });
   }
-  return t('records.io.scope_all', {
+  return t(keys.records.io.scope_all, {
     count,
-    defaultValue: 'all {count} records',
   });
 }

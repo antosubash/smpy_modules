@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
+import { keys, useT } from '../../utils/i18n';
 
 import type { ChangeClass, SchemaPreview } from '../../utils/types';
 import { changeKindLabel, changeWhatLabel } from './changeLabels';
@@ -39,7 +39,7 @@ export function SchemaChangeList({ preview }: { preview: SchemaPreview }) {
       <ChangeKindBadge kind={preview.kind} />
       {preview.changes.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.preview.no_changes', { defaultValue: 'No changes.' })}
+          {t(keys.records.type_editor.preview.no_changes)}
         </p>
       ) : (
         <ul className="space-y-1 text-sm">
@@ -49,7 +49,7 @@ export function SchemaChangeList({ preview }: { preview: SchemaPreview }) {
             >
               <span className="font-mono">
                 {change.field_key === '*'
-                  ? t('records.type_editor.reindex.whole_type', { defaultValue: 'Whole type' })
+                  ? t(keys.records.type_editor.reindex.whole_type)
                   : change.field_key}
               </span>
               {' — '}

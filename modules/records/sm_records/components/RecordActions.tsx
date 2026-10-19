@@ -1,8 +1,7 @@
 import { router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-
 import { deleteRecord, purgeRecord, restoreRecord } from '../utils/api-records';
+import { keys, useT } from '../utils/i18n';
 import type { RecordRead } from '../utils/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RecordDeleteDialog } from './RecordDeleteDialog';
@@ -39,7 +38,7 @@ export function RecordActions({
   };
 
   if (!record.is_deleted) {
-    const label = t('records.records.delete', { defaultValue: 'Delete' });
+    const label = t(keys.records.records.delete);
     return (
       <RecordDeleteDialog
         typeKey={typeKey}
@@ -69,8 +68,8 @@ export function RecordActions({
     );
   }
 
-  const restoreLabel = t('records.editor.restore', { defaultValue: 'Restore' });
-  const purgeLabel = t('records.editor.purge', { defaultValue: 'Delete permanently' });
+  const restoreLabel = t(keys.records.editor.restore);
+  const purgeLabel = t(keys.records.editor.purge);
   return (
     <>
       <ConfirmDialog
@@ -80,9 +79,7 @@ export function RecordActions({
           </Button>
         }
         title={restoreLabel}
-        description={t('records.editor.confirm_restore', {
-          defaultValue: 'Restore this record?',
-        })}
+        description={t(keys.records.editor.confirm_restore)}
         confirmLabel={restoreLabel}
         onConfirm={async () => {
           onRestored(await restoreRecord(typeKey, record.uuid));
@@ -96,9 +93,7 @@ export function RecordActions({
           </Button>
         }
         title={purgeLabel}
-        description={t('records.editor.confirm_purge', {
-          defaultValue: 'This cannot be undone. Delete this record permanently?',
-        })}
+        description={t(keys.records.editor.confirm_purge)}
         confirmLabel={purgeLabel}
         destructive
         onConfirm={async () => {

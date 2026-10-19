@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, mount } from '../test-dom';
 import { ApiError } from '../utils/api';
 import type { BulkReport } from '../utils/api-records';
+import { englishText as fakeT } from '../utils/i18n';
 
 vi.mock('@inertiajs/react', () => ({ router: { reload: vi.fn() } }));
 
@@ -22,10 +23,6 @@ vi.mock('../utils/api-records', async (importOriginal) => {
 });
 
 const { useBulkActions } = await import('./useBulkActions');
-
-function fakeT(_key: string, opts: { defaultValue: string }): string {
-  return opts.defaultValue;
-}
 
 type Hook = ReturnType<typeof useBulkActions>;
 

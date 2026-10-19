@@ -1,8 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-
 import type { BulkAction } from '../utils/api-records';
 import { bulkActions } from '../utils/bulk-copy';
+import { keys, useT } from '../utils/i18n';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /**
@@ -40,7 +39,7 @@ export function RecordBulkToolbar({
       className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2"
     >
       <span className="text-sm font-medium" data-testid="records-bulk-count">
-        {t('records.bulk.selected', { count, defaultValue: '{count} selected' })}
+        {t(keys.records.bulk.selected, { count })}
       </span>
       {bulkActions(t, { count, trashed }).map((item) => (
         <ConfirmDialog
@@ -70,7 +69,7 @@ export function RecordBulkToolbar({
         onClick={onClear}
         data-testid="records-bulk-clear"
       >
-        {t('records.bulk.clear', { defaultValue: 'Clear selection' })}
+        {t(keys.records.bulk.clear)}
       </Button>
     </div>
   );

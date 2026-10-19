@@ -1,17 +1,16 @@
-import { useT } from '@simple-module-py/i18n';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
-import type { Translate } from '../../utils/translate';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import { RELATION_ON_DELETE, type RelationOnDelete, type TargetType } from './types';
 
 function onDeleteLabel(t: Translate, choice: RelationOnDelete): string {
-  const defaults: Record<RelationOnDelete, string> = {
-    restrict: 'Restrict (block the delete)',
-    set_null: 'Set null',
-    cascade: 'Cascade (delete this record too)',
+  const labels: Record<RelationOnDelete, string> = {
+    restrict: keys.records.type_editor.on_delete.restrict,
+    set_null: keys.records.type_editor.on_delete.set_null,
+    cascade: keys.records.type_editor.on_delete.cascade,
   };
-  return t(`records.type_editor.on_delete.${choice}`, { defaultValue: defaults[choice] });
+  return t(labels[choice]);
 }
 
 /** `relation`'s `options`: which type it points at, whether one record can
@@ -47,9 +46,7 @@ export function RelationOptions({
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="grid gap-1.5">
-        <Label htmlFor={targetId}>
-          {t('records.type_editor.target_type', { defaultValue: 'Target type' })}
-        </Label>
+        <Label htmlFor={targetId}>{t(keys.records.type_editor.target_type)}</Label>
         <NativeSelect
           id={targetId}
           value={targetType}
@@ -57,7 +54,7 @@ export function RelationOptions({
           onChange={(e) => onChange({ targetType: e.target.value })}
         >
           <NativeSelectOption value="">
-            {t('records.type_editor.target_type_pick', { defaultValue: 'Choose a type…' })}
+            {t(keys.records.type_editor.target_type_pick)}
           </NativeSelectOption>
           {targetTypes.map((tt) => (
             <NativeSelectOption key={tt.key} value={tt.key}>
@@ -75,14 +72,12 @@ export function RelationOptions({
           onCheckedChange={(checked) => onChange({ many: checked === true })}
         />
         <Label htmlFor={manyId} className="font-normal">
-          {t('records.type_editor.many', { defaultValue: 'Many (a list of records)' })}
+          {t(keys.records.type_editor.many)}
         </Label>
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor={onDeleteId}>
-          {t('records.type_editor.on_delete_label', { defaultValue: 'When the target is deleted' })}
-        </Label>
+        <Label htmlFor={onDeleteId}>{t(keys.records.type_editor.on_delete_label)}</Label>
         <NativeSelect
           id={onDeleteId}
           value={onDelete}

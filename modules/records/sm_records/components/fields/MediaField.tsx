@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { MediaApi } from '../../utils/media-api';
 import { useMediaApi } from '../media/MediaApiContext';
@@ -27,13 +27,7 @@ function MediaPickerField({
   const actionTextId = `${id}-action`;
 
   return (
-    <FieldShell
-      field={field}
-      error={error}
-      helpFallback={t('records.fields.media_picker_help', {
-        defaultValue: 'Choose a file from the media library, or upload one.',
-      })}
-    >
+    <FieldShell field={field} error={error} helpFallback={t(keys.records.fields.media_picker_help)}>
       {(labelId) => (
         <fieldset
           aria-labelledby={labelId}
@@ -44,7 +38,7 @@ function MediaPickerField({
             <MediaPreview api={api} value={stored} variant="field" />
           ) : (
             <p className="text-sm text-muted-foreground" data-testid="records-media-none">
-              {t('records.media.none', { defaultValue: 'No file chosen.' })}
+              {t(keys.records.media.none)}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -64,9 +58,7 @@ function MediaPickerField({
               data-testid="records-media-choose"
             >
               <span id={actionTextId}>
-                {stored
-                  ? t('records.media.replace', { defaultValue: 'Replace…' })
-                  : t('records.media.choose', { defaultValue: 'Choose file…' })}
+                {stored ? t(keys.records.media.replace) : t(keys.records.media.choose)}
               </span>
             </Button>
             {stored && (
@@ -82,9 +74,7 @@ function MediaPickerField({
                 }}
                 data-testid="records-media-remove"
               >
-                <span id={`${id}-remove`}>
-                  {t('records.media.remove', { defaultValue: 'Remove' })}
-                </span>
+                <span id={`${id}-remove`}>{t(keys.records.media.remove)}</span>
               </Button>
             )}
           </div>

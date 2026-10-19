@@ -1,8 +1,8 @@
-import { useT } from '@simple-module-py/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
@@ -36,7 +36,7 @@ export function PointerFields({
   onChange: (patch: Partial<TypeMetadataValues>) => void;
 }) {
   const { t } = useT();
-  const none = t('records.type_editor.pointer_none', { defaultValue: 'None' });
+  const none = t(keys.records.type_editor.pointer_none);
   // Only the field types the API accepts for each pointer
   // (`services/_schema.py::DISPLAY_FIELD_TYPES`/`SLUG_FIELD_TYPES`). Offering
   // a `json` display field or a `boolean` slug field meant a 422 on save at
@@ -67,15 +67,11 @@ export function PointerFields({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {t('records.type_editor.section_pointers', { defaultValue: 'Record identity' })}
-        </CardTitle>
+        <CardTitle>{t(keys.records.type_editor.section_pointers)}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">
-          <Label htmlFor={ID.displayField}>
-            {t('records.type_editor.display_field', { defaultValue: 'Display field' })}
-          </Label>
+          <Label htmlFor={ID.displayField}>{t(keys.records.type_editor.display_field)}</Label>
           <NativeSelect
             id={ID.displayField}
             value={values.displayField}
@@ -91,24 +87,19 @@ export function PointerFields({
           </NativeSelect>
           {empty && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.pointer_needs_field', { defaultValue: 'Add a field first.' })}
+              {t(keys.records.type_editor.pointer_needs_field)}
             </p>
           )}
           {!empty && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.display_field_help', {
-                defaultValue:
-                  'The field a record is listed and linked by — its title in every list.',
-              })}
+              {t(keys.records.type_editor.display_field_help)}
             </p>
           )}
           <FieldError message={fieldMessage(errors, 'display_field')} />
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor={ID.slugField}>
-            {t('records.type_editor.slug_field', { defaultValue: 'Slug field' })}
-          </Label>
+          <Label htmlFor={ID.slugField}>{t(keys.records.type_editor.slug_field)}</Label>
           <NativeSelect
             id={ID.slugField}
             value={values.slugField}
@@ -124,7 +115,7 @@ export function PointerFields({
           </NativeSelect>
           {empty && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.pointer_needs_field', { defaultValue: 'Add a field first.' })}
+              {t(keys.records.type_editor.pointer_needs_field)}
             </p>
           )}
           <FieldError message={fieldMessage(errors, 'slug_field')} />

@@ -1,8 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { FileIcon, ImageOffIcon } from 'lucide-react';
 import { useState } from 'react';
-
 import { useMediaFile } from '../../hooks/useMediaFile';
+import { keys, useT } from '../../utils/i18n';
 import {
   fileUrl,
   forgetMediaFile,
@@ -150,16 +149,14 @@ export function MediaPreview({
             className={`${field ? 'size-24' : 'size-10'} animate-pulse rounded bg-muted`}
             aria-hidden="true"
           />
-          <span className="sr-only">
-            {t('records.media.loading_file', { defaultValue: 'Loading file details…' })}
-          </span>
+          <span className="sr-only">{t(keys.records.media.loading_file)}</span>
         </span>
       );
     case 'missing':
       return (
         <span className="grid min-w-0 gap-0.5" data-testid="records-media-missing">
           <span className="text-sm font-medium text-destructive">
-            {t('records.media.file_missing', { defaultValue: 'File missing' })}
+            {t(keys.records.media.file_missing)}
           </span>
           <code
             className={`${field ? 'break-all' : CELL_CLIP} text-xs text-muted-foreground`}
@@ -169,10 +166,7 @@ export function MediaPreview({
           </code>
           {field && (
             <span className="text-xs text-muted-foreground">
-              {t('records.media.file_missing_help', {
-                defaultValue:
-                  'This file is no longer in the media library. The record keeps its id until you choose another file or remove it.',
-              })}
+              {t(keys.records.media.file_missing_help)}
             </span>
           )}
         </span>
@@ -184,9 +178,7 @@ export function MediaPreview({
             {value}
           </code>
           <span className="text-xs text-muted-foreground" title={state.message}>
-            {t('records.media.details_failed', {
-              defaultValue: "Couldn't load this file's details.",
-            })}
+            {t(keys.records.media.details_failed)}
           </span>
         </span>
       );

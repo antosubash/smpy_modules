@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +8,7 @@ import {
 import { ChevronDownIcon } from 'lucide-react';
 import type React from 'react';
 import { useRef, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import {
   type ParseFailure,
@@ -98,7 +98,7 @@ export function TypeIoMenu({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="outline" data-testid="records-type-io-menu">
-            {t('records.type_io.menu', { defaultValue: 'Definition' })}
+            {t(keys.records.type_io.menu)}
             <ChevronDownIcon className="size-4 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
@@ -111,12 +111,12 @@ export function TypeIoMenu({
                 download={typeExportFilename(currentKey)}
                 data-testid="records-type-export"
               >
-                {t('records.type_io.export', { defaultValue: 'Download definition' })}
+                {t(keys.records.type_io.export)}
               </a>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onSelect={() => input.current?.click()}>
-            {t('records.type_io.import', { defaultValue: 'Import definition…' })}
+            {t(keys.records.type_io.import)}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { UploadIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import {
   type MediaApi,
@@ -91,13 +91,12 @@ export function MediaUpload({
         data-testid="records-media-upload"
       >
         <UploadIcon aria-hidden="true" />
-        {t('records.media.upload', { defaultValue: 'Upload a file' })}
+        {t(keys.records.media.upload)}
       </Button>
       {progress && (
         <div className="grid gap-1" role="status" data-testid="records-media-upload-progress">
           <span className="truncate text-xs text-muted-foreground">
-            {t('records.media.uploading', {
-              defaultValue: 'Uploading {name}… {percent}',
+            {t(keys.records.media.uploading, {
               name: progress.name,
               percent: percentLabel(progress.percent),
             })}
@@ -106,9 +105,7 @@ export function MediaUpload({
             className="h-2 w-full"
             max={100}
             value={progress.percent}
-            aria-label={t('records.media.upload_progress_label', {
-              defaultValue: 'Upload progress',
-            })}
+            aria-label={t(keys.records.media.upload_progress_label)}
           />
         </div>
       )}
@@ -118,8 +115,7 @@ export function MediaUpload({
           role="alert"
           data-testid="records-media-upload-error"
         >
-          {t('records.media.upload_failed', {
-            defaultValue: "Couldn't upload the file: {message}",
+          {t(keys.records.media.upload_failed, {
             message: error,
           })}
         </p>

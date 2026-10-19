@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
+import { keys, useT } from '../../utils/i18n';
 
 import { ChoicesEditor } from './ChoicesEditor';
 import { DefaultInput } from './DefaultInput';
@@ -72,22 +72,20 @@ export function FieldOptions({
         <div className="grid gap-3 sm:grid-cols-3">
           {numberField(
             `${idBase}-min-length`,
-            t('records.type_editor.min_length', { defaultValue: 'Minimum length' }),
+            t(keys.records.type_editor.min_length),
             field.constraints.min_length,
             (v) => setConstraint('min_length', v),
             disabled,
           )}
           {numberField(
             `${idBase}-max-length`,
-            t('records.type_editor.max_length', { defaultValue: 'Maximum length' }),
+            t(keys.records.type_editor.max_length),
             field.constraints.max_length,
             (v) => setConstraint('max_length', v),
             disabled,
           )}
           <div className="grid gap-1.5">
-            <Label htmlFor={`${idBase}-pattern`}>
-              {t('records.type_editor.pattern', { defaultValue: 'Pattern (regex)' })}
-            </Label>
+            <Label htmlFor={`${idBase}-pattern`}>{t(keys.records.type_editor.pattern)}</Label>
             <Input
               id={`${idBase}-pattern`}
               value={(field.constraints.pattern as string | undefined) ?? ''}
@@ -102,14 +100,14 @@ export function FieldOptions({
         <div className="grid gap-3 sm:grid-cols-2">
           {numberField(
             `${idBase}-min`,
-            t('records.type_editor.min', { defaultValue: 'Minimum' }),
+            t(keys.records.type_editor.min),
             field.constraints.min,
             (v) => setConstraint('min', v),
             disabled,
           )}
           {numberField(
             `${idBase}-max`,
-            t('records.type_editor.max', { defaultValue: 'Maximum' }),
+            t(keys.records.type_editor.max),
             field.constraints.max,
             (v) => setConstraint('max', v),
             disabled,

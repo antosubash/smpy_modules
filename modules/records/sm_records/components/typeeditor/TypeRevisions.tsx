@@ -1,11 +1,10 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-
 import { useSchemaApply } from '../../hooks/useSchemaApply';
 import { listTypeRevisions, restoreTypeRevision } from '../../utils/api-history';
+import { keys, useT } from '../../utils/i18n';
 import type { TypeRead, TypeRevision } from '../../utils/types';
 import { formatDateTime } from '../../utils/values';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -63,7 +62,7 @@ export function TypeRevisions({
   // reopen the panel.
   const apply = useSchemaApply((result) => {
     onRestored(result);
-    toast.success(t('records.type_editor.revisions.restored', { defaultValue: 'Schema restored' }));
+    toast.success(t(keys.records.type_editor.revisions.restored));
     void load();
   });
 
@@ -88,12 +87,12 @@ export function TypeRevisions({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle role="heading" aria-level={2}>
-          {t('records.type_editor.revisions.title', { defaultValue: 'Schema history' })}
+          {t(keys.records.type_editor.revisions.title)}
         </CardTitle>
         <Button type="button" variant="ghost" size="sm" onClick={toggle}>
           {open
-            ? t('records.type_editor.revisions.hide', { defaultValue: 'Hide' })
-            : t('records.type_editor.revisions.show', { defaultValue: 'Show' })}
+            ? t(keys.records.type_editor.revisions.hide)
+            : t(keys.records.type_editor.revisions.show)}
         </Button>
       </CardHeader>
       {open && (
@@ -105,14 +104,12 @@ export function TypeRevisions({
           )}
           {items === null && !loadError && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.revisions.loading', { defaultValue: 'Loading…' })}
+              {t(keys.records.type_editor.revisions.loading)}
             </p>
           )}
           {items?.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.revisions.empty', {
-                defaultValue: 'No earlier versions yet.',
-              })}
+              {t(keys.records.type_editor.revisions.empty)}
             </p>
           )}
           {items && items.length > 0 && (
@@ -125,20 +122,16 @@ export function TypeRevisions({
                 >
                   <div>
                     <p className="font-medium">
-                      {t('records.type_editor.revisions.version_label', {
+                      {t(keys.records.type_editor.revisions.version_label, {
                         version: rev.version,
-                        defaultValue: 'v{version}',
                       })}
                       {' · '}
-                      {t('records.type_editor.revisions.field_count', {
+                      {t(keys.records.type_editor.revisions.field_count, {
                         count: rev.fields.length,
-                        defaultValue: '{count} field',
-                        defaultValue_other: '{count} fields',
                       })}
                       {' · '}
-                      {t('records.type_editor.revisions.schema_version_label', {
+                      {t(keys.records.type_editor.revisions.schema_version_label, {
                         version: rev.schema_version,
-                        defaultValue: 'schema v{version}',
                       })}
                     </p>
                     <p className="text-muted-foreground">
@@ -149,22 +142,14 @@ export function TypeRevisions({
                   <ConfirmDialog
                     trigger={
                       <Button type="button" variant="outline" size="sm">
-                        {t('records.type_editor.revisions.restore', {
-                          defaultValue: 'Restore this schema',
-                        })}
+                        {t(keys.records.type_editor.revisions.restore)}
                       </Button>
                     }
-                    title={t('records.type_editor.revisions.restore', {
-                      defaultValue: 'Restore this schema',
-                    })}
-                    description={t('records.type_editor.revisions.restore_confirm', {
+                    title={t(keys.records.type_editor.revisions.restore)}
+                    description={t(keys.records.type_editor.revisions.restore_confirm, {
                       version: rev.version,
-                      defaultValue:
-                        'Restore the schema from v{version}? This is checked the same way any other schema change is.',
                     })}
-                    confirmLabel={t('records.type_editor.revisions.restore', {
-                      defaultValue: 'Restore this schema',
-                    })}
+                    confirmLabel={t(keys.records.type_editor.revisions.restore)}
                     onConfirm={() => restore(rev.version)}
                   />
                 </li>
@@ -179,10 +164,9 @@ export function TypeRevisions({
               data-testid="records-type-revisions-more"
               onClick={() => void load(page + 1, true)}
             >
-              {t('records.type_editor.revisions.load_more', {
+              {t(keys.records.type_editor.revisions.load_more, {
                 shown: items.length,
                 total,
-                defaultValue: 'Load more ({shown} of {total})',
               })}
             </Button>
           )}

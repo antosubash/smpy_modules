@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { ValidationError } from '../../utils/types';
 import { FieldRow } from './FieldRow';
@@ -124,9 +124,7 @@ export function FieldList({
   return (
     <div className="grid gap-4">
       {fields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.no_fields', { defaultValue: 'No fields yet.' })}
-        </p>
+        <p className="text-sm text-muted-foreground">{t(keys.records.type_editor.no_fields)}</p>
       ) : (
         <div className="grid gap-2">
           {fields.map((field, index) => (
@@ -155,7 +153,7 @@ export function FieldList({
 
       <div>
         <Button type="button" variant="outline" disabled={disabled} onClick={addField}>
-          {t('records.type_editor.add_field', { defaultValue: 'Add field' })}
+          {t(keys.records.type_editor.add_field)}
         </Button>
       </div>
     </div>

@@ -1,9 +1,8 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useRef, useState } from 'react';
-
 import { ApiError, getPreviewJob, previewSchema } from '../../utils/api';
+import { keys, useT } from '../../utils/i18n';
 import type { SchemaPreview, TypeRead } from '../../utils/types';
 import { DryRunReportView } from './DryRunReportView';
 import { stripUids } from './formHelpers';
@@ -182,14 +181,13 @@ export function SchemaPreviewPanel({
           onClick={() => void runPreview('draft')}
         >
           {!pending
-            ? t('records.type_editor.preview.button', { defaultValue: 'Preview changes' })
+            ? t(keys.records.type_editor.preview.button)
             : progress
-              ? t('records.type_editor.preview.progress', {
+              ? t(keys.records.type_editor.preview.progress, {
                   checked: progress.checked,
                   total: progress.total,
-                  defaultValue: 'Checked {checked} of {total}…',
                 })
-              : t('records.type_editor.preview.checking', { defaultValue: 'Checking…' })}
+              : t(keys.records.type_editor.preview.checking)}
         </Button>
         <Button
           type="button"
@@ -198,28 +196,20 @@ export function SchemaPreviewPanel({
           data-testid="records-check-records"
           onClick={() => void runPreview('saved')}
         >
-          {t('records.type_editor.preview.check_button', { defaultValue: 'Check records' })}
+          {t(keys.records.type_editor.preview.check_button)}
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        {t('records.type_editor.preview.check_help', {
-          defaultValue:
-            '"Check records" runs the same dry run against the schema exactly as it is saved, and marks the records that fail so the list can show them. "Preview changes" writes nothing.',
-        })}
+        {t(keys.records.type_editor.preview.check_help)}
       </p>
       {(error || failed) && !expired && (
         <p className="text-sm text-destructive" role="alert">
-          {error ??
-            t('records.type_editor.preview.failed', {
-              defaultValue: 'The check could not be completed. Try previewing again.',
-            })}
+          {error ?? t(keys.records.type_editor.preview.failed)}
         </p>
       )}
       {expired && (
         <p className="text-sm text-destructive" role="alert" data-testid="records-preview-expired">
-          {t('records.type_editor.preview.expired', {
-            defaultValue: 'The preview expired; preview again.',
-          })}{' '}
+          {t(keys.records.type_editor.preview.expired)}{' '}
           <Button
             type="button"
             variant="link"
@@ -227,7 +217,7 @@ export function SchemaPreviewPanel({
             data-testid="records-preview-expired-retry"
             onClick={() => void runPreview(mode)}
           >
-            {t('records.type_editor.preview.retry', { defaultValue: 'Preview again' })}
+            {t(keys.records.type_editor.preview.retry)}
           </Button>
         </p>
       )}
@@ -237,9 +227,7 @@ export function SchemaPreviewPanel({
             <SchemaChangeList preview={preview} />
           ) : (
             <p className="text-sm font-medium" data-testid="records-check-records-title">
-              {t('records.type_editor.preview.check_title', {
-                defaultValue: 'Records checked against the saved schema',
-              })}
+              {t(keys.records.type_editor.preview.check_title)}
             </p>
           )}
           {/* A preview of the saved schema is a preview of no change, and the
@@ -264,11 +252,8 @@ export function SchemaPreviewPanel({
           {mode === 'saved' && preview.report.failing > 0 && (
             <>
               <p className="text-sm text-muted-foreground">
-                {t('records.type_editor.preview.report_marked_note', {
+                {t(keys.records.type_editor.preview.report_marked_note, {
                   count: preview.report.failing,
-                  defaultValue: '{count} record is marked invalid, including any in the Trash.',
-                  defaultValue_other:
-                    '{count} records are marked invalid, including any in the Trash.',
                 })}
               </p>
               <Link
@@ -276,9 +261,7 @@ export function SchemaPreviewPanel({
                 className="inline-block text-sm text-primary hover:underline"
                 data-testid="records-check-records-link"
               >
-                {t('records.type_editor.preview.check_worklist', {
-                  defaultValue: 'Show the marked records',
-                })}
+                {t(keys.records.type_editor.preview.check_worklist)}
               </Link>
             </>
           )}

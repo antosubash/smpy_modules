@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
+import { keys, useT } from '../utils/i18n';
 
 import { localeLabel } from '../utils/locale';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
@@ -12,13 +12,9 @@ import { formatDateTime } from '../utils/values';
 export function RecordStatusBadge({ status }: { status: RecordStatus }) {
   const { t } = useT();
   if (status === 'published') {
-    return (
-      <Badge variant="default">
-        {t('records.records.published', { defaultValue: 'Published' })}
-      </Badge>
-    );
+    return <Badge variant="default">{t(keys.records.records.published)}</Badge>;
   }
-  return <Badge variant="secondary">{t('records.records.draft', { defaultValue: 'Draft' })}</Badge>;
+  return <Badge variant="secondary">{t(keys.records.records.draft)}</Badge>;
 }
 
 /** The record's language, as a small badge — the record list's locale
@@ -48,9 +44,7 @@ export function RecordEditorHeaderBadges({
 }) {
   const { t } = useT();
   if (!current) return null;
-  const localeHelp = t('records.editor.locale_badge_help', {
-    defaultValue: "This record's language is fixed for its lifetime.",
-  });
+  const localeHelp = t(keys.records.editor.locale_badge_help);
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -59,14 +53,12 @@ export function RecordEditorHeaderBadges({
             schema" — two names for one fact. One label, everywhere. */}
         {current.schema_stale && (
           <Badge variant="outline" className="border-amber-500 text-amber-600">
-            {t('records.records.schema_stale', { defaultValue: 'Outdated schema' })}
+            {t(keys.records.records.schema_stale)}
           </Badge>
         )}
         {current.invalid_since && <InvalidBadge since={current.invalid_since} />}
         {current.is_deleted && (
-          <Badge variant="destructive">
-            {t('records.editor.deleted_badge', { defaultValue: 'Deleted' })}
-          </Badge>
+          <Badge variant="destructive">{t(keys.records.editor.deleted_badge)}</Badge>
         )}
         {translatable && <RecordLocaleBadge locale={current.locale} title={localeHelp} />}
       </div>
@@ -98,12 +90,11 @@ export function InvalidBadge({ since }: { since: string }) {
       variant="outline"
       data-testid="records-invalid-badge"
       className="border-destructive/50 text-destructive"
-      title={t('records.records.invalid_badge_help', {
+      title={t(keys.records.records.invalid_badge_help, {
         date: formatDateTime(since),
-        defaultValue: 'This record has not satisfied its schema since {date}. Open it to see why.',
       })}
     >
-      {t('records.records.invalid_badge', { defaultValue: 'Invalid' })}
+      {t(keys.records.records.invalid_badge)}
     </Badge>
   );
 }
@@ -118,7 +109,7 @@ export function SchemaStaleBadge() {
   const { t } = useT();
   return (
     <Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-      {t('records.records.schema_stale', { defaultValue: 'Outdated schema' })}
+      {t(keys.records.records.schema_stale)}
     </Badge>
   );
 }

@@ -1,7 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { NavIcon } from '@simple-module-py/ui/components/NavIcon';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
+import { keys, useT } from '../../utils/i18n';
 
 import { DEFAULT_TYPE_ICON, isKnownNavIcon, NAV_ICON_EXAMPLES, navIconName } from './navIcons';
 
@@ -34,19 +34,19 @@ export function IconField({
 
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={ID}>{t('records.type_editor.icon', { defaultValue: 'Icon' })}</Label>
+      <Label htmlFor={ID}>{t(keys.records.type_editor.icon)}</Label>
       <div className="flex items-center gap-2">
         <Input
           id={ID}
           className="min-w-0 flex-1"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={t('records.type_editor.icon_placeholder', { defaultValue: 'database' })}
+          placeholder={t(keys.records.type_editor.icon_placeholder)}
           aria-invalid={!!error}
         />
         <span
           role="img"
-          aria-label={t('records.type_editor.icon_preview', { defaultValue: 'Icon preview' })}
+          aria-label={t(keys.records.type_editor.icon_preview)}
           data-testid="records-type-icon-preview"
           data-icon={navIconName(value)}
           className="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground"
@@ -55,19 +55,15 @@ export function IconField({
         </span>
       </div>
       <p className="text-sm text-muted-foreground">
-        {t('records.type_editor.icon_help', {
+        {t(keys.records.type_editor.icon_help, {
           examples: NAV_ICON_EXAMPLES.join(', '),
-          defaultValue:
-            'One of the framework\'s navigation icons — {examples} and about sixty more — rather than any lucide-react name. Also used for this type\'s sidebar entry when "Show in sidebar" is on.',
         })}
       </p>
       {unknown && (
         <p className="text-sm text-muted-foreground" data-testid="records-type-icon-unknown">
-          {t('records.type_editor.icon_unknown', {
+          {t(keys.records.type_editor.icon_unknown, {
             name: value,
             fallback: DEFAULT_TYPE_ICON,
-            defaultValue:
-              '"{name}" is not one of the framework\'s navigation icons, so "{fallback}" is drawn wherever this type is listed.',
           })}
         </p>
       )}

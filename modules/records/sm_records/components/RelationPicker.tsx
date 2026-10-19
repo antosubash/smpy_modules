@@ -1,9 +1,8 @@
-import { useT } from '@simple-module-py/i18n';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import { useRelationLabels } from '../hooks/useRelationLabels';
+import { keys, useT } from '../utils/i18n';
 import { searchByTitle } from '../utils/relation-search';
 import type { ExpandedRef, FieldDef, RecordRead } from '../utils/types';
 import {
@@ -187,14 +186,11 @@ export function RelationPicker({
           aria-activedescendant={activeUuid ? optionId(activeUuid) : undefined}
           value={query}
           disabled={disabled || !target}
-          placeholder={t('records.relation.search_placeholder', {
-            defaultValue: 'Search by title…',
-          })}
+          placeholder={t(keys.records.relation.search_placeholder)}
           // Two relation fields on one form gave two identically named search
           // boxes; the field's own label is what tells them apart (R11).
-          aria-label={t('records.relation.search_field_label', {
+          aria-label={t(keys.records.relation.search_field_label, {
             label: field.label,
-            defaultValue: 'Search {label}',
           })}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -204,13 +200,7 @@ export function RelationPicker({
         />
       )}
 
-      {!target && (
-        <p className="text-sm text-destructive">
-          {t('records.relation.no_target', {
-            defaultValue: 'This relation field has no target type configured.',
-          })}
-        </p>
-      )}
+      {!target && <p className="text-sm text-destructive">{t(keys.records.relation.no_target)}</p>}
       {searchError && <p className="text-sm text-destructive">{searchError}</p>}
 
       {/* Outside the `open` gate on purpose: a live region has to be in the
@@ -218,10 +208,8 @@ export function RelationPicker({
           region appearing rather than what it says. */}
       <p className="sr-only" role="status" aria-live="polite">
         {open && !searching
-          ? t('records.relation.result_count', {
+          ? t(keys.records.relation.result_count, {
               count: results.length,
-              defaultValue: '{count} record found',
-              defaultValue_other: '{count} records found',
             })
           : ''}
       </p>
@@ -230,12 +218,12 @@ export function RelationPicker({
         <div className="rounded-md border">
           {searching && results.length === 0 && (
             <p className="p-2 text-sm text-muted-foreground">
-              {t('records.relation.searching', { defaultValue: 'Searching…' })}
+              {t(keys.records.relation.searching)}
             </p>
           )}
           {!searching && results.length === 0 && (
             <p className="p-2 text-sm text-muted-foreground">
-              {t('records.relation.no_results', { defaultValue: 'No matching records' })}
+              {t(keys.records.relation.no_results)}
             </p>
           )}
           {/* A listbox of options is the ARIA pattern this control
