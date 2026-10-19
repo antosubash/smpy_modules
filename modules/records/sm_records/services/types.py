@@ -241,9 +241,10 @@ async def delete_type(
 
     Returns one :class:`~sm_records.services._common.PurgedRecord` per record
     it purged, and emits a ``RecordPurged`` for each — the one event whose
-    subject no subscriber can read back — then ``RecordTypeDeleted``. Identity only (``uuid``,
-    ``locale``, ``translation_group``), because the purge itself is set-based
-    and never instantiates the rows: see :func:`purge_type_records`.
+    subject no subscriber can read back — then ``RecordTypeDeleted``.
+    Identity only (``uuid``, ``locale``, ``translation_group``), because the
+    purge itself is set-based and never instantiates the rows: see
+    :func:`purge_type_records`.
     """
     held = await record_count(db, rtype, include_deleted=True)
     if confirm_record_count != held:

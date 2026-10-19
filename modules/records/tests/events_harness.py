@@ -133,7 +133,7 @@ async def _create(client, title: str = "One", **body: Any) -> dict:
 @pytest_asyncio.fixture
 async def bus(client) -> Recorder:
     """A subscriber to every event this module publishes, attached to the
-    app's real bus — the same object ``events.publish`` reaches."""
+    app's real bus — the same object the records session's events reach."""
     return recorder(client)
 
 

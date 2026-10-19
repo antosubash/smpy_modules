@@ -48,9 +48,9 @@ def guarded(db_state):
     return db_state
 
 
-def _app(db_state: Any, bus: Any = None) -> Any:
-    """``request.app`` as the deferred callers reach it: ``state.sm.{db,event_bus}``."""
-    return SimpleNamespace(state=SimpleNamespace(sm=SimpleNamespace(db=db_state, event_bus=bus)))
+def _app(db_state: Any) -> Any:
+    """``request.app`` as the deferred callers reach it: ``state.sm.db``."""
+    return SimpleNamespace(state=SimpleNamespace(sm=SimpleNamespace(db=db_state)))
 
 
 async def _serve(app: Any, tenant: str, work) -> None:

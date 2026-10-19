@@ -45,7 +45,7 @@ listening. That is what makes one event per record of a bulk path affordable.
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from functools import partial
 from typing import Any, Final
 
@@ -101,11 +101,7 @@ def attach(session: Any, bus: Any) -> None:
 
 
 async def _publish_all(bus: Any, events: Sequence[Any], tenant: str | None) -> None:
-    if tenant is None:
-        for event in events:
-            await bus.publish(event)
-        return
-    with tenant_scope(tenant):
+    with tenant_scope(tenant) if tenant is not None else nullcontext():
         for event in events:
             await bus.publish(event)
 
