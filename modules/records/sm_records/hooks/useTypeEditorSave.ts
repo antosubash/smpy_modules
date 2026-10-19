@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { buildChanges, extraCreateFields, stripUids } from '../components/typeeditor/formHelpers';
@@ -49,10 +49,21 @@ export function useTypeEditorSave({
   // (§4.1) — none of `useSchemaApply`'s shapes, so it lands here.
   const [translatableError, setTranslatableError] = useState<string | null>(null);
 
+  // Typing a label answers its error; waiting for the next Save left
+  // "A label is required" under a field that is no longer wrong.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the label is the trigger, not an input
+  useEffect(() => {
+    setCreateErrors((prev) =>
+      prev.some((e) => e.field === 'label') ? prev.filter((e) => e.field !== 'label') : prev,
+    );
+  }, [values.label]);
+
   const save = async () => {
     // The server refuses a blank label too (422); saying so here spares the
     // round trip and puts the message under the field.
-    if (!values.label.trim()) {
+    // Not on an update that leaves a legacy blank label as it is: that save
+    // is about something else, and the server allows it.
+    if (!values.label.trim() && (isNew || values.label !== current?.label)) {
       setCreateErrors([{ field: 'label', message: t(keys.records.type_editor.label_required) }]);
       return;
     }

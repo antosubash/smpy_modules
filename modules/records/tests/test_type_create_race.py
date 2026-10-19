@@ -86,3 +86,35 @@ async def test_an_update_cannot_blank_the_label(client):
         headers=roles(ADMIN),
     )
     assert resp.status_code == 422, resp.text
+
+
+async def test_a_legacy_blank_label_type_still_takes_other_edits(client, records_app):
+    from tests.app_harness import seed_type
+
+    _, db_state = records_app
+    made = await seed_type(db_state, "legacy", [], label="")
+    resp = await client.put(
+        "/api/records/types/legacy",
+        json={"expected_version": made.version, "label": "", "description": "edited"},
+        headers=roles(ADMIN),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["description"] == "edited"
+    # ...but setting it to a different blank is still refused.
+    again = await client.put(
+        "/api/records/types/legacy",
+        json={"expected_version": resp.json()["version"], "label": "  "},
+        headers=roles(ADMIN),
+    )
+    assert again.status_code == 422, again.text
+
+
+async def test_an_unrelated_integrity_error_is_not_a_conflict(db, monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+
+    async def boom(*args, **kwargs):
+        raise IntegrityError("INSERT", {}, Exception("FOREIGN KEY constraint failed"))
+
+    monkeypatch.setattr(db, "flush", boom)
+    with pytest.raises(IntegrityError):
+        await type_service.create_type(db, key="fkfail", label="X", settings=RecordsSettings())

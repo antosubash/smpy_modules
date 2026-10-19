@@ -211,8 +211,13 @@ async def create_type(
     except IntegrityError as exc:
         # The SELECT above is only a check; the unique (tenant_id, key) index
         # is the authority, and a concurrent create that passed the same
-        # check lands here. Same 409 as the sequential duplicate.
-        raise Conflict(f"a record type with key {key!r} already exists") from exc
+        # check lands here. Same 409 as the sequential duplicate, but only for
+        # *that* violation: an FK or NOT NULL failure must stay a 500. The
+        # insert blocked on the winner's uncommitted row, so by now it is
+        # committed and a fresh look at the key sees it.
+        if (await db.execute(taken)).scalars().first():
+            raise Conflict(f"a record type with key {key!r} already exists") from exc
+        raise
     await snapshot(db, rtype, actor)
     return rtype
 
