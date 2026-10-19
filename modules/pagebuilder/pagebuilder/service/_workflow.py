@@ -138,6 +138,8 @@ class WorkflowMixin(RevisionsMixin):
         back so a later tick retries, and logged with the page's id: a
         schedule that quietly never fires leaves no other trace.
         """
+        # Aware UTC, as ``publish`` compares it against stored timestamps.
+        now = _normalize_to_utc(now) or datetime.now(UTC)
         if missed := await retire_missed_windows(self.db, now):
             logger.warning("pagebuilder.scheduler.window_missed count=%s", missed)
         flipped: list[Page] = []

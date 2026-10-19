@@ -75,9 +75,9 @@ def missed_window(now: datetime) -> ColumnElement[bool]:
 
 def any_due(now: datetime) -> ColumnElement[bool]:
     """Everything ``process_due`` acts on: the scheduler's tenant scan uses it,
-    so what it looks for cannot drift from what gets flipped. ``missed_window``
-    is subsumed by ``publish_due``; it is listed so the three cases read off."""
-    return or_(publish_due(now), unpublish_due(now), missed_window(now))
+    so what it looks for cannot drift from what gets flipped. A missed window
+    is a ``publish_due`` draft, so it needs no clause of its own."""
+    return or_(publish_due(now), unpublish_due(now))
 
 
 async def retire_missed_windows(db: AsyncSession, now: datetime) -> int:
@@ -91,11 +91,15 @@ async def retire_missed_windows(db: AsyncSession, now: datetime) -> int:
     Both times are cleared and the page stays a draft.
 
     Safe on every replica at once without a claim: the statement is idempotent,
-    and the second to run finds nothing left to match. Returns the row count.
+    and the second to run finds nothing left to match. The rows are locked in
+    id order first, as :func:`due_candidates` orders its claims, so two
+    replicas retiring the same set cannot deadlock on it (SQLite has no
+    ``FOR UPDATE`` and drops it). Returns the row count.
     """
+    locked = select(Page.id).where(missed_window(now)).order_by(Page.id).with_for_update()  # type: ignore[arg-type]
     result = await db.execute(
         update(Page)
-        .where(missed_window(now))
+        .where(Page.id.in_(locked))  # type: ignore[union-attr]
         .values(publish_at=None, unpublish_at=None)
         .execution_options(synchronize_session=False)
     )
