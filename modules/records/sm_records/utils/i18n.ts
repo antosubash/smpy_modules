@@ -177,7 +177,9 @@ export function useT(): { t: Translate } {
 
 /**
  * A key's English text, resolved without i18next: `{name}` placeholders are
- * filled from `params`, and a `count` picks the `_one` / `_other` entry.
+ * filled from `params` (an unsupplied one is left as written, as i18next does,
+ * so a label that documents `{slug}` keeps it), and a `count` picks the
+ * `_one` / `_other` entry.
  *
  * For module-scope config built before i18n is configured (`RecordsListBlock`'s
  * static field shape), and for tests that need a translator to hand a helper —
@@ -188,5 +190,7 @@ export function englishText(key: string, params: TranslateParams = {}): string {
   const plural =
     typeof count === 'number' ? english[`${key}_${count === 1 ? 'one' : 'other'}`] : undefined;
   const template = plural ?? english[key] ?? key;
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(params[name] ?? ''));
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    params[name] === undefined ? match : String(params[name]),
+  );
 }
