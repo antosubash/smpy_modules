@@ -13,7 +13,7 @@ development app that mounts them; it is never published.
 
 **Pin policy differs by role.** Published modules depend on the framework with
 *ranges* (`simple_module_core>=0.0.35,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.35`). Never give a published module an `==` pin —
+(`simple_module_hosting==0.0.36`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
@@ -26,7 +26,9 @@ labelled revision sits on one linear history and `<module>@base` walks
 everything beneath it — verified: `downgrade records@base` ran 20 downgrades
 and emptied the database. Removing one module's schema in isolation needs its
 tables on a real branch (`down_revision = None`), which nothing here produces
-yet. Upstream: antosubash/simple_module_python#333.
+yet. Upstream #333 was closed on 2026-10-07 as a documentation correction
+(framework 0.0.36, PR #403): the framework's own docs now say the label is only
+a named target, and no behaviour changed, so the limitation stands.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
 `(tenant_id, locale, slug)`, and a rename records a redirect scoped to that locale.
@@ -127,11 +129,14 @@ venv and back. Neither touches a tracked file.
   translation's key tree or placeholders drift from `en.json` — add a key to
   every catalogue at once. The demo host speaks both
   (`SM_I18N_SUPPORTED_LOCALES` in `.env.example`; the `locale` cookie picks
-  one, written by `host/locale_switch.py` because framework 0.0.35 has no
-  `/i18n/set-locale` route for its own switcher). The console chrome
-  (`packages/ui/locales/de.json`, also parity-checked) is German too; the
-  framework modules' screens (users, settings, …) ship English only and fall
-  back to it.
+  one, written by `host/locale_switch.py` because framework 0.0.36 has no
+  `/i18n/set-locale` route for its own switcher). The console chrome is German
+  too, through `host/locales/overrides/de.json`: since 0.0.36 the framework
+  ships the `ui` catalogue inside `simple_module_hosting` (English and Spanish
+  only) and ignores any `packages/ui/locales`, so a host's German is an
+  override, and `host/tests/test_ui_locales.py` fails when a framework bump
+  adds a `ui` key it lacks. The framework modules' screens (users, settings,
+  …) ship English only and fall back to it.
 
   news, pagebuilder, ai and billing call
   `t(keys.<module>.<section>.<key>)`; records passes string keys with a

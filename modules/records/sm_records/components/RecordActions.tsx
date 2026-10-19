@@ -52,7 +52,7 @@ export function RecordActions({
         onConfirm={async () => {
           await deleteRecord(typeKey, record.uuid);
           // Before `onGone()` navigates: the toast names the Trash the
-          // record went to and offers to put it back (UX-R8). `RecordsToaster`
+          // record went to and offers to put it back (UX-R8). The `<Toaster>`
           // is mounted by the layout both screens share, so the toast
           // survives the visit to the list that follows.
           trashToast(t, {

@@ -26,7 +26,6 @@ vi.mock('@inertiajs/react', () => ({
   router: { get, replace, reload: vi.fn(), visit: vi.fn() },
 }));
 vi.mock('../components/RecordIoMenu', () => ({ RecordIoMenu: () => null }));
-vi.mock('../components/RecordsToaster', () => ({ RecordsToaster: () => null }));
 
 const RecordList = (await import('../pages/RecordList')).default;
 

@@ -18,6 +18,7 @@ from typing import Final
 
 from fastapi import Depends, HTTPException, Query, Request
 from simple_module_db import get_db
+from simple_module_hosting.permissions import RequiresPermission
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
@@ -36,29 +37,16 @@ from sm_records.services.errors import Forbidden
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
 
-try:
-    # The ``permissions`` module's checker additionally consults per-user
-    # direct grants (``permissions_user_permission``, written by the
-    # permissions admin screen) on top of roles — the framework's own
-    # ``simple_module_hosting.permissions.RequiresPermission`` resolves roles
-    # only, so a direct ``records.view`` grant with no role attached is
-    # silently ignored by every route below. ``permissions`` is not a
-    # ``simple_module_records`` dependency (a published module can't require
-    # another plugin), so a host may install ``records`` without it — fall
-    # back to the roles-only checker in that case rather than failing to import.
-    from permissions.deps import RequiresPermission as _RequiresPermission
-    from permissions.service import PermissionService as _PermissionService
+# Since framework 0.0.36 (#337) the hosting checker honours roles *and* every
+# registered grant source, so a direct per-user ``records.view`` grant from the
+# ``permissions`` module counts here too; ``permissions.deps`` re-exports this
+# same class. Records used to import that module's checker to get the grants.
 
-    async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
-        service = _PermissionService(db, request.app.state.sm.permissions)
-        await _RequiresPermission(permission)(request, service)
 
-    RequiresPermission = _RequiresPermission
-except ImportError:  # pragma: no cover - exercised only when `permissions` isn't installed
-    from simple_module_hosting.permissions import RequiresPermission
-
-    async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
-        RequiresPermission(permission)(request)
+async def _check_permission(request: Request, db: AsyncSession, permission: str) -> None:
+    """Raise 401/403 unless the caller holds ``permission``. ``db`` is unused
+    since 0.0.36 (the grant sources need no session); callers still pass it."""
+    await RequiresPermission(permission)(request)
 
 
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))
