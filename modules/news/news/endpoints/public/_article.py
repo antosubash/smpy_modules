@@ -32,6 +32,8 @@ from news.endpoints.public._urls import (
     apply_cache,
     etag_for,
     public_base_url,
+    signed_in,
+    viewer_key,
 )
 from news.safe_url import canonical_or_none
 from news.settings import NewsSettings, active, public_article_path
@@ -129,13 +131,15 @@ def article_router(locale: str) -> APIRouter:
             raise HTTPException(status_code=404, detail="Article not found")
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
-        etag = etag_for(article.id or 0, article.updated_at, variant)
+        etag = etag_for(article.id or 0, article.updated_at, variant, viewer_key(request))
+        # A signed-in copy is never kept, so it gets no validator and no 304.
+        reader_signed_in = signed_in(request)
 
         def apply_headers(response: Response) -> Response:
-            response.headers["ETag"] = etag
-            # The same URL serves two representations; see `etag_for`.
-            response.headers["Vary"] = "X-Inertia"
-            apply_cache(response, request, settings)
+            if not reader_signed_in:
+                response.headers["ETag"] = etag
+            # Two representations and many viewers per URL; see `etag_for` (#94).
+            apply_cache(response, request, settings, per_viewer=True)
             # Which language was served, for caches and for anything reading
             # the response without parsing the body.
             response.headers["Content-Language"] = locale
@@ -143,7 +147,7 @@ def article_router(locale: str) -> APIRouter:
                 response.headers["Content-Security-Policy"] = settings.public_csp
             return response
 
-        if request.headers.get("if-none-match") == etag:
+        if not reader_signed_in and request.headers.get("if-none-match") == etag:
             return apply_headers(Response(status_code=304))
 
         canonical = canonical_or_none(article.canonical_url) or absolute_article(
