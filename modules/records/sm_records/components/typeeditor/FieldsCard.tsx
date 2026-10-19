@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
+import { keys, useT } from '../../utils/i18n';
 
 import type { DryRunReport, TypeRead, ValidationError } from '../../utils/types';
 import { FieldList } from './FieldList';
@@ -45,22 +45,17 @@ export function FieldsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('records.type_editor.section_fields', { defaultValue: 'Fields' })}</CardTitle>
+        <CardTitle>{t(keys.records.type_editor.section_fields)}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.field_indexed_hint', {
-            defaultValue:
-              'Tick "Indexed" on the fields worth filtering, sorting or showing as list columns — each one costs a write per save.',
-          })}
+          {t(keys.records.type_editor.field_indexed_hint)}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {!isNew && current && (
           <p className="text-sm text-muted-foreground">
-            {t('records.type_editor.live_notice', {
+            {t(keys.records.type_editor.live_notice, {
               count: current.record_count,
               trashed: current.trashed_record_count,
-              defaultValue:
-                '{count} live, {trashed} trashed records — changes are checked against them before they apply.',
             })}
           </p>
         )}

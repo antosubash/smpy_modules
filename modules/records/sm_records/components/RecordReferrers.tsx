@@ -1,12 +1,10 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useState } from 'react';
-
 import { listReferrers } from '../utils/api-history';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate, useT } from '../utils/i18n';
 import type { ReferrerRead } from '../utils/types';
 
 const PAGE_SIZE = 20;
@@ -14,11 +12,11 @@ const PAGE_SIZE = 20;
 function onDeleteLabel(t: Translate, onDelete: string): string {
   switch (onDelete) {
     case 'set_null':
-      return t('records.referrers.on_delete.set_null', { defaultValue: 'Set null' });
+      return t(keys.records.referrers.on_delete.set_null);
     case 'cascade':
-      return t('records.referrers.on_delete.cascade', { defaultValue: 'Cascade' });
+      return t(keys.records.referrers.on_delete.cascade);
     default:
-      return t('records.referrers.on_delete.restrict', { defaultValue: 'Restrict' });
+      return t(keys.records.referrers.on_delete.restrict);
   }
 }
 
@@ -49,7 +47,7 @@ function ReferrerRow({ item }: { item: ReferrerRead }) {
         </Badge>
         {item.is_deleted && (
           <Badge variant="secondary" data-testid="records-referrer-trashed">
-            {t('records.referrers.trashed', { defaultValue: 'Trashed' })}
+            {t(keys.records.referrers.trashed)}
           </Badge>
         )}
       </div>
@@ -122,10 +120,8 @@ export function RecordReferrers({
             how the panel becomes reachable by heading navigation — the
             editor exposed exactly two headings before (UX review R15). */}
         <CardTitle role="heading" aria-level={2}>
-          {t('records.referrers.title', {
+          {t(keys.records.referrers.title, {
             count: referrerCount,
-            defaultValue: 'Referenced by {count} record',
-            defaultValue_other: 'Referenced by {count} records',
           })}
         </CardTitle>
         {/* Nothing to expand at zero: the header has already said "Referenced
@@ -140,9 +136,7 @@ export function RecordReferrers({
             onClick={toggle}
             data-testid="records-referrers-toggle"
           >
-            {open
-              ? t('records.referrers.hide', { defaultValue: 'Hide' })
-              : t('records.referrers.show', { defaultValue: 'Show' })}
+            {open ? t(keys.records.referrers.hide) : t(keys.records.referrers.show)}
           </Button>
         )}
       </CardHeader>
@@ -155,13 +149,11 @@ export function RecordReferrers({
           )}
           {total === null && !loadError && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.revisions.loading', { defaultValue: 'Loading…' })}
+              {t(keys.records.type_editor.revisions.loading)}
             </p>
           )}
           {total === 0 && (
-            <p className="text-sm text-muted-foreground">
-              {t('records.referrers.empty', { defaultValue: 'Nothing references this record.' })}
-            </p>
+            <p className="text-sm text-muted-foreground">{t(keys.records.referrers.empty)}</p>
           )}
           {items.length > 0 && (
             <ul className="space-y-2" data-testid="records-referrers-list">
@@ -175,9 +167,7 @@ export function RecordReferrers({
               className="text-sm text-muted-foreground"
               data-testid="records-referrers-hidden-note"
             >
-              {t('records.referrers.hidden_note', {
-                defaultValue: 'Some referrers are not visible to you.',
-              })}
+              {t(keys.records.referrers.hidden_note)}
             </p>
           )}
           {hasMore && (
@@ -189,9 +179,7 @@ export function RecordReferrers({
               onClick={() => void loadPage(page + 1)}
               data-testid="records-referrers-load-more"
             >
-              {loading
-                ? t('records.common.loading', { defaultValue: 'Loading…' })
-                : t('records.referrers.load_more', { defaultValue: 'Load more' })}
+              {loading ? t(keys.records.common.loading) : t(keys.records.referrers.load_more)}
             </Button>
           )}
         </CardContent>

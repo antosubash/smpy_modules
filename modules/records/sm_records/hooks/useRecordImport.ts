@@ -1,9 +1,8 @@
 import { router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-
 import { DEFAULT_IMPORT_OPTIONS, type ImportOptionsValue } from '../components/RecordImportOptions';
+import { keys, useT } from '../utils/i18n';
 import {
   formatImportLimit,
   friendlyImportError,
@@ -91,10 +90,9 @@ export function useRecordImport(typeKey: string, maxImportBytes: number) {
       // Said here, before the upload: the server's own refusal is a 413 that
       // arrives only after the whole file has gone up the wire (R9/M13).
       toast.error(
-        t('records.io.too_large', {
+        t(keys.records.io.too_large, {
           name: chosen.name,
           limit: formatImportLimit(maxImportBytes),
-          defaultValue: '"{name}" is larger than the {limit} import limit.',
         }),
       );
       return false;

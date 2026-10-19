@@ -1,7 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
-
 import { useBulkActions } from '../hooks/useBulkActions';
 import type { RecordSelection } from '../hooks/useRecordSelection';
+import { useT } from '../utils/i18n';
 import type { RecordRead } from '../utils/types';
 import { BulkRefusalReport } from './BulkRefusalReport';
 import { EmptyTrashButton } from './EmptyTrashButton';
@@ -23,7 +22,7 @@ import { RecordBulkToolbar } from './RecordBulkToolbar';
  * nothing to act on, and the toast that announces a success has to outlive
  * the reload that empties the list — otherwise the one action that leaves no
  * rows behind is the one that announces nothing. It does: the `<Toaster>` is
- * mounted once, in the layout (`RecordsToaster`), outside the part of the
+ * mounted once, in the layout (`AdminLayout`), outside the part of the
  * tree a partial reload swaps.
  */
 export function RecordListBulk({

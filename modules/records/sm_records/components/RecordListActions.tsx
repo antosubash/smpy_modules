@@ -1,7 +1,7 @@
 import { Link, router } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import type React from 'react';
+import { keys, useT } from '../utils/i18n';
 
 import type { FieldDef, TenancyMode } from '../utils/types';
 import { RecordIoMenu } from './RecordIoMenu';
@@ -80,7 +80,7 @@ export function RecordListActions({
     <div className={TOOLBAR_CLASS} data-testid="records-list-actions">
       <TenantBadge tenant={tenant} tenancyMode={tenancyMode} />
       <Button variant="outline" onClick={() => router.visit('/admin/records')}>
-        {t('records.types.title', { defaultValue: 'Record Types' })}
+        {t(keys.records.types.title)}
       </Button>
       {columnsMenu}
       <RecordIoMenu
@@ -101,16 +101,12 @@ export function RecordListActions({
           data-testid="records-trash-toggle"
           onClick={onToggleTrashed}
         >
-          {trashed
-            ? t('records.trash.view_live', { defaultValue: 'Back to live records' })
-            : t('records.trash.view', { defaultValue: 'Trash' })}
+          {trashed ? t(keys.records.trash.view_live) : t(keys.records.trash.view)}
         </Button>
       )}
       {!trashed && (
         <Button asChild>
-          <Link href={`/admin/records/${typeKey}/new`}>
-            {t('records.records.new', { defaultValue: 'New record' })}
-          </Link>
+          <Link href={`/admin/records/${typeKey}/new`}>{t(keys.records.records.new)}</Link>
         </Button>
       )}
     </div>

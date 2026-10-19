@@ -60,7 +60,7 @@ an empty holder. There `current_settings()` hydrates lazily through
 precedence is the web lifespan's (DB row, then `SM_AI_*` env / `.env`, then the
 default). It also installs a secret provider resolving the secret the web app
 encrypts under: explicit `SM_SECRET_KEY`, else the stored `host.secret_key`.
-Framework 0.0.35's `SettingsReloaded` only travels the web process's in-memory
+Framework 0.0.36's `SettingsReloaded` only travels the web process's in-memory
 bus, so the worker caches for `LAZY_SETTINGS_TTL_SECONDS` (60 s) and
 `services.invalidate()` forces a re-read. An unreachable or unmigrated
 database falls back to env and defaults with a warning, as the lifespan's

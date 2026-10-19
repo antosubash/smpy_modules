@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
+import { keys, useT } from '../../utils/i18n';
 
 import type { TypeRead } from '../../utils/types';
 
@@ -23,27 +23,18 @@ export function TypeConflictNotice({
     <Card className="border-destructive/50" data-testid="records-type-conflict">
       <CardHeader>
         <CardTitle className="text-destructive">
-          {t('records.type_editor.conflict_title', {
-            defaultValue: 'This type changed while you were editing',
-          })}
+          {t(keys.records.type_editor.conflict_title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {t('records.type_editor.conflict_help', {
-            defaultValue:
-              'Someone else saved a change to this type since you opened it. Reload to see the latest version, then reapply your changes.',
-          })}
-        </p>
+        <p className="text-sm text-muted-foreground">{t(keys.records.type_editor.conflict_help)}</p>
         <p className="text-sm">
-          {t('records.type_editor.conflict_server_label', {
-            defaultValue: 'Current label on the server',
-          })}
+          {t(keys.records.type_editor.conflict_server_label)}
           {': '}
           <span className="font-medium">{current.label}</span>
         </p>
         <Button type="button" variant="outline" onClick={() => onReload(current)}>
-          {t('records.editor.reload', { defaultValue: 'Reload' })}
+          {t(keys.records.editor.reload)}
         </Button>
       </CardContent>
     </Card>

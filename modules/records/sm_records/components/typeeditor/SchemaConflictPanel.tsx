@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { keys, useT } from '../../utils/i18n';
 
 import type { DryRunReport } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -45,9 +45,7 @@ export function SchemaConflictPanel({
           data-testid="records-schema-report"
         >
           <h2 className="font-medium text-destructive">
-            {t('records.type_editor.preview.report_title', {
-              defaultValue: 'This change would leave records invalid',
-            })}
+            {t(keys.records.type_editor.preview.report_title)}
           </h2>
           <DryRunReportView report={report} />
           <ConfirmDialog
@@ -61,28 +59,16 @@ export function SchemaConflictPanel({
                     trashed)" is what keeps the two from reading as a
                     contradiction rather than two honestly different
                     scopes. */}
-                {t('records.type_editor.preview.apply_anyway', {
+                {t(keys.records.type_editor.preview.apply_anyway, {
                   count: report.failing,
-                  defaultValue:
-                    'Apply anyway — {count} record will be marked invalid (including trashed)',
-                  defaultValue_other:
-                    'Apply anyway — {count} records will be marked invalid (including trashed)',
                 })}
               </Button>
             }
-            title={t('records.type_editor.preview.apply_anyway_title', {
-              defaultValue: 'Apply this change anyway?',
-            })}
-            description={t('records.type_editor.preview.apply_anyway_description', {
+            title={t(keys.records.type_editor.preview.apply_anyway_title)}
+            description={t(keys.records.type_editor.preview.apply_anyway_description, {
               count: report.failing,
-              defaultValue:
-                '{count} record will be marked as not satisfying the schema (including trashed), rather than being changed or deleted.',
-              defaultValue_other:
-                '{count} records will be marked as not satisfying the schema (including trashed), rather than being changed or deleted.',
             })}
-            confirmLabel={t('records.type_editor.preview.apply_anyway_confirm', {
-              defaultValue: 'Apply anyway',
-            })}
+            confirmLabel={t(keys.records.type_editor.preview.apply_anyway_confirm)}
             destructive
             onConfirm={onForce}
           />
@@ -94,17 +80,10 @@ export function SchemaConflictPanel({
           className="space-y-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-4"
           data-testid="records-orphaned-conflicts"
         >
-          <h2 className="font-medium">
-            {t('records.type_editor.preview.conflicts_title', {
-              defaultValue: 'These fields still hold values from a previous delete',
-            })}
-          </h2>
+          <h2 className="font-medium">{t(keys.records.type_editor.preview.conflicts_title)}</h2>
           <OrphanedConflictsList conflicts={conflicts} />
           <p className="text-sm text-muted-foreground">
-            {t('records.type_editor.preview.conflicts_help', {
-              defaultValue:
-                'Restore brings those values back into the field; discard drops them for good.',
-            })}
+            {t(keys.records.type_editor.preview.conflicts_help)}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -114,7 +93,7 @@ export function SchemaConflictPanel({
                 void onOrphaned('restore');
               }}
             >
-              {t('records.type_editor.preview.orphaned_restore', { defaultValue: 'Restore' })}
+              {t(keys.records.type_editor.preview.orphaned_restore)}
             </Button>
             <Button
               type="button"
@@ -124,7 +103,7 @@ export function SchemaConflictPanel({
                 void onOrphaned('discard');
               }}
             >
-              {t('records.type_editor.preview.orphaned_discard', { defaultValue: 'Discard' })}
+              {t(keys.records.type_editor.preview.orphaned_discard)}
             </Button>
           </div>
         </div>

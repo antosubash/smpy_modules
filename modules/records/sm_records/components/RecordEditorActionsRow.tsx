@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { keys, useT } from '../utils/i18n';
 
 import type { RecordRead } from '../utils/types';
 import { RecordActions } from './RecordActions';
@@ -36,9 +36,7 @@ export function RecordEditorActionsRow({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button type="submit" disabled={pending}>
-        {pending
-          ? t('records.editor.saving', { defaultValue: 'Saving…' })
-          : t('records.editor.save', { defaultValue: 'Save' })}
+        {pending ? t(keys.records.editor.saving) : t(keys.records.editor.save)}
       </Button>
 
       {/* Opens a prefilled `/…/new` rather than resetting in place, so the
@@ -51,7 +49,7 @@ export function RecordEditorActionsRow({
           data-testid="records-editor-duplicate"
           onClick={onDuplicate}
         >
-          {t('records.editor.duplicate', { defaultValue: 'Save as copy' })}
+          {t(keys.records.editor.duplicate)}
         </Button>
       )}
 
@@ -73,10 +71,8 @@ export function RecordEditorActionsRow({
           found the problem. */}
       {errorCount > 0 && (
         <p className="text-sm text-destructive" role="alert" data-testid="records-save-summary">
-          {t('records.editor.fields_need_attention', {
+          {t(keys.records.editor.fields_need_attention, {
             count: errorCount,
-            defaultValue: '{count} field needs attention',
-            defaultValue_other: '{count} fields need attention',
           })}
         </p>
       )}

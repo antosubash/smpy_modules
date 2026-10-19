@@ -26,7 +26,8 @@
  * recognise is returned unchanged rather than guessed at.
  */
 
-import type { Translate } from './translate';
+import type { Translate } from './i18n';
+import { keys } from './i18n';
 
 /** pydantic v2's exact wording for a field with no value at all
  *  (`type: 'missing'`), and for `None` reaching a type-specific validator —
@@ -38,9 +39,7 @@ const MISSING_VALUE_PATTERN = /^(Field required|Input should be a valid [a-z ]+)
 
 export function humanizeDryRunMessage(t: Translate, message: string): string {
   if (MISSING_VALUE_PATTERN.test(message.trim())) {
-    return t('records.type_editor.preview.error_missing_value', {
-      defaultValue: 'required, but this record has no value for it',
-    });
+    return t(keys.records.type_editor.preview.error_missing_value);
   }
   return message;
 }

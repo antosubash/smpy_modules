@@ -26,9 +26,9 @@ describe('ConfirmDialog — U1: the confirm button renders the variant it is giv
     await click(view.button('Open'));
     const btn = confirmButton();
     expect(btn).not.toBeNull();
-    // The button carries `data-variant` from `buttonVariants` and its class
-    // list is the destructive one — not the green primary `bg-primary`.
-    expect(btn?.getAttribute('data-variant')).toBe('destructive');
+    // The class list is the destructive one — not the green primary
+    // `bg-primary`. (Since ui 0.0.36 the action applies `buttonVariants`
+    // itself rather than wrapping `Button`, so there is no `data-variant`.)
     expect(btn?.className).toContain('bg-destructive');
     expect(btn?.className).not.toContain('bg-primary');
     await view.unmount();
@@ -48,7 +48,6 @@ describe('ConfirmDialog — U1: the confirm button renders the variant it is giv
     );
     await click(view.button('Open'));
     const btn = confirmButton();
-    expect(btn?.getAttribute('data-variant')).toBe('default');
     expect(btn?.className).toContain('bg-primary');
     expect(btn?.className).not.toContain('bg-destructive');
     await view.unmount();

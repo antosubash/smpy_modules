@@ -12,19 +12,10 @@
  * validator built at module scope freezes against the first render's locale.
  */
 
+import { keys, type Translate } from './i18n';
 import type { FieldDef } from './types';
 import { choicesOf, fieldConstraints, isRelationValue, relationIsMany } from './values';
 
-/** The subset of i18next's `t` this module needs.
- *
- * Deliberately a plain function type rather than `ReturnType<typeof useT>['t']`:
- * i18next's own signature is generic enough that calling it through an alias
- * makes `tsc` give up with "type instantiation is excessively deep". The one
- * `t as unknown as Translate` that bridges the two lives in `useRecordForm`. */
-export type Translate = (
-  key: string,
-  options: { defaultValue: string; [name: string]: unknown },
-) => string;
 export type Validator = (values: Record<string, unknown>) => Record<string, string>;
 
 /** `Numeric(19, 5)` — design §7.3, and `NUMBER_SCALE` in `constants.py`. */
@@ -58,14 +49,12 @@ function checkTextConstraints(t: Translate, field: FieldDef, text: string): stri
   const min = numberOr(constraints.min_length, null);
   const max = numberOr(constraints.max_length, null);
   if (min !== null && text.length < min) {
-    return t('records.validation.min_length', {
-      defaultValue: 'Must be at least {min} characters',
+    return t(keys.records.validation.min_length, {
       min,
     });
   }
   if (max !== null && text.length > max) {
-    return t('records.validation.max_length', {
-      defaultValue: 'Must be at most {max} characters',
+    return t(keys.records.validation.max_length, {
       max,
     });
   }
@@ -74,9 +63,7 @@ function checkTextConstraints(t: Translate, field: FieldDef, text: string): stri
     try {
       // `re.search`, not `re.match` — the server uses `pattern.search`.
       if (!new RegExp(pattern).test(text)) {
-        return t('records.validation.pattern', {
-          defaultValue: 'Does not match the required format',
-        });
+        return t(keys.records.validation.pattern);
       }
     } catch {
       // A pattern JS cannot compile is the type editor's problem, not this
@@ -87,9 +74,7 @@ function checkTextConstraints(t: Translate, field: FieldDef, text: string): stri
 }
 
 function checkUrl(t: Translate, text: string): string | undefined {
-  const message = t('records.validation.url', {
-    defaultValue: 'Must be an http:// or https:// URL with a host',
-  });
+  const message = t(keys.records.validation.url);
   try {
     const parsed = new URL(text);
     if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || !parsed.host) {
@@ -103,18 +88,16 @@ function checkUrl(t: Translate, text: string): string | undefined {
 
 function checkNumber(t: Translate, field: FieldDef, text: string): string | undefined {
   if (!DECIMAL_RE.test(text)) {
-    return t('records.validation.not_a_number', { defaultValue: 'Not a number' });
+    return t(keys.records.validation.not_a_number);
   }
   const [whole, fraction = ''] = text.replace(/^[+-]/, '').split('.');
   if (fraction.length > NUMBER_SCALE) {
-    return t('records.validation.decimals', {
-      defaultValue: 'At most {scale} decimal places are stored',
+    return t(keys.records.validation.decimals, {
       scale: NUMBER_SCALE,
     });
   }
   if (whole.replace(/^0+(?=\d)/, '').length > MAX_INT_DIGITS) {
-    return t('records.validation.int_digits', {
-      defaultValue: 'At most {digits} digits before the decimal point',
+    return t(keys.records.validation.int_digits, {
       digits: MAX_INT_DIGITS,
     });
   }
@@ -127,25 +110,23 @@ function checkRange(t: Translate, field: FieldDef, value: number): string | unde
   const min = numberOr(constraints.min, null);
   const max = numberOr(constraints.max, null);
   if (min !== null && value < min) {
-    return t('records.validation.min', { defaultValue: 'Must be at least {min}', min });
+    return t(keys.records.validation.min, { min });
   }
   if (max !== null && value > max) {
-    return t('records.validation.max', { defaultValue: 'Must be at most {max}', max });
+    return t(keys.records.validation.max, { max });
   }
   return undefined;
 }
 
 function checkChoice(t: Translate, field: FieldDef, value: unknown): string | undefined {
   const allowed = new Set(choicesOf(field).map((choice) => choice.value));
-  const unknownChoice = t('records.validation.choice', {
-    defaultValue: 'Not one of the configured choices',
-  });
+  const unknownChoice = t(keys.records.validation.choice);
   if (field.type === 'select') {
     return typeof value === 'string' && allowed.has(value) ? undefined : unknownChoice;
   }
   if (!Array.isArray(value)) return unknownChoice;
   if (new Set(value).size !== value.length) {
-    return t('records.validation.duplicate_choice', { defaultValue: 'Contains duplicate values' });
+    return t(keys.records.validation.duplicate_choice);
   }
   return value.every((item) => typeof item === 'string' && allowed.has(item))
     ? undefined
@@ -157,12 +138,10 @@ function checkJson(t: Translate, text: string): string | undefined {
   try {
     parsed = JSON.parse(text);
   } catch {
-    return t('records.validation.json', { defaultValue: 'Not valid JSON' });
+    return t(keys.records.validation.json);
   }
   if (parsed === null || typeof parsed !== 'object') {
-    return t('records.validation.json_shape', {
-      defaultValue: 'Must be a JSON object or array, not a scalar',
-    });
+    return t(keys.records.validation.json_shape);
   }
   return undefined;
 }
@@ -173,9 +152,7 @@ function refIsValid(value: unknown): boolean {
 }
 
 function checkRelation(t: Translate, field: FieldDef, value: unknown): string | undefined {
-  const message = t('records.validation.relation', {
-    defaultValue: 'Not a valid link to a record',
-  });
+  const message = t(keys.records.validation.relation);
   if (relationIsMany(field)) {
     return Array.isArray(value) && value.every(refIsValid) ? undefined : message;
   }
@@ -191,9 +168,7 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
       const text = String(value);
       return (
         checkTextConstraints(t, field, text) ??
-        (EMAIL_RE.test(text)
-          ? undefined
-          : t('records.validation.email', { defaultValue: 'Not a valid email address' }))
+        (EMAIL_RE.test(text) ? undefined : t(keys.records.validation.email))
       );
     }
     case 'url': {
@@ -202,8 +177,7 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
     }
     case 'media':
       return String(value).length > MEDIA_MAX_LEN
-        ? t('records.validation.max_length', {
-            defaultValue: 'Must be at most {max} characters',
+        ? t(keys.records.validation.max_length, {
             max: MEDIA_MAX_LEN,
           })
         : undefined;
@@ -212,34 +186,31 @@ function checkOne(t: Translate, field: FieldDef, value: unknown): string | undef
     case 'integer': {
       const text = String(value).trim();
       if (!INTEGER_RE.test(text)) {
-        return t('records.validation.not_an_integer', { defaultValue: 'Must be a whole number' });
+        return t(keys.records.validation.not_an_integer);
       }
       // Same cap `number` gets (F8): the wire value is the trimmed digit
       // string now, not a parsed JS number, so a value past
       // `Number.isSafeInteger` needs its own length check rather than
       // relying on `Number()` to have already lost precision on the way in.
       if (text.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '').length > MAX_INT_DIGITS) {
-        return t('records.validation.int_digits', {
-          defaultValue: 'At most {digits} digits before the decimal point',
+        return t(keys.records.validation.int_digits, {
           digits: MAX_INT_DIGITS,
         });
       }
       return checkRange(t, field, Number(text));
     }
     case 'boolean':
-      return typeof value === 'boolean'
-        ? undefined
-        : t('records.validation.boolean', { defaultValue: 'Expected true or false' });
+      return typeof value === 'boolean' ? undefined : t(keys.records.validation.boolean);
     case 'date': {
       const text = String(value).trim();
       const parsed = new Date(`${text}T00:00:00Z`);
       return DATE_RE.test(text) && !Number.isNaN(parsed.getTime())
         ? undefined
-        : t('records.validation.date', { defaultValue: 'Not a valid date (YYYY-MM-DD)' });
+        : t(keys.records.validation.date);
     }
     case 'datetime':
       return Number.isNaN(new Date(String(value).trim()).getTime())
-        ? t('records.validation.datetime', { defaultValue: 'Not a valid date and time' })
+        ? t(keys.records.validation.datetime)
         : undefined;
     case 'select':
     case 'multiselect':
@@ -263,9 +234,7 @@ export function buildValidator(t: Translate, fields: FieldDef[]): Validator {
       const value = values[field.key];
       if (isEmptyValue(value)) {
         if (field.required) {
-          errors[field.key] = t('records.validation.required', {
-            defaultValue: 'This field is required',
-          });
+          errors[field.key] = t(keys.records.validation.required);
         }
         continue;
       }

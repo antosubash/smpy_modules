@@ -21,7 +21,8 @@
  */
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
-import type { Translate } from './translate';
+import type { Translate } from './i18n';
+import { keys } from './i18n';
 import type { FieldDef } from './types';
 
 export { exportScopeLabel } from './export-scope';
@@ -108,10 +109,10 @@ export type ImportOptionsSummaryInput = {
  *  longer shows `uuid`/`slug` raw). */
 function matchByLabel(t: Translate, matchBy: string, fields: FieldDef[]): string {
   if (matchBy === 'uuid') {
-    return t('records.io.match_by_uuid', { defaultValue: 'Record ID (uuid)' });
+    return t(keys.records.io.match_by_uuid);
   }
   if (matchBy === 'slug') {
-    return t('records.io.match_by_slug', { defaultValue: 'Slug' });
+    return t(keys.records.io.match_by_slug);
   }
   const field = fields.find((candidate) => candidate.key === matchBy);
   return field ? `${field.label} (${field.key})` : matchBy;
@@ -129,18 +130,17 @@ export function importOptionsSummary(
 ): string {
   const modeText =
     options.mode === 'create'
-      ? t('records.io.mode_create', { defaultValue: 'Create only' })
+      ? t(keys.records.io.mode_create)
       : options.mode === 'update'
-        ? t('records.io.mode_update', { defaultValue: 'Update only' })
-        : t('records.io.mode_upsert', { defaultValue: 'Create or update (upsert)' });
+        ? t(keys.records.io.mode_update)
+        : t(keys.records.io.mode_upsert);
   const forceText = options.force
-    ? t('records.io.summary_force_on', { defaultValue: 'overwrite unversioned rows: on' })
-    : t('records.io.summary_force_off', { defaultValue: 'overwrite unversioned rows: off' });
+    ? t(keys.records.io.summary_force_on)
+    : t(keys.records.io.summary_force_off);
   return [
     modeText,
-    t('records.io.summary_match_by', {
+    t(keys.records.io.summary_match_by, {
       label: matchByLabel(t, options.matchBy, fields),
-      defaultValue: 'match by {label}',
     }),
     forceText,
   ].join(' · ');
@@ -227,18 +227,12 @@ export function importApplyBlockedReason(
   if (onError === 'skip') return null;
   // U10: "N of M rows" declines by M (the total), while "Fix it/them" declines
   // by N (the failed rows) — two nouns, two plural forms, so two keys.
-  const sentence = t('records.io.apply_blocked', {
+  const sentence = t(keys.records.io.apply_blocked, {
     failed: report.failed,
     count: report.total,
-    defaultValue: "{failed} of {count} row can't be imported, so nothing will be written.",
-    defaultValue_other: "{failed} of {count} rows can't be imported, so nothing will be written.",
   });
-  const remedy = t('records.io.apply_blocked_fix', {
+  const remedy = t(keys.records.io.apply_blocked_fix, {
     count: report.failed,
-    defaultValue:
-      'Fix it and try again, or choose "Skip it and write the rest" under Import options.',
-    defaultValue_other:
-      'Fix them and try again, or choose "Skip it and write the rest" under Import options.',
   });
   return `${sentence} ${remedy}`;
 }
@@ -250,16 +244,10 @@ export function importApplyBlockedReason(
  *  rewritten server-side, so this stays a UI concern (UX-5). */
 export function friendlyImportError(t: Translate, raw: string): string {
   if (raw.includes('cannot tell whether this is JSON or CSV')) {
-    return t('records.io.error_unknown_format', {
-      defaultValue:
-        "Couldn't tell whether that file is JSON or CSV — save it with a .json or .csv extension and try again.",
-    });
+    return t(keys.records.io.error_unknown_format);
   }
   if (raw.includes('is not valid JSON')) {
-    return t('records.io.error_bad_json', {
-      defaultValue:
-        "That file isn't valid JSON — open it in a text editor and check it's complete.",
-    });
+    return t(keys.records.io.error_bad_json);
   }
   return raw;
 }

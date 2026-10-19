@@ -1,6 +1,6 @@
-import { useT } from '@simple-module-py/i18n';
 import { FileIcon } from 'lucide-react';
 import type React from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import {
   fileUrl,
@@ -65,7 +65,7 @@ export function MediaGrid({
     <ul
       className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
       onKeyDown={moveFocus}
-      aria-label={t('records.media.grid_label', { defaultValue: 'Files' })}
+      aria-label={t(keys.records.media.grid_label)}
       data-testid="records-media-grid"
     >
       {files.map((file) => {
@@ -79,8 +79,7 @@ export function MediaGrid({
               data-media-item=""
               data-testid="records-media-item"
               aria-current={current ? 'true' : undefined}
-              aria-label={t('records.media.item_label', {
-                defaultValue: '{name}, {type}, {size}, uploaded {date}',
+              aria-label={t(keys.records.media.item_label, {
                 name: file.filename,
                 type: file.content_type,
                 size,
@@ -117,7 +116,7 @@ export function MediaGrid({
                 </span>
                 {current && (
                   <span className="text-xs font-medium text-primary">
-                    {t('records.media.current', { defaultValue: 'Current file' })}
+                    {t(keys.records.media.current)}
                   </span>
                 )}
               </span>

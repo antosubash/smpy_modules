@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { NavIcon } from '@simple-module-py/ui/components/NavIcon';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import type React from 'react';
+import { keys, useT } from '../utils/i18n';
 import type { TypeRead } from '../utils/types';
 import { RecordListPublicUrl } from './RecordListPublicUrl';
 import { navIconName } from './typeeditor/navIcons';
@@ -55,7 +55,7 @@ export function TypeIdentity({
             className="ml-2 text-xs font-normal text-muted-foreground"
             data-testid="records-type-in-sidebar"
           >
-            {t('records.types.in_sidebar', { defaultValue: 'In sidebar' })}
+            {t(keys.records.types.in_sidebar)}
           </span>
         )}
         {type.description && (
@@ -100,17 +100,13 @@ export function TypeCounts({ type, card = false }: { type: TypeRead; card?: bool
   const { t } = useT();
   return (
     <>
-      {t('records.types.record_count', {
+      {t(keys.records.types.record_count, {
         count: type.record_count,
-        defaultValue: '{count} record',
-        defaultValue_other: '{count} records',
       })}
       {type.trashed_record_count > 0 && (
         <span className={card ? 'ml-1' : 'ml-1 text-muted-foreground'}>
-          {t('records.types.trashed_record_count', {
+          {t(keys.records.types.trashed_record_count, {
             count: type.trashed_record_count,
-            defaultValue: '({count} trashed)',
-            defaultValue_other: '({count} trashed)',
           })}
         </span>
       )}
@@ -123,10 +119,8 @@ export function TypeCounts({ type, card = false }: { type: TypeRead; card?: bool
           className="ml-1 text-destructive hover:underline"
           data-testid="records-type-invalid-count"
         >
-          {t('records.types.invalid_record_count', {
+          {t(keys.records.types.invalid_record_count, {
             count: type.invalid_record_count,
-            defaultValue: '({count} invalid)',
-            defaultValue_other: '({count} invalid)',
           })}
         </Link>
       )}
@@ -172,7 +166,7 @@ export function TypesCardList({
               className="mt-1 inline-block text-sm text-primary hover:underline"
               data-testid="records-type-edit-schema"
             >
-              {t('records.types.edit_schema', { defaultValue: 'Edit schema' })}
+              {t(keys.records.types.edit_schema)}
             </Link>
           </TypeIdentity>
         </li>

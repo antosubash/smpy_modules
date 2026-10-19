@@ -1,12 +1,10 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useState } from 'react';
 import { toast } from 'sonner';
-
 import { ApiError } from '../utils/api';
 import { getRecordRevision, listRevisions, restoreRecordRevision } from '../utils/api-history';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate, useT } from '../utils/i18n';
 import type {
   RecordRead,
   RecordRevision,
@@ -30,15 +28,14 @@ import { ConfirmDialog } from './ConfirmDialog';
  *  does not know still prints, as itself. Exported for its own test, the
  *  way `RecordDeleteDialog` exports its two halves. */
 export function revisionEvent(t: Translate, event: string): string {
-  const defaults: Record<string, string> = {
-    create: 'Created',
-    update: 'Updated',
-    delete: 'Deleted',
-    restore: 'Restored',
+  const labels: Record<string, string> = {
+    create: keys.records.editor.revisions.event.create,
+    update: keys.records.editor.revisions.event.update,
+    delete: keys.records.editor.revisions.event.delete,
+    restore: keys.records.editor.revisions.event.restore,
   };
-  const fallback = defaults[event];
-  if (!fallback) return event;
-  return t(`records.editor.revisions.event.${event}`, { defaultValue: fallback });
+  const key = labels[event];
+  return key ? t(key) : event;
 }
 
 export function RecordRevisions({
@@ -99,22 +96,16 @@ export function RecordRevisions({
       const restored = await restoreRecordRevision(typeKey, uuid, revision.id, currentVersion);
       onRestored(restored);
       setSelected(null);
-      toast.success(t('records.editor.revisions.restored', { defaultValue: 'Version restored' }));
+      toast.success(t(keys.records.editor.revisions.restored));
       void load();
     } catch (err) {
       if (err instanceof ApiError && err.status === 422 && err.body?.errors) {
         setRestoreError(
           formatSchemaMismatch(t, err.body.errors) ??
-            t('records.editor.revisions.restore_schema_mismatch', {
-              defaultValue: "This version no longer fits the type's current schema.",
-            }),
+            t(keys.records.editor.revisions.restore_schema_mismatch),
         );
       } else if (err instanceof ApiError && err.status === 409) {
-        setRestoreError(
-          t('records.editor.conflict_title', {
-            defaultValue: 'This record changed while you were editing',
-          }),
-        );
+        setRestoreError(t(keys.records.editor.conflict_title));
       } else {
         setRestoreError(err instanceof Error ? err.message : String(err));
       }
@@ -127,15 +118,13 @@ export function RecordRevisions({
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         {/* See `RecordReferrers` for why the role is spelled out (R15). */}
         <CardTitle role="heading" aria-level={2}>
-          {t('records.editor.revisions.title', { defaultValue: 'History' })}
+          {t(keys.records.editor.revisions.title)}
         </CardTitle>
         {/* This panel's own keys, not the type editor's: the two screens are
             free to word their toggles differently, and sharing a key made
             "one vocabulary per screen" (R14) a cross-screen argument. */}
         <Button type="button" variant="ghost" size="sm" onClick={toggle}>
-          {open
-            ? t('records.editor.revisions.hide', { defaultValue: 'Hide' })
-            : t('records.editor.revisions.show', { defaultValue: 'Show' })}
+          {open ? t(keys.records.editor.revisions.hide) : t(keys.records.editor.revisions.show)}
         </Button>
       </CardHeader>
       {open && (
@@ -147,12 +136,12 @@ export function RecordRevisions({
           )}
           {items === null && !loadError && (
             <p className="text-sm text-muted-foreground">
-              {t('records.type_editor.revisions.loading', { defaultValue: 'Loading…' })}
+              {t(keys.records.type_editor.revisions.loading)}
             </p>
           )}
           {items?.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              {t('records.editor.revisions.empty', { defaultValue: 'No earlier versions yet.' })}
+              {t(keys.records.editor.revisions.empty)}
             </p>
           )}
           {items && items.length > 0 && (
@@ -169,9 +158,8 @@ export function RecordRevisions({
                     onClick={() => void showDetail(rev)}
                   >
                     <p className="font-medium">
-                      {t('records.type_editor.revisions.version_label', {
+                      {t(keys.records.type_editor.revisions.version_label, {
                         version: rev.version,
-                        defaultValue: 'v{version}',
                       })}
                       {' · '}
                       {revisionEvent(t, rev.event)}
@@ -197,21 +185,14 @@ export function RecordRevisions({
                       <ConfirmDialog
                         trigger={
                           <Button type="button" variant="outline" size="sm">
-                            {t('records.editor.revisions.restore', {
-                              defaultValue: 'Restore this version',
-                            })}
+                            {t(keys.records.editor.revisions.restore)}
                           </Button>
                         }
-                        title={t('records.editor.revisions.restore', {
-                          defaultValue: 'Restore this version',
-                        })}
-                        description={t('records.editor.revisions.restore_confirm', {
+                        title={t(keys.records.editor.revisions.restore)}
+                        description={t(keys.records.editor.revisions.restore_confirm, {
                           version: rev.version,
-                          defaultValue: 'Restore the data from v{version}?',
                         })}
-                        confirmLabel={t('records.editor.revisions.restore', {
-                          defaultValue: 'Restore this version',
-                        })}
+                        confirmLabel={t(keys.records.editor.revisions.restore)}
                         onConfirm={() => restore(selected)}
                       />
                     </div>
@@ -238,8 +219,7 @@ export function RecordRevisions({
 function formatSchemaMismatch(t: Translate, errors: ValidationError[]): string | null {
   if (errors.length === 0) return null;
   const detail = errors.map((e) => `${e.field}: ${e.message}`).join('; ');
-  return t('records.editor.revisions.restore_schema_mismatch_detail', {
+  return t(keys.records.editor.revisions.restore_schema_mismatch_detail, {
     detail,
-    defaultValue: "This version no longer fits the type's current schema: {detail}",
   });
 }

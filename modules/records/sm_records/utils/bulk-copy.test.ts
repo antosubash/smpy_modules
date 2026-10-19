@@ -1,19 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { bulkActions, emptyTrashDescription } from './bulk-copy';
-
-/** The same stand-in for `useT()`'s `t` that `RecordDeleteDialog.test.tsx`
- *  uses: `{name}` interpolation and the `_one` plural, which is all i18next's
- *  contract these sentences rely on — and which a mounted test cannot show,
- *  since i18next is unconfigured under vitest. */
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  const count = typeof opts?.count === 'number' ? opts.count : undefined;
-  const template =
-    count === 1 && typeof opts?.defaultValue_one === 'string'
-      ? (opts.defaultValue_one as string)
-      : ((opts?.defaultValue as string) ?? key);
-  return template.replace(/\{(\w+)\}/g, (_m, name: string) => String(opts?.[name] ?? ''));
-}
+import { englishText as fakeT } from './i18n';
 
 describe('bulkActions — the two sets never mix', () => {
   it('offers Trash, Publish and Unpublish on the live list', () => {

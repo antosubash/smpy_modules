@@ -67,8 +67,12 @@ def check_dir(locales: Path) -> list[str]:
 
 
 def discover(root: Path) -> list[Path]:
-    """Every module's catalogues, plus the host's vendored ``packages/*/locales``."""
-    found = [*(root / "modules").glob("*/*/locales"), *(root / "packages").glob("*/locales")]
+    """Every module's catalogues.
+
+    The console chrome's German lives in ``host/locales/overrides/de.json``,
+    checked against the framework's catalogue by ``host/tests/test_ui_locales.py``.
+    """
+    found = list((root / "modules").glob("*/*/locales"))
     return sorted(path for path in found if path.is_dir() and "node_modules" not in path.parts)
 
 

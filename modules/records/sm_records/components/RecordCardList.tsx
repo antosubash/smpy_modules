@@ -1,8 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { Fragment } from 'react';
-
 import type { RecordSelection } from '../hooks/useRecordSelection';
+import { keys, useT } from '../utils/i18n';
 import { availableColumns, type ListColumn, resolveListColumns } from '../utils/listing';
 import { recordDisplayTitle } from '../utils/record-title';
 import type { RecordRead, TypeRead } from '../utils/types';
@@ -77,11 +76,7 @@ export function RecordCardList({
   const showLocale = shown.some((column) => column.key === 'locale');
   const labels =
     givenLabels ??
-    columnLabels(
-      t,
-      availableColumns(type, showLocale),
-      t('records.records.display_title', { defaultValue: 'Title' }),
-    );
+    columnLabels(t, availableColumns(type, showLocale), t(keys.records.records.display_title));
   const lines = shown
     .filter((column) => column.key !== 'status' && column.key !== 'locale')
     .slice(0, CARD_COLUMNS);
@@ -97,9 +92,7 @@ export function RecordCardList({
             indeterminate={selection.someSelected}
             onToggle={selection.toggleAll}
           />
-          <span>
-            {t('records.bulk.select_all_label', { defaultValue: 'Select all on this page' })}
-          </span>
+          <span>{t(keys.records.bulk.select_all_label)}</span>
         </div>
       )}
       <ul className="space-y-3">

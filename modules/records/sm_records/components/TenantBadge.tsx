@@ -1,5 +1,5 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
+import { keys, useT } from '../utils/i18n';
 
 import type { TenancyMode } from '../utils/types';
 
@@ -27,7 +27,7 @@ export function TenantBadge({
   if (tenancyMode !== 'multi' || !tenant) return null;
   return (
     <Badge variant="secondary" data-testid="records-tenant-badge">
-      {t('records.common.tenant_badge', { tenant, defaultValue: 'Tenant: {tenant}' })}
+      {t(keys.records.common.tenant_badge, { tenant })}
     </Badge>
   );
 }

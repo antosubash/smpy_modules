@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Dialog,
@@ -18,6 +17,7 @@ import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
 import { ChevronDownIcon } from 'lucide-react';
 import { useRef } from 'react';
 import { useRecordImport } from '../hooks/useRecordImport';
+import { keys, useT } from '../utils/i18n';
 import {
   DEFAULT_MAX_IMPORT_BYTES,
   exportScopeLabel,
@@ -102,24 +102,22 @@ export function RecordIoMenu({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="outline" data-testid="records-export-menu">
-            {t('records.io.export', { defaultValue: 'Export' })}
+            {t(keys.records.io.export)}
             <ChevronDownIcon className="size-4 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <a href={exportUrl(typeKey, 'json', search)} data-testid="records-export-json">
-              {t('records.io.export_json_scoped', {
+              {t(keys.records.io.export_json_scoped, {
                 scope,
-                defaultValue: 'Download JSON ({scope})',
               })}
             </a>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <a href={exportUrl(typeKey, 'csv', search)} data-testid="records-export-csv">
-              {t('records.io.export_csv_scoped', {
+              {t(keys.records.io.export_csv_scoped, {
                 scope,
-                defaultValue: 'Download CSV ({scope})',
               })}
             </a>
           </DropdownMenuItem>
@@ -130,10 +128,7 @@ export function RecordIoMenu({
                 className="max-w-64 text-wrap font-normal text-muted-foreground"
                 data-testid="records-export-trash-note"
               >
-                {t('records.io.trash_export_note', {
-                  defaultValue:
-                    "A trash export can't be re-imported — restore or purge the records first.",
-                })}
+                {t(keys.records.io.trash_export_note)}
               </DropdownMenuLabel>
             </>
           )}
@@ -160,10 +155,10 @@ export function RecordIoMenu({
             {phase === 'checking' ? (
               <span className="inline-flex items-center gap-1.5">
                 <Spinner className="size-3.5" />
-                {t('records.io.checking_button', { defaultValue: 'Checking…' })}
+                {t(keys.records.io.checking_button)}
               </span>
             ) : (
-              t('records.io.import', { defaultValue: 'Import' })
+              t(keys.records.io.import)
             )}
           </Button>
         </>
@@ -173,9 +168,7 @@ export function RecordIoMenu({
         <DialogContent data-testid="records-import-report">
           <DialogHeader>
             <DialogTitle>
-              {dryRunNow
-                ? t('records.io.preview_title', { defaultValue: 'Import preview' })
-                : t('records.io.result_title', { defaultValue: 'Import result' })}
+              {dryRunNow ? t(keys.records.io.preview_title) : t(keys.records.io.result_title)}
             </DialogTitle>
           </DialogHeader>
           {file && (
@@ -188,9 +181,8 @@ export function RecordIoMenu({
               {' — '}
               {importOptionsSummary(t, options, fields)}
               <br />
-              {t('records.io.limit_note', {
+              {t(keys.records.io.limit_note, {
                 limit: limitText,
-                defaultValue: 'Files up to {limit}.',
               })}
             </p>
           )}
@@ -200,9 +192,7 @@ export function RecordIoMenu({
               data-testid="records-import-progress"
             >
               <Spinner className="size-4" />
-              {phase === 'checking'
-                ? t('records.io.checking', { defaultValue: 'Checking the file…' })
-                : t('records.io.applying', { defaultValue: 'Writing the import…' })}
+              {phase === 'checking' ? t(keys.records.io.checking) : t(keys.records.io.applying)}
             </div>
           )}
           {report && <ImportReportSummary report={report} />}
@@ -231,7 +221,7 @@ export function RecordIoMenu({
                 fixed accessible name "Close" — naming this button the same
                 thing gave the dialog two controls with one name. */}
             <Button type="button" variant="outline" disabled={busy} onClick={close}>
-              {t('records.io.close', { defaultValue: 'Done' })}
+              {t(keys.records.io.close)}
             </Button>
             {report?.dry_run && file && (
               <Button
@@ -241,7 +231,7 @@ export function RecordIoMenu({
                 data-testid="records-import-apply"
                 onClick={() => void apply()}
               >
-                {t('records.io.apply', { defaultValue: 'Apply import' })}
+                {t(keys.records.io.apply)}
               </Button>
             )}
           </div>

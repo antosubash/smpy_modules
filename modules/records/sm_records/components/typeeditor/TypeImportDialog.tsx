@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Dialog,
@@ -7,18 +6,18 @@ import {
   DialogTitle,
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Spinner } from '@simple-module-py/ui/components/ui/spinner';
-import type { Translate } from '../../utils/translate';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { ParseFailure, TypeDefinition } from '../../utils/type-io';
 
 function failureMessage(t: Translate, reason: ParseFailure): string {
-  const defaults: Record<ParseFailure, string> = {
-    not_json: "That file isn't valid JSON — open it in a text editor and check it's complete.",
-    not_object: "That file isn't a type definition: the top level has to be a JSON object.",
-    missing_key: 'That definition has no "key", so there is no type to create or update.',
-    missing_label: 'That definition has no "label".',
-    missing_fields: 'That definition has no "fields" list.',
+  const labels: Record<ParseFailure, string> = {
+    not_json: keys.records.type_io.error_not_json,
+    not_object: keys.records.type_io.error_not_object,
+    missing_key: keys.records.type_io.error_missing_key,
+    missing_label: keys.records.type_io.error_missing_label,
+    missing_fields: keys.records.type_io.error_missing_fields,
   };
-  return t(`records.type_io.error_${reason}`, { defaultValue: defaults[reason] });
+  return t(labels[reason]);
 }
 
 /**
@@ -61,9 +60,7 @@ export function TypeImportDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent data-testid="records-type-import-dialog">
         <DialogHeader>
-          <DialogTitle>
-            {t('records.type_io.import_title', { defaultValue: 'Import a type definition' })}
-          </DialogTitle>
+          <DialogTitle>{t(keys.records.type_io.import_title)}</DialogTitle>
         </DialogHeader>
 
         {fileName && (
@@ -82,33 +79,21 @@ export function TypeImportDialog({
           <div className="space-y-1 text-sm" data-testid="records-type-import-summary">
             <p>
               {creates
-                ? t('records.type_io.will_create', {
+                ? t(keys.records.type_io.will_create, {
                     key: definition.key,
                     label: definition.label,
-                    defaultValue: 'Creates a new type "{label}" ({key}).',
                   })
-                : t('records.type_io.will_update', {
+                : t(keys.records.type_io.will_update, {
                     key: definition.key,
-                    defaultValue: 'Updates this type ({key}) from the definition.',
                   })}
             </p>
             <p className="text-muted-foreground">
-              {t('records.type_io.field_count', {
+              {t(keys.records.type_io.field_count, {
                 count: definition.fields.length,
-                defaultValue: '{count} field',
-                defaultValue_other: '{count} fields',
               })}
             </p>
             <p className="text-muted-foreground">
-              {creates
-                ? t('records.type_io.create_help', {
-                    defaultValue:
-                      'Nothing about the type you are editing changes; you will land on the new type.',
-                  })
-                : t('records.type_io.update_help', {
-                    defaultValue:
-                      'Checked against this type’s records first, exactly as the same change made here would be — anything it would break is reported instead of applied.',
-                  })}
+              {creates ? t(keys.records.type_io.create_help) : t(keys.records.type_io.update_help)}
             </p>
           </div>
         )}
@@ -123,7 +108,7 @@ export function TypeImportDialog({
               it always means, without claiming a completion that has not
               happened. */}
           <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
-            {t('records.type_io.cancel', { defaultValue: 'Cancel' })}
+            {t(keys.records.type_io.cancel)}
           </Button>
           {definition && (
             <Button
@@ -135,10 +120,10 @@ export function TypeImportDialog({
               {pending ? (
                 <span className="inline-flex items-center gap-1.5">
                   <Spinner className="size-3.5" />
-                  {t('records.editor.saving', { defaultValue: 'Saving…' })}
+                  {t(keys.records.editor.saving)}
                 </span>
               ) : (
-                t('records.type_io.apply', { defaultValue: 'Import definition' })
+                t(keys.records.type_io.apply)
               )}
             </Button>
           )}

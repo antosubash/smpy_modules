@@ -14,7 +14,7 @@
  */
 
 import type { CustomField } from '@puckeditor/core';
-import { useT } from '@simple-module-py/i18n';
+import { keys, useT } from '../../utils/i18n';
 
 /** `type` is the field's declared type — the picker notes the one kind it
  *  cannot show to visitors (`media`). */
@@ -40,13 +40,7 @@ export function FieldsPicker({
   const selected = value ?? [];
 
   if (options.length === 0) {
-    return (
-      <p className="text-xs text-gray-500">
-        {t('records.widget.fields_picker_empty', {
-          defaultValue: 'Pick a record type above to choose its fields.',
-        })}
-      </p>
-    );
+    return <p className="text-xs text-gray-500">{t(keys.records.widget.fields_picker_empty)}</p>;
   }
 
   function toggle(key: string, checked: boolean) {
@@ -57,10 +51,7 @@ export function FieldsPicker({
   // `media_url_template`, which is null unless the host lets visitors
   // download files — on a stock host it renders nothing, and a ticked option
   // that silently shows nothing read as a bug in the editor (review 4, ux F8).
-  const mediaNote = t('records.widget.media_not_public', {
-    defaultValue:
-      'Not shown on public pages unless the media library lets visitors download files.',
-  });
+  const mediaNote = t(keys.records.widget.media_not_public);
 
   return (
     <div className="space-y-1">

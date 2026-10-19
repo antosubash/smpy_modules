@@ -1,4 +1,4 @@
-import { useT } from '@simple-module-py/i18n';
+import { keys, useT } from '../utils/i18n';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import type { FormValues } from '../utils/values';
@@ -28,9 +28,7 @@ export function RecordForm({
   if (fields.length === 0) {
     return (
       <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-        {t('records.form.no_fields', {
-          defaultValue: 'This type has no fields yet. Add some on its schema screen.',
-        })}
+        {t(keys.records.form.no_fields)}
       </p>
     );
   }

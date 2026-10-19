@@ -1,10 +1,10 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { XIcon } from 'lucide-react';
 import { useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { Choice } from './types';
 
@@ -69,13 +69,11 @@ export function ChoicesEditor({
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-2">
-        <Label>{t('records.type_editor.choices', { defaultValue: 'Choices' })}</Label>
+        <Label>{t(keys.records.type_editor.choices)}</Label>
         <div className="flex items-center gap-1">
           <span className="text-sm text-muted-foreground" data-testid="records-choices-count">
-            {t('records.type_editor.choice_count', {
+            {t(keys.records.type_editor.choice_count, {
               count: choices.length,
-              defaultValue: '{count} choice',
-              defaultValue_other: '{count} choices',
             })}
           </span>
           <Button
@@ -87,8 +85,8 @@ export function ChoicesEditor({
             onClick={() => setOpen((prev) => !prev)}
           >
             {open
-              ? t('records.type_editor.choices_hide', { defaultValue: 'Hide' })
-              : t('records.type_editor.choices_show', { defaultValue: 'Show' })}
+              ? t(keys.records.type_editor.choices_hide)
+              : t(keys.records.type_editor.choices_show)}
           </Button>
         </div>
       </div>
@@ -99,15 +97,15 @@ export function ChoicesEditor({
             // biome-ignore lint/suspicious/noArrayIndexKey: a choice has no field of its own that could stand in for identity; reordering isn't supported here, only add/remove.
             <div key={`${fieldKey}-choice-${index}`} className="flex items-center gap-2">
               <Input
-                aria-label={t('records.type_editor.choice_value', { defaultValue: 'Value' })}
-                placeholder={t('records.type_editor.choice_value', { defaultValue: 'Value' })}
+                aria-label={t(keys.records.type_editor.choice_value)}
+                placeholder={t(keys.records.type_editor.choice_value)}
                 value={choice.value}
                 disabled={disabled}
                 onChange={(e) => update(index, { value: e.target.value })}
               />
               <Input
-                aria-label={t('records.type_editor.choice_label', { defaultValue: 'Label' })}
-                placeholder={t('records.type_editor.choice_label', { defaultValue: 'Label' })}
+                aria-label={t(keys.records.type_editor.choice_label)}
+                placeholder={t(keys.records.type_editor.choice_label)}
                 value={choice.label}
                 disabled={disabled}
                 onChange={(e) => update(index, { label: e.target.value })}
@@ -117,9 +115,7 @@ export function ChoicesEditor({
                 variant="ghost"
                 size="icon"
                 disabled={disabled}
-                aria-label={t('records.type_editor.remove_choice', {
-                  defaultValue: 'Remove choice',
-                })}
+                aria-label={t(keys.records.type_editor.remove_choice)}
                 onClick={() => remove(index)}
               >
                 <XIcon className="size-4" />
@@ -134,23 +130,16 @@ export function ChoicesEditor({
                 value={bulk}
                 disabled={disabled}
                 data-testid="records-choices-bulk"
-                aria-label={t('records.type_editor.choices_paste_label', {
-                  defaultValue: 'Paste a list of choices',
-                })}
-                placeholder={t('records.type_editor.choices_paste_placeholder', {
-                  defaultValue: 'red | Red',
-                })}
+                aria-label={t(keys.records.type_editor.choices_paste_label)}
+                placeholder={t(keys.records.type_editor.choices_paste_placeholder)}
                 onChange={(e) => setBulk(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                {t('records.type_editor.choices_paste_help', {
-                  defaultValue:
-                    'One per line. Separate the stored value from the label shown with "|" or "="; a line with neither is used as both.',
-                })}
+                {t(keys.records.type_editor.choices_paste_help)}
               </p>
               <div className="flex gap-2">
                 <Button type="button" size="sm" disabled={disabled} onClick={applyBulk}>
-                  {t('records.type_editor.choices_paste_add', { defaultValue: 'Add these' })}
+                  {t(keys.records.type_editor.choices_paste_add)}
                 </Button>
                 <Button
                   type="button"
@@ -159,7 +148,7 @@ export function ChoicesEditor({
                   disabled={disabled}
                   onClick={() => setBulk(null)}
                 >
-                  {t('records.editor.cancel', { defaultValue: 'Cancel' })}
+                  {t(keys.records.editor.cancel)}
                 </Button>
               </div>
             </div>
@@ -167,7 +156,7 @@ export function ChoicesEditor({
 
           <div className="flex gap-2">
             <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={add}>
-              {t('records.type_editor.add_choice', { defaultValue: 'Add choice' })}
+              {t(keys.records.type_editor.add_choice)}
             </Button>
             {bulk === null && (
               <Button
@@ -178,7 +167,7 @@ export function ChoicesEditor({
                 data-testid="records-choices-paste"
                 onClick={() => setBulk('')}
               >
-                {t('records.type_editor.choices_paste', { defaultValue: 'Paste a list' })}
+                {t(keys.records.type_editor.choices_paste)}
               </Button>
             )}
           </div>

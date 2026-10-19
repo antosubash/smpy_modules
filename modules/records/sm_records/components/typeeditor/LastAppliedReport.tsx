@@ -1,8 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
-
 import { humanizeDryRunMessage } from '../../utils/dry-run-messages';
+import { keys, useT } from '../../utils/i18n';
 import type { DryRunReport } from '../../utils/types';
 
 /**
@@ -46,17 +45,13 @@ export function LastAppliedReport({
       data-testid="records-last-applied-report"
     >
       <p className="font-medium">
-        {t('records.type_editor.last_applied.title', {
+        {t(keys.records.type_editor.last_applied.title, {
           count: report.failing,
-          defaultValue: 'Last applied change left {count} record invalid',
-          defaultValue_other: 'Last applied change left {count} records invalid',
         })}
       </p>
       <p className="text-muted-foreground">
-        {t('records.type_editor.last_applied.help', {
+        {t(keys.records.type_editor.last_applied.help, {
           shown: report.sample.length,
-          defaultValue:
-            'They still hold their values and are still editable — opening one shows what no longer fits. This list is a sample of {shown} and is lost when you leave this page.',
         })}
       </p>
       <ul className="space-y-1.5" data-testid="records-last-applied-sample">
@@ -86,8 +81,8 @@ export function LastAppliedReport({
         onClick={() => void copy()}
       >
         {copied
-          ? t('records.type_editor.last_applied.copied', { defaultValue: 'Copied' })
-          : t('records.type_editor.last_applied.copy', { defaultValue: 'Copy record IDs' })}
+          ? t(keys.records.type_editor.last_applied.copied)
+          : t(keys.records.type_editor.last_applied.copy)}
       </Button>
     </div>
   );

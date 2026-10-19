@@ -13,10 +13,9 @@
  */
 
 import type { ComponentConfig, CustomField, SelectField } from '@puckeditor/core';
-import { t } from '@simple-module-py/i18n';
 import { listTypes } from '../../utils/api';
+import { englishText, keys, type Translate, translate } from '../../utils/i18n';
 import { DEFAULT_PUBLIC_PREFIX } from '../../utils/public-api';
-import type { Translate } from '../../utils/translate';
 import { choicesOf } from '../../utils/values';
 import { FieldsPicker, type FieldsPickerField } from './FieldsPicker';
 import { RecordsListRender } from './RecordsListRender';
@@ -50,78 +49,61 @@ function hiddenField<Value>(): CustomField<Value> {
  * spreading a widened union would mix in members (`TextField`, …) that don't
  * have a `render` to spread from.
  */
-function buildBaseFields(tr: Translate = t) {
+function buildBaseFields(tr: Translate = translate) {
   return {
     typeKey: {
       type: 'select',
-      label: tr('records.widget.field_type_key', { defaultValue: 'Record type' }),
-      options: [{ label: tr('records.fields.choose', { defaultValue: '— choose —' }), value: '' }],
+      label: tr(keys.records.widget.field_type_key),
+      options: [{ label: tr(keys.records.fields.choose), value: '' }],
     },
     fields: {
       type: 'custom',
-      label: tr('records.widget.field_fields', {
-        defaultValue: 'Fields to show (beyond the title)',
-      }),
+      label: tr(keys.records.widget.field_fields),
       render: FieldsPicker,
     },
     filter: {
       type: 'text',
-      label: tr('records.widget.field_filter', {
-        defaultValue: 'Filter (e.g. status:eq:paid — one term, indexed fields only)',
-      }),
+      label: tr(keys.records.widget.field_filter),
     },
     sort: {
       type: 'text',
-      label: tr('records.widget.field_sort', {
-        defaultValue: 'Sort (e.g. -published_at for newest first)',
-      }),
+      label: tr(keys.records.widget.field_sort),
     },
     locale: {
       type: 'text',
-      label: tr('records.widget.field_locale', {
-        defaultValue: 'Locale (blank = default content locale)',
-      }),
+      label: tr(keys.records.widget.field_locale),
     },
     tenant: {
       type: 'text',
-      label: tr('records.widget.field_tenant', {
-        defaultValue: 'Tenant (multi-tenant hosts only — blank uses the host default)',
-      }),
+      label: tr(keys.records.widget.field_tenant),
     },
     limit: {
       type: 'number',
-      label: tr('records.widget.field_limit', { defaultValue: 'How many' }),
+      label: tr(keys.records.widget.field_limit),
       min: 1,
       max: 50,
     },
     layout: {
       type: 'select',
-      label: tr('records.widget.field_layout', { defaultValue: 'Layout' }),
+      label: tr(keys.records.widget.field_layout),
       options: [
-        { label: tr('records.widget.layout_list', { defaultValue: 'List' }), value: 'list' },
-        { label: tr('records.widget.layout_cards', { defaultValue: 'Cards' }), value: 'cards' },
-        { label: tr('records.widget.layout_table', { defaultValue: 'Table' }), value: 'table' },
+        { label: tr(keys.records.widget.layout_list), value: 'list' },
+        { label: tr(keys.records.widget.layout_cards), value: 'cards' },
+        { label: tr(keys.records.widget.layout_table), value: 'table' },
       ],
     },
-    title: { type: 'text', label: tr('records.widget.field_title', { defaultValue: 'Heading' }) },
+    title: { type: 'text', label: tr(keys.records.widget.field_title) },
     emptyText: {
       type: 'text',
-      label: tr('records.widget.field_empty_text', {
-        defaultValue: 'Text shown when there are no records',
-      }),
+      label: tr(keys.records.widget.field_empty_text),
     },
     linkTemplate: {
       type: 'text',
-      label: tr('records.widget.field_link_template', {
-        defaultValue: 'Link template ({slug} or {uuid}; blank = no link)',
-      }),
+      label: tr(keys.records.widget.field_link_template),
     },
     apiPrefix: {
       type: 'text',
-      label: tr('records.widget.field_api_prefix', {
-        defaultValue:
-          'Public API prefix (advanced — only change if the Records settings screen shows a different one)',
-      }),
+      label: tr(keys.records.widget.field_api_prefix),
     },
     fieldMeta: hiddenField<FieldMetaEntry[]>(),
     typeIsPublic: hiddenField<boolean | null>(),
@@ -130,16 +112,14 @@ function buildBaseFields(tr: Translate = t) {
 
 // The static field shape `ComponentConfig.fields` needs at module-evaluation
 // time — before `resolveFields` has ever run and before i18n is configured
-// (see `buildBaseFields`'s own comment). Built by an identity translator that
-// returns each `defaultValue`, so it never calls i18next at module scope and
+// (see `buildBaseFields`'s own comment). Built with `englishText`, which reads
+// the catalogue directly, so it never calls i18next at module scope and
 // cannot drift from the translated builder. English here is the accepted gap
 // (L2): Puck calls `resolveFields` to get the real, translated labels as soon
 // as the block is added to a page or its data changes, so these are only ever
 // visible, if at all, for the first paint of a brand new block in the editor
 // — never on the public page, and never to an anonymous visitor.
-const BASE_FIELDS = buildBaseFields(
-  (_key: string, opts: { defaultValue: string }) => opts.defaultValue,
-);
+const BASE_FIELDS = buildBaseFields(englishText);
 
 /** Every admin-visible type. Not filtered to `is_public` ones: an author
  *  picking a type that isn't (yet) public is exactly the case the "not
@@ -160,7 +140,7 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
   // The block's own name in Puck's block palette. Module-scope, so it holds
   // the catalogue *key*: pagebuilder's localizeConfig resolves every palette
   // label through the catalogue when the editor mounts, as news' blocks do.
-  label: 'records.widget.block_label',
+  label: keys.records.widget.block_label,
   fields: BASE_FIELDS,
   defaultProps: {
     typeKey: '',
@@ -186,13 +166,12 @@ export const RecordsListBlock: ComponentConfig<RecordsListProps> = {
     const types = await loadTypes();
     const fields = buildBaseFields();
     const typeOptions = [
-      { label: t('records.fields.choose', { defaultValue: '— choose —' }), value: '' },
+      { label: translate(keys.records.fields.choose), value: '' },
       ...types.map((rtype) => ({
         label: rtype.is_public
           ? rtype.label
-          : t('records.widget.type_not_public', {
+          : translate(keys.records.widget.type_not_public, {
               label: rtype.label,
-              defaultValue: '{label} (not public)',
             }),
         value: rtype.key,
       })),

@@ -1,5 +1,4 @@
 import { Head, Link } from '@inertiajs/react';
-import { useT } from '@simple-module-py/i18n';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
@@ -12,11 +11,11 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { useMemo, useState } from 'react';
-
 import { RecordsLayout } from '../components/RecordsLayout';
 import { TenantBadge } from '../components/TenantBadge';
 import { TypeCounts, TypeIdentity, TypeKey, TypesCardList } from '../components/TypesCardList';
 import { useIsNarrow } from '../hooks/useIsNarrow';
+import { keys, useT } from '../utils/i18n';
 import type { TenancyMode, TypeRead } from '../utils/types';
 
 type Props = {
@@ -56,38 +55,30 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
 
   return (
     <>
-      <Head title={t('records.types.page_title', { defaultValue: 'Records' })} />
+      <Head title={t(keys.records.types.page_title)} />
       <PageShell
-        title={t('records.types.page_title', { defaultValue: 'Records' })}
-        description={t('records.types.page_subtitle', {
-          defaultValue: 'Every record type in this install.',
-        })}
+        title={t(keys.records.types.page_title)}
+        description={t(keys.records.types.page_subtitle)}
         actions={
           <>
             <TenantBadge tenant={tenant} tenancyMode={tenancy_mode} />
             <Button type="button" asChild>
-              <Link href="/admin/records/types/new">
-                {t('records.types.new', { defaultValue: 'New type' })}
-              </Link>
+              <Link href="/admin/records/types/new">{t(keys.records.types.new)}</Link>
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">
-              {t('records.types.title', { defaultValue: 'Record Types' })}
-            </h2>
+            <h2 className="text-lg font-semibold">{t(keys.records.types.title)}</h2>
             {showFilter && (
               <Input
                 className="w-full sm:w-64"
                 type="search"
                 value={query}
                 data-testid="records-types-filter"
-                aria-label={t('records.types.filter_label', { defaultValue: 'Filter types' })}
-                placeholder={t('records.types.filter_placeholder', {
-                  defaultValue: 'Filter by name or key…',
-                })}
+                aria-label={t(keys.records.types.filter_label)}
+                placeholder={t(keys.records.types.filter_placeholder)}
                 onChange={(e) => setQuery(e.target.value)}
               />
             )}
@@ -95,16 +86,15 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
 
           {types.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-              {t('records.types.empty', { defaultValue: 'No record types yet' })}
+              {t(keys.records.types.empty)}
             </div>
           ) : visible.length === 0 ? (
             <div
               className="rounded-lg border border-dashed p-8 text-center text-muted-foreground"
               data-testid="records-types-no-match"
             >
-              {t('records.types.no_match', {
+              {t(keys.records.types.no_match, {
                 query,
-                defaultValue: 'No record type matches "{query}".',
               })}
             </div>
           ) : narrow ? (
@@ -113,9 +103,9 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('records.types.label', { defaultValue: 'Label' })}</TableHead>
-                  <TableHead>{t('records.types.key', { defaultValue: 'Key' })}</TableHead>
-                  <TableHead>{t('records.records.title', { defaultValue: 'Records' })}</TableHead>
+                  <TableHead>{t(keys.records.types.label)}</TableHead>
+                  <TableHead>{t(keys.records.types.key)}</TableHead>
+                  <TableHead>{t(keys.records.records.title)}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -137,7 +127,7 @@ function Types({ types, public_route_prefix, tenant, tenancy_mode }: Props) {
                         className="text-sm text-primary hover:underline"
                         data-testid="records-type-edit-schema"
                       >
-                        {t('records.types.edit_schema', { defaultValue: 'Edit schema' })}
+                        {t(keys.records.types.edit_schema)}
                       </Link>
                     </TableCell>
                   </TableRow>

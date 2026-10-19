@@ -377,8 +377,8 @@ browser *where* the API is.
    module whose `meta.name` is `FileStorage` wins. Two unexplained matches mean
    *off* and a warning, not a guess.
 3. Two facts are read off what was found: whether the list route declares a
-   `q`/`search` query parameter (file_storage's does not — the picker then
-   filters the loaded page and says so), and whether the host's public-route
+   `q`/`search` query parameter (file_storage's does since framework 0.0.36;
+   without one the picker filters the loaded page and says so), and whether the host's public-route
    registry exempts `GET {p}/files/{id}/download` from `AuthMiddleware`.
 4. The result, a frozen `MediaApi`, is parked on the services container
    (`app.state.sm_records.media_api`).

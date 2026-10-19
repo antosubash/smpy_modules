@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TypeMetadataValues } from '../components/typeeditor/types';
 import { act, mount } from '../test-dom';
+import { englishText as fakeT } from '../utils/i18n';
 import type { TypeRead } from '../utils/types';
 import type { useSchemaApply } from './useSchemaApply';
 import type { useUnsavedGuard } from './useUnsavedGuard';
@@ -22,10 +23,6 @@ vi.mock('../utils/api', () => ({
 }));
 
 const { useTypeEditorSave } = await import('./useTypeEditorSave');
-
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  return (opts?.defaultValue as string) ?? key;
-}
 
 function values(overrides: Partial<TypeMetadataValues> = {}): TypeMetadataValues {
   return {

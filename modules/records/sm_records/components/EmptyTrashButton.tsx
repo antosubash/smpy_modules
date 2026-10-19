@@ -1,11 +1,9 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useState } from 'react';
-
 import { emptyTrashDescription } from '../utils/bulk-copy';
-import type { Translate } from '../utils/translate';
+import { keys, type Translate, useT } from '../utils/i18n';
 import { ConfirmDialog } from './ConfirmDialog';
 
 /**
@@ -59,7 +57,7 @@ export function EmptyTrashButton({
   // The key is compared as text and the count as a number: `012` is the
   // count, ` product ` is the key, and neither is a different answer.
   const matches = capped ? entered === typeKey : entered !== '' && Number(entered) === count;
-  const label = t('records.bulk.empty_trash', { defaultValue: 'Empty trash' });
+  const label = t(keys.records.bulk.empty_trash);
   const inputId = 'records-empty-trash-confirm';
   const hintId = 'records-empty-trash-hint';
   const showMismatch = entered !== '' && !matches;
@@ -83,8 +81,8 @@ export function EmptyTrashButton({
         <div className="grid gap-2">
           <Label htmlFor={inputId}>
             {capped
-              ? t('records.bulk.empty_trash_key_label', { defaultValue: 'Record type key' })
-              : t('records.bulk.empty_trash_count_label', { defaultValue: 'Record count' })}
+              ? t(keys.records.bulk.empty_trash_key_label)
+              : t(keys.records.bulk.empty_trash_count_label)}
           </Label>
           <Input
             id={inputId}
@@ -131,21 +129,16 @@ function mismatchOrHint(
 ): string {
   if (capped) {
     return showMismatch
-      ? t('records.bulk.empty_trash_key_mismatch', {
+      ? t(keys.records.bulk.empty_trash_key_mismatch, {
           key: typeKey,
-          defaultValue: "That doesn't match. Type {key} to confirm.",
         })
-      : t('records.bulk.empty_trash_key_hint', {
+      : t(keys.records.bulk.empty_trash_key_hint, {
           key: typeKey,
-          defaultValue: 'Type {key} to enable Empty trash.',
         });
   }
   return showMismatch
-    ? t('records.type_editor.delete_count_mismatch', {
-        defaultValue: "That doesn't match. Type the exact number to confirm.",
-      })
-    : t('records.bulk.empty_trash_count_hint', {
+    ? t(keys.records.type_editor.delete_count_mismatch)
+    : t(keys.records.bulk.empty_trash_count_hint, {
         count,
-        defaultValue: 'Type {count} to enable Empty trash.',
       });
 }

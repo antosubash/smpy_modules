@@ -13,11 +13,12 @@
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
 import { RecordsListBlock } from './components/widget/RecordsListBlock';
+import { keys } from './utils/i18n';
 
 registerPuckBlocks({
   blocks: { RecordsList: RecordsListBlock },
   // A catalogue key, resolved by pagebuilder's localizeConfig at render.
-  category: { key: 'data', title: 'records.widget.palette_group' },
+  category: { key: 'data', title: keys.records.widget.palette_group },
   // Page-only: a live records table in the site header or footer would
   // repeat, unfiltered, on every page of the site.
 });

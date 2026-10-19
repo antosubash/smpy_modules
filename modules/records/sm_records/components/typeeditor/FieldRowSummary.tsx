@@ -1,8 +1,8 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, XIcon } from 'lucide-react';
 import type { Ref } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import type { EditableField } from './types';
 
@@ -44,7 +44,7 @@ export function FieldRowSummary({
   onMoveDown: () => void;
 }) {
   const { t } = useT();
-  const unnamed = t('records.type_editor.field_unnamed', { defaultValue: 'New field' });
+  const unnamed = t(keys.records.type_editor.field_unnamed);
   const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
 
   return (
@@ -71,22 +71,22 @@ export function FieldRowSummary({
         <span className="shrink-0 text-sm text-muted-foreground">{field.type}</span>
         {field.required && (
           <Badge variant="secondary" className="shrink-0 font-normal">
-            {t('records.type_editor.field_required', { defaultValue: 'Required' })}
+            {t(keys.records.type_editor.field_required)}
           </Badge>
         )}
         {field.unique && (
           <Badge variant="secondary" className="shrink-0 font-normal">
-            {t('records.type_editor.field_unique', { defaultValue: 'Unique' })}
+            {t(keys.records.type_editor.field_unique)}
           </Badge>
         )}
         {field.indexed && (
           <Badge variant="secondary" className="shrink-0 font-normal">
-            {t('records.type_editor.field_indexed', { defaultValue: 'Indexed' })}
+            {t(keys.records.type_editor.field_indexed)}
           </Badge>
         )}
         {invalid && (
           <Badge variant="destructive" className="shrink-0 font-normal">
-            {t('records.type_editor.field_has_error', { defaultValue: 'Needs attention' })}
+            {t(keys.records.type_editor.field_has_error)}
           </Badge>
         )}
       </button>
@@ -98,7 +98,7 @@ export function FieldRowSummary({
           variant="ghost"
           size="icon"
           disabled={disabled || index === 0}
-          aria-label={t('records.type_editor.move_up', { defaultValue: 'Move up' })}
+          aria-label={t(keys.records.type_editor.move_up)}
           onClick={onMoveUp}
         >
           <ArrowUpIcon className="size-4" />
@@ -109,7 +109,7 @@ export function FieldRowSummary({
           variant="ghost"
           size="icon"
           disabled={disabled || index === total - 1}
-          aria-label={t('records.type_editor.move_down', { defaultValue: 'Move down' })}
+          aria-label={t(keys.records.type_editor.move_down)}
           onClick={onMoveDown}
         >
           <ArrowDownIcon className="size-4" />
@@ -119,7 +119,7 @@ export function FieldRowSummary({
           variant="ghost"
           size="icon"
           disabled={disabled}
-          aria-label={t('records.type_editor.remove_field', { defaultValue: 'Remove field' })}
+          aria-label={t(keys.records.type_editor.remove_field)}
           onClick={onRemove}
         >
           <XIcon className="size-4" />

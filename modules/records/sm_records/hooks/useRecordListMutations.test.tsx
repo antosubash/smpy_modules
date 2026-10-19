@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, mount } from '../test-dom';
+import { englishText as fakeT } from '../utils/i18n';
 import type { RecordRead } from '../utils/types';
 
 const deleted = vi.fn(async () => undefined);
@@ -22,10 +23,6 @@ vi.mock('../utils/api-records', () => ({
 }));
 
 const { useRecordListMutations } = await import('./useRecordListMutations');
-
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  return (opts?.defaultValue as string) ?? key;
-}
 
 function record(overrides: Partial<RecordRead> = {}): RecordRead {
   return { uuid: 'r1', type_key: 'book', is_deleted: false, ...overrides } as RecordRead;

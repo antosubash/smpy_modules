@@ -1,20 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-
+import { englishText as fakeT } from '../utils/i18n';
 import type { ReferrerRead } from '../utils/types';
 import { DialogDescription, DialogDetails } from './RecordDeleteDialog';
-
-/** A minimal stand-in for `useT()`'s `t`: applies `{name}` interpolation and
- *  picks `defaultValue_other` over `defaultValue` for a `count` other than
- *  one — just enough of i18next's contract for `DialogBody`'s own text. */
-function fakeT(key: string, opts?: Record<string, unknown>): string {
-  const count = typeof opts?.count === 'number' ? opts.count : undefined;
-  const template =
-    count !== undefined && count !== 1 && typeof opts?.defaultValue_other === 'string'
-      ? (opts.defaultValue_other as string)
-      : ((opts?.defaultValue as string) ?? key);
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(opts?.[name] ?? ''));
-}
 
 function referrer(overrides: Partial<ReferrerRead>): ReferrerRead {
   return {

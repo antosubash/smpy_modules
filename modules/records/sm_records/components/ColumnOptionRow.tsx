@@ -1,4 +1,3 @@
-import { useT } from '@simple-module-py/i18n';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
@@ -24,8 +23,8 @@ import {
   ToggleLeftIcon,
   TypeIcon,
 } from 'lucide-react';
-
 import { fieldTypeName } from '../utils/field-type-name';
+import { keys, useT } from '../utils/i18n';
 import type { ListColumn } from '../utils/listing';
 
 const FIELD_ICONS: Record<string, typeof TypeIcon> = {
@@ -117,20 +116,16 @@ export function ColumnOptionRow({
           </Label>
           {field?.indexed && (
             <Badge variant="secondary" className="font-normal">
-              {t('records.columns.indexed', { defaultValue: 'Indexed' })}
+              {t(keys.records.columns.indexed)}
             </Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          {field
-            ? fieldTypeName(t, field.type)
-            : t('records.columns.record_column', { defaultValue: 'Record column' })}
+          {field ? fieldTypeName(t, field.type) : t(keys.records.columns.record_column)}
         </p>
         {field && !field.indexed && (
           <p className="text-xs text-muted-foreground" data-testid="records-column-not-indexed">
-            {t('records.columns.not_indexed_help', {
-              defaultValue: "Not indexed: shown, but it can't be sorted or filtered.",
-            })}
+            {t(keys.records.columns.not_indexed_help)}
           </p>
         )}
       </div>
@@ -143,7 +138,7 @@ export function ColumnOptionRow({
             size="icon"
             className="size-7"
             disabled={first}
-            aria-label={t('records.columns.move_up', { label, defaultValue: 'Move {label} up' })}
+            aria-label={t(keys.records.columns.move_up, { label })}
             onClick={() => onMove(-1)}
           >
             <ArrowUpIcon className="size-4" />
@@ -155,9 +150,8 @@ export function ColumnOptionRow({
             size="icon"
             className="size-7"
             disabled={last}
-            aria-label={t('records.columns.move_down', {
+            aria-label={t(keys.records.columns.move_down, {
               label,
-              defaultValue: 'Move {label} down',
             })}
             onClick={() => onMove(1)}
           >

@@ -1,10 +1,8 @@
-import { useT } from '@simple-module-py/i18n';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import type React from 'react';
 import { useState } from 'react';
-
 import {
   defaultFilterValue,
   disambiguateLabels,
@@ -12,6 +10,7 @@ import {
   normaliseFilterValue,
   opsForFieldType,
 } from '../utils/filters';
+import { keys, useT } from '../utils/i18n';
 import type { FilterValue } from '../utils/listing';
 import { FILTER_OPS, type FieldDef, type FilterOp } from '../utils/types';
 import { FilterValueInput } from './FilterValueInput';
@@ -153,9 +152,7 @@ export function FilterBar({
       onSubmit={submit}
     >
       <div className="grid gap-1.5">
-        <Label htmlFor="records-filter-field">
-          {t('records.records.filter_field', { defaultValue: 'Field' })}
-        </Label>
+        <Label htmlFor="records-filter-field">{t(keys.records.records.filter_field)}</Label>
         <NativeSelect
           id="records-filter-field"
           value={field}
@@ -163,9 +160,8 @@ export function FilterBar({
         >
           {unknownField && field === unknownField && (
             <NativeSelectOption value={unknownField}>
-              {t('records.records.filter_unknown_field', {
+              {t(keys.records.records.filter_unknown_field, {
                 field: unknownField,
-                defaultValue: '{field} (not filterable)',
               })}
             </NativeSelectOption>
           )}
@@ -177,16 +173,12 @@ export function FilterBar({
         </NativeSelect>
         {field === unknownField && (
           <p className="text-sm text-muted-foreground" data-testid="records-filter-unknown">
-            {t('records.records.filter_unknown_help', {
-              defaultValue: 'This type has no filterable field by that name. Pick another.',
-            })}
+            {t(keys.records.records.filter_unknown_help)}
           </p>
         )}
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="records-filter-op">
-          {t('records.records.filter_op', { defaultValue: 'Condition' })}
-        </Label>
+        <Label htmlFor="records-filter-op">{t(keys.records.records.filter_op)}</Label>
         <NativeSelect
           id="records-filter-op"
           value={op}
@@ -210,11 +202,11 @@ export function FilterBar({
       )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={!field || field === unknownField}>
-          {t('records.records.filter_apply', { defaultValue: 'Apply' })}
+          {t(keys.records.records.filter_apply)}
         </Button>
         {current && (
           <Button type="button" size="sm" variant="outline" onClick={onClear}>
-            {t('records.records.filter_clear', { defaultValue: 'Clear' })}
+            {t(keys.records.records.filter_clear)}
           </Button>
         )}
       </div>

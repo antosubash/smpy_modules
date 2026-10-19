@@ -89,9 +89,11 @@ async def test_an_unflushed_add_is_stamped_at_commit_and_the_tenant_reset_after(
 
 
 async def test_the_control_binding_after_get_db_commits_unbound_and_is_refused(client):
-    """What the order rule prevents: the permission check opens ``get_db``
-    first, so it exits last, after the binding has already been reset."""
-    client.app.include_router(_probe([require_view, Depends(bind_admin)]))
+    """What the order rule prevents: a dependency ahead of the binding opens
+    ``get_db`` first, so it exits last, after the binding has already been
+    reset. (Until framework 0.0.36 ``require_view`` itself opened it; the
+    hosting checker no longer needs a session, so the control opens it.)"""
+    client.app.include_router(_probe([Depends(request_db), Depends(bind_admin)]))
     with pytest.raises(TenantUnbound):
         await client.post("/probe/early", headers=roles(ADMIN))
     assert await _stored(client.db_state, "early") is None

@@ -17,10 +17,10 @@
  * an author gets the empty state *plus* the reason.
  */
 
-import { useT } from '@simple-module-py/i18n';
 import { Section } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import { keys, useT } from '../../utils/i18n';
 
 import { fetchPublicRecords, type PublicRecordItem } from '../../utils/public-api';
 import { FieldValues, publicValue } from './FieldValues';
@@ -63,7 +63,7 @@ function SkeletonRows({ count }: { count: number }) {
 
 function useLoadingLabel(): string {
   const { t } = useT();
-  return t('records.widget.loading', { defaultValue: 'Loading records…' });
+  return t(keys.records.widget.loading);
 }
 
 function RecordTitle({ item, linkTemplate }: { item: PublicRecordItem; linkTemplate: string }) {
@@ -129,7 +129,7 @@ function TableLayout({ items, props, media }: LayoutProps) {
       <thead>
         <tr className="border-b" style={{ borderColor: 'var(--pb-surface-muted)' }}>
           <th className="py-2 pr-4 font-medium" style={BODY_STYLE}>
-            {t('records.widget.title_column', { defaultValue: 'Title' })}
+            {t(keys.records.widget.title_column)}
           </th>
           {props.fieldMeta.map((meta) => (
             <th key={meta.key} className="py-2 pr-4 font-medium" style={BODY_STYLE}>
@@ -227,21 +227,17 @@ export function RecordsListRender(props: RecordsListRenderProps) {
       )}
       {state.status === 'error' && (
         <p className="text-sm" style={MUTED_STYLE}>
-          {t('records.widget.error', {
-            defaultValue: "Couldn't load records right now.",
-          })}
+          {t(keys.records.widget.error)}
         </p>
       )}
       {state.status === 'ready' && state.items.length === 0 && (
         <div>
           <p className="text-sm" style={MUTED_STYLE}>
-            {props.emptyText || t('records.widget.empty', { defaultValue: 'No records to show.' })}
+            {props.emptyText || t(keys.records.widget.empty)}
           </p>
           {showHint && (
             <p className="mt-1 text-xs" style={MUTED_STYLE}>
-              {t('records.widget.hint_not_public', {
-                defaultValue: 'Only public types render on the site.',
-              })}
+              {t(keys.records.widget.hint_not_public)}
             </p>
           )}
         </div>

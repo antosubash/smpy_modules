@@ -52,7 +52,7 @@ def index_router(locale: str) -> APIRouter:
     """
     router = APIRouter()
 
-    @router.get("/", response_model=None)
+    @router.api_route("/", methods=["GET", "HEAD"], response_model=None)
     async def archive_index(
         request: Request,
         inertia: InertiaDep,
@@ -72,7 +72,7 @@ def index_router(locale: str) -> APIRouter:
             heading=active().site_name or "News",
         )
 
-    @router.get("/category/{slug}", response_model=None)
+    @router.api_route("/category/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def archive_category(
         slug: str,
         request: Request,
@@ -103,7 +103,7 @@ def index_router(locale: str) -> APIRouter:
             category=name or slug,
         )
 
-    @router.get("/tag/{slug}", response_model=None)
+    @router.api_route("/tag/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def archive_tag(
         slug: str,
         request: Request,
@@ -133,7 +133,7 @@ def index_router(locale: str) -> APIRouter:
             tag=slug,
         )
 
-    @router.get("/author/{slug}", response_model=None)
+    @router.api_route("/author/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def archive_author(
         slug: str,
         request: Request,

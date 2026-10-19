@@ -1,8 +1,7 @@
-import { useT } from '@simple-module-py/i18n';
 import type { ReactNode } from 'react';
+import { keys, type Translate, useT } from '../utils/i18n';
 
 import { PAGE_SIZES } from '../utils/listing';
-import type { Translate } from '../utils/translate';
 import { PagerButton } from './PagerButton';
 import { PageSizeSelect } from './PageSizeSelect';
 import { cursorPagerParts } from './RecordCursorPager';
@@ -22,27 +21,24 @@ function pageInfo(
   capped: boolean,
 ): string {
   if (capped) {
-    return t('records.records.page_info_capped', {
+    return t(keys.records.records.page_info_capped, {
       start,
       end,
       count: total.toLocaleString(),
-      defaultValue: 'Showing {start}–{end} of {count}+',
     });
   }
-  return t('records.records.page_info', {
+  return t(keys.records.records.page_info, {
     start,
     end,
     total,
-    defaultValue: 'Showing {start}–{end} of {total}',
   });
 }
 
 /** What "N+" means, as a `title` on the whole footer line (UX-2) — the count
  *  stopped rather than the data, and nothing else on screen says so. */
 function cappedHelp(t: Translate, total: number): string {
-  return t('records.records.page_info_capped_help', {
+  return t(keys.records.records.page_info_capped_help, {
     count: total.toLocaleString(),
-    defaultValue: 'More than {count} records match; the count stops at {count}.',
   });
 }
 
@@ -51,12 +47,11 @@ function cappedHelp(t: Translate, total: number): string {
  *  Two `t()` calls for the reason `pageInfo` gives. */
 function pagePosition(t: Translate, page: number, pages: number, capped: boolean): string {
   if (capped) {
-    return t('records.records.page_position_capped', { page, defaultValue: 'Page {page}' });
+    return t(keys.records.records.page_position_capped, { page });
   }
-  return t('records.records.page_position', {
+  return t(keys.records.records.page_position, {
     page,
     pages,
-    defaultValue: 'Page {page} of {pages}',
   });
 }
 
@@ -209,25 +204,25 @@ function numberedPagerParts(t: Translate, props: PagerProps, page: number): Page
     actions: [
       {
         key: 'first',
-        label: t('records.records.first', { defaultValue: 'First' }),
+        label: t(keys.records.records.first),
         unavailable: onFirst,
         onPress: () => onGo(1),
       },
       {
         key: 'previous',
-        label: t('records.records.previous', { defaultValue: 'Previous' }),
+        label: t(keys.records.records.previous),
         unavailable: onFirst,
         onPress: () => onGo(page - 1),
       },
       {
         key: 'next',
-        label: t('records.records.next', { defaultValue: 'Next' }),
+        label: t(keys.records.records.next),
         unavailable: onLast && !continues,
         onPress: () => (continues ? onContinue(nextCursor) : onGo(page + 1)),
       },
       {
         key: 'last',
-        label: t('records.records.last', { defaultValue: 'Last' }),
+        label: t(keys.records.records.last),
         unavailable: onLast,
         onPress: () => onGo(lastPage),
       },
