@@ -27,6 +27,14 @@ records = "sm_records.module:RecordsModule"
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
 
+# Optional: RecordsList joins pagebuilder's palette on hosts running both modules.
+# Must stay a 0.0.x range: the repo publishes at 0.0.x.
+# Floor 0.0.12 (#142): records registers from ``pagebuilder-blocks.ts``, which
+# only pagebuilder's own ``puck-blocks.ts`` globs in — added in 0.0.12.
+# On an older neighbour nothing crashes, but RecordsList silently drops out
+# of the palette.
+pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.1"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -65,3 +73,8 @@ markers = [
     "unbound_tenant: run with no records tenant bound (tests/conftest.py binds 'default' otherwise)",
 ]
 addopts = "-m 'not perf'"
+
+# Resolve the sibling module from the workspace during development. This is
+# tool config, so the published wheel still carries the range above.
+[tool.uv.sources]
+simple_module_pagebuilder = { workspace = true }

@@ -1,8 +1,8 @@
 /**
  * `RecordsList` Puck block: the records module's "natural integration" into
  * pagebuilder, deferred by the design doc (§16) with `news`'s
- * `puck-blocks.ts` named as the seam to copy — see this package's own
- * `puck-blocks.ts` for the registration side of that copy.
+ * `pagebuilder-blocks.ts` named as the seam to copy — see this package's own
+ * `pagebuilder-blocks.ts` for the registration side of that copy.
  *
  * Field wiring is admin-only (`resolveFields`/`resolveData` call the
  * session-gated `GET /api/records/types`) and runs only inside the Puck
@@ -34,8 +34,8 @@ function hiddenField<Value>(): CustomField<Value> {
 
 /**
  * The Puck field labels for this block (L2), built fresh on every call
- * rather than as a module-scope constant: the host globs every module's
- * `puck-blocks.ts` eagerly, before `configureI18n()` ever runs
+ * rather than as a module-scope constant: pagebuilder globs every module's
+ * `pagebuilder-blocks.ts` eagerly, before `configureI18n()` ever runs
  * (`host/client_app/app.tsx`/`blocks.ts`), so a `t()` call baked into a
  * top-level object literal here would run before i18next has any messages
  * and freeze that way forever (the same risk CLAUDE.md flags for a Zod
