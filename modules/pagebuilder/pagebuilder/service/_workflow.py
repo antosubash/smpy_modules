@@ -7,42 +7,18 @@ file focused; the methods are unchanged and still rely on ``self.db``,
 
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import ColumnElement, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
-from pagebuilder.models import NOT_TRASHED, Page, PageStatus, RevisionEvent
-from pagebuilder.service._common import _UNSET, _normalize_to_utc, _Unset
+from pagebuilder.models import Page, PageStatus, RevisionEvent
+from pagebuilder.service._claims import claim, due_candidates, release, retire_missed_windows
+from pagebuilder.service._common import _UNSET, _elapsed, _normalize_to_utc, _Unset
 from pagebuilder.service._revisions import RevisionsMixin
 
-
-def publish_due(now: datetime) -> ColumnElement[bool]:
-    """Drafts whose ``publish_at`` has elapsed.
-
-    Shared with the scheduler's tenant scan so what it looks for cannot drift
-    from what :meth:`WorkflowMixin.process_due` flips. Trashed pages are
-    excluded: a binned page must not flip itself live on a schedule it was
-    carrying when it was binned.
-    """
-    return and_(
-        NOT_TRASHED,
-        Page.status == PageStatus.DRAFT,
-        Page.publish_at.is_not(None),  # type: ignore[union-attr]
-        Page.publish_at <= now,  # type: ignore[operator]
-    )
-
-
-def unpublish_due(now: datetime) -> ColumnElement[bool]:
-    """Published pages whose ``unpublish_at`` has elapsed."""
-    return and_(
-        NOT_TRASHED,
-        Page.status == PageStatus.PUBLISHED,
-        Page.unpublish_at.is_not(None),  # type: ignore[union-attr]
-        Page.unpublish_at <= now,  # type: ignore[operator]
-    )
+logger = logging.getLogger(__name__)
 
 
 class WorkflowMixin(RevisionsMixin):
@@ -59,6 +35,12 @@ class WorkflowMixin(RevisionsMixin):
         # same page; clearing it stops the scheduler from re-firing on
         # the next tick.
         page.publish_at = None
+        # A genuinely future ``unpublish_at`` is a real "take it down later"
+        # instruction and survives. One that has already elapsed is a leftover
+        # from a schedule this publish did not go through, and would take the
+        # page straight back down on the next tick.
+        if _elapsed(page.unpublish_at, datetime.now(UTC)):
+            page.unpublish_at = None
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.PUBLISH, note=note)
         await self.db.flush()
@@ -126,37 +108,61 @@ class WorkflowMixin(RevisionsMixin):
     async def process_due(self, now: datetime) -> list[Page]:
         """Flip every page whose scheduled time has elapsed.
 
-        Drafts with ``publish_at <= now`` go live (clearing ``publish_at``);
-        published pages with ``unpublish_at <= now`` go back to draft
-        (clearing ``unpublish_at``). Returns the flipped pages so callers
-        can log / emit metrics.
+        Drafts with ``publish_at <= now`` go live; published pages with
+        ``unpublish_at <= now`` go back to draft. Returns the flipped pages
+        so callers can log / emit metrics.
 
-        Idempotent: each tick re-queries the table, so a missed wakeup
-        catches up on the next one. Failures on a single page are caught
-        and skipped so one bad row doesn't poison the whole tick.
+        Safe to run in more than one process. Each row is *claimed* first — one
+        conditional ``UPDATE`` that clears the timestamp it acts on, whose
+        affected-row count says whether this caller won it — so two replicas
+        ticking at once flip a due page exactly once. :mod:`._claims` has the
+        reasoning; the two steps are spelt out here because the gap between
+        them is the whole subject.
+
+        Idempotent: each tick re-queries, so a missed wakeup catches up on the
+        next — unless the whole window passed unseen, which is retired
+        unpublished rather than flipped twice (``retire_missed_windows``). One
+        bad row is skipped rather than poisoning the tick, its claim handed
+        back so a later tick retries, and logged with the page's id: a
+        schedule that quietly never fires leaves no other trace.
         """
+        if missed := await retire_missed_windows(self.db, now):
+            logger.warning("pagebuilder.scheduler.window_missed count=%s", missed)
         flipped: list[Page] = []
-
-        pub_due = await self.db.execute(
-            select(Page).where(publish_due(now))
-        )
-        for page in pub_due.scalars().all():
-            try:
-                await self.publish(page.id or 0, note="Auto-published on schedule")
-                flipped.append(page)
-            except HTTPException:
-                continue
-
-        unpub_due = await self.db.execute(
-            select(Page).where(unpublish_due(now))
-        )
-        for page in unpub_due.scalars().all():
-            try:
-                await self.unpublish(page.id or 0, note="Auto-unpublished on schedule")
-                flipped.append(page)
-            except HTTPException:
-                continue
-
+        for label, column, status, act, note in (
+            (
+                "publish",
+                Page.publish_at,
+                PageStatus.DRAFT,
+                self.publish,
+                "Auto-published on schedule",
+            ),
+            (
+                "unpublish",
+                Page.unpublish_at,
+                PageStatus.PUBLISHED,
+                self.unpublish,
+                "Auto-unpublished on schedule",
+            ),
+        ):
+            for page_id, due_at in await due_candidates(
+                self.db, column=column, status=status, now=now
+            ):
+                if not await claim(self.db, page_id, column=column, status=status, now=now):
+                    # Another replica got there first, or a person did. Not a
+                    # failure: the page is being flipped, just not by us.
+                    continue
+                try:
+                    flipped.append(await act(page_id, note=note))
+                except HTTPException as exc:
+                    await release(self.db, page_id, column=column, when=due_at)
+                    logger.warning(
+                        "pagebuilder.scheduler.%s_failed page_id=%s: %s",
+                        label,
+                        page_id,
+                        exc.detail,
+                        extra={"page_id": page_id, "status_code": exc.status_code},
+                    )
         return flipped
 
     async def submit_for_review(self, page_id: int, note: str | None = None) -> Page:
@@ -197,6 +203,11 @@ class WorkflowMixin(RevisionsMixin):
         page.published_data = page.draft_data
         page.status = PageStatus.PUBLISHED
         page.rejection_note = None
+        # Spent, exactly as in ``publish``: approving *is* publishing, so a
+        # stale ``unpublish_at`` must not take the page straight back down.
+        page.publish_at = None
+        if _elapsed(page.unpublish_at, datetime.now(UTC)):
+            page.unpublish_at = None
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.APPROVE, note=note)
         await self.db.flush()
@@ -218,9 +229,16 @@ class WorkflowMixin(RevisionsMixin):
             )
         page.status = PageStatus.DRAFT
         page.rejection_note = note
+        # A schedule set before submission must not survive the rejection: the
+        # page is a draft again, which is exactly what ``process_due`` looks
+        # for, so a stale ``publish_at`` would auto-publish the very page a
+        # reviewer just turned back. An elapsed ``unpublish_at`` would sit
+        # inert until a later publish, then take the page straight back down.
+        page.publish_at = None
+        if _elapsed(page.unpublish_at, datetime.now(UTC)):
+            page.unpublish_at = None
         self.db.add(page)
         self._record_revision(page, event=RevisionEvent.REJECT, note=note)
         await self.db.flush()
         await self.db.refresh(page)
         return page
-
