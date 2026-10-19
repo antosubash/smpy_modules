@@ -312,6 +312,8 @@
     "key_immutable": "Der Schlüssel kann nach dem Erstellen des Typs nicht mehr geändert werden.",
     "key_placeholder": "blog_post",
     "key_new_help": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben. Wird einmalig festgelegt und kann später nicht geändert werden.",
+    "key_limit": "Grenze von {max} Zeichen erreicht. Alles Längere wurde abgeschnitten.",
+    "label_required": "Eine Bezeichnung ist erforderlich.",
     "type_key_error": {
       "required": "Ein Schlüssel ist erforderlich.",
       "reserved": "„{key}“ ist vom Modul reserviert.",

@@ -23,6 +23,7 @@ from typing import Any
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records._text import has_nul
@@ -200,8 +201,23 @@ async def create_type(
         collection=collection,
         created_by=actor,
     )
-    db.add(rtype)
-    await db.flush()
+    try:
+        # A savepoint, so losing the race leaves the request's transaction
+        # usable. ``add`` goes *inside* it: ``begin_nested`` flushes whatever
+        # is pending first, and a row flushed there is outside the savepoint.
+        async with db.begin_nested():
+            db.add(rtype)
+            await db.flush()
+    except IntegrityError as exc:
+        # The SELECT above is only a check; the unique (tenant_id, key) index
+        # is the authority, and a concurrent create that passed the same
+        # check lands here. Same 409 as the sequential duplicate, but only for
+        # *that* violation: an FK or NOT NULL failure must stay a 500. The
+        # insert blocked on the winner's uncommitted row, so by now it is
+        # committed and a fresh look at the key sees it.
+        if (await db.execute(taken)).scalars().first():
+            raise Conflict(f"a record type with key {key!r} already exists") from exc
+        raise
     await snapshot(db, rtype, actor)
     return rtype
 

@@ -67,7 +67,7 @@ export function SidebarField({
           {t(keys.records.type_editor.show_in_menu)}
         </Label>
       </div>
-      <p className="-mt-2 text-sm text-muted-foreground sm:col-span-2">
+      <p className="-mt-2 break-words text-sm text-muted-foreground sm:col-span-2">
         {t(keys.records.type_editor.show_in_menu_help, {
           label_plural: labelPlural,
         })}

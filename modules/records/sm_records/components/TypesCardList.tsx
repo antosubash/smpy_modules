@@ -45,7 +45,9 @@ export function TypeIdentity({
       <div className={card ? 'min-w-0 flex-1' : 'min-w-0'}>
         <Link
           href={`/admin/records/${type.key}`}
-          className={card ? 'font-medium hover:underline' : 'hover:underline'}
+          className={
+            card ? 'break-words font-medium hover:underline' : 'break-words hover:underline'
+          }
           data-testid="records-type-link"
         >
           {type.label}
@@ -60,7 +62,7 @@ export function TypeIdentity({
         )}
         {type.description && (
           <p
-            className="text-sm font-normal text-muted-foreground"
+            className="break-words text-sm font-normal text-muted-foreground"
             data-testid="records-type-description"
           >
             {type.description}

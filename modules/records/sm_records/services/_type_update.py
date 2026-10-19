@@ -160,7 +160,7 @@ async def update_type(
             else f"cannot change {unknown}"
         )
         raise ValidationFailed(problem, [{"field": unknown[0], "message": problem}])
-    check_type_text(changes)
+    check_type_text(changes, stored_label=rtype.label)
 
     fields_raw = changes.pop("fields_raw", None)
     fields: list[dict[str, Any]] | None = None

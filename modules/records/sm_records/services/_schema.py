@@ -26,7 +26,7 @@ against ``TYPE_KEY_PATTERN`` and ``collection`` because it is matched against
 the declared set."""
 
 
-def check_type_text(values: dict[str, Any]) -> None:
+def check_type_text(values: dict[str, Any], *, stored_label: str | None = None) -> None:
     """Refuse a NUL in anything about a type that is stored as text.
 
     Called by both write paths — ``create_type`` and ``update_type`` — over
@@ -35,8 +35,20 @@ def check_type_text(values: dict[str, Any]) -> None:
     ``varchar`` and its ``allowed_roles`` to a JSON column, and Postgres
     refuses ``\x00`` in both from the driver: a 500 for a value that is simply
     not storable, where the rest of this module answers 422 and names the
-    field.
+    field. A blank ``label`` is refused for the same reason: it created a type
+    that listed as an empty row. Only the *input* paths call this, so stored
+    rows that predate the rule still read back.
+
+    ``stored_label`` is the update path's: a legacy type whose label is already
+    blank may be edited (fields, roles, ...) as long as the label is left as it
+    is. The rule bites when a label is being *set* to blank, not when it is
+    echoed back unchanged.
     """
+    label = values.get("label")
+    if isinstance(label, str) and not label.strip() and label != stored_label:
+        raise ValidationFailed(
+            "label is required", [{"field": "label", "message": "label is required"}]
+        )
     for name in _TEXT_COLUMNS:
         if has_nul(values.get(name)):
             raise ValidationFailed(
