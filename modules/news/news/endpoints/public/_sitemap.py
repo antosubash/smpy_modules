@@ -191,7 +191,7 @@ def sitemap_router() -> APIRouter:
     """
     router = APIRouter()
 
-    @router.get("/sitemap.xml", response_model=None)
+    @router.api_route("/sitemap.xml", methods=["GET", "HEAD"], response_model=None)
     async def article_sitemap(
         request: Request, db: AsyncSession = Depends(get_db)
     ) -> Response:
