@@ -446,7 +446,7 @@ Everything below was probed and behaved as §§1–6 say it should.
   snapshot it started with: 6 records, `data` keys `['name','state']` after
   `state` was dropped mid-stream.
 
-**Widget** — `puck-blocks.ts` registers one block; `RecordsListRender` only ever
+**Widget** — `pagebuilder-blocks.ts` registers one block; `RecordsListRender` only ever
 calls `fetchPublicRecords` with `prefix`/`typeKey`/`limit`/`filter`/`sort`/
 `locale`; `buildPublicListUrl` sets `page_size`, `filter`, `sort`, `locale` and
 nothing else; `fields` never leaves the client. Nothing server-side beyond the

@@ -74,7 +74,7 @@ Decided and delegated with these rules; recorded here so the numbers in
 
 ## 3. The pagebuilder widget
 
-A `RecordsList` Puck block registered from `sm_records/puck-blocks.ts`, the
+A `RecordsList` Puck block registered from `sm_records/pagebuilder-blocks.ts`, the
 seam `news` uses: records knows about pagebuilder, pagebuilder knows nothing
 about records. It renders from the **anonymous read API** only, so it can show
 nothing the public API would not — a private type renders the empty state.

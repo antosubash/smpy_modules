@@ -12,6 +12,11 @@
     "@simple-module-py/pagebuilder": "*",
     "sonner": "^2.0.0"
   },
+  "peerDependenciesMeta": {
+    "@simple-module-py/pagebuilder": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@simple-module-py/tsconfig": "*"
   },

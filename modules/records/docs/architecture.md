@@ -480,7 +480,7 @@ sm_records/
 ├── menu.py          per-type sidebar entries (+ _menu_middleware.py)
 ├── health.py        the records.reindex check
 ├── deferred.py      post-response job middleware
-├── collections.py, locales.py, puck-blocks.ts
+├── collections.py, locales.py, pagebuilder-blocks.ts
 ├── cli.py           + cli_io.py, cli_verify.py
 ├── models/          tables, per-table-set factories
 ├── schema/          field definitions, the compiler, the diff and its classes
