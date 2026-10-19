@@ -38,6 +38,15 @@ describe('safeHref', () => {
     ['mailto:a@b.c', 'mailto:a@b.c'],
     ['tel:+123', 'tel:+123'],
     ['  /x  ', '/x'],
+    ['news', 'news'],
+    ['./news', './news'],
+    ['../news', '../news'],
+    ['x/y', 'x/y'],
+    ['x/y:z', 'x/y:z'],
+    ['?page=2', '?page=2'],
+    ['?a=b:c', '?a=b:c'],
+    ['#a:b', '#a:b'],
+    ['./a:b', './a:b'],
   ])('keeps %s', (input, expected) => {
     expect(safeHref(input)).toBe(expected);
   });
@@ -53,7 +62,13 @@ describe('safeHref', () => {
     'data:text/html,<script>alert(1)</script>',
     'vbscript:msgbox(1)',
     'ftp://x',
-    'relative/path',
+    'java\tscript:alert(1)',
+    'data:,x',
+    'javascript://%0aalert(1)',
+    'a:b/c',
+    '\\\\evil.com',
+    '\\evil.com',
+    '  //evil.com',
     '',
     '   ',
   ])('drops %j', (input) => {
