@@ -89,7 +89,7 @@ export function useMediaUploads({ uploadFolder, onUploaded, setMessage }: Params
           );
         }
         if (succeeded > 0) {
-          setMessage(`Uploaded ${succeeded} file${succeeded === 1 ? '' : 's'}.`);
+          setMessage(translate(keys.pagebuilder.media.uploaded, { count: succeeded }));
           // Best-effort: also re-sync via Inertia so the SSR props
           // reflect the new state on next reload.
           router.reload({ only: ['initial'] });

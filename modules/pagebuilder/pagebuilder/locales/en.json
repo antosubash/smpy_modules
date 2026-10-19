@@ -1050,7 +1050,9 @@
     "load_more": "Load more",
     "loading": "Loading…",
     "title": "Media library",
-    "unfiled": "Unfiled"
+    "unfiled": "Unfiled",
+    "uploaded_one": "Uploaded {count} file.",
+    "uploaded_other": "Uploaded {count} files."
   },
   "media_filters": {
     "max_kb": "Max KB",

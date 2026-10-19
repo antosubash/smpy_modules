@@ -1050,7 +1050,9 @@
     "load_more": "Mehr laden",
     "loading": "Wird geladen …",
     "title": "Mediathek",
-    "unfiled": "Nicht zugeordnet"
+    "unfiled": "Nicht zugeordnet",
+    "uploaded_one": "{count} Datei hochgeladen.",
+    "uploaded_other": "{count} Dateien hochgeladen."
   },
   "media_filters": {
     "max_kb": "Max. KB",

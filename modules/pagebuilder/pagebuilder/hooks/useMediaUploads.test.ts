@@ -20,12 +20,14 @@ vi.mock('../utils/api', () => ({ uploadMedia: vi.fn() }));
 const file = (name: string) => new File(['x'], name, { type: 'image/png' });
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+const setMessage = vi.fn();
+
 function start(files: File[]) {
   // biome-ignore lint/correctness/useHookAtTopLevel: react is stubbed; the hook is plain code here
   const uploads = useMediaUploads({
     uploadFolder: '',
     onUploaded: vi.fn(),
-    setMessage: vi.fn(),
+    setMessage,
   });
   uploads.startUploads(files);
   return flush();
@@ -57,5 +59,13 @@ describe('useMediaUploads failure reporting', () => {
     vi.mocked(uploadMedia).mockResolvedValue({} as never);
     await start([file('a.png')]);
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('reports the successes through the translated, pluralised message', async () => {
+    vi.mocked(uploadMedia).mockResolvedValue({} as never);
+    await start([file('a.png')]);
+    expect(setMessage).toHaveBeenLastCalledWith('Uploaded 1 file.');
+    await start([file('a.png'), file('b.png')]);
+    expect(setMessage).toHaveBeenLastCalledWith('Uploaded 2 files.');
   });
 });
