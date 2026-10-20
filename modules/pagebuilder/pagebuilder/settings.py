@@ -259,9 +259,11 @@ class PagebuilderSettings(BaseSettings):
     scheduler_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Run an in-process loop that flips pages on their scheduled times.
 
-    Disable in deployments where a separate worker (Celery beat, k8s
-    CronJob, etc.) drives :meth:`PagesService.process_due` directly —
-    otherwise both would race and double-publish.
+    Safe to leave on in every process: ``process_due`` claims each due page
+    with a conditional ``UPDATE`` before flipping it, so replicas (or an
+    external worker driving :meth:`PagesService.process_due` alongside) flip
+    a page once. Disable where a deployment would rather one place polled
+    (Celery beat, k8s CronJob, etc.).
     """
 
     scheduler_interval_seconds: int = Field(default=30, json_schema_extra=_RESTART)

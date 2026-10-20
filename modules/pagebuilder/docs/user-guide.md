@@ -119,8 +119,11 @@ Changing the URL of a saved page leaves a permanent (301) redirect from the old
 address — *Saving leaves a permanent redirect from …, so existing links keep
 working.* Renaming again moves the redirect, renaming back to an old slug never
 creates a loop, and a chain of renames always lands on the current address in one
-hop. Redirects belong to the page's language. A trashed page keeps its slug, so no
-new page can take its address while it waits in the trash.
+hop. A redirect only forwards to a page that is live: while the page is
+unpublished, scheduled, in review or in the Trash, its old address answers 404
+rather than sending visitors to a dead URL, and it forwards again once the page
+is republished. Redirects belong to the page's language. A trashed page keeps
+its slug, so no new page can take its address while it waits in the trash.
 
 ### Delete, trash and purge
 

@@ -22,7 +22,9 @@ have nothing else to do with it.
 
 from __future__ import annotations
 
+import logging
 import re
+from functools import cache
 
 from pagebuilder.settings import PagebuilderSettings
 
@@ -35,7 +37,10 @@ part of a URL and a column value, so accepting the full grammar would let two
 spellings of one language address the same page."""
 
 
+_log = logging.getLogger("simple_module.pagebuilder")
+
 _active: PagebuilderSettings | None = None
+_warned = False
 
 
 def use(settings: PagebuilderSettings) -> None:
@@ -46,15 +51,49 @@ def use(settings: PagebuilderSettings) -> None:
 
 def reset() -> None:
     """Forget the published instance, so one test does not leak into the next."""
-    global _active
+    global _active, _warned
     _active = None
+    _warned = False
+    _defaults.cache_clear()
 
 
 def _settings() -> PagebuilderSettings:
-    global _active
-    if _active is None:
-        _active = PagebuilderSettings()
-    return _active
+    """The published instance, or the pydantic defaults — never kept (#129).
+
+    Reading before ``use()`` means the caller gets the *default*
+    ``content_locales`` whatever the database says, and slugs resolve against
+    the wrong language with no error. That is logged rather than raised: the
+    callers that can get here (news borrowing on a host that never registered
+    pagebuilder, a script, a worker that skipped the module's hooks) are
+    running hosts, and turning a wrong-language risk into a crash on every
+    article write is the worse failure. Logged once per process (``reset()`` re-arms
+    it), because news borrows on every call and would otherwise log per request.
+    The fallback is never stored in ``_active``, so nothing early can stand in
+    for the hydrated instance.
+    """
+    if _active is not None:
+        return _active
+    global _warned
+    if not _warned:
+        _warned = True
+        _log.warning(
+            "pagebuilder.locales read before use(): falling back to the default "
+            "content locales, not the configured ones"
+        )
+    return _defaults()
+
+
+@cache
+def _defaults() -> PagebuilderSettings:
+    """The pure pydantic defaults, built once.
+
+    Safe to keep, unlike the old ``_active`` fallback: it is never published,
+    so ``use()`` still wins, and it holds no configuration that could go stale.
+    Kept because constructing settings scans ``os.environ`` before the class
+    discards that source, and news' sitemap would otherwise pay that per
+    article on the event loop. Callers only read it.
+    """
+    return PagebuilderSettings()
 
 
 def supported() -> tuple[str, ...]:

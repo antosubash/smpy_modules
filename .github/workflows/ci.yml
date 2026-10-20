@@ -67,7 +67,7 @@ jobs:
 
 
       - name: Sync workspace (all packages, with dev extras)
-        run: uv sync --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras
 
       # Run pytest from within each module so each picks up its own
       # `[tool.pytest.ini_options]` (e.g. `asyncio_mode = "auto"`).
@@ -130,7 +130,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Sync workspace (all packages)
-        run: uv sync --all-packages
+        run: uv sync --locked --all-packages
 
       # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
       # needs no extra install. Two databases: one for the records unit
@@ -217,7 +217,7 @@ jobs:
 
 
       - name: Sync Python workspace
-        run: uv sync --all-packages
+        run: uv sync --locked --all-packages
 
       - name: Install npm workspace
         run: npm ci
@@ -227,6 +227,12 @@ jobs:
 
       - name: Generate pages manifest
         run: make gen-pages
+
+      # `npm run build` type-checks host/client_app only. Module TSX — and the
+      # typed `t(keys.<module>…)` lookups, which rely on tsc rejecting an
+      # unknown key — is checked by `make typecheck`, per module (#113).
+      - name: Typecheck modules
+        run: make typecheck
 
       - name: Build frontend (typecheck + vite build)
         run: npm run build
@@ -295,7 +301,7 @@ jobs:
 
 
       - name: Sync Python workspace
-        run: uv sync --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras
 
       - name: Install npm workspace
         run: npm ci
@@ -379,7 +385,7 @@ jobs:
 
 
       - name: Sync Python workspace
-        run: uv sync --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras
 
       - name: Install npm workspace
         run: npm ci
@@ -470,7 +476,7 @@ jobs:
 
 
       - name: Sync workspace
-        run: uv sync --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras
 
       # scripts/tests/test_nav_icons.py reads the framework's NavIcon.tsx out
       # of node_modules and skips itself when it is absent.
@@ -504,6 +510,12 @@ jobs:
       # same version as the repo root.
       - name: Version sync
         run: uv run python scripts/bump_version.py --check-current
+
+      # Two PRs that each add a revision off the same parent leave two heads
+      # once both land; `make migration` then refuses and `make downgrade`
+      # picks a branch. The Postgres job's `upgrade heads` would hide it (#107).
+      - name: Single migration head
+        run: uv run python scripts/check_migration_heads.py
 
       - name: Bump script tests
         run: uv run pytest scripts/tests

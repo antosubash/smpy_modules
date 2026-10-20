@@ -232,7 +232,9 @@ class PagebuilderModule(ModuleBase):
         # Publish immediately as well as from ``on_startup``: the model's
         # ``locale`` column default is a pure function, and a row written
         # before the app ever starts (a CLI, a migration, a test) still has to
-        # come out in the right language.
+        # come out in the right language. This is the pre-hydration value; it
+        # is superseded by ``_live_settings`` at the top of ``on_startup``,
+        # before the scheduler starts or any request is served (#129).
         locales.use(self.settings or PagebuilderSettings())
 
     def register_permissions(self, registry: PermissionRegistry) -> None:

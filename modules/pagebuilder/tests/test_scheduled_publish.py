@@ -48,6 +48,17 @@ async def test_schedule_endpoint_sets_publish_at(authed_client: AsyncClient) -> 
     assert body["unpublish_at"] is None
 
 
+async def test_schedule_round_trips_as_a_utc_instant(authed_client: AsyncClient) -> None:
+    """SQLite hands the stored value back naive; the editor parses a zoneless
+    string as local time, so each re-save shifted the schedule by the offset."""
+    page = await _create_draft(authed_client)
+    when = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0)
+    url = f"/api/pagebuilder/pages/{page['id']}"
+    saved = await authed_client.post(f"{url}/schedule", json={"publish_at": when.isoformat()})
+    for body in (saved.json(), (await authed_client.get(url)).json()):
+        assert datetime.fromisoformat(body["publish_at"]) == when
+
+
 async def test_schedule_endpoint_sets_unpublish_at(authed_client: AsyncClient) -> None:
     page = await _create_draft(authed_client)
     await authed_client.post(f"/api/pagebuilder/pages/{page['id']}/publish")

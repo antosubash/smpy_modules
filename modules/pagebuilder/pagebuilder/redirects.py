@@ -16,7 +16,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder.models import PageRedirect
+from pagebuilder.models import NOT_TRASHED, Page, PageRedirect, PageStatus
 
 
 async def record(
@@ -57,24 +57,40 @@ async def resolve(db: AsyncSession, slug: str, locale: str) -> str | None:
     renames collapses to one hop: every old address points at the page, and the
     page always knows where it lives now.
 
+    A page the public viewer would not serve resolves to nothing. Forwarding
+    to an address that would itself 404 is worse than saying so at the old
+    one — and worse than it sounds, because the redirect is a 301: a browser
+    that once followed it to a dead URL keeps doing so from cache, long after
+    the page is republished. So the conditions below are deliberately the
+    viewer's own (``get_by_slug_published`` plus its ``published_data``
+    check): not trashed, published, and carrying a snapshot to serve. News'
+    ``redirects.resolve`` applies the same three.
+
     The page's own locale is checked as well as the redirect's. They agree
     today — a rename cannot change a page's language — but a redirect that
     outlived a locale change would otherwise hand ``/de/p/x`` an English slug
     and send the visitor to a URL that 404s.
     """
-    from pagebuilder.models import Page
-
     result = await db.execute(
-        select(Page.slug)
+        select(Page.slug, Page.published_data)
         .join(PageRedirect, PageRedirect.page_id == Page.id)
         .where(
             PageRedirect.from_slug == slug,
             PageRedirect.locale == locale,
             Page.locale == locale,
-            Page.deleted_at.is_(None),
+            NOT_TRASHED,
+            Page.status == PageStatus.PUBLISHED,
         )
     )
-    return result.scalars().first()
+    row = result.first()
+    # The snapshot is checked in Python rather than in the `WHERE`, and that is
+    # forced rather than stylistic: `published_data` is a JSON column, and a
+    # Python ``None`` is stored in one as the JSON text ``null``, not as SQL
+    # NULL — so ``IS NOT NULL`` is true of a never-published snapshot too.
+    # Cheap here, where at most one row is ever loaded.
+    if row is None or row.published_data is None:
+        return None
+    return row.slug
 
 
 async def clear_for_page(db: AsyncSession, page_id: int) -> None:

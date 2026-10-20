@@ -138,6 +138,15 @@ test.describe('Page inspector', () => {
     expect(old.status()).toBe(301);
     expect(old.headers().location).toBe(`/p/${moved}`);
     expect((await page.request.get(`/p/${moved}`)).status()).toBe(200);
-    void id;
+
+    // #109: the old address forwards only while the page is live. A cached
+    // 301 to a 404 would outlive the republish, so unpublished means 404 here.
+    const headers = await csrfHeader(page);
+    await page.request.post(`/api/pagebuilder/pages/${id}/unpublish`, { headers, data: {} });
+    expect((await page.request.get(`/p/${slug}`, { maxRedirects: 0 })).status()).toBe(404);
+    await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
+    const back = await page.request.get(`/p/${slug}`, { maxRedirects: 0 });
+    expect(back.status()).toBe(301);
+    expect(back.headers().location).toBe(`/p/${moved}`);
   });
 });
