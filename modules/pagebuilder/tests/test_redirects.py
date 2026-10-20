@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from pagebuilder import redirects
+from pagebuilder.models import Page, PageStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -95,6 +97,69 @@ class TestRename:
         await authed_client.delete(f"{API}/{page['id']}")
 
         assert (await authed_client.get("/p/binned-old")).status_code == 404
+
+
+class TestRedirectTargetMustBeLive:
+    """An old address forwards only to a page the public viewer would serve.
+
+    The redirect is a 301, which browsers cache: one that once sent a visitor
+    to a 404 keeps doing so after the page comes back (#109).
+    """
+
+    async def test_an_unpublished_target_does_not_redirect(
+        self, authed_client: AsyncClient
+    ) -> None:
+        page = await _published(authed_client, "draft-old")
+        await authed_client.put(f"{API}/{page['id']}", json={"slug": "draft-new"})
+        await authed_client.post(f"{API}/{page['id']}/publish", json={})
+        await authed_client.post(f"{API}/{page['id']}/unpublish", json={})
+
+        # Unpublish keeps the snapshot, so status alone has to stop the hop.
+        assert (await authed_client.get("/p/draft-new")).status_code == 404
+        assert (await authed_client.get("/p/draft-old")).status_code == 404
+
+    async def test_republishing_brings_the_redirect_back(
+        self, authed_client: AsyncClient
+    ) -> None:
+        page = await _published(authed_client, "back-old")
+        await authed_client.put(f"{API}/{page['id']}", json={"slug": "back-new"})
+        await authed_client.post(f"{API}/{page['id']}/unpublish", json={})
+        await authed_client.post(f"{API}/{page['id']}/publish", json={})
+
+        moved = await authed_client.get("/p/back-old")
+        assert moved.status_code == 301
+        assert moved.headers["location"] == "/p/back-new"
+
+    async def test_a_published_page_without_a_snapshot_does_not_redirect(
+        self, db
+    ) -> None:
+        """The viewer 404s a published row with nothing to render, so its old
+        address must not forward to it either. Not reachable through the API,
+        hence built directly — and why the snapshot is checked in Python: a
+        ``None`` in a JSON column is stored as JSON ``null``, not SQL NULL."""
+        page = Page(
+            slug="hollow-new",
+            title="Hollow",
+            draft_data={"content": []},
+            published_data=None,
+            status=PageStatus.PUBLISHED,
+        )
+        db.add(page)
+        await db.flush()
+        assert page.id is not None
+        await redirects.record(
+            db,
+            page_id=page.id,
+            old_slug="hollow-old",
+            new_slug="hollow-new",
+            locale=page.locale,
+        )
+
+        assert await redirects.resolve(db, "hollow-old", page.locale) is None
+
+        page.published_data = {"content": []}
+        await db.flush()
+        assert await redirects.resolve(db, "hollow-old", page.locale) == "hollow-new"
 
 
 class TestNavAndSeoFields:
