@@ -20,7 +20,7 @@ root `.env` is the single source of truth (see CLAUDE.md).
 ## Launch
 | Scenario | Command |
 |---|---|
-| Migrations | `make migrate` (alembic `upgrade heads` — there are several heads) |
+| Migrations | `make migrate` (alembic `upgrade heads`; history has one head, enforced by `scripts/check_migration_heads.py`) |
 | Full stack | `SM_USERS_BOOTSTRAP_EMAIL=<email> SM_USERS_BOOTSTRAP_PASSWORD=<pw> make dev` |
 | Second stack beside another (worktree) | prefix with `API_PORT=8010 UI_PORT=5070 SM_UI_PORT=5070 SM_VITE_DEV_URL=http://localhost:5070` |
 | API only / UI only | `make dev-api` / `make dev-ui` |
