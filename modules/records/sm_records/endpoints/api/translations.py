@@ -18,7 +18,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.i18n import TranslationCreate, TranslationRead, translation_read
 from sm_records.contracts.schemas import RecordRead, record_read
 from sm_records.deps import (
@@ -106,9 +105,8 @@ async def create_record_translation(
         settings=settings,
         actor=who,
     )
-    # A translation is a record, so it is a ``RecordCreated`` like any other —
-    # its ``translation_group`` is what says it is a sibling.
-    events.publish(request, events.created(rtype, created))
+    # A translation is a record, so ``create_record`` emits a ``RecordCreated``
+    # for it like any other — its ``translation_group`` says it is a sibling.
     return record_read(rtype, created)
 
 

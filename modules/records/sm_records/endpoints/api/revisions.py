@@ -20,7 +20,6 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.schema_change import (
     TypeRestoreRequest,
     TypeRevisionListResponse,
@@ -142,7 +141,6 @@ async def restore_record_revision(
     against "now" rather than "then" is the correct answer, not a gap)."""
     check_type_roles(request, rtype)
     record = await record_service.get_record(db, rtype, uuid)
-    was = record.status.value
     restored = await revision_service.restore(
         db,
         rtype,
@@ -152,9 +150,8 @@ async def restore_record_revision(
         settings=settings,
         actor=who,
     )
-    # A restore is an ordinary write with a different revision label, so it is
-    # a ``RecordUpdated`` — a subscriber acts on the new payload either way.
-    events.publish(request, events.updated(rtype, restored, status_before=was))
+    # A restore is an ordinary write with a different revision label, so
+    # ``update_record`` emits a ``RecordUpdated`` for it like any other.
     return record_read(rtype, restored)
 
 

@@ -23,6 +23,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records import events
 from sm_records.index.query import Filter, filtered, only_trashed
 from sm_records.models import RecordType, tables_for
 from sm_records.services._common import mark_written
@@ -108,8 +109,8 @@ async def empty_trash(
 ) -> list[Identity]:
     """Purge every trashed record of ``rtype``, or the filtered part of it.
 
-    Returns the identity of each record purged — the endpoint publishes one
-    ``RecordPurged`` per entry, which is the contract every other purge keeps
+    Returns the identity of each record purged, and emits one ``RecordPurged``
+    per entry, which is the contract every other purge keeps
     and the only way a subscriber hears about a record that is no longer there
     to be read.
 
@@ -133,4 +134,6 @@ async def empty_trash(
     if not rows:
         return []
     await _purge_ids(db, rtype, [row[0] for row in rows])
-    return [Identity(row[1], row[2], row[3]) for row in rows]
+    purged = [Identity(row[1], row[2], row[3]) for row in rows]
+    events.emit(db, *[events.purged(rtype, identity) for identity in purged])
+    return purged

@@ -24,13 +24,10 @@ file and nowhere but the query string for an option.
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.io import (
     ImportFormat,
     ImportMode,
@@ -177,13 +174,9 @@ async def import_records(
         match_by=text_option(form, "match_by", match_by),
         force=flag_option(form, "force", force),
     )
-    # One event per row that wrote, not one per file: a subscriber acts on
-    # records, and an import is many ordinary writes (``_import_rows.write_row``
-    # goes through ``create_record``/``update_record`` for exactly that reason).
-    # A dry run fills nothing, because it wrote nothing.
-    written: list[Any] = []
-    report = await import_service.import_records(
-        db, rtype, text, fmt=chosen, options=options, settings=settings, actor=who, written=written
+    # One event per row that wrote, emitted by ``create_record``/
+    # ``update_record`` themselves (:mod:`sm_records.events`): a subscriber acts
+    # on records, and an import is many ordinary writes.
+    return await import_service.import_records(
+        db, rtype, text, fmt=chosen, options=options, settings=settings, actor=who
     )
-    events.publish(request, *events.imported(rtype, written))
-    return report

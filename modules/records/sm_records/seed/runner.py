@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from sm_records import events
 from sm_records.index._analyze import analyze_tables, owned_table_names
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.seed import generate
@@ -74,7 +75,7 @@ async def _ensure_types(db: Any, settings: RecordsSettings) -> dict[str, RecordT
             )
             log(f"created type {type_def.key!r}")
         types[type_def.key] = rtype
-    await db.commit()
+    await events.commit(db)
     return types
 
 
@@ -97,7 +98,7 @@ async def _reset(db: Any) -> None:
         held = await record_count(db, rtype, include_deleted=True)
         await delete_type(db, rtype, confirm_record_count=held)
         log(f"reset: deleted type {type_def.key!r} ({held} record(s))")
-    await db.commit()
+    await events.commit(db)
 
 
 class _BatchCommitter:
@@ -117,11 +118,11 @@ class _BatchCommitter:
     async def tick(self) -> None:
         self._count += 1
         if self._count % _BATCH_SIZE == 0:
-            await self._db.commit()
+            await events.commit(self._db)
             log(f"{self._count}/{self._total_planned} records written")
 
     async def finish(self) -> None:
-        await self._db.commit()
+        await events.commit(self._db)
 
 
 async def _create(
@@ -153,6 +154,7 @@ async def seed_database(
     records: int = 5000,
     seed: int = 42,
     reset: bool = False,
+    bus: Any = None,
 ) -> SeedSummary:
     """Seed (or top up, or reset-and-reseed) the demo dataset.
 
@@ -166,6 +168,11 @@ async def seed_database(
     One session for the entire run (matching ``cli.py reindex``'s shape) —
     ``expire_on_commit=False`` makes that safe across the periodic commits a
     :class:`_BatchCommitter` issues.
+
+    Every commit goes through :func:`sm_records.events.commit`, so ``bus``
+    (a host's ``app.state.sm.event_bus``, say) hears one ``RecordCreated`` per
+    seeded record, batch by batch, and ``reset``'s purge events. A bare
+    ``commit()`` would drop them — it never runs the session's ``on_commit``.
     """
     started = time.monotonic()
     rng = random.Random(seed)
@@ -174,6 +181,7 @@ async def seed_database(
     summary = SeedSummary(reset=reset)
 
     async with db_state.session_factory() as db:
+        events.attach(db, bus)
         if reset:
             await _reset(db)
         types = await _ensure_types(db, settings)
@@ -243,14 +251,14 @@ async def seed_database(
         # the only difference is which tables ``tables_for`` hands the writer
         # (Phase 5 §6.3), which is the point.
         if "event" in counts:
-            events = 0
+            event_count = 0
             store_uuids = [store.uuid for store in stores]
             for i in range(counts["event"]):
                 venue = rng.choice(store_uuids) if store_uuids else None
                 payload, slug = generate.gen_event(rng, offsets["event"] + i, store_uuid=venue)
                 await _create(db, committer, types["event"], payload, settings=settings, slug=slug)
-                events += 1
-            summary.created["event"] = events
+                event_count += 1
+            summary.created["event"] = event_count
 
         await committer.finish()
         # A bulk load is exactly the state SQLite has no statistics for, and a
@@ -258,7 +266,7 @@ async def seed_database(
         # any request, is worth orders of magnitude on the filters that read
         # the index tables — see :mod:`sm_records.index._analyze`.
         await analyze_tables(db, owned_table_names())
-        await db.commit()
+        await events.commit(db)
 
     summary.elapsed_seconds = time.monotonic() - started
     log(

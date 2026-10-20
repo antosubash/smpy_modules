@@ -1,5 +1,15 @@
 """Work a request asks for but must not start until its transaction is gone.
 
+Two callers are left, and both open a session of their own: the reindex a type
+write queues (``endpoints/api/types.py``) and the schema-preview job
+(``endpoints/api/preview.py``). Domain events no longer come through here —
+they ride the session's ``on_commit`` (:mod:`sm_records.events`), which every
+write path reaches, not only a request (GH #128). The jobs here cannot: an
+``on_commit`` callback runs before the response is sent and holds it until it
+returns, while a rebuild can take minutes; and a manual reindex of a type whose
+request wrote nothing would take ``finalize_session``'s read-only branch,
+which discards the callbacks instead of running them.
+
 FastAPI's ``BackgroundTasks`` is the obvious home for the reindex of §8.9 and
 is the wrong one, for a reason that is entirely about ordering rather than
 about background work. A route's ``Depends`` teardown is registered on the

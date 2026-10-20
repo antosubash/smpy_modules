@@ -18,8 +18,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
-from sm_records.contracts.bulk import BulkAction, BulkRequest, BulkResult, TrashEmptied
+from sm_records.contracts.bulk import BulkRequest, BulkResult, TrashEmptied
 from sm_records.deps import (
     actor,
     caller_roles,
@@ -43,28 +42,6 @@ router = APIRouter(
     route_class=RecordsErrorRoute,
     responses=responses(*WRITE),
 )
-
-
-def _event_for(action: BulkAction, rtype: RecordType, change: bulk_service.Change) -> list[object]:
-    """The events one record's change publishes — the single-record builders.
-
-    A trash yields one per record it reached, cascade included, exactly as
-    ``DELETE /records/{uuid}`` does; everything else yields one — except a
-    turn that found nothing to do, which yields none: a publish of an already
-    published record wrote nothing, and an event for it would tell every
-    subscriber a record changed when its own history says it did not. The
-    service could not build these itself: the bus is the endpoint's
-    (architecture rule 1), and ``events`` imports Starlette.
-    """
-    if change.unchanged:
-        return []
-    if action is BulkAction.TRASH:
-        return list(events.trashed(rtype, change.record, change.cascade))
-    if action is BulkAction.RESTORE:
-        return [events.restored(rtype, change.record)]
-    if action is BulkAction.PURGE:
-        return [events.purged(rtype, change.record)]
-    return [events.updated(rtype, change.record, status_before=change.status_before or "")]
 
 
 @router.post("/records/bulk", response_model=BulkResult, dependencies=[require_edit])
@@ -96,7 +73,7 @@ async def bulk_records(
             f"{len(body.uuids)} records named, over the {settings.max_bulk_records}-record "
             "limit for one bulk request"
         )
-    result, changes = await bulk_service.apply_bulk(
+    result, _changes = await bulk_service.apply_bulk(
         db,
         rtype,
         action=body.action,
@@ -106,10 +83,6 @@ async def bulk_records(
         actor=who,
         roles=caller_roles(request),
     )
-    published: list[object] = []
-    for change in changes:
-        published.extend(_event_for(body.action, rtype, change))
-    events.publish(request, *published)
     return result
 
 
@@ -144,5 +117,4 @@ async def empty_trash(
     """
     check_type_roles(request, rtype)
     purged = await bulk_service.empty_trash(db, rtype, filters=filters)
-    events.publish(request, *[events.purged(rtype, identity) for identity in purged])
     return TrashEmptied(purged=len(purged), filtered=bool(filters))

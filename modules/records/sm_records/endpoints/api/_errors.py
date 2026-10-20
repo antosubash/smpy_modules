@@ -54,6 +54,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from sm_records import events
 from sm_records.deps import request_session
 from sm_records.endpoints.api._error_bodies import response_for
 from sm_records.endpoints.api._public_cache import error_headers
@@ -127,7 +128,9 @@ async def _discard_writes(request: Request) -> None:
     session = request_session(request)
     if session is None:  # pragma: no cover - every route here uses ``request_db``
         return
-    await session.rollback()
+    # ``events.rollback``, not a bare one: the services queued their events on
+    # the session, and a bare rollback leaves the queue for the commit.
+    await events.rollback(session)
     session.info.pop(SESSION_HAS_WRITES_KEY, None)
 
 

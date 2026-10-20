@@ -93,8 +93,9 @@ def force_pending(database_url: str, type_key: str, tenant: str = DEFAULT_TENANT
     schema change triggers — including being resumable if this process dies
     halfway through it.
     """
+    from sm_records import events
     from sm_records.constants import REINDEX_ALL
-    from sm_records.services._common import mark_written, utcnow
+    from sm_records.services._common import utcnow
 
     async def run() -> None:
         async with connected(database_url) as db_state:
@@ -115,8 +116,7 @@ def force_pending(database_url: str, type_key: str, tenant: str = DEFAULT_TENANT
                             pending.setdefault(str(raw.get("key")), utcnow().isoformat())
                     rtype.reindex_pending = pending
                     session.add(rtype)
-                    mark_written(session)
-                    await session.commit()
+                    await events.commit(session)
 
     asyncio.run(run())
 
