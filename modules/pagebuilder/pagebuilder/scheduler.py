@@ -4,14 +4,18 @@ Lifted out of :mod:`pagebuilder.module` when that file crossed the repo's
 300-line cap. It is a coherent piece to lift: everything here is about *when*
 a page changes state, and nothing else in the module registration is.
 
-A deployment that drives :meth:`PagesService.process_due` from a separate
-worker (Celery beat, a k8s CronJob) turns this off with the
-``scheduler_enabled`` setting — on the Settings screen, or
+One of these runs per process, so a replica set runs several. That is not a
+hazard: :meth:`PagesService.process_due` claims each due page with a single
+conditional ``UPDATE`` before flipping it, so two ticks landing on the same
+instant flip it exactly once — see :mod:`pagebuilder.service._claims`. The same
+holds for a separate worker driving ``process_due`` alongside the loop.
+
+``scheduler_enabled`` turns this off anyway where a deployment would rather one
+place did the polling (Celery beat, a k8s CronJob) — on the Settings screen, or
 ``scripts/set_setting.py pagebuilder scheduler_enabled false``. Not an
 environment variable: this module reads none, so an
 ``SM_PAGEBUILDER_SCHEDULER_ENABLED`` in a deploy manifest would leave the
-in-process loop running and racing the worker, which is exactly the
-double-publish this switch exists to prevent.
+in-process loop running with nothing on screen saying so.
 """
 
 from __future__ import annotations
@@ -94,7 +98,8 @@ class Scheduler:
 
 
 async def _due_tenants(factory: Any, now: datetime) -> list[str]:
-    """Distinct tenants with a scheduled flip due or trash past retention.
+    """Distinct tenants with a scheduled flip due, a missed window to retire,
+    or trash past retention.
 
     Read unscoped on a session of its own, closed before any tenant's work
     starts, so nothing read here is carried into a tenant's transaction.
@@ -104,10 +109,10 @@ async def _due_tenants(factory: Any, now: datetime) -> list[str]:
     from sqlmodel import select
 
     from pagebuilder.models import Page
+    from pagebuilder.service._claims import any_due
     from pagebuilder.service._trash import trash_expired
-    from pagebuilder.service._workflow import publish_due, unpublish_due
 
-    due = or_(publish_due(now), unpublish_due(now), trash_expired(now))
+    due = or_(any_due(now), trash_expired(now))
     with all_tenants():
         async with factory() as session:
             rows = await session.execute(select(Page.tenant_id).where(due).distinct())
@@ -133,7 +138,14 @@ async def _tick(factory: Any) -> None:
 
 
 async def _tick_tenant(factory: Any) -> None:
-    """One fresh session in the bound tenant: flip what is due, purge expired trash."""
+    """One fresh session in the bound tenant: flip what is due, purge expired trash.
+
+    Always committed, never only when something flipped. ``process_due`` also
+    writes without flipping — it retires a draft whose whole window passed
+    while no scheduler ran, and hands a refused claim back — and a rollback on
+    an empty tick would discard the retirement, so the same row would be found,
+    warned about and rolled back again every interval, forever.
+    """
     from pagebuilder.service import PagesService
 
     async with factory() as session:
@@ -145,14 +157,12 @@ async def _tick_tenant(factory: Any) -> None:
             # so the promise holds for a process that stays up for months as
             # well as one that restarts nightly.
             purged = await service.purge_expired()
+            await session.commit()
             if flipped or purged:
-                await session.commit()
                 _log.info(
                     "pagebuilder.scheduler.flipped",
                     extra={"count": len(flipped), "purged": purged},
                 )
-            else:
-                await session.rollback()
         except Exception:
             await session.rollback()
             raise

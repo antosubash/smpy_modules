@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
 from pagebuilder.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus, RevisionEvent
@@ -22,6 +22,16 @@ def _blank_to_none(value: Any) -> Any:
 # "no filter", not "the empty status", which would otherwise 422. A non-empty
 # value that is not a status still fails validation.
 StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
+
+
+def _assume_utc(value: datetime | None) -> datetime | None:
+    return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
+
+
+# Every instant is stored as UTC, but SQLite hands it back naive. Serialised
+# without an offset, the editor's ``new Date()`` reads it as local time, so the
+# schedule shows shifted and each re-save moves it again by the offset.
+UtcInstant = Annotated[datetime, AfterValidator(_assume_utc)]
 
 
 class PageCreate(BaseModel):
@@ -108,15 +118,15 @@ class PageRead(BaseModel):
     canonical_url: str | None = None
     index_in_search: bool = True
     rejection_note: str | None
-    publish_at: datetime | None = None
-    unpublish_at: datetime | None = None
+    publish_at: UtcInstant | None = None
+    unpublish_at: UtcInstant | None = None
     parent_id: int | None = None
     is_template: bool = False
     show_in_header_nav: bool = False
     show_in_footer: bool = False
-    deleted_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime | None
+    deleted_at: UtcInstant | None = None
+    created_at: UtcInstant
+    updated_at: UtcInstant | None
 
 
 class LocalesResponse(BaseModel):
