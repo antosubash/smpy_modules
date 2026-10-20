@@ -22,13 +22,22 @@ against them. A module's first revision carries
 `branch_labels = ("<module>",)` so the revision can be named
 (`alembic downgrade <module>@base`). **That does not roll back only that
 module.** Autogenerate chains every revision off the current head, so the
-labelled revision sits on one linear history and `<module>@base` walks
+labelled revision sits on one shared history and `<module>@base` walks
 everything beneath it — verified: `downgrade records@base` ran 20 downgrades
 and emptied the database. Removing one module's schema in isolation needs its
 tables on a real branch (`down_revision = None`), which nothing here produces
 yet. Upstream #333 was closed on 2026-10-07 as a documentation correction
 (framework 0.0.36, PR #403): the framework's own docs now say the label is only
 a named target, and no behaviour changed, so the limitation stands.
+
+**The history must end in exactly one head.** It is not linear: two PRs that
+each add a revision off the same parent leave two heads once both land, which
+breaks `make migration` ("Multiple heads are present") and makes
+`make downgrade` (`-1`) roll back an arbitrary branch (#107). The fix is an
+empty `alembic merge heads` revision (see `52ce60faa542`, `d3a2801784b0`);
+`scripts/check_migration_heads.py` fails CI until one exists. `make migrate`
+runs `upgrade heads`, which would hide a split — don't rely on it to notice.
+Downgrading *through* a merge point is ambiguous with `-1`; name the parent.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
 `(tenant_id, locale, slug)`, and a rename records a redirect scoped to that locale.
