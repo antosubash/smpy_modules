@@ -55,3 +55,24 @@ def test_ai_routes_mounted(app):
     paths = set(app.openapi()["paths"])
     assert "/api/ai/settings" in paths
     assert "/api/ai/test" in paths
+
+
+def test_no_module_subscribes_to_record_events(app):
+    """The evidence behind GH #157's "leave publishing inline" call.
+
+    Record events publish at commit, inside the request, so whatever subscribes
+    adds its time to every record write's response. Today nothing does, and a
+    publish with no listener returns before gathering anything. When this
+    fails, a module started listening: check that its handler is cheap, or
+    hands its work off, before updating the expectation. ``_emitter`` is read
+    because ``EventBus`` has no public way to list listeners.
+    """
+    from sm_records.contracts import events
+
+    bus = app.state.sm.event_bus
+    listening = {
+        name
+        for name in events.__all__
+        if bus._emitter.listeners(bus._event_key(getattr(events, name)))
+    }
+    assert listening == set()
