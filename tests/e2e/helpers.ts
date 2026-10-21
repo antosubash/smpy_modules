@@ -57,6 +57,27 @@ export async function csrfHeader(page: Page): Promise<Record<string, string>> {
 }
 
 /**
+ * The framework CSRF token (`RequiresCsrf`) that news' and records' APIs check
+ * (#110, #111): every screen of theirs shares it as the `csrf_token` Inertia
+ * prop. Not pagebuilder's — that module still keeps its own token under its
+ * own session key (#126), so a spec writing to both needs both headers.
+ *
+ * Read off the server-rendered page through `page.request`, which shares the
+ * logged-in context's cookie jar, so the browser tab stays where it was.
+ */
+export async function moduleCsrfHeader(
+  page: Page,
+  view: '/admin/news/' | '/admin/records/' = '/admin/news/',
+): Promise<Record<string, string>> {
+  const html = await (await page.request.get(view)).text();
+  const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);
+  expect(json, `expected the Inertia page JSON on ${view}`).toBeTruthy();
+  const token = (JSON.parse(json![1]) as { props?: { csrf_token?: string } }).props?.csrf_token;
+  expect(token, `expected a csrf_token prop on ${view}`).toBeTruthy();
+  return { 'X-CSRF-Token': token! };
+}
+
+/**
  * Publish from the editor through the note dialog that replaced the
  * publish prompt. An empty `note` publishes without recording one.
  */

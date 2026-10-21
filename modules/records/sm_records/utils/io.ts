@@ -21,6 +21,7 @@
  */
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
+import { csrfHeaders } from './csrf';
 import type { Translate } from './i18n';
 import { keys } from './i18n';
 import type { FieldDef } from './types';
@@ -172,6 +173,7 @@ export async function importRecords(
     response = await fetch(`${BASE}/types/${encodeURIComponent(typeKey)}/records/import`, {
       method: 'POST',
       credentials: 'same-origin',
+      headers: csrfHeaders('POST'),
       body,
     });
   } catch {

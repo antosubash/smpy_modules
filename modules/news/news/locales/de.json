@@ -542,7 +542,8 @@
     "too_short": "{field} muss mindestens {min} Zeichen lang sein.",
     "required": "{field} ist erforderlich.",
     "gone": "Dieser Artikel wurde in den Papierkorb verschoben oder gelöscht.",
-    "reload": "Neu laden"
+    "reload": "Neu laden",
+    "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen."
   },
   "public_switch": {
     "label": "Diesen Artikel in einer anderen Sprache lesen"
