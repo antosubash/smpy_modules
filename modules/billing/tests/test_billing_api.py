@@ -236,3 +236,20 @@ async def test_status_seats_count_members(app, user_client):
             rows = (await session.execute(select(Membership))).scalars().all()
             assert len(rows) == 3
         assert (await owner.get("/api/billing/status")).json()["seats"]["used"] == 3
+
+
+async def test_get_context_requires_a_user(app):
+    """``get_context`` awaits ``require_user_id``: no user is 401, not 403.
+
+    Called directly: over HTTP the auth gate answers first, which hid a
+    ``require_user_id(request)`` without ``await`` that never ran.
+    """
+    from types import SimpleNamespace
+
+    from sm_billing.deps import get_context
+    from tenants.errors import TenantError
+
+    request = SimpleNamespace(state=SimpleNamespace(), scope={}, app=app)
+    with pytest.raises(TenantError) as exc:
+        await get_context(request, db=None)
+    assert exc.value.status_code == 401

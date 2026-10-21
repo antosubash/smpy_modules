@@ -83,7 +83,12 @@ through it (`sync.resync` = fetch + apply). Its rules:
   else from the Stripe customer id, else `unknown_tenant`. Only a completed
   Checkout may supply one more source, the `client_reference_id` of the session
   as re-fetched from Stripe (`fetch_checkout`); nothing is ever read from the
-  payload, which is why `WebhookEvent` carries ids and no tenant;
+  payload, which is why `WebhookEvent` carries ids and no tenant. Anyone can
+  open a Checkout naming any tenant (a Payment Link takes `client_reference_id`
+  from its URL), so the reference counts only when the session and the
+  subscription have the same customer, the tenant has no stored customer or
+  that one, and the customer is not another tenant's. Otherwise the event is
+  acknowledged as `ignored_customer_mismatch` and nothing is overwritten;
 - a lapsing status with an unknown price still applies on the plan the
   organisation had, so an unmappable price never keeps paid access alive; an
   entitling status with an unknown price is an error, never the default plan;

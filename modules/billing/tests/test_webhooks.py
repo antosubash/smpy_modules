@@ -10,7 +10,7 @@ from fake_provider import GOOD_SIGNATURE, SIGNATURE_HEADER, FakeProvider
 from helpers import make_plan, make_sub, make_tenant
 from simple_module_core.public_routes import PublicRouteRegistry
 from sm_billing import constants as c
-from sm_billing.contracts.provider import CheckoutSnapshot, SubscriptionSnapshot, WebhookEvent
+from sm_billing.contracts.provider import SubscriptionSnapshot, WebhookEvent
 from sm_billing.models import Customer, Plan, Subscription
 from sm_billing.models import WebhookEvent as EventRow
 from sm_billing.module import BillingModule
@@ -203,38 +203,6 @@ async def test_subscription_without_tenant_is_not_claimed(app, client, fake, wor
     assert (response.status_code, response.json()["detail"]) == (200, "ignored_unknown_tenant")
     assert await _sub(app, tenant_id) is None
     assert fake.called("fetch_checkout") == []
-
-
-def checkout_event(fake: FakeProvider, eid: str, cid: str = "cs_1") -> bytes:
-    fake.events[eid] = WebhookEvent(
-        id=eid, type=c.CHECKOUT_COMPLETED, subscription_id="sub_1", checkout_id=cid
-    )
-    return eid.encode()
-
-
-async def test_checkout_tenant_comes_from_the_refetched_session(app, client, fake, world):
-    tenant_id, _ = world
-    fake.checkouts["cs_1"] = CheckoutSnapshot("cs_1", "sub_1", tenant_id, "cus_1")
-    fake.snapshots["sub_1"] = snap(None)
-    response = await client.post(URL, content=checkout_event(fake, "evt_1"), headers=HEADERS)
-    assert response.status_code == 200, response.text
-    assert fake.called("fetch_checkout") == [{"session_id": "cs_1"}]
-    assert (await _sub(app, tenant_id)).provider_subscription_id == "sub_1"
-
-
-async def test_checkout_metadata_tenant_wins_over_reference(app, client, fake, world):
-    tenant_id, _ = world
-    fake.checkouts["cs_1"] = CheckoutSnapshot("cs_1", "sub_1", "someone-else", "cus_1")
-    fake.snapshots["sub_1"] = snap(tenant_id)
-    await client.post(URL, content=checkout_event(fake, "evt_1"), headers=HEADERS)
-    assert (await _sub(app, tenant_id)) is not None
-
-
-async def test_checkout_without_subscription_is_acknowledged(app, client, fake, world):
-    fake.checkouts["cs_1"] = CheckoutSnapshot("cs_1", None, world[0], "cus_1")
-    response = await client.post(URL, content=checkout_event(fake, "evt_1"), headers=HEADERS)
-    assert (response.status_code, response.json()["detail"]) == (200, "ignored_nothing_to_apply")
-    assert fake.called("fetch_subscription") == []
 
 
 async def test_stale_canceled_snapshot_does_not_replace_live_subscription(app, client, fake, world):

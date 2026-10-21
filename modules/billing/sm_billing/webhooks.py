@@ -17,16 +17,19 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from simple_module_db import finalize_session
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from sm_billing.constants import CHECKOUT_COMPLETED, HANDLED_EVENTS
 from sm_billing.contracts.provider import InvalidWebhookSignature, ProviderError
+from sm_billing.models import Customer
 from sm_billing.models import WebhookEvent as EventRow
 from sm_billing.seats import push_quantity
 from sm_billing.sync import SyncError, apply_snapshot
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from sm_billing.contracts.provider import (
         BillingProvider,
@@ -40,6 +43,7 @@ logger = logging.getLogger(__name__)
 _ACKNOWLEDGED = {
     "unknown_tenant": "ignored_unknown_tenant",
     "nothing_to_apply": "ignored_nothing_to_apply",
+    "customer_mismatch": "ignored_customer_mismatch",
 }
 
 
@@ -74,24 +78,48 @@ async def _finish(
         await session.commit()
 
 
-async def _snapshot(provider: BillingProvider, event: WebhookEvent) -> SubscriptionSnapshot:
+async def _snapshot(
+    provider: BillingProvider, event: WebhookEvent
+) -> tuple[SubscriptionSnapshot, bool]:
     """Re-fetch the subscription ``event`` points at; nothing from its payload.
 
-    A subscription without a ``tenant_id`` in its metadata is left that way:
-    ``apply_snapshot`` then finds the tenant through the customer or raises
-    ``unknown_tenant``. Only a completed Checkout may supply one, and only
-    as the provider reports it now (the re-fetched ``client_reference_id``).
+    Returns the snapshot and whether its tenant came from a Checkout's
+    ``client_reference_id`` rather than the subscription itself. A subscription
+    without a ``tenant_id`` in its metadata is left that way: ``apply_snapshot``
+    then finds the tenant through the customer or raises ``unknown_tenant``.
+    Only a completed Checkout may supply one, as the provider reports it now.
     """
-    if event.type != CHECKOUT_COMPLETED:
-        return await provider.fetch_subscription(event.subscription_id or "")
-    checkout = await provider.fetch_checkout(event.checkout_id or "")
+    if event.type != CHECKOUT_COMPLETED or not event.checkout_id:
+        # No session id to re-fetch (a malformed delivery): the subscription
+        # alone, never a retrieve("") that would 500 on every redelivery.
+        return await provider.fetch_subscription(event.subscription_id or ""), False
+    checkout = await provider.fetch_checkout(event.checkout_id)
     if not checkout.subscription_id:
         # Not a subscription checkout after all; no retry makes it one.
         raise SyncError("nothing_to_apply", f"checkout {checkout.id} has no subscription")
     snapshot = await provider.fetch_subscription(checkout.subscription_id)
-    if snapshot.tenant_id is None and checkout.tenant_id is not None:
-        snapshot = replace(snapshot, tenant_id=checkout.tenant_id)
-    return snapshot
+    if snapshot.tenant_id is not None or checkout.tenant_id is None:
+        return snapshot, False
+    # Anyone can open a Checkout (a Payment Link) naming any tenant, so the
+    # reference only counts when the session and subscription agree on who pays.
+    if not checkout.customer_id or checkout.customer_id != snapshot.customer_id:
+        raise SyncError("customer_mismatch", f"checkout {checkout.id}")
+    return replace(snapshot, tenant_id=checkout.tenant_id), True
+
+
+async def _check_reference(session: AsyncSession, snapshot: SubscriptionSnapshot) -> None:
+    """The reference only binds a customer to a tenant that has none or the same.
+
+    A tenant already billed to another customer is not taken over, and a
+    customer that already pays for another tenant is not moved onto this one.
+    """
+    stored = await session.get(Customer, snapshot.tenant_id)
+    if stored is not None and stored.provider_customer_id != snapshot.customer_id:
+        raise SyncError("customer_mismatch", f"tenant {snapshot.tenant_id}")
+    stmt = select(Customer.tenant_id).where(Customer.provider_customer_id == snapshot.customer_id)
+    owner = (await session.execute(stmt)).scalar_one_or_none()
+    if owner is not None and owner != snapshot.tenant_id:
+        raise SyncError("customer_mismatch", f"customer of tenant {owner}")
 
 
 async def process_webhook(
@@ -111,13 +139,19 @@ async def process_webhook(
     except ProviderError as exc:
         return 500, str(exc)
 
-    if event.type not in HANDLED_EVENTS or not event.subscription_id:
+    # A completed Checkout is gated on its session id: whether it made a
+    # subscription is read from the re-fetched session, not the payload.
+    checkout = event.type == CHECKOUT_COMPLETED
+    target = (event.checkout_id or event.subscription_id) if checkout else event.subscription_id
+    if event.type not in HANDLED_EVENTS or not target:
         await _finish(app, event.id, None)
         return 200, "ignored"
 
     try:
-        snapshot = await _snapshot(provider, event)
+        snapshot, referenced = await _snapshot(provider, event)
         async with app.state.sm.db.session_factory() as session:
+            if referenced:
+                await _check_reference(session, snapshot)
             sub = await apply_snapshot(session, app, snapshot, provider=provider.name)
             tenant_id = sub.tenant_id
             await finalize_session(session)
@@ -125,7 +159,8 @@ async def process_webhook(
         if exc.code not in _ACKNOWLEDGED:
             return await _failed(app, event, exc)
         # Not ours (another product on the same Stripe account, or a tenant
-        # since deleted), or a lapse with nothing local to lapse; no retry
+        # since deleted), a Checkout naming a tenant someone else pays for,
+        # or a lapse with nothing local to lapse; no retry
         # changes that. Acknowledge it, keep the reason: a permanent 500
         # would get the endpoint disabled for all.
         logger.warning("billing: webhook %s: %s — acknowledged", event.id, exc)
