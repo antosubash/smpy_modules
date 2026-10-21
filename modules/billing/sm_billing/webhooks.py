@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from simple_module_db import finalize_session
 from sqlalchemy.exc import IntegrityError
 
-from sm_billing.constants import HANDLED_EVENTS
+from sm_billing.constants import CHECKOUT_COMPLETED, HANDLED_EVENTS
 from sm_billing.contracts.provider import InvalidWebhookSignature, ProviderError
 from sm_billing.models import WebhookEvent as EventRow
 from sm_billing.seats import push_quantity
@@ -28,7 +28,11 @@ from sm_billing.sync import SyncError, apply_snapshot
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-    from sm_billing.contracts.provider import BillingProvider, WebhookEvent
+    from sm_billing.contracts.provider import (
+        BillingProvider,
+        SubscriptionSnapshot,
+        WebhookEvent,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,26 @@ async def _finish(
         await session.commit()
 
 
+async def _snapshot(provider: BillingProvider, event: WebhookEvent) -> SubscriptionSnapshot:
+    """Re-fetch the subscription ``event`` points at; nothing from its payload.
+
+    A subscription without a ``tenant_id`` in its metadata is left that way:
+    ``apply_snapshot`` then finds the tenant through the customer or raises
+    ``unknown_tenant``. Only a completed Checkout may supply one, and only
+    as the provider reports it now (the re-fetched ``client_reference_id``).
+    """
+    if event.type != CHECKOUT_COMPLETED:
+        return await provider.fetch_subscription(event.subscription_id or "")
+    checkout = await provider.fetch_checkout(event.checkout_id or "")
+    if not checkout.subscription_id:
+        # Not a subscription checkout after all; no retry makes it one.
+        raise SyncError("nothing_to_apply", f"checkout {checkout.id} has no subscription")
+    snapshot = await provider.fetch_subscription(checkout.subscription_id)
+    if snapshot.tenant_id is None and checkout.tenant_id is not None:
+        snapshot = replace(snapshot, tenant_id=checkout.tenant_id)
+    return snapshot
+
+
 async def process_webhook(
     app: FastAPI, provider: BillingProvider, body: bytes, headers: Mapping[str, str]
 ) -> tuple[int, str]:
@@ -92,11 +116,7 @@ async def process_webhook(
         return 200, "ignored"
 
     try:
-        snapshot = await provider.fetch_subscription(event.subscription_id)
-        if snapshot.tenant_id is None and event.tenant_id is not None:
-            # checkout.session.completed carries client_reference_id even
-            # when the subscription's own metadata is missing.
-            snapshot = replace(snapshot, tenant_id=event.tenant_id)
+        snapshot = await _snapshot(provider, event)
         async with app.state.sm.db.session_factory() as session:
             sub = await apply_snapshot(session, app, snapshot, provider=provider.name)
             tenant_id = sub.tenant_id

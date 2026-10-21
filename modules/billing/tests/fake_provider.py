@@ -8,6 +8,7 @@ from typing import Any
 
 from sm_billing.contracts.provider import (
     CheckoutSession,
+    CheckoutSnapshot,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
@@ -24,6 +25,7 @@ class FakeProvider:
     name: str = "stripe"
     supports_checkout: bool = True
     snapshots: dict[str, SubscriptionSnapshot] = field(default_factory=dict)
+    checkouts: dict[str, CheckoutSnapshot] = field(default_factory=dict)
     prices: dict[str, PriceInfo] = field(default_factory=dict)
     events: dict[str, WebhookEvent] = field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
@@ -80,6 +82,10 @@ class FakeProvider:
     async def fetch_subscription(self, subscription_id: str) -> SubscriptionSnapshot:
         self._record("fetch_subscription", subscription_id=subscription_id)
         return self.snapshots[subscription_id]
+
+    async def fetch_checkout(self, session_id: str) -> CheckoutSnapshot:
+        self._record("fetch_checkout", session_id=session_id)
+        return self.checkouts[session_id]
 
     async def verify_price(self, price_id: str) -> PriceInfo:
         self._record("verify_price", price_id=price_id)

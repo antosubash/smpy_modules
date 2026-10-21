@@ -18,9 +18,10 @@ from typing import Any
 
 import stripe
 
-from sm_billing.constants import PROVIDER_STRIPE
+from sm_billing.constants import CHECKOUT_COMPLETED, PROVIDER_STRIPE
 from sm_billing.contracts.provider import (
     CheckoutSession,
+    CheckoutSnapshot,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
@@ -29,7 +30,6 @@ from sm_billing.contracts.provider import (
 )
 
 _SUBSCRIPTION_EVENTS = ("customer.subscription.",)
-_CHECKOUT_COMPLETED = "checkout.session.completed"
 # Still billing or granting access — a second checkout would double-charge.
 _LIVE_STATUSES = frozenset({"active", "trialing", "past_due", "unpaid"})
 
@@ -176,20 +176,20 @@ class StripeProvider:
             raise InvalidWebhookSignature(str(exc)) from exc
         obj = (event.get("data") or {}).get("object") or {}
         etype = event.get("type", "")
-        if etype == _CHECKOUT_COMPLETED:
+        # Ids only: the handler re-fetches whatever they point at.
+        if etype == CHECKOUT_COMPLETED:
             return WebhookEvent(
                 id=event["id"],
                 type=etype,
                 subscription_id=_id(obj.get("subscription")),
-                tenant_id=obj.get("client_reference_id"),
                 customer_id=_id(obj.get("customer")),
+                checkout_id=obj.get("id"),
             )
         if etype.startswith(_SUBSCRIPTION_EVENTS):
             return WebhookEvent(
                 id=event["id"],
                 type=etype,
                 subscription_id=obj.get("id"),
-                tenant_id=(obj.get("metadata") or {}).get("tenant_id"),
                 customer_id=_id(obj.get("customer")),
             )
         return WebhookEvent(id=event["id"], type=etype)
@@ -197,6 +197,15 @@ class StripeProvider:
     async def fetch_subscription(self, subscription_id: str) -> SubscriptionSnapshot:
         sub = await self._call(self._v1.subscriptions.retrieve_async, subscription_id)
         return snapshot_from(sub)
+
+    async def fetch_checkout(self, session_id: str) -> CheckoutSnapshot:
+        session = await self._call(self._v1.checkout.sessions.retrieve_async, session_id)
+        return CheckoutSnapshot(
+            id=session["id"],
+            subscription_id=_id(session.get("subscription")),
+            tenant_id=session.get("client_reference_id"),
+            customer_id=_id(session.get("customer")),
+        )
 
     async def verify_price(self, price_id: str) -> PriceInfo:
         price = await self._call(self._v1.prices.retrieve_async, price_id)
