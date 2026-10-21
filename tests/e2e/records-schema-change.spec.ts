@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { login } from './helpers';
+import { login, moduleCsrfHeader } from './helpers';
 import {
   addFieldInEditor,
   apiCreateRecord,
@@ -205,7 +205,10 @@ test.describe('Records — schema change', () => {
     // describes rather than racing the background task through the UI.
     const type = await apiGetType(page, key);
     await page.request.put(`/api/records/types/${key}`, {
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(await moduleCsrfHeader(page, '/admin/records/')),
+      },
       data: {
         expected_version: type.version,
         fields: [
