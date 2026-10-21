@@ -11,6 +11,8 @@ before it is read. Tenant isolation at depth is in
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from pydantic import ValidationError
 from sm_records.constants import EXPAND_DEPTH_CAP
@@ -194,7 +196,8 @@ async def test_one_statement_per_hop_whatever_the_page_size(client, records_app)
     assert all(item["expanded"]["author"][0]["expanded"]["publisher"] for item in items)
     batched = [sql for sql, _ in seen.statements if "records_record.uuid IN" in sql]
     assert len(batched) == 2, batched
-    types = [sql for sql, _ in seen.statements if 'records_type."key" IN' in sql]
+    # SQLite quotes ``key``, Postgres does not.
+    types = [sql for sql, _ in seen.statements if re.search(r'records_type\."?key"? IN', sql)]
     assert len(types) == 2, types  # one per level
 
 
