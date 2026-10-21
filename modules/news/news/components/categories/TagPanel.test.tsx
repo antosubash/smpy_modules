@@ -170,4 +170,29 @@ describe('TagPanel — rename and delete', () => {
     expect(actions()?.textContent).toContain('Rural is on 0 articles');
     expect(button('Merge')).toBeUndefined();
   });
+
+  it("does not pre-select a new tag that reuses a deleted one's id", async () => {
+    const view = await mount();
+    await click(chip('Urbn'));
+    await view.render([TAGS[1]]);
+
+    // SQLite hands the next tag the freed id.
+    await view.render([TAGS[1], { id: 1, name: 'Fresh', slug: 'fresh', article_count: 0 }]);
+    expect(chip('Fresh')?.getAttribute('aria-pressed')).toBe('false');
+    expect(actions()).toBeNull();
+  });
+
+  it('Escape cancels an inline rename', async () => {
+    const onRename = vi.fn(async () => true);
+    await mount({ onRename });
+    await click(chip('Urbn'));
+    await click(button('Rename'));
+
+    const input = nameInput() as HTMLInputElement;
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(nameInput()).toBeNull();
+    expect(onRename).not.toHaveBeenCalled();
+  });
 });

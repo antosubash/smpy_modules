@@ -65,6 +65,9 @@ export function TagActions({ tag, busy, onRename, onDelete }: Props) {
             autoFocus
             disabled={busy}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !busy) setEditing(false);
+            }}
           />
           <Button type="submit" size="sm" disabled={busy || !name.trim()}>
             {t(keys.news.tags.save)}

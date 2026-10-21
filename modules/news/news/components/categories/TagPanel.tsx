@@ -1,6 +1,6 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 import type { TagRead } from '../../utils/taxonomyApi';
@@ -38,6 +38,15 @@ export function TagPanel({ tags, busy, onCreate, onMerge, onRename, onDelete }: 
   // Only ids still listed: a tag deleted or merged away must not linger as a
   // selection that the next click would pair with something.
   const selected = picked.filter((id) => tags.some((tag) => tag.id === id));
+  // And forget them for good once the list moves on: SQLite reuses ids, so the
+  // next tag created can come back under a deleted one's id and would otherwise
+  // appear already selected.
+  useEffect(() => {
+    setPicked((all) => {
+      const listed = all.filter((id) => tags.some((tag) => tag.id === id));
+      return listed.length === all.length ? all : listed;
+    });
+  }, [tags]);
 
   const filtered = draft.trim()
     ? tags.filter((t) => t.name.toLowerCase().includes(draft.trim().toLowerCase()))
