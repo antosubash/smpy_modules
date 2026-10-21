@@ -12,6 +12,7 @@
  */
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
+import { csrfHeaders } from './csrf';
 import type {
   FieldDef,
   FilterOp,
@@ -44,7 +45,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     response = await fetch(`${BASE}${path}`, {
       credentials: 'same-origin',
       ...init,
-      headers: { ...defaultHeaders, ...(init.headers ?? {}) },
+      headers: { ...defaultHeaders, ...csrfHeaders(init.method), ...(init.headers ?? {}) },
     });
   } catch {
     throw offlineError();

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-import { csrfHeader, uniqueSlug } from './helpers';
+import { moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Seed an article, for the specs that need one to look at.
@@ -40,7 +40,7 @@ export async function seedArticle(
     body?: Record<string, unknown>;
   } = {},
 ): Promise<{ articleId: number; slug: string; title: string; url: string }> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page);
   const slug = uniqueSlug(prefix);
   const resolvedTitle = title ?? (titlePrefix ? `${titlePrefix} ${slug}` : slug);
 

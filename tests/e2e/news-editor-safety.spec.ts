@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { clickAndConfirm, csrfHeader, login } from './helpers';
+import { clickAndConfirm, login, moduleCsrfHeader } from './helpers';
 
 /**
  * The editor's safety nets: taking an article down, reading it in another
@@ -35,7 +35,7 @@ test.describe('News — editor safety', () => {
       publish: true,
       body: paragraphBody('The English body.'),
     });
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     const created = await page.request.post(`/api/news/articles/${en.articleId}/translations`, {
       headers,
       data: { locale: 'de', title: 'Sicherheit auf Deutsch' },

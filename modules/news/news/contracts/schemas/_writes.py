@@ -8,7 +8,7 @@ named after the resource; these are the writes to it.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from pydantic import Field, field_validator, model_validator
@@ -160,6 +160,8 @@ class ArticleBodyUpdate(NoNul):
 class RejectRequest(NoNul):
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
 
+    _note = field_validator("note", mode="before")(_guards.optional_note)
+
 
 class ScheduleRequest(NoNul):
     """When an article should go live, and when it should come down.
@@ -172,18 +174,14 @@ class ScheduleRequest(NoNul):
     Neither is truncated to a calendar day, unlike ``published_at``. That is a
     display date and the day is the whole of it; these are instants, and an
     embargo that lifts "some time on Tuesday" is not an embargo.
+
+    Each is an ISO-8601 string with an offset; a number or a naive time is a
+    422 rather than a guess (#158).
     """
 
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
 
-    @field_validator("publish_at", "unpublish_at")
-    @classmethod
-    def _as_utc(cls, value: datetime | None) -> datetime | None:
-        """Normalise to UTC: SQLite drops the offset on write without
-        converting, and ``process_due`` reads stored values back as UTC."""
-        if value is None:
-            return None
-        if value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value.astimezone(UTC)
+    _instants = field_validator("publish_at", "unpublish_at", mode="before")(
+        _guards.aware_instant
+    )
