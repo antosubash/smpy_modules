@@ -7,7 +7,7 @@ import functools
 import logging
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from simple_module_hosting.permissions import RequiresPermission
 
 from sm_ai import constants, services
@@ -41,6 +41,9 @@ async def update_settings(data: AiSettingsUpdate, service: AiServiceDep) -> AiSe
     changes = AiService.build_changes(data)
     if not changes:
         return service.current()
+    errors = AiService.slot_errors(changes)
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
     return await service.apply(changes)
 
 
