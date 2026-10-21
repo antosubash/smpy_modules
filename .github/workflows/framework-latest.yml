@@ -41,7 +41,10 @@ jobs:
         uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
+          # Never cache: this job resolves versions no lockfile vetted, and
+          # a cache saved on main (where schedules run) is restorable by
+          # ci.yml and release.yml. It uploads no artifacts either.
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}

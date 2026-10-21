@@ -21,8 +21,8 @@ the commit it would ship, and waits for CI if it is still running.
 | Job | Does |
 |---|---|
 | `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Then the gates: the run must be on `main`; `v<version>` must not already be tagged and `release/v<version>` must not exist; and every ci.yml `push` (or manual) run on the dispatched commit must, as its latest attempt, have concluded `success` — not only the newest, so a failed re-run of an older run is never outvoted by a green one (`scripts/release_ci_gate.py`). A run still in progress is waited for, up to 70 minutes; a failed or cancelled one (a pending run is cancelled when a newer one queues behind it) is cleared by re-running it to green. Every later job reads this job's outputs, so the version is decided exactly once. |
-| `build` | Commits the bump (versions + `uv lock`) on top of the dispatched commit, builds the module frontends and `uv build --all-packages` from that commit, uploads the artifacts, and only then pushes the commit to the staging branch **`release/v<version>`**. |
-| `publish-pypi` | One matrix job per module. Selects that module's artifacts, checks that any of them PyPI already has for this version are byte-identical (sha256, `scripts/release_pypi_check.py`), and publishes via OIDC trusted publishing with `skip-existing`, so a retry skips files that already landed. `fail-fast: false`, so one failure doesn't cancel the others. |
+| `build` | Commits the bump (versions + `uv lock`) on top of the dispatched commit, builds the module frontends and `uv build --all-packages` from that commit with no dependency cache, records the sha256 of every artifact as a job output, uploads them, and only then pushes the commit to the staging branch **`release/v<version>`**. |
+| `publish-pypi` | One matrix job per module. Downloads this run's artifact and verifies it against `build`'s sha256 manifest (same files, same hashes, nothing extra), selects that module's artifacts, checks that any of them PyPI already has for this version are byte-identical (sha256, `scripts/release_pypi_check.py`), and publishes via OIDC trusted publishing with `skip-existing`, so a retry skips files that already landed. `fail-fast: false`, so one failure doesn't cancel the others. |
 | `finalize` | Tags the staged commit `v<version>`, lands the bump on `main`, creates the GitHub release, and deletes the staging branch. |
 
 Only one release runs at a time (`concurrency: release`).
@@ -66,6 +66,21 @@ have; the tag and the published artifacts still record exactly what was built.
 A version that is fully on PyPI but whose `finalize` cannot complete (say
 `main` refuses pushes from Actions) is still tagged once the tag step has run;
 bumping `main` by hand to that version is then the only step left.
+
+## Supply chain
+
+- **What reaches PyPI is what `build` built.** `build` writes the sha256 of
+  every artifact (and of the PyPI check script, which travels with them so
+  `publish-pypi` checks out nothing) into a job output. `publish-pypi`
+  downloads this run's artifact and refuses to upload unless every file
+  matches and none was added. Nothing is rebuilt after `build`; `finalize`
+  tags only a staged commit whose parent is the CI-verified SHA.
+- **No caches in a release.** The release build restores neither the uv nor
+  the npm cache, and `framework-latest.yml` (which resolves versions no
+  lockfile vetted) saves none, so the nightly run can never feed ci.yml or a
+  release. It has `contents: read` only and uploads no artifacts.
+- **Actions are pinned to commit SHAs** in `release.yml`, the tag in a
+  comment; Dependabot moves both together.
 
 ## One-time PyPI setup, per module
 

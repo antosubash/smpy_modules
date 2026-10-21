@@ -25,12 +25,15 @@
 # `resolve` job, so a new module is published without editing this file
 # (#118) — it still needs the one-time Trusted Publishing setup above.
 #
-# `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
-# steps which float on their major. That is deliberate: setup-uv stopped
-# publishing major/minor tags at v8 (as a supply-chain hardening measure), so
-# `@v9` does not resolve. Dependabot proposes new releases. uv itself is
+# Every action here is pinned to a full commit SHA, with its tag in a comment,
+# unlike ci.yml's floating majors: this workflow holds the PyPI publishing
+# identity and write access to main, so a moved tag must not change what it
+# runs. Dependabot updates SHA pins and their comments together. uv itself is
 # pinned by `UV_VERSION` below, which Dependabot does not track; keep it equal
 # to ci.yml's (#120).
+#
+# Nothing here restores a dependency cache (see the build job), and
+# publish-pypi uploads only files whose sha256 the build job recorded.
 
 name: release
 
@@ -79,7 +82,7 @@ jobs:
       # may have moved since the check.
       sha: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -209,8 +212,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # push the staging branch
+    outputs:
+      # sha256 of every file publish-pypi may upload or run, recorded here
+      # and re-checked there before anything reaches PyPI.
+      manifest: ${{ steps.manifest.outputs.manifest }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
@@ -222,20 +229,21 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
+          # No dependency caches in a release build: caches saved on main are
+          # restorable by every workflow, so restoring one would let a run that
+          # resolved other versions (framework-latest.yml, say) feed this build.
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
 
       # `--locked` fails the release if uv.lock disagrees with the manifests,
       # rather than building from a silently re-resolved set (#114).
@@ -268,10 +276,29 @@ jobs:
       - name: Build wheels + sdists
         run: uv build --all-packages --out-dir dist-py
 
-      - uses: actions/upload-artifact@v7
+      # The PyPI check script travels with the artifacts, so publish-pypi
+      # checks out nothing: every file it uploads or runs comes from this job
+      # and is in the manifest.
+      - name: Record the artifact manifest
+        id: manifest
+        run: |
+          mkdir -p release-tools
+          cp scripts/release_pypi_check.py release-tools/
+          find dist-py release-tools -type f -print0 | sort -z \
+            | xargs -0 sha256sum > "$RUNNER_TEMP/SHA256SUMS"
+          cat "$RUNNER_TEMP/SHA256SUMS"
+          {
+            echo "manifest<<SHA256SUMS_EOF"
+            cat "$RUNNER_TEMP/SHA256SUMS"
+            echo "SHA256SUMS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-py
-          path: dist-py/
+          path: |
+            dist-py/
+            release-tools/
           retention-days: 14
 
       # The commit every artifact above was built from, on origin before any
@@ -295,10 +322,24 @@ jobs:
       matrix:
         package: ${{ fromJSON(needs.resolve.outputs.packages) }}
     steps:
-      - uses: actions/download-artifact@v8
+      # This run's artifact (download-artifact reads another run's only when
+      # given a run id), then proof it is byte-for-byte what `build` recorded:
+      # the same files, the same sha256, nothing added.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-py
-          path: dist-py
+          path: .
+
+      - name: Verify the artifacts against the build manifest
+        env:
+          MANIFEST: ${{ needs.build.outputs.manifest }}
+        run: |
+          test -n "$MANIFEST" || { echo "::error::build recorded no manifest"; exit 1; }
+          printf '%s\n' "$MANIFEST" > "$RUNNER_TEMP/SHA256SUMS"
+          sha256sum --check --strict "$RUNNER_TEMP/SHA256SUMS"
+          diff <(awk '{print $2}' "$RUNNER_TEMP/SHA256SUMS" | sort) \
+               <(find dist-py release-tools -type f | sort) \
+            || { echo "::error::downloaded files differ from the build manifest"; exit 1; }
 
       # uv writes wheels under the normalised (hyphenated) distribution name
       # while the sdist may use either form, so match both.
@@ -315,14 +356,6 @@ jobs:
           test -n "$(ls -A upload)" || {
             echo "::error::no artifacts found for $PACKAGE"; exit 1; }
 
-      # Only the check script, from the commit being released.
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.resolve.outputs.sha }}
-          sparse-checkout: scripts
-          path: src
-          persist-credentials: false
-
       # A re-run after a partial upload (the wheel accepted, the sdist not,
       # or the response lost) must not fail on the files PyPI already has,
       # or the version is stuck half-published — hence `skip-existing`
@@ -332,9 +365,9 @@ jobs:
         env:
           PACKAGE: ${{ matrix.package }}
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
-        run: python3 src/scripts/release_pypi_check.py "$PACKAGE" "$RELEASE_VERSION" upload
+        run: python3 release-tools/release_pypi_check.py "$PACKAGE" "$RELEASE_VERSION" upload
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: upload
           skip-existing: true
@@ -350,13 +383,13 @@ jobs:
       RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
       VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
 
