@@ -1,0 +1,48 @@
+# Weekly version updates, one grouped PR per ecosystem (#120). Security
+# updates are unaffected by the groups below and still open as soon as an
+# advisory lands.
+#
+# Not covered: the uv binary itself (`UV_VERSION` in ci.yml and release.yml)
+# — Dependabot tracks the `astral-sh/setup-uv` action, not the uv version it
+# installs — so bump that by hand.
+#
+# Also not covered: the framework itself (`simple_module_*` on PyPI,
+# `@simple-module-py/*` on npm). A framework bump moves the host's exact
+# Python and npm pins together and is checked against the host's locale
+# overrides (CLAUDE.md); a grouped PR that moved one ecosystem without the
+# other, or rewrote a published module's `>=x,<0.1` range, would break that
+# pin policy rather than help it.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # One root package-lock.json covers every npm workspace (host/client_app
+  # and modules/*).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "@simple-module-py/*"
+    groups:
+      npm:
+        patterns: ["*"]
+
+  # One root uv.lock covers the whole workspace (host and modules/*).
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "simple_module_*"
+      - dependency-name: "simple-module-*"
+    groups:
+      uv:
+        patterns: ["*"]
