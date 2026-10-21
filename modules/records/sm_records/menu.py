@@ -183,6 +183,7 @@ def sync_type_menu(
     Until that lands, the splice below is the whole of this module's reach
     into framework internals: one function, and it restores the registry's own
     invariant by invalidating the sorted cache it keeps beside ``_items``.
+    ``tests/test_framework_pins.py`` fails when either name changes (#125).
     """
     items = type_menu_items(types)
     if list(previous) == items:
