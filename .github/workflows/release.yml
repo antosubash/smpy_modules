@@ -10,12 +10,16 @@
 #   Workflow filename = release.yml
 #   Environment       = pypi
 #
-# Every new module must be added to the `publish-pypi` matrix below.
+# The `publish-pypi` matrix is read from `modules/*/pyproject.toml` by the
+# `resolve` job, so a new module is published without editing this file
+# (#118) — it still needs the one-time Trusted Publishing setup above.
 #
 # `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
 # steps which float on their major. That is deliberate: setup-uv stopped
 # publishing major/minor tags at v8 (as a supply-chain hardening measure), so
-# `@v9` does not resolve. Bump it by hand when a new release lands.
+# `@v9` does not resolve. Dependabot proposes new releases. uv itself is
+# pinned by `UV_VERSION` below, which Dependabot does not track; keep it equal
+# to ci.yml's (#120).
 
 name: release
 
@@ -39,6 +43,7 @@ permissions:
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "24"
+  UV_VERSION: "0.13.4"
 
 jobs:
   # Resolve the release version once and share it with every downstream job.
@@ -46,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.compute.outputs.version }}
+      packages: ${{ steps.packages.outputs.packages }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -85,6 +91,26 @@ jobs:
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
           echo "Resolved version: ${ver}"
 
+      # The distribution name of every `modules/<name>/`, as a JSON list for
+      # the `publish-pypi` matrix. An empty list fails here rather than
+      # publishing nothing and tagging a release anyway.
+      - id: packages
+        shell: bash
+        run: |
+          packages=$(python3 <<'PY'
+          import json, pathlib, tomllib
+          names = sorted(
+              tomllib.loads(p.read_text())["project"]["name"]
+              for p in pathlib.Path("modules").glob("*/pyproject.toml")
+          )
+          if not names:
+              raise SystemExit("no modules/*/pyproject.toml found")
+          print(json.dumps(names))
+          PY
+          )
+          echo "packages=${packages}" >> "$GITHUB_OUTPUT"
+          echo "Publishing: ${packages}"
+
   # Bump versions in the working tree only (no commit), build, upload.
   build:
     needs: resolve
@@ -97,7 +123,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -146,12 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - simple_module_pagebuilder
-          - simple_module_news
-          - simple_module_ai
-          - simple_module_records
-          - simple_module_billing
+        package: ${{ fromJSON(needs.resolve.outputs.packages) }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -189,7 +210,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}

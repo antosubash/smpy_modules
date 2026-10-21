@@ -4,7 +4,12 @@
 # `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
 # steps which float on their major. That is deliberate: setup-uv stopped
 # publishing major/minor tags at v8 (as a supply-chain hardening measure), so
-# `@v9` does not resolve. Bump it by hand when a new release lands.
+# `@v9` does not resolve. Dependabot proposes new releases.
+#
+# uv itself is pinned through `UV_VERSION` below rather than `latest`, so a uv
+# release cannot change resolution or lockfile behaviour under an unchanged
+# PR (#120). Dependabot does not track this value; bump it by hand, together
+# with the copy in release.yml.
 
 name: CI
 
@@ -30,6 +35,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "24"
+  UV_VERSION: "0.13.4"
 
 jobs:
   lint-python:
@@ -41,14 +47,20 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
+      # The ruff in uv.lock's dev group, not whatever `uvx` resolves today: a
+      # new ruff release must not turn every PR red (#120). `--only-dev`
+      # skips the workspace packages, which ruff does not need installed.
+      - name: Install dev tools
+        run: uv sync --locked --only-dev
+
       - name: Ruff check
-        run: uvx ruff check .
+        run: uv run --no-sync ruff check .
 
   python-tests:
     name: Python tests (pytest)
@@ -59,7 +71,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -70,21 +82,30 @@ jobs:
         run: uv sync --locked --all-packages --all-extras
 
       # Run pytest from within each module so each picks up its own
-      # `[tool.pytest.ini_options]` (e.g. `asyncio_mode = "auto"`).
-      - name: Run pytest (ai)
-        run: cd modules/ai && uv run pytest
-
-      - name: Run pytest (billing)
-        run: cd modules/billing && uv run pytest
-
-      - name: Run pytest (pagebuilder)
-        run: cd modules/pagebuilder && uv run pytest
-
-      - name: Run pytest (news)
-        run: cd modules/news && uv run pytest
-
-      - name: Run pytest (records)
-        run: cd modules/records && uv run pytest
+      # `[tool.pytest.ini_options]` (e.g. `asyncio_mode = "auto"`). The list
+      # is `modules/*/`, as in `make test-py`, so a new module is tested
+      # without editing this file (#118). Every module runs even after one
+      # fails — each in its own log group, each failure an annotation naming
+      # the module — and the step fails at the end, so one run shows every
+      # broken module rather than only the first.
+      - name: Run pytest (each module)
+        shell: bash
+        run: |
+          failed=()
+          for d in modules/*/; do
+            name=$(basename "$d")
+            [ -d "$d/tests" ] || { echo "::warning::$name has no tests/ directory"; continue; }
+            echo "::group::pytest $name"
+            if ! (cd "$d" && uv run pytest); then
+              failed+=("$name")
+              echo "::error title=pytest $name::pytest failed in modules/$name"
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::pytest failed in: ${failed[*]}"
+            exit 1
+          fi
 
       - name: Run pytest (host)
         run: uv run pytest host/tests
@@ -123,7 +144,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -203,7 +224,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -287,7 +308,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -371,7 +392,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -468,7 +489,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
-          version: latest
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
