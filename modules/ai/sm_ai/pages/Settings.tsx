@@ -10,6 +10,7 @@ import {
   type AiSettingsOut,
   listModels,
   loadSettings,
+  missingBaseUrl,
   type SlotValues,
   saveSettings,
   type TestResult,
@@ -86,14 +87,26 @@ function Settings() {
     }
   }
 
-  const save = () =>
-    run(async () => {
+  const save = () => {
+    // The API rejects this too; checking first keeps the toast in the page's
+    // words, while the card already marks the field.
+    if (missingBaseUrl(chat) || missingBaseUrl(embedding)) {
+      toast.error(
+        t(keys.ai.settings.error_with_reason, {
+          message: t(keys.ai.settings.save_failed),
+          reason: t(keys.ai.card.base_url_missing),
+        }),
+      );
+      return;
+    }
+    return run(async () => {
       hydrate(await saveSettings(chat, embedding));
       // Results describe the previous configuration — drop them.
       setChatTest(null);
       setEmbeddingTest(null);
       toast.success(t(keys.ai.settings.saved));
     }, t(keys.ai.settings.save_failed));
+  };
 
   // The probe runs against *saved* settings; testing with unsaved edits
   // would report on the old configuration and mislead either way.

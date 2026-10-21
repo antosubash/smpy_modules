@@ -93,8 +93,8 @@ class AiSettingsUpdate(SQLModel):
     @field_validator("embedding_dim")
     @classmethod
     def _dim_non_negative(cls, value: int | None) -> int | None:
-        if value is not None and value < 0:
-            raise ValueError("embedding_dim must be >= 0")
+        if value is not None and value < constants.MIN_EMBEDDING_DIM:
+            raise ValueError(f"embedding_dim must be >= {constants.MIN_EMBEDDING_DIM}")
         return value
 
 

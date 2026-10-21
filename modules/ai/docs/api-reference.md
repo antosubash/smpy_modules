@@ -133,7 +133,10 @@ the same shape as `GET`.
 | `embedding_api_key`, `clear_embedding_api_key` | string, bool | as for chat |
 | `embedding_dim` | int | `>= 0` |
 
-`null` is treated as omitted. Only values that differ from the current ones
+`null` is treated as omitted. A slot whose provider is `openai_compatible`
+must end up with a non-blank base URL — judged on the stored values merged
+with the update, so sending only the provider, or blanking the URL, is a `422`
+whose error `loc` names `chat_base_url` or `embedding_base_url`. Only values that differ from the current ones
 are written. The handling worker's settings are replaced immediately and a
 `SettingsReloaded` event is published.
 

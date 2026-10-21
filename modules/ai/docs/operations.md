@@ -28,13 +28,13 @@
 |---|---|---|
 | `chat_provider` | `anthropic` | `anthropic`, `openai`, `google`, `openai_compatible` |
 | `chat_model` | `claude-opus-5` | bare model name, no provider prefix |
-| `chat_base_url` | `""` | required for `openai_compatible`; an optional proxy/gateway override otherwise |
+| `chat_base_url` | `""` | required for `openai_compatible` (a save without one is a `422`); an optional proxy/gateway override otherwise |
 | `chat_api_key` | `""` | stored `enc:v1:…` when saved through the AI page |
 | `embedding_provider` | `""` | `""` = not configured; `openai`, `google`, `openai_compatible` |
 | `embedding_model` | `""` | |
 | `embedding_base_url` | `""` | as for chat |
 | `embedding_api_key` | `""` | as for chat |
-| `embedding_dim` | `0` | vector width; `0` = not set |
+| `embedding_dim` | `0` | vector width; `0` = not set. A negative stored value (only `set_setting.py` can write one) is read as `0` with a warning |
 
 Out of scope by design: temperature, max tokens, prompts, retries, timeouts
 and streaming. Each consuming module sets those on its own `Agent` or call.
@@ -146,12 +146,13 @@ never opened, so a worker can't create an empty one.
 | "'chat_api_key' is missing or invalid" | no key for a provider that needs one | Enter the key on the AI page. For a keyless local server, use `openai_compatible`. |
 | "'chat_base_url' … needs the server's /v1 URL" | `openai_compatible` without a base URL | Set the base URL, ending in `/v1`. |
 | "'embedding_provider' … not configured" | the embedding slot is empty | Configure **Embeddings**. |
+| Every save fails with `chat_base_url: a base URL is required …` | a slot is stored as `openai_compatible` with no URL (possible before #164) | Enter the server's base URL on that card. |
 | "'embedding_dim' … Set the vector width" | `embedding_dim` is `0` | Set **Vector dimension** to the model's output width. |
 | "cannot be decrypted — SM_SECRET_KEY has changed" | secret rotated, or the host's in-code `secret_key` differs from the one used to save | Re-enter the keys. |
 | Saving a key returns 500, log says `SM_SECRET_KEY is not set` | no secret anywhere | Set `SM_SECRET_KEY` (`make env`) and restart. |
-| Every save fails with `chat_provider must be one of …` | a provider written by `set_setting.py` or the Settings screen outside the list (shown as "(unknown provider)") | Pick a real provider on the page. |
+| Every save fails with `chat_provider must be one of …` | a provider written by `set_setting.py` outside the list (shown as "(unknown provider)") | Pick a real provider on the page. |
 | Save returns 403 "Invalid or missing CSRF token" | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` from the `sm_ai_csrf` cookie. |
-| Warning "stored unencrypted" | a key came from `set_setting.py` or the generic settings screen | Re-save it on the AI page. |
+| Warning "stored unencrypted" | a key came from `set_setting.py` (or, before #164, the generic settings screen) | Re-save it on the AI page. |
 | Saved a change but some requests still use the old model | other workers have stale settings | Restart the app. |
 | Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai-variables). |
 | **Test connection** OK, but a module still fails | the module's own call (prompt, output schema, model override) | That is the module's behaviour; check its logs. |
