@@ -1268,6 +1268,7 @@ python -m sm_records.cli export --type order --format json --out order.json
 python -m sm_records.cli export --type order --format csv          # stdout
 python -m sm_records.cli import --type order order.json            # dry run
 python -m sm_records.cli import --type order order.json --apply
+python -m sm_records.cli import --type order order.json --apply --app main:app --app-dir host  # + subscribers
 ```
 
 `import` is a dry run unless `--apply`, takes `--mode`, `--on-error`,
@@ -1380,7 +1381,7 @@ The set is `RecordCreated`, `RecordUpdated`, `RecordTrashed`,
 `RecordRestored`, `RecordPurged`, `RecordTypeChanged` and `RecordTypeDeleted`
 — see
 [docs/architecture.md § Extension points](docs/architecture.md#extension-points)
-for what each carries and why. Five properties are worth knowing before you
+for what each carries and why. Seven properties are worth knowing before you
 rely on them:
 
 - **Every event carries `tenant_id`.** A key and a uuid are unique only
@@ -1404,6 +1405,17 @@ rely on them:
   `EventBus.publish` gathers with `return_exceptions=True` and logs; a
   subscriber that raises does not take the write down, and does not stop the
   other subscribers.
+- **A command-line write reaches them only with `--app`.** `python -m
+  sm_records.cli seed` and `import --apply` run outside your app, so they have
+  no bus unless you name it: `--app main:app --app-dir host` runs the app's
+  lifespan (not its server) around the write and publishes on its bus. Without
+  it the command warns on stderr and writes anyway. See
+  [docs/operations.md § Event subscribers](docs/operations.md#event-subscribers---app).
+- **They run inline at commit.** An HTTP write publishes when the request's
+  session commits, before the response is sent, so a subscriber's own time is
+  added to that request. None in this repository subscribes, and a publish
+  with no subscriber costs under a microsecond; a slow handler should hand its
+  work to a task of its own rather than make every record write wait for it.
 
 `RecordTypeChanged` is the one to reach for if you register an index or reduce
 provider: `index_affecting_keys` names the fields whose stored shape just
