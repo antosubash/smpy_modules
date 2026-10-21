@@ -98,9 +98,12 @@ async def test_url_prefix_is_where_an_old_slug_redirects(authed_client: AsyncCli
 async def test_the_own_route_does_not_warn(authed_client: AsyncClient) -> None:
     await _publish(authed_client, "plain")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
         response = await authed_client.get("/p/plain", headers=_INERTIA)
 
+    # Only this keyword's warning matters; a library's own deprecation is not
+    # this test's business.
+    assert not [w for w in seen if "url_prefix" in str(w.message)]
     assert response.status_code == 200
     assert response.json()["props"]["canonical_url"].endswith("/p/plain")

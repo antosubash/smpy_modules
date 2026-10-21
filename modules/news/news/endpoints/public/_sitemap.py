@@ -199,8 +199,8 @@ def sitemap_router() -> APIRouter:
 
         Articles used to reach one through pagebuilder's sitemap, because they
         were pages in it (through a slug-claim hook pagebuilder has since
-        dropped, #132). They are not pages any more, so this module advertises its own or the
-        archive silently drops out of every index.
+        dropped, #132). They are not pages any more, so this module advertises
+        its own or the archive silently drops out of every index.
         """
         settings = active()
         base = public_base_url(request, settings)

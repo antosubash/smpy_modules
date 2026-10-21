@@ -94,6 +94,7 @@ async def sitemap(
     pages = await PagesService(db).list_sitemap_entries()
     origin = _public_origin(request, settings)
     prefix = settings.public_route_prefix
+
     def absolute(page) -> str:
         return _sitemap_url_for(origin, prefix, page.slug, page.locale)
 

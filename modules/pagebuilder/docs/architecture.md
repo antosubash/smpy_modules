@@ -120,14 +120,16 @@ sequenceDiagram
   *published* pages, plus `x-default` = the
   default locale, omitted when fewer than two.
 - **`site_nav`** (`site_nav.py`) returns published, non-trashed pages in the
-  page's locale with either flag, ordered by `lower(title)`. The SiteHeader/SiteFooter widgets append them after the layout's links,
+  page's locale with either flag, ordered by `lower(title)`. The
+  SiteHeader/SiteFooter widgets append them after the layout's links,
   skipping hrefs the layout already has (trailing slash ignored, dropdown
   children included) — `appendPages` in
   `components/widgets/_internal/site-nav-context.tsx`. Order is the layout's.
 - **Preview** (`/pagebuilder/{id}/preview`) renders `draft_data` through the same
   `PublicPage` component with `index_in_search=False` and no alternates, so the
   preview cannot disagree with the live renderer.
-- **Sitemap** uses a column-only query (no block JSON) and adds `xhtml:link` alternates per translation group.
+- **Sitemap** uses a column-only query (no block JSON) and adds `xhtml:link`
+  alternates per translation group.
 
 Redirects (`redirects.py`) are locale-scoped. `record` first deletes any redirect
 *from* the new slug (no loops) and from the old one (re-renames move it);
