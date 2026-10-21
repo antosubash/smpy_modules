@@ -34,6 +34,8 @@ export default function Categories() {
     persistOrder,
     addTag,
     mergeTags,
+    renameTag,
+    removeTag,
   } = useTaxonomy();
 
   const [draftName, setDraftName] = useState('');
@@ -175,7 +177,14 @@ export default function Categories() {
           <p className="pt-2 text-sm text-muted-foreground">{t(keys.news.categories.help)}</p>
         </section>
 
-        <TagPanel tags={tags} busy={busy} onCreate={addTag} onMerge={mergeTags} />
+        <TagPanel
+          tags={tags}
+          busy={busy}
+          onCreate={addTag}
+          onMerge={mergeTags}
+          onRename={renameTag}
+          onDelete={removeTag}
+        />
       </div>
     </PageShell>
   );
