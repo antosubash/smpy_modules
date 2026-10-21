@@ -9,19 +9,11 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from pagebuilder import public_claims
 
 pytestmark = pytest.mark.asyncio
 
 API = "/api/pagebuilder/pages"
 INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
-
-
-@pytest.fixture(autouse=True)
-def _no_leaked_claims():
-    public_claims.reset()
-    yield
-    public_claims.reset()
 
 
 async def _page(client: AsyncClient, slug: str, *, publish: bool = True, **extra) -> int:
@@ -76,19 +68,6 @@ async def test_drafts_and_trashed_pages_are_left_out(authed_client: AsyncClient)
     assert (await authed_client.delete(f"{API}/{trashed}")).status_code == 204
 
     assert (await _props(authed_client))["site_nav"] == {"header": [], "footer": []}
-
-
-async def test_a_claimed_page_links_to_the_claimant(authed_client: AsyncClient) -> None:
-    async def claim(session, slugs, locale):
-        return {slug: f"/news/{slug}" for slug in slugs if slug == "story"}
-
-    await _page(authed_client, "home")
-    await _page(authed_client, "story", show_in_footer=True)
-    public_claims.register(claim)
-
-    footer = (await _props(authed_client))["site_nav"]["footer"]
-
-    assert footer == [{"label": "Story", "href": "/news/story"}]
 
 
 async def test_only_the_pages_own_language_is_listed(bilingual_client: AsyncClient) -> None:

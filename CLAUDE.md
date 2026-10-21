@@ -44,9 +44,8 @@ Downgrading *through* a merge point is ambiguous with `-1`; name the parent.
 Moving a page between languages would strand its slug in the old one and
 orphan the redirect pointing at it, so there is no "change language" — there
 is `POST /pages/{id}/translations`, which creates a sibling sharing a
-`translation_group`. Every slug lookup, redirect and public claim takes a
-locale; adding one that does not is how `/de/p/x` starts serving the English
-page.
+`translation_group`. Every slug lookup and redirect takes a locale; adding one
+that does not is how `/de/p/x` starts serving the English page.
 
 **Every pagebuilder and news entry point binds a tenant (#38).** Their tables carry
 `MultiTenantMixin`, and the framework filters them only while a tenant is

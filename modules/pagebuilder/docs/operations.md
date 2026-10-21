@@ -197,7 +197,7 @@ the other leaves pages pointing at missing images.
 
 | Symptom | Likely cause | Check / fix |
 |---|---|---|
-| `/p/{slug}` 404 | not published, trashed, wrong language prefix, or claimed by another module | Page status and language; a German page is at `/de/p/…`. A claimed slug serves at the claimant's address. |
+| `/p/{slug}` 404 | not published, trashed, or wrong language prefix | Page status and language; a German page is at `/de/p/…`. |
 | `/p/{slug}` redirects to login | public routes not exempted | Check startup ran (`pagebuilder.media_root` logged); `public_route_prefix` changed without a restart |
 | `/de/p/…` 404 although the page is published | `de` not in `content_locales`, or not restarted since adding it | Set it and restart |
 | Boot fails: `default_content_locale … is not in content_locales` | inconsistent settings | Fix with `scripts/set_setting.py` |
