@@ -97,7 +97,7 @@ See [docs/adding-a-module.md](docs/adding-a-module.md). In short:
 make new-module name=orders
 ```
 
-then wire it into `host/pyproject.toml`, add it to the release matrix, and
+then wire it into `host/pyproject.toml`, add it to the root `testpaths` and
 generate its migration.
 
 ## Releasing

@@ -1,6 +1,8 @@
-# Weekly version updates, one grouped PR per ecosystem (#120). Security
-# updates are unaffected by the groups below and still open as soon as an
-# advisory lands.
+# Weekly version updates, one grouped PR per ecosystem for minor and patch
+# releases (#120). Major npm and uv releases stay out of the groups and open
+# one PR each, so a single breaking upgrade cannot hold every other bump
+# hostage. Security updates are unaffected by the groups below and still open
+# as soon as an advisory lands.
 #
 # Not covered: the uv binary itself (`UV_VERSION` in ci.yml and release.yml)
 # — Dependabot tracks the `astral-sh/setup-uv` action, not the uv version it
@@ -34,6 +36,7 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+        update-types: [minor, patch]
 
   # One root uv.lock covers the whole workspace (host and modules/*).
   - package-ecosystem: uv
@@ -46,3 +49,4 @@ updates:
     groups:
       uv:
         patterns: ["*"]
+        update-types: [minor, patch]

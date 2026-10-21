@@ -94,7 +94,11 @@ jobs:
           failed=()
           for d in modules/*/; do
             name=$(basename "$d")
-            [ -d "$d/tests" ] || { echo "::warning::$name has no tests/ directory"; continue; }
+            if [ ! -d "$d/tests" ]; then
+              failed+=("$name")
+              echo "::error title=pytest $name::modules/$name has no tests/ directory"
+              continue
+            fi
             echo "::group::pytest $name"
             if ! (cd "$d" && uv run pytest); then
               failed+=("$name")
