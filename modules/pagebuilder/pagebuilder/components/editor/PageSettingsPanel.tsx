@@ -7,9 +7,11 @@ import type { ReactNode } from 'react';
 
 import type { PageRead } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
+import { isValidSlug } from '../../utils/slugRule';
 
 const TITLE_ID = 'page-settings-title';
 const SLUG_ID = 'page-settings-slug';
+const SLUG_HINT_ID = 'page-settings-slug-hint';
 const PARENT_ID = 'page-settings-parent';
 const HEADER_ID = 'page-settings-header-nav';
 const FOOTER_ID = 'page-settings-footer';
@@ -64,6 +66,9 @@ export function PageSettingsPanel({
 }: Props) {
   const { t } = useT();
   const slugMoved = savedSlug !== null && savedSlug !== slug;
+  // Empty is not an error here: the save falls back to the title's slug. What
+  // the API would refuse is said before the autosave finds out (#188).
+  const slugInvalid = slug !== '' && !isValidSlug(slug);
 
   return (
     <div className="grid gap-5 text-sm md:grid-cols-2">
@@ -76,13 +81,25 @@ export function PageSettingsPanel({
         <Label htmlFor={SLUG_ID}>{t(keys.pagebuilder.settings.url)}</Label>
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">{publicPrefix}/</span>
-          <Input id={SLUG_ID} value={slug} onChange={(e) => onSlugChange(e.target.value)} />
+          <Input
+            id={SLUG_ID}
+            value={slug}
+            aria-invalid={slugInvalid || undefined}
+            aria-describedby={SLUG_HINT_ID}
+            onChange={(e) => onSlugChange(e.target.value)}
+          />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {slugMoved
-            ? t(keys.pagebuilder.settings.slug_moved, { from: `${publicPrefix}/${savedSlug}` })
-            : t(keys.pagebuilder.settings.slug_help)}
-        </p>
+        {slugInvalid ? (
+          <p id={SLUG_HINT_ID} className="text-xs text-destructive" data-testid="slug-error">
+            {t(keys.pagebuilder.settings.slug_invalid)}
+          </p>
+        ) : (
+          <p id={SLUG_HINT_ID} className="text-xs text-muted-foreground">
+            {slugMoved
+              ? t(keys.pagebuilder.settings.slug_moved, { from: `${publicPrefix}/${savedSlug}` })
+              : t(keys.pagebuilder.settings.slug_help)}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-2">
