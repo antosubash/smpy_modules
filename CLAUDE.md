@@ -102,12 +102,7 @@ command.
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt.
 
-## Local database (shared dev-services stack)
-
-**Do NOT spin up a new Postgres container for local dev.** All repos under
-`/Volumes/ext1/GitHub` share one stack defined in
-`/Volumes/ext1/GitHub/dev-services` (PostGIS + Redis + MinIO + Adminer on the
-`devnet` Docker network). Start it once with `make up` there.
+## Local database
 
 Local dev defaults to **SQLite** (`host/app.db`), so Postgres is optional. To
 use it, set:
@@ -116,19 +111,31 @@ use it, set:
 SM_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/smpy_modules
 ```
 
-Add the database to `dev-services/init/01-databases.sql` if it doesn't exist.
-If 5432 is taken by an old per-project container, stop that container rather
-than remapping ports. This repo does not use Redis or Celery.
+**Prefer the maintainer's shared `dev-services` stack when you have it.** Every
+local repo shares one (PostGIS + Redis + MinIO + Adminer on the `devnet` Docker
+network), started once with `make up` in `<path-to>/dev-services`. Add the
+database to its `init/01-databases.sql` if it doesn't exist, and don't spin up
+a per-project Postgres beside it; if 5432 is taken by an old per-project
+container, stop that container rather than remapping ports.
+
+Without that stack, one container matching CI's image is enough:
+
+```bash
+docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
+```
+
+This repo does not use Redis or Celery.
 
 ## Working against an unreleased framework
 
 ```bash
-make link-framework FRAMEWORK=/Volumes/ext1/GitHub/simple_module_python
+make link-framework FRAMEWORK=<path-to>/simple_module_python
 make unlink-framework
 ```
 
 Editable-installs the framework's `core`/`db`/`hosting` into the workspace
-venv and back. Neither touches a tracked file.
+venv and back. Neither touches a tracked file. `FRAMEWORK` has no default;
+the target fails without it.
 
 ## Known deferred work
 
