@@ -313,6 +313,7 @@ this module departs from the repo's SQLModel rule.
 | `RecordPurged` | `DELETE …/purge`, and one per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
 | `RecordTypeChanged` | `PUT /types/{key}`, a schema rollback, a `mode=update` type import | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
+| `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
 
 Three decisions are worth the sentence they cost. **Publishing is a status
 transition, not its own event**: `RecordUpdated` carries the status pair rather

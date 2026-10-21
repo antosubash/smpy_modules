@@ -252,10 +252,17 @@ PostgreSQL's 63-byte identifier limit — at 22 it lands exactly on 63) and not 
 declaring one **after** the app is built is a `RuntimeError`, because those
 tables are in no migration.
 
-**A type cannot be moved between collections.** Moving records into one is
-export → delete the type → recreate with `collection=` → import, **in that
-order**: the importer preserves uuids verbatim, so importing before deleting
-plants a duplicate and is refused.
+**Moving a type between collections** is `PUT /api/records/types/{key}`
+with `{"expected_version": …, "collection": "<name>"}` (`null` for the shared
+tables). It copies the type's records, trash, revisions and index rows into
+the target tables and deletes them from the source in one transaction, so it
+either happens completely or not at all; a large type holds the type's write
+lock for the length of the copy, so schedule it like a reindex. The target
+collection's tables must already be migrated. It refuses (`409`) while a
+reindex of the type is outstanding — run `reindex` first — and when sent
+together with a schema change. A host that reads the module's tables
+directly should subscribe to `RecordTypeMoved`: every row id of the type
+changes.
 
 ---
 

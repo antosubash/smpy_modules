@@ -295,8 +295,8 @@ omitted.
 
 Body is `TypeCreate`: `key`\*, `label`\*, `label_plural`, `description`, `icon`,
 `fields`, `display_field`, `slug_field`, `is_public`, `show_in_menu`,
-`translatable`, `allowed_roles`, `collection`. `collection` may be set **only
-here**.
+`translatable`, `allowed_roles`, `collection`. `collection` is set here, and
+changed afterwards only by a move (`PUT /types/{key}`, below).
 
 ```bash
 curl -s -b cookies.txt -X POST http://localhost:8000/api/records/types \
@@ -399,9 +399,18 @@ Extra keys: `force` (bool, default `false`) applies a restrictive change and
 marks the failing records; `orphaned` (`"restore"` | `"discard"`) resolves
 re-added keys that still hold orphaned values.
 
-`key` cannot change. A changed `collection` is a `409` (*"moving a populated
-type between collections is not supported"*); an echo of the current value is
-accepted.
+`key` cannot change. A changed `collection` **moves the type** (#82): every
+record of it — trash included — with its revisions and index rows is copied
+into the target collection's tables (`null` is the shared tables) and deleted
+from the source, in the request's one transaction, and `RecordTypeMoved` is
+published after the commit. Relations in both directions keep working with
+nothing re-pointed: a reference names its target by `(uuid, type)`, and both
+survive the move. An echo of the current value is not a move. Refusals, each
+before a row is written: an undeclared collection is a `422`; a stale
+`expected_version`, a move sent together with a `fields`/`display_field`/
+`slug_field` change (send two requests), a type with a reindex outstanding,
+or a uuid already present in the target set is a `409`. Row ids change with
+the table, so an `?after=` cursor taken before a move should be dropped.
 
 ### `DELETE /api/records/types/{key}?confirm_record_count=N` → `204`
 
@@ -975,6 +984,7 @@ they are the only way to observe a write without polling.
 | `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, and once per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
 | `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
+| `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
 
 **`tenant_id` is on every event**, second after `type_key`. It was added to
 the contract with multi-tenancy. A type key and a record uuid are unique only
@@ -1157,8 +1167,8 @@ this install's copy: a collection-backed type exported without it landed on the
 next install as a shared-tables type with no warning anywhere. On a create it
 reaches `create_type`, so a name this host has not declared is the same `422`
 `POST /types` gives; on `mode=update` a value that differs from the stored one
-is the same `409` `PUT /types/{key}` gives, since a collection is assigned at
-creation and never after. An echo of the current value is not a change and is
+is a `409`: a move copies every record into other tables, and a file must not
+ask for that on the side — send it as its own `PUT /types/{key}`. An echo of the current value is not a change and is
 dropped, so re-importing this install's own export is unaffected.
 
 `POST /types/import` takes `TypeImportRequest` — a `TypeExport` plus `mode`
@@ -1369,7 +1379,7 @@ kind of route can produce, with the body schema
 | `409` | Re-adding a key that still holds orphaned values | `{"detail", "conflicts": {key: n}}` |
 | `409` | A filter or sort on a field mid-rebuild | `{"detail", "field", "reason": "reindexing"}` |
 | `409` | `DELETE /types/{key}` with a wrong `confirm_record_count` | `{"detail"}` |
-| `409` | A changed `collection` on `PUT /types/{key}` | `{"detail"}` |
+| `409` | A `collection` move on `PUT /types/{key}` that cannot run (stale version, sent with a schema change, a reindex outstanding, a uuid already in the target), or a changed `collection` in a `mode=update` type import | `{"detail"}` |
 | `409` | A translation a type or a sibling will not allow | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |

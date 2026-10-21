@@ -20,9 +20,9 @@ tables, each built by the *same factory* that builds the global ones and
 therefore identical in shape modulo the prefix. The host then autogenerates one
 migration for the new tables, exactly as it did for the module itself.
 
-**Assignment is per type, at creation only** (§6.2). ``POST /types`` takes
-``collection``; ``PATCH`` refuses to change it with a 409, because moving a
-populated type between collections is a data migration with no rollback story.
+**Assignment is per type** (§6.2). ``POST /types`` takes ``collection``;
+``PUT /types/{key}`` with a changed one moves the type and its rows, in one
+transaction (#82, :mod:`sm_records.services._type_move`).
 
 **What stays global** (§6.4): ``records_type``, ``records_type_revision``, the
 reduce table (keyed by ``type_id``, with no ``record_id`` to partition on),
