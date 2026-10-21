@@ -41,7 +41,7 @@ from sm_ai.contracts import AiNotConfiguredError, resolve_model, resolve_embedde
 agent = Agent(instructions="...", output_type=MySchema)
 result = await agent.run(text, model=resolve_model())
 
-embedder = resolve_embedder()          # raises AiNotConfiguredError until the
+embedder = resolve_embedder()  # raises AiNotConfiguredError until the
 result = await embedder.embed_documents(chunks)  # embedding slot is set up
 ```
 
@@ -79,5 +79,5 @@ host read the same settings themselves, re-reading at most once a minute.
 | `POST /api/ai/test` | probe the chat or embedding slot |
 | `POST /api/ai/models` | list the model ids the slot's saved endpoint serves (first 500, sorted) |
 
-Writes require an `X-CSRF-Token` header bound to the session (the admin page
-sends it automatically; the token is mirrored to the `sm_ai_csrf` cookie).
+Writes require the framework's `X-CSRF-Token` header bound to the session (the
+admin page sends it automatically; it is shared as the `csrf_token` prop).

@@ -1,5 +1,6 @@
 /** Client for the AI settings API. */
 
+import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
 
 export type AiSettingsOut = {
@@ -41,15 +42,6 @@ export type SlotValues = {
 };
 
 const BASE = '/api/ai';
-const CSRF_COOKIE = 'sm_ai_csrf';
-
-/** The admin view mints the token into the session; middleware mirrors it to
- * this JS-readable cookie. Tolerant when absent (e.g. session not mounted) —
- * the server skips enforcement in exactly that case. */
-function csrfHeader(): Record<string, string> {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
-  return match ? { 'X-CSRF-Token': decodeURIComponent(match[1]) } : {};
-}
 
 /** Turn a failed response into something worth showing a person — our own
  * JSON `detail` when present, the status line otherwise (never raw HTML).
@@ -59,6 +51,8 @@ async function errorFrom(response: Response): Promise<Error> {
   const text = await response.text();
   try {
     const detail = (JSON.parse(text) as { detail?: unknown }).detail;
+    if (isCsrfRefusal(response.status, detail))
+      return new Error(translate(keys.ai.api.csrf_failed));
     if (typeof detail === 'string') return new Error(detail);
     if (Array.isArray(detail)) {
       const lines = detail
@@ -112,7 +106,7 @@ export async function saveSettings(
     await fetch(`${BASE}/settings`, {
       method: 'PUT',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders('PUT') },
       body: JSON.stringify(payload),
     }),
   );
@@ -124,7 +118,7 @@ async function postSlot<T>(path: string, slot: 'chat' | 'embedding'): Promise<T>
     await fetch(`${BASE}/${path}`, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
       body: JSON.stringify({ slot }),
     }),
   );
