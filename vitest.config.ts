@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 // block registry's memo invalidation being the case that prompted it.
 export default defineConfig({
   test: {
-    include: ['modules/**/*.test.ts', 'modules/**/*.test.tsx'],
+    include: ['modules/**/*.test.ts', 'modules/**/*.test.tsx', 'scripts/**/*.test.ts'],
     environment: 'node',
     // Modules translate their labels through `@simple-module-py/i18n`, which
     // the host configures at boot and nothing configures in a test process.

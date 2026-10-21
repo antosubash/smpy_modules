@@ -62,6 +62,10 @@ class AiModule(ModuleBase):
             constants.PACKAGE,
             AiSettings,
             lambda s: services.install(services.AiServices(settings=s)),
+            # The generic Settings screen links to /ai/ and refuses writes
+            # (#164): a second editor would skip the provider and base-URL
+            # checks, the embedding_dim bound and key encryption.
+            manage_url=constants.MENU_URL,
         )
 
         # Hosts may inject ``secret_key`` programmatically

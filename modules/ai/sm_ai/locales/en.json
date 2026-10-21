@@ -26,6 +26,7 @@
     "base_url_required": "Base URL (required)",
     "base_url_optional": "Base URL (optional override)",
     "base_url_placeholder_required": "http://your-server:8000/v1",
+    "base_url_missing": "openai_compatible has no default endpoint — enter the server's base URL.",
     "base_url_placeholder_optional": "provider default",
     "api_key": "API key",
     "api_key_saved": "saved — leave blank to keep",

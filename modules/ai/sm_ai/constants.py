@@ -69,6 +69,13 @@ EMBEDDING_PROVIDERS: Final = (
 # value — same literal GeoWiki's AiClientFactory substitutes.
 PLACEHOLDER_API_KEY: Final = "not-needed"
 
+# Smallest valid embedding width; 0 means "not set". The API rejects anything
+# lower, and AiSettings reads a lower stored value as 0 (#164).
+MIN_EMBEDDING_DIM: Final = 0
+
+# Providers with no default endpoint: their slot is unusable without a base URL.
+PROVIDERS_NEEDING_BASE_URL: Final = frozenset({PROVIDER_OPENAI_COMPATIBLE})
+
 SLOT_CHAT: Final = "chat"
 SLOT_EMBEDDING: Final = "embedding"
 TEST_SLOTS: Final = (SLOT_CHAT, SLOT_EMBEDDING)
