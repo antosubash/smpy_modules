@@ -1,5 +1,11 @@
 # simple_module_python_modules Implementation Plan
 
+> **Historical record.** Paths under `/Volumes/ext1/...` below are the
+> author's machine at the time of writing and exist nowhere else. Read them as
+> `<path-to>/simple_module_python`, `<path-to>/smpy_pagebuilder`,
+> `<path-to>/dev-services` and the repo root; current instructions are in
+> `CLAUDE.md` and `README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the empty `simple_module_python_modules` repo into a uv + npm workspace that publishes distributable SimpleModule add-ons to PyPI, with a runnable demo host, and `pagebuilder` ported out of `smpy_pagebuilder` as the first module.
