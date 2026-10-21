@@ -83,3 +83,28 @@ describe('the CSRF token', () => {
     expect(headers().get('X-CSRF-Token')).toBeNull();
   });
 });
+
+describe('a CSRF refusal', () => {
+  function refuse(detail: string) {
+    const body = JSON.stringify({ detail });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => new Response(body, { status: 403 })),
+    );
+  }
+
+  it("shows the module's message, not the framework's developer sentence", async () => {
+    const { api } = await load({ csrf_token: 'stale' });
+    refuse('CSRF token missing or invalid — read it via get_csrf_token.');
+    const error = await api.request('/types', { method: 'POST', body: '{}' }).catch((e) => e);
+    expect((error as Error).message).toMatch(/security token is out of date/);
+    expect((error as { status: number }).status).toBe(403);
+  });
+
+  it('leaves a permission 403 as the server worded it', async () => {
+    const { api } = await load({ csrf_token: 'tok' });
+    refuse('Permission required: records.manage');
+    const error = await api.request('/types', { method: 'POST', body: '{}' }).catch((e) => e);
+    expect((error as Error).message).toBe('Permission required: records.manage');
+  });
+});

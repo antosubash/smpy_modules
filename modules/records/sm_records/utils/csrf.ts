@@ -40,7 +40,7 @@ function initialProps(): unknown {
 if (typeof document !== 'undefined') {
   remember(initialProps());
   try {
-    router.on('navigate', (event) => remember(event.detail.page.props));
+    router.on('navigate', (event) => remember(event.detail?.page?.props));
   } catch {
     // A component test's partial mock of `@inertiajs/react` has no `router`.
   }
@@ -53,7 +53,10 @@ export function csrfHeaders(method: string | undefined): Record<string, string> 
   return { [CSRF_HEADER]: current };
 }
 
-/** For tests: forget the token, or set the one a page would have shared. */
-export function setCsrfToken(token: string): void {
-  current = token;
+/** How the framework's `RequiresCsrf` 403 begins. Its English sentence is
+ *  written for developers; a person is shown the module's own message. */
+const REFUSAL_PREFIX = 'CSRF token missing or invalid';
+
+export function isCsrfRefusal(status: number, detail: unknown): boolean {
+  return status === 403 && typeof detail === 'string' && detail.startsWith(REFUSAL_PREFIX);
 }

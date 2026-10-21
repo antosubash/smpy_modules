@@ -12,6 +12,7 @@
  * module should say twice, so neither lives in `api.ts` any more.
  */
 
+import { isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
 
 import type { ApiErrorBody } from './types';
@@ -76,6 +77,7 @@ export function messageFor(status: number, statusText: string, body: ApiErrorBod
       ? translate(keys.records.errors.server_error)
       : `Request failed (${status} ${statusText})`.trim();
   if (!body) return fallback;
+  if (isCsrfRefusal(status, body.detail)) return translate(keys.records.errors.csrf_failed);
   if (body.errors?.length) return summarizeErrors(body.errors);
   if (typeof body.detail === 'string' && body.detail.trim()) return body.detail;
   return fallback;

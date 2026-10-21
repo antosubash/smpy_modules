@@ -4,7 +4,7 @@
  * error decoder rather than growing a second copy that drifts from it.
  */
 
-import { csrfHeaders } from './csrf';
+import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
 
 export const BASE = '/api/news';
@@ -49,6 +49,9 @@ export async function errorFrom(response: Response): Promise<HttpError> {
 
   try {
     const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    if (isCsrfRefusal(response.status, detail)) {
+      return new HttpError(translate(keys.news.errors.csrf_failed), response.status);
+    }
     if (typeof detail === 'string' && detail.trim()) return new HttpError(detail, response.status);
     const validation = fromValidationErrors(detail);
     if (validation) return new HttpError(validation, response.status);
