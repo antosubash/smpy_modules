@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news import tag_redirects
 from news.constants import MAX_TAG_LEN
 from news.contracts.schemas import TagRead
 from news.models import NewsArticleTag, NewsTag
@@ -148,22 +150,36 @@ async def set_for_article(db: AsyncSession, article_id: int, names: list[str]) -
     return sorted(tag.name for tag in tags)
 
 
-async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
-    """Rename a tag in place. The slug follows, so links stay derivable."""
-    name = name.strip()
-    slug = _slug_for(name)
-    clash = await db.scalar(
+async def _clash(db: AsyncSession, tag: NewsTag, name: str, slug: str) -> int | None:
+    """Another tag already holding this name (ignoring case) or slug."""
+    return await db.scalar(
         select(NewsTag.id).where(
             NewsTag.id != tag.id,
             (NewsTag.slug == slug) | (func.lower(NewsTag.name) == name.lower()),
         )
     )
-    if clash is not None:
+
+
+async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
+    """Rename a tag in place. The slug follows, and the old one redirects."""
+    name = name.strip()
+    slug = _slug_for(name)
+    if await _clash(db, tag, name, slug) is not None:
         raise TagCollisionError(f"A tag named {name!r} already exists.")
-    tag.name = name
-    tag.slug = slug
-    db.add(tag)
-    await db.flush()
+    old_slug = tag.slug
+    try:
+        # The check above is check-then-write: two concurrent renames to
+        # "Urban" and "urban" both pass it, and the unique index stops the
+        # second at flush. A savepoint keeps the request session usable so
+        # that loser gets the same 409 as the sequential case, not a 500.
+        async with db.begin_nested():
+            tag.name = name
+            tag.slug = slug
+            db.add(tag)
+            await db.flush()
+    except IntegrityError as exc:
+        raise TagCollisionError(f"A tag named {name!r} already exists.") from exc
+    await tag_redirects.record(db, tag_id=tag.id or 0, old_slug=old_slug, new_slug=slug)
     await db.refresh(tag)
     return tag
 
@@ -181,6 +197,7 @@ async def delete(db: AsyncSession, tag: NewsTag) -> None:
     ``merge`` already does this for the same reason; this is the other path.
     """
     await db.execute(sa_delete(NewsArticleTag).where(NewsArticleTag.tag_id == tag.id))
+    await tag_redirects.clear_for_tag(db, tag.id or 0)
     await db.delete(tag)
     await db.flush()
 
@@ -233,6 +250,7 @@ async def merge(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> int:
         db.add(NewsArticleTag(article_id=article_id, tag_id=target.id or 0))
 
     await db.execute(sa_delete(NewsArticleTag).where(NewsArticleTag.tag_id == source.id))
+    await tag_redirects.repoint(db, source=source, target=target)
     await db.delete(source)
     await db.flush()
     return len(source_articles)

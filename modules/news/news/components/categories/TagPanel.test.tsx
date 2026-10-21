@@ -134,6 +134,20 @@ describe('TagPanel — rename and delete', () => {
     expect(onDelete).toHaveBeenCalledWith(1);
   });
 
+  it('keeps a refused delete open with the reason in it', async () => {
+    const onDelete = vi.fn(async () => {
+      throw new Error('Tag not found.');
+    });
+    await mount({ onDelete });
+    await click(chip('Urbn'));
+    await click(button('Delete'));
+    await click(button('Delete tag'));
+
+    const dialog = document.querySelector('[role="alertdialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.textContent).toContain('Tag not found.');
+  });
+
   it('says nothing else changes when the tag is unused', async () => {
     await mount();
     await click(chip('Rural'));

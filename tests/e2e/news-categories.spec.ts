@@ -210,6 +210,10 @@ test.describe('News tags', () => {
     await expect(page.getByRole('button', { name: new RegExp(typo) })).toHaveCount(0);
     const onArticle = await page.request.get(`/api/news/articles/${articleId}/tags`);
     expect(await onArticle.json()).toEqual([fixed]);
+    // The archive URL published under the old slug follows the rename.
+    const old = await page.request.get(`/news/tag/${typo}`, { maxRedirects: 0 });
+    expect(old.status()).toBe(301);
+    expect(old.headers().location).toBe(`/news/tag/${fixed}`);
   });
 
   test('deleting a used tag says how many articles lose it, then detaches it', async ({ page }) => {
