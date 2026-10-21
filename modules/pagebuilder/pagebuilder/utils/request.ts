@@ -3,29 +3,14 @@
  *
  * All endpoints live under `/api/pagebuilder` and return JSON. We use
  * plain fetch + same-origin cookies for auth, plus an `X-CSRF-Token`
- * header on every mutating request (token is read from the
- * `pagebuilder_csrf` cookie set by the view layer).
+ * header on every mutating request: the framework token the screens share
+ * as the `csrf_token` prop, kept by `./csrf`.
  */
 
+import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
 
 export const BASE = '/api/pagebuilder';
-
-export const CSRF_COOKIE = 'pagebuilder_csrf';
-
-const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-export function readCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const target = `${name}=`;
-  for (const piece of document.cookie.split(';')) {
-    const trimmed = piece.trim();
-    if (trimmed.startsWith(target)) {
-      return decodeURIComponent(trimmed.slice(target.length));
-    }
-  }
-  return null;
-}
 
 /** How many characters of an unrecognised error body are worth showing. */
 const MAX_BODY_SNIPPET = 200;
@@ -88,6 +73,9 @@ export async function errorMessage(response: Response): Promise<string> {
 
   try {
     const parsed = JSON.parse(body) as { detail?: unknown };
+    if (isCsrfRefusal(response.status, parsed.detail)) {
+      return translate(keys.pagebuilder.errors.csrf_failed);
+    }
     if (typeof parsed.detail === 'string' && parsed.detail.trim()) return parsed.detail;
     // FastAPI's 422 sends a *list* of Pydantic errors. Without this the author
     // who typed a space into a URL field got "Request failed (422
@@ -108,18 +96,12 @@ export async function errorMessage(response: Response): Promise<string> {
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = init.body instanceof FormData;
-  const method = (init.method ?? 'GET').toUpperCase();
-  const csrfHeaders: Record<string, string> = {};
-  if (UNSAFE_METHODS.has(method)) {
-    const token = readCookie(CSRF_COOKIE);
-    if (token) csrfHeaders['X-CSRF-Token'] = token;
-  }
   const response = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       Accept: 'application/json',
-      ...csrfHeaders,
+      ...csrfHeaders(init.method),
       ...(init.headers || {}),
     },
     ...init,
