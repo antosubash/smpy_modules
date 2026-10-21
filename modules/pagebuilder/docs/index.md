@@ -33,8 +33,9 @@ and what the Markdown block understands.
 ### [api-reference.md](api-reference.md) — for integrators
 
 Every route under `/api/pagebuilder`: method, permission, request and response
-shapes, and the error table. Also the public routes and the `PageDeleted`
-event.
+shapes, and the error table. Also the public routes, the `PageDeleted`
+event, the removed `public_claims` hook and the deprecated `url_prefix` keyword
+of `render_public_page`.
 
 ### [operations.md](operations.md) — for operators
 

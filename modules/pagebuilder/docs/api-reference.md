@@ -258,6 +258,22 @@ restore would otherwise come back without what other modules dropped. A module
 that keys rows to a page id must handle it: there is no cross-module foreign key,
 and SQLite reuses ids.
 
+**Removed: `pagebuilder.public_claims`** (#132). The hook that let another
+module claim a page's public address is gone — nothing used it. `import
+pagebuilder.public_claims` now fails; every published page is served at
+`/p/{slug}` (or `/{locale}/p/{slug}`), and the sitemap, `hreflang` alternates,
+nav links and old-slug redirects all point there.
+
+**Deprecated: `render_public_page(..., url_prefix=…)`.**
+`pagebuilder.endpoints.public_views.render_public_page(slug, request, inertia,
+db, settings, locale=…)` still serves a published page with the viewer's ETag,
+cache, CSP, canonical, `hreflang`, nav and redirect handling, from a router that
+depends on `tenancy.bind_public`. `locale` is required, with no fallback to the
+default language. The `url_prefix` keyword, which belonged to public claims, is
+still accepted: it sets the canonical URL and where an old slug 301s to, as it
+did before, and emits a `DeprecationWarning`. It will be removed in a later
+release; omit it.
+
 ## Errors
 
 | Status | Detail | When |

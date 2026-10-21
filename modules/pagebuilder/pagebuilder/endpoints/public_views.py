@@ -15,6 +15,7 @@ rewriting an address that already exists.
 from __future__ import annotations
 
 import json
+import warnings
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -98,6 +99,7 @@ async def render_public_page(
     settings: PagebuilderSettings,
     *,
     locale: str,
+    url_prefix: str | None = None,
 ) -> Response:
     """Serve a published page, with everything a public URL needs: ETag, cache,
     CSP, canonical, ``hreflang`` and old-slug handling.
@@ -106,8 +108,21 @@ async def render_public_page(
     fallback to the default language: a caller that forgot it would be served
     the default-language page at a translated address, which is how
     ``/de/p/x`` starts serving the English one.
+
+    ``url_prefix`` is deprecated (#132). It was the claimant module's address,
+    from the ``public_claims`` hook that has since been removed, and is kept so
+    a host that still passes it keeps working: it sets the canonical URL and
+    the old-slug redirect target, exactly as before. The hreflang alternates,
+    sitemap and nav always use this module's own prefix. Omit it.
     """
-    prefix = settings.public_route_prefix
+    if url_prefix is not None:
+        warnings.warn(
+            "render_public_page(url_prefix=...) is deprecated and will be "
+            "removed; the page is served at the module's own public_route_prefix",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    prefix = url_prefix if url_prefix is not None else settings.public_route_prefix
     page = await PagesService(db).get_by_slug_published(slug, locale)
     if page is None or page.published_data is None:
         # Before giving up: this may be an address the page used to live at.
