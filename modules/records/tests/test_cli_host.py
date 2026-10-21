@@ -36,10 +36,14 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 from simple_module_core.events import EventBus
+from simple_module_db.listeners import register_listeners
+from simple_module_db.session import init_db
+from sqlalchemy import event as sa_event
 from sm_records.contracts import events
 
 seen = []
 phase = []
+commits = []
 
 
 def build():
@@ -51,14 +55,21 @@ def build():
     for name in events.__all__:
         bus.subscribe(getattr(events, name), handle)
 
+    db = init_db(URL)
+    register_listeners(db)
+    # A listener only this app's sessions carry: a write through any other
+    # engine (one the CLI opened itself) never reaches it.
+    sa_event.listen(db.sync_session_class, "after_commit", lambda s: commits.append(phase[-1]))
+
     @asynccontextmanager
     async def lifespan(app):
         phase.append("up")
         yield
+        await db.engine.dispose()
         phase.append("down")
 
     app = FastAPI(lifespan=lifespan)
-    app.state.sm = SimpleNamespace(event_bus=bus, settings=SimpleNamespace(database_url=URL))
+    app.state.sm = SimpleNamespace(event_bus=bus, db=db, settings=SimpleNamespace(database_url=URL))
     return app
 
 
@@ -131,6 +142,8 @@ def test_an_applied_import_publishes_to_the_hosts_bus_while_it_is_up(host, url, 
     mod = _module(name)
     assert [(when, type(event)) for when, event in mod.seen] == [("up", RecordCreated)] * 2
     assert mod.phase == ["up", "down"]
+    # Written through the app's own database state, not a second engine.
+    assert mod.commits == ["up"]
     assert "WARNING" not in capsys.readouterr().err
 
 
@@ -148,6 +161,8 @@ def test_a_seed_publishes_one_event_per_record_through_a_factory(host, url, caps
     total = int(re.search(r"records seed: (\d+) record\(s\) in tenant", out)[1])
     assert len(created) == total > 0
     assert {when for when, _ in mod.seen} == {"up"}
+    assert mod.commits
+    assert set(mod.commits) == {"up"}
     # Only the factory's app (the CLI's) started; the module-level one never did.
     assert mod.phase == ["up", "down"]
 

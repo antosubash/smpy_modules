@@ -798,8 +798,13 @@ a module registered in `register_event_handlers` hears the writes in the state
 its `on_startup` left it (settings hydrated, tenancy mode fixed). It also picks
 up whatever the host's entry point declares at import, which is how `seed
 --app main:app` seeds the `event` type of the demo host's `events` collection.
-The database is the app's; a `--database-url` that names another one is
-refused. The lifespan is the host's own, costs included: a database behind
+The database is the app's, and so is the connection: the write goes through
+`app.state.sm.db`, with the session listeners and tenant configuration the app
+set up, not through an engine of the CLI's. A `--database-url` that restates it
+(a relative SQLite path, another query order) is accepted; one that names
+another database is refused, with any password masked. The lifespan is left
+normally however the command ends — a refused import, an error, Ctrl-C — so
+every module's `on_shutdown` runs. The lifespan is the host's own, costs included: a database behind
 head fails it (`make migrate` first), and pagebuilder's scheduler, if enabled,
 runs for the length of the command.
 

@@ -118,6 +118,7 @@ async def import_command(
     apply: bool,
     tenant: str = DEFAULT_TENANT,
     bus: Any = None,
+    app: Any = None,
 ) -> ImportReport:
     """Import one file into ``tenant``. Writes nothing unless ``apply``.
 
@@ -125,7 +126,9 @@ async def import_command(
     the import commits — a caller running this in-process with a host's
     ``app.state.sm.event_bus`` reaches that host's subscribers, and so does
     ``python -m sm_records.cli import --apply --app main:app``
-    (:mod:`sm_records.cli_host`). Without one nothing is published.
+    (:mod:`sm_records.cli_host`). Without one nothing is published. ``app``,
+    when that host is running, is whose database state the import writes
+    through (:func:`sm_records.cli_common.connected`).
     """
     text = Path(path).read_text(encoding="utf-8-sig")
     fmt = ImportFormat.CSV if path.lower().endswith(".csv") else ImportFormat.JSON
@@ -136,7 +139,7 @@ async def import_command(
         match_by=match_by,
         force=force,
     )
-    async with connected(database_url) as db_state:
+    async with connected(database_url, app if apply else None) as db_state:
         with tenant_scope(tenant):
             async with db_state.session_factory() as session:
                 events.attach(session, bus)
@@ -215,6 +218,7 @@ def run(args: Any, database_url: str, app: Any = None) -> int:
                 apply=args.apply,
                 tenant=args.tenant,
                 bus=bus,
+                app=app,
             )
 
     try:

@@ -48,6 +48,7 @@ async def seed(
     reset: bool,
     tenant: str = DEFAULT_TENANT,
     bus: Any = None,
+    app: Any = None,
 ) -> SeedSummary:
     """Create the demo types (if missing) and write ``records`` records.
 
@@ -60,10 +61,13 @@ async def seed(
     Everything runs inside ``tenant_scope(tenant)``. So ``--reset`` sees, and
     deletes, only that tenant's demo types: another tenant's ``company`` is a
     different row that the type lookup under this scope never returns.
+
+    ``app`` is the host ``--app`` named, already inside its lifespan: the
+    write then goes through its database state (:func:`connected`).
     """
     from sm_records.seed import seed_database
 
-    async with connected(database_url) as db_state:
+    async with connected(database_url, app) as db_state:
         settings = await load_settings(db_state)
         with tenant_scope(tenant):
             summary = await seed_database(
@@ -185,6 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     reset=args.reset,
                     tenant=args.tenant,
                     bus=bus,
+                    app=app,
                 )
 
         asyncio.run(run_seed())
