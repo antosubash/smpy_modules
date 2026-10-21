@@ -7,36 +7,59 @@ versioning, and it matches how `simple_module_python` itself releases.
 
 ## Running a release
 
-Actions → **release** → *Run workflow*. Pick either:
+Actions → **release** → *Run workflow*, **on `main`**. Pick either:
 
 - **bump** — `patch` (default), `minor`, or `major`, applied to the version in
   the root `pyproject.toml`.
 - **version** — an explicit value like `0.2.0`, which overrides `bump`.
 
-That's the whole process. Nothing is tagged or committed until every package
-has published.
+That's the whole process. The release refuses to start unless CI is green on
+the commit it would ship, and waits for CI if it is still running.
 
 ## What the four jobs do
 
 | Job | Does |
 |---|---|
-| `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Every later job reads this one output, so the version is decided exactly once. |
-| `build` | Bumps versions **in the working tree only**, builds the module frontends, then `uv build --all-packages`. Uploads the artifacts. No commit. |
+| `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Then the gates: the run must be on `main`; `v<version>` must not already be tagged and `release/v<version>` must not exist; and ci.yml's newest `push` (or manual) run on the dispatched commit must have concluded `success`. A run still in progress is waited for, up to 70 minutes. Every later job reads this job's outputs, so the version is decided exactly once. |
+| `build` | Commits the bump (versions + `uv lock`) on top of the dispatched commit, builds the module frontends and `uv build --all-packages` from that commit, uploads the artifacts, and only then pushes the commit to the staging branch **`release/v<version>`**. |
 | `publish-pypi` | One matrix job per module. Selects that module's artifacts and publishes via OIDC trusted publishing. `fail-fast: false`, so one failure doesn't cancel the others. |
-| `finalize` | Re-applies the bump, commits, tags `v<version>`, pushes, and creates the GitHub release. |
+| `finalize` | Tags the staged commit `v<version>`, lands the bump on `main`, creates the GitHub release, and deletes the staging branch. |
 
-The ordering matters: the tag reaches origin only after every publish
-succeeds, so a failed build never strands an orphan tag you have to clean up.
+Only one release runs at a time (`concurrency: release`).
 
-## If a publish fails partway
+### Why the bump is staged before publishing (#115)
 
-Nothing was committed or tagged, so there is no cleanup on the repo side. Fix
-the cause and re-run the workflow with the **same explicit version**.
+PyPI never takes a version back. Previously the bump commit and tag were
+created *after* publishing and pushed to `main` atomically; if anything merged
+to `main` while the release ran, that push was rejected and the version sat on
+PyPI with no commit or tag, and re-running could not help because PyPI refuses
+the same version twice.
 
-The one thing you cannot redo is a version that already uploaded to PyPI —
-PyPI rejects re-uploads of an existing version. If module A published and
-module B failed, re-running the same version will fail on A. Release the next
-patch version instead.
+Now the exact commit the artifacts were built from reaches origin — on a new
+branch, so nothing can reject it — before any upload. After publishing:
+
+- **The tag** points at that staged commit, so `v<version>` is always the
+  source of what is on PyPI. Pushing a new tag cannot race with `main`.
+- **`main`** is fast-forwarded to the staged commit when nothing landed in the
+  meantime (the usual case: the tag is then on `main`'s history). When `main`
+  moved, the bump is *re-applied* on top of the new `main` — `bump_version.py`
+  plus `uv lock`, both deterministic — rather than rebasing the staged commit,
+  whose `uv.lock` would conflict with any dependency change. That commit's
+  message names the tagged one. The push is retried, never forced.
+
+### If something fails
+
+| Where | State | What to do |
+|---|---|---|
+| `resolve` | Nothing happened. | Fix the cause (wait for or fix CI; for a commit with no CI run, such as the bot's own release commit, run **CI** by hand with *Run workflow*) and dispatch again. |
+| `build`, before staging | Nothing reached origin or PyPI. | Fix and dispatch again with the same version. |
+| `publish-pypi`, every package | `release/v<version>` exists; nothing on PyPI. | Fix the cause and **Re-run failed jobs** — the same artifacts are published and `finalize` runs. To abandon the version instead, delete `release/v<version>`. |
+| `publish-pypi`, some packages | Some packages are on PyPI. | **Re-run failed jobs** once the cause is fixed: the published ones are not retried. Do not dispatch a fresh run — its build would produce different artifacts for the version some packages already carry. |
+| `finalize` | Packages are on PyPI; the staged commit holds their source. | **Re-run failed jobs.** Each step checks what already happened (tag present on the staged commit, `main` already at the version, release already created), so a re-run picks up where it stopped. |
+
+A version that is fully on PyPI but whose `finalize` cannot complete (say
+`main` refuses pushes from Actions) is still tagged once the tag step has run;
+bumping `main` by hand to that version is then the only step left.
 
 ## One-time PyPI setup, per module
 
