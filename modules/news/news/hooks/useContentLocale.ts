@@ -15,6 +15,8 @@
 
 import { usePage } from '@inertiajs/react';
 
+import { useT } from '../utils/i18n';
+
 interface LocaleCarryingProps {
   /** Sent by the public page viewer. */
   locale?: string | null;
@@ -25,4 +27,12 @@ interface LocaleCarryingProps {
 export function useContentLocale(): string | undefined {
   const props = usePage().props as unknown as LocaleCarryingProps;
   return props?.locale ?? props?.page?.locale ?? undefined;
+}
+
+/** The locale a block's dates are written in: the page's language where there
+ * is one, else the console's — never the browser's (#189). */
+export function useDateLocale(): string | undefined {
+  const content = useContentLocale();
+  const { locale } = useT();
+  return content ?? locale;
 }

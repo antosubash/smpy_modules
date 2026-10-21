@@ -133,6 +133,7 @@ export function ColumnHeader({
 
 /** One column's value for one record — shared by the table and the cards. */
 export function ColumnValue({ column, record }: { column: ListColumn; record: RecordRead }) {
+  const { locale } = useT();
   if (column.kind === 'field') {
     return (
       <RecordCell
@@ -155,8 +156,8 @@ export function ColumnValue({ column, record }: { column: ListColumn; record: Re
     case 'position':
       return <>{record.position}</>;
     case 'published_at':
-      return <>{record.published_at ? formatDateTime(record.published_at) : EMPTY_CELL}</>;
+      return <>{record.published_at ? formatDateTime(record.published_at, locale) : EMPTY_CELL}</>;
     default:
-      return <>{formatDateTime(record.updated_at ?? record.created_at)}</>;
+      return <>{formatDateTime(record.updated_at ?? record.created_at, locale)}</>;
   }
 }

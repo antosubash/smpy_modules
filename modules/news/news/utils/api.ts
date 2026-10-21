@@ -76,8 +76,11 @@ export async function listCategories(signal?: AbortSignal): Promise<CategoryList
  * display date stored as midnight UTC, so handing the full timestamp to
  * `toLocaleDateString` in the viewer's own timezone would show everyone west
  * of UTC the previous day.
+ *
+ * `locale` is passed, never left to the browser (#189): the console's
+ * (`useT().locale`) on admin screens, the page's own language on public ones.
  */
-export function formatArticleDate(iso: string | null, locale?: string): string {
+export function formatArticleDate(iso: string | null, locale: string | undefined): string {
   if (!iso) return '';
   const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return '';
@@ -87,6 +90,13 @@ export function formatArticleDate(iso: string | null, locale?: string): string {
     day: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/** A moment (a revision's `created_at`) as date and time, in `locale`. */
+export function formatTimestamp(iso: string, locale: string | undefined): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 /** Set or clear when an article goes live and comes down.

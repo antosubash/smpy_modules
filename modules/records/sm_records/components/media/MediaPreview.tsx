@@ -84,12 +84,13 @@ export function MediaUrlLink({ url, full }: { url: string; full: boolean }) {
 
 /** Size · type · upload date — the facts the chip and the picker grid show. */
 export function MediaFacts({ file }: { file: MediaFile }) {
+  const { locale } = useT();
   return (
     <span className="text-xs text-muted-foreground">
       {[
         formatBytes(file.size_bytes),
         file.content_type,
-        file.created_at && formatDateTime(file.created_at),
+        file.created_at && formatDateTime(file.created_at, locale),
       ]
         .filter(Boolean)
         .join(' · ')}

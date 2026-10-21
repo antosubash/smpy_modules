@@ -5,7 +5,7 @@ import {
 } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/article-cards-render';
 import { useEffect, useState } from 'react';
 
-import { useContentLocale } from '../hooks/useContentLocale';
+import { useContentLocale, useDateLocale } from '../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../utils/api';
 import {
   clampFeedLimit,
@@ -25,12 +25,12 @@ export interface NewsFeedProps {
   viewAllHref: string;
 }
 
-function toCard(article: ArticleRead): ArticleCardItem {
+function toCard(article: ArticleRead, dateLocale: string | undefined): ArticleCardItem {
   return {
     imageUrl: article.cover_image_url,
     imageAlt: '',
     eyebrow: article.category,
-    date: formatArticleDate(article.published_at),
+    date: formatArticleDate(article.published_at, dateLocale),
     title: article.title,
     body: article.excerpt,
     // The article's own public URL, served by news. Sent by the server rather
@@ -52,6 +52,7 @@ export function NewsFeedRender({
   // on a page written in another is a mistake nothing would catch, and an
   // English card in a German list is worse than no card.
   const locale = useContentLocale();
+  const dateLocale = useDateLocale();
   // Stored props may predate the editor's constraints (`limit: 4.5` is a 422
   // from the API, which the catch below would turn into a vanished feed).
   const safeLimit = clampFeedLimit(limit);
@@ -61,12 +62,12 @@ export function NewsFeedRender({
     // `in_feed` is the block's own filter: an article can be published and
     // linked to without belonging in the chronological feed.
     listArticles({ limit: safeLimit, category, locale, in_feed: true, signal: controller.signal })
-      .then((response) => setItems(response.items.map(toCard)))
+      .then((response) => setItems(response.items.map((a) => toCard(a, dateLocale))))
       // An empty feed and a failed fetch look the same to a visitor on
       // purpose: a broken API must not put an error box on a public page.
       .catch(() => setItems([]));
     return () => controller.abort();
-  }, [safeLimit, category, locale]);
+  }, [safeLimit, category, locale, dateLocale]);
 
   // Render nothing at all until the first response, and nothing when there
   // are no articles: a heading with an empty grid under it reads as a broken

@@ -111,7 +111,8 @@ export function localInputToIso(local: string): string {
 }
 
 /**
- * ISO datetime (with offset) → the viewer's own locale, date + short time.
+ * ISO datetime (with offset) → date + short time in `locale`, the console's
+ * (`useT().locale`) — never the browser's, which need not match it (#189).
  *
  * Shared between a schema `datetime` field's cell (`RecordCell`) and the
  * envelope's own fixed timestamps (`published_at`/`updated_at`/`created_at`,
@@ -124,23 +125,22 @@ export function localInputToIso(local: string): string {
  * own fallback — the point is never to substitute a value for one the
  * browser's `Date` rejects.
  */
-export function formatDateTime(value: string): string {
+export function formatDateTime(value: string, locale: string | undefined): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
     parsed,
   );
 }
 
 /** A bare calendar day ("YYYY-MM-DD", design §7.3) has no timezone of its
  *  own: anchor it at UTC midnight and format in UTC, so the displayed day
- *  cannot shift for a viewer west of UTC. Unparseable input comes back as is. */
-export function formatCalendarDate(value: string): string {
+ *  cannot shift for a viewer west of UTC. Unparseable input comes back as is.
+ *  `locale` as for `formatDateTime`. */
+export function formatCalendarDate(value: string, locale: string | undefined): string {
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    parsed,
-  );
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed);
 }
 
 function asText(raw: unknown): string {

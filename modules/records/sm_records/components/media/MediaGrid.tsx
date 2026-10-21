@@ -60,7 +60,7 @@ export function MediaGrid({
   currentId: string | null;
   onPick: (file: MediaFile) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   return (
     <ul
       className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
@@ -70,7 +70,7 @@ export function MediaGrid({
     >
       {files.map((file) => {
         const current = file.id === currentId;
-        const date = file.created_at ? formatDateTime(file.created_at) : '';
+        const date = file.created_at ? formatDateTime(file.created_at, locale) : '';
         const size = formatBytes(file.size_bytes);
         return (
           <li key={file.id} className="min-w-0">

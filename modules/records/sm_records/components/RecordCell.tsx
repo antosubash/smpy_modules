@@ -102,7 +102,7 @@ export function RecordCell({
    *  expand this column. */
   expanded?: ExpandedRef[];
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">{DASH}</span>;
   }
@@ -143,14 +143,18 @@ export function RecordCell({
     case 'date':
       // A bare calendar day, fixed in UTC so it cannot shift a day for a
       // viewer west of UTC — `formatCalendarDate` (utils/values.ts).
-      return <span>{typeof value === 'string' ? formatCalendarDate(value) : String(value)}</span>;
+      return (
+        <span>{typeof value === 'string' ? formatCalendarDate(value, locale) : String(value)}</span>
+      );
 
     case 'datetime':
       // ISO datetime (design doc §7.3), rendered in the viewer's own zone —
       // `formatDateTime` (utils/values.ts) is the one place that formatting
       // lives, shared with the envelope's own `published_at`/`updated_at`
       // timestamps in `RecordTable`/`RecordCardList`.
-      return <span>{typeof value === 'string' ? formatDateTime(value) : String(value)}</span>;
+      return (
+        <span>{typeof value === 'string' ? formatDateTime(value, locale) : String(value)}</span>
+      );
 
     case 'select':
       return <span>{choiceLabel(field, value)}</span>;
