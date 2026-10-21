@@ -24,54 +24,63 @@
 
 ## Settings
 
-| Field | Default | Env var | Notes |
-|---|---|---|---|
-| `chat_provider` | `anthropic` | `SM_AI_CHAT_PROVIDER` | `anthropic`, `openai`, `google`, `openai_compatible` |
-| `chat_model` | `claude-opus-5` | `SM_AI_CHAT_MODEL` | bare model name, no provider prefix |
-| `chat_base_url` | `""` | `SM_AI_CHAT_BASE_URL` | required for `openai_compatible`; an optional proxy/gateway override otherwise |
-| `chat_api_key` | `""` | `SM_AI_CHAT_API_KEY` | stored `enc:v1:…` when saved through the AI page |
-| `embedding_provider` | `""` | `SM_AI_EMBEDDING_PROVIDER` | `""` = not configured; `openai`, `google`, `openai_compatible` |
-| `embedding_model` | `""` | `SM_AI_EMBEDDING_MODEL` | |
-| `embedding_base_url` | `""` | `SM_AI_EMBEDDING_BASE_URL` | as for chat |
-| `embedding_api_key` | `""` | `SM_AI_EMBEDDING_API_KEY` | as for chat |
-| `embedding_dim` | `0` | `SM_AI_EMBEDDING_DIM` | vector width; `0` = not set |
+| Field | Default | Notes |
+|---|---|---|
+| `chat_provider` | `anthropic` | `anthropic`, `openai`, `google`, `openai_compatible` |
+| `chat_model` | `claude-opus-5` | bare model name, no provider prefix |
+| `chat_base_url` | `""` | required for `openai_compatible`; an optional proxy/gateway override otherwise |
+| `chat_api_key` | `""` | stored `enc:v1:…` when saved through the AI page |
+| `embedding_provider` | `""` | `""` = not configured; `openai`, `google`, `openai_compatible` |
+| `embedding_model` | `""` | |
+| `embedding_base_url` | `""` | as for chat |
+| `embedding_api_key` | `""` | as for chat |
+| `embedding_dim` | `0` | vector width; `0` = not set |
 
 Out of scope by design: temperature, max tokens, prompts, retries, timeouts
 and streaming. Each consuming module sets those on its own `Agent` or call.
 
 ### Where a value comes from
 
-Unlike `pagebuilder`, `news` and `billing`, the AI module **does** read
-environment variables. `AiSettings` is a pydantic `BaseSettings` with
-`env_prefix="SM_AI_"` and `env_file=".env"`. At boot the framework builds it
-from the rows in the settings store, and any field without a row falls back
-in this order:
+Like `pagebuilder`, `news` and `billing`, the AI module reads **no
+environment variables**. `AiSettings` is a `DbBackedSettings`: it has no env,
+`.env` or secrets-file source, so a field is either its row in the settings
+store (SYSTEM scope, package `sm_ai`) or the default above. An `SM_AI_*`
+variable anywhere is dead. Nothing is read only at boot, so no field needs a
+restart; a save applies on the next call.
 
-1. a row in the settings store (SYSTEM scope, package `sm_ai`);
-2. the `SM_AI_<FIELD>` environment variable;
-3. the same variable in `.env`, resolved from the process's working
-   directory (run from the repo root, as for every entry point here);
-4. the default above.
+### One configuration for every tenant
 
-Consequences:
+The settings are SYSTEM-scope only. On a multi-tenant host every tenant uses
+the same chat and embedding providers, and **the same API keys** — usage by
+every organisation is billed to the one provider account behind them. There
+is no per-tenant key or model. A consumer that needs to separate tenants'
+usage has to do it itself (for example, tagging requests in a gateway set as
+`chat_base_url`).
 
-- **Dev, CI and e2e can configure the module with no database rows**, e.g.
-  `SM_AI_CHAT_PROVIDER=openai_compatible`, `SM_AI_CHAT_MODEL=…`,
-  `SM_AI_CHAT_BASE_URL=http://127.0.0.1:8001/v1`.
-- **A database row always wins.** A save writes only the fields whose value
-  changed, so a field left as the environment set it keeps following the
-  environment. Once a field is saved with a different value, changing its
-  `SM_AI_*` variable does nothing.
-- **Clearing a key stores an empty value**, and that row also wins: a cleared
-  key doesn't fall back to `SM_AI_*_API_KEY`.
-- A key seeded from the environment is plaintext. It works, and a one-time
-  warning per field asks you to re-save it on the AI page to encrypt it.
-- Environment values are read at process start; restart to pick up a change.
+### Configuring without the UI
 
-The settings can also be written headlessly with the repo's script, e.g.
-`python scripts/set_setting.py sm_ai chat_model claude-opus-5`. Don't use it
-for API keys: it writes the value as given, so the key would be stored
-unencrypted.
+A fresh deployment, CI job or e2e stack configures the module with the repo's
+script, run from the repo root, e.g.
+`python scripts/set_setting.py sm_ai chat_model claude-opus-5`. It writes the
+value as given, so an API key written that way is stored unencrypted. It
+works, and a one-time warning per field asks you to re-save it on the AI page
+to encrypt it; for a production key, prefer entering it on the AI page.
+
+### Moving off `SM_AI_*` variables
+
+Before #124 a field with no row fell back to `SM_AI_<FIELD>` in the
+environment or a `.env` in the working directory. A deployment that relied on
+that now gets the defaults. For each variable you set, write the row once and
+delete the variable:
+
+```bash
+python scripts/set_setting.py sm_ai chat_provider openai_compatible
+python scripts/set_setting.py sm_ai chat_model my-model
+python scripts/set_setting.py sm_ai chat_base_url http://127.0.0.1:8001/v1
+```
+
+then enter the API keys on the AI page so they are stored encrypted. Fields
+already saved on the AI page are unaffected: their row always won.
 
 ## Keys at rest
 
@@ -79,7 +88,13 @@ Keys saved through the AI page or `PUT /api/ai/settings` are stored as
 `enc:v1:<Fernet token>`. The Fernet key is the SHA-256 of the app's secret,
 URL-safe base64-encoded. The secret is the running app's `secret_key` (which a
 host may set in code via `create_app(settings=...)`), falling back to
-`SM_SECRET_KEY` from the environment, then from `.env`. If none is set,
+`SM_SECRET_KEY` from the environment, then from the project `.env` as the
+framework's `BootstrapSettings` locates it: `$SM_PROJECT_ROOT/.env` when that
+variable is set, otherwise the first `.env` found walking up from the working
+directory to the project root (the directory holding `.git` or
+`.env.example`). That is the file the host itself reads, so a process started
+from `host/` or `modules/ai/` finds the same secret; one started outside the
+project must set `SM_PROJECT_ROOT` (or `SM_SECRET_KEY`). If none is set,
 encrypting or decrypting raises `RuntimeError("SM_SECRET_KEY is not set …")`.
 
 When a key is read:
@@ -110,13 +125,14 @@ branding too.)
 
 A Celery worker (or any process that imports a consumer without running the
 web host) reads the AI settings itself: the same settings table the web app
-uses, through `SM_DATABASE_URL`, with `SM_AI_*` env and the defaults beneath
-it. To decrypt stored keys it needs the web app's secret — the same
-`SM_SECRET_KEY`, or, when that is unset, read access to the `host.secret_key`
-row the web app generated. Settings are cached per worker process for 60
+uses, through `SM_DATABASE_URL`, with the defaults beneath it. To decrypt
+stored keys it needs the web app's secret — the same `SM_SECRET_KEY` (in its
+environment, or in the project `.env`; start a worker outside the project
+with `SM_PROJECT_ROOT` pointing at it), or, when that is unset, read access
+to the `host.secret_key` row the web app generated. Settings are cached per worker process for 60
 seconds, so a save on the AI page reaches workers within a minute without a
 restart; `sm_ai.services.invalidate()` forces a re-read. If the database
-can't be read, the worker uses env and defaults for 5 seconds and then tries
+can't be read, the worker uses the defaults for 5 seconds and then tries
 again; each read is capped at 5 seconds, and while one thread re-reads, the
 others keep the previous settings. A SQLite file that doesn't exist yet is
 never opened, so a worker can't create an empty one.
@@ -125,17 +141,17 @@ never opened, so a worker can't create an empty one.
 
 | Symptom | Likely cause | Check / fix |
 |---|---|---|
-| A worker logs "AI settings: database read failed (…)" — once per outage; the bracket names the error type only | `SM_DATABASE_URL` unset or unreachable in the worker, not migrated, or a SQLite path with no file | Give the worker the web app's `SM_DATABASE_URL`; env-only settings still apply meanwhile. |
-| A worker fails with "cannot be decrypted" but the web app works | the worker has a different `SM_SECRET_KEY` (or none and cannot read `host.secret_key`) | Give it the web app's secret. |
+| A worker logs "AI settings: database read failed (…)" — once per outage; the bracket names the error type only | `SM_DATABASE_URL` unset or unreachable in the worker, not migrated, or a SQLite path with no file | Give the worker the web app's `SM_DATABASE_URL`; the defaults apply meanwhile. |
+| A worker fails with "cannot be decrypted" but the web app works | the worker has a different `SM_SECRET_KEY` (or none and cannot read `host.secret_key`), often because it was started outside the project and found no `.env` | Give it the web app's secret, or set `SM_PROJECT_ROOT` to the project directory. |
 | "'chat_api_key' is missing or invalid" | no key for a provider that needs one | Enter the key on the AI page. For a keyless local server, use `openai_compatible`. |
 | "'chat_base_url' … needs the server's /v1 URL" | `openai_compatible` without a base URL | Set the base URL, ending in `/v1`. |
 | "'embedding_provider' … not configured" | the embedding slot is empty | Configure **Embeddings**. |
 | "'embedding_dim' … Set the vector width" | `embedding_dim` is `0` | Set **Vector dimension** to the model's output width. |
 | "cannot be decrypted — SM_SECRET_KEY has changed" | secret rotated, or the host's in-code `secret_key` differs from the one used to save | Re-enter the keys. |
 | Saving a key returns 500, log says `SM_SECRET_KEY is not set` | no secret anywhere | Set `SM_SECRET_KEY` (`make env`) and restart. |
-| Every save fails with `chat_provider must be one of …` | an env-seeded provider outside the list (shown as "(unknown provider)") | Pick a real provider on the page, or fix `SM_AI_CHAT_PROVIDER`. |
+| Every save fails with `chat_provider must be one of …` | a provider written by `set_setting.py` or the Settings screen outside the list (shown as "(unknown provider)") | Pick a real provider on the page. |
 | Save returns 403 "Invalid or missing CSRF token" | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` from the `sm_ai_csrf` cookie. |
-| Warning "stored unencrypted" | a key came from `SM_AI_*`, `set_setting.py` or the generic settings screen | Re-save it on the AI page. |
+| Warning "stored unencrypted" | a key came from `set_setting.py` or the generic settings screen | Re-save it on the AI page. |
 | Saved a change but some requests still use the old model | other workers have stale settings | Restart the app. |
-| Changing `SM_AI_CHAT_MODEL` has no effect | a database row for that field wins | Change it on the AI page instead. |
+| Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai-variables). |
 | **Test connection** OK, but a module still fails | the module's own call (prompt, output schema, model override) | That is the module's behaviour; check its logs. |

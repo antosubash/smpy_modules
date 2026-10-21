@@ -5,37 +5,61 @@ name); consuming modules own *behaviour* (agents, prompts, temperature,
 retries, streaming). Two slots because real deployments run chat and
 embeddings as separate endpoints (e.g. two vLLM processes on one GPU host).
 
+No environment, ``.env`` or secrets-file sources (``DbBackedSettings``): an
+``SM_AI_*`` variable is dead, so a worker started from another directory can
+no longer see a different provider than the web host (#124). Configure on
+``/ai/`` (which encrypts the API keys), on the Settings screen, or with
+``scripts/set_setting.py``.
+
 Values persist in the shared settings store at SYSTEM scope and hot-swap on
-save. Unset fields fall back to ``SM_AI_*`` environment variables or the root
-``.env`` (the same sources the host's BootstrapSettings reads) — dev, CI and
-e2e configure with zero DB rows; DB values win when present.
+save: there is one provider configuration — and one API key per slot — for
+the whole deployment, shared by every tenant. Nothing is read while booting,
+so no field needs a restart.
 
 API keys are stored as ``enc:v1:<fernet>`` — see ``sm_ai.crypto``.
 """
 
 from __future__ import annotations
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+from simple_module_core.settings_base import DbBackedSettings
 
 from sm_ai import constants
 
 
-class AiSettings(BaseSettings):
+class AiSettings(DbBackedSettings):
     """Connection configuration for the chat and embedding slots."""
 
-    model_config = SettingsConfigDict(
-        env_prefix="SM_AI_", env_file=".env", extra="ignore"
+    # --- chat slot ---
+    chat_provider: str = Field(
+        default=constants.PROVIDER_ANTHROPIC,
+        description="Chat provider: anthropic, openai, google or openai_compatible.",
+    )
+    chat_model: str = Field(
+        default="claude-opus-5", description="Bare model name, no provider prefix."
+    )
+    chat_base_url: str = Field(
+        default="",
+        description="Endpoint URL. Required for openai_compatible; optional override otherwise.",
+    )
+    chat_api_key: str = Field(
+        default="", description="Provider API key. Save it on /ai/ to store it encrypted."
     )
 
-    # --- chat slot ---
-    chat_provider: str = constants.PROVIDER_ANTHROPIC
-    chat_model: str = "claude-opus-5"  # bare model name, no provider prefix
-    chat_base_url: str = ""  # required for openai_compatible; optional override otherwise
-    chat_api_key: str = ""
-
     # --- embedding slot (unconfigured by default) ---
-    embedding_provider: str = ""  # "" = embeddings not configured
-    embedding_model: str = ""
-    embedding_base_url: str = ""
-    embedding_api_key: str = ""
-    embedding_dim: int = 0  # consumer-visible (vector stores fix width to it)
+    embedding_provider: str = Field(
+        default="",
+        description=(
+            "Embedding provider: openai, google or openai_compatible. Empty: not configured."
+        ),
+    )
+    embedding_model: str = Field(default="", description="Bare embedding model name.")
+    embedding_base_url: str = Field(
+        default="",
+        description="Endpoint URL. Required for openai_compatible; optional override otherwise.",
+    )
+    embedding_api_key: str = Field(
+        default="", description="Provider API key. Save it on /ai/ to store it encrypted."
+    )
+    # Consumer-visible: vector stores fix their width to it.
+    embedding_dim: int = Field(default=0, description="Embedding vector width.")

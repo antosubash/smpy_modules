@@ -38,6 +38,19 @@ class TestRegisterSettings:
         finally:
             services.reset()
 
+    def test_warns_about_dead_env_vars(self, monkeypatch, caplog):
+        # #124: SM_AI_* no longer seeds anything, so a host still setting one
+        # is told rather than silently running on the defaults.
+        monkeypatch.setenv("SM_AI_CHAT_MODEL", "x")
+        app = FastAPI()
+        app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
+        try:
+            with caplog.at_level("WARNING", logger="sm_ai.module"):
+                AiModule().register_settings(app)
+        finally:
+            services.reset()
+        assert "SM_AI_CHAT_MODEL" in caplog.text
+
 
 class TestPermissions:
     def test_manage_permission_registered(self):

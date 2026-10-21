@@ -82,7 +82,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news` and `billing` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing` and `ai` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -93,6 +93,12 @@ or with `scripts/set_setting.py`. Anything the module reads while booting
 hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
+These settings are SYSTEM-scope: ai has one provider configuration and one
+API key per slot for the whole deployment, shared by every tenant. The one
+thing ai still reads from the environment is `SM_SECRET_KEY`, for its key
+encryption, and only as the framework's `BootstrapSettings` locates `.env`
+(`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
+cwd-relative file (#124).
 
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
