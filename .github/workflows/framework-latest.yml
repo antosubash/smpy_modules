@@ -1,0 +1,97 @@
+# Nightly: every module's tests against the newest framework its ranges allow.
+#
+# Published modules depend on the framework by range
+# (`simple_module_core>=0.0.35,<0.1`), but the host pins it exactly, so ci.yml
+# only ever resolves one point of that range. A user installing a module gets
+# the newest build in range instead — and several modules reach into framework
+# internals a patch release may rename (#116, #125). This job relaxes the
+# host's pins to the modules' own ceiling, re-resolves the workspace to the
+# newest versions allowed, and runs each module's pytest.
+#
+# Allowed to fail for now (`continue-on-error`): a red run is a warning that
+# the next framework bump needs work, not a broken main. Tighten it once a few
+# runs have been green. The resolved versions are in the job summary.
+#
+# Keep `UV_VERSION` equal to ci.yml's (#120).
+
+name: framework-latest
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.13.4"
+
+jobs:
+  pytest-newest-framework:
+    name: Python tests (newest framework in range)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      # The host's `==` pins (CLAUDE.md: the host pins exactly) would hold the
+      # whole workspace at one framework build. Turn each into `>=<pin>,<0.1`,
+      # the modules' own ceiling, in this checkout only.
+      - name: Relax the host's framework pins
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          path = pathlib.Path("host/pyproject.toml")
+          text, n = re.subn(
+              r'"(simple[_-]module[_-][a-z_-]+)==([^"]+)"', r'"\1>=\2,<0.1"', path.read_text()
+          )
+          if not n:
+              raise SystemExit("no exact simple_module pins found in host/pyproject.toml")
+          path.write_text(text)
+          print(f"relaxed {n} pins")
+          PY
+          git diff --stat
+
+      # Re-resolve *everything* to its newest allowed version — what a fresh
+      # `pip install simple_module_<name>` gets — not only `simple_module_*`.
+      # Upgrading the framework alone is not a state any user is in: 0.0.37
+      # imports `sqlmodel.sql.sqltypes.UTCDateTime` while still declaring
+      # `sqlmodel>=0.0.22`, so against the lock's older sqlmodel every suite
+      # failed at import, on a combination only an old environment has.
+      - name: Upgrade to the newest versions in range
+        run: |
+          uv lock --upgrade 2>&1 | tee "$RUNNER_TEMP/lock-changes.txt"
+          uv sync --all-packages --all-extras
+
+      - name: Record the resolved framework versions
+        run: |
+          {
+            echo "### Framework versions under test"
+            echo
+            echo '```'
+            uv pip list 2>/dev/null | grep -iE '^simple[_-]module' || true
+            echo '```'
+            echo
+            echo "<details><summary>Lock changes</summary>"
+            echo
+            echo '```'
+            grep -E '^(Updated|Added|Removed) ' "$RUNNER_TEMP/lock-changes.txt" || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          uv pip list | grep -iE '^simple[_-]module' || true
+
+      - name: Run pytest (each module)
+        run: scripts/pytest_modules.sh
