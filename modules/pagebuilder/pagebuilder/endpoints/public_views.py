@@ -22,7 +22,7 @@ from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import locales, public_cache, public_claims, redirects, site_nav
+from pagebuilder import locales, public_cache, redirects, site_nav
 from pagebuilder.deps import get_settings
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.og_image import og_image
@@ -64,14 +64,6 @@ async def _alternates(
     Only published ones: advertising a draft translation points a crawler at a
     404 and offers a reader a language switch that dead-ends.
 
-    Each sibling is resolved through :mod:`pagebuilder.public_claims`, exactly
-    as the sitemap does, rather than assembled from the *caller's* prefix: a
-    translation group can hold a page this module serves and one another
-    module has claimed — translate an article's page from the page list and it
-    does — and pasting one prefix over both would advertise ``/de/news/x`` for
-    an ordinary page or ``/p/x`` for an article. Both 404, in the one place a
-    404 is invisible until traffic drops.
-
     Omitted entirely when the group has one member, which is every page on a
     monolingual site — a lone ``hreflang`` pointing at the page itself says
     nothing and is noise in the head of every document.
@@ -79,20 +71,15 @@ async def _alternates(
     published = await PagesService(db).published_alternates(group)
     if len(published) < 2:
         return []
-    base = _public_base_url(request, settings)
-    alternates = []
-    for locale, slug in published:
-        claimed = await public_claims.claimed_url(db, slug, locale)
-        alternates.append(
-            {
-                "locale": locale,
-                "url": f"{base}{claimed}"
-                if claimed
-                else _absolute_page_url(
-                    request, settings, slug, settings.public_route_prefix, locale
-                ),
-            }
-        )
+    alternates = [
+        {
+            "locale": locale,
+            "url": _absolute_page_url(
+                request, settings, slug, settings.public_route_prefix, locale
+            ),
+        }
+        for locale, slug in published
+    ]
     # x-default names the version to serve someone whose language nobody
     # matched. The site's own default is the only defensible answer.
     default = next(
@@ -111,35 +98,22 @@ async def render_public_page(
     settings: PagebuilderSettings,
     *,
     locale: str,
-    url_prefix: str | None = None,
 ) -> Response:
-    """Serve a published page, with everything a public URL needs.
+    """Serve a published page, with everything a public URL needs: ETag, cache,
+    CSP, canonical, ``hreflang`` and old-slug handling.
 
-    Exposed rather than kept inside the route so a module that claims a page's
-    public address (see :mod:`pagebuilder.public_claims`) serves it through the
-    same ETag, cache, CSP, canonical, ``hreflang`` and old-slug handling instead
-    of growing a second viewer that drifts from this one.
-
-    ``url_prefix`` is the address the caller serves at, used for the canonical
-    URL and for old-slug redirects. It defaults to this module's own, which is
-    what the route below passes. ``locale`` is which language's page to look
-    for, and is required with no fallback to the default language: a caller
-    that forgot it would be served the default-language page at a translated
-    address, which is how ``/de/p/x`` starts serving the English one.
+    ``locale`` is which language's page to look for, and is required with no
+    fallback to the default language: a caller that forgot it would be served
+    the default-language page at a translated address, which is how
+    ``/de/p/x`` starts serving the English one.
     """
-    prefix = url_prefix if url_prefix is not None else settings.public_route_prefix
+    prefix = settings.public_route_prefix
     page = await PagesService(db).get_by_slug_published(slug, locale)
     if page is None or page.published_data is None:
         # Before giving up: this may be an address the page used to live at.
         moved_to = await redirects.resolve(db, slug, locale)
         if moved_to is not None:
-            # The page's current address, wherever that now is. When another
-            # module has claimed it, the old URL forwards *there* rather than
-            # to this module's version of it — that one 404s, and sending a
-            # visitor to it would turn a rename into a broken link, which is
-            # the exact thing recording a redirect exists to prevent.
-            claimed = await public_claims.claimed_url(db, moved_to, locale)
-            target = claimed or locales.public_path(prefix, moved_to, locale)
+            target = locales.public_path(prefix, moved_to, locale)
             # A 301 is cacheable by default; key it on what picks the tenant.
             return vary_on_tenant(RedirectResponse(target, status_code=301), request.app)
         raise HTTPException(status_code=404, detail="Page not found")
@@ -218,7 +192,7 @@ def locale_router(locale: str) -> APIRouter:
     widened to something that no longer describes what is public.
 
     ``bind_public`` comes first so everything the viewer reads — redirects,
-    claims, layout, alternates — runs in the request's tenant, and a request
+    layout, alternates — runs in the request's tenant, and a request
     that resolved none gets the unknown-slug 404.
     """
     router = APIRouter(dependencies=[Depends(bind_public)])
@@ -231,16 +205,7 @@ def locale_router(locale: str) -> APIRouter:
         db: AsyncSession = Depends(get_db),
         settings: PagebuilderSettings = Depends(get_settings),
     ) -> Response:
-        """A published page at this module's own address, in one language.
-
-        A slug another module has claimed is *not* served here, even though the
-        page exists and is published: it answers at the claimant's address
-        instead, and serving it at both would put the same document at two
-        URLs. 404 rather than a redirect is deliberate — the two addresses were
-        never equivalent, so there is no old address to forward from.
-        """
-        if await public_claims.claimed_url(db, slug, locale) is not None:
-            raise HTTPException(status_code=404, detail="Page not found")
+        """A published page at this module's own address, in one language."""
         return await render_public_page(
             slug, request, inertia, db, settings, locale=locale
         )

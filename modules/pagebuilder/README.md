@@ -29,7 +29,7 @@ at `/p/{slug}`.
 **Full documentation** lives in [`docs/`](docs/index.md):
 [user guide](docs/user-guide.md) (the editor, workflow, layout, media and
 snapshots screens), [API reference](docs/api-reference.md) (every
-`/api/pagebuilder` route, public claims, errors), [operations](docs/operations.md)
+`/api/pagebuilder` route, the public routes, errors), [operations](docs/operations.md)
 (install, settings, languages, tenancy, troubleshooting) and
 [architecture](docs/architecture.md).
 
@@ -83,9 +83,9 @@ if the module is meant to work without it.)
 
 Because registration is eager, a block that statically imports a heavy render
 component puts that component's whole dependency graph in the entry chunk —
-on every page of the site, for every visitor. Measured on a consuming site, a
-map block's static import put maplibre-gl (1 MB minified, 62% of the bundle)
-in front of visitors who never opened the map. Register heavy blocks with
+on every page of the site, for every visitor. Measured on a consuming site, one
+block's static import put a 1 MB (minified) library, 62% of the bundle, in
+front of visitors who never saw that block. Register heavy blocks with
 `lazyBlock` instead, which keeps fields and defaults eager but loads the
 component the first time a page actually renders the block:
 
@@ -95,9 +95,9 @@ import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/co
 
 registerPuckBlocks({
   blocks: {
-    AtlasMap: lazyBlock(
-      () => import('./components/AtlasMap').then((m) => m.AtlasMapEmbed),
-      { label: 'Atlas map', fields: { /* … */ }, defaultProps: { /* … */ } },
+    Chart: lazyBlock(
+      () => import('./components/Chart').then((m) => m.ChartEmbed),
+      { label: 'Chart', fields: { /* … */ }, defaultProps: { /* … */ } },
       (props) => <div className={heightClass[props.height]} aria-busy="true" />,
     ),
   },

@@ -198,8 +198,8 @@ def sitemap_router() -> APIRouter:
         """Every published article, in every language, for a crawler.
 
         Articles used to reach one through pagebuilder's sitemap, because they
-        were pages in it — see the ``public_claims`` hook that made that work.
-        They are not pages any more, so this module advertises its own or the
+        were pages in it (through a slug-claim hook pagebuilder has since
+        dropped, #132). They are not pages any more, so this module advertises its own or the
         archive silently drops out of every index.
         """
         settings = active()

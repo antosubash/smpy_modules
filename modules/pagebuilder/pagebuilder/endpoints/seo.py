@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import locales, public_claims
+from pagebuilder import locales
 from pagebuilder.deps import get_settings
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
@@ -94,24 +94,7 @@ async def sitemap(
     pages = await PagesService(db).list_sitemap_entries()
     origin = _public_origin(request, settings)
     prefix = settings.public_route_prefix
-    # A page another module serves the public URL for is advertised at *that*
-    # address. Without this the sitemap would point a crawler at /p/{slug},
-    # which the viewer now refuses for exactly those pages.
-    #
-    # Asked once per language rather than once per slug: a claim answers about
-    # one locale at a time, and a four-language site would otherwise make four
-    # times the queries it needs. Keyed by ``(locale, slug)`` on the way back
-    # out, because the same slug in two languages is two different pages.
-    claimed: dict[tuple[str, str], str] = {}
-    for locale in {page.locale for page in pages}:
-        in_locale = [page.slug for page in pages if page.locale == locale]
-        for slug, url in (await public_claims.resolve(db, in_locale, locale)).items():
-            claimed[(locale, slug)] = url
-
     def absolute(page) -> str:
-        claim = claimed.get((page.locale, page.slug))
-        if claim:
-            return f"{origin}{claim}"
         return _sitemap_url_for(origin, prefix, page.slug, page.locale)
 
     # Built before the entry loop so each URL can name every *other* language's
