@@ -40,6 +40,15 @@ export type SlotValues = {
   dim?: number;
 };
 
+/** Has no default endpoint, so its slot is unusable without a base URL. */
+const OPENAI_COMPATIBLE = 'openai_compatible';
+
+export const needsBaseUrl = (slot: SlotValues): boolean => slot.provider === OPENAI_COMPATIBLE;
+
+/** The check the API makes on save (a 422 otherwise), made before sending. */
+export const missingBaseUrl = (slot: SlotValues): boolean =>
+  needsBaseUrl(slot) && slot.base_url.trim() === '';
+
 const BASE = '/api/ai';
 const CSRF_COOKIE = 'sm_ai_csrf';
 

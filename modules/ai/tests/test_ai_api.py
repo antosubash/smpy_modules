@@ -148,6 +148,61 @@ class TestPutSettings:
         assert client.applied == []
 
 
+class TestSlotRequiresBaseUrl:
+    """#164: openai_compatible has no default endpoint, so a blank URL is a 422
+    on either slot — judged on the merged result, not only the payload."""
+
+    @pytest.mark.parametrize("slot", [constants.SLOT_CHAT, constants.SLOT_EMBEDDING])
+    async def test_blank_url_rejected(self, client, slot):
+        res = await client.put(
+            "/api/ai/settings",
+            json={f"{slot}_provider": "openai_compatible", f"{slot}_base_url": "  "},
+        )
+        assert res.status_code == 422
+        assert res.json()["detail"][0]["loc"][-1] == f"{slot}_base_url"
+        assert client.applied == []
+
+    async def test_provider_alone_rejected_when_stored_url_blank(self, client):
+        res = await client.put(
+            "/api/ai/settings", json={"embedding_provider": "openai_compatible"}
+        )
+        assert res.status_code == 422
+
+    async def test_with_url_accepted(self, client):
+        res = await client.put(
+            "/api/ai/settings",
+            json={
+                "embedding_provider": "openai_compatible",
+                "embedding_base_url": "http://vllm:8000/v1",
+            },
+        )
+        assert res.status_code == 200
+
+    async def test_clearing_the_url_of_a_stored_compatible_slot_rejected(self, client):
+        services.current_settings().chat_provider = "openai_compatible"
+        services.current_settings().chat_base_url = "http://vllm:8000/v1"
+        res = await client.put("/api/ai/settings", json={"chat_base_url": ""})
+        assert res.status_code == 422
+
+    async def test_other_providers_need_no_url(self, client):
+        res = await client.put(
+            "/api/ai/settings", json={"embedding_provider": "openai", "embedding_base_url": ""}
+        )
+        assert res.status_code == 200
+
+
+class TestEmbeddingDim:
+    async def test_negative_rejected(self, client):
+        res = await client.put("/api/ai/settings", json={"embedding_dim": -5})
+        assert res.status_code == 422
+        assert client.applied == []
+
+    async def test_zero_and_positive_accepted(self, client):
+        for dim in (0, 1536):
+            res = await client.put("/api/ai/settings", json={"embedding_dim": dim})
+            assert res.status_code == 200
+
+
 class TestTestEndpoint:
     async def test_unconfigured_slot_reports_error(self, client):
         res = await client.post("/api/ai/test", json={"slot": constants.SLOT_EMBEDDING})

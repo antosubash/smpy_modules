@@ -244,9 +244,8 @@ Anonymous, `GET`/`HEAD` only, mounted at startup from the settings:
 | `/robots.txt` | when `robots_enabled` |
 | `{media_url_prefix}/{tenant}/{file}` | uploaded media, `max-age=31536000, immutable` |
 
-An old slug answers 301 to the page's current address. A claimed slug (below)
-answers 404 here. See [operations.md](operations.md#public-pages-caching-and-csp)
-for headers.
+An old slug answers 301 to the page's current address. See
+[operations.md](operations.md#public-pages-caching-and-csp) for headers.
 
 ## For other modules
 
@@ -259,31 +258,21 @@ restore would otherwise come back without what other modules dropped. A module
 that keys rows to a page id must handle it: there is no cross-module foreign key,
 and SQLite reuses ids.
 
-**Public claims** (`pagebuilder.public_claims`). A module that presents a page at
-its own address registers a claim from its startup hook:
+**Removed: `pagebuilder.public_claims`** (#132). The hook that let another
+module claim a page's public address is gone — nothing used it. `import
+pagebuilder.public_claims` now fails; every published page is served at
+`/p/{slug}` (or `/{locale}/p/{slug}`), and the sitemap, `hreflang` alternates,
+nav links and old-slug redirects all point there.
 
-```python
-from pagebuilder import public_claims
-
-async def claim(db, slugs, locale) -> dict[str, str]:
-    # return {slug: public_path} for the slugs in `locale` this module serves
-    ...
-
-public_claims.register(claim)
-```
-
-Claims are asked in bulk, one locale at a time. A claimed slug is then refused
-(404) by `/p/{slug}`; the sitemap, `hreflang` alternates, nav links and old-slug
-redirects all point at the claimed path instead. On the same slug the earliest
-registered claim wins. `public_claims.reset()` clears them (tests).
-
-To serve the claimed page, call
+**Deprecated: `render_public_page(..., url_prefix=…)`.**
 `pagebuilder.endpoints.public_views.render_public_page(slug, request, inertia,
-db, settings, locale=…, url_prefix=…)` from a router that depends on
-`tenancy.bind_public`: it applies the same ETag, cache, CSP, canonical,
-`hreflang`, nav and redirect handling. `locale` is required — there is no
-fallback to the default language, so a claimant always says which language it
-serves.
+db, settings, locale=…)` still serves a published page with the viewer's ETag,
+cache, CSP, canonical, `hreflang`, nav and redirect handling, from a router that
+depends on `tenancy.bind_public`. `locale` is required, with no fallback to the
+default language. The `url_prefix` keyword, which belonged to public claims, is
+still accepted: it sets the canonical URL and where an old slug 301s to, as it
+did before, and emits a `DeprecationWarning`. It will be removed in a later
+release; omit it.
 
 ## Errors
 
