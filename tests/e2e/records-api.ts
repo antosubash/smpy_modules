@@ -1,11 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 
+import { moduleCsrfHeader } from './helpers';
+
 /**
  * The `records-*.spec.ts` suite's seeding layer: the module's own JSON API
  * (`/api/records/*`) driven through `page.request`, which shares the logged-in
- * context's cookie jar. Records writes ride the framework's `SameSite=Lax`
- * baseline and opt into no CSRF token (see `sm_records/utils/api.ts`), so
- * unlike `csrfHeader()` for pagebuilder there is no header to attach here.
+ * context's cookie jar. Writes carry the framework CSRF token the API checks
+ * (#111), read off a records screen by `moduleCsrfHeader()`.
  *
  * Split out of `records-helpers.ts` (300-line cap), which re-exports all of
  * it — specs keep importing from there.
@@ -80,17 +81,40 @@ export function uniqueTypeKey(prefix = 'e2e'): string {
   return `${prefix}_${stamp}_${salt}`.toLowerCase();
 }
 
+/** The token per browser context (its cookie jar is the session). Read once:
+ *  the type list it comes from renders every type, and a cleanup that deletes
+ *  hundreds of them must not render that list hundreds of times. */
+const csrfByContext = new WeakMap<object, Record<string, string>>();
+
+async function csrfFor(page: Page, fresh: boolean): Promise<Record<string, string>> {
+  const cached = csrfByContext.get(page.context());
+  if (cached && !fresh) return cached;
+  const headers = await moduleCsrfHeader(page, '/admin/records/');
+  csrfByContext.set(page.context(), headers);
+  return headers;
+}
+
 async function api<T>(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   data?: Json,
 ): Promise<T> {
-  const response = await page.request.fetch(`${BASE}${path}`, {
-    method,
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    ...(data === undefined ? {} : { data }),
-  });
+  const send = async (fresh: boolean) =>
+    page.request.fetch(`${BASE}${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        ...(method === 'GET' ? {} : await csrfFor(page, fresh)),
+      },
+      ...(data === undefined ? {} : { data }),
+    });
+  let response = await send(false);
+  // A cached token goes stale when the context signs in again (new session).
+  if (response.status() === 403 && (await response.text()).includes('CSRF')) {
+    response = await send(true);
+  }
   if (!response.ok()) {
     throw new Error(`${method} ${path} → ${response.status()}: ${await response.text()}`);
   }
