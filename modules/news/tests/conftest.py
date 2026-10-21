@@ -33,6 +33,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
+from csrf_support import add_token_route, arm_csrf
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
@@ -176,6 +177,7 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
     )
 
     app.add_middleware(StubAuthMiddleware, user=user)
+    add_token_route(app)
     # Inertia reads flashed errors off the session on every render, so the
     # public viewer cannot answer at all without this. Added last so it ends up
     # outermost at runtime — Starlette runs the last-added middleware first on
@@ -211,6 +213,7 @@ async def _client(user: Any, *, mount_public: bool = False) -> AsyncIterator[Asy
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]
         client.db_state = state  # type: ignore[attr-defined]
+        await arm_csrf(client)
         yield client
     await state.engine.dispose()
 

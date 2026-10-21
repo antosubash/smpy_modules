@@ -13,6 +13,7 @@ this router is built.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from simple_module_hosting.csrf import RequiresCsrf
 
 from sm_records.endpoints.api import (
     aggregate,
@@ -35,7 +36,13 @@ from sm_records.tenancy import bind_admin
 # dependencies exit in reverse, and ``get_db`` — opened by the permission check
 # — commits on its way out, which has to happen while the tenant is still
 # bound or an unflushed write reaches the database with none.
-router = APIRouter(dependencies=[Depends(bind_admin)])
+#
+# Then the framework's CSRF check on every write (#111), billing's dependency:
+# the session cookie's SameSite=Lax does not separate the console from an
+# organisation's public site, which is same-site with it. Reads pass; the
+# anonymous read API is mounted on its own router and never sees this. The
+# token reaches the browser through ``sm_records.csrf``.
+router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
 # Before ``types``: ``/types/{key}/schema/preview/{job}`` is a GET the types
 # router has no route for, but keeping the pair adjacent is what makes the
 # split between them visible at the mount point.

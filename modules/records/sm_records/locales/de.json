@@ -298,7 +298,8 @@
   "errors": {
     "offline": "Der Server ist nicht erreichbar. Ihre Änderungen bleiben auf dieser Seite erhalten; versuchen Sie es erneut.",
     "session_expired": "Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldeseite weitergeleitet – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
-    "server_error": "Auf dem Server ist ein Fehler aufgetreten. Es ist unklar, ob Ihre letzte Änderung gespeichert wurde – prüfen Sie dies, bevor Sie es erneut versuchen."
+    "server_error": "Auf dem Server ist ein Fehler aufgetreten. Es ist unklar, ob Ihre letzte Änderung gespeichert wurde – prüfen Sie dies, bevor Sie es erneut versuchen.",
+    "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen."
   },
   "type_editor": {
     "title_new": "Neuer Typ",

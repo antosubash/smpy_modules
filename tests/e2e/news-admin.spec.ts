@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { csrfHeader, login } from './helpers';
+import { login, moduleCsrfHeader } from './helpers';
 
 /**
  * The admin list is where an article's category and date are set.
@@ -131,7 +131,7 @@ test.describe('Article lifecycle', () => {
     // It is there, and it serves.
     expect((await page.request.get(`/news/${slug}`)).status()).toBe(200);
 
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     const deleted = await page.request.delete(`/api/news/articles/${articleId}`, { headers });
     expect(deleted.status(), await deleted.text()).toBe(204);
 

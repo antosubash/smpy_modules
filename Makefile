@@ -18,24 +18,21 @@ dev: gen-pages
 # single source of truth for settings. `--app-dir host` puts host/main.py on
 # sys.path without changing cwd.
 # Overridable so a second checkout (e.g. a worktree running e2e) can boot
-# beside a dev stack that already holds the default ports.
-# e2e runs name their overrides E2E_* (see playwright.config.ts); honor them
-# too so `make kill` after an aborted e2e run targets the right orphans —
-# provided E2E_* (or API_PORT/UI_PORT) is still set when `make kill` runs; an
-# inline env on the aborted command line is gone with its shell.
-# Every source — including a direct API_PORT/UI_PORT from the environment,
-# which `?=` alone would let straight through — passes the same guard
-# playwright.config.ts and vite.config.ts apply (`^[1-9][0-9]*$`, else the
-# default): a raw bad value would make lsof abort the whole sweep (freeing
-# neither port) and would be interpolated unescaped into the pkill regex
-# below. `override` re-assigns even env/command-line values, so the guarded
-# result always wins. E2E_* wins over SM_UI_PORT because an e2e run
-# overrides SM_UI_PORT only inside its own subprocess env — after an aborted
-# run the orphan sits on the E2E_* port, not the shell's SM_UI_PORT.
-_API_PORT_RAW = $(or $(API_PORT),$(E2E_API_PORT))
-override API_PORT := $(if $(shell echo '$(_API_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_API_PORT_RAW),8000)
-_UI_PORT_RAW = $(or $(UI_PORT),$(E2E_UI_PORT),$(SM_UI_PORT))
-override UI_PORT := $(if $(shell echo '$(_UI_PORT_RAW)' | grep -E '^[1-9][0-9]*$$'),$(_UI_PORT_RAW),5050)
+# beside a dev stack that already holds the default ports. E2E_* is honored
+# so `make kill` after an aborted e2e run finds its orphans (while E2E_* is
+# still set), and wins over SM_UI_PORT, which an e2e run overrides only
+# inside its own subprocess. scripts/ports.mjs applies the guard
+# playwright.config.ts and vite.config.ts share; `override` makes the guarded
+# value win over an env or command-line one.
+_q = '$(subst ','\'',$(1))'
+_API_PORT := $(shell node scripts/ports.mjs api $(call _q,$(API_PORT)) $(call _q,$(E2E_API_PORT)))
+_UI_PORT := $(shell node scripts/ports.mjs ui $(call _q,$(UI_PORT)) $(call _q,$(E2E_UI_PORT)) $(call _q,$(SM_UI_PORT)))
+# Empty means node is missing or failed. Only a target that uses a port stops
+# (`=` defers the error to use): an empty port would hand dev-api no --port
+# and widen `make kill`'s pkill regex to every uvicorn.
+_no_port = $(error node is required to resolve the $(1) port (scripts/ports.mjs))
+override API_PORT = $(or $(_API_PORT),$(call _no_port,API))
+override UI_PORT = $(or $(_UI_PORT),$(call _no_port,UI))
 
 dev-api:
 	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
