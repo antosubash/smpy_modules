@@ -74,9 +74,14 @@ jobs:
     outputs:
       version: ${{ steps.compute.outputs.version }}
       packages: ${{ steps.packages.outputs.packages }}
+      # The one commit this release ships. CI is verified on it below, and
+      # every later job checks out exactly this SHA — never the branch, which
+      # may have moved since the check.
+      sha: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
       # Inputs reach the shell as environment variables, never as ${{ }}
       # interpolated into the script body — otherwise a crafted `version`
@@ -161,7 +166,9 @@ jobs:
           fi
 
       # Green CI on the exact commit being released (#115). The run that
-      # counts is ci.yml's own on that SHA — a `push` to main, or a manual
+      # counts is ci.yml's own (queried by workflow file, and its `path` and
+      # `head_sha` re-checked, so no other workflow and no other commit can
+      # satisfy it) on that SHA — a `push` to main, or a manual
       # `workflow_dispatch` for a commit that has none (the bot's release
       # commit does not trigger CI). A pull-request run tested a merge ref,
       # not this SHA, so it does not count. The newest such run decides; if
@@ -174,7 +181,9 @@ jobs:
           deadline=$((SECONDS + 60 * 70))
           while :; do
             run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=50" \
-              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")]
+              --jq '[.workflow_runs[]
+                    | select(.head_sha == env.GITHUB_SHA and .path == ".github/workflows/ci.yml")
+                    | select(.event == "push" or .event == "workflow_dispatch")]
                     | sort_by(.created_at) | last
                     | if . == null then "" else "\(.status) \(.conclusion // "-") \(.html_url)" end')
             if [ -z "$run" ]; then
@@ -209,7 +218,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
+
+      # Belt and braces: the bump below must sit on the verified commit.
+      - name: Confirm the checked-out commit
+        env:
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
@@ -318,9 +334,11 @@ jobs:
       contents: write
     env:
       RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+      VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
 
       - name: Install uv
@@ -355,6 +373,13 @@ jobs:
             staged=$(git rev-parse "$tag^{commit}")
           else
             echo "::error::neither release/v$RELEASE_VERSION nor v$RELEASE_VERSION exists on origin"
+            exit 1
+          fi
+          # Only ever tag the bump commit built on the CI-verified SHA: a
+          # staged commit with any other parent is not what CI passed.
+          parent=$(git rev-parse "$staged^")
+          if [ "$parent" != "$VERIFIED_SHA" ]; then
+            echo "::error::staged $staged sits on $parent, not the CI-verified $VERIFIED_SHA"
             exit 1
           fi
           echo "STAGED=$staged" >> "$GITHUB_ENV"
