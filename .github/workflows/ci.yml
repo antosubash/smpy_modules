@@ -22,6 +22,10 @@ on:
   # gate on `main` is unchanged; this only adds coverage for PRs that are not
   # yet aimed at it.
   pull_request:
+  # A commit with no CI run of its own — the release bot's "Release vX" push
+  # does not trigger workflows — can be checked by hand before release.yml,
+  # which requires a green run on the commit it ships (#115).
+  workflow_dispatch:
 
 # Cancel any in-progress run when a new commit is pushed to the same ref,
 # unless that ref is `main` (we always want main's history to be fully
@@ -81,47 +85,23 @@ jobs:
       - name: Sync workspace (all packages, with dev extras)
         run: uv sync --locked --all-packages --all-extras
 
-      # Run pytest from within each module so each picks up its own
-      # `[tool.pytest.ini_options]` (e.g. `asyncio_mode = "auto"`). The list
-      # is `modules/*/`, as in `make test-py`, so a new module is tested
-      # without editing this file (#118). Every module runs even after one
-      # fails — each in its own log group, each failure an annotation naming
-      # the module — and the step fails at the end, so one run shows every
-      # broken module rather than only the first.
+      # Every modules/*/, each from its own directory, all of them even after
+      # one fails — see the script for why.
       - name: Run pytest (each module)
-        shell: bash
-        run: |
-          failed=()
-          for d in modules/*/; do
-            name=$(basename "$d")
-            if [ ! -d "$d/tests" ]; then
-              failed+=("$name")
-              echo "::error title=pytest $name::modules/$name has no tests/ directory"
-              continue
-            fi
-            echo "::group::pytest $name"
-            if ! (cd "$d" && uv run pytest); then
-              failed+=("$name")
-              echo "::error title=pytest $name::pytest failed in modules/$name"
-            fi
-            echo "::endgroup::"
-          done
-          if [ ${#failed[@]} -gt 0 ]; then
-            echo "::error::pytest failed in: ${failed[*]}"
-            exit 1
-          fi
+        run: scripts/pytest_modules.sh
 
       - name: Run pytest (host)
         run: uv run pytest host/tests
 
   postgres:
-    name: Postgres (migrations + records)
+    name: Postgres (migrations + module suites)
     runs-on: ubuntu-latest
     # The records unit suite alone is ~3 min on SQLite (~4 min measured
     # against Postgres — postgres-2026-09-21.md § 3); the migration round
-    # trip and perf smoke add a few minutes more. 20 gives comfortable room
-    # without chasing a hung step to the billable ceiling.
-    timeout-minutes: 20
+    # trip and perf smoke add a few minutes more, and pagebuilder, news and
+    # billing about as much again (#117). 30 gives room without chasing a
+    # hung step to the billable ceiling.
+    timeout-minutes: 30
     services:
       # `postgres:16` is what postgres-2026-09-21.md verified against
       # (16.13). POSTGRES_DB pre-creates the database the migration round
@@ -158,15 +138,17 @@ jobs:
         run: uv sync --locked --all-packages
 
       # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
-      # needs no extra install. Two databases: one for the records unit
-      # suite (pg_support.py's TRUNCATE … RESTART IDENTITY reset) and one
-      # for the perf smoke (which also does CREATE DATABASE … TEMPLATE
-      # copies of its own) — kept apart from `ci`, and from each other, so
-      # none of the three resets the others' schema mid-job.
-      - name: Create records test databases
+      # needs no extra install. One database per suite, kept apart from `ci`
+      # and from each other, because each resets its database its own way:
+      # records, pagebuilder and news through pg_support.py's TRUNCATE …
+      # RESTART IDENTITY, billing (simple_module_test's fixtures) by dropping
+      # and recreating the `public` schema, and the records perf smoke with
+      # CREATE DATABASE … TEMPLATE copies of its own.
+      - name: Create test databases
         run: |
-          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records
-          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records_perf
+          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing; do
+            PGPASSWORD=postgres createdb -h localhost -U postgres "$db"
+          done
 
       # Migration round trip against a real Postgres database — this is what
       # caught the four Postgres-only migration bugs in
@@ -206,6 +188,28 @@ jobs:
           SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
         run: cd modules/records && uv run pytest -q -p no:cacheprovider
 
+      # The other suites whose tenant-filtered queries, scheduler claims and
+      # row locks behave differently on Postgres (#117). The full suites, not
+      # a subset: each runs clean against Postgres. `!cancelled()` so every
+      # suite reports even after an earlier one failed.
+      - name: Run pytest (pagebuilder, Postgres)
+        if: ${{ !cancelled() }}
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_pagebuilder
+        run: scripts/pytest_modules.sh pagebuilder
+
+      - name: Run pytest (news, Postgres)
+        if: ${{ !cancelled() }}
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_news
+        run: scripts/pytest_modules.sh news
+
+      - name: Run pytest (billing, Postgres)
+        if: ${{ !cancelled() }}
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_billing
+        run: scripts/pytest_modules.sh billing
+
       # A short smoke, not the full study (which runs at N=20000): enough to
       # exercise the write, read, aggregate and i18n statement-count
       # assertions against a real Postgres database on every PR.
@@ -214,6 +218,7 @@ jobs:
       # backend, never a hard-coded SQLite statement count, so the suite
       # needs no `-k` filter here.
       - name: Run pytest (records perf smoke, Postgres)
+        if: ${{ !cancelled() }}
         env:
           RECORDS_PERF_N: 500
           RECORDS_PERF_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records_perf
