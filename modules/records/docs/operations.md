@@ -804,9 +804,9 @@ set up, not through an engine of the CLI's. A `--database-url` that restates it
 (a relative SQLite path, another query order) is accepted; one that names
 another database is refused, with any password masked. The lifespan is left
 normally however the command ends — a refused import, an error, Ctrl-C — so
-every module's `on_shutdown` runs. The lifespan is the host's own, costs included: a database behind
-head fails it (`make migrate` first), and pagebuilder's scheduler, if enabled,
-runs for the length of the command.
+every module's `on_shutdown` runs. The lifespan is the host's own, costs
+included: a database behind head fails it (`make migrate` first), and
+pagebuilder's scheduler, if enabled, runs for the length of the command.
 
 **What a write without `--app` skips** is exactly the host's subscribers and
 nothing of the module's own: the record, its revisions and its index rows are
