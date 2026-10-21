@@ -57,6 +57,24 @@ def _fresh_membership_cache():
     forget(None)
 
 
+@pytest.fixture
+def status_events(app) -> list[str]:
+    """Every ``TenantStatusChanged`` published, as its new status.
+
+    The event is queued on ``on_commit`` and only ``finalize_session`` drains
+    it, so a path that commits with a bare ``commit()`` leaves this empty.
+    """
+    from tenants.contracts.events import TenantStatusChanged
+
+    seen: list[str] = []
+
+    async def record(event: TenantStatusChanged) -> None:
+        seen.append(event.status)
+
+    app.state.sm.event_bus.subscribe(TenantStatusChanged, record)
+    return seen
+
+
 async def make_user(app, email: str) -> str:
     from users.models import Role, User, UserRole
 
