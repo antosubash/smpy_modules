@@ -97,7 +97,7 @@ typecheck:
 	done
 
 lint:
-	uvx ruff check .
+	uv run ruff check .
 	npx biome check .
 	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py

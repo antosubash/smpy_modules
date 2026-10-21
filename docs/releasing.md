@@ -20,7 +20,7 @@ has published.
 
 | Job | Does |
 |---|---|
-| `resolve` | Computes the version (from `bump` or `version`) and validates its format. Every later job reads this one output, so the version is decided exactly once. |
+| `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Every later job reads this one output, so the version is decided exactly once. |
 | `build` | Bumps versions **in the working tree only**, builds the module frontends, then `uv build --all-packages`. Uploads the artifacts. No commit. |
 | `publish-pypi` | One matrix job per module. Selects that module's artifacts and publishes via OIDC trusted publishing. `fail-fast: false`, so one failure doesn't cancel the others. |
 | `finalize` | Re-applies the bump, commits, tags `v<version>`, pushes, and creates the GitHub release. |
@@ -78,6 +78,8 @@ Module code never hardcodes its version: `ModuleMeta.version` reads
 
 ## Adding a module to releases
 
-New modules are **not** published until they appear in the `publish-pypi`
-matrix in `.github/workflows/release.yml`. See
+The `publish-pypi` matrix is built by the `resolve` job from every
+`modules/*/pyproject.toml`, so a new module is published without editing
+`.github/workflows/release.yml`. It still needs one-time PyPI Trusted
+Publishing setup, or its publish job fails. See
 [adding-a-module.md](adding-a-module.md).
