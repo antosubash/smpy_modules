@@ -44,30 +44,17 @@ export async function clickAndConfirm(
 }
 
 /**
- * Read the pagebuilder CSRF cookie the admin middleware mirrors for
- * the JS client, after touching an admin page so the cookie exists.
- * Pass the logged-in `page` so cookies + session share a jar.
- */
-export async function csrfHeader(page: Page): Promise<Record<string, string>> {
-  await page.goto('/pagebuilder/');
-  const cookies = await page.context().cookies();
-  const token = cookies.find((c) => c.name === 'pagebuilder_csrf')?.value;
-  expect(token, 'expected pagebuilder_csrf cookie after admin GET').toBeTruthy();
-  return { 'X-CSRF-Token': decodeURIComponent(token!) };
-}
-
-/**
- * The framework CSRF token (`RequiresCsrf`) that news' and records' APIs check
- * (#110, #111): every screen of theirs shares it as the `csrf_token` Inertia
- * prop. Not pagebuilder's — that module still keeps its own token under its
- * own session key (#126), so a spec writing to both needs both headers.
+ * The framework CSRF token (`RequiresCsrf`) every module's admin API checks —
+ * pagebuilder, news, records and ai (#110, #111, #126). One token per session,
+ * and every screen of theirs shares it as the `csrf_token` Inertia prop, so any
+ * of those screens gives the header for a write to any of the APIs.
  *
  * Read off the server-rendered page through `page.request`, which shares the
  * logged-in context's cookie jar, so the browser tab stays where it was.
  */
 export async function moduleCsrfHeader(
   page: Page,
-  view: '/admin/news/' | '/admin/records/' = '/admin/news/',
+  view: '/admin/news/' | '/admin/records/' | '/pagebuilder/' | '/ai/' = '/admin/news/',
 ): Promise<Record<string, string>> {
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);

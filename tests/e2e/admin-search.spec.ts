@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Cross-section search — screen 2g.
@@ -15,7 +15,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
 const SEARCH = '/admin/search';
 
 async function makePage(page: Page, title: string, body = '') {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const slug = uniqueSlug('srch');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,

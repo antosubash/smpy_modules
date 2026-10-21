@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Coverage for the widget set ported from IIASA.GeoWiki's Global Canopy Atlas.
@@ -97,7 +97,7 @@ test.describe('Ported GCA widgets', () => {
     ];
 
     const created = await page.request.post('/api/pagebuilder/pages', {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: {
         title: 'Widget coverage',
         slug,
@@ -112,7 +112,7 @@ test.describe('Ported GCA widgets', () => {
     const { id } = await created.json();
 
     const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: { note: 'widget coverage' },
     });
     expect(published.ok()).toBeTruthy();
@@ -134,7 +134,7 @@ test.describe('Ported GCA widgets', () => {
     const slug = uniqueSlug();
 
     const created = await page.request.post('/api/pagebuilder/pages', {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: {
         title: 'FAQ behaviour',
         slug,
@@ -158,7 +158,7 @@ test.describe('Ported GCA widgets', () => {
     });
     const { id } = await created.json();
     await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: { note: 'faq' },
     });
 
