@@ -102,6 +102,12 @@ docker compose down            # -v also drops the data volumes
   `SMPY_ENV_FILE=path` picks a different file.
 - **Admin.** `SM_USERS_BOOTSTRAP_EMAIL` / `_PASSWORD` in the env file seed the
   first admin, on first start against an empty users table only.
+- **Plain HTTP.** Production marks the session cookie `Secure`, which browsers
+  accept on `http://localhost` / `127.0.0.1` (Chrome, Firefox) but drop on any
+  other plain-HTTP origin and in Safari — login then appears to succeed and
+  never sticks. Put TLS in front, or for a throwaway LAN demo turn the flag off
+  (a DB-backed users setting, not an env var):
+  `docker compose run --rm host python scripts/set_setting.py users cookie_secure false`.
 - **Port.** `SMPY_PORT` (default `8090`) is the host port; the container
   listens on 8000. It is published on `127.0.0.1` only; set
   `SMPY_BIND_ADDRESS=0.0.0.0` to reach it from other machines.

@@ -1,6 +1,6 @@
 # The demo host in a container: the API serving the pre-built UI, nothing else.
 #
-#   make env                      # once: .env with a generated SM_SECRET_KEY
+#   make env                      # once: .env with generated secrets
 #   docker compose up -d --build  # http://localhost:8090
 #   docker compose down           # add -v to drop the data volumes
 #
@@ -28,8 +28,9 @@ services:
   host:
     build: .
     image: smpy-modules-host:dev
-    # Secrets (SM_SECRET_KEY, SM_USERS_BOOTSTRAP_*) and every other SM_*
-    # setting come from this file. It is never baked into the image.
+    # Secrets (SM_SECRET_KEY, SM_USERS_*_TOKEN_SECRET, SM_USERS_BOOTSTRAP_*)
+    # and every other SM_* setting come from this file. It is never baked into
+    # the image.
     env_file:
       - path: ${SMPY_ENV_FILE:-.env}
         required: true

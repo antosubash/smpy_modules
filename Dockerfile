@@ -32,9 +32,14 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON=${PYTHON_VERSION} \
     UV_PYTHON_INSTALL_DIR=/opt/uv-python
 WORKDIR /app
-COPY . .
+# Manifests first, so a source-only change reuses the npm layer. `--parents`
+# keeps each file at its own path (a plain wildcard COPY would flatten them),
+# so a new workspace under modules/ is picked up without editing this line.
+COPY --parents package.json package-lock.json host/client_app/package.json \
+     modules/*/package.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --no-audit --no-fund
+COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --all-packages
 # The Makefile's sync-module-deps, gen-pages and build targets, minus make.
@@ -61,14 +66,11 @@ WORKDIR /app
 
 # Dependencies first, so a source-only change reuses this layer. The members'
 # pyproject.toml files are enough for uv to resolve them; the members
-# themselves are installed (editable) once the sources are in.
-COPY pyproject.toml uv.lock .python-version ./
-COPY host/pyproject.toml host/
-COPY modules/ai/pyproject.toml modules/ai/
-COPY modules/billing/pyproject.toml modules/billing/
-COPY modules/news/pyproject.toml modules/news/
-COPY modules/pagebuilder/pyproject.toml modules/pagebuilder/
-COPY modules/records/pyproject.toml modules/records/
+# themselves are installed (editable) once the sources are in. `--parents`
+# keeps every member's pyproject.toml at its own path, so a new module under
+# modules/ needs no edit here.
+COPY --parents pyproject.toml uv.lock .python-version host/pyproject.toml \
+     modules/*/pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --all-packages --no-install-workspace
 
