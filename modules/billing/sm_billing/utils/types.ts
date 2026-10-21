@@ -68,6 +68,15 @@ export interface SubscriptionRow {
   synced_at: string | null;
 }
 
+/** How far the local mirror may lag Stripe (admin subscriptions screen). */
+export interface SyncHealth {
+  oldest_synced_at: string | null;
+  never_synced: number;
+  unprocessed_webhooks: number;
+  reconcile_interval_minutes: number;
+  reconcile_running: boolean;
+}
+
 export interface Connection {
   provider: string;
   active_provider: string;

@@ -172,6 +172,16 @@
     "resynced": "{name} wurde mit Stripe neu synchronisiert",
     "assigned": "{name} wurde ein Tarif zugewiesen"
   },
+  "sync_health": {
+    "title": "Abgleich mit Stripe",
+    "oldest_synced": "Ältester Abgleich: {date}",
+    "never_synced": "{count} nie abgeglichen",
+    "nothing_synced": "Noch keine Stripe-Abonnements",
+    "unprocessed_webhooks": "Unverarbeitete Webhooks: {count}",
+    "reconcile_every": "Geplanter Abgleich: alle {minutes} Min.",
+    "reconcile_off": "Geplanter Abgleich: aus — `smpy billing reconcile` ausführen oder reconcile_interval_minutes setzen",
+    "reconcile_not_running": "Geplanter Abgleich: eingestellt, läuft aber nicht — App neu starten"
+  },
   "subscriptions_table": {
     "col_organisation": "Organisation",
     "col_plan": "Tarif",
