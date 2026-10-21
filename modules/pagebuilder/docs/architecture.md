@@ -14,8 +14,6 @@ else. Other modules reach it only through:
 |---|---|
 | `pagebuilder.contracts` | DTOs; everything else is internal |
 | `PageDeleted` event | dropping rows keyed to a purged page |
-| `pagebuilder.public_claims` | serving a page at another module's address |
-| `render_public_page` | rendering a claimed page with the viewer's headers |
 | `registerPuckBlocks` (frontend) | adding blocks to the palette |
 
 A module that only *might* have pagebuilder installed (news does this) imports it
@@ -72,8 +70,9 @@ only). The host hydrates them at **lifespan start**, after app construction. So:
   public prefixes (one per content locale, trailing `/` so `/p` never exempts
   `/pagebuilder/`), mounts one `locale_router` per locale, the default-locale
   alias, the SEO router and the media mount.
-- `CsrfCookieMiddleware` is always installed and checks `csrf_protect` per
-  request.
+- The CSRF check is the framework's `RequiresCsrf`, wrapped in `csrf.py` so
+  `csrf_protect` is read per request. The view router shares the token as the
+  `csrf_token` prop; there is no middleware and no cookie.
 
 Any field read in `on_startup` is marked `json_schema_extra=_RESTART`. Adding a
 field means adding it to the class; there is no env var to add.
@@ -105,14 +104,12 @@ handler errors. Purge clears revisions and redirects and nulls children's
 sequenceDiagram
   participant V as Visitor
   participant R as locale_router(locale)
-  participant C as public_claims
   participant DB as pages / redirects / layout
   V->>R: GET /de/p/about
   R->>R: bind_public (tenant or 404)
-  R->>C: claimed_url(about, de)? → 404 if claimed
   R->>DB: published page (slug, locale)
   alt not found
-    R->>DB: redirects.resolve(slug, locale) → 301 to current (or claimed) URL, else 404
+    R->>DB: redirects.resolve(slug, locale) → 301 to current URL, else 404
   end
   R->>DB: layout + site_nav(locale)
   R->>R: ETag(page, layout, variant, nav) → 304 on match
@@ -121,19 +118,19 @@ sequenceDiagram
 
 - **Title** is `meta_title` stripped, else `title`; **canonical** is
   `canonical_url` or `public_base_url` + path; **alternates** are the group's
-  *published* pages (each resolved through claims), plus `x-default` = the
+  *published* pages, plus `x-default` = the
   default locale, omitted when fewer than two.
 - **`site_nav`** (`site_nav.py`) returns published, non-trashed pages in the
-  page's locale with either flag, ordered by `lower(title)`, hrefs through
-  claims. The SiteHeader/SiteFooter widgets append them after the layout's links,
+  page's locale with either flag, ordered by `lower(title)`. The
+  SiteHeader/SiteFooter widgets append them after the layout's links,
   skipping hrefs the layout already has (trailing slash ignored, dropdown
   children included) — `appendPages` in
   `components/widgets/_internal/site-nav-context.tsx`. Order is the layout's.
 - **Preview** (`/pagebuilder/{id}/preview`) renders `draft_data` through the same
   `PublicPage` component with `index_in_search=False` and no alternates, so the
   preview cannot disagree with the live renderer.
-- **Sitemap** uses a column-only query (no block JSON), asks claims once per
-  locale, and adds `xhtml:link` alternates per translation group.
+- **Sitemap** uses a column-only query (no block JSON) and adds `xhtml:link`
+  alternates per translation group.
 
 Redirects (`redirects.py`) are locale-scoped. `record` first deletes any redirect
 *from* the new slug (no loops) and from the old one (re-renames move it);
@@ -222,10 +219,10 @@ one — ignoring trashed pages.
 |---|---|
 | `module.py`, `boot.py` | registration hooks; startup wiring |
 | `settings.py`, `locales.py` | DB-backed settings; content-locale helpers |
-| `tenancy.py`, `security.py`, `permissions.py` | tenant binding; auth/CSRF; permissions and roles |
+| `tenancy.py`, `access.py`, `csrf.py`, `permissions.py` | tenant binding; admin route dependencies; CSRF; permissions and roles |
 | `models/`, `contracts/` | tables; public DTOs and `PageDeleted` |
 | `service/` | `PagesService` (CRUD, workflow, revisions, trash, translations) |
-| `layout_service.py`, `site_nav.py`, `redirects.py`, `public_claims.py` | layout; nav flags; old slugs; claims |
+| `layout_service.py`, `site_nav.py`, `redirects.py` | layout; nav flags; old slugs |
 | `media_*.py` | upload, images, queries, files, usage |
 | `scheduler.py` | per-tenant publish/unpublish/purge loop |
 | `snapshots/` | capture, archive, validate, plan, apply |

@@ -9,5 +9,5 @@
 export * from './locale';
 export * from './mediaApi';
 export * from './pagesApi';
-export { BASE, CSRF_COOKIE, readCookie, request } from './request';
+export { BASE, request } from './request';
 export * from './types';

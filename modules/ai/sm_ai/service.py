@@ -73,6 +73,32 @@ class AiService:
                 changes[target] = ""
         return changes
 
+    @staticmethod
+    def slot_errors(changes: dict[str, Any]) -> list[dict[str, Any]]:
+        """Request-validation errors for the slots as they would be after ``changes``.
+
+        Judged on the merged result, not the payload: a partial update that
+        sets only the provider, or only blanks the URL, must not leave an
+        ``openai_compatible`` slot with no endpoint — it has no default one,
+        so the slot would fail every call until someone noticed (#164).
+        Shaped like FastAPI's own 422 items so the page renders them alike.
+        """
+        merged = {**services.current_settings().model_dump(), **changes}
+        errors: list[dict[str, Any]] = []
+        for slot in constants.TEST_SLOTS:
+            provider = str(merged[f"{slot}_provider"]).strip().lower()
+            url_field = f"{slot}_base_url"
+            if provider in constants.PROVIDERS_NEEDING_BASE_URL and not merged[url_field].strip():
+                errors.append(
+                    {
+                        "type": "value_error",
+                        "loc": ["body", url_field],
+                        "msg": f"a base URL is required for the {provider} provider",
+                        "input": merged[url_field],
+                    }
+                )
+        return errors
+
     async def apply(self, changes: dict[str, Any]) -> AiSettingsOut:
         """Persist and hot-swap the given field changes, then return current."""
         # Plugin→plugin imports (settings is a declared dependency); kept local

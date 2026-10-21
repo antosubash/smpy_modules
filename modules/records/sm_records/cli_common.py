@@ -47,8 +47,21 @@ def open_db(database_url: str) -> Any:
 
 
 @asynccontextmanager
-async def connected(database_url: str) -> AsyncIterator[Any]:
-    """:func:`open_db` for the length of a ``with`` block, disposed on the way out."""
+async def connected(database_url: str, app: Any = None) -> AsyncIterator[Any]:
+    """:func:`open_db` for the length of a ``with`` block, disposed on the way out.
+
+    With the host ``app`` that ``--app`` named (GH #157), its own
+    ``app.state.sm.db`` instead, inside the lifespan the caller is running: the
+    same engine, session listeners and tenant configuration the host's
+    subscribers use. ``database_url`` is then only what was checked against it
+    (:func:`sm_records.cli_host.resolve_database_url`), and the engine is the
+    lifespan's to dispose, not this block's.
+    """
+    if app is not None:
+        db_state = app.state.sm.db
+        install_guard(db_state.sync_session_class)
+        yield db_state
+        return
     db_state = open_db(database_url)
     try:
         yield db_state

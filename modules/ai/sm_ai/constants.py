@@ -46,11 +46,6 @@ _PAGE_SETTINGS: Final = f"{MODULE_NAME}/Settings"
 
 PERM_MANAGE: Final = "ai.manage"
 
-# CSRF channel between the view (mints into the session), the middleware
-# (mirrors to this JS-readable cookie) and the API (verifies this header).
-CSRF_COOKIE: Final = "sm_ai_csrf"
-CSRF_HEADER: Final = "x-csrf-token"
-
 # Provider identifiers (stored values — changing them breaks existing rows).
 PROVIDER_ANTHROPIC: Final = "anthropic"
 PROVIDER_OPENAI: Final = "openai"
@@ -73,6 +68,13 @@ EMBEDDING_PROVIDERS: Final = (
 # vLLM and friends ignore the key but the OpenAI protocol requires a non-empty
 # value — same literal GeoWiki's AiClientFactory substitutes.
 PLACEHOLDER_API_KEY: Final = "not-needed"
+
+# Smallest valid embedding width; 0 means "not set". The API rejects anything
+# lower, and AiSettings reads a lower stored value as 0 (#164).
+MIN_EMBEDDING_DIM: Final = 0
+
+# Providers with no default endpoint: their slot is unusable without a base URL.
+PROVIDERS_NEEDING_BASE_URL: Final = frozenset({PROVIDER_OPENAI_COMPATIBLE})
 
 SLOT_CHAT: Final = "chat"
 SLOT_EMBEDDING: Final = "embedding"

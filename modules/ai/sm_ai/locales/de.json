@@ -26,6 +26,7 @@
     "base_url_required": "Basis-URL (erforderlich)",
     "base_url_optional": "Basis-URL (optionale Überschreibung)",
     "base_url_placeholder_required": "http://your-server:8000/v1",
+    "base_url_missing": "openai_compatible hat keinen Standard-Endpunkt – geben Sie die Basis-URL des Servers ein.",
     "base_url_placeholder_optional": "Standard des Anbieters",
     "api_key": "API-Schlüssel",
     "api_key_saved": "gespeichert – leer lassen, um ihn beizubehalten",
@@ -43,6 +44,7 @@
     "models_none": "Der Endpunkt listet für diesen Slot keine Modelle auf."
   },
   "api": {
+    "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})"
   },
   "menu": {

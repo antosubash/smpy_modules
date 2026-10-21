@@ -41,7 +41,7 @@ from sm_ai.contracts import AiNotConfiguredError, resolve_model, resolve_embedde
 agent = Agent(instructions="...", output_type=MySchema)
 result = await agent.run(text, model=resolve_model())
 
-embedder = resolve_embedder()          # raises AiNotConfiguredError until the
+embedder = resolve_embedder()  # raises AiNotConfiguredError until the
 result = await embedder.embed_documents(chunks)  # embedding slot is set up
 ```
 
@@ -59,8 +59,10 @@ Two slots — chat and embeddings — each with provider (`anthropic`, `openai`,
 `openai_compatible` provider covers vLLM, Ollama and LM Studio (base URL
 required; a blank key is replaced by a protocol-satisfying placeholder).
 
-Configure at `/ai/` (permission `ai.manage`), on the Settings screen, or
-headlessly with `scripts/set_setting.py sm_ai <field> <value>`. The module
+Configure at `/ai/` (permission `ai.manage`) or headlessly with
+`scripts/set_setting.py sm_ai <field> <value>`. The generic Settings screen
+links to `/ai/` rather than editing these fields itself, so the page's
+validation and key encryption apply to every save. The module
 reads no `SM_AI_*` environment variables: settings live in the database at
 SYSTEM scope, so every tenant shares one provider configuration and one API
 key per slot. API keys are encrypted at
@@ -79,5 +81,5 @@ host read the same settings themselves, re-reading at most once a minute.
 | `POST /api/ai/test` | probe the chat or embedding slot |
 | `POST /api/ai/models` | list the model ids the slot's saved endpoint serves (first 500, sorted) |
 
-Writes require an `X-CSRF-Token` header bound to the session (the admin page
-sends it automatically; the token is mirrored to the `sm_ai_csrf` cookie).
+Writes require the framework's `X-CSRF-Token` header bound to the session (the
+admin page sends it automatically; it is shared as the `csrf_token` prop).

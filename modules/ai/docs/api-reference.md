@@ -12,8 +12,12 @@ another PyPI project.
 
 ```python
 from sm_ai.contracts import (
-    AiError, AiKeyUnreadableError, AiNotConfiguredError,
-    embedding_dim, resolve_embedder, resolve_model,
+    AiError,
+    AiKeyUnreadableError,
+    AiNotConfiguredError,
+    embedding_dim,
+    resolve_embedder,
+    resolve_model,
 )
 ```
 
@@ -83,13 +87,14 @@ Each slot is checked in this order. The first failure raises
 ## HTTP API — `/api/ai`
 
 Every route requires the `ai.manage` permission. `PUT` and `POST` also need
-the CSRF token in an `X-CSRF-Token` header. The settings view (`GET /ai/`)
-stores the token in the session. Responses under `/ai` and `/api/ai` then
-copy it to the JS-readable cookie `sm_ai_csrf` whenever the request didn't
-already carry the current value
-(`SameSite=Strict`, `Secure` over HTTPS). A missing or wrong token gives
-`403 {"detail": "Invalid or missing CSRF token"}`. When the host mounts no
-session middleware, the check is skipped and a warning is logged once.
+the session's CSRF token in an `X-CSRF-Token` header. The check is the
+framework's `RequiresCsrf`, the one billing, news, records and pagebuilder use,
+so one token serves every module. The settings view (`GET /ai/`) shares it as
+the `csrf_token` Inertia prop (`simple_module_hosting.csrf.get_csrf_token`),
+and the page sends it from there; there is no CSRF cookie. A missing or wrong
+token gives `403 {"detail": "CSRF token missing or invalid — …"}`, before the
+permission check runs. When the host mounts no session middleware, the
+framework skips the check (there is no session to bind a token to).
 
 Body validation errors are FastAPI's `422` with a Pydantic error list.
 
@@ -133,7 +138,10 @@ the same shape as `GET`.
 | `embedding_api_key`, `clear_embedding_api_key` | string, bool | as for chat |
 | `embedding_dim` | int | `>= 0` |
 
-`null` is treated as omitted. Only values that differ from the current ones
+`null` is treated as omitted. A slot whose provider is `openai_compatible`
+must end up with a non-blank base URL — judged on the stored values merged
+with the update, so sending only the provider, or blanking the URL, is a `422`
+whose error `loc` names `chat_base_url` or `embedding_base_url`. Only values that differ from the current ones
 are written. The handling worker's settings are replaced immediately and a
 `SettingsReloaded` event is published.
 

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The header and footer are one site-wide record, not per-page content, so
@@ -59,7 +59,7 @@ const FOOTER = {
 
 async function putLayout(page: Page, header: unknown, footer: unknown) {
   const response = await page.request.put('/api/pagebuilder/layout', {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: { header_data: header, footer_data: footer, note: 'e2e chrome' },
   });
   expect(response.ok(), 'layout PUT').toBeTruthy();
@@ -69,7 +69,7 @@ async function putLayout(page: Page, header: unknown, footer: unknown) {
 async function publishPage(page: Page): Promise<string> {
   const slug = uniqueSlug('e2e-chrome');
   const created = await page.request.post('/api/pagebuilder/pages', {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: {
       title: 'Chrome',
       slug,
@@ -85,7 +85,7 @@ async function publishPage(page: Page): Promise<string> {
   expect(created.ok()).toBeTruthy();
   const { id } = await created.json();
   const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: { note: 'chrome' },
   });
   expect(published.ok()).toBeTruthy();
@@ -168,7 +168,7 @@ test.describe('Site header and footer', () => {
     const slug = uniqueSlug('e2e-flagged');
     const title = `Flagged ${slug.slice(-6)}`;
     const created = await page.request.post('/api/pagebuilder/pages', {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: {
         title,
         slug,
@@ -181,7 +181,7 @@ test.describe('Site header and footer', () => {
     expect(created.ok()).toBeTruthy();
     const { id } = await created.json();
     const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: {},
     });
     expect(published.ok()).toBeTruthy();
@@ -204,7 +204,7 @@ test.describe('Site header and footer', () => {
       await expect(page).toHaveTitle(new RegExp(`^${title} \\| Search title`));
     } finally {
       await page.request.delete(`/api/pagebuilder/pages/${id}`, {
-        headers: await csrfHeader(page),
+        headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       });
     }
   });

@@ -8,10 +8,15 @@ router-level dependencies, in this order:
 2. **Tenant binding** (`tenancy.bind_admin`) — single-tenant host: tenant
    `"default"`; multi-tenant host: the tenant the framework resolved, or
    `403 tenant_required`.
-3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` needs the session token in an
-   `X-CSRF-Token` header, else `403 Invalid or missing CSRF token` (when
-   `csrf_protect` is on). The admin views expose it as the Inertia shared prop
-   `csrf.token` and in a JS-readable cookie (`pagebuilder_csrf` by default).
+3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` (media uploads included)
+   needs the session's CSRF token in an `X-CSRF-Token` header, else `403`
+   (when `csrf_protect` is on). The check is the framework's `RequiresCsrf`,
+   the one billing, news and records use, so one token serves every module.
+   Every pagebuilder screen shares it as the `csrf_token` Inertia prop
+   (`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
+   sends it from there. There is no CSRF cookie. Reads need no token. It runs
+   before any permission check, so a write without a token is refused as CSRF
+   even for a user who also lacks the permission.
 
 "Permission" below is the extra `RequiresPermission` check on top; **auth** means
 any signed-in user. Errors are `{"detail": "<message>"}`; the table is at the end.
@@ -244,9 +249,8 @@ Anonymous, `GET`/`HEAD` only, mounted at startup from the settings:
 | `/robots.txt` | when `robots_enabled` |
 | `{media_url_prefix}/{tenant}/{file}` | uploaded media, `max-age=31536000, immutable` |
 
-An old slug answers 301 to the page's current address. A claimed slug (below)
-answers 404 here. See [operations.md](operations.md#public-pages-caching-and-csp)
-for headers.
+An old slug answers 301 to the page's current address. See
+[operations.md](operations.md#public-pages-caching-and-csp) for headers.
 
 ## For other modules
 
@@ -259,31 +263,21 @@ restore would otherwise come back without what other modules dropped. A module
 that keys rows to a page id must handle it: there is no cross-module foreign key,
 and SQLite reuses ids.
 
-**Public claims** (`pagebuilder.public_claims`). A module that presents a page at
-its own address registers a claim from its startup hook:
+**Removed: `pagebuilder.public_claims`** (#132). The hook that let another
+module claim a page's public address is gone — nothing used it. `import
+pagebuilder.public_claims` now fails; every published page is served at
+`/p/{slug}` (or `/{locale}/p/{slug}`), and the sitemap, `hreflang` alternates,
+nav links and old-slug redirects all point there.
 
-```python
-from pagebuilder import public_claims
-
-async def claim(db, slugs, locale) -> dict[str, str]:
-    # return {slug: public_path} for the slugs in `locale` this module serves
-    ...
-
-public_claims.register(claim)
-```
-
-Claims are asked in bulk, one locale at a time. A claimed slug is then refused
-(404) by `/p/{slug}`; the sitemap, `hreflang` alternates, nav links and old-slug
-redirects all point at the claimed path instead. On the same slug the earliest
-registered claim wins. `public_claims.reset()` clears them (tests).
-
-To serve the claimed page, call
+**Deprecated: `render_public_page(..., url_prefix=…)`.**
 `pagebuilder.endpoints.public_views.render_public_page(slug, request, inertia,
-db, settings, locale=…, url_prefix=…)` from a router that depends on
-`tenancy.bind_public`: it applies the same ETag, cache, CSP, canonical,
-`hreflang`, nav and redirect handling. `locale` is required — there is no
-fallback to the default language, so a claimant always says which language it
-serves.
+db, settings, locale=…)` still serves a published page with the viewer's ETag,
+cache, CSP, canonical, `hreflang`, nav and redirect handling, from a router that
+depends on `tenancy.bind_public`. `locale` is required, with no fallback to the
+default language. The `url_prefix` keyword, which belonged to public claims, is
+still accepted: it sets the canonical URL and where an old slug 301s to, as it
+did before, and emits a `DeprecationWarning`. It will be removed in a later
+release; omit it.
 
 ## Errors
 
@@ -291,7 +285,7 @@ serves.
 |---|---|---|
 | 401 | `Not authenticated` | no user and `requires_auth` on |
 | 403 | `tenant_required` | multi-tenant host, admin request with no tenant |
-| 403 | `Invalid or missing CSRF token` | mutating request without the header |
+| 403 | `CSRF token missing or invalid — …` | mutating request without the session's token |
 | 403 | (framework) | missing permission |
 | 404 | `Page not found` / `Revision not found` / `Asset not found` / `Snapshot not found` / `Import not found` | unknown id, trashed page, other tenant's row |
 | 409 | `Slug already in use in <locale>` | create, update |

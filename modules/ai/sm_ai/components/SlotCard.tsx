@@ -11,10 +11,14 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 
 import { useId, useRef, useState } from 'react';
 
-import type { ModelsResult, SlotValues, TestResult } from '../utils/api';
+import {
+  type ModelsResult,
+  missingBaseUrl,
+  needsBaseUrl,
+  type SlotValues,
+  type TestResult,
+} from '../utils/api';
 import { keys, useT } from '../utils/i18n';
-
-const OPENAI_COMPATIBLE = 'openai_compatible';
 
 export function SlotCard({
   title,
@@ -50,7 +54,8 @@ export function SlotCard({
 }) {
   const { t } = useT();
   const c = keys.ai.card;
-  const needsUrl = values.provider === OPENAI_COMPATIBLE;
+  const needsUrl = needsBaseUrl(values);
+  const urlMissing = missingBaseUrl(values);
   const listId = useId();
   const [models, setModels] = useState<ModelsResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -154,7 +159,15 @@ export function SlotCard({
               needsUrl ? t(c.base_url_placeholder_required) : t(c.base_url_placeholder_optional)
             }
             disabled={busy}
+            required={needsUrl}
+            aria-invalid={urlMissing}
+            aria-describedby={urlMissing ? `${idPrefix}-url-error` : undefined}
           />
+          {urlMissing && (
+            <p id={`${idPrefix}-url-error`} className="text-xs text-destructive">
+              {t(c.base_url_missing)}
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-key`}>{t(c.api_key)}</Label>
@@ -186,8 +199,9 @@ export function SlotCard({
             <Input
               id={`${idPrefix}-dim`}
               type="number"
+              min={0}
               value={values.dim ?? 0}
-              onChange={(e) => set({ dim: Number(e.target.value) || 0 })}
+              onChange={(e) => set({ dim: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })}
               disabled={busy}
             />
             <p className="text-xs text-muted-foreground">{t(c.vector_dimension_hint)}</p>

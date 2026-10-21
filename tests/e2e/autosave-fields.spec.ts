@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Every editable field reaches the autosave.
@@ -17,7 +17,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  */
 
 async function makePage(page: Page, slug: string): Promise<number> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: { title: 'Autosave subject', slug, draft_data: { content: [] } },

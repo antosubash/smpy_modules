@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { defineConfig, devices } from '@playwright/test';
 
+import { DEFAULT_API_PORT, DEFAULT_UI_PORT, resolvePort } from './scripts/ports.mjs';
+
 export const TEST_ADMIN_EMAIL = 'admin@example.com';
 export const TEST_ADMIN_PASSWORD = 'changeme1';
 
@@ -10,15 +12,11 @@ const REPO_ROOT = dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = resolve(REPO_ROOT, 'host', 'test.db');
 
 // Overridable so a worktree can run e2e beside a dev stack holding the
-// default ports (E2E_API_PORT / E2E_UI_PORT; defaults unchanged).
-// Normalized here, once: `??` alone would pass a set-but-empty or garbage
-// value through, and the Makefile and vite each apply the same regex guard
-// to their own env inputs — all three agreeing on which port the stack is
-// on only because the guards stay identical.
-const numericPort = (raw: string | undefined, fallback: string): string =>
-  raw && /^[1-9][0-9]*$/.test(raw) ? raw : fallback;
-const API_PORT = numericPort(process.env.E2E_API_PORT, '8000');
-const UI_PORT = numericPort(process.env.E2E_UI_PORT, '5050');
+// default ports (E2E_API_PORT / E2E_UI_PORT). scripts/ports.mjs is the guard
+// the Makefile and vite.config.ts use too, so a set-but-empty or garbage
+// value means the default everywhere rather than three different things.
+const API_PORT = resolvePort([process.env.E2E_API_PORT], DEFAULT_API_PORT);
+const UI_PORT = resolvePort([process.env.E2E_UI_PORT], DEFAULT_UI_PORT);
 const APP_URL = `http://localhost:${API_PORT}`;
 
 // The suite's own SQLite file unless the caller names a database, which is how
