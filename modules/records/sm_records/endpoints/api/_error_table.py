@@ -62,8 +62,9 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         400,
-        "An `?expand=` path with an empty segment, deeper than `max_expand_depth`, "
-        "or more than `max_expand_paths` hops",
+        "An `?expand=` path with an empty or over-long segment, deeper than "
+        "`max_expand_depth`, more than `max_expand_paths` hops, or an `expand` value "
+        "too long to be any of those",
         '`{"detail"}`',
     ),
     ErrorRow(
