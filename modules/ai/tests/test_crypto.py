@@ -60,3 +60,52 @@ class TestDecrypt:
             crypto.decrypt_value("sk-plain", "chat_api_key")
             crypto.decrypt_value("sk-plain", "chat_api_key")
         assert sum("unencrypted" in r.message for r in caplog.records) == 1
+
+
+class TestDotenvFallback:
+    """The ``.env`` the secret comes from is the project's, never the cwd's (#124)."""
+
+    @pytest.fixture(autouse=True)
+    def _no_env_secret(self, monkeypatch):
+        monkeypatch.delenv("SM_SECRET_KEY", raising=False)
+        crypto._dotenv_secret.cache_clear()
+        yield
+        crypto._dotenv_secret.cache_clear()
+
+    def _project(self, root, secret: str):
+        root.mkdir(parents=True)
+        (root / ".env.example").write_text("")  # marks the project root
+        (root / ".env").write_text(f"SM_SECRET_KEY={secret}\n")
+        return root
+
+    def test_sm_project_root_anchors_the_file_whatever_the_cwd(self, monkeypatch, tmp_path):
+        project = self._project(tmp_path / "project", "project-secret")
+        elsewhere = self._project(tmp_path / "elsewhere", "some-other-secret")
+        monkeypatch.chdir(elsewhere)
+        monkeypatch.setenv("SM_PROJECT_ROOT", str(project))
+
+        stored = crypto.encrypt_value("sk-1")
+
+        crypto.set_secret_provider(lambda: "project-secret")
+        assert crypto.decrypt_value(stored, "chat_api_key") == "sk-1"
+
+    def test_a_subdirectory_finds_the_project_root_file(self, monkeypatch, tmp_path):
+        # e.g. a worker or CLI started from host/ or modules/ai/.
+        project = self._project(tmp_path / "project", "root-secret")
+        (project / "host").mkdir()
+        monkeypatch.chdir(project / "host")
+
+        stored = crypto.encrypt_value("sk-2")
+
+        crypto.set_secret_provider(lambda: "root-secret")
+        assert crypto.decrypt_value(stored, "chat_api_key") == "sk-2"
+
+    def test_the_placeholder_default_is_never_used(self, monkeypatch, tmp_path):
+        # BootstrapSettings defaults secret_key to a placeholder; encrypting
+        # under it would make every key unreadable once a real one is set.
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / ".env.example").write_text("")
+        monkeypatch.setenv("SM_PROJECT_ROOT", str(project))
+        with pytest.raises(RuntimeError, match="SM_SECRET_KEY"):
+            crypto.encrypt_value("x")

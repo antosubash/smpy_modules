@@ -59,7 +59,7 @@ class AiSettingsUpdate(SQLModel):
     @classmethod
     def _chat_provider_known(cls, value: str | None) -> str | None:
         # Normalize the same way resolve.py reads (strip().lower()): an
-        # env-seeded "Anthropic" works at runtime and must not brick every
+        # "Anthropic" stored by set_setting.py works at runtime and must not brick every
         # save on the settings page until the provider is re-picked.
         if value is None:
             return value

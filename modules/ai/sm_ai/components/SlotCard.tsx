@@ -102,7 +102,8 @@ export function SlotCard({
             disabled={busy}
           >
             {optionalSlot && <option value="">{t(c.not_configured)}</option>}
-            {/* An env-seeded value can fall outside the served list; without
+            {/* A value stored outside this page (set_setting.py, the Settings
+                screen) can fall outside the served list; without
                 its own option the select would render unselected while every
                 save 422s with no visible cause. Showing it makes the fix —
                 re-picking a real provider — obvious. */}
