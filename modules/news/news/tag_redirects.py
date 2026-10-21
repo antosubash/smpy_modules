@@ -38,6 +38,15 @@ async def record(db: AsyncSession, *, tag_id: int, old_slug: str, new_slug: str)
     await db.flush()
 
 
+async def release(db: AsyncSession, slug: str) -> None:
+    """A new tag claims ``slug``: a dormant redirect from it must not outlive it.
+
+    The live tag already wins at the archive route, but the row would come back
+    to life, pointing at some other tag, the day this one is renamed or deleted.
+    """
+    await db.execute(sa_delete(NewsTagRedirect).where(NewsTagRedirect.from_slug == slug))
+
+
 async def repoint(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> None:
     """A merge folds ``source`` into ``target``: its addresses go with it."""
     await db.execute(

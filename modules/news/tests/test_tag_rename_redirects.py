@@ -139,3 +139,15 @@ async def test_another_tenants_tag_cannot_be_renamed_or_deleted() -> None:
         assert (await _rename(mt, own["id"], "New", a)).status_code == 200
         assert (await mt.get("/news/tag/old", headers=a)).status_code == 301
         assert (await mt.get("/news/tag/old", headers=b)).status_code == 200
+
+
+async def test_a_new_tag_at_a_retired_slug_takes_it_back(editor_public_client) -> None:
+    """Re-creating "Urbn" after it was renamed gives the slug to the new tag;
+    the old redirect must not resurface once that tag is gone."""
+    tag = await _create(editor_public_client, "Urbn")
+    await _rename(editor_public_client, tag["id"], "Urban")
+    again = await _create(editor_public_client, "Urbn")
+    assert (await editor_public_client.get("/news/tag/urbn")).status_code == 200
+
+    assert (await editor_public_client.delete(f"{TAGS}/{again['id']}")).status_code == 204
+    assert (await editor_public_client.get("/news/tag/urbn")).status_code == 200

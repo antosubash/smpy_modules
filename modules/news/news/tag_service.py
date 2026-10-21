@@ -80,6 +80,7 @@ async def get_or_create(db: AsyncSession, name: str) -> NewsTag:
         )
     if existing is not None:
         return existing
+    await tag_redirects.release(db, slug)
     tag = NewsTag(name=name.strip(), slug=slug)
     db.add(tag)
     await db.flush()
@@ -177,9 +178,12 @@ async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
             tag.slug = slug
             db.add(tag)
             await db.flush()
+            # Inside the savepoint too, so a refused rename leaves no redirect.
+            await tag_redirects.record(
+                db, tag_id=tag.id or 0, old_slug=old_slug, new_slug=slug
+            )
     except IntegrityError as exc:
         raise TagCollisionError(f"A tag named {name!r} already exists.") from exc
-    await tag_redirects.record(db, tag_id=tag.id or 0, old_slug=old_slug, new_slug=slug)
     await db.refresh(tag)
     return tag
 
