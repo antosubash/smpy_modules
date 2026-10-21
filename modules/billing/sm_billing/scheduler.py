@@ -23,7 +23,10 @@ sets, it does not add; a second identical snapshot changes nothing).
 pause between them (a few calls a second, far under Stripe's limits, which the
 SDK's own retries already back off from). A ``ProviderError`` doubles the pause
 up to a cap, and a run of them ends the tick early: an outage is waited out
-until the next interval rather than hammered tenant by tenant.
+until the next interval rather than hammered tenant by tenant. A subscription
+that failed on the previous tick (one deleted at Stripe, say) is tried *after*
+the rest, so a handful of permanently failing rows cannot trip the early stop
+ahead of every healthy tenant on every tick.
 """
 
 from __future__ import annotations
@@ -107,8 +110,14 @@ async def _release(factory: Any, row_id: int, stamp: datetime, previous: datetim
         await finalize_session(session)
 
 
-async def reconcile_stale(app: FastAPI, max_age: timedelta) -> ReconcileReport:
-    """One tick: reconcile every subscription not synced within ``max_age``."""
+async def reconcile_stale(
+    app: FastAPI, max_age: timedelta, failing: set[int] | None = None
+) -> ReconcileReport:
+    """One tick: reconcile every subscription not synced within ``max_age``.
+
+    ``failing`` holds the row ids that failed last tick; they go last, and the
+    set is updated in place with this tick's outcome.
+    """
     report = ReconcileReport()
     provider = getattr(app.state, c.PACKAGE).provider
     if provider is None or not provider.supports_checkout:
@@ -116,19 +125,27 @@ async def reconcile_stale(app: FastAPI, max_age: timedelta) -> ReconcileReport:
         return report
     factory = app.state.sm.db.session_factory
     cutoff = datetime.now(UTC) - max_age
+    failing = set() if failing is None else failing
     pause, provider_errors = PACE_SECONDS, 0
-    for row_id, tenant_id, subscription_id, previous in await _stale(factory, cutoff):
+    rows = sorted(await _stale(factory, cutoff), key=lambda r: r[0] in failing)  # stable
+    for row_id, tenant_id, subscription_id, previous in rows:
         stamp = datetime.now(UTC)
         if not await _claim(factory, row_id, cutoff, stamp):
             continue  # another instance has it, or a webhook just synced it
         try:
             pushed = await reconcile_one(app, tenant_id, subscription_id)
+        except asyncio.CancelledError:
+            # Shutdown mid-sync: hand the claim back so the tenant is not parked
+            # for an interval by a stamp nobody will finish.
+            await asyncio.shield(_release(factory, row_id, stamp, previous))
+            raise
         except Exception as exc:
             logger.warning(
                 "billing: scheduled reconcile failed for tenant %s", tenant_id, exc_info=True
             )
             report.errors.append((tenant_id, f"{type(exc).__name__}: {exc}"))
             await _release(factory, row_id, stamp, previous)
+            failing.add(row_id)
             if isinstance(exc, ProviderError):
                 provider_errors += 1
                 pause = min(pause * 2, MAX_BACKOFF_SECONDS)
@@ -137,6 +154,7 @@ async def reconcile_stale(app: FastAPI, max_age: timedelta) -> ReconcileReport:
                     logger.warning("billing: provider failing; reconcile resumes next interval")
                     break
         else:
+            failing.discard(row_id)
             report.synced += 1
             report.pushed += int(pushed)
             pause, provider_errors = PACE_SECONDS, 0
@@ -149,6 +167,8 @@ class ReconcileScheduler:
 
     def __init__(self) -> None:
         self._task: asyncio.Task[None] | None = None
+        #: Row ids that failed on the last tick; tried last on the next one.
+        self._failing: set[int] = set()
 
     @property
     def running(self) -> bool:
@@ -164,7 +184,7 @@ class ReconcileScheduler:
         while True:
             try:
                 await asyncio.sleep(interval.total_seconds())
-                report = await reconcile_stale(app, interval)
+                report = await reconcile_stale(app, interval, self._failing)
                 if report.synced or report.errors:
                     logger.info(
                         "billing: scheduled reconcile synced %d, pushed %d, failed %d",

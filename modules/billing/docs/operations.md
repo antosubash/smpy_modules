@@ -113,7 +113,7 @@ and restart, and the app runs the same per-organisation sync on a loop:
   `finalize_session`, so a suspension or reactivation publishes
   `TenantStatusChanged` and clears the membership cache exactly as a webhook
   would. One organisation failing is logged and the rest carry on; its claim is
-  released, so the next tick retries it.
+  released, so the next tick retries it (a failure after the snapshot was applied, i.e. the seat push, keeps the fresh stamp and retries one interval later).
 - **Several app instances are safe.** Every process runs the loop, but each
   organisation is claimed with a conditional `UPDATE` on its `synced_at`
   before Stripe is called, so in any window exactly one instance fetches it.
@@ -121,7 +121,10 @@ and restart, and the app runs the same per-organisation sync on a loop:
 - **Rate limits.** Organisations are synced one at a time with a 0.2 s pause
   (a few Stripe calls a second; the SDK also retries a 429 with backoff). Each
   Stripe error doubles the pause, up to 30 s, and five in a row end the tick —
-  an outage is waited out until the next interval, not hammered.
+  an outage is waited out until the next interval, not hammered. An
+  organisation whose sync failed on the previous tick (its subscription was
+  deleted in Stripe, say) is retried after the others, so a few permanently
+  failing ones cannot end every tick before the healthy ones are reached.
 
 Prefer an external scheduler (cron, a Kubernetes CronJob)? Leave the setting at
 `0` and run `smpy billing reconcile` from there.
@@ -143,7 +146,7 @@ rows are unprocessed, and whether the scheduled reconcile is running. An old
 | Organisation shows **Suspended (unpaid)** | retries ran out | The owner pays from **Billing → Pay now**; the next webhook reactivates it. To lift it by hand on the manual provider, assign **Active**. |
 | Organisation shows **Suspended** (no "unpaid") | an administrator suspended it on the Organisations screen | Billing never lifts this; reactivate it there. |
 | Owner can't downgrade: "remove N first" | members plus pending invitations exceed the target plan's seats | Remove members or revoke invitations. |
-| Per-seat quantity at Stripe differs from members | a membership change happened while Stripe was unreachable | The scheduled reconcile pushes it within one interval; without it, `smpy billing reconcile`. |
+| Per-seat quantity at Stripe differs from members | a membership change happened while Stripe was unreachable | The scheduled reconcile pushes it within one to two intervals; without it, `smpy billing reconcile`. |
 | "Changing a price that is in use" when editing a plan | a live subscription bills on that price | Create a new plan with the new price; move organisations to it. |
 | Connection screen: "cannot be decrypted" | app `secret_key` changed | Re-enter both Stripe secrets. |
 | Checkout says "already subscribed" but the page shows the free plan | a subscription exists at Stripe the app hasn't recorded | `smpy billing reconcile --tenant ID`. |

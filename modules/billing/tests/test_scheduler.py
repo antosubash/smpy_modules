@@ -156,8 +156,8 @@ async def test_enabled_starts_a_loop_that_ticks_and_stops(app, fake, pauses, mon
     ticked = asyncio.Event()
     real = scheduler.reconcile_stale
 
-    async def tick(app_, max_age):
-        report = await real(app_, max_age)
+    async def tick(app_, max_age, *rest):
+        report = await real(app_, max_age, *rest)
         ticked.set()
         return report
 
@@ -176,7 +176,7 @@ async def test_a_failed_tick_does_not_stop_the_loop(app, fake, monkeypatch):
     calls = 0
     done = asyncio.Event()
 
-    async def tick(_app, _max_age):
+    async def tick(_app, _max_age, *_):
         nonlocal calls
         calls += 1
         if calls >= 2:
