@@ -14,8 +14,9 @@ root `.env` is the single source of truth (see CLAUDE.md).
   (SQLite at `host/app.db`; no Postgres needed).
 - `uv sync --all-packages --all-extras` (= `make install-py`), `npm ci`,
   `make sync-module-deps`, `make gen-pages`.
-- Postgres is optional: the shared `dev-services` stack, never a new container
-  (CLAUDE.md "Local database").
+- Postgres is optional: the shared `dev-services` stack when available (never a
+  second container beside it), else the one-line `docker run` in CLAUDE.md
+  "Local database".
 
 ## Launch
 | Scenario | Command |
