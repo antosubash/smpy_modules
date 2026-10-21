@@ -29,10 +29,14 @@ from base64 import urlsafe_b64encode
 from collections.abc import Callable
 from functools import lru_cache
 from hashlib import sha256
+from typing import TYPE_CHECKING
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from sm_ai.contracts.errors import AiKeyUnreadableError
+
+if TYPE_CHECKING:
+    from simple_module_hosting.bootstrap_settings import BootstrapSettings
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +84,11 @@ def _dotenv_secret() -> str:
     """
     from simple_module_hosting.bootstrap_settings import BootstrapSettings
 
-    boot = BootstrapSettings()
+    return explicit_secret(BootstrapSettings())
+
+
+def explicit_secret(boot: BootstrapSettings) -> str:
+    """The secret ``boot`` was actually given, or ``""`` for its placeholder default."""
     return boot.secret_key if "secret_key" in boot.model_fields_set else ""
 
 

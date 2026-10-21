@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import importlib.metadata
 import importlib.resources
+import logging
+import os
 import weakref
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from simple_module_core.permissions import PermissionRegistry
 from sm_ai import constants
 
 _VERSION = importlib.metadata.version("simple_module_ai")
+logger = logging.getLogger(__name__)
 
 
 class AiModule(ModuleBase):
@@ -40,6 +43,16 @@ class AiModule(ModuleBase):
 
         from sm_ai import crypto, services
         from sm_ai.settings import AiSettings
+
+        # Before #124 these seeded unset fields; now they are dead, and a
+        # deployment that relied on them silently runs on the defaults.
+        dead = sorted(k for k in os.environ if k.startswith("SM_AI_"))
+        if dead:
+            logger.warning(
+                "Ignoring %s: the AI module reads no environment variables. "
+                "Set them on /ai/ or with scripts/set_setting.py (see the ai operations docs).",
+                ", ".join(dead),
+            )
 
         # The factory installs the instance in the module-global holder AND
         # returns it for app.state.sm_ai — one shared object, so hydration and

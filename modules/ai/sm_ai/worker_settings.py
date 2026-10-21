@@ -152,7 +152,7 @@ def _hydrate() -> tuple[AiSettings, str, bool]:
     # Deliberately outside the try: a placeholder SM_SECRET_KEY in production
     # makes BootstrapSettings raise, and the web host refuses to boot on it too.
     boot = BootstrapSettings()
-    explicit = boot.secret_key if "secret_key" in boot.model_fields_set else ""
+    explicit = crypto.explicit_secret(boot)
     reason = _unreadable(boot.database_url)
     if reason is None:
         pool = ThreadPoolExecutor(max_workers=1)
