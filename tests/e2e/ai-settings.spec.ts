@@ -72,4 +72,34 @@ test.describe('AI settings', () => {
     // A failed listing offers no suggestions; the field stays free text.
     await expect(page.locator('#ai-chat-model')).not.toHaveAttribute('list', /.+/);
   });
+
+  test('openai_compatible without a base URL is flagged and not saved (#164)', async ({ page }) => {
+    const url = page.locator('#ai-embedding-url');
+    await page.locator('#ai-embedding-provider').selectOption('openai_compatible');
+    await url.fill('   ');
+    await expect(url).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#ai-embedding-url-error')).toContainText('no default endpoint');
+
+    let puts = 0;
+    page.on('request', (r) => {
+      if (r.method() === 'PUT' && r.url().includes('/api/ai/settings')) puts += 1;
+    });
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText(/Save failed/)).toBeVisible();
+    expect(puts).toBe(0);
+
+    await url.fill('http://127.0.0.1:1/v1');
+    await expect(url).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.locator('#ai-embedding-url-error')).toHaveCount(0);
+  });
+
+  test('the generic Settings screen links to /ai/ instead of editing it (#164)', async ({
+    page,
+  }) => {
+    await page.goto('/admin/settings/');
+    await page.getByRole('button', { name: /sm_ai/ }).click();
+    await expect(page.getByText('Managed on its own page')).toBeVisible();
+    await page.getByRole('link', { name: /Open Ai settings/ }).click();
+    await expect(page).toHaveURL(/\/ai\/$/);
+  });
 });

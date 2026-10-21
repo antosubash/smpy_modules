@@ -313,8 +313,8 @@ it was.
 
 Articles in the default language keep `/news/{slug}`; every other language is
 prefixed, `/de/news/{slug}`. `ArticleRead.url` carries the prefix, so the admin
-list, the feed block and the slug news claims from pagebuilder all agree on
-one address. `/{default}/news/{slug}` permanently redirects to the bare form.
+list, the feed block and news' own sitemap all agree on one address.
+`/{default}/news/{slug}` permanently redirects to the bare form.
 
 `?locale=de` narrows a listing to one language — what a feed block on a German
 page passes, so a German list never shows an English card. The block reads the
