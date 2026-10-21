@@ -20,6 +20,7 @@ anyway. Stdlib only.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import sys
 import time
@@ -65,7 +66,7 @@ def fetch_released(distribution: str, version: str) -> list[dict]:
             if exc.code == 404:
                 return []
             error: Exception = exc
-        except (urllib.error.URLError, TimeoutError) as exc:
+        except (OSError, ValueError, http.client.HTTPException) as exc:
             error = exc
         print(f"::warning::PyPI lookup failed (attempt {attempt}/{ATTEMPTS}): {error}")
         if attempt < ATTEMPTS:

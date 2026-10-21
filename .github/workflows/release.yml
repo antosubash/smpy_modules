@@ -244,6 +244,10 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # setup-node turns npm caching on by itself when package.json
+          # names a packageManager; say no explicitly. `npm ci` below
+          # installs fresh from package-lock.json.
+          package-manager-cache: false
 
       # `--locked` fails the release if uv.lock disagrees with the manifests,
       # rather than building from a silently re-resolved set (#114).
@@ -392,6 +396,8 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
+          # setup-uv caches by default on hosted runners; not in a release.
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}

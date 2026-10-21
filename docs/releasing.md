@@ -75,8 +75,13 @@ bumping `main` by hand to that version is then the only step left.
   downloads this run's artifact and refuses to upload unless every file
   matches and none was added. Nothing is rebuilt after `build`; `finalize`
   tags only a staged commit whose parent is the CI-verified SHA.
-- **No caches in a release.** The release build restores neither the uv nor
-  the npm cache, and `framework-latest.yml` (which resolves versions no
+- **No caches in a release.** Caches are shared across workflows, and ci.yml
+  runs for pull requests, so a release restores none: every `setup-uv` in
+  `release.yml` has `enable-cache: false` (its default caches on hosted
+  runners), `setup-node` has `package-manager-cache: false` (it caches npm on
+  its own when `package.json` names a package manager), and there is no
+  `actions/cache`. `build` installs fresh with `uv sync --locked` and
+  `npm ci`. Likewise `framework-latest.yml` (which resolves versions no
   lockfile vetted) saves none, so the nightly run can never feed ci.yml or a
   release. It has `contents: read` only and uploads no artifacts.
 - **Actions are pinned to commit SHAs** in `release.yml`, the tag in a
