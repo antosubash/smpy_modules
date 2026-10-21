@@ -71,9 +71,15 @@ def aware_instant(value: Any) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def optional_note(value: str | None) -> str | None:
-    """Stripped; a note of only whitespace is no note at all."""
-    return (value.strip() or None) if value is not None else None
+def optional_note(value: Any) -> Any:
+    """Stripped; a note of only whitespace is no note at all.
+
+    Runs before the field's own checks, so the length bound applies to the
+    stripped note: padding never pushes a valid note over it, and a long run
+    of spaces is no note rather than a 422. Anything but a string is left to
+    pydantic to refuse.
+    """
+    return (value.strip() or None) if isinstance(value, str) else value
 
 
 def _has_nul(value: Any) -> bool:

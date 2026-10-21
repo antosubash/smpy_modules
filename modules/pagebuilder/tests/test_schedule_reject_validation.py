@@ -13,8 +13,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
+from pagebuilder.contracts.schemas import (
+    ImportDecisionRequest,
+    LayoutUpdate,
+    PageNoteRequest,
+    PageRejectRequest,
+    SnapshotCreateRequest,
+)
+from pagebuilder.contracts.schemas._fields import NOTE_MAX
+from pydantic import ValidationError
 
 PAGES = "/api/pagebuilder/pages"
 LATER = (datetime.now(UTC) + timedelta(days=3)).replace(microsecond=0)
@@ -119,3 +126,42 @@ async def test_a_blank_optional_note_is_recorded_as_no_note(authed_client: Async
     assert response.status_code == 200, response.text
     revisions = (await authed_client.get(f"{PAGES}/{page_id}/revisions")).json()["items"]
     assert [r["note"] for r in revisions if r["event"] == "publish"] == [None]
+
+
+# Every note a write takes: the bound is on the stripped note, so padding never
+# pushes a valid note over it and a long run of spaces is blank, not too long.
+OPTIONAL_NOTES = [PageNoteRequest, LayoutUpdate, SnapshotCreateRequest, ImportDecisionRequest]
+
+
+@pytest.mark.parametrize("model", [*OPTIONAL_NOTES, PageRejectRequest])
+def test_a_padded_note_at_the_limit_is_kept(model) -> None:
+    note = "a" * NOTE_MAX
+    assert model(note=f" {note} ").note == note
+
+
+@pytest.mark.parametrize("model", [*OPTIONAL_NOTES, PageRejectRequest])
+def test_a_trimmed_note_over_the_limit_is_refused(model) -> None:
+    with pytest.raises(ValidationError):
+        model(note="a" * (NOTE_MAX + 1))
+
+
+@pytest.mark.parametrize("model", OPTIONAL_NOTES)
+def test_a_long_run_of_spaces_is_no_optional_note(model) -> None:
+    assert model(note=" " * (NOTE_MAX + 1)).note is None
+
+
+def test_a_long_run_of_spaces_is_a_blank_rejection() -> None:
+    with pytest.raises(ValidationError) as caught:
+        PageRejectRequest(note=" " * (NOTE_MAX + 1))
+    assert caught.value.errors()[0]["type"] == "string_too_short"
+
+
+async def test_reject_keeps_a_padded_note_at_the_limit(authed_client: AsyncClient) -> None:
+    page_id = await _draft(authed_client)
+    await authed_client.post(f"{PAGES}/{page_id}/submit")
+    note = "a" * NOTE_MAX
+
+    response = await authed_client.post(f"{PAGES}/{page_id}/reject", json={"note": f" {note} "})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["rejection_note"] == note

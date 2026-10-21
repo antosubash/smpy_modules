@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from factories import make_article
-from news.constants import ROUTE_PREFIX_API
+from news.constants import MAX_NOTE_LEN, ROUTE_PREFIX_API
 from news.models import ArticleStatus
 
 pytestmark = pytest.mark.asyncio
@@ -103,3 +103,39 @@ async def test_a_rejection_note_is_stored_trimmed(editor_client) -> None:
 
     detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
     assert detail["rejection_note"] == "Cite it."
+
+
+async def test_the_note_bound_applies_after_trimming(editor_client) -> None:
+    """Padding round a note of exactly the limit does not push it over."""
+    article_id = await _article(editor_client, "padded-note", ArticleStatus.SUBMITTED_FOR_REVIEW)
+    note = "a" * MAX_NOTE_LEN
+
+    response = await editor_client.post(
+        f"{ARTICLES}/{article_id}/reject", json={"note": f" {note} "}
+    )
+
+    assert response.status_code == 200, response.text
+    detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
+    assert detail["rejection_note"] == note
+
+
+async def test_a_long_run_of_spaces_is_no_note(editor_client) -> None:
+    article_id = await _article(editor_client, "space-note", ArticleStatus.SUBMITTED_FOR_REVIEW)
+
+    response = await editor_client.post(
+        f"{ARTICLES}/{article_id}/reject", json={"note": " " * (MAX_NOTE_LEN + 1)}
+    )
+
+    assert response.status_code == 200, response.text
+    detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
+    assert detail["rejection_note"] is None
+
+
+async def test_a_trimmed_note_over_the_limit_is_refused(editor_client) -> None:
+    article_id = await _article(editor_client, "long-note", ArticleStatus.SUBMITTED_FOR_REVIEW)
+
+    response = await editor_client.post(
+        f"{ARTICLES}/{article_id}/reject", json={"note": "a" * (MAX_NOTE_LEN + 1)}
+    )
+
+    assert response.status_code == 422, response.text

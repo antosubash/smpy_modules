@@ -160,7 +160,7 @@ class ArticleBodyUpdate(NoNul):
 class RejectRequest(NoNul):
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
 
-    _note = field_validator("note")(_guards.optional_note)
+    _note = field_validator("note", mode="before")(_guards.optional_note)
 
 
 class ScheduleRequest(NoNul):
