@@ -253,6 +253,17 @@ for headers.
 **Contracts.** DTOs are exported from `pagebuilder.contracts`; anything else in
 the package may change without a major version.
 
+**`search_pages(db, pattern, *, tenant_id, include_drafts, limit, locale=None)`**
+and **`search_media(db, pattern, *, tenant_id, limit)`** (`pagebuilder.contracts`)
+return `(hits, total)` — `PageSearchHit` / `MediaSearchHit`, newest first, at
+most `limit`, plus the full match count. `pattern` is a SQL `LIKE` pattern
+escaped with `\`. The caller names the tenant and the contract pins it with a
+`WHERE`, so a host with no tenant bound still reads one tenant's rows; a strict
+session with none bound answers `([], 0)`. Pages match title, slug and draft
+body, never trashed, unpublished only with `include_drafts`, every language
+unless `locale` is given; media match the uploaded or stored filename. News'
+admin search is the consumer (#130).
+
 **`PageDeleted(page_id, slug)`** (`pagebuilder.contracts.events`) is published
 on the event bus when a page is *purged* — not when it is trashed, since a
 restore would otherwise come back without what other modules dropped. A module
