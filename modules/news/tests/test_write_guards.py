@@ -63,3 +63,43 @@ async def test_a_schedule_is_stored_in_utc(editor_client) -> None:
 
     detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
     assert datetime.fromisoformat(detail["publish_at"]) == instant
+
+
+@pytest.mark.parametrize(
+    "value",
+    [1, 1_700_000_000_000, True, "1700000000", "2026-12-01T09:00:00", "2026-12-01", "soon"],
+)
+@pytest.mark.parametrize("field", ["publish_at", "unpublish_at"])
+async def test_a_schedule_must_be_an_offset_aware_iso_string(
+    editor_client, field: str, value: object
+) -> None:
+    """A number is Unix seconds to pydantic — ``1`` went live on the next tick —
+    and a naive time is a guess about the zone (#158)."""
+    article_id = await _article(editor_client, "numeric", ArticleStatus.DRAFT)
+
+    response = await editor_client.post(f"{ARTICLES}/{article_id}/schedule", json={field: value})
+
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"][0]["loc"] == ["body", field]
+
+
+@pytest.mark.parametrize("note", ["   ", "\n\t"])
+async def test_a_blank_rejection_note_is_no_note(editor_client, note: str) -> None:
+    """The note is optional here, so spaces mean "no reason given" — not an
+    empty reason in the author's banner."""
+    article_id = await _article(editor_client, "blank-note", ArticleStatus.SUBMITTED_FOR_REVIEW)
+
+    response = await editor_client.post(f"{ARTICLES}/{article_id}/reject", json={"note": note})
+
+    assert response.status_code == 200, response.text
+    detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
+    assert detail["rejection_note"] is None
+
+
+async def test_a_rejection_note_is_stored_trimmed(editor_client) -> None:
+    article_id = await _article(editor_client, "trim-note", ArticleStatus.SUBMITTED_FOR_REVIEW)
+
+    await editor_client.post(f"{ARTICLES}/{article_id}/reject", json={"note": " Cite it. \n"})
+
+    detail = (await editor_client.get(f"{ARTICLES}/{article_id}/detail")).json()
+    assert detail["rejection_note"] == "Cite it."
