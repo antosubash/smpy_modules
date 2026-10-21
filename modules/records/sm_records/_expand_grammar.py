@@ -20,11 +20,19 @@ from fastapi import Depends, HTTPException, Query, Request
 from sm_records import constants
 from sm_records.settings import RecordsSettings
 
-__all__ = ["expand_hops", "max_expand_chars", "parse_expand"]
+__all__ = ["max_expand_chars", "parse_expand"]
 
 
 def _settings(request: Request) -> RecordsSettings:
-    """``deps.get_settings`` at call time — ``deps`` imports this module."""
+    """``deps.get_settings``, imported at call time.
+
+    :mod:`sm_records.deps` imports this module (through ``_grammar``, which
+    re-exports it and shares this accessor), so naming it at module scope
+    would be a cycle. One accessor and not a second copy of
+    ``request.app.state.sm_records.settings``: the caps are settings-screen
+    values like every other, and a stale second reader is how a limit starts
+    depending on which dependency asked.
+    """
     from sm_records.deps import get_settings
 
     return get_settings(request)
@@ -37,18 +45,6 @@ def _refuse(detail: str) -> HTTPException:
 def _prefixes(parts: list[str]) -> list[str]:
     """``["a", "b", "c"]`` -> ``["a", "a.b", "a.b.c"]``."""
     return [".".join(parts[: index + 1]) for index in range(len(parts))]
-
-
-def expand_hops(paths: list[str]) -> set[str]:
-    """Every distinct prefix of every path: ``a.b,a.c`` is ``{a, a.b, a.c}``.
-
-    One hop is one batched statement in ``services.expand``, so this — and
-    not the number of terms — is what ``max_expand_paths`` bounds.
-    """
-    hops: set[str] = set()
-    for path in paths:
-        hops.update(_prefixes(path.split(".")))
-    return hops
 
 
 def max_expand_chars(settings: RecordsSettings) -> int:

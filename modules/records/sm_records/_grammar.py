@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from typing import Any, Final, NamedTuple
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query
 
-from sm_records._expand_grammar import parse_expand
+from sm_records._expand_grammar import _settings, parse_expand
 from sm_records._text import has_nul
 from sm_records.index.query import Filter, FilterOp, Sort
 from sm_records.settings import RecordsSettings
@@ -55,20 +55,6 @@ route's own parameter (and each route clamps it with
 would make the product mean anything. A flat ceiling is the part that is
 true of every listing.
 """
-
-
-def _settings(request: Request) -> RecordsSettings:
-    """``deps.get_settings``, imported at call time.
-
-    :mod:`sm_records.deps` imports *this* module (it re-exports the grammar),
-    so naming it at module scope would be a cycle. One accessor and not a
-    second copy of ``request.app.state.sm_records.settings``: the caps below
-    are settings-screen values like every other, and a stale second reader is
-    how a limit starts depending on which dependency asked.
-    """
-    from sm_records.deps import get_settings
-
-    return get_settings(request)
 
 
 def _too_many(parameter: str, sent: int, cap: int) -> HTTPException:

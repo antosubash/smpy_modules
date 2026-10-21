@@ -172,8 +172,12 @@ async def _targets(
     return {uuid: rows[(target_type.id, uuid)] for uuid in uuids if (target_type.id, uuid) in rows}
 
 
+_Refs = list[list[tuple[str, str, bool]]]
+""":func:`_refs` of one hop, per holder — computed once, charged and resolved."""
+
+
 async def _resolve_hop(
-    db: AsyncSession, key: str, hop: Hop, holders: list[_Holder], rows: _Rows
+    db: AsyncSession, key: str, hop: Hop, holders: list[_Holder], per_holder: _Refs, rows: _Rows
 ) -> list[_Holder]:
     """Write ``hop``'s references into every holder; return the next level's.
 
@@ -181,7 +185,6 @@ async def _resolve_hop(
     exists) reads nothing: nothing can be resolved *as* it — the same answer
     the type predicate in ``_targets`` gives for a mismatch.
     """
-    per_holder = [_refs(record, key, hop.target_key) for record, _, _ in holders]
     wanted = {uuid for refs in per_holder for _, uuid, ok in refs if ok}
     found = (
         {} if hop.restricted or hop.target is None else await _targets(db, hop.target, wanted, rows)
@@ -201,10 +204,15 @@ async def _resolve_hop(
     return below
 
 
-def _charge(hop: Hop, key: str, holders: list[_Holder], spent: int, budget: int | None) -> int:
+def _charge(hop: Hop, per_holder: _Refs, spent: int, budget: int | None) -> int:
     """Count the references a deeper level is about to resolve, against the
-    budget, and refuse the request before the level is read if it crosses."""
-    spent += sum(len(_refs(record, key, hop.target_key)) for record, _, _ in holders)
+    budget, and refuse the request before the level is read if it crosses.
+
+    A hop that reads nothing (restricted, or its target type is gone) resolves
+    no references, so it is not charged for them."""
+    if hop.restricted or hop.target is None:
+        return spent
+    spent += sum(len(refs) for refs in per_holder)
     if budget is not None and spent > budget:
         raise QueryError(
             hop.path,
@@ -258,9 +266,10 @@ async def expand(
         next_level = []
         for level_hops, holders in level:
             for key, hop in level_hops.items():
+                per_holder = [_refs(record, key, hop.target_key) for record, _, _ in holders]
                 if depth > 1:
-                    spent = _charge(hop, key, holders, spent, max_refs)
-                below = await _resolve_hop(db, key, hop, holders, rows)
+                    spent = _charge(hop, per_holder, spent, max_refs)
+                below = await _resolve_hop(db, key, hop, holders, per_holder, rows)
                 if hop.children and below:
                     next_level.append((hop.children, below))
         level = next_level

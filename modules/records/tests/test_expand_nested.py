@@ -223,6 +223,21 @@ async def test_a_level_over_the_budget_is_refused_before_it_is_read(client):
     assert flat.status_code == 200
 
 
+async def test_a_restricted_hop_spends_no_budget(client):
+    """A hop that reads nothing resolves no references, so it is not charged
+    for them: the editor's read crosses a budget the viewer's does not."""
+    await _chain(client, house_roles=[ROLE_EDITOR])
+    for index in range(3):
+        await _book(client, index, actor=ROLE_EDITOR)
+    client.app.state.sm_records.settings.max_expand_refs = 2
+    url = f"{_BOOKS}?expand=author.publisher"
+    viewer = await client.get(url, headers=roles(ROLE_VIEWER))
+    assert viewer.status_code == 200, viewer.text
+    editor = await client.get(url, headers=roles(ROLE_EDITOR))
+    assert editor.status_code == 400
+    assert editor.json()["reason"] == "expand_budget"
+
+
 async def test_a_huge_expand_is_a_fast_400_before_it_is_split(client):
     """Tens of thousands of terms used to be parsed — duplicates checked
     against a list, the hop cap applied at the end — before any refusal:
