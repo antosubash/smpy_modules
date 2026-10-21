@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The public page has no layout, so nothing mounts BrandingHead for it unless
@@ -52,7 +52,7 @@ async function setBrandColor(page: Page, color: string) {
 async function seedPage(page: Page): Promise<string> {
   const slug = uniqueSlug('e2e-brand');
   const created = await page.request.post('/api/pagebuilder/pages', {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: {
       title: 'Branding',
       slug,
@@ -76,7 +76,7 @@ async function seedPage(page: Page): Promise<string> {
   expect(created.ok()).toBeTruthy();
   const { id } = await created.json();
   const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: { note: 'branding' },
   });
   expect(published.ok()).toBeTruthy();
