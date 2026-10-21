@@ -169,6 +169,8 @@ class ReconcileScheduler:
         self._task: asyncio.Task[None] | None = None
         #: Row ids that failed on the last tick; tried last on the next one.
         self._failing: set[int] = set()
+        #: The interval the running loop was started with (``None`` until started).
+        self.interval: timedelta | None = None
 
     @property
     def running(self) -> bool:
@@ -177,6 +179,7 @@ class ReconcileScheduler:
     def start(self, app: FastAPI, interval: timedelta) -> None:
         # Stopped from ``BillingModule.on_shutdown``: the host's custom lifespan
         # never runs router shutdown handlers (see ``news.scheduler``).
+        self.interval = interval
         self._task = asyncio.create_task(self._run(app, interval))
 
     async def _run(self, app: FastAPI, interval: timedelta) -> None:

@@ -143,13 +143,18 @@ instead of a 500, and the request session stays usable.
 
 `BillingSettings` subclasses `DbBackedSettings` (no env sources) and is
 registered with `register_module_settings`. `provider` and
-`reconcile_interval_minutes` are read once in `on_startup`
+`reconcile_interval_minutes` are first read in `on_startup`
 (`providers.factory.install_provider`, `startup.start_reconcile`). A `stripe` choice with a
 missing or undecryptable secret falls back to `ManualProvider` and records
-`provider_error` for the admin screens — the app still boots. Saving the
-connection rebuilds the provider only when it is the one already chosen (new
-secrets apply at once; switching provider waits for the restart the setting
-promises). Secrets are `enc:v1:<fernet>` under a key derived from the app's
+`provider_error` for the admin screens — the app still boots. After that,
+`live.py` subscribes to the framework's `SettingsReloaded`: a save that changes
+`provider` or a Stripe secret rebuilds the provider with the same
+`install_provider`, and one that changes those or the interval calls
+`startup.sync_reconcile`, which starts, stops or re-times the loop (a loop
+already at the wanted interval is kept). The swap is one attribute assignment
+on the event loop, under a lock so two saves cannot both start a loop; every
+caller reads `services.provider` per request or per tick. It is per process —
+other workers pick the change up at their restart. Secrets are `enc:v1:<fernet>` under a key derived from the app's
 `secret_key` (`crypto.py`, a copy of `sm_ai.crypto`'s scheme — a published
 module must not import a sibling optional module).
 

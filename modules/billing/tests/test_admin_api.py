@@ -201,8 +201,8 @@ async def test_connection_save_rebuilds_stripe_provider(app, admin):
     assert (conn["active_provider"], conn["provider_error"]) == ("stripe", "")
 
 
-async def test_connection_save_does_not_switch_provider(app, admin):
-    # Switching manual -> stripe is restart-required; only the setting changes.
+async def test_connection_save_switches_to_a_chosen_stripe(app, admin):
+    # The setting says stripe while manual still runs: the save completes it (#85).
     app.state.sm_billing.settings = app.state.sm_billing.settings.model_copy(
         update={"provider": "stripe"}
     )
@@ -210,7 +210,7 @@ async def test_connection_save_does_not_switch_provider(app, admin):
         f"{ADMIN}/connection",
         json={"stripe_secret_key": "sk_test_1", "stripe_webhook_secret": "whsec_1"},
     )
-    assert app.state.sm_billing.provider.name == "manual"
+    assert app.state.sm_billing.provider.name == "stripe"
 
 
 async def test_assign_without_provider_is_503(app, admin):

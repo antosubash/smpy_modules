@@ -42,11 +42,11 @@ environment variables — an `SM_BILLING_*` line does nothing.
 
 | Field | Default | Notes |
 |---|---|---|
-| `provider` | `manual` | `manual` or `stripe`. Read at startup: changing it needs a restart. |
+| `provider` | `manual` | `manual` or `stripe`. Takes effect on save, no restart (see [Switching provider](#switching-provider)). |
 | `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Enter it on the connection screen, which encrypts it (`enc:v1:…`, Fernet keyed on the app's `secret_key`). A plaintext value still works and logs a one-time warning. |
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. Blank uses the request's host — set it behind a proxy. |
-| `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Read at startup: changing it needs a restart. `60` suits most deployments. |
+| `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen
@@ -75,7 +75,35 @@ environment variables — an `SM_BILLING_*` line does nothing.
    **Do not let the portal switch customers to prices that belong to no plan**
    here: billing maps every subscription to a plan by its price, and an unknown
    price on a live subscription fails until a plan carries it.
-7. Set `provider = stripe` on the Settings screen and restart.
+7. Set `provider = stripe` on the Settings screen. It takes effect on save.
+
+## Switching provider
+
+Saving `provider`, either Stripe secret or `reconcile_interval_minutes` — on
+the Settings screen or the connection screen — rebuilds the provider and the
+reconcile loop in the running process; no restart.
+
+- **manual → stripe**: the next request uses Stripe (checkout, portal, price
+  checks on plan save, seat pushes). If a secret is missing or can't be
+  decrypted, billing stays on `manual` and the connection screen says why;
+  saving the missing secret completes the switch. A configured
+  `reconcile_interval_minutes` starts its loop.
+- **stripe → manual**: Stripe calls stop; the reconcile loop stops. Webhook
+  deliveries get **404 `stripe_not_configured`** — Stripe retries them for up
+  to three days, so switching back within that window processes them (each
+  event once). Subscriptions stay as last synced; run `smpy billing reconcile`
+  after switching back.
+- **Rotating the webhook signing secret**: applies on save. Deliveries signed
+  with the old secret get 400 until the Stripe endpoint uses the new one.
+- A request already in flight finishes with the provider it started with.
+
+Still needing a restart:
+
+- **Other workers.** The settings hot-swap is per process. With several
+  workers or instances, the one that served the save switches at once; the
+  others keep their old settings, provider and loop until they restart.
+- **`scripts/set_setting.py`** writes the database only; the running app reads
+  that value at its next boot.
 
 To try it locally with test keys:
 
@@ -104,7 +132,8 @@ Nothing re-reads Stripe on its own unless you turn it on: a missed webhook or a
 seat push that failed while Stripe was unreachable otherwise stays wrong until
 someone runs the command above. Set `reconcile_interval_minutes` (Settings
 screen, or `scripts/set_setting.py sm_billing reconcile_interval_minutes 60`)
-and restart, and the app runs the same per-organisation sync on a loop:
+(on save from the Settings screen; a `set_setting.py` value at the next boot),
+and the app runs the same per-organisation sync on a loop:
 
 - Every N minutes it picks the subscriptions whose `synced_at` is older than N
   minutes, oldest first. A webhook or a **Resync** refreshes `synced_at`, so a
@@ -140,7 +169,7 @@ rows are unprocessed, and whether the scheduled reconcile is running. An old
 |---|---|---|
 | Organisation paid but is still on the free plan | webhook not arriving, or failing | The subscriptions screen's "Unprocessed webhooks" count; Stripe → Webhooks → endpoint → recent deliveries; `billing_webhook_event` rows with `processed_at IS NULL` and their `error`. Fix the cause, then `smpy billing reconcile --tenant ID` (or **Resync**). |
 | Webhook deliveries return 400 | wrong signing secret | Re-enter the endpoint's `whsec_…` on the connection screen. |
-| Webhook deliveries return 404 | provider isn't `stripe`, or it fell back to manual | Connection screen banner; restart after setting `provider = stripe`. |
+| Webhook deliveries return 404 | provider isn't `stripe`, or it fell back to manual | Connection screen banner; set `provider = stripe` and any missing secret. |
 | Webhook error `unknown_price` | the subscription's price is on no plan (portal plan switching, a price created by hand) | Add the price to a plan (or a new plan), then reconcile. |
 | Event row reads `SyncError: unknown_tenant` with status 200 | a subscription from another product on the same Stripe account, or a deleted organisation | Nothing to do; it is acknowledged on purpose so Stripe doesn't disable the endpoint. |
 | Organisation shows **Suspended (unpaid)** | retries ran out | The owner pays from **Billing → Pay now**; the next webhook reactivates it. To lift it by hand on the manual provider, assign **Active**. |
