@@ -1,19 +1,13 @@
 /** Shared fetch plumbing for the news API clients.
  *
- * Split out of `api.ts` so the taxonomy client reuses one CSRF read and one
+ * Split out of `api.ts` so the taxonomy client reuses one CSRF header and one
  * error decoder rather than growing a second copy that drifts from it.
  */
 
+import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
 
 export const BASE = '/api/news';
-
-const CSRF_COOKIE = 'news_csrf';
-
-export function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
 
 /** How many characters of an unrecognised error body are worth showing. */
 const MAX_BODY_SNIPPET = 200;
@@ -55,6 +49,9 @@ export async function errorFrom(response: Response): Promise<HttpError> {
 
   try {
     const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    if (isCsrfRefusal(response.status, detail)) {
+      return new HttpError(translate(keys.news.errors.csrf_failed), response.status);
+    }
     if (typeof detail === 'string' && detail.trim()) return new HttpError(detail, response.status);
     const validation = fromValidationErrors(detail);
     if (validation) return new HttpError(validation, response.status);
@@ -144,14 +141,13 @@ export async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export async function write<T>(path: string, method: string, body?: unknown): Promise<T | null> {
-  const token = readCookie(CSRF_COOKIE);
   const response = await fetch(`${BASE}${path}`, {
     method,
     credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      ...(token ? { 'X-CSRF-Token': token } : {}),
+      ...csrfHeaders(method),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

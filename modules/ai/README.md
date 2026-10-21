@@ -59,8 +59,10 @@ Two slots — chat and embeddings — each with provider (`anthropic`, `openai`,
 `openai_compatible` provider covers vLLM, Ollama and LM Studio (base URL
 required; a blank key is replaced by a protocol-satisfying placeholder).
 
-Configure at `/ai/` (permission `ai.manage`), on the Settings screen, or
-headlessly with `scripts/set_setting.py sm_ai <field> <value>`. The module
+Configure at `/ai/` (permission `ai.manage`) or headlessly with
+`scripts/set_setting.py sm_ai <field> <value>`. The generic Settings screen
+links to `/ai/` rather than editing these fields itself, so the page's
+validation and key encryption apply to every save. The module
 reads no `SM_AI_*` environment variables: settings live in the database at
 SYSTEM scope, so every tenant shares one provider configuration and one API
 key per slot. API keys are encrypted at

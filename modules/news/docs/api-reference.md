@@ -1,8 +1,14 @@
 # News API reference
 
-All `/api/news` routes are JSON. Writes (`POST`/`PUT`/`DELETE`) need the
-session's CSRF token in an `X-CSRF-Token` header; the console's own client
-reads it from the `news_csrf` cookie. Errors are `{"detail": "<message>"}`
+All `/api/news` routes are JSON. Writes (`POST`/`PUT`/`PATCH`/`DELETE`) need
+the session's CSRF token in an `X-CSRF-Token` header — the framework's
+`RequiresCsrf`, as billing uses; a write without it is a `403`. Every news
+screen shares the token as the `csrf_token` Inertia prop
+(`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
+sends it from there. Reads need no token, so the feed block on public pages is
+unaffected. The session cookie's `SameSite=Lax` alone is not enough: on a
+multi-tenant host every organisation's public site is same-site with the
+console. Errors are `{"detail": "<message>"}`
 (validation errors use FastAPI's 422 list). Every route is bound to a tenant
 first — see [Tenancy](#tenancy).
 

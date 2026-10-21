@@ -82,8 +82,9 @@ class WorkflowMixin(RevisionsMixin):
 
         Each field is independently optional: pass a ``datetime`` to set,
         pass ``None`` to clear, omit (sentinel ``_UNSET``) to leave the
-        existing value alone. Aware datetimes are normalized to UTC;
-        naive ones are assumed UTC. Rejects ``publish_at >= unpublish_at``
+        existing value alone. The API takes only offset-aware times
+        (``AwareInstant``); a naive value here is a stored one SQLite handed
+        back without its offset, and is read as UTC. Rejects ``publish_at >= unpublish_at``
         with a 422 since that would auto-unpublish before the auto-publish
         could fire.
         """

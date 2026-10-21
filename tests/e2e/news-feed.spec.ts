@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { csrfHeader, login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The feed is the reason the block registry exists.
@@ -37,7 +37,7 @@ async function publishArticle(page: Page, category: string): Promise<string> {
     body: paragraphBody('Body'),
     publish: true,
   });
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page);
   // The card excerpt is the article's meta description.
   await page.request.put(`/api/news/articles/${articleId}`, {
     headers,

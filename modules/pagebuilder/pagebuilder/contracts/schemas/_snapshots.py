@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
+from pagebuilder.contracts.schemas._fields import OptionalNote
 from pagebuilder.models import ImportStatus, SnapshotSource
 
 
@@ -28,7 +29,7 @@ class SnapshotListResponse(BaseModel):
 
 
 class SnapshotCreateRequest(BaseModel):
-    note: str | None = Field(default=None, max_length=2000)
+    note: OptionalNote = None
 
 
 class PendingImportRead(BaseModel):
@@ -46,7 +47,7 @@ class PendingImportRead(BaseModel):
 
 
 class ImportDecisionRequest(BaseModel):
-    note: str | None = Field(default=None, max_length=2000)
+    note: OptionalNote = None
 
 
 class ImportApplyResponse(BaseModel):
