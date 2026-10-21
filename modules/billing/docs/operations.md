@@ -46,6 +46,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Enter it on the connection screen, which encrypts it (`enc:v1:…`, Fernet keyed on the app's `secret_key`). A plaintext value still works and logs a one-time warning. |
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. Blank uses the request's host — set it behind a proxy. |
+| `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Read at startup: changing it needs a restart. `60` suits most deployments. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen
@@ -94,14 +95,50 @@ Re-reads each subscription from Stripe, applies it exactly as a webhook would
 (status, plan, period, suspension), and pushes the member count to Stripe for
 per-seat plans whose quantity drifted. Safe to run while the app is live and
 safe to repeat. Exit code 1 if any organisation failed (each is printed); the
-others are still synced. Run it after a webhook outage, after restoring a
-backup, or on a schedule as a backstop.
+others are still synced. Run it after a webhook outage or after restoring a
+backup.
+
+### Scheduled reconcile
+
+Nothing re-reads Stripe on its own unless you turn it on: a missed webhook or a
+seat push that failed while Stripe was unreachable otherwise stays wrong until
+someone runs the command above. Set `reconcile_interval_minutes` (Settings
+screen, or `scripts/set_setting.py sm_billing reconcile_interval_minutes 60`)
+and restart, and the app runs the same per-organisation sync on a loop:
+
+- Every N minutes it picks the subscriptions whose `synced_at` is older than N
+  minutes, oldest first. A webhook or a **Resync** refreshes `synced_at`, so a
+  subscription Stripe already told us about is not fetched again.
+- Each organisation is synced bound to its own tenant and committed with
+  `finalize_session`, so a suspension or reactivation publishes
+  `TenantStatusChanged` and clears the membership cache exactly as a webhook
+  would. One organisation failing is logged and the rest carry on; its claim is
+  released, so the next tick retries it (a failure after the snapshot was applied, i.e. the seat push, keeps the fresh stamp and retries one interval later).
+- **Several app instances are safe.** Every process runs the loop, but each
+  organisation is claimed with a conditional `UPDATE` on its `synced_at`
+  before Stripe is called, so in any window exactly one instance fetches it.
+  The sync itself is idempotent anyway (a quantity is *set*, not added).
+- **Rate limits.** Organisations are synced one at a time with a 0.2 s pause
+  (a few Stripe calls a second; the SDK also retries a 429 with backoff). Each
+  Stripe error doubles the pause, up to 30 s, and five in a row end the tick —
+  an outage is waited out until the next interval, not hammered. An
+  organisation whose sync failed on the previous tick (its subscription was
+  deleted in Stripe, say) is retried after the others, so a few permanently
+  failing ones cannot end every tick before the healthy ones are reached.
+
+Prefer an external scheduler (cron, a Kubernetes CronJob)? Leave the setting at
+`0` and run `smpy billing reconcile` from there.
+
+**Admin → Billing → Subscriptions** shows, under Stripe, how old the oldest
+`synced_at` is, how many subscriptions were never synced, how many webhook
+rows are unprocessed, and whether the scheduled reconcile is running. An old
+"oldest sync" with the loop off, or any unprocessed webhook, is worth a look.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Check / fix |
 |---|---|---|
-| Organisation paid but is still on the free plan | webhook not arriving, or failing | Stripe → Webhooks → endpoint → recent deliveries; `billing_webhook_event` rows with `processed_at IS NULL` and their `error`. Fix the cause, then `smpy billing reconcile --tenant ID` (or **Resync**). |
+| Organisation paid but is still on the free plan | webhook not arriving, or failing | The subscriptions screen's "Unprocessed webhooks" count; Stripe → Webhooks → endpoint → recent deliveries; `billing_webhook_event` rows with `processed_at IS NULL` and their `error`. Fix the cause, then `smpy billing reconcile --tenant ID` (or **Resync**). |
 | Webhook deliveries return 400 | wrong signing secret | Re-enter the endpoint's `whsec_…` on the connection screen. |
 | Webhook deliveries return 404 | provider isn't `stripe`, or it fell back to manual | Connection screen banner; restart after setting `provider = stripe`. |
 | Webhook error `unknown_price` | the subscription's price is on no plan (portal plan switching, a price created by hand) | Add the price to a plan (or a new plan), then reconcile. |
@@ -109,7 +146,7 @@ backup, or on a schedule as a backstop.
 | Organisation shows **Suspended (unpaid)** | retries ran out | The owner pays from **Billing → Pay now**; the next webhook reactivates it. To lift it by hand on the manual provider, assign **Active**. |
 | Organisation shows **Suspended** (no "unpaid") | an administrator suspended it on the Organisations screen | Billing never lifts this; reactivate it there. |
 | Owner can't downgrade: "remove N first" | members plus pending invitations exceed the target plan's seats | Remove members or revoke invitations. |
-| Per-seat quantity at Stripe differs from members | a membership change happened while Stripe was unreachable | `smpy billing reconcile`. |
+| Per-seat quantity at Stripe differs from members | a membership change happened while Stripe was unreachable | The scheduled reconcile pushes it within one to two intervals; without it, `smpy billing reconcile`. |
 | "Changing a price that is in use" when editing a plan | a live subscription bills on that price | Create a new plan with the new price; move organisations to it. |
 | Connection screen: "cannot be decrypted" | app `secret_key` changed | Re-enter both Stripe secrets. |
 | Checkout says "already subscribed" but the page shows the free plan | a subscription exists at Stripe the app hasn't recorded | `smpy billing reconcile --tenant ID`. |

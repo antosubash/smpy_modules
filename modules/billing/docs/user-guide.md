@@ -64,6 +64,8 @@ member count (and the billed quantity if it differs), and the period end.
   Organisations screen).
 - With **Stripe** each row with a Stripe subscription has **Resync**, which
   re-reads it from Stripe — the same as one webhook arriving.
+- With **Stripe** a line above the table shows the oldest sync, webhook rows
+  not yet processed, and whether the scheduled reconcile is on.
 
 | Status | Shown as | Organisation gets |
 |---|---|---|
