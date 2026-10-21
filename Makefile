@@ -25,8 +25,14 @@ dev: gen-pages
 # playwright.config.ts and vite.config.ts share; `override` makes the guarded
 # value win over an env or command-line one.
 _q = '$(subst ','\'',$(1))'
-override API_PORT := $(shell node scripts/ports.mjs api $(call _q,$(API_PORT)) $(call _q,$(E2E_API_PORT)))
-override UI_PORT := $(shell node scripts/ports.mjs ui $(call _q,$(UI_PORT)) $(call _q,$(E2E_UI_PORT)) $(call _q,$(SM_UI_PORT)))
+_API_PORT := $(shell node scripts/ports.mjs api $(call _q,$(API_PORT)) $(call _q,$(E2E_API_PORT)))
+_UI_PORT := $(shell node scripts/ports.mjs ui $(call _q,$(UI_PORT)) $(call _q,$(E2E_UI_PORT)) $(call _q,$(SM_UI_PORT)))
+# Empty means node is missing or failed. Only a target that uses a port stops
+# (`=` defers the error to use): an empty port would hand dev-api no --port
+# and widen `make kill`'s pkill regex to every uvicorn.
+_no_port = $(error node is required to resolve the $(1) port (scripts/ports.mjs))
+override API_PORT = $(or $(_API_PORT),$(call _no_port,API))
+override UI_PORT = $(or $(_UI_PORT),$(call _no_port,UI))
 
 dev-api:
 	uv run --project host uvicorn main:app --app-dir host --reload --port $(API_PORT)
