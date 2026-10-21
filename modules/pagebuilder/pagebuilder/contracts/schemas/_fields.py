@@ -30,7 +30,10 @@ def _parse_aware(value: Any) -> Any:
         raise ValueError(ISO_REQUIRED)
     if parsed.tzinfo is None:
         raise ValueError(ISO_REQUIRED)
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except OverflowError:  # 9999-12-31T23:59:59-05:00 has no UTC form
+        raise ValueError(ISO_REQUIRED) from None
 
 
 # A schedule instant on the way in.

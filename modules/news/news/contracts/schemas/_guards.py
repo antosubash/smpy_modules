@@ -68,7 +68,10 @@ def aware_instant(value: Any) -> datetime | None:
         raise ValueError(ISO_REQUIRED)
     if parsed.tzinfo is None:
         raise ValueError(ISO_REQUIRED)
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except OverflowError:  # 9999-12-31T23:59:59-05:00 has no UTC form
+        raise ValueError(ISO_REQUIRED) from None
 
 
 def optional_note(value: Any) -> Any:

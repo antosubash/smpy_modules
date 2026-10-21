@@ -139,3 +139,11 @@ async def test_a_trimmed_note_over_the_limit_is_refused(editor_client) -> None:
     )
 
     assert response.status_code == 422, response.text
+
+
+def test_an_offset_that_overflows_utc_is_refused_not_a_500() -> None:
+    from news.contracts.schemas import ScheduleRequest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ScheduleRequest(publish_at="9999-12-31T23:59:59-05:00")

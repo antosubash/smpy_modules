@@ -165,3 +165,10 @@ async def test_reject_keeps_a_padded_note_at_the_limit(authed_client: AsyncClien
 
     assert response.status_code == 200, response.text
     assert response.json()["rejection_note"] == note
+
+
+def test_an_offset_that_overflows_utc_is_refused_not_a_500() -> None:
+    from pagebuilder.contracts.schemas import PageScheduleRequest
+
+    with pytest.raises(ValidationError):
+        PageScheduleRequest(publish_at="9999-12-31T23:59:59-05:00")
