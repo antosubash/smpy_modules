@@ -13,15 +13,20 @@
 **/.ruff_cache
 
 # Secrets: the stack reads them from an env file at run time, never the image.
-.env*
-*.pem
-credentials*
+# `**/` matters: a bare `.env*` matches only at the context root, so a
+# host/.env or modules/ai/credentials.json would otherwise reach `COPY . .`.
+**/.env*
+**/*.pem
+**/*.key
+**/credentials*
+**/secrets*
 
-# Local state
-host/*.db
-host/*.db-*
-app.db*
-qa.db*
+# Local state, at any depth
+**/*.db
+**/*.db-*
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-*
 var/
 uploads/
 

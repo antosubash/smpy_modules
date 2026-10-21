@@ -88,7 +88,13 @@ docker compose down            # -v also drops the data volumes
   `gen-pages`, `npm run build`), then installs the Python workspace without dev
   dependencies into a slim Python image. Each start runs
   `alembic upgrade heads`, then uvicorn. The container runs
-  `SM_ENVIRONMENT=production`.
+  `SM_ENVIRONMENT=production`. Base images are pinned to an exact tag and
+  digest; Dependabot bumps them.
+- **Migrations** run on every start, which is right for the one container
+  compose starts and wrong for several: nothing locks the upgrade, so replicas
+  starting together would run the same DDL at once. Run more than one with
+  `SMPY_MIGRATE_ON_START=0` and migrate once beforehand:
+  `docker compose run --rm -e SMPY_MIGRATE_ON_START=1 host true`.
 - **Secrets** come from the env file, never the image: `SM_SECRET_KEY` and the
   two `SM_USERS_*_TOKEN_SECRET` keys, which production refuses to boot without.
   A `.env` from before those keys were added to `.env.example` needs them added
@@ -97,7 +103,8 @@ docker compose down            # -v also drops the data volumes
 - **Admin.** `SM_USERS_BOOTSTRAP_EMAIL` / `_PASSWORD` in the env file seed the
   first admin, on first start against an empty users table only.
 - **Port.** `SMPY_PORT` (default `8090`) is the host port; the container
-  listens on 8000.
+  listens on 8000. It is published on `127.0.0.1` only; set
+  `SMPY_BIND_ADDRESS=0.0.0.0` to reach it from other machines.
 - **Database.** SQLite at `/app/var/app.db` in the `smpy-data` volume by default
   (pagebuilder media and snapshots live there too; file uploads are in
   `smpy-uploads`). For the shared dev-services Postgres, add the overlay that

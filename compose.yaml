@@ -14,6 +14,10 @@
 # SM_DATABASE_URL and SM_ENVIRONMENT describe a process on this machine, not in
 # a container:
 #   SMPY_PORT          host port to publish on (default 8090)
+#   SMPY_BIND_ADDRESS  host interface to publish on (default 127.0.0.1, this
+#                      machine only; 0.0.0.0 exposes it to the network)
+#   SMPY_MIGRATE_ON_START  1 (default) applies migrations before serving; set
+#                      0 when another process runs them (see entrypoint.sh)
 #   SMPY_ENV_FILE      env file handed to the app (default .env)
 #   SMPY_DATABASE_URL  database URL as seen from inside the container
 #                      (default SQLite at /app/var/app.db, in the volume)
@@ -33,9 +37,10 @@ services:
     environment:
       SM_ENVIRONMENT: production
       SM_DATABASE_URL: ${SMPY_DATABASE_URL:-sqlite+aiosqlite:////app/var/app.db}
+      SMPY_MIGRATE_ON_START: ${SMPY_MIGRATE_ON_START:-1}
       PORT: "8000"
     ports:
-      - "${SMPY_PORT:-8090}:8000"
+      - "${SMPY_BIND_ADDRESS:-127.0.0.1}:${SMPY_PORT:-8090}:8000"
     volumes:
       # SQLite database plus pagebuilder media and snapshots.
       - smpy-data:/app/var

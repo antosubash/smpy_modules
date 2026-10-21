@@ -14,15 +14,18 @@
 # Both stages work under /app: the generated pages files carry absolute paths
 # to the module sources, so the tree has to sit at the same place in each.
 
+# The base images are pinned to an exact release and digest in the FROM lines
+# themselves (not through ARGs) so Dependabot's docker ecosystem can see and
+# bump them (.github/dependabot.yml). PYTHON_VERSION is only the interpreter uv
+# installs in the ui stage, which runs `gen-pages` and nothing else.
 ARG PYTHON_VERSION=3.12
-ARG NODE_VERSION=24
 # Same uv as CI (UV_VERSION in .github/workflows/ci.yml); bump them together.
 ARG UV_VERSION=0.13.4
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 # ---------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-bookworm-slim AS ui
+FROM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS ui
 ARG PYTHON_VERSION
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
@@ -42,7 +45,7 @@ RUN uv run --no-sync --project host python -m simple_module_hosting sync-js-deps
  && npm run build
 
 # ---------------------------------------------------------------------------
-FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+FROM python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70 AS runtime
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
@@ -52,6 +55,7 @@ ENV UV_LINK_MODE=copy \
     PYTHONUNBUFFERED=1 \
     SM_ENVIRONMENT=production \
     SM_DATABASE_URL=sqlite+aiosqlite:////app/var/app.db \
+    SMPY_MIGRATE_ON_START=1 \
     PORT=8000
 WORKDIR /app
 
