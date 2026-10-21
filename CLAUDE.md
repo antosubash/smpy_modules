@@ -129,7 +129,7 @@ This repo does not use Redis or Celery.
 ## Working against an unreleased framework
 
 ```bash
-make link-framework FRAMEWORK=<path-to>/simple_module_python
+make link-framework FRAMEWORK=/path/to/simple_module_python
 make unlink-framework
 ```
 

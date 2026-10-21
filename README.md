@@ -110,14 +110,14 @@ bump level. See [docs/releasing.md](docs/releasing.md).
 ## Working against an unreleased framework
 
 ```bash
-make link-framework FRAMEWORK=<path-to>/simple_module_python
+make link-framework FRAMEWORK=/path/to/simple_module_python
 make unlink-framework
 ```
 
 `FRAMEWORK` is required and has no default. `link-framework` editable-installs
 the framework's `core`, `db`, and `hosting` packages into the workspace venv;
-`unlink-framework` restores the PyPI versions. Neither touches a tracked file, so a local override cannot leak into
-a release.
+`unlink-framework` restores the PyPI versions. Neither touches a tracked file,
+so a local override cannot leak into a release.
 
 ## Conventions
 
