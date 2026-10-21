@@ -201,7 +201,7 @@ export function SlotCard({
               type="number"
               min={0}
               value={values.dim ?? 0}
-              onChange={(e) => set({ dim: Number(e.target.value) || 0 })}
+              onChange={(e) => set({ dim: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })}
               disabled={busy}
             />
             <p className="text-xs text-muted-foreground">{t(c.vector_dimension_hint)}</p>
