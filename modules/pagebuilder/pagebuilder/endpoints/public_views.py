@@ -110,8 +110,8 @@ async def render_public_page(
     db: AsyncSession,
     settings: PagebuilderSettings,
     *,
+    locale: str,
     url_prefix: str | None = None,
-    locale: str | None = None,
 ) -> Response:
     """Serve a published page, with everything a public URL needs.
 
@@ -123,23 +123,23 @@ async def render_public_page(
     ``url_prefix`` is the address the caller serves at, used for the canonical
     URL and for old-slug redirects. It defaults to this module's own, which is
     what the route below passes. ``locale`` is which language's page to look
-    for — the default one when the caller does not say, so a monolingual host
-    and every pre-existing caller behave exactly as before.
+    for, and is required with no fallback to the default language: a caller
+    that forgot it would be served the default-language page at a translated
+    address, which is how ``/de/p/x`` starts serving the English one.
     """
     prefix = url_prefix if url_prefix is not None else settings.public_route_prefix
-    active = locale or locales.default()
-    page = await PagesService(db).get_by_slug_published(slug, active)
+    page = await PagesService(db).get_by_slug_published(slug, locale)
     if page is None or page.published_data is None:
         # Before giving up: this may be an address the page used to live at.
-        moved_to = await redirects.resolve(db, slug, active)
+        moved_to = await redirects.resolve(db, slug, locale)
         if moved_to is not None:
             # The page's current address, wherever that now is. When another
             # module has claimed it, the old URL forwards *there* rather than
             # to this module's version of it — that one 404s, and sending a
             # visitor to it would turn a rename into a broken link, which is
             # the exact thing recording a redirect exists to prevent.
-            claimed = await public_claims.claimed_url(db, moved_to, active)
-            target = claimed or locales.public_path(prefix, moved_to, active)
+            claimed = await public_claims.claimed_url(db, moved_to, locale)
+            target = claimed or locales.public_path(prefix, moved_to, locale)
             # A 301 is cacheable by default; key it on what picks the tenant.
             return vary_on_tenant(RedirectResponse(target, status_code=301), request.app)
         raise HTTPException(status_code=404, detail="Page not found")

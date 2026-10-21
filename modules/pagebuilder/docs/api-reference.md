@@ -279,9 +279,11 @@ registered claim wins. `public_claims.reset()` clears them (tests).
 
 To serve the claimed page, call
 `pagebuilder.endpoints.public_views.render_public_page(slug, request, inertia,
-db, settings, url_prefix=…, locale=…)` from a router that depends on
+db, settings, locale=…, url_prefix=…)` from a router that depends on
 `tenancy.bind_public`: it applies the same ETag, cache, CSP, canonical,
-`hreflang`, nav and redirect handling.
+`hreflang`, nav and redirect handling. `locale` is required — there is no
+fallback to the default language, so a claimant always says which language it
+serves.
 
 ## Errors
 
