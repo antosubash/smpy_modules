@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { DEFAULT_UI_PORT, resolvePort } from '../../scripts/ports.mjs';
+
 // Force every importer (host, workspace module, wheel-installed module)
 // to resolve to one React copy + a single Inertia hook context. Without
 // dedupe, plugin-react fires "can't detect preamble" and `usePage` from
@@ -135,11 +137,9 @@ function collectOptimizeIncludes(): string[] {
   return [...includes];
 }
 
-// Same guard playwright.config.ts and the Makefile apply, so every consumer
-// agrees on which port the UI actually took (Number() would also accept
-// hex/exponent/leading-zero forms the other two reject).
-const rawUiPort = process.env.SM_UI_PORT;
-const uiPort = rawUiPort && /^[1-9][0-9]*$/.test(rawUiPort) ? Number(rawUiPort) : 5050;
+// scripts/ports.mjs is the guard the Makefile and playwright.config.ts use
+// too, so every consumer agrees on which port the UI took.
+const uiPort = Number(resolvePort([process.env.SM_UI_PORT], DEFAULT_UI_PORT));
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -161,8 +161,8 @@ export default defineConfig({
   server: {
     // Overridable so a second checkout (e.g. a worktree running e2e) can
     // boot beside a dev stack that already holds the default port. `uiPort`
-    // is regex-guarded above, so an exported-but-empty or garbage SM_UI_PORT
-    // falls back to 5050 rather than yielding port 0/NaN.
+    // is guarded above, so an exported-but-empty or garbage SM_UI_PORT falls
+    // back to 5050 rather than yielding port 0/NaN.
     port: uiPort,
     strictPort: true,
     origin: `http://localhost:${uiPort}`,
