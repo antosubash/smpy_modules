@@ -45,6 +45,18 @@ def test_placeholder_drift_and_blank_fail(tmp_path):
     assert any("de.c: blank translation" in e for e in errors)
 
 
+def test_backticks_fail_in_every_catalogue(tmp_path):
+    # Rendered as plain text, a Markdown code span shows its backticks (#189).
+    loc = _locales(tmp_path)
+    _write(loc, "en.json", {"a": {"b": "run `smpy x`"}, "c": "fine"})
+    _write(loc, "de.json", {"a": {"b": "„smpy x“ ausführen"}, "c": "`gut`"})
+    errors = check_locales.check_dir(loc)
+    assert len([e for e in errors if "backtick" in e]) == 2
+    assert any("en.json: en.a.b: contains a backtick" in e for e in errors)
+    assert any("de.json: de.c: contains a backtick" in e for e in errors)
+    assert check_locales.main(["--root", str(tmp_path)]) == 1
+
+
 def test_repo_catalogues_pass():
     repo = Path(__file__).resolve().parents[2]
     assert check_locales.main(["--root", str(repo)]) == 0

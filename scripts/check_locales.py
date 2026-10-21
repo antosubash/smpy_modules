@@ -12,6 +12,11 @@ Rules for each ``modules/<name>/<package>/locales/<lang>.json`` other than
     renders a literal brace or loses the value.
   * No translated string is blank where the English is not.
 
+And for every catalogue, ``en.json`` included:
+  * No string carries a backtick. The console renders catalogue text as plain
+    text, so Markdown code spans reach the reader as literal backticks (#189).
+    Name a command or setting in quotes instead.
+
 Exit 0 if all pass, 1 otherwise.
 """
 
@@ -25,6 +30,7 @@ from pathlib import Path
 
 SOURCE = "en.json"
 PLACEHOLDER = re.compile(r"\{\{?\s*[\w.]+\s*\}?\}")
+MARKDOWN = "`"
 
 
 def compare(en: object, other: object, where: str) -> list[str]:
@@ -48,12 +54,21 @@ def compare(en: object, other: object, where: str) -> list[str]:
     return errors
 
 
+def markdown(node: object, where: str) -> list[str]:
+    """Every string under ``node`` that would show a literal backtick."""
+    if isinstance(node, dict):
+        return [e for key, value in node.items() for e in markdown(value, f"{where}.{key}")]
+    if isinstance(node, str) and MARKDOWN in node:
+        return [f"{where}: contains a backtick (rendered literally; use quotes)"]
+    return []
+
+
 def check_dir(locales: Path) -> list[str]:
     source = locales / SOURCE
     if not source.is_file():
         return []
     en = json.loads(source.read_text(encoding="utf-8"))
-    errors: list[str] = []
+    errors = [f"{source}: {e}" for e in markdown(en, source.stem)]
     for path in sorted(locales.glob("*.json")):
         if path.name == SOURCE:
             continue
@@ -63,6 +78,7 @@ def check_dir(locales: Path) -> list[str]:
             errors.append(f"{path}: invalid JSON: {exc}")
             continue
         errors += [f"{path}: {e}" for e in compare(en, other, path.stem)]
+        errors += [f"{path}: {e}" for e in markdown(other, path.stem)]
     return errors
 
 
