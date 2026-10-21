@@ -12,10 +12,13 @@ before it is read. Tenant isolation at depth is in
 from __future__ import annotations
 
 import re
+import time
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
-from sm_records.constants import EXPAND_DEPTH_CAP
+from sm_records._expand_grammar import parse_expand
+from sm_records.constants import EXPAND_DEPTH_CAP, MAX_KEY_LEN
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_VIEWER, roles
@@ -218,3 +221,36 @@ async def test_a_level_over_the_budget_is_refused_before_it_is_read(client):
     )
     flat = await client.get(f"{_BOOKS}?expand=author", headers=roles(ADMIN))
     assert flat.status_code == 200
+
+
+async def test_a_huge_expand_is_a_fast_400_before_it_is_split(client):
+    """Tens of thousands of terms used to be parsed — duplicates checked
+    against a list, the hop cap applied at the end — before any refusal:
+    seconds of event-loop time from one query string."""
+    await _chain(client)
+    # httpx caps a URL at 64 KiB; the parser is fed a far bigger one below.
+    huge = ",".join(f"a{index}" for index in range(8_000))
+    resp = await client.get(f"{_BOOKS}?expand={huge}", headers=roles(ADMIN))
+    assert resp.status_code == 400
+    assert "characters long" in resp.json()["detail"]
+
+    enormous = [",".join(f"a{index}" for index in range(200_000))]
+    started = time.perf_counter()
+    with pytest.raises(HTTPException):
+        parse_expand(enormous, RecordsSettings())
+    assert time.perf_counter() - started < 0.1
+
+
+def test_parse_expand_stops_at_the_first_term_over_the_hop_cap():
+    """Within the length bound the cap is enforced as each term is read."""
+    settings = RecordsSettings(max_expand_paths=2)
+    with pytest.raises(HTTPException) as refused:
+        parse_expand(["a,b,c,d"], settings)
+    assert "more than 2" in refused.value.detail
+    assert parse_expand(["a,a, a ,b"], settings) == ["a", "b"]
+
+
+def test_a_segment_longer_than_any_key_is_a_400():
+    with pytest.raises(HTTPException) as refused:
+        parse_expand(["a" * (MAX_KEY_LEN + 1)], RecordsSettings())
+    assert "longer than" in refused.value.detail

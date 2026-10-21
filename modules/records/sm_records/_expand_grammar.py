@@ -20,7 +20,7 @@ from fastapi import Depends, HTTPException, Query, Request
 from sm_records import constants
 from sm_records.settings import RecordsSettings
 
-__all__ = ["expand_hops", "parse_expand"]
+__all__ = ["expand_hops", "max_expand_chars", "parse_expand"]
 
 
 def _settings(request: Request) -> RecordsSettings:
@@ -34,6 +34,11 @@ def _refuse(detail: str) -> HTTPException:
     return HTTPException(status_code=400, detail=detail)
 
 
+def _prefixes(parts: list[str]) -> list[str]:
+    """``["a", "b", "c"]`` -> ``["a", "a.b", "a.b.c"]``."""
+    return [".".join(parts[: index + 1]) for index in range(len(parts))]
+
+
 def expand_hops(paths: list[str]) -> set[str]:
     """Every distinct prefix of every path: ``a.b,a.c`` is ``{a, a.b, a.c}``.
 
@@ -42,9 +47,21 @@ def expand_hops(paths: list[str]) -> set[str]:
     """
     hops: set[str] = set()
     for path in paths:
-        parts = path.split(".")
-        hops.update(".".join(parts[: index + 1]) for index in range(len(parts)))
+        hops.update(_prefixes(path.split(".")))
     return hops
+
+
+def max_expand_chars(settings: RecordsSettings) -> int:
+    """The longest ``?expand=`` (all values together) that could name a
+    request the other caps allow: ``max_expand_paths`` terms, each
+    ``max_expand_depth`` keys of ``MAX_KEY_LEN`` plus their separators.
+
+    Checked before the string is split, so a request of a hundred thousand
+    ``a,a,a,…`` terms is refused in one ``len`` instead of being parsed first —
+    every later check is per term, and without this bound the term count is
+    the client's to choose.
+    """
+    return settings.max_expand_paths * settings.max_expand_depth * (constants.MAX_KEY_LEN + 1)
 
 
 def parse_expand(
@@ -61,26 +78,44 @@ def parse_expand(
     queries; ``a`` beside ``a.b`` is kept and costs nothing extra, because the
     hop ``a`` is read once either way.
 
-    Three refusals, each a ``400`` naming the parameter: an empty segment
-    (``a..b``, ``.a``), a path deeper than ``max_expand_depth``, and more
-    distinct hops than ``max_expand_paths``.
+    Every refusal is a ``400`` naming the parameter, and each is decided
+    as soon as the term that crosses it is read: a value longer than
+    :func:`max_expand_chars` (before anything is split), an empty segment
+    (``a..b``, ``.a``), a segment longer than any key can be, a path deeper
+    than ``max_expand_depth``, and more distinct hops than
+    ``max_expand_paths``. Duplicates and hops are tracked in sets, so the work
+    is linear in the (already bounded) input.
     """
+    limit = max_expand_chars(settings)
+    total = sum(len(raw) for raw in raw_expand)
+    if total > limit:
+        raise _refuse(f"'expand' is {total} characters long, at most {limit}")
     paths: list[str] = []
+    seen: set[str] = set()
+    hops: set[str] = set()
     for raw in raw_expand:
         for item in raw.split(","):
             path = item.strip()
-            if not path or path in paths:
+            if not path or path in seen:
                 continue
             parts = path.split(".")
             if not all(parts):
                 raise _refuse(f"malformed 'expand' path {path!r}: empty segment")
+            if any(len(part) > constants.MAX_KEY_LEN for part in parts):
+                raise _refuse(
+                    f"malformed 'expand' path {path!r}: a segment is longer than "
+                    f"{constants.MAX_KEY_LEN} characters"
+                )
             if len(parts) > settings.max_expand_depth:
                 raise _refuse(
                     f"'expand' path {path!r} is {len(parts)} levels deep, "
                     f"at most {settings.max_expand_depth}"
                 )
+            hops.update(_prefixes(parts))
+            if len(hops) > settings.max_expand_paths:
+                raise _refuse(
+                    f"too many 'expand' hops: more than {settings.max_expand_paths} named"
+                )
+            seen.add(path)
             paths.append(path)
-    hops = len(expand_hops(paths))
-    if hops > settings.max_expand_paths:
-        raise _refuse(f"too many 'expand' hops: {hops} named, at most {settings.max_expand_paths}")
     return paths

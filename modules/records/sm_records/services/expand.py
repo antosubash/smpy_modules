@@ -66,9 +66,12 @@ ExpandedMap = dict[str, dict[str, list[ExpandedRef]]]
 ``RecordRead.expanded``. Keyed by uuid and not by row id because that is the
 identifier the contract, the payload and the URL all speak."""
 
-_Holder = tuple[Record, dict[str, list[ExpandedRef]], frozenset[str]]
+_Holder = tuple[Record, dict[str, list[ExpandedRef]], frozenset[tuple[int, str]]]
 """A record a level reads relations *of*: the row, the dict its expansion is
-written into, and the uuids on its chain (itself included) — the cycle set."""
+written into, and the ``(type id, uuid)`` of every record on its chain (itself
+included) — the cycle set. Keyed like ``_Rows`` and not by uuid alone: each
+collection has its own record table, so two distinct records of two types can
+share a uuid, and a relation from one to the other is not a cycle."""
 
 _Rows = dict[tuple[int, str], Record]
 """Every row this request has read, by ``(type id, uuid)``."""
@@ -188,11 +191,11 @@ async def _resolve_hop(
         entries = []
         for type_key, uuid, resolvable in refs:
             target = _live(found.get(uuid)) if resolvable else None
-            cycle = target is not None and uuid in chain
+            cycle = target is not None and (target.type_id, target.uuid) in chain
             ref = expanded_ref(type_key, uuid, target, restricted=hop.restricted, cycle=cycle)
             if hop.children and target is not None and not hop.restricted and not cycle:
                 ref.expanded = {}
-                below.append((target, ref.expanded, chain | {uuid}))
+                below.append((target, ref.expanded, chain | {(target.type_id, target.uuid)}))
             entries.append(ref)
         out[key] = entries
     return below
@@ -242,7 +245,13 @@ async def expand(
     rows: _Rows = {}
     spent = 0
     level: list[tuple[dict[str, Hop], list[_Holder]]] = [
-        (hops, [(record, out[record.uuid], frozenset({record.uuid})) for record in records])
+        (
+            hops,
+            [
+                (record, out[record.uuid], frozenset({(record.type_id, record.uuid)}))
+                for record in records
+            ],
+        )
     ]
     depth = 1
     while level:

@@ -451,7 +451,9 @@ one:
 - **Bounded up front.** A path is at most `max_expand_depth` levels (default
   3; the setting cannot go past 5), and a request names at most
   `max_expand_paths` distinct hops (`a.b,a.c` is three). Both are a `400`
-  before anything is read. Each hop is one batched query for the whole page
+  before anything is read, as is an `expand` value longer than those caps
+  could ever need — checked before it is split, so a huge query string costs
+  one length check. Each hop is one batched query for the whole page
   at its level, and a row an earlier hop read is not read again — a page of
   fifty books expanding `author.publisher` is two record queries, not a
   hundred.

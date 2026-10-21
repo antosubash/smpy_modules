@@ -228,9 +228,12 @@ or a **dotted path** of them — `writer.agency` resolves `writer`, then the
 writer's `agency` — up to `max_expand_depth` (3, never more than 5) levels.
 Every hop is one batched query for the whole page, at every level. Duplicates
 are dropped. A key that is not a relation field of the type it is read on is a
-`400` naming its whole path (`writer.nope`). An empty segment, a path past
-`max_expand_depth`, or more than `max_expand_paths` (50) distinct hops is a
-`400` before anything is read. The public API has no `expand` at all.
+`400` naming its whole path (`writer.nope`). An empty segment, a segment
+longer than a key can be (64), a path past `max_expand_depth`, or more than
+`max_expand_paths` (50) distinct hops is a `400` before anything is read — and
+so is an `expand` longer in total than those caps could need
+(`max_expand_paths × max_expand_depth × 65` characters), refused before it is
+even split. The public API has no `expand` at all.
 
 ### `?trashed=true` — admin only
 
@@ -682,7 +685,9 @@ has none. Three more rules apply below depth one:
 
 - **Cycles stop.** A target already on its own chain — the record being read,
   or one an outer level expanded — comes back resolved with `"cycle": true`
-  and is not expanded again.
+  and is not expanded again. "Already on the chain" means the same type *and*
+  uuid: two records in different collections that share a uuid are not a
+  cycle.
 - **Restricted hides the subtree.** Nothing below a restricted entry is read
   or validated, so a caller cannot probe the field keys of a type they may not
   see.
@@ -1368,7 +1373,7 @@ kind of route can produce, with the body schema
 | `400` | A filter value the field's kind cannot parse | `{"detail", "field", "reason": "bad_value"}` |
 | `400` | `?expand=` naming a non-relation field | `{"detail", "field", "reason": "not_a_relation"}` |
 | `400` | `?expand=` resolving more than `max_expand_refs` references below depth one | `{"detail", "field", "reason": "expand_budget"}` |
-| `400` | An `?expand=` path with an empty segment, deeper than `max_expand_depth`, or more than `max_expand_paths` hops | `{"detail"}` |
+| `400` | An `?expand=` path with an empty or over-long segment, deeper than `max_expand_depth`, more than `max_expand_paths` hops, or an `expand` value too long to be any of those | `{"detail"}` |
 | `400` | A malformed filter term, or `in` over `max_in_values` | `{"detail"}` |
 | `400` | More than `max_filter_terms` / `max_sort_terms` terms | `{"detail"}` |
 | `400` | `page` and `after` sent together | `{"detail"}` |
