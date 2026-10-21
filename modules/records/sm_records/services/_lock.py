@@ -18,6 +18,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import RecordType
+from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
 
 __all__ = ["lock_type"]
@@ -55,14 +56,33 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     describes and the README states. It is taken for every write rather than
     only for types with a ``unique`` field: the slug claim of §5 is the same
     check-then-act, and every type can have one.
+
+    **The lock also re-reads ``collection``** (#82). A writer loads its type
+    row *before* it reaches this lock, and a collection move commits while it
+    waits here — so without the re-read the writer would go on to write into
+    the table set the type just left, a record no read could ever find. The
+    value read once the lock is held is the committed one (``FOR UPDATE``
+    returns the latest row version on Postgres; on SQLite the write lock is
+    exclusive, and a snapshot older than the move cannot take it at all), and
+    a disagreement is a ``409`` the caller can simply retry.
     """
     if db.get_bind().dialect.name == "sqlite":
         # The tenant said explicitly: this is DML, which no tenant filter
         # reaches (tenancy design §E).
-        await db.execute(
+        # ``RETURNING`` reads the collection in the same statement, so the
+        # re-read costs no round trip on the path every write takes.
+        stored = await db.scalar(
             sa_update(RecordType)
             .where(RecordType.id == rtype.id, RecordType.tenant_id == bound_tenant())
             .values(version=RecordType.version, updated_at=RecordType.updated_at)
+            .returning(RecordType.collection)
         )
-        return
-    await db.execute(select(RecordType.id).where(RecordType.id == rtype.id).with_for_update())
+    else:
+        stored = await db.scalar(
+            select(RecordType.collection).where(RecordType.id == rtype.id).with_for_update()
+        )
+    if stored != rtype.collection:
+        raise Conflict(
+            f"record type {rtype.key!r} moved to another collection while this write "
+            "was waiting for it; nothing was written — send the request again"
+        )

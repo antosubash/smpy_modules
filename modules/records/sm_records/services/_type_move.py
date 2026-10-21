@@ -124,6 +124,18 @@ async def move_type(db: AsyncSession, rtype: RecordType, target: str | None) -> 
     src, dst = source.record.__table__, dest.record.__table__
     tenant = rtype.tenant_id
     mine = and_(src.c.type_id == rtype.id, src.c.tenant_id == tenant)
+    if db.get_bind().dialect.name != "sqlite":
+        # The type lock stops every writer that takes it, but a trash, restore
+        # or purge updates its row without it. Locking the rows themselves, in
+        # id order so two lockers cannot deadlock, makes such a write either
+        # commit before this copy reads (and be copied) or wait for the move
+        # and then find its row gone — a rollback, never an edit to a row the
+        # copy has already passed. SQLite needs neither: the guarded bump took
+        # its exclusive write lock before this function was called.
+        await db.execute(
+            select(src.c.id).where(mine).order_by(src.c.id).with_for_update(),
+            execution_options=_ALL_ROWS,
+        )
 
     clash = await db.scalar(
         select(func.count())

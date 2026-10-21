@@ -828,7 +828,15 @@ The move is refused before a row is written when the target is undeclared
 together with a schema change (two requests), while a reindex of the type is
 outstanding, or when one of its uuids is already in the target set. An echo of
 the current value is not a move, so a client that sends back the whole type it
-just read still saves. A `mode=update` type import refuses a changed
+just read still saves.
+
+**Concurrent writes.** Two moves of one type cannot both run: the second fails
+the version guard (`409`). A record write that loaded the type before a move
+committed is refused with a `409` to retry, because the type lock re-reads
+`collection` once it is held — otherwise it would write into the tables the
+type just left. On Postgres the move also row-locks the type's records in id
+order, so a trash, restore or purge racing it is either copied or rolled back,
+never applied to a row the copy has passed. A `mode=update` type import refuses a changed
 `collection` with a `409` — a file must not move a type on the side. The type
 editor shows the collection read-only once the type exists: a move is an API
 operation, not a by-product of saving the form.

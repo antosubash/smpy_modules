@@ -71,7 +71,7 @@ test.describe('Records — collections', () => {
     await expect(select).toHaveValue('');
     await expect(select.locator('option')).toHaveText(['Shared tables', COLLECTION]);
     await expect(
-      field.getByText('Gives this type its own document and index tables. Chosen once'),
+      field.getByText('Gives this type its own document and index tables. It can be moved'),
     ).toBeVisible();
 
     await select.selectOption(COLLECTION);
