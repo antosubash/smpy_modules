@@ -38,6 +38,19 @@ class TestRegisterSettings:
         finally:
             services.reset()
 
+    def test_generic_settings_screen_defers_to_the_ai_page(self):
+        # #164: /ai/ is the one write path, so its validation (provider list,
+        # base URL, embedding_dim bound) and key encryption cannot be bypassed
+        # on the generic screen — which then links here and refuses writes.
+        app = FastAPI()
+        app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
+        try:
+            AiModule().register_settings(app)
+            registry = app.state.settings.module_registry
+            assert registry.manage_url(constants.PACKAGE) == constants.MENU_URL
+        finally:
+            services.reset()
+
     def test_warns_about_dead_env_vars(self, monkeypatch, caplog):
         # #124: SM_AI_* no longer seeds anything, so a host still setting one
         # is told rather than silently running on the defaults.
