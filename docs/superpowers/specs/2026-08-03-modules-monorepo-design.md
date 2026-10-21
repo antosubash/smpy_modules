@@ -1,5 +1,11 @@
 # simple_module_python_modules — repo setup design
 
+> **Historical record.** Paths under `/Volumes/ext1/...` below are the
+> author's machine at the time of writing and exist nowhere else. Read them as
+> `<path-to>/simple_module_python`, `<path-to>/smpy_pagebuilder`,
+> `<path-to>/dev-services` and the repo root; current instructions are in
+> `CLAUDE.md` and `README.md`.
+
 **Date:** 2026-08-03
 **Status:** Approved
 

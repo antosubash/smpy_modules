@@ -121,10 +121,12 @@ env:
 FRAMEWORK_MODULES ?= branding
 
 # Develop against an unreleased framework checkout.
-#   make link-framework FRAMEWORK=/Volumes/ext1/GitHub/simple_module_python
+#   make link-framework FRAMEWORK=/path/to/simple_module_python
+# FRAMEWORK is required; there is no default checkout location.
 # Override the module list with e.g. FRAMEWORK_MODULES="branding users".
 link-framework:
-	@test -n "$(FRAMEWORK)" || (echo 'Usage: make link-framework FRAMEWORK=/path/to/simple_module_python' && exit 1)
+	@test -n "$(FRAMEWORK)" || (echo 'error: FRAMEWORK is not set. Usage: make link-framework FRAMEWORK=/path/to/simple_module_python' >&2 && exit 1)
+	@test -d "$(FRAMEWORK)/framework/core" || (echo 'error: FRAMEWORK=$(FRAMEWORK) is not a simple_module_python checkout (no framework/core).' >&2 && exit 1)
 	uv pip install -e $(FRAMEWORK)/framework/core \
 	               -e $(FRAMEWORK)/framework/db \
 	               -e $(FRAMEWORK)/framework/hosting \
