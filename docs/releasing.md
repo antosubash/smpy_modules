@@ -20,9 +20,9 @@ the commit it would ship, and waits for CI if it is still running.
 
 | Job | Does |
 |---|---|
-| `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Then the gates: the run must be on `main`; `v<version>` must not already be tagged and `release/v<version>` must not exist; and ci.yml's newest `push` (or manual) run on the dispatched commit must have concluded `success`. A run still in progress is waited for, up to 70 minutes. Every later job reads this job's outputs, so the version is decided exactly once. |
+| `resolve` | Computes the version (from `bump` or `version`) and validates its format, and lists the module packages to publish from `modules/*/pyproject.toml`. Then the gates: the run must be on `main`; `v<version>` must not already be tagged and `release/v<version>` must not exist; and every ci.yml `push` (or manual) run on the dispatched commit must, as its latest attempt, have concluded `success` — not only the newest, so a failed re-run of an older run is never outvoted by a green one (`scripts/release_ci_gate.py`). A run still in progress is waited for, up to 70 minutes; a failed one is cleared by re-running it to green. Every later job reads this job's outputs, so the version is decided exactly once. |
 | `build` | Commits the bump (versions + `uv lock`) on top of the dispatched commit, builds the module frontends and `uv build --all-packages` from that commit, uploads the artifacts, and only then pushes the commit to the staging branch **`release/v<version>`**. |
-| `publish-pypi` | One matrix job per module. Selects that module's artifacts and publishes via OIDC trusted publishing. `fail-fast: false`, so one failure doesn't cancel the others. |
+| `publish-pypi` | One matrix job per module. Selects that module's artifacts, checks that any of them PyPI already has for this version are byte-identical (sha256, `scripts/release_pypi_check.py`), and publishes via OIDC trusted publishing with `skip-existing`, so a retry skips files that already landed. `fail-fast: false`, so one failure doesn't cancel the others. |
 | `finalize` | Tags the staged commit `v<version>`, lands the bump on `main`, creates the GitHub release, and deletes the staging branch. |
 
 Only one release runs at a time (`concurrency: release`).
@@ -47,6 +47,11 @@ branch, so nothing can reject it — before any upload. After publishing:
   whose `uv.lock` would conflict with any dependency change. That commit's
   message names the tagged one. The push is retried, never forced.
 
+**`uv.lock` on a moved `main`.** The re-applied commit's `uv lock` resolves
+against the new `main`, so its lockfile can differ from the staged one — any
+dependency change merged meanwhile is in it. That is the lock `main` should
+have; the tag and the published artifacts still record exactly what was built.
+
 ### If something fails
 
 | Where | State | What to do |
@@ -54,7 +59,8 @@ branch, so nothing can reject it — before any upload. After publishing:
 | `resolve` | Nothing happened. | Fix the cause (wait for or fix CI; for a commit with no CI run, such as the bot's own release commit, run **CI** by hand with *Run workflow*) and dispatch again. |
 | `build`, before staging | Nothing reached origin or PyPI. | Fix and dispatch again with the same version. |
 | `publish-pypi`, every package | `release/v<version>` exists; nothing on PyPI. | Fix the cause and **Re-run failed jobs** — the same artifacts are published and `finalize` runs. To abandon the version instead, delete `release/v<version>`. |
-| `publish-pypi`, some packages | Some packages are on PyPI. | **Re-run failed jobs** once the cause is fixed: the published ones are not retried. Do not dispatch a fresh run — its build would produce different artifacts for the version some packages already carry. |
+| `publish-pypi`, some packages or files | Some packages — or one file of a package, say its wheel but not its sdist — are on PyPI. | **Re-run failed jobs** once the cause is fixed: the published packages are not retried, and inside a retried one the files PyPI already has are skipped after their sha256 is checked against this build. Do not dispatch a fresh run — its build would produce different artifacts for the version some packages already carry. |
+| `publish-pypi`, "different sha256" | PyPI holds a file for this version that this run did not build. | Nothing this run can fix: the version is taken. Delete `release/v<version>` and release the next version. |
 | `finalize` | Packages are on PyPI; the staged commit holds their source. | **Re-run failed jobs.** Each step checks what already happened (tag present on the staged commit, `main` already at the version, release already created), so a re-run picks up where it stopped. |
 
 A version that is fully on PyPI but whose `finalize` cannot complete (say

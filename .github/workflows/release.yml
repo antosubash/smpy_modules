@@ -165,46 +165,35 @@ jobs:
             exit 1
           fi
 
-      # Green CI on the exact commit being released (#115). The run that
-      # counts is ci.yml's own (queried by workflow file, and its `path` and
-      # `head_sha` re-checked, so no other workflow and no other commit can
-      # satisfy it) on that SHA — a `push` to main, or a manual
-      # `workflow_dispatch` for a commit that has none (the bot's release
-      # commit does not trigger CI). A pull-request run tested a merge ref,
-      # not this SHA, so it does not count. The newest such run decides; if
-      # it is still going, wait for it rather than make the releaser come
-      # back. A run's conclusion is `success` only when every job passed.
+      # Green CI on the exact commit being released (#115): every ci.yml
+      # `push` or manual `workflow_dispatch` run on that SHA, each as its
+      # latest attempt, must have concluded `success` — the bot's release
+      # commit triggers no CI of its own, hence the manual trigger. A
+      # pull-request run tested a merge ref, not this SHA, and does not count.
+      # A run still going is waited for rather than make the releaser come
+      # back. scripts/release_ci_gate.py holds the rules and explains why all
+      # runs count, not the newest; scripts/tests covers it.
       - name: Require green CI on the dispatched commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           deadline=$((SECONDS + 60 * 70))
           while :; do
-            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=50" \
-              --jq '[.workflow_runs[]
-                    | select(.head_sha == env.GITHUB_SHA and .path == ".github/workflows/ci.yml")
-                    | select(.event == "push" or .event == "workflow_dispatch")]
-                    | sort_by(.created_at) | last
-                    | if . == null then "" else "\(.status) \(.conclusion // "-") \(.html_url)" end')
-            if [ -z "$run" ]; then
-              echo "::error::no CI run for $GITHUB_SHA. Run the CI workflow on main" \
-                "(Actions → CI → Run workflow) and dispatch the release once it is green"
-              exit 1
-            fi
-            read -r status conclusion url <<<"$run"
-            if [ "$status" = completed ]; then
-              if [ "$conclusion" = success ]; then
-                echo "CI is green on $GITHUB_SHA: $url"
-                exit 0
-              fi
-              echo "::error::CI on $GITHUB_SHA concluded '$conclusion': $url"
-              exit 1
-            fi
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=100" \
+              > "$RUNNER_TEMP/ci-runs.json"
+            rc=0
+            python3 scripts/release_ci_gate.py "$GITHUB_SHA" < "$RUNNER_TEMP/ci-runs.json" || rc=$?
+            case $rc in
+              0) echo "CI is green on $GITHUB_SHA"; exit 0 ;;
+              2) ;;
+              *) echo "::error::CI on $GITHUB_SHA is not green (runs listed above)"; exit 1 ;;
+            esac
             if [ $SECONDS -ge $deadline ]; then
-              echo "::error::CI on $GITHUB_SHA is still '$status' after 70 minutes: $url"
+              echo "::error::CI on $GITHUB_SHA is still running after 70 minutes"
               exit 1
             fi
-            echo "CI on $GITHUB_SHA is $status; waiting ($url)"
+            echo "CI on $GITHUB_SHA is still running; waiting"
             sleep 30
           done
 
@@ -321,9 +310,29 @@ jobs:
           test -n "$(ls -A upload)" || {
             echo "::error::no artifacts found for $PACKAGE"; exit 1; }
 
+      # Only the check script, from the commit being released.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          sparse-checkout: scripts
+          path: src
+          persist-credentials: false
+
+      # A re-run after a partial upload (the wheel accepted, the sdist not,
+      # or the response lost) must not fail on the files PyPI already has,
+      # or the version is stuck half-published — hence `skip-existing`
+      # below. That skips by filename alone, so first make sure every file
+      # PyPI already has for this version is byte-identical to this build.
+      - name: Check files already on PyPI match this build
+        env:
+          PACKAGE: ${{ matrix.package }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: python3 src/scripts/release_pypi_check.py "$PACKAGE" "$RELEASE_VERSION" upload
+
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: upload
+          skip-existing: true
 
   # Tag the staged commit, land the bump on main, release. Each step checks
   # whether it already happened, so re-running a failed finalize is safe.
