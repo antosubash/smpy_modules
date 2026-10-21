@@ -98,13 +98,15 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   const isFormData = init.body instanceof FormData;
   const response = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
+    ...init,
+    // After `...init`, or a caller's `headers` would replace this object whole
+    // and take the CSRF header with it.
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       Accept: 'application/json',
       ...csrfHeaders(init.method),
       ...(init.headers || {}),
     },
-    ...init,
   });
   if (!response.ok) {
     throw new Error(await errorMessage(response));
