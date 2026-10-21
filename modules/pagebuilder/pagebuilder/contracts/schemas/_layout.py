@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
+
+from pagebuilder.contracts.schemas._fields import OptionalNote
 
 PuckData = dict[str, Any]
 
@@ -15,7 +17,7 @@ class LayoutUpdate(BaseModel):
 
     header_data: PuckData | None = None
     footer_data: PuckData | None = None
-    note: str | None = Field(default=None, max_length=2000)
+    note: OptionalNote = None
 
 
 class LayoutRead(BaseModel):
@@ -48,5 +50,3 @@ class LayoutRevisionDetail(LayoutRevisionRead):
 
 class LayoutRevisionListResponse(BaseModel):
     items: list[LayoutRevisionRead]
-
-

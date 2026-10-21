@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
+from pagebuilder.contracts.schemas._fields import (
+    AwareInstant,
+    OptionalNote,
+    RequiredNote,
+    UtcInstant,
+)
 from pagebuilder.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus, RevisionEvent
 
@@ -22,16 +28,6 @@ def _blank_to_none(value: Any) -> Any:
 # "no filter", not "the empty status", which would otherwise 422. A non-empty
 # value that is not a status still fails validation.
 StatusFilter = Annotated[PageStatus | None, BeforeValidator(_blank_to_none)]
-
-
-def _assume_utc(value: datetime | None) -> datetime | None:
-    return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
-
-
-# Every instant is stored as UTC, but SQLite hands it back naive. Serialised
-# without an offset, the editor's ``new Date()`` reads it as local time, so the
-# schedule shows shifted and each re-save moves it again by the offset.
-UtcInstant = Annotated[datetime, AfterValidator(_assume_utc)]
 
 
 class PageCreate(BaseModel):
@@ -56,8 +52,8 @@ class PageCreate(BaseModel):
     index_in_search: bool = True
     json_ld: dict[str, Any] | None = None
     draft_data: PuckData = Field(default_factory=dict)
-    publish_at: datetime | None = None
-    unpublish_at: datetime | None = None
+    publish_at: AwareInstant | None = None
+    unpublish_at: AwareInstant | None = None
     parent_id: int | None = None
     """Breadcrumb parent. Deliberately does not affect the public URL."""
 
@@ -95,11 +91,12 @@ class PageScheduleRequest(BaseModel):
     Both fields are optional and independent — set ``publish_at`` to flip
     a draft live, set ``unpublish_at`` to take a published page down, or
     set both for a bounded campaign. Send ``null`` to clear an existing
-    schedule. Sending ``{}`` is a no-op.
+    schedule. Sending ``{}`` is a no-op. Each value is an ISO-8601 string
+    with an offset; a number or a naive time is a 422 (see ``AwareInstant``).
     """
 
-    publish_at: datetime | None = None
-    unpublish_at: datetime | None = None
+    publish_at: AwareInstant | None = None
+    unpublish_at: AwareInstant | None = None
 
 
 class PageRead(BaseModel):
@@ -248,7 +245,7 @@ class PageRejectRequest(BaseModel):
     actionable feedback — an empty rejection is a 422 from the API.
     """
 
-    note: str = Field(min_length=1, max_length=2000)
+    note: RequiredNote
 
 
 class PageNoteRequest(BaseModel):
@@ -258,7 +255,7 @@ class PageNoteRequest(BaseModel):
     schema; clients send ``{}`` (or ``{"note": null}``) to opt out.
     """
 
-    note: str | None = Field(default=None, max_length=2000)
+    note: OptionalNote = None
 
 
 class BlockChange(BaseModel):
@@ -285,5 +282,3 @@ class RevisionDiffResponse(BaseModel):
     after_id: int
     metadata: dict[str, MetadataChange] = Field(default_factory=dict)
     blocks: dict[str, list[BlockChange]] = Field(default_factory=dict)
-
-

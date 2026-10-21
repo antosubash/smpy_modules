@@ -111,10 +111,18 @@ test.describe('News — first visit of a session', () => {
     await page.goto('/admin/news/');
 
     const message = await page.evaluate(async () => {
+      // The screen's token (#110), so the refusal is the 404 under test here
+      // rather than the CSRF check's 403.
+      const pageJson = document.querySelector('script[data-page="app"]')?.textContent ?? '{}';
+      const token = (JSON.parse(pageJson) as { props?: { csrf_token?: string } }).props?.csrf_token;
       const r = await fetch('/api/news/articles/999999', {
         method: 'PUT',
         credentials: 'same-origin',
-        headers: { Accept: 'text/html', 'Content-Type': 'application/json' },
+        headers: {
+          Accept: 'text/html',
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': token ?? '',
+        },
         body: JSON.stringify({ category: 'nope' }),
       });
       const text = await r.text();

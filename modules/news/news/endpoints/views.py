@@ -13,13 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import constants, locales
 from news.content import ArticlesService
+from news.csrf import share_csrf_token
 from news.endpoints.api._deps import may_see_drafts
 from news.endpoints.public._render import render_article
 from news.models import ArticleStatus, NewsArticle
 from news.settings import active, public_article_path
 from news.tenancy import bind_admin
 
-router = APIRouter(dependencies=[Depends(bind_admin)])
+# ``share_csrf_token`` puts the token the API's CSRF check wants (#110) in
+# every screen's props, for ``utils/csrf.ts`` to send back.
+router = APIRouter(dependencies=[Depends(bind_admin), Depends(share_csrf_token)])
 
 
 def _locale_props() -> dict:
@@ -40,7 +43,7 @@ def _locale_props() -> dict:
     return {"locales": list(locales.supported()), "default_locale": locales.default()}
 
 
-admin_router = APIRouter(dependencies=[Depends(bind_admin)])
+admin_router = APIRouter(dependencies=[Depends(bind_admin), Depends(share_csrf_token)])
 """Routes mounted at the app root rather than under ``VIEW_PREFIX``.
 
 The search screen spans articles, pages and media, so filing it under ``/news``

@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from conftest import _build_app
+from csrf_support import arm_csrf
 from httpx import ASGITransport, AsyncClient
 from news import tenancy
 from news.tenancy import TenancyMode
@@ -55,6 +56,7 @@ async def multi_client(user: Any, *, mount_public: bool = False) -> AsyncIterato
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             client.app = app  # type: ignore[attr-defined]
             client.db_state = state  # type: ignore[attr-defined]
+            await arm_csrf(client)
             yield client
     finally:
         await state.engine.dispose()
