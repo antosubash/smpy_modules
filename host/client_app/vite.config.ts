@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 
 import { DEFAULT_UI_PORT, resolvePort } from '../../scripts/ports.mjs';
 
@@ -167,7 +167,13 @@ export default defineConfig({
     strictPort: true,
     origin: `http://localhost:${uiPort}`,
     fs: {
-      allow: [fsRoot, ...moduleFsAllow],
+      // The workspace root too: `host/client_app/node_modules` exists (npm
+      // keeps a non-hoisted copy there), so `fsRoot` stops at the host and
+      // the hoisted root `node_modules` was outside the allow list. Modules
+      // are fine — Vite serves what the module graph imports — but an asset a
+      // stylesheet points at is checked against this list, which is how the
+      // editor's bundled Inter came back 403 under `vite dev` (#188).
+      allow: [fsRoot, searchForWorkspaceRoot(import.meta.dirname), ...moduleFsAllow],
     },
   },
 });
