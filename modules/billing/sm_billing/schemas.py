@@ -220,3 +220,17 @@ class SubscriptionRow(BaseModel):
     suspended_by_billing: bool
     provider_subscription_id: str | None
     synced_at: datetime | None
+
+
+class SyncHealth(BaseModel):
+    """How far the local mirror may lag the provider (admin subscriptions screen)."""
+
+    #: Oldest ``synced_at`` among subscriptions held at the provider.
+    oldest_synced_at: datetime | None
+    #: Provider subscriptions never synced at all.
+    never_synced: int
+    #: Webhook rows received but not processed (failed, or still in flight).
+    unprocessed_webhooks: int
+    #: 0 when the periodic reconcile is off.
+    reconcile_interval_minutes: int
+    reconcile_running: bool

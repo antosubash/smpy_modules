@@ -142,8 +142,9 @@ instead of a 500, and the request session stays usable.
 ## Settings and secrets
 
 `BillingSettings` subclasses `DbBackedSettings` (no env sources) and is
-registered with `register_module_settings`. `provider` is read once in
-`on_startup` (`providers.factory.install_provider`). A `stripe` choice with a
+registered with `register_module_settings`. `provider` and
+`reconcile_interval_minutes` are read once in `on_startup`
+(`providers.factory.install_provider`, `startup.start_reconcile`). A `stripe` choice with a
 missing or undecryptable secret falls back to `ManualProvider` and records
 `provider_error` for the admin screens — the app still boots. Saving the
 connection rebuilds the provider only when it is the one already chosen (new
@@ -173,11 +174,12 @@ module must not import a sibling optional module).
 | File | Responsibility |
 |---|---|
 | `module.py` | framework hooks only |
-| `startup.py` | seed default plan, install provider and entitlements |
+| `startup.py` | seed default plan, install provider and entitlements, start/stop the reconcile loop |
 | `plans.py` | plan CRUD and invariants |
 | `resolve.py`, `entitlements.py` | plan in force; the entitlement seam |
 | `checkout.py`, `context.py`, `deps.py` | tenant-side service and request context |
 | `sync.py`, `webhooks.py`, `reconcile.py`, `seats.py` | provider → local state |
+| `scheduler.py` | the periodic reconcile: stale-row claims, pacing, the loop task |
 | `lifecycle.py` | status → tenant suspension |
 | `admin.py` | admin operations and connection settings |
 | `providers/` | `manual`, `stripe`, factory |

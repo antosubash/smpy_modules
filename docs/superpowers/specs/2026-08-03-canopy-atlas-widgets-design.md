@@ -135,3 +135,7 @@ This is a large port. Delivering it as one commit would be unreviewable.
   layout feature (header/footer), which is where that would go later.
 - The CanopyMap / MapLibre widget: it needs `@geowiki/maplibre` and is a
   separate subsystem.
+
+  > **Dropped, 2026-10-21 (see #90).** No host needs the atlas map, so the
+  > separate spec this promised will not be written and the widget is not
+  > planned for this repo.

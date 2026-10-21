@@ -218,10 +218,14 @@ needed the schema decision. Wiring it to a route still would.
    all of them.** Done — §11.
 2. ~~**Layout: option (a), (b) or (c)?**~~ **Resolved as (a)** by the above —
    see §2.
-3. **Where does translated page content live?** Still open, but it never
-   blocked the port (§13) — it is the question for *using* translation, not
-   for having it. A host that wants it needs a table and an Alembic revision
-   in `host/migrations/versions/` under a `pagebuilder` branch label.
+3. ~~**Where does translated page content live?**~~ **Answered (2026-10-21,
+   #83): in sibling pages.** Each page carries a `locale` and a
+   `translation_group`, and `POST /pages/{id}/translations` creates a sibling
+   page in another language sharing the group — so a translation is an
+   ordinary page row, with no extra table or module-specific revision. It
+   never blocked the port (§13). Original note: a host that wanted it was to
+   need a table and an Alembic revision in `host/migrations/versions/` under a
+   `pagebuilder` branch label.
 4. ~~**Does `Text` becoming rich text change the public-page CSP?**~~
    **Answered by not creating the question** — Text renders parsed markdown,
    never stored HTML, so there is no sanitisation boundary to confirm. §12.
