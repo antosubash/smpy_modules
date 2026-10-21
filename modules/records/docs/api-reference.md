@@ -12,6 +12,16 @@ The admin views under `/admin/records` render the same data through Inertia and
 parse the same query grammar, so a deep link into the UI and the equivalent API
 call return the same set. Writes always go through the JSON API.
 
+Every admin-API write (`POST`/`PUT`/`PATCH`/`DELETE`, imports included) needs
+the session's CSRF token in an `X-CSRF-Token` header — the framework's
+`RequiresCsrf`, as billing uses; a write without it is a `403`, checked before
+the permission. Every records screen shares the token as the `csrf_token`
+Inertia prop (`simple_module_hosting.csrf.get_csrf_token`), and the console's
+own client sends it from there. Reads need no token. The session cookie's
+`SameSite=Lax` alone is not enough: on a multi-tenant host every
+organisation's public site is same-site with the console. The public read API
+takes no writes and no token.
+
 Contents:
 [Conventions](#conventions) ·
 [Query grammar](#query-grammar) ·

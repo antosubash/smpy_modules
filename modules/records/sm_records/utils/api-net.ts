@@ -86,9 +86,6 @@ export function messageFor(status: number, statusText: string, body: ApiErrorBod
  *  on `status`, and `0` is the one value no response can carry. */
 export const OFFLINE_STATUS = 0;
 
-// Writes rely on the framework's SameSite=Lax session-cookie baseline.
-// A `RequiresCsrf`-style opt-in is a later phase.
-
 /** Send an expired session to the sign-in page, with `next` pointing back at
  *  the screen it was on, after a beat long enough to read the toast (R12b).
  *
