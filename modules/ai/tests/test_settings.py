@@ -53,6 +53,34 @@ class TestNoEnvironment:
         assert AiSettings(chat_model="from-db").chat_model == "from-db"
 
 
+class TestStoredEmbeddingDim:
+    """#164: a negative width already in the store must not fail hydration.
+
+    The framework falls back to *all* defaults when a class will not construct,
+    which would drop the chat slot and its key along with the bad width.
+    """
+
+    def test_negative_stored_dim_reads_as_unset(self, caplog):
+        with caplog.at_level("WARNING", logger="sm_ai.settings"):
+            s = AiSettings(embedding_dim=-5, chat_model="kept")
+        assert s.embedding_dim == 0
+        assert s.chat_model == "kept"
+        assert "embedding_dim" in caplog.text
+
+    def test_hydration_keeps_other_fields(self):
+        from settings.hydrate import build_settings
+
+        s = build_settings(
+            AiSettings,
+            {"embedding_dim": ("-5", "int"), "chat_provider": ("openai", "string")},
+        )
+        assert s.embedding_dim == 0
+        assert s.chat_provider == "openai"
+
+    def test_valid_dim_kept(self):
+        assert AiSettings(embedding_dim=1536).embedding_dim == 1536
+
+
 class TestHolder:
     def test_current_settings_without_install_hydrates_lazily(self, monkeypatch):
         # No host registered the module (a Celery worker, #100): settings come
