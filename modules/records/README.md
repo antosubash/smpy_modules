@@ -364,6 +364,9 @@ variables are read. Configure on the Settings screen or with
 | `max_filter_terms` | 20 | no |
 | `max_sort_terms` | 5 | no |
 | `max_in_values` | 200 | no |
+| `max_expand_depth` | 3 (at most 5) | no |
+| `max_expand_paths` | 50 | no |
+| `max_expand_refs` | 1000 | no |
 | `preview_sync_limit` | 5000 | no |
 | `preview_job_ttl_seconds` | 600 (10 min) | no |
 | `max_import_bytes` | 52428800 (50 MB) | no |
@@ -422,7 +425,7 @@ and a row in the reference index, which is what makes both directions cheap.
 
 **Forward: `?expand=`.** `GET /api/records/types/{key}/records` and
 `…/records/{uuid}` take `?expand=field_a,field_b` and resolve those relation
-fields to **depth one**, one batched query per named field for the whole page.
+fields, one batched query per named field for the whole page.
 Each reference comes back under `expanded[field_key]`, in payload order, in
 exactly one of three states:
 
@@ -436,10 +439,34 @@ exactly one of three states:
 - **restricted** — the target's type narrows `allowed_roles` past the caller.
   Nothing but the uuid the caller already holds in `data` comes back.
 
-A key that is not a relation field of the type is a `400` naming it. Depth
-greater than one is not supported; the admin list and record editor always
-expand every relation column they render, so "opt-in" describes the API rather
-than the UI.
+A key that is not a relation field of the type is a `400` naming it. The
+admin list and record editor always expand every relation column they render,
+to depth one, so "opt-in" describes the API rather than the UI.
+
+**Deeper: dotted paths.** `?expand=author.publisher` resolves `author`, then
+the author's `publisher`, nested under each resolved entry's own `expanded`.
+Every rule above holds at every hop, plus four that only matter below depth
+one:
+
+- **Bounded up front.** A path is at most `max_expand_depth` levels (default
+  3; the setting cannot go past 5), and a request names at most
+  `max_expand_paths` distinct hops (`a.b,a.c` is three). Both are a `400`
+  before anything is read. Each hop is one batched query for the whole page
+  at its level, and a row an earlier hop read is not read again — a page of
+  fifty books expanding `author.publisher` is two record queries, not a
+  hundred.
+- **Cycles stop.** A target already on its own chain — the record being read,
+  or one an outer level expanded — comes back resolved and flagged
+  `cycle: true`, and is not expanded again.
+- **Restricted hides the subtree.** Nothing below a `restricted` entry is read,
+  and its keys are not even validated: a `400 unknown` for a key under a type
+  the caller may not see would name that type's fields.
+- **Budgeted.** A request that would resolve more than `max_expand_refs`
+  (default 1000) references below depth one is a `400`
+  (`reason: expand_budget`) naming the path that crossed it, refused before
+  that level is read. Every hop runs on the request's tenant-bound session, so
+  a stored reference into another tenant is `dangling` at depth three as at
+  depth one.
 
 **Reverse: referrers.**
 `GET /api/records/types/{key}/records/{uuid}/referrers?page=&page_size=`
@@ -846,7 +873,7 @@ Two consequences are worth knowing:
   That is a query per declared collection on the delete path and on the
   referrers panel; it is the cost of the partition, and it is why collections
   are a per-type escape hatch rather than a default.
-- **`?expand=` is still one batched query per field.** The target type decides
+- **`?expand=` is still one batched query per hop.** The target type decides
   the table, so expanding a field that points into a collection reads that
   collection's record table once for the whole page.
 

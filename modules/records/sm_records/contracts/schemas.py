@@ -121,7 +121,8 @@ class RecordRead(SQLModel):
     order, so a to-many field's list lines up with ``data[key]``. ``None`` when
     the caller did not ask; a stored reference whose target is trashed, purged
     or not this caller's to see is still listed, flagged rather than dropped.
-    Depth is one — an expanded target's own relations stay bare."""
+    A dotted path (``?expand=author.publisher``) nests the next level under
+    each resolved entry's own ``expanded``."""
 
 
 class RecordPage(SQLModel):

@@ -441,6 +441,9 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `max_filter_terms` | `20` | no | `?filter=` terms per request; each is another `EXISTS` |
 | `max_sort_terms` | `5` | no | Distinct `?sort=` fields; each is another `LEFT JOIN` |
 | `max_in_values` | `200` | no | Values in one `in:` list |
+| `max_expand_depth` | `3` | no | Levels one `?expand=` path reaches; at most 5 |
+| `max_expand_paths` | `50` | no | Distinct `?expand=` hops per request; each is one batched query |
+| `max_expand_refs` | `1000` | no | References one read resolves below depth one |
 | `max_payload_bytes` | `262144` (256 KB) | no | One record's serialized `data` |
 | `max_import_bytes` | `52428800` (50 MB) | no | One import body, refused `413` **before** parsing |
 | `max_import_rows` | `20000` | no | Rows in one import, refused `413` **before** anything is written |

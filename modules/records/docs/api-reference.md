@@ -223,11 +223,14 @@ paging `400` above is instead the list's notice, via `errors.filter` on a
 
 ### `?expand=` — admin only
 
-`?expand=a,b` and `?expand=a&expand=b` both work. Named relation fields are
-resolved to **depth one**, one batched query per field for the whole page.
-Duplicates are dropped. A key that is not a relation field of the type is a
-`400`. There is no depth greater than one, and the public API has no `expand`
-at all.
+`?expand=a,b` and `?expand=a&expand=b` both work. Each term is a field key
+or a **dotted path** of them — `writer.agency` resolves `writer`, then the
+writer's `agency` — up to `max_expand_depth` (3, never more than 5) levels.
+Every hop is one batched query for the whole page, at every level. Duplicates
+are dropped. A key that is not a relation field of the type it is read on is a
+`400` naming its whole path (`writer.nope`). An empty segment, a path past
+`max_expand_depth`, or more than `max_expand_paths` (50) distinct hops is a
+`400` before anything is read. The public API has no `expand` at all.
 
 ### `?trashed=true` — admin only
 
@@ -671,6 +674,22 @@ curl -s -b cookies.txt \
 | **resolved** | `display_title`, `slug` and `status` are filled; `dangling` and `restricted` are `false` |
 | **dangling** | The target is trashed, gone, or not a record of the declared type. `display_title` is `null`. A restorable delete must not break what references it, so this is a flag, not an error |
 | **restricted** | The target's type narrows `allowed_roles` past the caller. Nothing but the uuid the caller already holds comes back |
+
+A dotted path nests the next level under each **resolved** entry's own
+`expanded` (`?expand=writer.agency` puts the agency under
+`expanded.writer[0].expanded.agency`); a dangling, restricted or `cycle` entry
+has none. Three more rules apply below depth one:
+
+- **Cycles stop.** A target already on its own chain — the record being read,
+  or one an outer level expanded — comes back resolved with `"cycle": true`
+  and is not expanded again.
+- **Restricted hides the subtree.** Nothing below a restricted entry is read
+  or validated, so a caller cannot probe the field keys of a type they may not
+  see.
+- **Work is budgeted.** A request that would resolve more than
+  `max_expand_refs` (1000) references below depth one is a `400` naming the
+  path that crossed it (`"reason": "expand_budget"`), refused before that
+  level is read. Depth one is bounded by the page and the payload as before.
 
 Expanding a non-relation field is a `400`:
 
@@ -1348,6 +1367,8 @@ kind of route can produce, with the body schema
 | `400` | An operator the field's kind does not support | `{"detail", "field", "reason": "unsupported_op"}` |
 | `400` | A filter value the field's kind cannot parse | `{"detail", "field", "reason": "bad_value"}` |
 | `400` | `?expand=` naming a non-relation field | `{"detail", "field", "reason": "not_a_relation"}` |
+| `400` | `?expand=` resolving more than `max_expand_refs` references below depth one | `{"detail", "field", "reason": "expand_budget"}` |
+| `400` | An `?expand=` path with an empty segment, deeper than `max_expand_depth`, or more than `max_expand_paths` hops | `{"detail"}` |
 | `400` | A malformed filter term, or `in` over `max_in_values` | `{"detail"}` |
 | `400` | More than `max_filter_terms` / `max_sort_terms` terms | `{"detail"}` |
 | `400` | `page` and `after` sent together | `{"detail"}` |
@@ -1505,6 +1526,9 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `max_filter_terms` | 20 | `?filter=` terms per request — `400` over it |
 | `max_sort_terms` | 5 | Distinct `?sort=` fields — `400` over it |
 | `max_in_values` | 200 | Values in one `in:` list — `400` over it |
+| `max_expand_depth` | 3 (at most 5) | Levels one `?expand=` path reaches — `400` over it |
+| `max_expand_paths` | 50 | Distinct `?expand=` hops per request — `400` over it |
+| `max_expand_refs` | 1,000 | References resolved below depth one — `400` over it |
 | `max_aggregate_groups` | 1,000 | Groups one aggregate returns, then `truncated: true` |
 | `max_payload_bytes` | 262,144 | One record's serialized `data` |
 | `max_payload_bytes` + 65,536 | 327,680 | Any `/api/records/*` write body except the import — `413` **before** the body is read |

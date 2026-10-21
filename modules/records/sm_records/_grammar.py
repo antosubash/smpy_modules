@@ -16,7 +16,7 @@ from typing import Any, Final, NamedTuple
 
 from fastapi import Depends, HTTPException, Query, Request
 
-from sm_records import constants
+from sm_records._expand_grammar import parse_expand
 from sm_records._text import has_nul
 from sm_records.index.query import Filter, FilterOp, Sort
 from sm_records.settings import RecordsSettings
@@ -185,32 +185,6 @@ def parse_view_filters(
         return [_parse_filter(item, settings) for item in raw_filters], None
     except HTTPException:
         return [], MALFORMED_FILTER
-
-
-def parse_expand(
-    raw_expand: list[str] = Query(default=[], alias=constants.EXPAND_PARAM),
-) -> list[str]:
-    """``?expand=a,b`` (and ``?expand=a&expand=b``) — the relation fields to
-    resolve on this read, design §9.
-
-    Both spellings, because both are what a client reaches for and neither is
-    ambiguous: the grammar is a list of field keys, and a field key cannot
-    contain a comma (``TYPE_KEY_PATTERN``). Order is preserved and duplicates
-    are dropped here rather than in the service, so ``expand=a,a`` cannot cost
-    two queries.
-
-    No validation of the keys themselves: whether a key names a relation field
-    is a question about the *type*, which this dependency cannot see — it is
-    ``services.expand``'s, and it answers with the same ``QueryError`` the
-    filter grammar refuses an unknown field with.
-    """
-    keys: list[str] = []
-    for raw in raw_expand:
-        for item in raw.split(","):
-            key = item.strip()
-            if key and key not in keys:
-                keys.append(key)
-    return keys
 
 
 def parse_sorts(
