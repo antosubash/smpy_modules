@@ -28,7 +28,11 @@ describe('SlotCard — Load models', () => {
     host?.remove();
   });
 
-  async function mount(onLoadModels: () => Promise<ModelsResult>, dirty = false) {
+  async function mount(
+    onLoadModels: () => Promise<ModelsResult>,
+    dirty = false,
+    slot: SlotValues = values,
+  ) {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -40,7 +44,7 @@ describe('SlotCard — Load models', () => {
           idPrefix="chat"
           providers={['openai_compatible']}
           optionalSlot={false}
-          values={values}
+          values={slot}
           hasStoredKey={false}
           dirty={dirty}
           busy={false}
@@ -92,5 +96,60 @@ describe('SlotCard — Load models', () => {
     const { button } = await mount(load, true);
 
     expect(button()?.disabled).toBe(true);
+  });
+});
+
+describe('SlotCard — base URL (#164)', () => {
+  let root: Root | undefined;
+  let host: HTMLDivElement | undefined;
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    host?.remove();
+  });
+
+  async function render(slot: SlotValues) {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <SlotCard
+          title="Embeddings"
+          description=""
+          idPrefix="emb"
+          providers={['openai', 'openai_compatible']}
+          optionalSlot={true}
+          values={slot}
+          hasStoredKey={false}
+          dirty={false}
+          busy={false}
+          testResult={null}
+          onChange={() => {}}
+          onTest={() => {}}
+          onLoadModels={async () => ({ ok: true, models: [], error: '' })}
+        />,
+      );
+    });
+    return host?.querySelector<HTMLInputElement>('#emb-url');
+  }
+
+  it('marks a blank URL for openai_compatible as required and invalid', async () => {
+    const input = await render({ ...values, base_url: '  ' });
+    expect(input?.required).toBe(true);
+    expect(input?.getAttribute('aria-invalid')).toBe('true');
+    expect(host?.querySelector('#emb-url-error')?.textContent).toContain('base URL');
+  });
+
+  it('shows no error once a URL is entered', async () => {
+    const input = await render(values);
+    expect(input?.getAttribute('aria-invalid')).toBe('false');
+    expect(host?.querySelector('#emb-url-error')).toBeNull();
+  });
+
+  it('does not require a URL for other providers', async () => {
+    const input = await render({ ...values, provider: 'openai', base_url: '' });
+    expect(input?.required).toBe(false);
+    expect(host?.querySelector('#emb-url-error')).toBeNull();
   });
 });
