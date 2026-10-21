@@ -83,7 +83,9 @@ class MediaSearchHit(BaseModel):
     content_type: str
 
 
-async def _page_of(db: AsyncSession, stmt: Any, order: Any, limit: int) -> tuple[list, int]:
+async def _newest_first(
+    db: AsyncSession, stmt: Any, order: Any, limit: int
+) -> tuple[list[Any], int]:
     """The first ``limit`` rows of ``stmt`` by ``order``, and the full count."""
     try:
         total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
@@ -125,7 +127,7 @@ async def search_pages(
         stmt = stmt.where(Page.status == PageStatus.PUBLISHED)
     if locale is not None:
         stmt = stmt.where(Page.locale == locale)
-    rows, total = await _page_of(db, stmt, Page.id.desc(), limit)
+    rows, total = await _newest_first(db, stmt, Page.id.desc(), limit)
     return [PageSearchHit.model_validate(row) for row in rows], total
 
 
@@ -143,5 +145,5 @@ async def search_media(
             MediaAsset.filename.ilike(pattern, escape="\\"),
         ),
     )
-    rows, total = await _page_of(db, stmt, MediaAsset.id.desc(), limit)
+    rows, total = await _newest_first(db, stmt, MediaAsset.id.desc(), limit)
     return [MediaSearchHit.model_validate(row) for row in rows], total

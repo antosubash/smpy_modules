@@ -201,8 +201,9 @@ one — ignoring trashed pages.
 - **Every slug lookup, redirect and claim takes a locale.** One that does not is
   how `/de/p/x` starts serving the English page.
 - **Every new entry point binds a tenant** (`bind_admin`, `bind_public`, or
-  `tenant_context` outside a request). Code in another module reading these
-  tables pins `tenant_id` itself.
+  `tenant_context` outside a request). Another module reads these
+  tables only through `pagebuilder.contracts` (e.g. `search_pages`), which pins
+  the `tenant_id` the caller names.
 - **No env vars.** New settings go on `PagebuilderSettings`; boot-time ones are
   read from `app.state.pagebuilder.settings` in `on_startup` and marked restart.
 - **No migrations in the module.** Hosts autogenerate against the models.
