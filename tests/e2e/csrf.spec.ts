@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { clickAndConfirm, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Issue #10 — CSRF protection.
@@ -120,4 +120,69 @@ test.describe('CSRF protection', () => {
       page.locator('tr', { hasText: `CSRF UI ${slug}` }).getByRole('button', { name: /^delete$/i }),
     );
   });
+});
+
+/**
+ * #110, #111 — news' and records' admin APIs check the framework's
+ * `RequiresCsrf`. Their screens share the token as the `csrf_token` Inertia
+ * prop (`moduleCsrfHeader` reads it), and the console's own clients send it
+ * back: the UI-driven news and records specs exercise that path on every save.
+ */
+const MODULE_WRITES = [
+  {
+    name: 'news',
+    view: '/admin/news/' as const,
+    create: () => ({
+      url: '/api/news/articles',
+      data: { title: 'CSRF news', slug: uniqueSlug('csrf-news') },
+      remove: (body: { id: number }) => `/api/news/articles/${body.id}`,
+    }),
+  },
+  {
+    name: 'records',
+    view: '/admin/records/' as const,
+    create: () => {
+      const key = uniqueSlug('csrf').replace(/-/g, '_').toLowerCase();
+      return {
+        url: '/api/records/types',
+        data: { key, label: `CSRF ${key}`, fields: [{ key: 'title', type: 'text', label: 'T' }] },
+        remove: () => `/api/records/types/${key}?confirm_record_count=0`,
+      };
+    },
+  },
+];
+
+test.describe('CSRF protection — news and records', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  for (const mod of MODULE_WRITES) {
+    test(`${mod.name}: a write without the token is refused with 403`, async ({ page }) => {
+      await page.goto(mod.view);
+      const { url, data } = mod.create();
+      const response = await page.request.post(url, { data });
+      expect(response.status()).toBe(403);
+      expect(await response.text()).toContain('CSRF');
+    });
+
+    test(`${mod.name}: a wrong token is refused with 403`, async ({ page }) => {
+      const { url, data } = mod.create();
+      const response = await page.request.post(url, {
+        data,
+        headers: { 'X-CSRF-Token': 'definitely-not-the-real-token' },
+      });
+      expect(response.status()).toBe(403);
+    });
+
+    test(`${mod.name}: the screen's token is accepted, on create and delete`, async ({ page }) => {
+      const headers = await moduleCsrfHeader(page, mod.view);
+      const { url, data, remove } = mod.create();
+      const created = await page.request.post(url, { data, headers });
+      expect(created.status(), await created.text()).toBe(201);
+      const target = remove(await created.json());
+      expect((await page.request.delete(target)).status()).toBe(403);
+      expect((await page.request.delete(target, { headers })).status()).toBe(204);
+    });
+  }
 });

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { expectPaletteRendered, seedArticle, shot, walkthroughBody } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * One article, start to finish, through the screens an author actually uses.
@@ -71,7 +71,7 @@ test.describe('News — the full editorial workflow', () => {
     // Blocks go in through the body API, which is the convention the rest of
     // this suite follows — Puck's palette is dnd-kit and dragging it under
     // Playwright is flaky enough to become the only thing this ever fails on.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     const seeded = await page.request.put(`/api/news/articles/${articleId}/body`, {
       headers,
       data: { draft_data: walkthroughBody(lead) },
@@ -144,7 +144,7 @@ test.describe('News — the full editorial workflow', () => {
 
   test('review, then publish', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
 
     // Submit and approve have no screens yet — the console publishes directly.
     // They are driven over the API here so the walkthrough covers the path a
@@ -229,7 +229,7 @@ test.describe('News — the full editorial workflow', () => {
 
     // Taking it down takes it down for readers too — published_data is what is
     // served, and unpublishing stops serving it.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     await page.request.post(`/api/news/articles/${articleId}/unpublish`, { headers, data: {} });
     expect((await anon.request.get(url, { maxRedirects: 0 })).status()).toBe(404);
     await anon.close();
@@ -250,7 +250,7 @@ test.describe('News — the full editorial workflow', () => {
 
   test('the trash holds an article and gives it back', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
 
     const trashed = await page.request.post(`/api/news/articles/${articleId}/trash`, {
       headers,
@@ -281,7 +281,7 @@ test.describe('News — the full editorial workflow', () => {
     const doomed = await seedArticle(page, { prefix: 'walkthrough-second', publish: true });
     expect((await page.request.get(doomed.url)).status()).toBe(200);
 
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     expect(
       (await page.request.delete(`/api/news/articles/${doomed.articleId}`, { headers })).status(),
     ).toBe(204);

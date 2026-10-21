@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { csrfHeader, login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * An article has its own public address — and now its own viewer behind it.
@@ -59,7 +59,7 @@ test.describe('News — the public article address', () => {
 
     // Nor is a draft served. Published-only is the whole point of the split
     // between draft_data and published_data.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     await page.request.post(`/api/news/articles/${articleId}/unpublish`, { headers, data: {} });
     expect((await page.request.get(url)).status()).toBe(404);
   });
@@ -127,7 +127,7 @@ test.describe('News — renaming an article', () => {
     // redirect table, read by news because the slug being renamed was a page's;
     // news keeps its own now, and the behaviour has to survive the move.
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page);
     const { articleId, slug: oldSlug } = await seedArticle(page, {
       prefix: 'renamed',
       titlePrefix: 'Renamed',
