@@ -179,11 +179,16 @@ jobs:
         run: |
           deadline=$((SECONDS + 60 * 70))
           while :; do
-            gh api --paginate \
+            # A transient API failure is retried like a pending run, not fatal.
+            rc=2
+            if gh api --paginate \
               "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=100" \
-              > "$RUNNER_TEMP/ci-runs.json"
-            rc=0
-            python3 scripts/release_ci_gate.py "$GITHUB_SHA" < "$RUNNER_TEMP/ci-runs.json" || rc=$?
+              > "$RUNNER_TEMP/ci-runs.json"; then
+              rc=0
+              python3 scripts/release_ci_gate.py "$GITHUB_SHA" < "$RUNNER_TEMP/ci-runs.json" || rc=$?
+            else
+              echo "::warning::could not list CI runs; retrying"
+            fi
             case $rc in
               0) echo "CI is green on $GITHUB_SHA"; exit 0 ;;
               2) ;;

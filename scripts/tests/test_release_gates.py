@@ -142,3 +142,13 @@ def test_main_passes_on_identical_file(tmp_path, monkeypatch):
     digest = pypi.sha256(tmp_path / "x.whl")
     monkeypatch.setattr(pypi, "fetch_released", lambda d, v: released(**{"x.whl": digest}))
     assert pypi.main(["release_pypi_check.py", "x", "1.0.0", str(tmp_path)]) == 0
+
+
+def test_fetch_released_fails_closed_after_retries(monkeypatch):
+    def down(url, timeout):
+        raise pypi.urllib.error.URLError("unreachable")
+
+    monkeypatch.setattr(pypi.urllib.request, "urlopen", down)
+    monkeypatch.setattr(pypi.time, "sleep", lambda s: None)
+    with pytest.raises(SystemExit, match="re-run this job"):
+        pypi.fetch_released("x", "1.0.0")

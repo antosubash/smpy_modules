@@ -10,7 +10,11 @@ local file PyPI already has must carry the same sha256, or the job fails
 rather than leave PyPI serving something other than what was built.
 
 Exits 0 when the version is not on PyPI yet or every overlapping file
-matches, 1 on a mismatch. Stdlib only.
+matches, 1 on a mismatch or when PyPI cannot be asked (fail closed: the job
+is re-run). The JSON API is CDN-cached, so a file uploaded seconds ago may
+not show yet; in this workflow a retry uploads the same artifact the first
+attempt did, so a stale answer can only skip a file that is identical
+anyway. Stdlib only.
 """
 
 from __future__ import annotations
@@ -18,11 +22,13 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 INDEX = "https://pypi.org/pypi"
+ATTEMPTS = 3
 
 
 def sha256(path: Path) -> str:
@@ -51,13 +57,20 @@ def compare(local: dict[str, str], released: list[dict]) -> tuple[list[str], lis
 def fetch_released(distribution: str, version: str) -> list[dict]:
     """The version's files on PyPI; empty when it has none yet."""
     url = f"{INDEX}/{distribution}/{version}/json"
-    try:
-        with urllib.request.urlopen(url, timeout=30) as response:
-            return json.load(response).get("urls", [])
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return []
-        raise
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                return json.load(response).get("urls", [])
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return []
+            error: Exception = exc
+        except (urllib.error.URLError, TimeoutError) as exc:
+            error = exc
+        print(f"::warning::PyPI lookup failed (attempt {attempt}/{ATTEMPTS}): {error}")
+        if attempt < ATTEMPTS:
+            time.sleep(5 * attempt)
+    raise SystemExit(f"::error::could not read {url}; re-run this job")
 
 
 def main(argv: list[str]) -> int:

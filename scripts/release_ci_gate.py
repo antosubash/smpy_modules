@@ -58,7 +58,10 @@ def counted(runs: Iterable[dict], sha: str) -> list[dict]:
     return [
         r
         for r in runs
-        if r.get("head_sha") == sha and r.get("path") == CI_PATH and r.get("event") in EVENTS
+        if r.get("head_sha") == sha
+        # Runs from a non-default ref report ``<path>@<ref>``; compare the file.
+        and (r.get("path") or "").split("@", 1)[0] == CI_PATH
+        and r.get("event") in EVENTS
     ]
 
 
