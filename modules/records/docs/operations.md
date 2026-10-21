@@ -1078,7 +1078,12 @@ Differences that matter:
   precision want a `text` or `json` field.
 - **Write serialization.** The per-type lock is `SELECT … FOR UPDATE` on
   PostgreSQL and a write against the type row on SQLite, because `FOR UPDATE`
-  locks nothing there.
+  locks nothing there. Every writer of a type's rows — record writes, trash,
+  restore, purge, empty-trash, schema changes, collection moves — takes it
+  first, and an operation that needs several (a cascading delete) takes them
+  in ascending type id. On PostgreSQL a lock needed out of that order is taken
+  `NOWAIT` and a held one is a retryable `409`, so two of these never
+  deadlock.
 - **Planner statistics.** SQLite with no statistics plans an index filter badly
   enough to be quadratic; the seeder runs `ANALYZE` over the module's tables for
   exactly this reason, and so does the reindex. Run `ANALYZE` after any bulk

@@ -225,3 +225,25 @@ async def test_a_failure_part_way_rolls_the_whole_move_back(client, monkeypatch)
     assert await _rows(client, None) == before
     assert await _rows(client, "events") == 0
     assert (await client.get(f"{TYPES}/author", headers=roles(ADMIN))).json()["collection"] is None
+
+
+async def test_an_empty_type_moves_and_publishes_with_moved_zero(client):
+    """Nothing to copy is still a move: ``collection`` changes and commits, so
+    subscribers hear about it like any other."""
+    await make_type(client, "author", [text_field("name")])
+    seen: list[RecordTypeMoved] = []
+
+    async def on_moved(event) -> None:
+        seen.append(event)
+
+    client.app.state.sm.event_bus.subscribe(RecordTypeMoved, on_moved)
+    assert (await _move(client, "events")).status_code == 200
+    (event,) = seen
+    assert (event.type_key, event.source, event.target, event.moved) == (
+        "author",
+        None,
+        "events",
+        0,
+    )
+    stored = (await client.get(f"{TYPES}/author", headers=roles(ADMIN))).json()
+    assert stored["collection"] == "events"

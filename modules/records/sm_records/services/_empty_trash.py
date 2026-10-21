@@ -27,6 +27,8 @@ from sm_records import events
 from sm_records.index.query import Filter, filtered, only_trashed
 from sm_records.models import RecordType, tables_for
 from sm_records.services._common import mark_written
+from sm_records.services._lock import lock_type
+from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
 
 __all__ = ["Identity", "empty_trash"]
@@ -94,9 +96,18 @@ async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> Non
         await db.execute(
             sa_delete(revision).where(revision.record_id.in_(batch), revision.tenant_id == tenant)
         )
-        await db.execute(
+        gone = await db.execute(
             sa_delete(document).where(document.id.in_(batch), document.tenant_id == tenant)
         )
+        # Every caller holds the type lock and selected these ids under it, so
+        # a shortfall is a writer that skipped the protocol — refused, and the
+        # request's rollback restores the rows this pass already deleted,
+        # rather than a ``RecordPurged`` published for a row nobody purged.
+        if gone.rowcount != len(batch):
+            raise Conflict(
+                f"{len(batch) - gone.rowcount} record(s) of {rtype.key!r} changed while "
+                "they were being purged; nothing was purged — send the request again"
+            )
     await db.flush()
     mark_written(db)
 
@@ -120,6 +131,9 @@ async def empty_trash(
     screen listed it with. Index rows survive a soft delete (§7.3), which is
     what makes the trash filterable at all.
     """
+    # The lock before the select, so the ids are the ones the purge deletes and
+    # the tables are the ones the type is in (``services._lock.lock_types``).
+    await lock_type(db, rtype)
     cls = tables_for(rtype).record
     # Four columns and no entity: the identities the events need and the ids
     # the delete needs, in one statement rather than ten thousand ORM

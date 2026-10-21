@@ -13,15 +13,130 @@ Re-exported from ``_claims``, so every caller keeps importing one module.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Any, Protocol
+
 from sqlalchemy import select
 from sqlalchemy import update as sa_update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import RecordType
 from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
 
-__all__ = ["lock_type"]
+__all__ = ["lock_type", "lock_types"]
+
+_HELD = "sm_records.type_locks"
+"""``Session.info`` key: ``(root transaction, ids locked in it)`` — see :func:`lock_types`."""
+
+
+class Locked(Protocol):
+    """What a lock needs to know of a type: its id, its key for the message,
+    and the collection the caller has been reading it from."""
+
+    @property
+    def id(self) -> Any: ...
+    @property
+    def key(self) -> str: ...
+    @property
+    def collection(self) -> str | None: ...
+
+
+def _held(db: AsyncSession) -> set[int]:
+    """The type ids already locked by this session's current transaction.
+
+    Keyed on the root transaction object, so a commit — the reindex runner
+    commits per batch and locks again — starts an empty set rather than
+    inheriting one whose locks were released.
+    """
+    txn = db.sync_session.get_transaction()
+    entry = db.info.get(_HELD)
+    if entry is None or entry[0] is not txn:
+        entry = (txn, set())
+        db.info[_HELD] = entry
+    return entry[1]
+
+
+_LOCK_NOT_AVAILABLE = "55P03"
+"""Postgres' SQLSTATE for a ``NOWAIT`` lock somebody else holds."""
+
+
+async def _lock_one(db: AsyncSession, rtype: Locked, *, nowait: bool = False) -> None:
+    if db.get_bind().dialect.name == "sqlite":
+        # The tenant said explicitly: this is DML, which no tenant filter
+        # reaches (tenancy design §E).
+        # ``RETURNING`` reads the collection in the same statement, so the
+        # re-read costs no round trip on the path every write takes.
+        found = (
+            await db.execute(
+                sa_update(RecordType)
+                .where(RecordType.id == rtype.id, RecordType.tenant_id == bound_tenant())
+                .values(version=RecordType.version, updated_at=RecordType.updated_at)
+                .returning(RecordType.id, RecordType.collection)
+            )
+        ).first()
+    else:
+        stmt = (
+            select(RecordType.id, RecordType.collection)
+            .where(RecordType.id == rtype.id)
+            .with_for_update(nowait=nowait)
+        )
+        try:
+            found = (await db.execute(stmt)).first()
+        except DBAPIError as exc:
+            code = getattr(exc.orig, "pgcode", None) or getattr(exc.orig, "sqlstate", None)
+            if not nowait or code != _LOCK_NOT_AVAILABLE:
+                raise
+            raise Conflict(
+                f"record type {rtype.key!r} is being written by another request; "
+                "nothing was written — send the request again"
+            ) from exc
+    if found is None:
+        raise Conflict(
+            f"record type {rtype.key!r} was deleted while this write was waiting for it; "
+            "nothing was written"
+        )
+    if found[1] != rtype.collection:
+        raise Conflict(
+            f"record type {rtype.key!r} moved to another collection while this write "
+            "was waiting for it; nothing was written — send the request again"
+        )
+
+
+async def lock_types(db: AsyncSession, rtypes: Iterable[Locked]) -> None:
+    """Lock several types, **in ascending id order**, re-reading each one's
+    ``collection`` — the one locking protocol of this module (#82).
+
+    Every write to a type's rows — a record write, a trash, restore or purge,
+    an empty-trash, a move, a schema change — takes that type's lock *before*
+    its first row write, and an operation that writes the rows of several
+    types (a delete cascading through the relation graph) takes all of them
+    up front, through here. Two consequences, and both are the point:
+
+    * **No row lock is ever waited for while a type lock is held by someone
+      else's writer of those rows**, because nobody writes a row without the
+      type lock. A move therefore needs no row locks of its own: it holds its
+      type's lock and every writer of those rows is queued behind it.
+    * **No transaction waits for a type lock out of order.** Locks are taken
+      in ascending id order; a transaction already holding a higher id that
+      needs a lower one — a seed reset deleting types newest first, or a
+      relation graph changing under a running delete — takes it with
+      ``NOWAIT`` on Postgres, and a lock somebody else holds is a retryable
+      ``409`` rather than a wait. A waiter therefore only ever waits for a
+      higher id than any it holds, which is what rules a cycle out. SQLite
+      needs neither: its lock is the database's one write lock, and the
+      first ``lock_types`` of a transaction already holds it.
+    """
+    wanted = {int(rtype.id): rtype for rtype in rtypes}
+    held = _held(db)
+    ceiling = max(held, default=None)
+    for type_id in sorted(wanted):
+        late = ceiling is not None and type_id < ceiling and type_id not in held
+        await _lock_one(db, wanted[type_id], nowait=late)
+        # Read again after the statement: the first lock of a transaction is
+        # what begins it, so the set has to be the new transaction's.
+        _held(db).add(type_id)
 
 
 async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
@@ -66,23 +181,4 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     exclusive, and a snapshot older than the move cannot take it at all), and
     a disagreement is a ``409`` the caller can simply retry.
     """
-    if db.get_bind().dialect.name == "sqlite":
-        # The tenant said explicitly: this is DML, which no tenant filter
-        # reaches (tenancy design §E).
-        # ``RETURNING`` reads the collection in the same statement, so the
-        # re-read costs no round trip on the path every write takes.
-        stored = await db.scalar(
-            sa_update(RecordType)
-            .where(RecordType.id == rtype.id, RecordType.tenant_id == bound_tenant())
-            .values(version=RecordType.version, updated_at=RecordType.updated_at)
-            .returning(RecordType.collection)
-        )
-    else:
-        stored = await db.scalar(
-            select(RecordType.collection).where(RecordType.id == rtype.id).with_for_update()
-        )
-    if stored != rtype.collection:
-        raise Conflict(
-            f"record type {rtype.key!r} moved to another collection while this write "
-            "was waiting for it; nothing was written — send the request again"
-        )
+    await lock_types(db, [rtype])

@@ -834,9 +834,13 @@ just read still saves.
 the version guard (`409`). A record write that loaded the type before a move
 committed is refused with a `409` to retry, because the type lock re-reads
 `collection` once it is held — otherwise it would write into the tables the
-type just left. On Postgres the move also row-locks the type's records in id
-order, so a trash, restore or purge racing it is either copied or rolled back,
-never applied to a row the copy has passed. A `mode=update` type import refuses a changed
+type just left. The same holds for every lifecycle operation: a trash, restore,
+purge or empty-trash takes the type lock before touching a row (a trash locks
+every type its `cascade`/`set_null` relations can reach, in id order), so one
+racing a move either runs entirely before it — and is moved with the type — or
+waits for it and is refused with a `409`; a purge never reports success for a
+record the move carried away. A record already purged or restored by a
+concurrent request is a `404`/`409`, not a second event. A `mode=update` type import refuses a changed
 `collection` with a `409` — a file must not move a type on the side. The type
 editor shows the collection read-only once the type exists: a move is an API
 operation, not a by-product of saving the form.

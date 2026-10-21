@@ -24,6 +24,7 @@ from sm_records.services import types as type_service
 from sm_records.services._common import guarded_bump
 from sm_records.services._empty_trash import _purge_ids
 from sm_records.services._lifecycle import hard_delete_record, purge_type_records
+from sm_records.services.errors import Conflict
 from sm_records.services.revisions import write_revision
 from sm_records.tenancy import all_tenants
 from sqlalchemy import insert, select
@@ -98,9 +99,13 @@ async def test_the_referrer_page_counts_only_the_bound_tenants_referrers(db_stat
 
 
 async def test_the_empty_trash_delete_leaves_another_tenants_row(db_state, two):
+    """Left alone — and the shortfall is a refusal, so no ``RecordPurged``
+    is published for a row this tenant could not delete."""
     acme, globex = two
     async with session_in(db_state, "acme") as session:
-        await _purge_ids(session, acme.rtype, [globex.record.id])
+        with pytest.raises(Conflict, match="changed while they were being purged"):
+            await _purge_ids(session, acme.rtype, [globex.record.id])
+        await session.rollback()
     assert await _survives(db_state, globex) == (True, 1)
 
 

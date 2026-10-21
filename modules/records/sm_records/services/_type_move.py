@@ -124,19 +124,11 @@ async def move_type(db: AsyncSession, rtype: RecordType, target: str | None) -> 
     src, dst = source.record.__table__, dest.record.__table__
     tenant = rtype.tenant_id
     mine = and_(src.c.type_id == rtype.id, src.c.tenant_id == tenant)
-    if db.get_bind().dialect.name != "sqlite":
-        # The type lock stops every writer that takes it, but a trash, restore
-        # or purge updates its row without it. Locking the rows themselves, in
-        # id order so two lockers cannot deadlock, makes such a write either
-        # commit before this copy reads (and be copied) or wait for the move
-        # and then find its row gone — a rollback, never an edit to a row the
-        # copy has already passed. SQLite needs neither: the guarded bump took
-        # its exclusive write lock before this function was called.
-        await db.execute(
-            select(src.c.id).where(mine).order_by(src.c.id).with_for_update(),
-            execution_options=_ALL_ROWS,
-        )
-
+    # No row locks: every writer of this type's rows — a record write, a
+    # trash, restore, purge or empty-trash, a cascade or ``set_null`` reaching
+    # in from another type — holds this type's lock before its first row write
+    # (``services._lock.lock_types``), so all of them are queued behind the
+    # lock just taken, and the copy below reads rows nobody else can change.
     clash = await db.scalar(
         select(func.count())
         .select_from(dst)
@@ -155,8 +147,29 @@ async def move_type(db: AsyncSession, rtype: RecordType, target: str | None) -> 
         )
         or 0
     )
-    if not moved:
-        return 0
+    if moved:
+        await _copy_rows(db, rtype, source, dest, mine)
+    mark_written(db)
+    # An empty type moves too — its ``collection`` changes and commits — so it
+    # publishes like any other move, with ``moved=0``.
+    events.emit(
+        db,
+        RecordTypeMoved(
+            type_key=rtype.key,
+            tenant_id=tenant,
+            source=source.name,
+            target=dest.name,
+            moved=moved,
+        ),
+    )
+    return moved
+
+
+async def _copy_rows(
+    db: AsyncSession, rtype: RecordType, source: Any, dest: Any, mine: Any
+) -> None:
+    """Copy every row of the type into ``dest``, then delete it from ``source``."""
+    src, dst = source.record.__table__, dest.record.__table__
     columns = _copy_columns(src)
     await _copy_batched(db, select(*[src.c[n] for n in columns]).where(mine), src.c.id, dst)
 
@@ -196,16 +209,3 @@ async def move_type(db: AsyncSession, rtype: RecordType, target: str | None) -> 
         from_table = from_cls.__table__
         await db.execute(delete(from_table).where(from_table.c.record_id.in_(old_ids)))
     await db.execute(delete(src).where(mine))
-    mark_written(db)
-
-    events.emit(
-        db,
-        RecordTypeMoved(
-            type_key=rtype.key,
-            tenant_id=tenant,
-            source=source.name,
-            target=dest.name,
-            moved=moved,
-        ),
-    )
-    return moved
