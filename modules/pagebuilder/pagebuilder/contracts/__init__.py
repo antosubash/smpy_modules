@@ -33,6 +33,7 @@ from pagebuilder.contracts.schemas import (
     RevisionDiffResponse,
 )
 from pagebuilder.contracts.search import (
+    MAX_SEARCH_LIMIT,
     MediaSearchHit,
     PageSearchHit,
     search_media,
@@ -40,6 +41,7 @@ from pagebuilder.contracts.search import (
 )
 
 __all__ = [
+    "MAX_SEARCH_LIMIT",
     "BlockChange",
     "LayoutDetail",
     "LayoutRead",

@@ -19,6 +19,10 @@ error on a screen that only wanted to add a section.
 **Pattern.** A SQL ``LIKE`` pattern with ``\\`` as the escape character — the
 caller owns escaping and wildcards, so both modules' sections match on the
 same rule.
+
+**Limit.** An ``int`` from 1 to :data:`MAX_SEARCH_LIMIT`; anything else raises
+``ValueError`` before a query runs. SQLAlchemy reads ``None`` (and SQLite a
+negative number) as "no limit", which would load every matching page body.
 """
 
 from __future__ import annotations
@@ -32,7 +36,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 
-__all__ = ["MediaSearchHit", "PageSearchHit", "search_media", "search_pages"]
+__all__ = [
+    "MAX_SEARCH_LIMIT",
+    "MediaSearchHit",
+    "PageSearchHit",
+    "search_media",
+    "search_pages",
+]
+
+MAX_SEARCH_LIMIT = 100
+"""The most hits one call returns. The total is still the full count."""
+
+
+def _checked_limit(limit: object) -> int:
+    # `bool` is an `int`; `True` as a limit is a caller bug, not "one row".
+    if not isinstance(limit, int) or isinstance(limit, bool):
+        raise ValueError(f"limit must be an int, got {type(limit).__name__}")
+    if not 1 <= limit <= MAX_SEARCH_LIMIT:
+        raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}, got {limit}")
+    return limit
 
 
 class PageSearchHit(BaseModel):
@@ -84,8 +106,9 @@ async def search_pages(
 
     Matches the title, the slug and the draft body. Trashed pages never match;
     unpublished ones only with ``include_drafts``. Every language unless
-    ``locale`` names one.
+    ``locale`` names one. ``limit`` must be 1..:data:`MAX_SEARCH_LIMIT`.
     """
+    limit = _checked_limit(limit)
     stmt = select(Page).where(
         NOT_TRASHED,
         Page.tenant_id == tenant_id,
@@ -110,7 +133,9 @@ async def search_media(
     db: AsyncSession, pattern: str, *, tenant_id: str, limit: int
 ) -> tuple[list[MediaSearchHit], int]:
     """Media in ``tenant_id`` whose name matches ``pattern``, newest first, and
-    the total. Both the uploaded name and the stored one are matched."""
+    the total. Both the uploaded name and the stored one are matched.
+    ``limit`` must be 1..:data:`MAX_SEARCH_LIMIT`."""
+    limit = _checked_limit(limit)
     stmt = select(MediaAsset).where(
         MediaAsset.tenant_id == tenant_id,
         or_(

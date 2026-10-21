@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 from pagebuilder.contracts import (
+    MAX_SEARCH_LIMIT,
     MediaSearchHit,
     PageSearchHit,
     search_media,
@@ -21,10 +22,21 @@ from pagebuilder.models import MediaAsset, Page, PageStatus
 pytestmark = [pytest.mark.asyncio, pytest.mark.unbound_tenant]
 
 
-async def _page(db, slug: str, *, tenant: str = "default", locale: str = "en",
-                status: PageStatus = PageStatus.PUBLISHED, trashed: bool = False) -> Page:
+async def _page(
+    db,
+    slug: str,
+    *,
+    tenant: str = "default",
+    locale: str = "en",
+    status: PageStatus = PageStatus.PUBLISHED,
+    trashed: bool = False,
+) -> Page:
     page = Page(
-        tenant_id=tenant, slug=slug, title=slug.title(), locale=locale, status=status,
+        tenant_id=tenant,
+        slug=slug,
+        title=slug.title(),
+        locale=locale,
+        status=status,
         draft_data={"content": [{"type": "Text", "props": {"text": f"body of {slug}"}}]},
         deleted_at=datetime.now(UTC) if trashed else None,
     )
@@ -36,7 +48,9 @@ async def _page(db, slug: str, *, tenant: str = "default", locale: str = "en",
 
 async def _asset(db, name: str, *, tenant: str = "default") -> MediaAsset:
     asset = MediaAsset(
-        tenant_id=tenant, filename=f"{tenant}-{name}", original_filename=name,
+        tenant_id=tenant,
+        filename=f"{tenant}-{name}",
+        original_filename=name,
         content_type="image/png",
     )
     db.add(asset)
@@ -70,8 +84,9 @@ async def test_pages_match_title_slug_and_body_newest_first(db) -> None:
     assert [h.id for h in hits] == [b.id]
     assert total == 2
     assert hits[0].draft_data == b.draft_data
-    assert (await search_pages(db, "%alph%", tenant_id="default", include_drafts=True,
-                               limit=5))[0][0].id == a.id
+    assert (await search_pages(db, "%alph%", tenant_id="default", include_drafts=True, limit=5))[0][
+        0
+    ].id == a.id
 
 
 async def test_drafts_only_when_asked_and_trash_never(db) -> None:
@@ -96,10 +111,10 @@ async def test_locale_narrows_only_when_given(db) -> None:
     en = await _page(db, "about", locale="en")
     de = await _page(db, "about", locale="de")
 
-    every, _ = await search_pages(db, "%about%", tenant_id="default",
-                                  include_drafts=True, limit=10)
-    german, total = await search_pages(db, "%about%", tenant_id="default",
-                                       include_drafts=True, limit=10, locale="de")
+    every, _ = await search_pages(db, "%about%", tenant_id="default", include_drafts=True, limit=10)
+    german, total = await search_pages(
+        db, "%about%", tenant_id="default", include_drafts=True, limit=10, locale="de"
+    )
 
     assert {h.id for h in every} == {en.id, de.id}
     assert [(h.id, h.locale) for h in german] == [(de.id, "de")]
@@ -125,3 +140,29 @@ async def test_media_matches_the_stored_name_too(db) -> None:
     hits, _ = await search_media(db, "%default-photo%", tenant_id="default", limit=10)
 
     assert [h.id for h in hits] == [asset.id]
+
+
+@pytest.mark.parametrize("limit", [0, -1, None, MAX_SEARCH_LIMIT + 1, 10**9, True, 2.0])
+async def test_an_out_of_range_limit_is_refused_before_any_query(db, limit) -> None:
+    # SQLAlchemy reads None (and SQLite a negative) as "no limit"; a huge one
+    # would load every matching page body. None of them reach the database.
+    await _page(db, "bounded")
+    await _asset(db, "bounded.png")
+
+    with pytest.raises(ValueError, match="limit"):
+        await search_pages(db, "%bounded%", tenant_id="default", include_drafts=True, limit=limit)
+    with pytest.raises(ValueError, match="limit"):
+        await search_media(db, "%bounded%", tenant_id="default", limit=limit)
+
+
+async def test_the_largest_limit_is_accepted(db) -> None:
+    page = await _page(db, "edge")
+    asset = await _asset(db, "edge.png")
+
+    pages, _ = await search_pages(
+        db, "%edge%", tenant_id="default", include_drafts=True, limit=MAX_SEARCH_LIMIT
+    )
+    media, _ = await search_media(db, "%edge%", tenant_id="default", limit=MAX_SEARCH_LIMIT)
+
+    assert [h.id for h in pages] == [page.id]
+    assert [h.id for h in media] == [asset.id]

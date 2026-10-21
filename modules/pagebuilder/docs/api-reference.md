@@ -255,7 +255,9 @@ the package may change without a major version.
 **`search_pages(db, pattern, *, tenant_id, include_drafts, limit, locale=None)`**
 and **`search_media(db, pattern, *, tenant_id, limit)`** (`pagebuilder.contracts`)
 return `(hits, total)` — `PageSearchHit` / `MediaSearchHit`, newest first, at
-most `limit`, plus the full match count. `pattern` is a SQL `LIKE` pattern
+most `limit`, plus the full match count. `limit` is an `int` from 1 to
+`MAX_SEARCH_LIMIT` (100); anything else — `None`, a negative, an oversized
+value — raises `ValueError` before any query runs. `pattern` is a SQL `LIKE` pattern
 escaped with `\`. The caller names the tenant and the contract pins it with a
 `WHERE`, so a host with no tenant bound still reads one tenant's rows; a strict
 session with none bound answers `([], 0)`. Pages match title, slug and draft
