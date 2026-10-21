@@ -1,5 +1,11 @@
 # PageBuilder UX Implementation Plan
 
+> **Historical record.** Paths under `/Volumes/ext1/...` below are the
+> author's machine at the time of writing and exist nowhere else. Read them as
+> `<path-to>/simple_module_python`, `<path-to>/smpy_pagebuilder`,
+> `<path-to>/dev-services` and the repo root; current instructions are in
+> `CLAUDE.md` and `README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the pagebuilder admin feel like part of the app — persistent navigation, one unambiguous publish action, and the shared UI primitives.
