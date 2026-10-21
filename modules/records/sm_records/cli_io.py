@@ -30,10 +30,11 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
-from sm_records import events
+from sm_records import cli_host, events
 from sm_records.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.contracts.io import ImportFormat, ImportMode, ImportReport, OnError
 from sm_records.services import export as export_service
@@ -122,8 +123,9 @@ async def import_command(
 
     ``bus`` gets one ``RecordCreated``/``RecordUpdated`` per written row once
     the import commits — a caller running this in-process with a host's
-    ``app.state.sm.event_bus`` reaches that host's subscribers. Without one (the
-    standalone ``python -m`` process has no host) nothing is published.
+    ``app.state.sm.event_bus`` reaches that host's subscribers, and so does
+    ``python -m sm_records.cli import --apply --app main:app``
+    (:mod:`sm_records.cli_host`). Without one nothing is published.
     """
     text = Path(path).read_text(encoding="utf-8-sig")
     fmt = ImportFormat.CSV if path.lower().endswith(".csv") else ImportFormat.JSON
@@ -190,18 +192,19 @@ def add_parsers(sub: Any) -> None:
     imp.add_argument("--apply", action="store_true", help="actually write; omit for a dry run")
     imp.add_argument("--database-url", dest="database_url", default=None)
     add_tenant_argument(imp)
+    cli_host.add_app_arguments(imp)
 
 
-def run(args: Any, database_url: str) -> int:
-    """Dispatch for ``cli.main``; returns the process exit code."""
-    try:
-        if args.command == "export":
-            asyncio.run(
-                export_command(database_url, args.type_key, args.fmt, args.out, args.tenant)
-            )
-            return 0
-        asyncio.run(
-            import_command(
+def run(args: Any, database_url: str, app: Any = None) -> int:
+    """Dispatch for ``cli.main``; returns the process exit code.
+
+    ``app`` is the host ``--app`` named, if any. Only an applied import
+    publishes, so only that one starts the host or warns that there is none.
+    """
+
+    async def run_import() -> None:
+        async with cli_host.host_bus(app, "import") if args.apply else nullcontext() as bus:
+            await import_command(
                 database_url,
                 args.type_key,
                 args.path,
@@ -211,8 +214,16 @@ def run(args: Any, database_url: str) -> int:
                 force=args.force,
                 apply=args.apply,
                 tenant=args.tenant,
+                bus=bus,
             )
-        )
+
+    try:
+        if args.command == "export":
+            asyncio.run(
+                export_command(database_url, args.type_key, args.fmt, args.out, args.tenant)
+            )
+            return 0
+        asyncio.run(run_import())
     except RecordsError as exc:
         print(f"records {args.command}: {exc.detail}")
         return 1

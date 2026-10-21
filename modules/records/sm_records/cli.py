@@ -30,7 +30,7 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from sm_records import cli_io
+from sm_records import cli_host, cli_io
 from sm_records._cross_tenant import TenantCounts, tenant_counts
 from sm_records.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.cli_reindex import force_pending, reindex, run_verify
@@ -155,6 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="override SM_DATABASE_URL / .env for this run",
     )
     add_tenant_argument(seed_parser)
+    cli_host.add_app_arguments(seed_parser)
     tenants_parser = sub.add_parser(
         "tenants", help="list the tenants holding record types, with counts (read-only)"
     )
@@ -163,20 +164,30 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from simple_module_hosting.settings import Settings
 
-    database_url = args.database_url or Settings().database_url
+    # The two writing commands take ``--app`` (GH #157): the host's app, whose
+    # lifespan runs around the write so its subscribers hear it.
+    spec = getattr(args, "app", None)
+    app = cli_host.load_app(spec, args.app_dir) if spec else None
+    database_url = cli_host.resolve_database_url(
+        app, args.database_url, lambda: Settings().database_url
+    )
     if args.command in ("export", "import"):
-        return cli_io.run(args, database_url)
+        return cli_io.run(args, database_url, app)
 
     if args.command == "seed":
-        asyncio.run(
-            seed(
-                database_url,
-                records=args.records,
-                seed_value=args.seed_value,
-                reset=args.reset,
-                tenant=args.tenant,
-            )
-        )
+
+        async def run_seed() -> None:
+            async with cli_host.host_bus(app, "seed") as bus:
+                await seed(
+                    database_url,
+                    records=args.records,
+                    seed_value=args.seed_value,
+                    reset=args.reset,
+                    tenant=args.tenant,
+                    bus=bus,
+                )
+
+        asyncio.run(run_seed())
         return 0
 
     if args.command == "tenants":
