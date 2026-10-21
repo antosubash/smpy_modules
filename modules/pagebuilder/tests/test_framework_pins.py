@@ -108,3 +108,29 @@ def test_the_frameworks_own_multi_wins():
     app = FastAPI()  # no TenantMiddleware at all
     app.state.sm = SimpleNamespace(tenancy="multi")
     assert tenancy.detect_mode(app) is TenancyMode.MULTI
+
+
+# --- no shared or premature cache ---------------------------------------------
+
+
+def test_each_app_keeps_its_own_mode():
+    """The mode lives on the app it was read from — nothing module-level."""
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    single, multi = FastAPI(), FastAPI()
+    multi.add_middleware(TenantMiddleware, header="X-Tenant-ID")
+    single.state.pagebuilder = SimpleNamespace()
+    multi.state.pagebuilder = SimpleNamespace()
+    assert tenancy.configure(single) is TenancyMode.SINGLE
+    assert tenancy.configure(multi) is TenancyMode.MULTI
+    assert tenancy.mode_of(single) is TenancyMode.SINGLE
+    assert tenancy.mode_of(multi) is TenancyMode.MULTI
+
+
+def test_a_detection_before_the_middleware_is_added_does_not_stick():
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    app = FastAPI()
+    assert tenancy.mode_of(app) is TenancyMode.SINGLE  # nothing stored by this
+    app.add_middleware(TenantMiddleware)
+    assert tenancy.mode_of(app) is TenancyMode.MULTI
