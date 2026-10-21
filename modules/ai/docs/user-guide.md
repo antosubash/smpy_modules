@@ -41,8 +41,8 @@ protocol requires one.
 
 ### An unknown provider
 
-A provider written outside this page (with `scripts/set_setting.py` or on the
-generic Settings screen) can hold a value that isn't in the list,
+A provider written outside this page (with `scripts/set_setting.py`) can hold
+a value that isn't in the list,
 for example a typo. The select then shows it as "`<value>` (unknown provider)",
 and every save fails until you pick a real provider.
 

@@ -16,7 +16,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder import locales, public_claims
+from pagebuilder import locales
 from pagebuilder.models import NOT_TRASHED, Page, PageStatus
 
 
@@ -38,10 +38,7 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
     database's collation.
 
     Only the page's own language: a German page's header linking to the English
-    "About" would drop a reader into the wrong language with no way back. The
-    href goes through the claims registry, so a page another module has claimed
-    links to that module's address rather than to a ``/p/`` URL
-    that 404s.
+    "About" would drop a reader into the wrong language with no way back.
     """
     result = await db.execute(
         select(Page.title, Page.slug, Page.show_in_header_nav, Page.show_in_footer)
@@ -53,13 +50,11 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
         )
         .order_by(func.lower(Page.title), Page.id)
     )
-    rows = result.all()
-    claimed = await public_claims.resolve(db, [row.slug for row in rows], locale)
     nav: SiteNav = {"header": [], "footer": []}
-    for row in rows:
+    for row in result.all():
         link: NavLink = {
             "label": row.title,
-            "href": claimed.get(row.slug) or locales.public_path(prefix, row.slug, locale),
+            "href": locales.public_path(prefix, row.slug, locale),
         }
         if row.show_in_header_nav:
             nav["header"].append(link)

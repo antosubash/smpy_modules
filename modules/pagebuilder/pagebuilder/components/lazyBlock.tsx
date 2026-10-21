@@ -6,9 +6,9 @@
  * before first render so the registry is populated when a page reads the
  * Puck config. But a registration that statically imports its
  * render component drags the component's whole dependency graph into the
- * entry chunk, on every page of the site. Measured on a consuming site, a
- * map block put maplibre-gl — 1 MB minified, 62% of the bundle — in front
- * of every visitor.
+ * entry chunk, on every page of the site. Measured on a consuming site, one
+ * block's static import put a 1 MB (minified) library — 62% of the bundle —
+ * in front of every visitor.
  *
  * `lazyBlock` keeps the cheap parts eager (fields, defaults, labels) and
  * loads the component the first time a page actually renders the block:
@@ -16,10 +16,10 @@
  * ```tsx
  * registerPuckBlocks({
  *   blocks: {
- *     CanopyAtlasMap: lazyBlock(
- *       () => import('./components/CanopyAtlasMap').then((m) => m.CanopyAtlasMapEmbed),
+ *     Chart: lazyBlock(
+ *       () => import('./components/Chart').then((m) => m.ChartEmbed),
  *       {
- *         label: 'Canopy Atlas map',
+ *         label: 'Chart',
  *         fields: { height: { type: 'select', options: HEIGHTS } },
  *         defaultProps: { height: 'screen' },
  *       },
