@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from tenants.models import Tenant
 
 from sm_billing import constants as c
@@ -13,7 +13,7 @@ from sm_billing import crypto
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import apply_lifecycle, tenant_service
-from sm_billing.models import Plan, Subscription
+from sm_billing.models import Plan, Subscription, WebhookEvent
 from sm_billing.plans import PlanService
 from sm_billing.providers.factory import install_provider
 from sm_billing.resolve import subscription_for
@@ -22,6 +22,7 @@ from sm_billing.schemas import (
     ConnectionOut,
     PlanIn,
     SubscriptionRow,
+    SyncHealth,
     normalise_return_url,
 )
 from sm_billing.services import current_provider
@@ -141,6 +142,29 @@ async def subscription_rows(
             )
         )
     return rows
+
+
+async def sync_health(db: AsyncSession, app: FastAPI) -> SyncHealth:
+    """The numbers that show a missed webhook before a customer does (#122)."""
+    held = Subscription.provider_subscription_id.is_not(None)
+    oldest, never = (
+        await db.execute(
+            select(
+                func.min(Subscription.synced_at),
+                func.count().filter(Subscription.synced_at.is_(None)),
+            ).where(held)
+        )
+    ).one()
+    stmt = select(func.count()).where(WebhookEvent.processed_at.is_(None))
+    unprocessed = (await db.execute(stmt)).scalar_one()
+    services = _services(app)
+    return SyncHealth(
+        oldest_synced_at=oldest,
+        never_synced=never or 0,
+        unprocessed_webhooks=unprocessed,
+        reconcile_interval_minutes=services.settings.reconcile_interval_minutes,
+        reconcile_running=bool(services.scheduler and services.scheduler.running),
+    )
 
 
 async def one_row(db: AsyncSession, app: FastAPI, tenant_id: str) -> SubscriptionRow:

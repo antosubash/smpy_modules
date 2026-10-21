@@ -11,15 +11,23 @@ import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
 import { AssignDialog } from '../components/AssignDialog';
 import { SubscriptionsTable } from '../components/SubscriptionsTable';
+import { SyncHealthBar } from '../components/SyncHealthBar';
 import { ADMIN_API, api } from '../utils/api';
 import { STATUSES, statusLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { AdminCommon, Plan, SubscriptionRow, SubscriptionStatus } from '../utils/types';
+import type {
+  AdminCommon,
+  Plan,
+  SubscriptionRow,
+  SubscriptionStatus,
+  SyncHealth,
+} from '../utils/types';
 
 interface Props extends AdminCommon {
   rows: SubscriptionRow[];
   plans: Plan[];
   status_filter: string;
+  sync_health: SyncHealth;
 }
 
 const VIEW_URL = '/admin/billing/subscriptions';
@@ -27,8 +35,16 @@ const VIEW_URL = '/admin/billing/subscriptions';
 function Subscriptions() {
   const { t } = useT();
   const c = keys.billing.subscriptions;
-  const { rows, plans, status_filter, csrf_token, can_manage, checkout_available, provider } =
-    usePage<{ props: Props }>().props as unknown as Props;
+  const {
+    rows,
+    plans,
+    status_filter,
+    sync_health,
+    csrf_token,
+    can_manage,
+    checkout_available,
+    provider,
+  } = usePage<{ props: Props }>().props as unknown as Props;
   const [assigning, setAssigning] = useState<SubscriptionRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,6 +89,7 @@ function Subscriptions() {
         }
       >
         <AdminNav active="subscriptions" />
+        {checkout_available && <SyncHealthBar health={sync_health} />}
         <div className="mb-4 flex max-w-xs items-center gap-2">
           <Label htmlFor="status-filter" className="shrink-0">
             {t(c.status)}

@@ -11,8 +11,9 @@ from the command line told no subscriber (GH #128). The bus is not imported —
 architecture rule 1 still holds — it rides on the session: the request's
 session gets ``app.state.sm.event_bus`` from :func:`sm_records.deps.request_db`,
 and a caller outside a request hands one to :func:`attach`. A session with no
-bus attached publishes nothing, which is what a standalone CLI process with no
-host (and therefore no subscriber) gets.
+bus attached publishes nothing, which is what a standalone CLI process gets
+unless ``--app`` names the host whose bus to use (:mod:`sm_records.cli_host`,
+GH #157) — and it says so on stderr when it writes without one.
 
 **After the commit, never inside it.** :func:`emit` queues on the framework's
 ``on_commit`` (``simple_module_db.callbacks``), which runs only once
