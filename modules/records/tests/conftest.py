@@ -52,6 +52,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
 # Fixtures several suites share, each defined once beside what it builds on.
 from tests.bulk_helpers import product  # noqa: F401
 from tests.census import Census, census_enabled
+from tests.csrf_support import session_client  # noqa: F401 - test_csrf*'s fixture
 from tests.events_harness import bus, note  # noqa: F401
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state

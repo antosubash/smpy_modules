@@ -66,7 +66,9 @@ test.describe('Records — permissions', () => {
       // …and the JSON API refuses the same session, so the screens are not
       // the only thing standing in the way. The write's 403 now comes from the
       // CSRF check (#111), which runs before the permission check: a user no
-      // records screen will render for is never handed a token to send.
+      // records screen will render for is never handed a token to send. That a
+      // valid token still meets the permission check is proven in pytest
+      // (modules/records/tests/test_csrf_permissions.py).
       const listed = await other.request.get('/api/records/types');
       expect(listed.status()).toBe(403);
       const created = await other.request.post('/api/records/types', {
