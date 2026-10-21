@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * A page published in two languages.
@@ -101,7 +101,7 @@ test.describe('Multilingual pages', () => {
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     await login(page);
-    await putLayout(page, await csrfHeader(page), false);
+    await putLayout(page, await moduleCsrfHeader(page, '/pagebuilder/'), false);
     await page.close();
   });
 
@@ -109,7 +109,7 @@ test.describe('Multilingual pages', () => {
     page,
   }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     await putLayout(page, headers, true);
     const slug = uniqueSlug('e2e-lang');
 
@@ -165,7 +165,7 @@ test.describe('Multilingual pages', () => {
 
   test('the header language switcher sits beside the CTA, not mid-row (#74)', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     await putLayout(page, headers, true, true);
     const slug = uniqueSlug('e2e-switch');
     const created = await (
@@ -202,7 +202,7 @@ test.describe('Multilingual pages', () => {
     page,
   }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const slug = uniqueSlug('e2e-alt');
 
     const en = await (
@@ -257,7 +257,7 @@ test.describe('Multilingual pages', () => {
     // German" while scanning the list should not have to open the page, find
     // Settings and then find a tab.
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const slug = uniqueSlug('e2e-dup');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,

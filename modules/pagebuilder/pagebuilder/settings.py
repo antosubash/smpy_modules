@@ -247,14 +247,12 @@ class PagebuilderSettings(BaseSettings):
     csrf_protect: bool = True
     """Require an ``X-CSRF-Token`` header on every mutating admin request.
 
-    The token is per-session, generated lazily on the first admin GET and
-    surfaced both via Inertia shared props (``csrf.token``) and a
-    non-``HttpOnly`` cookie (see ``csrf_cookie_name``) so the React client
-    can read it back and include it on every POST/PUT/PATCH/DELETE.
+    The check and the token are the framework's (``simple_module_hosting.csrf``),
+    the same ones billing, news and records use. Every pagebuilder screen
+    shares the token as the ``csrf_token`` Inertia prop, and the React client
+    sends it back on every POST/PUT/PATCH/DELETE. Turn it off only when the
+    host guards writes at a layer above the application.
     """
-
-    csrf_cookie_name: str = "pagebuilder_csrf"
-    """Cookie name used to expose the per-session CSRF token to JS."""
 
     scheduler_enabled: bool = Field(default=True, json_schema_extra=_RESTART)
     """Run an in-process loop that flips pages on their scheduled times.

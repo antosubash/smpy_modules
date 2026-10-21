@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, moduleCsrfHeader, publishWithNote, uniqueSlug } from './helpers';
 
 test.describe('PageBuilder admin', () => {
   test.beforeEach(async ({ page }) => {
@@ -131,7 +131,7 @@ test.describe('PageBuilder admin', () => {
 
   test('search and status filter narrow the list, and survive a reload', async ({ page }) => {
     const tag = uniqueSlug('filter');
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const created: number[] = [];
     for (const name of ['Alpha', 'Beta']) {
       const res = await page.request.post('/api/pagebuilder/pages', {
