@@ -1,0 +1,42 @@
+# Build context for the Dockerfile at the repo root. Everything the image
+# rebuilds itself (venvs, node_modules, the Vite bundle, generated pages) is
+# excluded so a checkout's local artefacts never leak into it, and nothing
+# secret or stateful (.env*, databases, uploads) is ever sent to the daemon.
+.git
+.github
+.claude
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+
+# Secrets: the stack reads them from an env file at run time, never the image.
+.env*
+*.pem
+credentials*
+
+# Local state
+host/*.db
+host/*.db-*
+app.db*
+qa.db*
+var/
+uploads/
+
+# Build output and generated files, rebuilt inside the image
+host/static/dist/
+modules/*/*/static/dist/
+host/client_app/modules.manifest.json
+host/client_app/modules.generated.ts
+host/client_app/modules.generated.css
+host/client_app/modules.assets.json
+dist/
+
+# Test and QA artefacts
+playwright-report/
+test-results/
+.playwright-mcp/
+.qa/
+.verify/

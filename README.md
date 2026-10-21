@@ -70,6 +70,51 @@ Local dev defaults to SQLite at `host/app.db`. For Postgres, see `CLAUDE.md`
 ("Local database"): the shared `dev-services` stack where you have it, or a
 one-line `docker run` of `postgres:16` otherwise.
 
+## Running in Docker
+
+`compose.yaml` runs the demo host alone in a container — the API serving the
+pre-built UI, no Vite, no database service:
+
+```bash
+make env                       # once: .env with generated secrets
+echo 'SM_USERS_BOOTSTRAP_EMAIL=admin@example.com' >> .env
+echo 'SM_USERS_BOOTSTRAP_PASSWORD=choose-one' >> .env
+docker compose up -d --build   # http://localhost:8090, first build ~2 min
+curl -fsS http://localhost:8090/health
+docker compose down            # -v also drops the data volumes
+```
+
+- **Image.** The `Dockerfile` builds the UI in a Node stage (`npm ci`,
+  `gen-pages`, `npm run build`), then installs the Python workspace without dev
+  dependencies into a slim Python image. Each start runs
+  `alembic upgrade heads`, then uvicorn. The container runs
+  `SM_ENVIRONMENT=production`.
+- **Secrets** come from the env file, never the image: `SM_SECRET_KEY` and the
+  two `SM_USERS_*_TOKEN_SECRET` keys, which production refuses to boot without.
+  A `.env` from before those keys were added to `.env.example` needs them added
+  (or regenerate it with `make env` after moving the old one aside).
+  `SMPY_ENV_FILE=path` picks a different file.
+- **Admin.** `SM_USERS_BOOTSTRAP_EMAIL` / `_PASSWORD` in the env file seed the
+  first admin, on first start against an empty users table only.
+- **Port.** `SMPY_PORT` (default `8090`) is the host port; the container
+  listens on 8000.
+- **Database.** SQLite at `/app/var/app.db` in the `smpy-data` volume by default
+  (pagebuilder media and snapshots live there too; file uploads are in
+  `smpy-uploads`). For the shared dev-services Postgres, add the overlay that
+  joins its `devnet` network and point `SMPY_DATABASE_URL` at it — the
+  `smpy_modules` database must exist there:
+
+  ```bash
+  SMPY_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/smpy_modules \
+    docker compose -f compose.yaml -f compose.devnet.yaml up -d --build
+  ```
+
+  The compose variables are `SMPY_*` rather than `SM_*` because `.env`'s own
+  `SM_DATABASE_URL` and `SM_ENVIRONMENT` describe a process on your machine;
+  compose overrides both inside the container.
+- **One-off commands** run after the migrations, in place of the server:
+  `docker compose run --rm host python scripts/set_setting.py pagebuilder content_locales '["en","de"]'`.
+
 ## Testing
 
 ```bash

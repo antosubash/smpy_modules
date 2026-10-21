@@ -262,6 +262,26 @@ jobs:
       - name: Build frontend (typecheck + vite build)
         run: npm run build
 
+  # The demo host's Dockerfile (#91) still builds. Build only — nothing is
+  # pushed; the image is never published. The GitHub Actions cache keeps a
+  # rebuild to the layers a change actually touched.
+  docker-image:
+    name: Docker image (build only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: smpy-modules-host:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   frontend-unit:
     name: Frontend unit tests (vitest)
     runs-on: ubuntu-latest
