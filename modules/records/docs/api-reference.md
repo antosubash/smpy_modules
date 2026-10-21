@@ -1358,7 +1358,7 @@ kind of route can produce, with the body schema
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
 | `403` | The type's `allowed_roles` exclude the caller | `{"detail"}` — names the type and the roles, deliberately |
-| `403` | *Multi-tenant hosts* — the signed-in account has no tenant of its own | `{"detail", "code": "tenant_required"}` — even when a tenant header was sent, unless `admin_header_tenant` is on and the account holds `admin` |
+| `403` | *Multi-tenant hosts* — the framework resolved no tenant (no active organisation) for the signed-in account | `{"detail", "code": "tenant_required"}` — a tenant header does not change it: the framework never lets a signed-in user pick a tenant by header |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid; on a multi-tenant host, no tenant resolved (no or malformed `X-Tenant-ID`) | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
