@@ -5,15 +5,16 @@ A Celery worker imports consumer code and calls ``sm_ai.contracts`` without
 ``sm_ai.services`` is empty. Instead of raising, ``current_settings()`` falls
 back to :func:`load`, which hydrates ``AiSettings`` the way the web lifespan
 does — the framework's own ``hydrate_settings`` over a ``SettingsStore``, so
-the precedence is identical: DB override, then ``SM_AI_*`` env / ``.env``,
-then the pydantic default.
+the result is identical: the DB value, else the pydantic default
+(``AiSettings`` reads no environment, #124).
 
 Keys are decrypted by the unchanged ``resolve`` path, which needs the secret
-the *web* app encrypts under. That is ``SM_SECRET_KEY`` from env / ``.env``
-when set explicitly, otherwise the key the host generated and stored as
-``host.secret_key`` (``simple_module_hosting._secret_key``) — so this installs
-a secret provider resolving exactly that, read-only: a worker never generates
-a key.
+the *web* app encrypts under. That is ``SM_SECRET_KEY`` from env or the
+project ``.env`` (located by ``BootstrapSettings``, so ``SM_PROJECT_ROOT``
+anchors it for a worker started elsewhere) when set explicitly, otherwise
+the key the host generated and stored as ``host.secret_key``
+(``simple_module_hosting._secret_key``) — so this installs a secret provider
+resolving exactly that, read-only: a worker never generates a key.
 
 Framework 0.0.35 has no cross-process settings signal — ``SettingsReloaded``
 travels the web process's in-memory ``EventBus`` and never reaches a worker —
@@ -22,7 +23,7 @@ save in the console applies to workers within that window. ``invalidate()``
 forces the next call to re-read.
 
 When the read fails (database down, unmigrated, no SQLite file yet) the
-env/default fallback is kept only ``LAZY_SETTINGS_RETRY_SECONDS``, so a blip
+default fallback is kept only ``LAZY_SETTINGS_RETRY_SECONDS``, so a blip
 does not pin a worker to the wrong provider for a minute. One thread
 refreshes at a time; the others keep serving the previous snapshot meanwhile,
 and the read itself is bounded by ``LAZY_SETTINGS_READ_TIMEOUT_SECONDS``.
@@ -151,7 +152,7 @@ def _hydrate() -> tuple[AiSettings, str, bool]:
     # Deliberately outside the try: a placeholder SM_SECRET_KEY in production
     # makes BootstrapSettings raise, and the web host refuses to boot on it too.
     boot = BootstrapSettings()
-    explicit = boot.secret_key if "secret_key" in boot.model_fields_set else ""
+    explicit = crypto.explicit_secret(boot)
     reason = _unreadable(boot.database_url)
     if reason is None:
         pool = ThreadPoolExecutor(max_workers=1)
@@ -168,7 +169,7 @@ def _hydrate() -> tuple[AiSettings, str, bool]:
     # can carry the connection URL, credentials included. Once per outage.
     log = logger.debug if _warned else logger.warning
     _warned = True
-    log("AI settings: database read failed (%s); using SM_AI_* env and defaults", reason)
+    log("AI settings: database read failed (%s); using defaults", reason)
     return AiSettings(), explicit, False
 
 

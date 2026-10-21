@@ -1,4 +1,4 @@
-"""Settings defaults, env seeding, and the module-global services holder."""
+"""Settings defaults, no environment sources, and the module-global services holder."""
 
 from __future__ import annotations
 
@@ -28,26 +28,35 @@ class TestDefaults:
         assert s.embedding_dim == 0
 
 
-class TestEnvSeeding:
-    def test_env_vars_fill_unset_fields(self, monkeypatch):
-        # hydrate_settings constructs AiSettings(**db_overrides); BaseSettings
-        # then reads SM_AI_* env for anything the DB didn't override. This is
-        # how dev/CI configure with zero DB rows.
-        monkeypatch.setenv("SM_AI_CHAT_MODEL", "claude-sonnet-5")
-        monkeypatch.setenv("SM_AI_EMBEDDING_DIM", "4096")
-        s = AiSettings()
-        assert s.chat_model == "claude-sonnet-5"
-        assert s.embedding_dim == 4096
+class TestNoEnvironment:
+    """DB-backed only (#124): an ``SM_AI_*`` variable or a ``.env`` is dead."""
 
-    def test_explicit_kwargs_beat_env(self, monkeypatch):
+    def test_env_vars_are_ignored(self, monkeypatch):
         monkeypatch.setenv("SM_AI_CHAT_MODEL", "from-env")
+        monkeypatch.setenv("SM_AI_EMBEDDING_DIM", "4096")
+        # Unprefixed field names too — a plain BaseSettings would read these.
+        monkeypatch.setenv("CHAT_API_KEY", "sk-from-bare-env")
+        s = AiSettings()
+        assert s.chat_model == "claude-opus-5"
+        assert s.embedding_dim == 0
+        assert s.chat_api_key == ""
+
+    def test_a_dotenv_in_the_working_directory_is_ignored(self, tmp_path):
+        # conftest chdir'd to tmp_path; this is the worker-from-elsewhere case.
+        (tmp_path / ".env").write_text("SM_AI_CHAT_PROVIDER=openai\nchat_model=x\n")
+        s = AiSettings()
+        assert s.chat_provider == "anthropic"
+        assert s.chat_model == "claude-opus-5"
+
+    def test_constructor_values_are_what_hydration_passes(self):
+        # hydrate_settings constructs AiSettings(**db_overrides).
         assert AiSettings(chat_model="from-db").chat_model == "from-db"
 
 
 class TestHolder:
     def test_current_settings_without_install_hydrates_lazily(self, monkeypatch):
         # No host registered the module (a Celery worker, #100): settings come
-        # from the store/env instead of raising — see test_worker_settings.
+        # from the store instead of raising — see test_worker_settings.
         monkeypatch.setattr(services.worker_settings, "load", lambda: AiSettings(chat_model="lazy"))
         assert services.current_settings().chat_model == "lazy"
 
@@ -64,10 +73,10 @@ class TestHolder:
 
 
 class TestReadDto:
-    def test_out_normalizes_env_seeded_provider_case(self):
-        # SM_AI_CHAT_PROVIDER=Anthropic works at runtime (resolve.py lowers
-        # it); the read DTO must serve the lowercase id or the settings
-        # dropdown renders no selection.
+    def test_out_normalizes_provider_case(self):
+        # A row saved as "Anthropic" (set_setting.py, the generic Settings
+        # screen) works at runtime (resolve.py lowers it); the read DTO must
+        # serve the lowercase id or the settings dropdown renders no selection.
         from sm_ai.contracts.schemas import AiSettingsOut
 
         out = AiSettingsOut(

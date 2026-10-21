@@ -6,7 +6,7 @@ and `blocksToHtml` with it (§9–§13). Not ported: `htmlToBlocks` and
 `isPuckContent` — §13 says why, and it is a judgement worth revisiting rather
 than an oversight.
 **Date:** 2026-08-05
-**Source of truth for the target:** `/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder`
+**Source of truth for the target:** `<path-to>/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
 **This side:** `modules/pagebuilder/` on Puck `0.22.4`.
 
@@ -510,7 +510,7 @@ visible rather than looking like an omission.
 Re-run the parity count with:
 
 ```bash
-G=/home/anto/Repos/IIASA.GeoWiki/frontend/packages/pagebuilder/src
+G=${GEOWIKI:?set GEOWIKI to an IIASA.GeoWiki checkout}/frontend/packages/pagebuilder/src
 grep -cE '^\t[A-Z][A-Za-z]+: [A-Z]' $G/config/puck-config.ts   # GeoWiki widget count
 grep -cE '^    [A-Z][A-Za-z]+: [A-Z]' \
   modules/pagebuilder/pagebuilder/components/puckConfig.tsx     # ours

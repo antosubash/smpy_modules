@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub, make_tenant
@@ -11,8 +13,9 @@ from sm_billing.models import Subscription
 from sm_billing.reconcile import reconcile
 from sm_billing.seats import push_quantity
 from sqlalchemy import select
+from tenants.constants import TenantStatus
 from tenants.contracts.events import MembershipAdded, MembershipRemoved
-from tenants.models import Membership
+from tenants.models import Membership, Tenant
 from typer.testing import CliRunner
 
 
@@ -95,6 +98,21 @@ async def test_reconcile_refreshes_status_and_pushes_drift(app, fake):
     async with app.state.sm.db.session_factory() as session:
         sub = (await session.execute(select(Subscription))).scalar_one()
         assert (sub.status, sub.quantity) == ("past_due", 3)
+
+
+async def test_reconcile_publishes_status_changes(app, fake, status_events):
+    """Reconcile commits through ``finalize_session``, so the event fires."""
+    tenant_id = await _tenant_on(app, "flat", members=1)
+    unpaid = SubscriptionSnapshot(
+        "sub_1", "cus_1", tenant_id, "unpaid", "price_team_m", 1, None, None, False
+    )
+    fake.snapshots["sub_1"] = unpaid
+    assert (await reconcile(app)).synced == 1
+    fake.snapshots["sub_1"] = replace(unpaid, status="active")
+    assert (await reconcile(app)).synced == 1
+    assert status_events == [TenantStatus.SUSPENDED, TenantStatus.ACTIVE]
+    async with app.state.sm.db.session_factory() as session:
+        assert (await session.get(Tenant, tenant_id)).status == TenantStatus.ACTIVE
 
 
 async def test_reconcile_collects_errors_and_filters_tenant(app, fake):

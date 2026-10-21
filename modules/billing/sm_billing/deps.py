@@ -48,7 +48,7 @@ def user_email(request: Request) -> str | None:
 
 async def get_context(request: Request, db: AsyncSession = Depends(get_db)) -> BillingContext:
     """Active tenant, or a billing-suspended one its owner is restoring."""
-    require_user_id(request)
+    await require_user_id(request)
     ctx = await billing_context(request, db)
     if ctx is None:
         raise BillingError("tenant_required", 403)

@@ -19,8 +19,8 @@ from sm_ai.contracts import (
 
 All three functions read the running host's current settings. You pass no
 app, session or request. They also work in a process that never ran the web
-host, such as a Celery worker: there they read the settings table and `SM_AI_*`
-env themselves, cached per process for 60 seconds (see
+host, such as a Celery worker: there they read the settings table
+themselves, cached per process for 60 seconds (see
 [operations.md](operations.md#background-workers)). None of them makes a network call: they validate the
 slot and build the object. Provider and authentication failures surface later,
 when you call the provider (`agent.run()`, `embed_documents()` and so on), as

@@ -18,9 +18,6 @@ SECRET = "test-secret-key-for-resolve"
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
     monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    # Keep host env out of these constructions.
-    for var in ("SM_AI_CHAT_PROVIDER", "SM_AI_CHAT_MODEL", "SM_AI_CHAT_API_KEY"):
-        monkeypatch.delenv(var, raising=False)
     yield
     services.reset()
 

@@ -20,7 +20,7 @@ from typing import Final
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import card, locales, query_filters, tag_service
+from news import card, query_filters, tag_service
 from news.constants import DEFAULT_LIMIT, MAX_LIMIT
 from news.contracts.schemas import ArticleRead, CategoryCount
 from news.models import (
@@ -206,22 +206,6 @@ async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:
     """
     return await db.scalar(
         select(NewsArticle).where(NOT_TRASHED, NewsArticle.id == article_id)
-    )
-
-
-async def get_by_slug(
-    db: AsyncSession, slug: str, locale: str | None = None
-) -> NewsArticle | None:
-    """One article by address. Scoped to a language, because that is what an
-    address is: a slug identifies an article only within one locale, so a
-    lookup without it returns whichever translation the database reached
-    first. ``None`` means the site's default language."""
-    return await db.scalar(
-        select(NewsArticle).where(
-            NOT_TRASHED,
-            NewsArticle.slug == slug,
-            NewsArticle.locale == (locale or locales.default()),
-        )
     )
 
 

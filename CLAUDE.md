@@ -82,7 +82,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news` and `billing` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing` and `ai` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -93,6 +93,12 @@ or with `scripts/set_setting.py`. Anything the module reads while booting
 hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
+These settings are SYSTEM-scope: ai has one provider configuration and one
+API key per slot for the whole deployment, shared by every tenant. The one
+thing ai still reads from the environment is `SM_SECRET_KEY`, for its key
+encryption, and only as the framework's `BootstrapSettings` locates `.env`
+(`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
+cwd-relative file (#124).
 
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
@@ -102,12 +108,7 @@ command.
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt.
 
-## Local database (shared dev-services stack)
-
-**Do NOT spin up a new Postgres container for local dev.** All repos under
-`/Volumes/ext1/GitHub` share one stack defined in
-`/Volumes/ext1/GitHub/dev-services` (PostGIS + Redis + MinIO + Adminer on the
-`devnet` Docker network). Start it once with `make up` there.
+## Local database
 
 Local dev defaults to **SQLite** (`host/app.db`), so Postgres is optional. To
 use it, set:
@@ -116,19 +117,31 @@ use it, set:
 SM_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/smpy_modules
 ```
 
-Add the database to `dev-services/init/01-databases.sql` if it doesn't exist.
-If 5432 is taken by an old per-project container, stop that container rather
-than remapping ports. This repo does not use Redis or Celery.
+**Prefer the maintainer's shared `dev-services` stack when you have it.** Every
+local repo shares one (PostGIS + Redis + MinIO + Adminer on the `devnet` Docker
+network), started once with `make up` in `<path-to>/dev-services`. Add the
+database to its `init/01-databases.sql` if it doesn't exist, and don't spin up
+a per-project Postgres beside it; if 5432 is taken by an old per-project
+container, stop that container rather than remapping ports.
+
+Without that stack, one container matching CI's image is enough:
+
+```bash
+docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
+```
+
+This repo does not use Redis or Celery.
 
 ## Working against an unreleased framework
 
 ```bash
-make link-framework FRAMEWORK=/Volumes/ext1/GitHub/simple_module_python
+make link-framework FRAMEWORK=/path/to/simple_module_python
 make unlink-framework
 ```
 
 Editable-installs the framework's `core`/`db`/`hosting` into the workspace
-venv and back. Neither touches a tracked file.
+venv and back. Neither touches a tracked file. `FRAMEWORK` has no default;
+the target fails without it.
 
 ## Known deferred work
 

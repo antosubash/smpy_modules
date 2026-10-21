@@ -11,8 +11,8 @@ retries, streaming.
 **Full documentation** lives in [`docs/`](docs/index.md):
 [user guide](docs/user-guide.md) (the AI settings page),
 [API reference](docs/api-reference.md) (the `sm_ai.contracts` API and the HTTP
-routes), [operations](docs/operations.md) (install, settings and `SM_AI_*`
-env fallback, key rotation, troubleshooting) and
+routes), [operations](docs/operations.md) (install, settings, key rotation,
+troubleshooting) and
 [architecture](docs/architecture.md).
 
 ## Install
@@ -59,8 +59,11 @@ Two slots — chat and embeddings — each with provider (`anthropic`, `openai`,
 `openai_compatible` provider covers vLLM, Ollama and LM Studio (base URL
 required; a blank key is replaced by a protocol-satisfying placeholder).
 
-Configure at `/ai/` (permission `ai.manage`) or seed via `SM_AI_*` env vars
-(e.g. `SM_AI_CHAT_MODEL`); DB values win over env. API keys are encrypted at
+Configure at `/ai/` (permission `ai.manage`), on the Settings screen, or
+headlessly with `scripts/set_setting.py sm_ai <field> <value>`. The module
+reads no `SM_AI_*` environment variables: settings live in the database at
+SYSTEM scope, so every tenant shares one provider configuration and one API
+key per slot. API keys are encrypted at
 rest with a key derived from `SM_SECRET_KEY` — rotating that secret means
 re-entering provider keys (the old ciphertexts surface as unreadable). A
 settings save hot-reloads the worker that handled it; other workers pick

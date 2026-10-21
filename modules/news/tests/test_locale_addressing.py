@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 from factories import make_article
-from news import locales, redirects
+from news import redirects
 from news.content import ArticlesService
 from news.models import NewsCategory
 
@@ -266,15 +266,3 @@ class TestRedirectsAreScopedToOneLanguage:
 
         assert await redirects.resolve(db, "budget", "en") == "the-budget"
         assert await redirects.resolve(db, "budget", "de") == "der-haushalt"
-
-
-class TestMonolingualSitesAreUnaffected:
-    async def test_an_unqualified_lookup_means_the_default_language(self, db) -> None:
-        """What every caller written before there was such a thing as a
-        language means, and what keeps a monolingual host working unchanged."""
-        await make_article(db, slug="field-notes")
-
-        found = await ArticlesService(db).get_by_slug_published("field-notes")
-
-        assert found is not None
-        assert found.locale == locales.default()

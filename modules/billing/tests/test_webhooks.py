@@ -173,12 +173,36 @@ async def test_deleted_subscription_falls_back_to_default(app, client, fake, wor
     assert await app.state.tenants.entitlements.limit(tenant_id, "tenants.seats") is None
 
 
-async def test_unpaid_suspends_tenant(app, client, fake, world):
+async def test_unpaid_suspends_tenant(app, client, fake, world, status_events):
     tenant_id, _ = world
     fake.snapshots["sub_1"] = snap(tenant_id, status="unpaid")
     await client.post(URL, content=event(fake, "evt_1"), headers=HEADERS)
     async with app.state.sm.db.session_factory() as session:
         assert (await session.get(Tenant, tenant_id)).status == TenantStatus.SUSPENDED
+    assert status_events == [TenantStatus.SUSPENDED]
+
+
+async def test_payment_reactivates_billing_suspended_tenant(
+    app, client, fake, world, status_events
+):
+    tenant_id, _ = world
+    fake.snapshots["sub_1"] = snap(tenant_id, status="unpaid")
+    await client.post(URL, content=event(fake, "evt_1"), headers=HEADERS)
+    fake.snapshots["sub_1"] = snap(tenant_id, status="active")
+    await client.post(URL, content=event(fake, "evt_2"), headers=HEADERS)
+    async with app.state.sm.db.session_factory() as session:
+        assert (await session.get(Tenant, tenant_id)).status == TenantStatus.ACTIVE
+    assert status_events == [TenantStatus.SUSPENDED, TenantStatus.ACTIVE]
+
+
+async def test_subscription_without_tenant_is_not_claimed(app, client, fake, world):
+    """No metadata tenant, no known customer: nothing to fall back to (#123)."""
+    tenant_id, _ = world
+    fake.snapshots["sub_1"] = snap(None, customer_id="cus_unknown")
+    response = await client.post(URL, content=event(fake, "evt_1"), headers=HEADERS)
+    assert (response.status_code, response.json()["detail"]) == (200, "ignored_unknown_tenant")
+    assert await _sub(app, tenant_id) is None
+    assert fake.called("fetch_checkout") == []
 
 
 async def test_stale_canceled_snapshot_does_not_replace_live_subscription(app, client, fake, world):

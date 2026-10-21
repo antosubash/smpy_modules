@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from sm_billing.constants import PROVIDER_MANUAL
 from sm_billing.contracts.provider import (
     CheckoutSession,
+    CheckoutSnapshot,
     PriceInfo,
     ProviderError,
     SubscriptionSnapshot,
@@ -54,6 +55,9 @@ class ManualProvider:
         raise ProviderError(_NO)
 
     async def fetch_subscription(self, subscription_id: str) -> SubscriptionSnapshot:
+        raise ProviderError(_NO)
+
+    async def fetch_checkout(self, session_id: str) -> CheckoutSnapshot:
         raise ProviderError(_NO)
 
     async def verify_price(self, price_id: str) -> PriceInfo:

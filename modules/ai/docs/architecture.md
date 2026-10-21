@@ -21,11 +21,13 @@ module's `register_module_settings` (`module.py`, `register_settings`). That
 provides:
 
 - per-field storage at SYSTEM scope under package `sm_ai`;
-- hydration at lifespan start: `AiSettings(**db_overrides)`. Because
-  `AiSettings` keeps pydantic-settings' env and `.env` sources (prefix
-  `SM_AI_`), a field with no row falls back to the environment. This is
-  deliberate, and it is where ai differs from pagebuilder, news and billing,
-  which drop those sources;
+- hydration at lifespan start: `AiSettings(**db_overrides)`. `AiSettings`
+  is a `DbBackedSettings`, which drops pydantic-settings' env, `.env` and
+  secrets sources, as pagebuilder, news and billing do, so a field with no
+  row is its default. Until #124 it kept an `SM_AI_` env and cwd-relative
+  `.env` fallback, which let a worker started from another directory see a
+  different provider than the web host. Nothing is read while booting, so no
+  field needs a restart;
 - hot reload on save through `settings.reload.apply_changes_and_reload`,
   which validates, writes the changed fields, swaps `.settings` and publishes
   `SettingsReloaded`.
@@ -57,13 +59,14 @@ A process that never registered the module — a Celery worker, a script — has
 an empty holder. There `current_settings()` hydrates lazily through
 `worker_settings.py` (#100): the framework's `hydrate_settings` over a
 `SettingsStore` on a short-lived engine for `SM_DATABASE_URL`, so the
-precedence is the web lifespan's (DB row, then `SM_AI_*` env / `.env`, then the
-default). It also installs a secret provider resolving the secret the web app
-encrypts under: explicit `SM_SECRET_KEY`, else the stored `host.secret_key`.
+result is the web lifespan's (the DB row, else the default). It also installs
+a secret provider resolving the secret the web app encrypts under: explicit
+`SM_SECRET_KEY` (env, or the `.env` `BootstrapSettings` finds), else the
+stored `host.secret_key`.
 Framework 0.0.36's `SettingsReloaded` only travels the web process's in-memory
 bus, so the worker caches for `LAZY_SETTINGS_TTL_SECONDS` (60 s) and
 `services.invalidate()` forces a re-read. An unreachable or unmigrated
-database falls back to env and defaults with a warning, as the lifespan's
+database falls back to the defaults with a warning, as the lifespan's
 hydrate step does.
 
 `resolve.py` is pure construction with no I/O, and nothing is cached. A new
@@ -98,8 +101,12 @@ The secret comes from a provider installed in `register_settings` that reads
 the live app's `settings.secret_key` through a weakref. Test suites build many
 apps, and a strong reference would keep the discarded ones alive. If the
 provider has nothing, the module reads `SM_SECRET_KEY` from the process
-environment, then from `.env` (cached, since the file can't change without a
-restart). The provider is consulted on every call and the derived `Fernet` is
+environment, then from the project `.env` exactly as the framework's
+`BootstrapSettings` finds it — `$SM_PROJECT_ROOT/.env`, else a bounded walk up
+from the cwd to the project root — so it is the file the host itself reads,
+never one that merely happens to sit in the working directory (cached, since
+the file can't change without a restart). The placeholder default
+`BootstrapSettings` carries never counts. The provider is consulted on every call and the derived `Fernet` is
 cached per secret, so a call made before the app's secret exists can't fix the
 fallback secret for the rest of the process.
 
@@ -187,7 +194,7 @@ async def index(chunks: list[str]) -> None:
 | File | Responsibility |
 |---|---|
 | `module.py` | framework hooks: settings registration, secret provider, permission, menu, routes, middleware |
-| `settings.py` | `AiSettings`: the nine fields and the `SM_AI_` env fallback |
+| `settings.py` | `AiSettings`: the nine DB-backed fields |
 | `services.py` | `AiServices` and the module-global holder |
 | `worker_settings.py` | lazy, TTL-cached hydration where no host registered the module (workers) |
 | `resolve.py` | slot validation and model / embedder construction |

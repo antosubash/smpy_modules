@@ -66,8 +66,9 @@ make migrate     # apply migrations
 make dev         # API on :8000, Vite on :5050
 ```
 
-Local dev defaults to SQLite at `host/app.db`. See `CLAUDE.md` for using the
-shared `dev-services` Postgres instead.
+Local dev defaults to SQLite at `host/app.db`. For Postgres, see `CLAUDE.md`
+("Local database"): the shared `dev-services` stack where you have it, or a
+one-line `docker run` of `postgres:16` otherwise.
 
 ## Testing
 
@@ -97,7 +98,7 @@ See [docs/adding-a-module.md](docs/adding-a-module.md). In short:
 make new-module name=orders
 ```
 
-then wire it into `host/pyproject.toml`, add it to the release matrix, and
+then wire it into `host/pyproject.toml`, add it to the root `testpaths` and
 generate its migration.
 
 ## Releasing
@@ -109,14 +110,14 @@ bump level. See [docs/releasing.md](docs/releasing.md).
 ## Working against an unreleased framework
 
 ```bash
-make link-framework FRAMEWORK=/Volumes/ext1/GitHub/simple_module_python
+make link-framework FRAMEWORK=/path/to/simple_module_python
 make unlink-framework
 ```
 
-`link-framework` editable-installs the framework's `core`, `db`, and `hosting`
-packages into the workspace venv; `unlink-framework` restores the PyPI
-versions. Neither touches a tracked file, so a local override cannot leak into
-a release.
+`FRAMEWORK` is required and has no default. `link-framework` editable-installs
+the framework's `core`, `db`, and `hosting` packages into the workspace venv;
+`unlink-framework` restores the PyPI versions. Neither touches a tracked file,
+so a local override cannot leak into a release.
 
 ## Conventions
 

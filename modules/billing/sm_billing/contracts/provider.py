@@ -24,11 +24,29 @@ class InvalidWebhookSignature(ProviderError):  # noqa: N818 - reads as the condi
 
 @dataclass(frozen=True)
 class WebhookEvent:
+    """What a verified delivery points at: ids to re-fetch, never state.
+
+    There is deliberately no ``tenant_id``. The tenant is read from the
+    re-fetched subscription or, for a completed Checkout, from the re-fetched
+    session's ``client_reference_id``; never from the payload.
+    """
+
     id: str
     type: str
     subscription_id: str | None = None
-    tenant_id: str | None = None
     customer_id: str | None = None
+    checkout_id: str | None = None
+
+
+@dataclass(frozen=True)
+class CheckoutSnapshot:
+    """The provider's current view of one Checkout session."""
+
+    id: str
+    subscription_id: str | None
+    #: ``client_reference_id``: the tenant that opened the session.
+    tenant_id: str | None
+    customer_id: str | None
 
 
 @dataclass(frozen=True)
@@ -103,5 +121,7 @@ class BillingProvider(Protocol):
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent: ...
 
     async def fetch_subscription(self, subscription_id: str) -> SubscriptionSnapshot: ...
+
+    async def fetch_checkout(self, session_id: str) -> CheckoutSnapshot: ...
 
     async def verify_price(self, price_id: str) -> PriceInfo: ...
