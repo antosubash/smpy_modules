@@ -329,8 +329,10 @@ left the command line silent). The bus is not imported: it rides on the
 session (`events.attach`), which `deps.request_db` fills from `app.state` and a
 caller outside a request fills itself — `import_command(..., bus=)`,
 `seed_database(..., bus=)`. A session with no bus publishes nothing, which is
-what the standalone `python -m sm_records.cli` process gets: it has no host, so
-no subscriber. Events are queued on the framework's `on_commit`, so they run
+what the standalone `python -m sm_records.cli` process gets unless `--app`
+names the host: the CLI then runs that app's lifespan around the write and
+uses its bus (`cli_host`, GH #157), and without it warns on stderr that the
+write reaches no subscriber. Events are queued on the framework's `on_commit`, so they run
 only after `finalize_session` commits and are dropped on rollback — which is
 why the CLI paths commit through `events.commit`, never a bare `commit()`.
 `events.held` lets an event through only if its savepoint survived (an

@@ -3,7 +3,9 @@
 The tenants module publishes ``MembershipAdded``/``MembershipRemoved`` after
 its commit, inline in the request. The handler opens its own session, and a
 provider failure is logged, never raised: the membership change already
-happened and must stand. ``reconcile`` pushes any drift left behind.
+happened and must stand. The drift stays until a reconcile pushes it: the
+periodic one if ``reconcile_interval_minutes`` is set, else ``smpy billing
+reconcile`` or the admin Resync.
 """
 
 from __future__ import annotations
@@ -54,7 +56,8 @@ def subscribe(bus: EventBus, app: FastAPI) -> None:
             await push_quantity(app, event.tenant_id)
         except Exception:
             logger.warning(
-                "billing: seat sync failed for tenant %s; reconcile will retry",
+                "billing: seat sync failed for tenant %s; the next reconcile pushes it "
+                "(scheduled only if reconcile_interval_minutes is set)",
                 event.tenant_id,
                 exc_info=True,
             )
