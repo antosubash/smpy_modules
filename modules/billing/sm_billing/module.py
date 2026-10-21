@@ -145,3 +145,9 @@ class BillingModule(ModuleBase):
         from sm_billing import startup
 
         await startup.run(app)
+
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the reconcile loop — the host's lifespan calls this directly."""
+        from sm_billing import startup
+
+        await startup.stop_reconcile(app)

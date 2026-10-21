@@ -5,8 +5,9 @@ No environment, ``.env`` or secrets-file sources (``DbBackedSettings``): an
 ``/admin/billing/connection`` (which encrypts the Stripe secrets), or with
 ``scripts/set_setting.py``.
 
-``provider`` is read once, in ``on_startup`` — the provider object is built
-then — so changing it needs a restart.
+``provider`` and ``reconcile_interval_minutes`` are read once, in
+``on_startup`` — the provider object and the reconcile loop are built then — so
+changing either needs a restart.
 """
 
 from __future__ import annotations
@@ -16,7 +17,8 @@ from simple_module_core.settings_base import DbBackedSettings
 
 from sm_billing import constants as c
 
-_RESTART = {"requires_restart": True, "group": "Billing", "choices": list(c.PROVIDERS)}
+_RESTART_ONLY = {"requires_restart": True, "group": "Billing"}
+_RESTART = {**_RESTART_ONLY, "choices": list(c.PROVIDERS)}
 
 
 class BillingSettings(DbBackedSettings):
@@ -44,4 +46,15 @@ class BillingSettings(DbBackedSettings):
             "Origin Stripe returns visitors to after Checkout and the portal, e.g. "
             "https://app.example.com. Empty: the request's own origin."
         ),
+    )
+    reconcile_interval_minutes: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Re-read every Stripe subscription not synced within this many minutes, "
+            "on a loop inside the app — the safety net for missed webhooks and failed "
+            "seat pushes. 0 turns the loop off (run `smpy billing reconcile` from cron "
+            "instead). 60 is a sensible value."
+        ),
+        json_schema_extra=_RESTART_ONLY,
     )
