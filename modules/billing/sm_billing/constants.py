@@ -104,10 +104,13 @@ STRIPE_STATUS_MAP: Final = {
     "paused": SubscriptionStatus.UNPAID,
 }
 
+#: Its tenant comes from the re-fetched session's ``client_reference_id``.
+CHECKOUT_COMPLETED: Final = "checkout.session.completed"
+
 #: Webhook event types that trigger a subscription re-fetch.
 HANDLED_EVENTS: Final = frozenset(
     {
-        "checkout.session.completed",
+        CHECKOUT_COMPLETED,
         "customer.subscription.created",
         "customer.subscription.updated",
         "customer.subscription.deleted",

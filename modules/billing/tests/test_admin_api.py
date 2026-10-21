@@ -96,7 +96,7 @@ async def test_tenant_owner_cannot_reach_admin(user_client):
         assert (await owner.get("/admin/billing/plans")).status_code in (302, 303, 403)
 
 
-async def test_subscriptions_list_and_assign_manual(app, admin):
+async def test_subscriptions_list_and_assign_manual(app, admin, status_events):
     async with app.state.sm.db.session_factory() as session:
         tenant = await make_tenant(session, "acme", members=2)
         team = await make_plan(session, "team")
@@ -117,11 +117,13 @@ async def test_subscriptions_list_and_assign_manual(app, admin):
         f"{ADMIN}/subscriptions/{tenant_id}/assign", json={"plan_id": team_id, "status": "active"}
     )
     assert again.json()["tenant_status"] == TenantStatus.ACTIVE
+    # Both changes went through the request session's finalize, not commit().
+    assert status_events == [TenantStatus.SUSPENDED, TenantStatus.ACTIVE]
     filtered = (await admin.get(f"{ADMIN}/subscriptions", params={"status": "past_due"})).json()
     assert filtered == []
 
 
-async def test_assign_refused_under_stripe_and_resync_works(app, admin, fake):
+async def test_assign_refused_under_stripe_and_resync_works(app, admin, fake, status_events):
     async with app.state.sm.db.session_factory() as session:
         tenant = await make_tenant(session)
         team = await make_plan(session, "team")
@@ -134,7 +136,7 @@ async def test_assign_refused_under_stripe_and_resync_works(app, admin, fake):
     nothing = await admin.post(f"{ADMIN}/subscriptions/{tenant_id}/resync")
     assert nothing.json()["detail"] == "no_provider_subscription"
     fake.snapshots["sub_1"] = SubscriptionSnapshot(
-        "sub_1", "cus_1", tenant_id, "active", "price_team_m", 1, None, None, False
+        "sub_1", "cus_1", tenant_id, "unpaid", "price_team_m", 1, None, None, False
     )
     async with app.state.sm.db.session_factory() as session:
         from sm_billing.models import Subscription
@@ -149,7 +151,11 @@ async def test_assign_refused_under_stripe_and_resync_works(app, admin, fake):
         )
         await session.commit()
     synced = await admin.post(f"{ADMIN}/subscriptions/{tenant_id}/resync")
-    assert synced.json()["status"] == "active"
+    assert (synced.json()["status"], synced.json()["tenant_status"]) == (
+        "unpaid",
+        TenantStatus.SUSPENDED,
+    )
+    assert status_events == [TenantStatus.SUSPENDED]
 
 
 async def test_assign_unknown_tenant_404(admin):
