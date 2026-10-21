@@ -108,25 +108,17 @@ and permissions, and its routes.
 
 Add `modules/orders/tests` to `testpaths` in the root `pyproject.toml`.
 `make test-py` discovers `modules/*/tests` automatically, but `testpaths`
-keeps a bare `uv run pytest` honest.
+keeps a bare `uv run pytest` honest. `scripts/check_metadata.py` (in
+`make lint` and CI) fails until the entry is there.
 
-## 7. Add it to CI and the release matrix
+## 7. CI and the release matrix pick it up
 
-In `.github/workflows/ci.yml`, add a pytest step:
-
-```yaml
-      - name: Run pytest (orders)
-        run: cd modules/orders && uv run pytest
-```
-
-In `.github/workflows/release.yml`, add it to the `publish-pypi` matrix —
-**this is what actually publishes it**:
-
-```yaml
-        package:
-          - simple_module_pagebuilder
-          - simple_module_orders
-```
+Nothing to edit. The CI pytest step loops over `modules/*/`, and the
+release's `resolve` job builds the `publish-pypi` matrix from every
+`modules/*/pyproject.toml`'s `project.name`. The one manual step is the
+PyPI Trusted Publishing setup described at the top of
+`.github/workflows/release.yml` — without it the first release fails at
+that module's publish.
 
 ## 8. Install and migrate
 

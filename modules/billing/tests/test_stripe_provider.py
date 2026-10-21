@@ -110,7 +110,9 @@ def test_parse_subscription_event(provider):
         "customer.subscription.updated",
         "sub_1",
     )
-    assert (event.tenant_id, event.customer_id) == ("t1", "cus_1")
+    assert event.customer_id == "cus_1"
+    # The payload's metadata.tenant_id is not carried: the handler re-fetches.
+    assert not hasattr(event, "tenant_id")
 
 
 def test_parse_checkout_completed(provider):
@@ -123,7 +125,30 @@ def test_parse_checkout_completed(provider):
     }
     body, headers = _signed(_event("checkout.session.completed", session))
     event = provider.parse_webhook(body, headers)
-    assert (event.subscription_id, event.tenant_id, event.customer_id) == ("sub_9", "t9", "cus_9")
+    assert (event.subscription_id, event.checkout_id, event.customer_id) == (
+        "sub_9",
+        "cs_1",
+        "cus_9",
+    )
+    assert not hasattr(event, "tenant_id")
+
+
+async def test_fetch_checkout_reads_the_retrieved_session(provider):
+    session = {
+        "id": "cs_1",
+        "object": "checkout.session",
+        "subscription": {"id": "sub_9", "object": "subscription"},
+        "client_reference_id": "t9",
+        "customer": "cus_9",
+    }
+    provider._v1.checkout = SimpleNamespace(sessions=_Recorder(provider.calls, "checkout", session))
+    checkout = await provider.fetch_checkout("cs_1")
+    assert provider.calls[-1][:2] == ("checkout.retrieve_async", ("cs_1",))
+    assert (checkout.subscription_id, checkout.tenant_id, checkout.customer_id) == (
+        "sub_9",
+        "t9",
+        "cus_9",
+    )
 
 
 def test_parse_other_event_has_no_subscription(provider):

@@ -8,6 +8,11 @@ Every `pyproject.toml` under modules/* must have:
   - "simple-module" in keywords
   - project.urls.Repository set to the canonical GitHub URL
 
+The root `pyproject.toml`'s pytest `testpaths` must list `modules/<name>/tests`
+for exactly the directories above, plus `NON_MODULE_TESTPATHS` (#118). CI and
+the release matrix derive the module list from `modules/*/`; `testpaths` is
+the one copy kept by hand, so this is where its drift is caught.
+
 Adapted from the framework repo's version. Two rule sets were dropped:
 `framework/*` packages don't exist here, and the npm rules don't apply
 because nothing in this repo publishes to npm — module `package.json`
@@ -26,6 +31,7 @@ import tomlkit
 
 CANONICAL_REPO = "https://github.com/antosubash/simple_module_python_modules"
 PLACEHOLDER_DESCRIPTIONS = {"", "Add your description here"}
+NON_MODULE_TESTPATHS = ("host/tests", "scripts/tests")
 
 
 def check_python_package(pyproject: Path) -> list[str]:
@@ -74,6 +80,20 @@ def discover_python_packages(root: Path) -> list[Path]:
     return found
 
 
+def check_testpaths(root: Path) -> list[str]:
+    """Return a violation per module missing from, or stale in, the root testpaths."""
+    data = tomlkit.parse((root / "pyproject.toml").read_text(encoding="utf-8"))
+    pytest_opts = data.get("tool", {}).get("pytest", {}).get("ini_options", {})
+    listed = {str(p).rstrip("/") for p in pytest_opts.get("testpaths", [])}
+    expected = set(NON_MODULE_TESTPATHS) | {
+        f"modules/{p.parent.name}/tests" for p in discover_python_packages(root)
+    }
+    where = "pyproject.toml [tool.pytest.ini_options] testpaths"
+    errors = [f"{where}: missing '{p}'" for p in sorted(expected - listed)]
+    errors += [f"{where}: '{p}' is not a module directory" for p in sorted(listed - expected)]
+    return errors
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -88,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     all_errors: list[str] = []
     for pyproject in discover_python_packages(root):
         all_errors.extend(check_python_package(pyproject))
+    all_errors.extend(check_testpaths(root))
 
     if all_errors:
         for e in all_errors:

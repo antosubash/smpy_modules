@@ -58,6 +58,7 @@ sequenceDiagram
   S->>W: event (signed)
   W->>W: verify signature (400 if bad)
   W->>DB: claim event id (duplicate → 200)
+  W->>S: fetch_checkout(id) — checkout.session.completed only
   W->>S: fetch_subscription(id)  — payload is never trusted
   W->>DB: apply_snapshot: map price→plan, tenant, upsert row
   W->>T: apply_lifecycle → set_status (suspend / reactivate)
@@ -79,7 +80,15 @@ state; webhooks, reconcile, the admin **Resync** and plan changes all go
 through it (`sync.resync` = fetch + apply). Its rules:
 
 - the tenant comes from subscription metadata (`tenant_id`, set at Checkout),
-  else from the Stripe customer id;
+  else from the Stripe customer id, else `unknown_tenant`. Only a completed
+  Checkout may supply one more source, the `client_reference_id` of the session
+  as re-fetched from Stripe (`fetch_checkout`); nothing is ever read from the
+  payload, which is why `WebhookEvent` carries ids and no tenant. Anyone can
+  open a Checkout naming any tenant (a Payment Link takes `client_reference_id`
+  from its URL), so the reference counts only when the session and the
+  subscription have the same customer, the tenant has no stored customer or
+  that one, and the customer is not another tenant's. Otherwise the event is
+  acknowledged as `ignored_customer_mismatch` and nothing is overwritten;
 - a lapsing status with an unknown price still applies on the plan the
   organisation had, so an unmappable price never keeps paid access alive; an
   entitling status with an unknown price is an error, never the default plan;
@@ -148,7 +157,8 @@ module must not import a sibling optional module).
 1. Implement `BillingProvider` (`contracts/provider.py`) in
    `providers/<name>.py`: map the provider's subscription to
    `SubscriptionSnapshot` (raw status string; add it to `STRIPE_STATUS_MAP` or
-   a sibling map), its webhook to `WebhookEvent`, its prices to `PriceInfo`.
+   a sibling map), its checkout session to `CheckoutSnapshot`, its webhook to
+   `WebhookEvent` (ids only), its prices to `PriceInfo`.
 2. Add the name to `constants.PROVIDERS` and a branch in
    `providers/factory.build_provider`.
 3. Add a webhook route next to `endpoints/webhooks.py` and register it as a

@@ -84,21 +84,25 @@ class ArticlesService(WorkflowMixin):
         return article
 
     async def get_by_slug_published(
-        self, slug: str, locale: str | None = None
+        self, slug: str, locale: str
     ) -> NewsArticle | None:
         """One published article by address — slug *and* language.
 
         Both, because a slug identifies an article only within one language:
         ``/news/budget`` and ``/de/news/budget`` are two documents, and a lookup
         that took only the slug would serve whichever of them the database
-        happened to return first. ``None`` means the site's default, which is
-        what an unqualified slug can only mean.
+        happened to return first.
+
+        ``locale`` is required, with no fallback to the default language: a
+        caller that forgot it would silently be handed the default-language
+        article at a translated address — how ``/de/news/x`` starts serving
+        the English one. The viewer always knows which language it serves.
         """
         result = await self.db.execute(
             select(NewsArticle).where(
                 NOT_TRASHED,
                 NewsArticle.slug == slug,
-                NewsArticle.locale == (locale or locales.default()),
+                NewsArticle.locale == locale,
                 NewsArticle.status == ArticleStatus.PUBLISHED,
             )
         )
