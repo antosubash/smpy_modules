@@ -30,7 +30,7 @@ Four steps. Each ends with a green suite and is shippable on its own.
 | 1 | `simple_module_canopy_atlas` shell — pack, seed, assets move here |
 | 2 | Block registry in `pagebuilder` |
 | 3 | `simple_module_news` |
-| 4 | Atlas map — **out of scope, its own spec** |
+| 4 | Atlas map — **out of scope, its own spec** (dropped 2026-10-21, #90) |
 
 Step 4 is described under "Out of scope" only far enough to show the earlier
 steps do not box it in.
@@ -398,6 +398,11 @@ net for the extraction. They must stay green, and `widgets.spec.ts`'s
    `puckConfig`. Split by responsibility, not by layer.
 
 ## Out of scope — step 4, the atlas map
+
+> **Dropped, 2026-10-21 (see #90).** The atlas map is not wanted in this repo:
+> no host needs it, its own spec will not be written, and the `canopy_atlas`
+> module designed above never landed here either. The rest of this section is
+> kept as the record of what was proposed.
 
 Its own spec. The shape, only to show this design does not box it in:
 `/atlas` as a full-screen public route with the layout header and no footer,
