@@ -548,7 +548,7 @@ jobs:
 
       # CLAUDE.md's honour-system rules (#135): no exact framework pin in a
       # published module, nothing but real pages under pages/, and sibling
-      # extra floors that someone has looked at recently.
+      # extra floors that carry a `# floor: <reason>` comment.
       - name: CLAUDE.md rules
         run: uv run python scripts/check_rules.py
 

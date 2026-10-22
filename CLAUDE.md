@@ -15,9 +15,11 @@ development app that mounts them; it is never published.
 *ranges* (`simple_module_core>=0.0.35,<0.1`). The host pins *exactly*
 (`simple_module_hosting==0.0.36`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
-`scripts/check_rules.py` (in `make lint` and CI) rejects one, and also a
-sibling floor (news' `pagebuilder` extra) more than two releases behind the
-lockstep version unless a `# floor: <reason>` comment says why it is older.
+`scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any
+requirement on another module of this repo (news' `pagebuilder` extra) without
+a `>=` floor and a `# floor: <reason>` comment saying which change that version
+first shipped. It never compares the floor with the lockstep version, so raise
+the floor and its comment together when a module starts using something newer.
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions

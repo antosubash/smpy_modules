@@ -29,7 +29,7 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
 
 # Optional: RecordsList joins pagebuilder's palette on hosts running both modules.
 # Must stay a 0.0.x range: the repo publishes at 0.0.x.
-# Floor 0.0.12 (#142): records registers from ``pagebuilder-blocks.ts``, which
+# floor: 0.0.12 (#142): records registers from ``pagebuilder-blocks.ts``, which
 # only pagebuilder's own ``puck-blocks.ts`` globs in — added in 0.0.12.
 # On an older neighbour nothing crashes, but RecordsList silently drops out
 # of the palette.

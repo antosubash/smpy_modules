@@ -71,6 +71,19 @@ def test_exact_pin_on_third_party_is_not_this_rule(tmp_path):
     assert check_rules.check(root) == []
 
 
+def test_pin_is_caught_under_any_spelling_of_the_name(tmp_path):
+    for name in ("Simple_Module_Core", "simple-module-core", "simple.module.core"):
+        root = _repo(tmp_path / name)
+        _module(root, "a", f'dependencies = ["{name}==0.0.36"]\n')
+        assert f"{name}==0.0.36" in _errors(root), name
+
+
+def test_wildcard_equality_is_a_range(tmp_path):
+    root = _repo(tmp_path)
+    _module(root, "a", 'dependencies = ["simple_module_core==0.0.*"]\n')
+    assert check_rules.check(root) == []
+
+
 def test_host_is_exempt(tmp_path):
     root = _repo(tmp_path)
     (root / "host").mkdir()
@@ -98,6 +111,36 @@ def test_exact_npm_pin_fails_and_ranges_pass(tmp_path):
     assert "@simple-module-py/i18n" in "\n".join(errors)
 
 
+def test_npm_workspace_and_alias_pins_fail(tmp_path):
+    root = _repo(tmp_path)
+    _module(
+        root,
+        "a",
+        package={
+            "dependencies": {
+                "@simple-module-py/ui": "workspace:1.2.3",
+                "ui-alias": "npm:@simple-module-py/ui@1.2.3",
+                "@simple-module-py/i18n": "npm:@simple-module-py/i18n@= 1.2.3",
+            },
+        },
+    )
+    errors = _errors(root)
+    assert "workspace:1.2.3" in errors
+    assert "ui-alias" in errors
+    assert "@= 1.2.3" in errors
+
+
+def test_npm_ranges_pass(tmp_path):
+    specs = [
+        "1.2.3||2.0.0", "^1.2.3", "~1.2.3", ">=1.2.3 <2", "1.2.x", "1.2.3 - 1.4.0",
+        "workspace:*", "workspace:^", "npm:@simple-module-py/ui@^1.2.3", "npm:react@19.0.0",
+    ]
+    root = _repo(tmp_path)
+    deps = {f"@simple-module-py/p{i}": spec for i, spec in enumerate(specs)}
+    _module(root, "a", package={"dependencies": deps})
+    assert check_rules.check(root) == []
+
+
 # --- pages/ -------------------------------------------------------------
 
 
@@ -113,6 +156,36 @@ def test_page_without_default_export_fails(tmp_path):
     d = _module(root, "a")
     (d / "a" / "pages" / "helpers.tsx").write_text("export const x = 1;\n", encoding="utf-8")
     assert "a/pages/helpers.tsx: has no `export default`" in _errors(root)
+
+
+def test_default_export_forms_pass(tmp_path):
+    sources = {
+        "Alias.tsx": "function Page() { return null; }\nexport { Page as default };\n",
+        "Reexport.tsx": 'export { default } from "./Other";\n',
+        "Both.tsx": 'export { default as default, x } from "./Other";\n',
+    }
+    root = _repo(tmp_path)
+    pages = _module(root, "a") / "a" / "pages"
+    for name, src in sources.items():
+        (pages / name).write_text(src, encoding="utf-8")
+    assert check_rules.check(root) == []
+
+
+def test_default_export_in_a_comment_or_string_does_not_count(tmp_path):
+    sources = {
+        "Line.tsx": "// export default function Page() {}\nexport const x = 1;\n",
+        "Block.tsx": "/*\n export default x;\n*/\nexport const x = 1;\n",
+        "Str.tsx": 'export const s = "export default";\n',
+        "Tpl.tsx": "export const s = `\nexport { x as default }`;\n",
+        "Named.tsx": 'export { default as Page } from "./Other";\n',
+    }
+    root = _repo(tmp_path)
+    pages = _module(root, "a") / "a" / "pages"
+    for name, src in sources.items():
+        (pages / name).write_text(src, encoding="utf-8")
+    errors = _errors(root)
+    for name in sources:
+        assert f"a/pages/{name}: has no `export default`" in errors, name
 
 
 def test_non_page_files_fail(tmp_path):
@@ -141,24 +214,26 @@ def _news(root: Path, extra: str) -> None:
     _module(root, "news", f"[project.optional-dependencies]\n{extra}\n")
 
 
-def test_stale_sibling_floor_fails(tmp_path):
+def test_sibling_floor_without_a_comment_fails(tmp_path):
     """news' pagebuilder extra at >=0.0.8 while the repo was at 0.0.11."""
-    root = _repo(tmp_path, "0.0.11")
+    root = _repo(tmp_path)
     _news(root, 'pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]')
-    assert "floor 0.0.8 is more than 2 releases behind 0.0.11" in _errors(root)
+    assert "needs a '# floor: <reason>' comment" in _errors(root)
 
 
-def test_recent_or_upcoming_floor_passes(tmp_path):
-    for floor in ("0.0.9", "0.0.11", "0.0.12"):
-        root = _repo(tmp_path / floor, "0.0.11")
-        _news(root, f'pagebuilder = ["simple_module_pagebuilder>={floor},<0.1"]')
-        assert check_rules.check(root) == [], floor
+def test_floor_is_not_compared_with_the_repo_version(tmp_path):
+    """A lockstep release (bump_version.py leaves specifiers alone) must not fail lint."""
+    extra = 'pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]  # floor: labels'
+    for version in ("0.0.11", "0.0.40", "0.1.0"):
+        root = _repo(tmp_path / version, version)
+        _news(root, extra)
+        assert check_rules.check(root) == [], version
 
 
-def test_floor_from_an_older_series_fails(tmp_path):
-    root = _repo(tmp_path, "0.1.1")
-    _news(root, 'pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.2"]')
-    assert "floor 0.0.12" in _errors(root)
+def test_sibling_is_matched_under_any_spelling(tmp_path):
+    root = _repo(tmp_path)
+    _news(root, 'pagebuilder = ["Simple-Module.Pagebuilder>=0.0.12,<0.1"]')
+    assert "needs a '# floor: <reason>' comment" in _errors(root)
 
 
 def test_floor_comment_inline_or_above_passes(tmp_path):
@@ -168,15 +243,15 @@ def test_floor_comment_inline_or_above_passes(tmp_path):
         'pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]'
     )
     for name, extra in (("inline", inline), ("above", above)):
-        root = _repo(tmp_path / name, "0.0.11")
+        root = _repo(tmp_path / name)
         _news(root, extra)
         assert check_rules.check(root) == [], name
 
 
 def test_floor_comment_separated_by_a_blank_line_does_not_count(tmp_path):
-    root = _repo(tmp_path, "0.0.11")
+    root = _repo(tmp_path)
     _news(root, '# floor: stale\n\npagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]')
-    assert "floor 0.0.8" in _errors(root)
+    assert "needs a '# floor: <reason>' comment" in _errors(root)
 
 
 def test_sibling_without_floor_fails(tmp_path):
@@ -186,7 +261,7 @@ def test_sibling_without_floor_fails(tmp_path):
 
 
 def test_framework_floor_is_not_a_sibling(tmp_path):
-    root = _repo(tmp_path, "0.0.11")
+    root = _repo(tmp_path)
     _module(root, "a", 'dependencies = ["simple_module_core>=0.0.1,<0.1"]\n')
     assert check_rules.check(root) == []
 
