@@ -54,11 +54,22 @@ def test_pagebuilder_registered(app):
     assert "PageBuilder" in _module_names(app)
 
 
+def _route_paths(app) -> set[str]:
+    """Every path the app serves, view routes included.
+
+    Not ``app.routes``: since FastAPI 0.141 ``include_router`` wraps the
+    sub-router in one lazily-resolved ``_IncludedRouter`` with no ``path``.
+    Not the OpenAPI schema: from framework 0.0.37 (the nightly newest-framework
+    run; the host pins 0.0.36) view routers are included with
+    ``include_in_schema=False``, so the schema lists only ``/api/...`` (#186).
+    ``iter_route_contexts`` ships with the FastAPI 0.141 every lock here
+    resolves, so it is imported unguarded.
+    """
+    return {r.path for r in iter_route_contexts(app.routes) if r.path}
+
+
 def test_pagebuilder_routes_mounted(app):
-    # Resolve the route table rather than reading app.routes (since FastAPI
-    # 0.141 an included router is one _IncludedRouter with no `path`) or the
-    # OpenAPI schema (framework 0.0.37 leaves view routes out of it, #186).
-    paths = {r.path for r in iter_route_contexts(app.routes) if r.path}
+    paths = _route_paths(app)
     assert "/api/pagebuilder/pages" in paths
     assert "/pagebuilder/media" in paths
 
@@ -68,6 +79,7 @@ def test_ai_registered(app):
 
 
 def test_ai_routes_mounted(app):
+    # Only /api/... paths, which stay in the OpenAPI schema on every framework.
     paths = set(app.openapi()["paths"])
     assert "/api/ai/settings" in paths
     assert "/api/ai/test" in paths
