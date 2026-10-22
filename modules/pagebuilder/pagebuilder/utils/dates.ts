@@ -1,3 +1,5 @@
+import { intlLocale } from './locale';
+
 /**
  * A timestamp as date and time, in the console's locale.
  *
@@ -14,5 +16,5 @@ export function formatTimestamp(
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(locale, options);
+  return date.toLocaleString(intlLocale(locale), options);
 }

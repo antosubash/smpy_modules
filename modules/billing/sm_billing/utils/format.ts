@@ -1,4 +1,5 @@
 import { keys, translate } from './i18n';
+import { intlLocale } from './locale';
 import type { Interval, Plan, Status, SubscriptionStatus } from './types';
 
 /**
@@ -22,7 +23,7 @@ export function formatMoney(
   locale: string | undefined,
 ): string {
   if (minor === null || minor === undefined) return '';
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'currency',
     currency: currency.toUpperCase(),
   }).format(minor / 100);
@@ -31,7 +32,7 @@ export function formatMoney(
 /** A date in the console's locale (`useT().locale`); '' when there is none. */
 export function formatDate(iso: string | null, locale: string | undefined): string {
   if (!iso) return '';
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium' }).format(new Date(iso));
 }
 
 export function priceFor(plan: Plan, interval: Interval): string | null {

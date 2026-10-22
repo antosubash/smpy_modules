@@ -57,6 +57,14 @@ def test_backticks_fail_in_every_catalogue(tmp_path):
     assert check_locales.main(["--root", str(tmp_path)]) == 1
 
 
+def test_a_lone_backtick_is_content_not_markdown(tmp_path):
+    # Only a delimited span is Markdown; a single backtick is text to show.
+    loc = _locales(tmp_path)
+    _write(loc, "en.json", {"a": "Press the ` key", "b": "it`s"})
+    _write(loc, "de.json", {"a": "Drücke die Taste `", "b": "es`s"})
+    assert check_locales.check_dir(loc) == []
+
+
 def test_repo_catalogues_pass():
     repo = Path(__file__).resolve().parents[2]
     assert check_locales.main(["--root", str(repo)]) == 0

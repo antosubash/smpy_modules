@@ -4,6 +4,7 @@
  * when `media` values stopped being plain text.
  */
 
+import { usePage } from '@inertiajs/react';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { useT } from '../../utils/i18n';
@@ -28,11 +29,23 @@ export function publicValue(
   return src ? <PublicMediaImage src={src} alt={item.display_title} /> : null;
 }
 
-/** The locale the widget's dates are written in: the language it lists, when
- *  one is set, else the console's — never the browser's (#189). */
+/** What the page around the widget says its language is: the public viewer
+ *  sends `locale`, the page editor (whose canvas renders the same block) the
+ *  page being edited — the same two props news' `useContentLocale` reads. */
+interface PageLocaleProps {
+  locale?: string | null;
+  page?: { locale?: string | null } | null;
+}
+
+/** The locale the widget's dates are written in (#189): the page's own
+ *  language, since the dates are part of the page a visitor reads; else the
+ *  language the widget lists, when one is set; else the console's — never the
+ *  browser's. A German page shows German dates even to a reader whose console
+ *  is in English. */
 export function useDateLocale(props: Pick<RecordsListProps, 'locale'>): string | undefined {
   const { locale } = useT();
-  return props.locale || locale;
+  const page = usePage().props as unknown as PageLocaleProps;
+  return page?.locale || page?.page?.locale || props.locale || locale;
 }
 
 /** "Label: value" per selected field, skipping a field with nothing to show

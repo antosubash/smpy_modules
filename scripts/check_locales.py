@@ -13,9 +13,10 @@ Rules for each ``modules/<name>/<package>/locales/<lang>.json`` other than
   * No translated string is blank where the English is not.
 
 And for every catalogue, ``en.json`` included:
-  * No string carries a backtick. The console renders catalogue text as plain
-    text, so Markdown code spans reach the reader as literal backticks (#189).
-    Name a command or setting in quotes instead.
+  * No string carries a Markdown code span (a backtick-delimited run). The
+    console renders catalogue text as plain text, so the reader sees the
+    backticks (#189); name a command or setting in quotes instead. A lone
+    backtick ("Press the ` key") is content, not Markdown, and passes.
 
 Exit 0 if all pass, 1 otherwise.
 """
@@ -30,7 +31,8 @@ from pathlib import Path
 
 SOURCE = "en.json"
 PLACEHOLDER = re.compile(r"\{\{?\s*[\w.]+\s*\}?\}")
-MARKDOWN = "`"
+# A pair of backticks around something: Markdown's inline code span.
+CODE_SPAN = re.compile(r"`[^`\n]+`")
 
 
 def compare(en: object, other: object, where: str) -> list[str]:
@@ -55,11 +57,11 @@ def compare(en: object, other: object, where: str) -> list[str]:
 
 
 def markdown(node: object, where: str) -> list[str]:
-    """Every string under ``node`` that would show a literal backtick."""
+    """Every string under ``node`` holding a code span its reader would see."""
     if isinstance(node, dict):
         return [e for key, value in node.items() for e in markdown(value, f"{where}.{key}")]
-    if isinstance(node, str) and MARKDOWN in node:
-        return [f"{where}: contains a backtick (rendered literally; use quotes)"]
+    if isinstance(node, str) and CODE_SPAN.search(node):
+        return [f"{where}: contains a backtick code span (rendered literally; use quotes)"]
     return []
 
 

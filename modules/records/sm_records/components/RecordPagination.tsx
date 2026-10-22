@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { keys, type Translate, useT } from '../utils/i18n';
-
 import { PAGE_SIZES } from '../utils/listing';
+import { formatNumber } from '../utils/locale';
 import { PagerButton } from './PagerButton';
 import { PageSizeSelect } from './PageSizeSelect';
 import { cursorPagerParts } from './RecordCursorPager';
@@ -19,26 +19,27 @@ function pageInfo(
   end: number,
   total: number,
   capped: boolean,
+  locale: string | undefined,
 ): string {
   if (capped) {
     return t(keys.records.records.page_info_capped, {
       start,
       end,
-      count: total.toLocaleString(),
+      count: formatNumber(total, locale),
     });
   }
   return t(keys.records.records.page_info, {
-    start,
-    end,
-    total,
+    start: formatNumber(start, locale),
+    end: formatNumber(end, locale),
+    total: formatNumber(total, locale),
   });
 }
 
 /** What "N+" means, as a `title` on the whole footer line (UX-2) — the count
  *  stopped rather than the data, and nothing else on screen says so. */
-function cappedHelp(t: Translate, total: number): string {
+function cappedHelp(t: Translate, total: number, locale: string | undefined): string {
   return t(keys.records.records.page_info_capped_help, {
-    count: total.toLocaleString(),
+    count: formatNumber(total, locale),
   });
 }
 
@@ -122,14 +123,15 @@ export type PagerProps = {
  * page".
  */
 export function RecordPagination(props: PagerProps) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const { page, pageSize, total, loading = false, onPageSize } = props;
   // The footer treats the first size as "unset": a type small enough to fit
   // on one page renders no footer at all unless the URL asked for another
   // size, and would otherwise strand a reader who picked 100 with no control
   // to go back to 25.
   if (page !== null && total <= pageSize && pageSize === PAGE_SIZES[0]) return null;
-  const parts = page === null ? cursorPagerParts(t, props) : numberedPagerParts(t, props, page);
+  const parts =
+    page === null ? cursorPagerParts(t, props) : numberedPagerParts(t, props, page, locale);
   return (
     <div
       className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground"
@@ -170,7 +172,12 @@ export type PagerAction = {
 /** What a mode puts in the shared footer frame. */
 export type PagerParts = { info: ReactNode; actions: PagerAction[]; testId?: string };
 
-function numberedPagerParts(t: Translate, props: PagerProps, page: number): PagerParts {
+function numberedPagerParts(
+  t: Translate,
+  props: PagerProps,
+  page: number,
+  locale: string | undefined,
+): PagerParts {
   const { pageSize, total, capped, itemCount, nextCursor = null, onGo, onContinue } = props;
   const rangeStart = itemCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = itemCount === 0 ? 0 : rangeStart + itemCount - 1;
@@ -193,8 +200,8 @@ function numberedPagerParts(t: Translate, props: PagerProps, page: number): Page
   return {
     info: (
       <>
-        <span title={inexact ? cappedHelp(t, total) : undefined}>
-          {pageInfo(t, rangeStart, rangeEnd, count, inexact)}
+        <span title={inexact ? cappedHelp(t, total, locale) : undefined}>
+          {pageInfo(t, rangeStart, rangeEnd, count, inexact, locale)}
         </span>
         <span data-testid="records-page-position">
           {pagePosition(t, page, ended ? page : lastPage, inexact)}

@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { keys, useT } from '../utils/i18n';
+import { formatNumber } from '../utils/locale';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import { EMPTY_CELL as DASH, formatCalendarDate, formatDateTime } from '../utils/values';
@@ -137,7 +138,7 @@ export function RecordCell({
       // for a payload from a build old enough to have stored something
       // else under the key.
       const n = typeof value === 'number' ? value : Number(value);
-      return <span>{Number.isFinite(n) ? n.toLocaleString() : String(value)}</span>;
+      return <span>{Number.isFinite(n) ? formatNumber(n, locale) : String(value)}</span>;
     }
 
     case 'date':

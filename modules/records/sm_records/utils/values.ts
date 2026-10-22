@@ -18,6 +18,7 @@
  * `toApiValue` stamps the browser's current offset on the way out.
  */
 
+import { intlLocale } from './locale';
 import type { FieldDef } from './types';
 
 export type FormValues = Record<string, unknown>;
@@ -117,9 +118,8 @@ export function localInputToIso(local: string): string {
  * Shared between a schema `datetime` field's cell (`RecordCell`) and the
  * envelope's own fixed timestamps (`published_at`/`updated_at`/`created_at`,
  * design §9) — both are ISO-with-offset on the wire, so the same
- * presentation belongs on both. Rendering the envelope's raw ISO string next
- * to a `datetime` field formatted this way is what actually reads as two
- * different clocks on one row.
+ * presentation belongs on both (a raw ISO string beside a formatted field
+ * reads as two different clocks on one row).
  *
  * Unparseable input is handed back unchanged, same as a `datetime` field's
  * own fallback — the point is never to substitute a value for one the
@@ -128,9 +128,8 @@ export function localInputToIso(local: string): string {
 export function formatDateTime(value: string, locale: string | undefined): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    parsed,
-  );
+  const options = { dateStyle: 'medium', timeStyle: 'short' } as const;
+  return new Intl.DateTimeFormat(intlLocale(locale), options).format(parsed);
 }
 
 /** A bare calendar day ("YYYY-MM-DD", design §7.3) has no timezone of its
@@ -140,7 +139,8 @@ export function formatDateTime(value: string, locale: string | undefined): strin
 export function formatCalendarDate(value: string, locale: string | undefined): string {
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed);
+  const options = { dateStyle: 'medium', timeZone: 'UTC' } as const;
+  return new Intl.DateTimeFormat(intlLocale(locale), options).format(parsed);
 }
 
 function asText(raw: unknown): string {

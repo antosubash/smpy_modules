@@ -2,6 +2,7 @@
 
 import { BASE, read, write } from './http';
 import { keys, type Translate } from './i18n';
+import { intlLocale } from './locale';
 import type {
   ArticleDetail,
   ArticleListResponse,
@@ -84,7 +85,7 @@ export function formatArticleDate(iso: string | null, locale: string | undefined
   if (!iso) return '';
   const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(locale, {
+  return date.toLocaleDateString(intlLocale(locale), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -96,7 +97,10 @@ export function formatArticleDate(iso: string | null, locale: string | undefined
 export function formatTimestamp(iso: string, locale: string | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
 }
 
 /** Set or clear when an article goes live and comes down.

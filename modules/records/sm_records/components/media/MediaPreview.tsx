@@ -88,7 +88,7 @@ export function MediaFacts({ file }: { file: MediaFile }) {
   return (
     <span className="text-xs text-muted-foreground">
       {[
-        formatBytes(file.size_bytes),
+        formatBytes(file.size_bytes, locale),
         file.content_type,
         file.created_at && formatDateTime(file.created_at, locale),
       ]

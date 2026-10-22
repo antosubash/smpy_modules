@@ -71,7 +71,7 @@ export function MediaGrid({
       {files.map((file) => {
         const current = file.id === currentId;
         const date = file.created_at ? formatDateTime(file.created_at, locale) : '';
-        const size = formatBytes(file.size_bytes);
+        const size = formatBytes(file.size_bytes, locale);
         return (
           <li key={file.id} className="min-w-0">
             <button
