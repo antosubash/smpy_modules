@@ -933,6 +933,7 @@
     "upload_toast_batch": "{count} Dateien konnten nicht hochgeladen werden.",
     "upload_toast_single": "{name} konnte nicht hochgeladen werden: {message}",
     "upload_too_large": "Diese Datei ist zu groß zum Hochladen.",
+    "upload_too_many_pixels": "Dieses Bild hat zu viele Pixel für die Verarbeitung. Verkleinern Sie es und laden Sie es erneut hoch.",
     "upload_unsupported": "Dieser Dateityp wird nicht unterstützt. Laden Sie ein gültiges Bild hoch."
   },
   "fields": {

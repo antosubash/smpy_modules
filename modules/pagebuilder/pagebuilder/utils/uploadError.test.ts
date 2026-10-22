@@ -42,6 +42,24 @@ describe('UploadError factories', () => {
     expect(err.message).toBe(en.errors.upload_unsupported);
   });
 
+  it('says "too many pixels" for a 413 carrying that code, not "too large" (#221)', () => {
+    const body = JSON.stringify({
+      detail: { code: 'image_too_many_pixels', message: 'Image dimensions exceed the pixel limit' },
+    });
+    const err = uploadRejected(413, body);
+    expect(err.status).toBe(413);
+    expect(err.message).toBe(en.errors.upload_too_many_pixels);
+    expect(err.message).not.toContain('Image dimensions');
+  });
+
+  it('keeps the byte-size message for a plain 413 or an unreadable body', () => {
+    expect(uploadRejected(413, '{"detail":"File exceeds 10 bytes"}').message).toBe(
+      en.errors.upload_too_large,
+    );
+    expect(uploadRejected(413, '<html>').message).toBe(en.errors.upload_too_large);
+    expect(uploadRejected(413).message).toBe(en.errors.upload_too_large);
+  });
+
   it('uses the translated network message, not the browser text', () => {
     const err = uploadNetworkError();
     expect(err).toBeInstanceOf(UploadError);
