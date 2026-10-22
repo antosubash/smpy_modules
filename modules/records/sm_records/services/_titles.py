@@ -8,6 +8,8 @@ this one is a single batched walk it calls.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index._batch import current_batch
@@ -19,7 +21,13 @@ from sm_records.services._payload import display_title, field_defs
 __all__ = ["recompute_titles"]
 
 
-async def recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int) -> int:
+async def recompute_titles(
+    db: AsyncSession,
+    rtype: RecordType,
+    batch_size: int,
+    *,
+    after_batch: Callable[[], Awaitable[None]] | None = None,
+) -> int:
     """Rebuild every record's denormalised ``display_title`` (§18 Q2).
 
     Resolved there in favour of the reindex owning it, because that is where
@@ -53,5 +61,7 @@ async def recompute_titles(db: AsyncSession, rtype: RecordType, batch_size: int)
         # Committed rather than flushed, for the reason ``run_pending`` gives
         # ``reindex_type``'s ``after_batch``: one batch of the write lock at a
         # time, and a half-finished title pass is repeated by the next run.
-        await db.commit()
+        # The runner's ``after_batch`` commits and takes the type lock again,
+        # so the next batch is read under it (``reindex_runner._rebuild``).
+        await (after_batch or db.commit)()
     return total
