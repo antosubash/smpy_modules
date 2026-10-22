@@ -92,3 +92,11 @@ class TestRewrite:
         body = b"<html><body></body></html>"
 
         assert set_html_lang(self._shell(body), "de").body == body
+
+    @pytest.mark.parametrize("attr", ["xml:lang", "data-lang"])
+    async def test_a_lookalike_attribute_is_not_the_lang(self, attr: str) -> None:
+        body = f'<html {attr}="fr" lang="en"><body></body></html>'.encode()
+
+        patched = set_html_lang(self._shell(body), "de").body
+
+        assert patched.startswith(f'<html {attr}="fr" lang="de" data-shell-lang="en">'.encode())

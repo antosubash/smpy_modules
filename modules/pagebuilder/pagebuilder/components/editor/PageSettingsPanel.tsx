@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 import type { PageRead } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import { isValidSlug } from '../../utils/slugRule';
+import { isValidSlug, SLUG_MAX_LENGTH } from '../../utils/slugRule';
 
 const TITLE_ID = 'page-settings-title';
 const SLUG_ID = 'page-settings-slug';
@@ -83,6 +83,7 @@ export function PageSettingsPanel({
           <Input
             id={SLUG_ID}
             value={slug}
+            maxLength={SLUG_MAX_LENGTH}
             aria-invalid={slugInvalid || undefined}
             aria-describedby={SLUG_HINT_ID}
             onChange={(e) => onSlugChange(e.target.value)}

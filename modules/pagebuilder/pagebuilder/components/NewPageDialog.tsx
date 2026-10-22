@@ -22,7 +22,7 @@ import { keys, useT } from '../utils/i18n';
 import { localeLabel, localePrefix } from '../utils/locale';
 import { createPage, listPages, listTemplates } from '../utils/pagesApi';
 import { slugify } from '../utils/slugify';
-import { isValidSlug } from '../utils/slugRule';
+import { isValidSlug, SLUG_MAX_LENGTH } from '../utils/slugRule';
 
 const TITLE_ID = 'new-page-title';
 const SLUG_ID = 'new-page-slug';
@@ -195,6 +195,7 @@ export function NewPageDialog({
                 <Input
                   id={SLUG_ID}
                   value={slug}
+                  maxLength={SLUG_MAX_LENGTH}
                   disabled={pending}
                   aria-invalid={(slug !== '' && !slugValid) || undefined}
                   aria-describedby={slug !== '' && !slugValid ? SLUG_ERROR_ID : undefined}

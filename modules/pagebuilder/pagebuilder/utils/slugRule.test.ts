@@ -23,6 +23,11 @@ describe('isValidSlug', () => {
     expect(isValidSlug(slug)).toBe(false);
   });
 
+  it('rejects a slug longer than the API allows', () => {
+    expect(isValidSlug('a'.repeat(200))).toBe(true);
+    expect(isValidSlug('a'.repeat(201))).toBe(false);
+  });
+
   it('accepts whatever slugify produces', () => {
     for (const title of ['Field notes', 'Étude №1', '2026: the plan']) {
       expect(isValidSlug(slugify(title))).toBe(true);

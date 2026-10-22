@@ -1262,8 +1262,8 @@
     "show_in_footer": "In der Fußzeile anzeigen",
     "show_in_header": "In der Kopfzeilen-Navigation anzeigen",
     "slug_help": "Eine Änderung hinterlässt eine Weiterleitung von der alten URL.",
-    "slug_moved": "Beim Speichern entsteht eine dauerhafte Weiterleitung von {from}, damit bestehende Links weiter funktionieren.",
     "slug_invalid": "Nur Kleinbuchstaben (a–z), Ziffern (0–9) und Bindestriche verwenden; das erste Zeichen muss ein Buchstabe oder eine Ziffer sein.",
+    "slug_moved": "Beim Speichern entsteht eine dauerhafte Weiterleitung von {from}, damit bestehende Links weiter funktionieren.",
     "title": "Titel",
     "url": "URL",
     "visibility": "Sichtbarkeit"

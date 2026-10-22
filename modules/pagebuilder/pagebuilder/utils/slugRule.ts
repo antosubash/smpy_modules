@@ -11,9 +11,12 @@ import { keys, translate } from './i18n';
 
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
+/** `PageCreate.slug`'s `max_length`. */
+export const SLUG_MAX_LENGTH = 200;
+
 /** True for a slug the API would accept. Empty is not one. */
 export function isValidSlug(slug: string): boolean {
-  return SLUG_PATTERN.test(slug);
+  return slug.length <= SLUG_MAX_LENGTH && SLUG_PATTERN.test(slug);
 }
 
 /** The sentence shown under a slug field the API would reject. */
