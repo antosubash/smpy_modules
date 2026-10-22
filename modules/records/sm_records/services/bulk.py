@@ -24,7 +24,9 @@ which is what makes all-or-nothing true rather than aspirational.
 sentence above true at all.** The semantic reason comes first: a write over
 many records of a type should serialise against schema changes and against
 other writers exactly as every single-record write does, and those take the
-lock inside ``_prepare`` — a path ``trash``/``restore``/``purge`` never touch.
+lock inside ``_prepare``. A trash locks every type its cascades can write,
+up front (``services._delete_locks``): locks are taken in ascending id order
+(``services._lock.lock_types``), so a turn may not discover a new one later.
 The mechanical reason is pysqlite's legacy transaction control, which emits
 ``BEGIN`` only before the first DML statement it recognises. With no write
 ahead of it the batch's first statement is ``SAVEPOINT``, which SQLite then
@@ -61,6 +63,7 @@ from sm_records.models import RecordType
 # would have made, and lives next door for the file cap — see that module.
 from sm_records.services._bulk_turn import Change, apply_one
 from sm_records.services._claims import lock_type
+from sm_records.services._delete_locks import lock_delete_graph
 
 # Re-exported: emptying the trash is one statement per table over a set of
 # records rather than a pass over them one at a time, and lives in
@@ -152,7 +155,10 @@ async def apply_bulk(
     trashed: set[str] = set()
     # Before the first savepoint, and load-bearing twice over — see the module
     # docstring's third paragraph.
-    await lock_type(db, rtype)
+    if action is BulkAction.TRASH:
+        await lock_delete_graph(db, rtype)
+    else:
+        await lock_type(db, rtype)
     with events.muted(db):
         for uuid in wanted:
             try:

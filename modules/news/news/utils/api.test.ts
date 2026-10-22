@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { formatArticleDate } from './api';
+import { formatArticleDate, formatTimestamp } from './api';
 
 // A timezone west of UTC, where midnight UTC is still the previous evening.
 // Against the pre-fix implementation (local-time rendering) every assertion
@@ -39,5 +39,21 @@ describe('formatArticleDate', () => {
 
   it('is empty rather than "Invalid Date" for garbage', () => {
     expect(formatArticleDate('not-a-date', 'en-US')).toBe('');
+  });
+
+  it('writes the date in the locale it is given (#189)', () => {
+    expect(formatArticleDate('2026-02-01T00:00:00Z', 'de')).toBe('1. Feb. 2026');
+  });
+});
+
+describe('formatTimestamp', () => {
+  it('renders date and time in the given locale, in the viewer timezone', () => {
+    // 18:05 UTC is 13:05 in New York.
+    expect(formatTimestamp('2026-02-01T18:05:00Z', 'de')).toBe('01.02.2026, 13:05');
+    expect(formatTimestamp('2026-02-01T18:05:00Z', 'en-US')).toMatch(/^Feb 1, 2026, 1:05\sPM$/);
+  });
+
+  it('hands garbage back unchanged', () => {
+    expect(formatTimestamp('nope', 'de')).toBe('nope');
   });
 });

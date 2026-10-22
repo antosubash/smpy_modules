@@ -30,9 +30,11 @@ from sm_records.services._common import (
 # Split out for the file cap: everything about the referrer graph — walking
 # it, and rewriting the records that point at the one being deleted — lives
 # there, and everything about a record's own existence lives here.
+from sm_records.services._delete_locks import check_delete_plan, lock_delete_graph, still_there
 from sm_records.services._delete_plan import apply_set_null, plan_delete
 from sm_records.services._empty_trash import _purge_ids
-from sm_records.services.errors import Conflict, ReferencedByOthers
+from sm_records.services._lock import lock_type
+from sm_records.services.errors import ReferencedByOthers
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import bound_tenant
@@ -97,7 +99,13 @@ async def soft_delete_record(
     is treated as ``restrict`` however its field is declared: see
     :func:`~sm_records.services._common.role_blocked`.
     """
+    # Locks first, then the walk: see ``services._delete_locks``.
+    graph = await lock_delete_graph(db, rtype)
+    await still_there(
+        db, rtype, record, trashed=False, refusal=f"record {record.uuid} is in the trash"
+    )
     trash, set_nulls, blockers = await plan_delete(db, rtype, record, roles)
+    await check_delete_plan(db, graph, [*(t for _, t in trash), *(r.rtype for r, _ in set_nulls)])
     if blockers:
         # ``blockers.total`` and not ``len(listed)``: the count has to stay the
         # one the referrers panel and the delete dialog speak, whether or not
@@ -137,6 +145,10 @@ async def restore_record(
     record is cheap and it is the difference between a restore that is
     queryable and one that is merely visible.
     """
+    await lock_type(db, rtype)
+    await still_there(
+        db, rtype, record, trashed=True, refusal=f"record {record.uuid} is not in the trash"
+    )
     record.is_deleted = False
     record.deleted_at = None
     record.deleted_by = None
@@ -169,8 +181,14 @@ async def hard_delete_record(db: AsyncSession, rtype: RecordType, record: Record
     it reachable in one step from a live record turns a mis-click into
     permanent data loss.
     """
-    if not record.is_deleted:
-        raise Conflict(f"record {record.uuid} must be in the trash before it can be purged")
+    await lock_type(db, rtype)
+    await still_there(
+        db,
+        rtype,
+        record,
+        trashed=True,
+        refusal=f"record {record.uuid} must be in the trash before it can be purged",
+    )
     # Built before the purge: afterwards the row is expunged and the uuid it
     # names is the one thing a subscriber cannot look up any more.
     purged = events.purged(rtype, record)

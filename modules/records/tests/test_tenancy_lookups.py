@@ -19,12 +19,13 @@ import pytest
 from simple_module_db.listeners import TenantIsolationError
 from sm_records._tenant_guard import is_guarded
 from sm_records.models import RecordStatus
+from sm_records.services import _claims
 from sm_records.services import public as public_service
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
 from sm_records.services._import_match import MATCH_UUID, resolve_matches
 from sm_records.services._import_parse import ImportRow
-from sm_records.services.errors import NotFound
+from sm_records.services.errors import Conflict, NotFound
 from sm_records.tenancy import TenantUnbound
 
 from tests.tenancy_support import SAME_UUID, SETTINGS, Tenant, seed_tenant, session_in
@@ -104,7 +105,24 @@ async def test_an_unbound_lookup_is_refused_without_the_guard(db_state):
             await public_service.get_public_type(session, "post")
 
 
-async def test_a_create_under_another_tenant_is_refused_by_the_stamp(db_state, two):
+async def test_a_create_under_another_tenant_is_refused_by_the_lock(db_state, two):
+    """The type lock sees no row of another tenant's type, so it refuses first."""
+    _, globex = two
+    async with session_in(db_state, "acme") as session:
+        with pytest.raises(Conflict, match="was deleted"):
+            await record_service.create_record(
+                session, globex.rtype, data={"title": "stray"}, settings=SETTINGS
+            )
+        await session.rollback()
+
+
+async def test_a_create_under_another_tenant_is_refused_by_the_stamp(db_state, two, monkeypatch):
+    """…and the flush stamp still refuses it without the lock in front."""
+
+    async def no_lock(*_args, **_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(_claims, "lock_type", no_lock)
     _, globex = two
     async with session_in(db_state, "acme") as session:
         with pytest.raises(TenantIsolationError):

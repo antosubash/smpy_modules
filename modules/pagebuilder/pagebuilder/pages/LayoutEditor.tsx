@@ -1,5 +1,5 @@
 import { type Data, Puck } from '@puckeditor/core';
-import '@puckeditor/core/puck.css';
+import '../components/editor/puck-editor.css';
 import { Head, router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
@@ -18,6 +18,7 @@ import {
   saveLayout,
 } from '../utils/api';
 import { blockLabels, moveBlock, outlineOf } from '../utils/blockOutline';
+import { formatTimestamp } from '../utils/dates';
 import { keys, useT } from '../utils/i18n';
 
 interface Props {
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export default function LayoutEditor() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { layout } = props;
   const revisions = props.revisions ?? [];
@@ -124,7 +125,7 @@ export default function LayoutEditor() {
                   <div>
                     <span className="font-medium">{t(keys.pagebuilder.layout.revision_saved)}</span>
                     <span className="ml-2 text-muted-foreground">
-                      {new Date(r.created_at).toLocaleString()}
+                      {formatTimestamp(r.created_at, locale)}
                     </span>
                     {r.created_by && (
                       <span className="ml-2 text-muted-foreground">
@@ -145,7 +146,7 @@ export default function LayoutEditor() {
                     }
                     title={t(keys.pagebuilder.layout.restore_title)}
                     description={t(keys.pagebuilder.layout.restore_description, {
-                      when: new Date(r.created_at).toLocaleString(),
+                      when: formatTimestamp(r.created_at, locale),
                     })}
                     confirmLabel={t(keys.pagebuilder.layout.restore)}
                     onConfirm={() => handleRestore(r.id)}

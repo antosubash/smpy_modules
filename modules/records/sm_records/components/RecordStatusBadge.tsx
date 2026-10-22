@@ -84,14 +84,14 @@ export function RecordEditorHeaderBadges({
  *  a validator pass the list does not pay, and the record's own screen has
  *  them. */
 export function InvalidBadge({ since }: { since: string }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   return (
     <Badge
       variant="outline"
       data-testid="records-invalid-badge"
       className="border-destructive/50 text-destructive"
       title={t(keys.records.records.invalid_badge_help, {
-        date: formatDateTime(since),
+        date: formatDateTime(since, locale),
       })}
     >
       {t(keys.records.records.invalid_badge)}

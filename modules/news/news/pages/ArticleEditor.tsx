@@ -26,7 +26,7 @@ import { keys, useT } from '../utils/i18n';
  * independently, and a full-bleed editor.
  */
 export default function ArticleEditor() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.news.editor;
   const props = usePage<{
     props: { article_id: number; preview_url: string; locales?: string[] };
@@ -88,7 +88,7 @@ export default function ArticleEditor() {
 
   const isDraft = article.status === 'draft';
   const isPublished = article.status === 'published';
-  const dated = formatArticleDate(article.published_at);
+  const dated = formatArticleDate(article.published_at, locale);
   const status = editorStatus(article.status, dated, t);
 
   return (

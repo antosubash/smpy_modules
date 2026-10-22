@@ -1,7 +1,12 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { listArticleRevisions, type RevisionRead, restoreArticleRevision } from '../../utils/api';
+import {
+  formatTimestamp,
+  listArticleRevisions,
+  type RevisionRead,
+  restoreArticleRevision,
+} from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -31,7 +36,7 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  * action pushes further down the list.
  */
 export function HistoryCard({ articleId }: { articleId: number }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.news.history;
   const [revisions, setRevisions] = useState<RevisionRead[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,7 +91,7 @@ export function HistoryCard({ articleId }: { articleId: number }) {
                     dateTime={revision.created_at}
                     className="shrink-0 text-xs text-muted-foreground"
                   >
-                    {new Date(revision.created_at).toLocaleString()}
+                    {formatTimestamp(revision.created_at, locale)}
                   </time>
                 )}
               </div>

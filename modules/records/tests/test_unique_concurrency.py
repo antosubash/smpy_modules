@@ -27,7 +27,7 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 from sm_records.models import Record
-from sm_records.services import _claims
+from sm_records.services import _claims, _lock
 from sqlalchemy import func, select
 
 from tests.app_harness import seed_type
@@ -180,7 +180,8 @@ def test_lock_type_is_a_write_on_sqlite_and_a_row_lock_elsewhere(dialect):
     """
     import inspect
 
-    source = inspect.getsource(_claims.lock_type)
+    # ``lock_type`` is ``lock_types`` of one; the statement is ``_lock_one``'s.
+    source = inspect.getsource(_lock._lock_one)
     assert 'dialect.name == "sqlite"' in source
     assert "with_for_update" in source
     if dialect == "sqlite":
