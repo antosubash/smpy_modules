@@ -48,6 +48,25 @@ def test_factory_falls_back_without_secrets(caplog):
     assert any("stripe_secret_key" in r.message for r in caplog.records)
 
 
+def test_fallback_message_names_both_missing_keys_in_the_plural():
+    _, error = build_provider(BillingSettings(provider="stripe"))
+    assert error == (
+        "provider is 'stripe' but stripe_secret_key and stripe_webhook_secret are not set"
+    )
+
+
+@pytest.mark.parametrize(
+    ("present", "missing"),
+    [
+        ({"stripe_secret_key": "sk_test"}, "stripe_webhook_secret"),
+        ({"stripe_webhook_secret": "whsec"}, "stripe_secret_key"),
+    ],
+)
+def test_fallback_message_names_one_missing_key_in_the_singular(present, missing):
+    _, error = build_provider(BillingSettings(provider="stripe", **present))
+    assert error == f"provider is 'stripe' but {missing} is not set"
+
+
 def test_factory_falls_back_on_unreadable_secret():
     crypto.set_secret_provider(lambda: "one")
     stored = crypto.encrypt_value("sk_test")
@@ -68,3 +87,16 @@ async def test_startup_installs_manual_provider(app):
     services = app.state.sm_billing
     assert isinstance(services.provider, ManualProvider)
     assert services.provider_error == ""
+
+
+def test_unreadable_secret_reason_has_no_trailing_full_stop():
+    # The screens write "{error}. Plans are ..."; a reason already ending in "." doubles it.
+    crypto.set_secret_provider(lambda: "one")
+    stored = crypto.encrypt_value("sk_test")
+    crypto.set_secret_provider(lambda: "two")
+    try:
+        _, error = build_provider(BillingSettings(provider="stripe", stripe_secret_key=stored))
+    finally:
+        crypto.set_secret_provider(lambda: "")
+    assert "stripe_secret_key" in error
+    assert not error.endswith(".")
