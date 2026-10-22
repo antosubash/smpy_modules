@@ -59,7 +59,13 @@ const firstLine = (text) =>
     ?.trim()
     .slice(0, 160) ?? '';
 
-const cell = (text) => text.replaceAll('|', '\\|');
+const cell = (text) =>
+  text
+    .replace(/\s+/g, ' ')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('`', "'")
+    .replaceAll('|', '\\|');
 
 function table(rows) {
   const lines = ['| Test | Attempts | First error |', '| --- | --- | --- |'];
