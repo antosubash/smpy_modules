@@ -55,8 +55,9 @@ host → `"default"`, multi → the resolved tenant, 404 for anonymous without
 one); the scheduler opens one session per tenant under `tenant_context`.
 News has its own copy, `news.tenancy` (admin with no tenant in multi mode →
 403 `tenant_required`), and its scheduler ticks per tenant the same way.
-Code outside pagebuilder that reads its tables (news' search) pins
-`tenant_id` itself.
+Another module reads pagebuilder only through `pagebuilder.contracts`
+(news' search calls `search_pages`/`search_media`, #130); the caller names the
+tenant and the contract pins `tenant_id` itself.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
