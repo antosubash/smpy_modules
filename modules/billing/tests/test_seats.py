@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+from api_helpers import create_tenant
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub, make_tenant
 from sm_billing.cli import app as cli_app
@@ -145,3 +146,13 @@ async def test_members_count_matches_rows(app):
             .all()
         )
     assert len(rows) == 2
+
+
+async def test_status_seats_count_pending_invitations(app, user_client):
+    async with user_client("owner@x.io") as (owner, _):
+        await create_tenant(owner)
+        invite = await owner.post(
+            "/api/tenants/current/invitations", json={"email": "m@x.io", "role": "member"}
+        )
+        assert invite.status_code == 201, invite.text
+        assert (await owner.get("/api/billing/status")).json()["seats"]["used"] == 2
