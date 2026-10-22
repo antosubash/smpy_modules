@@ -2,9 +2,10 @@
 # Entry point used by playwright.config.ts → webServer.command.
 # Resets the test SQLite database, runs migrations, then hands off to the
 # server: `make dev` by default, or — with E2E_BUNDLE=1, which CI sets — a
-# plain uvicorn (no --reload) serving the production bundle. Keeping this in a script (instead of chaining inside the
-# Playwright config) lets us share the same logic across CI and local
-# runs and gives Playwright a single PID to wait on / kill.
+# plain uvicorn (no --reload) serving the production bundle. Keeping this in a
+# script (instead of chaining inside the Playwright config) lets us share the
+# same logic across CI and local runs and gives Playwright a single PID to wait
+# on / kill.
 set -euo pipefail
 
 if [[ -z "${SM_DATABASE_URL:-}" ]]; then

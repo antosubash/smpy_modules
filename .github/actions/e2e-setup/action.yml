@@ -7,9 +7,10 @@
 # updates them here too (.github/dependabot.yml lists this directory).
 #
 # Caches are scoped to e2e. uv's carries an `e2e` suffix and the browsers' key
-# an `e2e-` prefix, so nothing this restores was written by another workflow,
-# and nothing it saves is read by one: release.yml restores no cache at all, and
-# framework-latest.yml never saves one.
+# an `e2e-` prefix, so neither is shared with another workflow: release.yml
+# restores no cache at all, and framework-latest.yml never saves one. The npm
+# cache (setup-node) is the exception: its key is the lockfile hash, shared
+# with ci.yml's other Node jobs.
 
 name: E2E setup
 description: Install the workspaces, build the production bundle and install Chromium.
