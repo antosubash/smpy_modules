@@ -33,6 +33,7 @@ from pagebuilder.media_files import (
 from pagebuilder.media_images import (
     CONTENT_TYPE_EXTENSIONS,
     SNIFF_BYTES,
+    TooManyPixelsError,
     normalize_folder,
     process_image,
     safe_extension,
@@ -207,12 +208,25 @@ class MediaService:
         # them on the event loop blocks other concurrent uploads. The
         # thread offload is essentially free for a single request and
         # turns parallel uploads back into parallel work.
-        width, height, variants = await asyncio.to_thread(
-            process_image,
-            target,
-            thumbnail_widths=self.settings.media_thumbnail_widths,
-            webp_quality=self.settings.media_webp_quality,
-        )
+        try:
+            width, height, variants = await asyncio.to_thread(
+                process_image,
+                target,
+                thumbnail_widths=self.settings.media_thumbnail_widths,
+                webp_quality=self.settings.media_webp_quality,
+            )
+        except TooManyPixelsError:
+            # Raised before any thumbnail is written, so the original is the
+            # only file to remove. The code lets the console say "too many
+            # pixels" rather than the byte-size sentence a plain 413 gets.
+            target.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "image_too_many_pixels",
+                    "message": "Image dimensions exceed the pixel limit",
+                },
+            ) from None
 
         asset = MediaAsset(
             filename=filename,
