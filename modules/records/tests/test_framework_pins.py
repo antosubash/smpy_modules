@@ -141,9 +141,7 @@ def test_the_splice_reaches_all_items():
     [ours] = menu.sync_type_menu(registry, [menu.MenuType("a", "As", None, [])])
     assert ours in registry.all_items  # warms the sorted cache
     menu.sync_type_menu(registry, [], previous=[ours])
-    assert registry.all_items == [hub], (
-        f"{_MENU}: MenuRegistry.remove no longer changes all_items"
-    )
+    assert registry.all_items == [hub], f"{_MENU}: MenuRegistry.remove no longer changes all_items"
 
 
 # --- error page ---------------------------------------------------------------
