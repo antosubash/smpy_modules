@@ -1,5 +1,5 @@
 .PHONY: install install-py install-js dev dev-api dev-ui build gen-pages sync-module-deps typecheck \
-        migrate migration downgrade test test-py test-js e2e lint kill \
+        migrate migration downgrade test test-py test-js e2e e2e-bundle lint kill \
         link-framework unlink-framework new-module env
 
 install: install-py install-js sync-module-deps
@@ -80,6 +80,13 @@ test-js:
 
 e2e:
 	npm run test:e2e
+
+# What CI runs: the suite against the production bundle, served by uvicorn
+# without --reload (#119). gen-pages first, so the bundle carries every
+# installed module's pages.
+e2e-bundle: gen-pages
+	npm run build
+	E2E_BUNDLE=1 npm run test:e2e
 
 # Typecheck module TSX. `npm run build` only runs tsc over host/client_app, so
 # without this a module-level type error (a missing import, a dropped props

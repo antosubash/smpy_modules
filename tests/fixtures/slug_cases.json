@@ -27,6 +27,14 @@
 
     { "input": "İstanbul", "expected": "istanbul" },
 
+    { "input": "Don't stop", "expected": "don-t-stop" },
+    { "input": "already-a-slug", "expected": "already-a-slug" },
+    { "input": "UPPER_snake_case", "expected": "upper-snake-case" },
+    { "input": "Tab\there\nnewline", "expected": "tab-here-newline" },
+    { "input": "ﬁnancial ﬂow", "expected": "financial-flow" },
+    { "input": "①②③ results", "expected": "123-results" },
+    { "input": "Ελληνικά νέα 2026", "expected": "2026" },
+
     { "input": "日本語", "expected": "" },
     { "input": "???", "expected": "" },
     { "input": "", "expected": "" }
