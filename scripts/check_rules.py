@@ -40,6 +40,7 @@ from pathlib import Path
 import tomlkit
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES_ALLOWLIST: frozenset[str] = frozenset()
@@ -84,11 +85,15 @@ def _parse(raw: str) -> Requirement | None:
 
 
 def _pins_exactly(req: Requirement) -> bool:
-    """``===X`` or ``==X``; ``==0.0.*`` is a prefix match, i.e. a range."""
-    return any(
+    """``===X``, ``==X`` or ``>=X,<=X``; ``==0.0.*`` is a prefix match, i.e. a range."""
+    if any(
         s.operator == "===" or (s.operator == "==" and not s.version.endswith("*"))
         for s in req.specifier
-    )
+    ):
+        return True
+    floors = {Version(s.version) for s in req.specifier if s.operator == ">="}
+    ceilings = {Version(s.version) for s in req.specifier if s.operator == "<="}
+    return bool(floors & ceilings)
 
 
 def check_python_pins(pyproject: Path, root: Path) -> list[str]:
@@ -172,8 +177,8 @@ def check_pages(root: Path, allowlist: frozenset[str] = PAGES_ALLOWLIST) -> list
 
 def _has_floor_comment(lines: list[str], needle: str) -> bool:
     for i, line in enumerate(lines):
-        if needle not in line:
-            continue
+        if f'"{needle}"' not in line and f"'{needle}'" not in line:
+            continue  # the requirement's own string literal, not a mention of it
         if FLOOR_COMMENT.search(line):
             return True
         j = i - 1

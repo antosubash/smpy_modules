@@ -78,6 +78,12 @@ def test_pin_is_caught_under_any_spelling_of_the_name(tmp_path):
         assert f"{name}==0.0.36" in _errors(root), name
 
 
+def test_floor_equal_to_ceiling_is_an_exact_pin(tmp_path):
+    root = _repo(tmp_path)
+    _module(root, "a", 'dependencies = ["simple_module_core>=0.0.36,<=0.0.36"]\n')
+    assert "pins exactly" in _errors(root)
+
+
 def test_wildcard_equality_is_a_range(tmp_path):
     root = _repo(tmp_path)
     _module(root, "a", 'dependencies = ["simple_module_core==0.0.*"]\n')
@@ -131,10 +137,10 @@ def test_npm_workspace_and_alias_pins_fail(tmp_path):
 
 
 def test_npm_ranges_pass(tmp_path):
-    specs = [
-        "1.2.3||2.0.0", "^1.2.3", "~1.2.3", ">=1.2.3 <2", "1.2.x", "1.2.3 - 1.4.0",
-        "workspace:*", "workspace:^", "npm:@simple-module-py/ui@^1.2.3", "npm:react@19.0.0",
-    ]
+    specs = (
+        "1.2.3||2.0.0,^1.2.3,~1.2.3,>=1.2.3 <2,1.2.x,1.2.3 - 1.4.0,workspace:*,workspace:^,"
+        "npm:@simple-module-py/ui@^1.2.3,npm:react@19.0.0"
+    ).split(",")
     root = _repo(tmp_path)
     deps = {f"@simple-module-py/p{i}": spec for i, spec in enumerate(specs)}
     _module(root, "a", package={"dependencies": deps})
@@ -251,6 +257,17 @@ def test_floor_comment_inline_or_above_passes(tmp_path):
 def test_floor_comment_separated_by_a_blank_line_does_not_count(tmp_path):
     root = _repo(tmp_path)
     _news(root, '# floor: stale\n\npagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]')
+    assert "needs a '# floor: <reason>' comment" in _errors(root)
+
+
+def test_floor_comment_above_a_mere_mention_does_not_count(tmp_path):
+    root = _repo(tmp_path)
+    _news(
+        root,
+        'pagebuilder = ["simple_module_pagebuilder>=0.0.8,<0.1"]\n\n'
+        "# floor: about the note, not the requirement\n"
+        'note = ["see simple_module_pagebuilder>=0.0.8,<0.1 above"]',
+    )
     assert "needs a '# floor: <reason>' comment" in _errors(root)
 
 
