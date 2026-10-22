@@ -2,8 +2,14 @@
 
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
-import type { PageRevisionRead, RevisionDiff, RevisionEvent } from '../../utils/api';
+import type {
+  PageRestoreMarker,
+  PageRevisionRead,
+  RevisionDiff,
+  RevisionEvent,
+} from '../../utils/api';
 import { formatTimestamp } from '../../utils/dates';
+import { buildHistory } from '../../utils/historyTimeline';
 import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { DiffSummary } from '../DiffSummary';
@@ -23,6 +29,8 @@ const RESTORABLE_EVENTS: ReadonlySet<RevisionEvent> = new Set(['publish', 'appro
 
 interface Props {
   revisions: PageRevisionRead[];
+  /** Bulk snapshot restores that wrote this page, shown in time order. */
+  restores?: PageRestoreMarker[];
   activeDiff: RevisionDiff | null;
   diffError: string | null;
   busy: boolean;
@@ -33,6 +41,7 @@ interface Props {
 
 export function RevisionHistoryPanel({
   revisions,
+  restores = [],
   activeDiff,
   diffError,
   busy,
@@ -44,16 +53,21 @@ export function RevisionHistoryPanel({
   // it is not translatable, and saying it is truer than saying nothing.
   const eventLabel = (event: RevisionEvent) =>
     EVENT_LABELS[event] ? t(EVENT_LABELS[event]) : event;
+  const history = buildHistory(revisions, restores);
   return (
     <div className="border-b bg-muted px-4 py-3 text-sm">
-      {revisions.length === 0 ? (
+      {history.length === 0 ? (
         <p className="text-muted-foreground">{t(keys.pagebuilder.history.empty)}</p>
       ) : (
         <ul className="space-y-1 max-h-48 overflow-y-auto">
-          {revisions.map((r, idx) => {
-            // Revisions are sorted newest-first, so the "previous" is
-            // the next index. The last item has no predecessor.
-            const previous = revisions[idx + 1];
+          {history.map((entry) => {
+            if (entry.kind === 'restore') {
+              return (
+                <RestoreMarkerRow key={`restore-${entry.marker.import_id}`} marker={entry.marker} />
+              );
+            }
+            // The next older *revision*: markers have no state to diff.
+            const { revision: r, previous } = entry;
             const isOpen =
               activeDiff !== null &&
               activeDiff.after_id === r.id &&
@@ -128,5 +142,30 @@ export function RevisionHistoryPanel({
       )}
       {activeDiff && <DiffSummary diff={activeDiff} />}
     </div>
+  );
+}
+
+/** "Restored from snapshot #N" — not a revision, so no Compare or Restore. */
+function RestoreMarkerRow({ marker }: { marker: PageRestoreMarker }) {
+  const { t, locale } = useT();
+  return (
+    <li className="py-1" data-testid={`restore-marker-${marker.import_id}`}>
+      <span className="font-medium">
+        {t(keys.pagebuilder.history.restored_from_snapshot, { id: marker.snapshot_id })}
+      </span>
+      <span className="ml-2 text-muted-foreground">
+        {formatTimestamp(marker.restored_at, locale)}
+      </span>
+      {marker.restored_by && (
+        <span className="ml-2 text-muted-foreground">
+          {t(keys.pagebuilder.history.by, { author: marker.restored_by })}
+        </span>
+      )}
+      {marker.change === 'created' && (
+        <div className="mt-0.5 text-muted-foreground">
+          {t(keys.pagebuilder.history.restored_created)}
+        </div>
+      )}
+    </li>
   );
 }

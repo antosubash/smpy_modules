@@ -49,8 +49,8 @@ from pagebuilder._tenancy_mode import (  # noqa: F401 - tests read the private n
     _tenant_middleware,
     _warn_if_unrecognised,
     detect_mode,
-    pinned_tenants,
     request_mode,
+    stray_pins,
     upstream_tenant,
 )
 
@@ -89,11 +89,10 @@ def configure(app: Any) -> TenancyMode:
     under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
     pagebuilder's data would sit in another.
     """
-    pins = pinned_tenants(app)
-    fixed = next((pin for pin in pins if pin != DEFAULT_TENANT), None)
-    if fixed is not None:
+    stray = stray_pins(app)
+    if stray is not None:
         raise RuntimeError(
-            f"pagebuilder: the host pins every request to default_tenant={fixed!r}, but "
+            f"pagebuilder: the host pins every request to {stray}, but "
             f"pagebuilder runs a single-tenant host in {DEFAULT_TENANT!r}. Unset "
             f"default_tenant and any TenantMiddleware(fixed=...), set them to "
             f"{DEFAULT_TENANT!r}, or turn multi_tenant on"

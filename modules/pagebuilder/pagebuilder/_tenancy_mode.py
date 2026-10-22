@@ -114,21 +114,43 @@ def _framework_mode(app: Any) -> TenancyMode | None:
     return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
 
 
-def pinned_tenants(app: Any) -> tuple[str, ...]:
-    """Every tenant the host pins its requests to, distinct, in order found.
+def pinned_tenants(app: Any) -> dict[str, str]:
+    """Every tenant the host pins its requests to, keyed by where the pin is.
 
     Both sources count (#212): a ``create_app`` host's public
-    ``single_tenant_id`` (its ``default_tenant``, else ``"default"``), and an
-    explicit ``TenantMiddleware(fixed=...)`` in the stack. Requests follow the
-    middleware and background work the framework's answer, so ``configure``
-    refuses any pin other than ``DEFAULT_TENANT`` — and with it two that
-    disagree — rather than let the two drift apart.
+    ``single_tenant_id`` (its ``default_tenant``, else ``"default"``) under
+    ``"default_tenant"``, and an explicit ``TenantMiddleware(fixed=...)`` under
+    ``"fixed"``. Requests follow the middleware and background work the
+    framework's answer, so ``configure`` refuses any pin other than
+    ``DEFAULT_TENANT`` — and with it two that disagree — rather than let the
+    two drift apart.
     """
-    pins = [single_tenant_id(app)] if _framework_mode(app) is TenancyMode.SINGLE else []
+    pins = (
+        {"default_tenant": single_tenant_id(app)}
+        if _framework_mode(app) is TenancyMode.SINGLE
+        else {}
+    )
     fixed = _fixed_tenant(_tenant_middleware(app))
     if fixed is not None:
-        pins.append(fixed)
-    return tuple(dict.fromkeys(pins))
+        pins["fixed"] = fixed
+    return pins
+
+
+_PIN_SHOWN: Final = {
+    "default_tenant": "default_tenant={!r}",
+    "fixed": "TenantMiddleware(fixed={!r})",
+}
+
+
+def stray_pins(app: Any) -> str | None:
+    """The host's pins to a tenant other than ``DEFAULT_TENANT``, each named
+    by where it is set, or ``None`` when there are none."""
+    stray = [
+        _PIN_SHOWN[source].format(tenant)
+        for source, tenant in pinned_tenants(app).items()
+        if tenant != DEFAULT_TENANT
+    ]
+    return " and ".join(stray) or None
 
 
 def detect_mode(app: Any) -> TenancyMode:

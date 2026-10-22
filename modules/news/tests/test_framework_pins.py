@@ -138,8 +138,9 @@ def test_an_explicit_fixed_pin_must_agree_with_the_frameworks_answer():
 
     split = _create_app_host(None)
     split.add_middleware(TenantMiddleware, fixed="acme")
-    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+    with pytest.raises(RuntimeError, match=r"TenantMiddleware\(fixed='acme'\)") as refused:
         tenancy.configure(split)
+    assert "default_tenant=" not in str(refused.value)  # the framework's pin is fine
     agreeing = _create_app_host(None)
     agreeing.add_middleware(TenantMiddleware, fixed="default")
     assert tenancy.configure(agreeing) is TenancyMode.SINGLE

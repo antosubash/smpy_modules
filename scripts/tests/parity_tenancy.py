@@ -5,9 +5,10 @@ rules there apply here — an allowance is a decision, and says why.
 
 Pagebuilder and news carry one design (#38, #125, #192, #211): mode detection
 in ``_tenancy_mode.py`` and request binding in ``tenancy.py``, copied whole.
-Records predates it (#112) and binds by a different rule, so only the stack
-reading it shares is compared declaration by declaration; its binding entry
-points are listed to pin that the difference is deliberate.
+Records shares the mode detection (and, since #210, the mounted-child rule)
+but keeps its own admin rule (#112), so its copies are compared declaration by
+declaration for what they share; its other binding entry points are listed to
+pin that the difference is deliberate.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             Copy(f"{PB}/_tenancy_mode.py"),
             Copy(
                 f"{RECORDS}/_tenancy_mode.py",
-                {"logger": "_log", "_pinned_tenants": "pinned_tenants"},
+                {"logger": "_log"},
             ),
         ),
         shared=(
@@ -50,14 +51,18 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             "_kwargs",
             "_fixed_tenant",
             "_warn_if_unrecognised",
+            "_opaque_middleware",
+            "_framework_mode",
+            "request_mode",
+            "pinned_tenants",
+            "_PIN_SHOWN",
+            "stray_pins",
+            "detect_mode",
         ),
         differ={
-            "pinned_tenants": "The same two pins (#212), but records asks the framework "
-            "through _framework_says_multi plus state.sm, having no _framework_mode; each "
-            "module's test_framework_pins holds all three to the same refusals.",
-            "detect_mode": "Records has no mounted-child or factory-built-entry reading "
-            "(#192 was pagebuilder's and news'). Its binding consults the tenant upstream "
-            "resolved first, so a wrong SINGLE only fills a gap nothing upstream filled.",
+            "mounted": "Pagebuilder and news take an own_prefix, a mount the app made itself "
+            "(pagebuilder's media), which does not count as a parent's; records mounts none.",
+            "scope_mode": "Passes own_prefix through to mounted; see mounted.",
         },
     ),
     Family(
@@ -85,14 +90,15 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "tenancy binding: records",
-        (Copy(f"{PB}/tenancy.py"), Copy(f"{RECORDS}/tenancy.py")),
-        shared=(),
+        (
+            Copy(f"{PB}/tenancy.py"),
+            Copy(f"{RECORDS}/tenancy.py", {"_resolved": "upstream_tenant"}),
+        ),
+        shared=("resolve_public",),
         differ={
             "resolve_admin": _RECORDS_ADMIN,
             "bind_admin": "Records binds through its own tenant_scope, which refuses to "
             "rebind a different tenant inside a bound scope (TenantIsolationError).",
-            "resolve_public": "Records reads its _resolved (request state, then the bound "
-            "contextvar) and has no mounted-child reading.",
             "bind_public": "Records' public 404 is its NotFound error, rendered by its "
             "own error pages.",
         },

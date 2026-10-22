@@ -35,7 +35,7 @@ def test_resolving_middleware_is_multi():
 
 
 def test_configure_refuses_a_host_pinned_elsewhere():
-    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+    with pytest.raises(RuntimeError, match=r"TenantMiddleware\(fixed='acme'\)"):
         tenancy.configure(_app(fixed="acme"))
 
 
@@ -119,8 +119,11 @@ async def test_bind_admin_binds_the_default_in_single_mode():
 
 
 @pytest.mark.unbound_tenant
-def test_search_tenant_falls_back_to_default():
-    assert tenancy.search_tenant() == "default"
+def test_search_tenant_refuses_when_nothing_is_bound():
+    """No fallback to the default (#210): unbound, it cannot tell the mode."""
+    with pytest.raises(HTTPException) as refused:
+        tenancy.search_tenant()
+    assert (refused.value.status_code, refused.value.detail) == (403, tenancy.TENANT_REQUIRED)
     with tenant_context("acme"):
         assert tenancy.search_tenant() == "acme"
 

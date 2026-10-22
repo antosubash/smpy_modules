@@ -41,6 +41,8 @@ per-tenant. :func:`refresh` therefore depends on the mode that
   Syncing every tenant's ``show_in_menu`` types would show each tenant's type
   labels to all the others, linking to keys that resolve differently for each
   viewer. The real fix is upstream (#340, a per-request menu provider).
+* a mounted app the framework has no answer for (#210): treated as multi from
+  its first such request on — :mod:`sm_records._menu_middleware` latches it.
 """
 
 from __future__ import annotations
@@ -237,7 +239,8 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
     window rather than one per request. The dirty flag is cleared with it for
     the same reason; the window will re-read anyway.
 
-    In multi-tenant mode it never reads, and it keeps the registry free of
+    In multi-tenant mode — or once a mounted request has latched
+    ``_menu_suppressed`` — it never reads, and it keeps the registry free of
     per-type items. See the module docstring.
     """
     registry = module.menu_registry
@@ -246,7 +249,8 @@ async def refresh(module: RecordsModule, *, force: bool = False) -> bool:
         # No ``register_menu_items`` (a harness that mounts the routers by
         # hand) or no database yet (a request that raced the lifespan).
         return False
-    if getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.MULTI:
+    multi = getattr(module, "tenancy_mode", TenancyMode.SINGLE) is TenancyMode.MULTI
+    if multi or getattr(module, "_menu_suppressed", False):
         module._type_menu_items = sync_type_menu(registry, [], previous=module._type_menu_items)
         return False
     now = time.monotonic()
