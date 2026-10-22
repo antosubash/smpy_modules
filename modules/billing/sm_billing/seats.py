@@ -52,7 +52,10 @@ def subscribe(bus: EventBus, app: FastAPI) -> None:
     from tenants.contracts.events import MembershipAdded, MembershipRemoved
 
     async def _sync(event: MembershipAdded | MembershipRemoved) -> None:
+        from sm_billing.live import ensure_current
+
         try:
+            await ensure_current(app)  # not through a provider another worker replaced
             await push_quantity(app, event.tenant_id)
         except Exception:
             logger.warning(
