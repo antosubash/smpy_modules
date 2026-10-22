@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { csrfHeader, login, moduleCsrfHeader, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The feed is the reason the block registry exists.
@@ -52,7 +52,7 @@ async function publishFeedPage(
   category: string,
   overrides: Record<string, unknown> = {},
 ): Promise<string> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const slug = uniqueSlug('e2e-feed');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,

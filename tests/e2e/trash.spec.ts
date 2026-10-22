@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Deleting is reversible now, and that changes what is worth asserting.
@@ -11,7 +11,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
  */
 
 async function makePage(page: Page, { publish = false }: { publish?: boolean } = {}) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const slug = uniqueSlug('trash');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
@@ -126,7 +126,7 @@ test.describe('Trash', () => {
 
     await expect(trashRow(page, slug)).toHaveCount(0);
     // The slug is free again, which is the observable difference from a soft delete.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const again = await page.request.post('/api/pagebuilder/pages', {
       headers,
       data: { title: 'Again', slug, draft_data: { content: [] } },

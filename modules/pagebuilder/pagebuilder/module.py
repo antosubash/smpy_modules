@@ -163,12 +163,12 @@ class PagebuilderModule(ModuleBase):
         )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
-        from pagebuilder.endpoints.api import router as api
-        from pagebuilder.endpoints.views import router as views
-        from pagebuilder.security import (
+        from pagebuilder.access import (
             build_admin_dependencies,
             build_view_dependencies,
         )
+        from pagebuilder.endpoints.api import router as api
+        from pagebuilder.endpoints.views import router as views
 
         # No settings read here on purpose. Routers are built during app
         # construction, before the host hydrates settings from the DB, so a
@@ -247,22 +247,6 @@ class PagebuilderModule(ModuleBase):
         registry.add_group("PageBuilder", list(ALL_PERMISSIONS))
         for role, perms in DEFAULT_ROLE_MAP.items():
             registry.map_role(role, perms)
-
-    def register_middleware(self, app: FastAPI) -> None:
-        """Install the CSRF cookie writer.
-
-        Unconditionally, and without reading ``csrf_protect`` here: middleware
-        is installed while the app is built, before the host hydrates settings
-        from the database. The middleware checks the flag itself on each
-        request and passes straight through when CSRF is off, so installing it
-        always costs a dictionary lookup rather than a wrong answer.
-        """
-        from pagebuilder.security import CsrfCookieMiddleware
-
-        app.add_middleware(
-            CsrfCookieMiddleware,
-            admin_prefixes=(self.meta.route_prefix, self.meta.view_prefix),
-        )
 
     def locale_dirs(self) -> dict[str, Path]:
         """Where the editor's own strings live, for the host's i18n registry.

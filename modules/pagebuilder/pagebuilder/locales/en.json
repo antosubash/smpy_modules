@@ -921,6 +921,7 @@
     "untitled": "Untitled page"
   },
   "errors": {
+    "csrf_failed": "This page's security token is out of date. Reload the page and try again — your changes are still on this page until you leave it.",
     "field_message": "{field}: {message}",
     "not_valid": "is not valid",
     "request_failed": "Request failed ({status} {statusText})",

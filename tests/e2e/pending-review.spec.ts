@@ -9,11 +9,11 @@
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { clickAndConfirm, csrfHeader, login, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /** A page sitting in `submitted_for_review`, which is what the queue lists. */
 async function submitForReview(page: Page, title: string): Promise<{ id: number; slug: string }> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const slug = uniqueSlug('review');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
@@ -49,7 +49,9 @@ test.describe('Pending review queue', () => {
     await expect(page).toHaveURL(/\/pagebuilder\/pending$/);
     await expect(page.locator('tr', { hasText: title })).toBeVisible();
 
-    await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers: await csrfHeader(page) });
+    await page.request.delete(`/api/pagebuilder/pages/${id}`, {
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
+    });
   });
 
   test('rejecting requires a note and sends the page back to draft', async ({ page }) => {
@@ -76,7 +78,9 @@ test.describe('Pending review queue', () => {
     await expect(page.locator('tr', { hasText: title })).toHaveCount(0);
     expect(await statusOf(page, id)).toBe('draft');
 
-    await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers: await csrfHeader(page) });
+    await page.request.delete(`/api/pagebuilder/pages/${id}`, {
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
+    });
   });
 
   test('cancelling a rejection leaves the page in the queue', async ({ page }) => {
@@ -96,7 +100,9 @@ test.describe('Pending review queue', () => {
     await expect(page.locator('tr', { hasText: title })).toBeVisible();
     expect(await statusOf(page, id)).toBe('submitted_for_review');
 
-    await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers: await csrfHeader(page) });
+    await page.request.delete(`/api/pagebuilder/pages/${id}`, {
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
+    });
   });
 
   test('approving publishes the page and clears it from the queue', async ({ page }) => {
@@ -123,7 +129,9 @@ test.describe('Pending review queue', () => {
     // Published means actually served.
     expect((await page.request.get(`/p/${slug}`)).status()).toBe(200);
 
-    await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers: await csrfHeader(page) });
+    await page.request.delete(`/api/pagebuilder/pages/${id}`, {
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
+    });
   });
 
   test('shows an empty state when nothing is awaiting review', async ({ page }) => {

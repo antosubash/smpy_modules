@@ -921,6 +921,7 @@
     "untitled": "Seite ohne Titel"
   },
   "errors": {
+    "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
     "field_message": "{field}: {message}",
     "not_valid": "ist ungültig",
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})",

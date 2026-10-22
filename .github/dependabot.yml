@@ -4,9 +4,10 @@
 # hostage. Security updates are unaffected by the groups below and still open
 # as soon as an advisory lands.
 #
-# Not covered: the uv binary itself (`UV_VERSION` in ci.yml and release.yml)
-# — Dependabot tracks the `astral-sh/setup-uv` action, not the uv version it
-# installs — so bump that by hand.
+# Not covered: the uv binary itself (`UV_VERSION` in ci.yml and release.yml,
+# and the Dockerfile's `UV_VERSION` ARG) — Dependabot tracks the
+# `astral-sh/setup-uv` action, not the uv version it installs — so bump those
+# together by hand.
 #
 # Also not covered: the framework itself (`simple_module_*` on PyPI,
 # `@simple-module-py/*` on npm). A framework bump moves the host's exact
@@ -50,3 +51,13 @@ updates:
       uv:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  # The demo host's Dockerfile pins its python and node base images to an
+  # exact tag and digest (#91); this keeps those current.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]

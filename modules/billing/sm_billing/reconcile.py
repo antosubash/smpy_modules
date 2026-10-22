@@ -3,6 +3,10 @@
 Safe to run live and to run twice: each tenant is one fetch → ``apply_snapshot``
 → quantity push, the same path a webhook takes. A failure for one tenant is
 recorded and the run moves on.
+
+This is the whole-estate run behind ``smpy billing reconcile``. The periodic
+loop (``reconcile_interval_minutes``) drives the same ``reconcile_one`` from
+:mod:`sm_billing.scheduler`, over only the subscriptions gone stale.
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select
 
 from sm_billing import constants as c
@@ -45,12 +49,18 @@ async def _targets(app: FastAPI, tenant_id: str | None) -> list[tuple[str, str]]
 
 
 async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> bool:
-    """Sync one tenant from the provider; returns whether a quantity was pushed."""
+    """Sync one tenant from the provider; returns whether a quantity was pushed.
+
+    Runs bound to ``tenant_id``: nothing outside a request binds one, and the
+    ``TenantStatusChanged`` handlers ``finalize_session`` runs may read
+    tenant-scoped tables of other modules, which are unfiltered while unbound.
+    """
     provider = current_provider(app)
-    async with app.state.sm.db.session_factory() as session:
-        await resync(session, app, provider, subscription_id)
-        await finalize_session(session)
-    return await push_quantity(app, tenant_id)
+    with tenant_context(tenant_id):
+        async with app.state.sm.db.session_factory() as session:
+            await resync(session, app, provider, subscription_id)
+            await finalize_session(session)
+        return await push_quantity(app, tenant_id)
 
 
 async def reconcile(app: FastAPI, *, tenant_id: str | None = None) -> ReconcileReport:

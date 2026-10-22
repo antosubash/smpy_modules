@@ -441,6 +441,9 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `max_filter_terms` | `20` | no | `?filter=` terms per request; each is another `EXISTS` |
 | `max_sort_terms` | `5` | no | Distinct `?sort=` fields; each is another `LEFT JOIN` |
 | `max_in_values` | `200` | no | Values in one `in:` list |
+| `max_expand_depth` | `3` | no | Levels one `?expand=` path reaches; at most 5 |
+| `max_expand_paths` | `50` | no | Distinct `?expand=` hops per request; each is one batched query |
+| `max_expand_refs` | `1000` | no | References one read resolves below depth one |
 | `max_payload_bytes` | `262144` (256 KB) | no | One record's serialized `data` |
 | `max_import_bytes` | `52428800` (50 MB) | no | One import body, refused `413` **before** parsing |
 | `max_import_rows` | `20000` | no | Rows in one import, refused `413` **before** anything is written |
@@ -770,6 +773,52 @@ the state SQLite has no planner statistics for.
 For an in-process caller, call
 `sm_records.seed.seed_database(db_state, settings, records=…, seed=…,
 reset=…)` directly instead of shelling out.
+
+### Event subscribers: `--app`
+
+`seed` and `import --apply` publish the same domain events an HTTP write does
+(`RecordCreated`, `RecordUpdated`, `RecordPurged`, `RecordTypeDeleted`), to
+the bus their session carries. A standalone process has no host and so no bus:
+**without `--app` the writes reach no subscriber**, and the command says so on
+stderr before it writes:
+
+```
+records seed: WARNING: no --app given, so these writes reach no event subscriber.
+```
+
+Pass the host's ASGI app, as `uvicorn` would take it, to publish to its
+subscribers:
+
+```bash
+python -m sm_records.cli seed --app main:app --app-dir host            # the demo host
+python -m sm_records.cli import --type order order.json --apply --app main:app --app-dir host
+python -m sm_records.cli seed --app simple_module_hosting:create_app   # the framework's app, no host file
+```
+
+The CLI imports the app and runs its **lifespan** — never its HTTP server —
+around the command, then writes with `app.state.sm.event_bus`, so every handler
+a module registered in `register_event_handlers` hears the writes in the state
+its `on_startup` left it (settings hydrated, tenancy mode fixed). It also picks
+up whatever the host's entry point declares at import, which is how `seed
+--app main:app` seeds the `event` type of the demo host's `events` collection.
+The database is the app's, and so is the connection: the write goes through
+`app.state.sm.db`, with the session listeners and tenant configuration the app
+set up, not through an engine of the CLI's. A `--database-url` that restates it
+(a relative SQLite path, another query order) is accepted; one that names
+another database is refused, with any password masked. The lifespan is left
+normally however the command ends — a refused import, an error, Ctrl-C — so
+every module's `on_shutdown` runs. The lifespan is the host's own, costs
+included: a database behind head fails it (`make migrate` first), and
+pagebuilder's scheduler, if enabled, runs for the length of the command.
+
+**What a write without `--app` skips** is exactly the host's subscribers and
+nothing of the module's own: the record, its revisions and its index rows are
+written inline by the services whether anyone listens or not, so no `reindex`
+is owed afterwards. As of 0.0.11 no module in this repository and no framework
+module subscribes to any records event (`host/tests/test_host_boots.py` pins
+that for the demo host), so on the demo host a bus-less write misses nothing
+today; a host that adds a subscriber — a search index, a webhook, a cache —
+is what `--app` is for.
 
 ---
 

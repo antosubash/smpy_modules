@@ -181,9 +181,17 @@ whole-type rebuild therefore never refuses a filter."""
 
 EXPAND_PARAM: Final = "expand"
 """Query parameter naming the relation fields to resolve on a read (design
-§9): comma-separated field keys, depth one, refused with a 400 for a key that
-is not a ``relation`` field of the type. Admin API only — the public read API
-never expands (§10)."""
+§9): comma-separated paths of relation field keys joined by ``.`` —
+``author.publisher`` resolves ``author`` and then the author's ``publisher`` —
+each at most ``max_expand_depth`` deep, refused with a 400 for a key that is
+not a ``relation`` field of the type it is read on. Admin API only — the
+public read API never expands (§10)."""
+
+EXPAND_DEPTH_CAP: Final = 5
+"""The ceiling ``max_expand_depth`` cannot be raised past. Each level is one
+more statement per path and multiplies the references a page resolves, and
+five hops is past any screen; a client that wants more is walking a graph and
+should page through it with follow-up reads."""
 
 PUBLIC_ROUTE_METHODS: Final = frozenset({"GET", "HEAD"})
 """The only verbs the anonymous read API answers, and the only ones its
