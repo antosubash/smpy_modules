@@ -17,11 +17,13 @@
 #      arch; no translations or command-not-found data). That comes to about
 #      28 MB of indexes, against 37 MB for the runner's default sources, and
 #      leaves out the third-party repos the image adds.
-#      - `apt-get update` gets its own short timeout. If it fails, the source
-#        moves from the runner's mirror list (Azure first) to
-#        archive.ubuntu.com and the update runs once more.
+#      - `apt-get update` gets its own short timeout, and any index that fails
+#        to download fails it (Error-Mode=any). If it fails, the source moves
+#        from the runner's mirror list (Azure first) to archive.ubuntu.com and
+#        the update runs once more.
 #      - Then install only what `install-deps --dry-run` reports missing, with
-#        --no-install-recommends, again under its own timeout.
+#        --no-install-recommends, again under its own timeout. A dry run that
+#        names nothing, or an install that fails, also moves to the archive.
 #   4. Smoke check again. A failure here fails the step.
 #
 # The caller's `timeout 20m` is the hard cap for the whole script.
@@ -91,8 +93,12 @@ EOF
 }
 
 apt_update() {
+  # Error-Mode=any: a single index that fails to download fails the update,
+  # instead of a warning and exit 0, so a half-reachable mirror takes the
+  # fallback too.
   sudo rm -rf /var/lib/apt/lists/partial
-  timeout -k 10s "$1" sudo APT_CONFIG="$APT_CONFIG" apt-get update
+  timeout -k 10s "$1" sudo APT_CONFIG="$APT_CONFIG" \
+    apt-get update -o APT::Update::Error-Mode=any
 }
 
 switch_to_archive() {
@@ -133,9 +139,16 @@ install_system_deps() {
   update_package_lists
   local pkgs
   mapfile -t pkgs < <(missing_packages)
+  if [ "${#pkgs[@]}" -eq 0 ] && [ "$mirror_switched" = false ]; then
+    # Chromium did not launch, yet the dry run named nothing to install. With
+    # no usable package lists it cannot resolve anything, so try the archive.
+    log "dry run listed no missing packages on the default mirror"
+    switch_to_archive
+    mapfile -t pkgs < <(missing_packages)
+  fi
   if [ "${#pkgs[@]}" -eq 0 ]; then
-    # Chromium did not launch, yet the dry run named nothing to install, or
-    # printed something this parser doesn't recognise. More apt would not help.
+    # Still nothing, or output this parser doesn't recognise. More apt would
+    # not help; fail rather than leave Chromium broken.
     log "dry run listed no missing packages; cannot repair the launch failure above"
     return 1
   fi
