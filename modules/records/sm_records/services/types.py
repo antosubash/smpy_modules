@@ -37,6 +37,7 @@ from sm_records.services._common import (
     record_counts,
     type_id_map,
 )
+from sm_records.services._lock import lock_type
 from sm_records.services._referrer_sets import _declares_a_relation_to
 from sm_records.services._schema import (
     check_pointers,
@@ -246,6 +247,9 @@ async def delete_type(
     purge itself is set-based and never instantiates the rows: see
     :func:`purge_type_records`.
     """
+    # Before the count: a move committing under it would leave this purging
+    # the tables the type just left (``services._lock.lock_types``).
+    await lock_type(db, rtype)
     held = await record_count(db, rtype, include_deleted=True)
     if confirm_record_count != held:
         raise Conflict(
