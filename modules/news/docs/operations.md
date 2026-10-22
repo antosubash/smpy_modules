@@ -43,14 +43,16 @@
 pip install "simple_module_news[pagebuilder]"
 ```
 
-This pulls in `simple_module_pagebuilder>=0.0.8,<0.1`. Where both modules run:
+This pulls in `simple_module_pagebuilder>=0.0.12,<0.1`. Where both modules run:
 
 - the **News feed (live articles)** block joins pagebuilder's palette (group
   **Feeds**), with **Heading**, **Category filter (blank = all)**, **How
   many**, **Columns (desktop)**, **View-all link label** and **View-all link
   URL**. It lists published, in-feed articles in the language of the page it
   sits on;
-- **Search everything** gains **Pages** and **Media** sections;
+- **Search everything** gains **Pages** and **Media** sections, read through
+  `pagebuilder.contracts.search_pages`/`search_media` (never its tables) in the
+  request's tenant;
 - the site's article languages become pagebuilder's `content_locales` (see
   below).
 
