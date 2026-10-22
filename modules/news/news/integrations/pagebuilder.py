@@ -16,8 +16,9 @@ site that happens to run both modules:
 * the "see all" links on those two sections point into pagebuilder's own
   screens;
 * the site's content languages are pagebuilder's, borrowed through the sibling
-  :mod:`news.integrations.locales` — a separate file only because this one is
-  at the repo's 300-line cap, and behind the same boundary.
+  :mod:`news.integrations.locales` — a separate file because it answers a
+  question about configuration rather than about data, behind the same
+  boundary.
 
 So every import here is deferred and guarded. On a host without pagebuilder
 ``available()`` is ``False``, the two extra sections return nothing, news
