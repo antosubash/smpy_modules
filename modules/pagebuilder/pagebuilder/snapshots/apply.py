@@ -117,9 +117,8 @@ async def _restore_pages(
     """
     before = {key: page_state(page) for key, page in match.rows.items()}
     if match.renames:
-        for key in match.renames:
-            page = match.rows[key]
-            page.slug = f"~restoring-{page.id}"
+        for key, temp in match.temp_slugs().items():
+            match.rows[key].slug = temp
         await db.flush()
 
     by_key = dict(match.rows)
@@ -129,7 +128,7 @@ async def _restore_pages(
         db.add(page)
         by_key[key] = page
     for key in sorted(bundled):
-        payload = dict(bundled[key])
+        payload = dict(match.writable(key, bundled[key]))
         # Only keys the document actually carries: `apply_payload` and the
         # plan both treat an absent field as "leave it alone", so injecting
         # one here would overwrite a live value with None.

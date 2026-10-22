@@ -18,6 +18,9 @@ A page's identity, in order of trust:
    group, a bundle from another host whose pages were made independently, or a
    page whose original was purged. This is the address the restore is about to
    write to, and overwriting what sits there is what restore has always done.
+   Its content is overwritten, but it keeps its *own* group: the bundle's would
+   regroup it and silently detach the live translations the bundle does not
+   carry. Those stay linked; the bundle's siblings, if any, stay in theirs.
 
 Every bundle page then has a final address, and the one thing that cannot be
 resolved is a page the bundle does *not* claim already sitting at one of them:
@@ -58,6 +61,9 @@ class PageMatch:
     untouched: list[Page] = field(default_factory=list)
     """Live rows nothing in the bundle claims, trashed ones included."""
 
+    by_slug: set[PageKey] = field(default_factory=set)
+    """Bundle keys matched by address, not group: these keep their live group."""
+
     def final_keys(self) -> set[PageKey]:
         """Every ``(locale, slug)`` that will hold a page once the restore lands."""
         return (
@@ -65,6 +71,36 @@ class PageMatch:
             | set(self.creates)
             | {(page.locale, page.slug) for page in self.untouched}
         )
+
+    def writable(self, key: PageKey, payload: dict[str, Any]) -> dict[str, Any]:
+        """The fields of *payload* the restore writes onto *key*'s row.
+
+        A row found by address keeps its own group, so the bundle's is dropped —
+        for the apply and for the plan alike, which must describe the same write.
+        """
+        if key not in self.by_slug:
+            return payload
+        return {k: v for k, v in payload.items() if k != "translation_group"}
+
+    def temp_slugs(self) -> dict[PageKey, str]:
+        """Bundle key → a scratch slug for every row the restore moves.
+
+        Moving rows pass through one so that two pages swapping addresses never
+        collide mid-flush. A bundle's slugs are not held to the slug pattern, so
+        a page may already sit at ``~restoring-<id>``: each scratch slug avoids
+        every address held now and every one the restore hands out.
+        """
+        taken = self.final_keys() | {(p.locale, p.slug) for p in self.rows.values()}
+        temps: dict[PageKey, str] = {}
+        for key in sorted(self.renames):
+            page = self.rows[key]
+            slug, n = f"~restoring-{page.id}", 1
+            while (page.locale, slug) in taken:
+                n += 1
+                slug = f"~restoring-{page.id}-{n}"
+            taken.add((page.locale, slug))
+            temps[key] = slug
+        return temps
 
     def rename_redirects(self) -> dict[PageKey, Page]:
         """``(locale, retired slug)`` → page, for every row the restore moves back.
@@ -123,6 +159,7 @@ def match_pages(bundled: dict[PageKey, dict[str, Any]], pages: Iterable[Page]) -
         page = by_slug.get(key)
         if page is not None and page.id not in claimed:
             match.rows[key] = page
+            match.by_slug.add(key)
             claimed.add(page.id)
         else:
             match.creates.append(key)

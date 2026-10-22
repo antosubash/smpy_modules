@@ -141,8 +141,8 @@ async def build_plan(
 
     for key in sorted(bundled):
         locale, slug = key
-        payload = bundled[key]
         page = match.rows.get(key)
+        payload = match.writable(key, bundled[key])
         entry: dict[str, Any] = {"slug": slug, "locale": locale, "title": payload.get("title")}
         if page is None:
             new.append(entry)
