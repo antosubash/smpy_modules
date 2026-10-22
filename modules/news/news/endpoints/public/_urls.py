@@ -52,23 +52,32 @@ def etag_for(
     return f'W/"{digest}"'
 
 
+def _user_key(user: object) -> str:
+    """A stable token for the signed-in principal, never its raw identifier."""
+    ident = next(
+        (
+            value
+            for attr in ("id", "sub", "email")
+            if (value := getattr(user, attr, None)) not in (None, "")
+        ),
+        None,
+    )
+    raw = str(ident) if ident is not None else repr(user)
+    return "u:" + hashlib.sha1(raw.encode()).hexdigest()[:12]
+
+
 def viewer_key(request: Request) -> str:
     """UI language + who is signed in — never the raw user identifier.
 
     A rendered page carries Inertia's shared props (``auth.user`` among them)
     and chrome in the visitor's language, so both are part of what was served.
+    Pagebuilder's ``public_cache.viewer_key`` is the same function, and
+    ``scripts/tests/test_helper_parity.py`` keeps it so.
     """
     user = getattr(request.state, "user", None)
-    if user is None:
-        who = "anon"
-    else:
-        ident = next(
-            (v for a in ("id", "sub", "email") if (v := getattr(user, a, None)) not in (None, "")),
-            None,
-        )
-        raw = str(ident) if ident is not None else repr(user)
-        who = "u:" + hashlib.sha1(raw.encode()).hexdigest()[:12]
-    return f"{getattr(request.state, 'locale', None) or ''}:{who}"
+    ui_locale = getattr(request.state, "locale", None) or ""
+    who = "anon" if user is None else _user_key(user)
+    return f"{ui_locale}:{who}"
 
 
 def public_base_url(request: Request, settings: NewsSettings) -> str:

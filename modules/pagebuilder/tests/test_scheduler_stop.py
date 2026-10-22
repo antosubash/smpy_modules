@@ -20,6 +20,8 @@ import asyncio
 import logging
 
 import pytest
+from fastapi import FastAPI
+from pagebuilder.module import PagebuilderModule
 from pagebuilder.scheduler import Scheduler
 
 LOGGER = "simple_module.pagebuilder.scheduler"
@@ -79,3 +81,49 @@ class TestStop:
         await scheduler.stop()
 
         assert scheduler._task is None
+
+    async def test_the_task_handle_is_dropped_even_when_the_await_fails(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Otherwise a failed stop leaves a dead task on the object, and a
+        second ``stop`` awaits it again and logs the same traceback twice.
+        Ported from news' suite (#127)."""
+        scheduler = Scheduler()
+        scheduler._task = await _settled(_boom)
+
+        with caplog.at_level(logging.ERROR, logger=LOGGER):
+            await scheduler.stop()
+            await scheduler.stop()
+
+        assert len([r for r in caplog.records if r.name == LOGGER]) == 1
+
+
+async def test_a_failed_teardown_does_not_strand_a_later_module(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The reason the exception is swallowed, against the real module hook.
+
+    Shaped like the host's lifespan teardown — a bare loop over each module's
+    ``on_shutdown`` with no ``try`` of its own — so pagebuilder raising here
+    would leave the neighbour (news' scheduler, say) never cancelled. Ported
+    from news' suite (#127).
+    """
+    app = FastAPI()
+    module = PagebuilderModule()
+    module._scheduler._task = await _settled(_boom)
+    neighbour = asyncio.create_task(_forever())
+
+    async def neighbour_on_shutdown(_: FastAPI) -> None:
+        neighbour.cancel()
+
+    with caplog.at_level(logging.ERROR, logger=LOGGER):
+        for on_shutdown in (module.on_shutdown, neighbour_on_shutdown):
+            await on_shutdown(app)
+
+    # Awaited rather than inspected: ``cancelling()`` is truthy the instant
+    # ``cancel`` is called, so it would pass without the cancellation landing.
+    with pytest.raises(asyncio.CancelledError):
+        await neighbour
+    assert [r.message for r in caplog.records if r.name == LOGGER] == [
+        "pagebuilder.scheduler.stop_failed"
+    ]

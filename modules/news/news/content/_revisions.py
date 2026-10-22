@@ -1,8 +1,8 @@
 """Revision recording, history and restore.
 
-Mixed into :class:`~news.content.ArticlesService`. Split out to keep each file
-inside the repo's 300-line cap; the methods rely on ``self.db`` and
-``self.get_article`` from the composing class.
+Mixed into :class:`~news.content.ArticlesService`. The root of the mixin chain:
+what the chain needs from the composing class is declared by
+:class:`~news.content._host.ArticlesHost`.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from news.content._host import HostBase
 from news.models import NewsArticle, NewsArticleRevision, RevisionEvent
 
 
@@ -29,15 +30,8 @@ async def clear_revisions(db: AsyncSession, article_id: int) -> None:
     )
 
 
-class RevisionsMixin:
+class RevisionsMixin(HostBase):
     """Revision behaviour for :class:`ArticlesService`."""
-
-    db: AsyncSession
-
-    async def get_article(  # pragma: no cover - provided by ArticlesService
-        self, article_id: int, *, include_trashed: bool = False
-    ) -> NewsArticle:
-        raise NotImplementedError
 
     def _record_revision(
         self,

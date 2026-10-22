@@ -1,8 +1,8 @@
 """Status transitions: publish, unpublish, schedule, submit, approve, reject.
 
-Mixed into :class:`~pagebuilder.service.PagesService`. Split out to keep each
-file focused; the methods are unchanged and still rely on ``self.db``,
-``self.get_page``, and ``self._record_revision`` from the composing class.
+Mixed into :class:`~pagebuilder.service.PagesService`. What it needs from the
+composing class is declared by :class:`~pagebuilder.service._host.PagesHost`;
+``_record_revision`` comes from :class:`RevisionsMixin`, which it extends.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from functools import partial
 
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.models import Page, PageStatus, RevisionEvent
 from pagebuilder.service._claims import claim, due_candidates, release, retire_missed_windows
@@ -24,8 +23,6 @@ logger = logging.getLogger(__name__)
 
 class WorkflowMixin(RevisionsMixin):
     """Status-transition behaviour for :class:`PagesService`."""
-
-    db: AsyncSession
 
     async def publish(
         self, page_id: int, note: str | None = None, *, now: datetime | None = None
