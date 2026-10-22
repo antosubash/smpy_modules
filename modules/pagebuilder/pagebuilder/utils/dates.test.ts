@@ -23,3 +23,11 @@ describe('formatTimestamp', () => {
     expect(formatTimestamp('nope', 'de')).toBe('');
   });
 });
+
+describe('formatTimestamp — a zone-less timestamp is UTC', () => {
+  it('reads a server timestamp without a Z as UTC, not local time', () => {
+    const utc = { timeZone: 'UTC' } as const;
+    expect(formatTimestamp('2026-10-22T08:33:14.174220', 'de', utc)).toBe('22.10.2026, 08:33:14');
+    expect(formatTimestamp('2026-10-22T08:33:14+02:00', 'de', utc)).toBe('22.10.2026, 06:33:14');
+  });
+});

@@ -93,9 +93,12 @@ export function formatArticleDate(iso: string | null, locale: string | undefined
   });
 }
 
-/** A moment (a revision's `created_at`) as date and time, in `locale`. */
+/** A moment (a revision's `created_at`) as date and time, in `locale`. A
+ *  zone-less value is UTC — the server's, sent without a `Z` by a plain
+ *  `datetime` schema — not the viewer's local time. */
 export function formatTimestamp(iso: string, locale: string | undefined): string {
-  const date = new Date(iso);
+  const naive = /T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(iso);
+  const date = new Date(naive ? `${iso}Z` : iso);
   if (Number.isNaN(date.getTime())) return iso;
   return new Intl.DateTimeFormat(intlLocale(locale), {
     dateStyle: 'medium',

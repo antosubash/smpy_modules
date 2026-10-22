@@ -25,3 +25,11 @@ describe('the date helpers never throw on a bad locale', () => {
     expect(formatArticleDate('2026-09-21T00:00:00Z', 'de-AT')).toBe('21. Sep. 2026');
   });
 });
+
+describe('formatTimestamp — a zone-less timestamp is UTC', () => {
+  it('matches the same instant written with a Z', () => {
+    expect(formatTimestamp('2026-10-22T08:33:14.174220', 'de')).toBe(
+      formatTimestamp('2026-10-22T08:33:14.174220Z', 'de'),
+    );
+  });
+});
