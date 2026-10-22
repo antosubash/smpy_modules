@@ -5,13 +5,14 @@ An entry in a ``differ`` or ``own`` map is a decision, so each one says why.
 Adding one to get a red build green is the drift this file exists to catch —
 the fix is usually to change the lagging copy instead.
 
-Not here yet: tenancy binding (``{pagebuilder,news,records}/tenancy.py``),
-which is being rewritten as this lands; it gets a family once that settles.
+The tenancy families (``{pagebuilder,news,records}/tenancy.py`` and
+``_tenancy_mode.py``) live in ``parity_tenancy.py`` and are appended below.
 """
 
 from __future__ import annotations
 
 from parity_support import Copy, Family
+from parity_tenancy import TENANCY_FAMILIES
 
 PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
@@ -197,8 +198,8 @@ FAMILIES: tuple[Family, ...] = (
                 messages=("news.scheduler.stop_failed",),
             ),
         ),
-        # `_run` and `_due_tenants` are the per-tenant tick, left for the
-        # tenancy family (see the module docstring).
+        # `_run` and `_due_tenants` are the per-tenant tick: each queries its
+        # own table and shapes the tick differently, so they are not compared.
         shared=("Scheduler.__init__", "Scheduler.start", "Scheduler.stop"),
     ),
     Family(
@@ -225,4 +226,5 @@ FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_shared", "_pg", "arm_reset", "USING_POSTGRES"),
     ),
+    *TENANCY_FAMILIES,
 )

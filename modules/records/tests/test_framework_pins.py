@@ -1,15 +1,16 @@
 """Pins on the framework internals records reads (#125).
 
-The module range admits any 0.0.x framework, but three call sites read names
+The module range admits any 0.0.x framework, but two call sites read names
 the framework does not promise to keep. Each test here fails, with a message
 naming the call site, the moment one of them changes — in CI on the
 framework bump, not in production.
 
 * ``sm_records/_tenancy_mode.py`` — ``TenantMiddleware``, its ``fixed`` /
-  ``header`` keywords, Starlette's ``user_middleware`` entry shape. Public
-  replacement (0.0.36+): ``simple_module_hosting.tenancy``.
-* ``sm_records/menu.py`` (``sync_type_menu``) — ``MenuRegistry._items`` and
-  ``_invalidate()``. Public replacement (core 0.0.36+): ``MenuRegistry.remove``.
+  ``header`` keywords, Starlette's ``user_middleware`` entry shape. Since the
+  0.0.36 floor (#211) the framework's public ``tenancy_mode`` and
+  ``single_tenant_id`` come first; the stack stays the fallback for an app
+  built outside ``create_app`` and the source of the tenant header, which
+  has no public replacement yet.
 * ``sm_records/endpoints/api/_errors.py`` —
   ``simple_module_hosting._error_handlers.render_error_page``. No public
   replacement yet.
@@ -108,28 +109,47 @@ def test_an_unreadable_stack_refuses_to_guess():
 
 
 def test_the_frameworks_own_multi_wins():
-    pytest.importorskip("simple_module_hosting.tenancy")
     app = FastAPI()  # no TenantMiddleware at all
     app.state.sm = SimpleNamespace(tenancy="multi")
     assert tenancy.detect_mode(app) is TenancyMode.MULTI
 
 
+def _create_app_host(default_tenant_id):
+    app = FastAPI()
+    app.state.sm = SimpleNamespace(
+        tenancy="single", db=SimpleNamespace(default_tenant_id=default_tenant_id)
+    )
+    setattr(app.state, constants.PACKAGE, SimpleNamespace(tenancy=None))
+    return app
+
+
+def test_a_create_app_hosts_pinned_tenant_is_the_frameworks_answer():
+    """``single_tenant_id``, not the stack: no ``TenantMiddleware`` here."""
+    assert tenancy.configure(_create_app_host(None)) is TenancyMode.SINGLE
+    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+        tenancy.configure(_create_app_host("acme"))
+
+
+def test_an_explicit_fixed_pin_must_agree_with_the_frameworks_answer():
+    """``single_tenant_id`` says ``"default"`` but the stack pins ``"acme"``:
+    requests would follow the middleware and background work the framework,
+    so startup refuses the split (#212)."""
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    split = _create_app_host(None)
+    split.add_middleware(TenantMiddleware, fixed="acme")
+    with pytest.raises(RuntimeError, match=r"TenantMiddleware\(fixed='acme'\)") as refused:
+        tenancy.configure(split)
+    assert "default_tenant=" not in str(refused.value)  # the framework's pin is fine
+    agreeing = _create_app_host(None)
+    agreeing.add_middleware(TenantMiddleware, fixed="default")
+    assert tenancy.configure(agreeing) is TenancyMode.SINGLE
+
+
 # --- menu registry ------------------------------------------------------------
 
 
-def test_menu_registry_keeps_items_list_and_invalidate():
-    registry = MenuRegistry()
-    assert isinstance(getattr(registry, "_items", None), list), (
-        f"{_MENU}: MenuRegistry._items is gone or no longer a list; the splice "
-        "that removes stale per-type entries writes it in place"
-    )
-    assert callable(getattr(registry, "_invalidate", None)), (
-        f"{_MENU}: MenuRegistry._invalidate() is gone; without it all_items "
-        "keeps serving the sorted cache from before the splice"
-    )
-
-
-def test_the_splice_reaches_all_items():
+def test_remove_reaches_all_items():
     """Behaviour, not just names: a removed entry leaves the *sorted* view."""
     registry = MenuRegistry()
     hub = MenuItem(label="Hub", url="/hub", order=1, section=MenuSection.ADMIN_SIDEBAR)
@@ -137,9 +157,7 @@ def test_the_splice_reaches_all_items():
     [ours] = menu.sync_type_menu(registry, [menu.MenuType("a", "As", None, [])])
     assert ours in registry.all_items  # warms the sorted cache
     menu.sync_type_menu(registry, [], previous=[ours])
-    assert registry.all_items == [hub], (
-        f"{_MENU}: removing through _items/_invalidate no longer changes all_items"
-    )
+    assert registry.all_items == [hub], f"{_MENU}: MenuRegistry.remove no longer changes all_items"
 
 
 # --- error page ---------------------------------------------------------------

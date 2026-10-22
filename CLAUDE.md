@@ -12,7 +12,7 @@ development app that mounts them; it is never published.
 ## Rules that are easy to get wrong
 
 **Pin policy differs by role.** Published modules depend on the framework with
-*ranges* (`simple_module_core>=0.0.35,<0.1`). The host pins *exactly*
+*ranges* (`simple_module_core>=0.0.36,<0.1`). The host pins *exactly*
 (`simple_module_hosting==0.0.36`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 `scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any

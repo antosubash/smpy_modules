@@ -1,7 +1,7 @@
 # Nightly: every module's tests against the newest framework its ranges allow.
 #
 # Published modules depend on the framework by range
-# (`simple_module_core>=0.0.35,<0.1`), but the host pins it exactly, so ci.yml
+# (`simple_module_core>=0.0.36,<0.1`), but the host pins it exactly, so ci.yml
 # only ever resolves one point of that range. A user installing a module gets
 # the newest build in range instead — and several modules reach into framework
 # internals a patch release may rename (#116, #125). This job relaxes the

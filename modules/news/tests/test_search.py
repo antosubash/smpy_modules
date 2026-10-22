@@ -17,6 +17,7 @@ import pytest
 from factories import make_article
 from news import search_service, tag_service
 from news.integrations import pagebuilder as pb
+from simple_module_db import tenant_context
 
 pytestmark = pytest.mark.asyncio
 
@@ -274,27 +275,15 @@ class TestItAgreesWithTheArticleList:
 @requires_pagebuilder
 @pytest.mark.unbound_tenant
 async def test_another_tenants_page_is_not_searched(db) -> None:
-    """With no tenant bound, pagebuilder's tables are not filtered at all; the
-    search pins itself to the default tenant rather than listing every one."""
+    """A single-tenant request binds the default tenant, under which
+    pagebuilder's tables are not filtered at all; the search pins itself to it
+    rather than listing every one. Nothing bound is refused —
+    ``test_search_tenancy`` (#210)."""
     await _page(db, "ours-zircon", title="Zircon ours")
     await _page(db, "theirs-zircon", title="Zircon theirs", tenant="other")
 
-    hits, total = await pb.search_pages(db, "%zircon%", include_drafts=True, limit=10)
+    with tenant_context("default"):
+        hits, total = await pb.search_pages(db, "%zircon%", include_drafts=True, limit=10)
 
     assert [p.title for p in hits] == ["Zircon ours"]
     assert total == 1
-
-
-@requires_pagebuilder
-@pytest.mark.unbound_tenant
-async def test_a_strict_session_with_no_tenant_finds_nothing(db, db_state) -> None:
-    """Multi-tenant hosts are strict: no tenant bound must not mean "default"."""
-    await _page(db, "ours-quartz", title="Quartz ours")
-    db_state.tenant_strict = True
-    try:
-        hits, total = await pb.search_pages(db, "%quartz%", include_drafts=True, limit=10)
-    finally:
-        db_state.tenant_strict = False
-
-    assert hits == []
-    assert total == 0
