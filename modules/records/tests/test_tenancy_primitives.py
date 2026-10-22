@@ -164,7 +164,7 @@ def test_a_host_pinned_to_default_is_single_and_any_other_pin_is_refused():
     elsewhere = FastAPI()
     elsewhere.add_middleware(TenantMiddleware, fixed="acme")
     setattr(elsewhere.state, constants.PACKAGE, SimpleNamespace(tenancy=None))
-    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+    with pytest.raises(RuntimeError, match=r"TenantMiddleware\(fixed='acme'\)"):
         configure(elsewhere)
 
 

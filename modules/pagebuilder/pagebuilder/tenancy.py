@@ -36,6 +36,7 @@ from typing import Any, Final
 
 from fastapi import HTTPException, Request
 from simple_module_db import tenant_context
+from simple_module_hosting.tenancy import tenant_vary as recorded_vary
 
 from pagebuilder._tenancy_mode import (  # noqa: F401 - tests read the private names here
     _KNOWN_KWARGS,
@@ -49,6 +50,7 @@ from pagebuilder._tenancy_mode import (  # noqa: F401 - tests read the private n
     _warn_if_unrecognised,
     detect_mode,
     request_mode,
+    stray_pins,
     upstream_tenant,
 )
 
@@ -87,12 +89,13 @@ def configure(app: Any) -> TenancyMode:
     under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
     pagebuilder's data would sit in another.
     """
-    fixed = _fixed_tenant(_tenant_middleware(app))
-    if fixed is not None and fixed != DEFAULT_TENANT:
+    stray = stray_pins(app)
+    if stray is not None:
         raise RuntimeError(
-            f"pagebuilder: the host pins every request to default_tenant={fixed!r}, but "
+            f"pagebuilder: the host pins every request to {stray}, but "
             f"pagebuilder runs a single-tenant host in {DEFAULT_TENANT!r}. Unset "
-            f"default_tenant, set it to {DEFAULT_TENANT!r}, or turn multi_tenant on"
+            f"default_tenant and any TenantMiddleware(fixed=...), set them to "
+            f"{DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)
     _warn_if_unrecognised(app)
@@ -133,15 +136,15 @@ def request_vary(request: Any) -> tuple[str, ...]:
 
     A tenant upstream chose, or a request-level ``MULTI``, varies like
     ``MULTI`` even on an app detected ``SINGLE`` (a child mounted under a
-    multi-tenant parent), plus whatever headers the framework recorded on
-    ``request.state.tenant_vary`` as having picked it.
+    multi-tenant parent), plus whatever headers the framework recorded as
+    having picked it (its public ``tenant_vary``).
     """
     app = request.app
     tenant = upstream_tenant(request)
     single = request_mode(request, mode_of(app)) is TenancyMode.SINGLE
     if single and tenant in (None, DEFAULT_TENANT):
         return ()
-    recorded = tuple(getattr(request.state, "tenant_vary", ()) or ())
+    recorded = recorded_vary(request)
     return tuple(dict.fromkeys(_multi_vary(app) + recorded))
 
 

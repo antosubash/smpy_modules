@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Final
 
+from simple_module_hosting.tenancy import single_tenant_id, tenancy_mode
+
 from sm_records import constants
 
 __all__ = [
@@ -104,18 +106,14 @@ def _opaque_middleware(app: Any) -> bool:
 
 
 def _framework_mode(app: Any) -> TenancyMode | None:
-    """The framework's own public answer (0.0.36+), or ``None`` without one.
+    """The framework's own public answer (``simple_module_hosting.tenancy``),
+    or ``None`` without one.
 
     ``tenancy_mode`` says ``SINGLE`` for any app built outside ``create_app``,
     so its ``SINGLE`` is an answer only on an app ``create_app`` built — one
-    carrying ``state.sm``. On 0.0.35, which lacks it, there is none:
-    ``state.sm`` alone is not taken as ``SINGLE``, so a child mounted under a
-    foreign parent there fails closed rather than binding the default.
+    carrying ``state.sm``. An app without it (a child mounted under a foreign
+    parent, a bare test app) has no answer, and the stack reading decides.
     """
-    try:
-        from simple_module_hosting.tenancy import tenancy_mode
-    except ImportError:
-        return None
     if str(tenancy_mode(app)) == TenancyMode.MULTI:
         return TenancyMode.MULTI
     return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
@@ -144,6 +142,45 @@ def scope_mode(app: Any, scope: Mapping[str, Any], stored: TenancyMode) -> Tenan
 def request_mode(request: Any, stored: TenancyMode) -> TenancyMode:
     """:func:`scope_mode` for a ``Request``."""
     return scope_mode(request.app, getattr(request, "scope", None) or {}, stored)
+
+
+def pinned_tenants(app: Any) -> dict[str, str]:
+    """Every tenant the host pins its requests to, keyed by where the pin is.
+
+    Both sources count (#212): a ``create_app`` host's public
+    ``single_tenant_id`` (its ``default_tenant``, else ``"default"``) under
+    ``"default_tenant"``, and an explicit ``TenantMiddleware(fixed=...)`` under
+    ``"fixed"``. Requests follow the middleware and background work the
+    framework's answer, so ``configure`` refuses any pin other than
+    ``DEFAULT_TENANT`` — and with it two that disagree — rather than let the
+    two drift apart.
+    """
+    pins = (
+        {"default_tenant": single_tenant_id(app)}
+        if _framework_mode(app) is TenancyMode.SINGLE
+        else {}
+    )
+    fixed = _fixed_tenant(_tenant_middleware(app))
+    if fixed is not None:
+        pins["fixed"] = fixed
+    return pins
+
+
+_PIN_SHOWN: Final = {
+    "default_tenant": "default_tenant={!r}",
+    "fixed": "TenantMiddleware(fixed={!r})",
+}
+
+
+def stray_pins(app: Any) -> str | None:
+    """The host's pins to a tenant other than ``DEFAULT_TENANT``, each named
+    by where it is set, or ``None`` when there are none."""
+    stray = [
+        _PIN_SHOWN[source].format(tenant)
+        for source, tenant in pinned_tenants(app).items()
+        if tenant != DEFAULT_TENANT
+    ]
+    return " and ".join(stray) or None
 
 
 def detect_mode(app: Any) -> TenancyMode:
@@ -205,11 +242,12 @@ def configure(app: Any) -> TenancyMode:
     run in :data:`DEFAULT_TENANT`, where the migration put existing rows, so
     the framework would bind one tenant and records another.
     """
-    fixed = _fixed_tenant(_tenant_middleware(app))
-    if fixed is not None and fixed != DEFAULT_TENANT:
+    stray = stray_pins(app)
+    if stray is not None:
         raise RuntimeError(
-            f"records: the host pins every request to default_tenant={fixed!r}, but records "
-            f"runs a single-tenant host in {DEFAULT_TENANT!r}. Unset default_tenant, set it "
+            f"records: the host pins every request to {stray}, but records "
+            f"runs a single-tenant host in {DEFAULT_TENANT!r}. Unset default_tenant and any "
+            f"TenantMiddleware(fixed=...), set them "
             f"to {DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)
