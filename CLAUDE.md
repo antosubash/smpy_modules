@@ -122,7 +122,12 @@ the root `.env` is the single source of truth for settings regardless of the
 command.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
-`scripts/check_file_size.py`. Nothing under `modules/` is exempt.
+`scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
+also lists files at 280+ lines as a WARNING: when you touch one, split it by
+responsibility rather than trimming comments until it fits (#133). A mixin
+split out of a service declares what it needs from the composing class as a
+`Protocol` (`pagebuilder/service/_host.py`, `news/content/_host.py`) — add a
+member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 
 ## Local database
 
