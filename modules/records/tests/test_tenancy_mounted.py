@@ -133,6 +133,19 @@ async def test_a_mounted_childs_sidebar_shows_no_default_tenant_types(db_state):
     assert module._type_menu_items == []
 
 
+@pytest.mark.unbound_tenant
+def test_a_mounted_childs_default_tenant_answer_is_never_shared():
+    """The parent may have a tenant called ``default``: a mounted child's
+    answer for it is private, not one shared cache entry for every tenant."""
+    from sm_records.endpoints.api._public_cache import _tenancy
+
+    request = _request(FastAPI(), {"app_root_path": "", "root_path": "/child"})
+    request.state.tenant_id = "default"
+    assert _tenancy(request) == (None, True)
+    request.scope = {}  # served directly: the single-tenant host's shared answer
+    assert _tenancy(request) == (None, False)
+
+
 async def test_an_unmounted_single_tenant_sidebar_keeps_its_types(db_state):
     module = await _synced_module(db_state)
     assert await _labels(_sidebar_app(module), "/admin/records/") == [
