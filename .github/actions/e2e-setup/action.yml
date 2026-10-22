@@ -101,4 +101,5 @@ runs:
       shell: bash
       env:
         CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
+        E2E_FORCE_APT: ${{ github.job == 'e2e' && '1' || 'fallback' }}
       run: timeout -k 30s 20m bash "$GITHUB_ACTION_PATH/install-browsers.sh"
