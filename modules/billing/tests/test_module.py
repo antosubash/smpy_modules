@@ -14,9 +14,15 @@ def test_settings_ignore_environment(monkeypatch):
     assert BillingSettings().provider == c.PROVIDER_MANUAL
 
 
-def test_provider_requires_restart():
-    extra = BillingSettings.model_fields["provider"].json_schema_extra
-    assert extra["requires_restart"] is True
+def test_live_fields_do_not_claim_a_restart():
+    # Both are rebuilt on SettingsReloaded (#85), so the Settings screen must
+    # not tell the admin to restart.
+    for name in ("provider", "reconcile_interval_minutes"):
+        extra = BillingSettings.model_fields[name].json_schema_extra
+        assert "requires_restart" not in extra
+    assert BillingSettings.model_fields["provider"].json_schema_extra["choices"] == list(
+        c.PROVIDERS
+    )
 
 
 def _role_perms(role: str) -> set[str]:

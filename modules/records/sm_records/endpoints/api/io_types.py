@@ -33,7 +33,7 @@ from sm_records.endpoints.api._responses import IMPORT, responses
 from sm_records.endpoints.api.types import _check_roles_for_discard, apply_update, create_from
 from sm_records.models import RecordType
 from sm_records.services import types as type_service
-from sm_records.services.errors import ValidationFailed
+from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*IMPORT))
@@ -78,16 +78,21 @@ def _update_changes(request: Request, rtype: RecordType, body: TypeImportRequest
     ``key`` is dropped rather than refused: it is the path here — it is what
     resolved ``rtype`` three lines up — so it cannot disagree with itself.
 
-    ``collection`` stays in the change set and is handled by ``update_type``'s
-    own ``_check_collection_unchanged``: an echo of the stored value is
-    dropped, a *different* one is the 409 ``PUT /types/{key}`` gives. A
-    collection is assigned at creation and never after, and a file must not be
-    able to ask for a move silently.
+    ``collection``: an echo of the stored value stays in the change set,
+    where ``update_type`` drops it; a *different* one is a 409 here. ``PUT
+    /types/{key}`` moves a type between collections (#82), copying every
+    record into other tables — and a file must not be able to ask for that
+    as a side effect of "import this definition". A move is its own request.
     """
     changes = body.model_dump(
         exclude_unset=True,
         exclude={"mode", "expected_version", "force", "orphaned", "key"},
     )
+    if changes.get("collection", rtype.collection) != rtype.collection:
+        raise Conflict(
+            "a type import does not move a type between collections; "
+            f"send the change with PUT /api/records/types/{rtype.key}"
+        )
     sent_roles = changes.get("allowed_roles")
     if sent_roles is not None and sorted(sent_roles) != sorted(rtype.allowed_roles or []):
         check_type_roles(request, rtype)

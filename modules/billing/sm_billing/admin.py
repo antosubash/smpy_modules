@@ -15,7 +15,6 @@ from sm_billing.errors import BillingError
 from sm_billing.lifecycle import apply_lifecycle, tenant_service
 from sm_billing.models import Plan, Subscription, WebhookEvent
 from sm_billing.plans import PlanService
-from sm_billing.providers.factory import install_provider
 from sm_billing.resolve import subscription_for
 from sm_billing.schemas import (
     ConnectionIn,
@@ -249,12 +248,6 @@ async def save_connection(db: AsyncSession, app: FastAPI, data: ConnectionIn) ->
     await apply_changes_and_reload(
         app, app.state.sm.event_bus, store, package=c.PACKAGE, changes=connection_changes(data)
     )
-    # New secrets take effect now; switching provider itself still needs a
-    # restart. A stripe that fell back to manual at startup (secrets missing)
-    # is still the chosen provider, so its new secrets apply too.
-    services = _services(app)
-    running = services.provider.name if services.provider else ""
-    chosen = services.settings.provider
-    if chosen == running or (chosen == c.PROVIDER_STRIPE and services.provider_error):
-        install_provider(services)
+    # The reload published ``SettingsReloaded``; ``sm_billing.live`` has rebuilt
+    # the provider (and the reconcile loop) from the new secrets by now.
     return connection_out(app)

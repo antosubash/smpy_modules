@@ -1,12 +1,11 @@
-"""Assigning a type to a collection: at creation, and never after — §6.2.
+"""Assigning a type to a collection: at creation, or by a move (#82).
 
 Three rules, all of them HTTP-visible:
 
 * ``POST /types`` takes ``collection`` and validates it against what the host
   declared (422 naming the declared set).
-* ``PUT /types/{key}`` refuses to change it — a 409 carrying the sentence
-  §6.2 writes, because the operation is coherent and this module will not do
-  it, which is not the same thing as a malformed request.
+* ``PUT /types/{key}`` with a changed value *moves* the type and its
+  records (#82, ``test_collections_move.py``); an echo is a no-op.
 * ``TypeRead.collection`` carries it back, and the type-editor view carries
   the declared set so the "new type" form can offer it.
 """
@@ -56,35 +55,35 @@ async def test_an_undeclared_collection_is_refused_and_names_what_is_declared(cl
         assert name in detail
 
 
-async def test_changing_a_types_collection_is_refused_with_the_designs_sentence(client, field_def):
+async def test_changing_a_types_collection_moves_it(client, field_def):
+    """#82: a changed ``collection`` is a move, not a 409 — the records go
+    with it (``test_collections_move.py`` covers what moves)."""
     rtype = await seed_type(
         client.db_state, "gig", [field_def("name", "text")], collection="events"
     )
-    refused = await client.put(
+    await seed_collection_record(client.db_state, rtype, {"name": "One"})
+    moved = await client.put(
         f"/api/records/types/{rtype.key}",
         json={"expected_version": rtype.version, "collection": "archive"},
         headers=roles(ADMIN),
     )
-    assert refused.status_code == 409
-    assert refused.json()["detail"] == (
-        "moving a populated type between collections is not supported"
-    )
-    read = await client.get("/api/records/types/gig", headers=roles(ADMIN))
-    assert read.json()["collection"] == "events"
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["collection"] == "archive"
+    assert moved.json()["record_count"] == 1
 
 
-async def test_moving_a_type_out_of_a_collection_is_refused_too(client, field_def):
-    """``null`` is a value like any other here — it names the shared tables,
-    and moving *to* them is the same data migration in the other direction."""
+async def test_moving_a_type_out_of_a_collection_works_too(client, field_def):
+    """``null`` is a value like any other here — it names the shared tables."""
     rtype = await seed_type(
         client.db_state, "gig", [field_def("name", "text")], collection="events"
     )
-    refused = await client.put(
+    moved = await client.put(
         f"/api/records/types/{rtype.key}",
         json={"expected_version": rtype.version, "collection": None},
         headers=roles(ADMIN),
     )
-    assert refused.status_code == 409
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["collection"] is None
 
 
 async def test_echoing_the_current_collection_back_is_accepted(client, field_def):
