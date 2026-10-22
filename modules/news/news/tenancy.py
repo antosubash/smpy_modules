@@ -31,7 +31,7 @@ its own ``tenant_id`` predicate (there are none today).
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
@@ -61,6 +61,7 @@ __all__ = [
     "configure",
     "detect_mode",
     "mode_of",
+    "request_vary",
     "resolve_admin",
     "resolve_public",
     "search_tenant",
@@ -126,20 +127,61 @@ def tenant_vary(app: Any) -> tuple[str, ...]:
     same Host + URL answers with different tenants' content and a shared
     cache has to key on them too.
     """
-    if mode_of(app) is TenancyMode.SINGLE:
-        return ()
-    header = (_kwargs(_tenant_middleware(app)) or {}).get("header")
+    return () if mode_of(app) is TenancyMode.SINGLE else _multi_vary(app)
+
+
+def _multi_vary(app: Any) -> tuple[str, ...]:
+    """``Cookie``, plus the tenant header read straight off the entry's
+    keywords — not through :func:`_kwargs`, whose ``None`` for an unknown
+    keyword would drop the header and fail the cache key open."""
+    kwargs = getattr(_tenant_middleware(app), "kwargs", None)
+    header = kwargs.get("header") if isinstance(kwargs, Mapping) else None
     return ("Cookie", header) if header else ("Cookie",)
 
 
-def vary_on_tenant(response: Any, app: Any) -> Any:
-    """Append :func:`tenant_vary` to *response*'s ``Vary``; a no-op in SINGLE."""
+def request_vary(request: Any) -> tuple[str, ...]:
+    """:func:`tenant_vary` for one request, following the resolvers (#192).
+
+    A tenant upstream chose, or a request-level ``MULTI``, varies like
+    ``MULTI`` even on an app detected ``SINGLE`` (a child mounted under a
+    multi-tenant parent), plus whatever headers the framework recorded on
+    ``request.state.tenant_vary`` as having picked it.
+    """
+    app = request.app
+    tenant = upstream_tenant(request)
+    single = request_mode(request, mode_of(app)) is TenancyMode.SINGLE
+    if single and tenant in (None, DEFAULT_TENANT):
+        return ()
+    recorded = tuple(getattr(request.state, "tenant_vary", ()) or ())
+    return tuple(dict.fromkeys(_multi_vary(app) + recorded))
+
+
+def vary_on_tenant(response: Any, request: Any) -> Any:
+    """Append :func:`request_vary` to *response*'s ``Vary``; a no-op for a
+    single-tenant host serving its default tenant.
+
+    An app detected ``SINGLE`` that serves another tenant has no cache key it
+    can trust — the parent's resolver is invisible from here — so the
+    response is also marked ``private``, out of every shared cache.
+    """
     listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
     seen = {f.lower() for f in listed}
-    added = [f for f in tenant_vary(app) if f.lower() not in seen]
+    added = [f for f in request_vary(request) if f.lower() not in seen]
     if added:
         response.headers["Vary"] = ", ".join(listed + added)
+    tenant = upstream_tenant(request)
+    if mode_of(request.app) is TenancyMode.SINGLE and tenant not in (None, DEFAULT_TENANT):
+        _make_private(response)
     return response
+
+
+def _make_private(response: Any) -> None:
+    kept = [
+        d.strip()
+        for d in response.headers.get("cache-control", "").split(",")
+        if d.strip() and d.strip().split("=")[0].lower() not in ("public", "private", "s-maxage")
+    ]
+    response.headers["Cache-Control"] = ", ".join(["private", *kept])
 
 
 def mode_of(app: Any) -> TenancyMode:

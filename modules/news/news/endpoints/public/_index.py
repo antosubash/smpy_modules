@@ -129,7 +129,7 @@ def index_router(locale: str) -> APIRouter:
             if request.url.query:
                 target = f"{target}?{request.url.query}"
             return tenancy.vary_on_tenant(
-                RedirectResponse(target, status_code=301), request.app
+                RedirectResponse(target, status_code=301), request
             )
         return await render_archive(
             request=request,

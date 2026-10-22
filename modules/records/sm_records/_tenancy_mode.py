@@ -138,8 +138,10 @@ def _warn_if_unrecognised(app: Any) -> None:
 def tenant_header(app: Any) -> str | None:
     """The header that middleware resolves a tenant from — its own ``header``
     argument, as the host passed it — or ``None`` (single mode, or no header)."""
-    entry = _tenant_middleware(app)
-    header = (_kwargs(entry) or {}).get("header") if entry else None
+    # Straight off the keywords, not through ``_kwargs``: its ``None`` for an
+    # unknown keyword would drop the header and fail the cache key open.
+    kwargs = getattr(_tenant_middleware(app), "kwargs", None)
+    header = kwargs.get("header") if isinstance(kwargs, Mapping) else None
     return header or None
 
 

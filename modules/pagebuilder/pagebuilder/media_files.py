@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import PlainTextResponse, Response
 from starlette.types import Scope
 
+from pagebuilder._tenancy_mode import scope_mode
 from pagebuilder.tenancy import DEFAULT_TENANT, TenancyMode, mode_of
 
 if TYPE_CHECKING:
@@ -144,32 +145,35 @@ def adopt_legacy_files(
     return moved
 
 
-def _serving_tenant(scope: Scope) -> str | None:
+def _serving_tenant(scope: Scope, own_prefix: str = "") -> str | None:
     """The tenant whose directory this request may read.
 
     ``StaticFiles`` is a bare ASGI mount, so no router dependency binds a
     tenant: the tenant comes off the context var that ``TenantMiddleware``
     binds around the whole stack (or ``state.tenant_id``), and only with none
-    does a single-tenant app's mode supply the default (#192).
+    does a single-tenant app's mode supply the default (#192). *own_prefix* is
+    this mount's own path, which does not make the app "mounted". No app at
+    all is no answer, so no tenant.
     """
     state = scope.get("state") or {}
     for tenant in (state.get("tenant_id"), current_tenant_id.get()):
         if is_valid_tenant_id(tenant):
             return tenant
     app = scope.get("app")
-    if app is None or mode_of(app) is TenancyMode.SINGLE:
-        return DEFAULT_TENANT
-    return None
+    if app is None:
+        return None
+    mode = scope_mode(app, scope, mode_of(app), own_prefix)
+    return DEFAULT_TENANT if mode is TenancyMode.SINGLE else None
 
 
-def _tenant_path(path: str, scope: Scope) -> str | None:
+def _tenant_path(path: str, scope: Scope, own_prefix: str = "") -> str | None:
     """*path* rewritten into the serving tenant's directory, or ``None`` (404).
 
     ``<tenant>/<file>`` is served only for the request's own tenant, so tenant
     A's host never serves tenant B's files. A bare ``<file>`` is a URL stored
     before #38 and is served from the request's tenant's directory.
     """
-    tenant = _serving_tenant(scope)
+    tenant = _serving_tenant(scope, own_prefix)
     parts = [p for p in path.replace(os.sep, "/").split("/") if p not in ("", ".")]
     if tenant is None:
         return None
@@ -193,8 +197,14 @@ class MediaFiles(StaticFiles):
 
     _CACHE_CONTROL = "public, max-age=31536000, immutable"
 
+    def _own_prefix(self, scope: Scope) -> str:
+        """The path the serving app mounted this at — that mount is not a
+        parent's; not found, ``""``, so any mount counts (fails closed)."""
+        routes = getattr(scope.get("app"), "routes", None) or ()
+        return next((r.path for r in routes if getattr(r, "app", None) is self), "")
+
     async def get_response(self, path: str, scope: Scope) -> Response:
-        scoped = _tenant_path(path, scope)
+        scoped = _tenant_path(path, scope, self._own_prefix(scope))
         if scoped is None:
             return PlainTextResponse("Not Found", status_code=404)
         try:

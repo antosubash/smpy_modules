@@ -100,19 +100,23 @@ def _fixed_tenant(entry: Any) -> str | None:
 
 
 def _framework_mode(app: Any) -> TenancyMode | None:
-    """The framework's own public answer (0.0.36+), or ``None`` without one.
+    """The framework's own answer for *app*, or ``None`` without one.
 
-    ``tenancy_mode`` says ``SINGLE`` for any app built outside ``create_app``,
-    so its ``SINGLE`` is an answer only on an app ``create_app`` built — one
-    carrying ``state.sm``. On 0.0.35, which lacks it, there is none.
+    ``tenancy_mode`` (0.0.36+) says ``SINGLE`` for any app built outside
+    ``create_app``, so its ``SINGLE`` is an answer only on an app
+    ``create_app`` built — one carrying ``state.sm``. On 0.0.35, which lacks
+    it, ``state.sm`` alone is the answer ``SINGLE``: a multi-tenant
+    ``create_app`` stack carries a visible ``TenantMiddleware``, which
+    :func:`detect_mode` reads first.
     """
+    built = getattr(app.state, "sm", None) is not None
     try:
         from simple_module_hosting.tenancy import tenancy_mode
     except ImportError:
-        return None
+        return TenancyMode.SINGLE if built else None
     if str(tenancy_mode(app)) == TenancyMode.MULTI:
         return TenancyMode.MULTI
-    return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
+    return TenancyMode.SINGLE if built else None
 
 
 def detect_mode(app: Any) -> TenancyMode:
@@ -164,22 +168,30 @@ def upstream_tenant(request: Any) -> str | None:
     return bound if is_valid_tenant_id(bound) else None
 
 
-def mounted(scope: Mapping[str, Any]) -> bool:
+def mounted(scope: Mapping[str, Any], own_prefix: str = "") -> bool:
     """Whether this request reached the app through a parent's ``Mount``.
 
     Starlette's ``Mount`` keeps the outermost ``root_path`` as
     ``app_root_path`` and extends ``root_path``; a proxy's ``--root-path``
-    alone sets no ``app_root_path``.
+    alone sets no ``app_root_path``. *own_prefix* is a mount the app itself
+    made (pagebuilder's media), which does not count.
     """
-    root = scope.get("root_path", "")
-    return root != scope.get("app_root_path", root)
+    outer = scope.get("app_root_path")
+    if outer is None:
+        return False
+    return scope.get("root_path", "") != outer + own_prefix.rstrip("/")
 
 
-def request_mode(request: Any, stored: TenancyMode) -> TenancyMode:
+def scope_mode(
+    app: Any, scope: Mapping[str, Any], stored: TenancyMode, own_prefix: str = ""
+) -> TenancyMode:
     """*stored* (the app's mode), unless it says ``SINGLE`` for a mounted app
     the framework has no answer for — the parent may well be multi-tenant,
     and nothing visible from here says otherwise, so that is ``MULTI``."""
-    ambiguous = (
-        mounted(getattr(request, "scope", None) or {}) and _framework_mode(request.app) is None
-    )
+    ambiguous = mounted(scope, own_prefix) and _framework_mode(app) is None
     return TenancyMode.MULTI if stored is TenancyMode.SINGLE and ambiguous else stored
+
+
+def request_mode(request: Any, stored: TenancyMode) -> TenancyMode:
+    """:func:`scope_mode` for a ``Request``."""
+    return scope_mode(request.app, getattr(request, "scope", None) or {}, stored)
