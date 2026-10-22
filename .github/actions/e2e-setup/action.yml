@@ -87,22 +87,13 @@ runs:
         path: ~/.cache/ms-playwright
         key: e2e-playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
-    # The Azure Ubuntu mirror stalls now and then mid-download (three 8-min
-    # timeouts in one day, on ~26 MB of fonts/xvfb for install-deps). apt's
-    # default is to wait on a stalled connection indefinitely and never retry;
-    # this makes each request time out after 30s and retry up to 5 times, so a
-    # stall costs seconds rather than the step.
-    - name: Make apt retry stalled downloads
-      shell: bash
-      run: |
-        printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "30";' \
-          'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
-
-    # Even with those retries, one apt call could still stall for the step's
-    # full 20 minutes (#215). install-browsers.sh now skips apt whenever
-    # Chromium already launches, gives each apt phase its own timeout, and
-    # switches off the Azure mirror when it fails. The whole step keeps its
-    # 20-minute cap. Composite steps cannot carry `timeout-minutes`, so
+    # The Azure Ubuntu mirror stalls now and then. Even with apt's
+    # Acquire::Retries set (#201), one `install-deps` call could sit out the
+    # step's full 20 minutes (#215). install-browsers.sh now skips apt
+    # whenever Chromium already launches. When apt is needed, each phase gets
+    # its own timeout and retry settings, and the script switches away from
+    # the Azure mirror if it fails. The whole step keeps its 20-minute cap.
+    # Composite steps cannot carry `timeout-minutes`, so
     # `timeout` enforces it: on expiry it SIGTERMs the script's process group
     # and exits 124. `-k 30s` follows with SIGKILL, because a child that
     # ignores SIGTERM would otherwise keep `timeout` waiting.
