@@ -4,10 +4,11 @@ Counts physical lines (``len(text.splitlines())``) so a trailing newline
 does not change the total. Exits 1 if any covered file exceeds ``--max``
 (default 300). Exempt paths matching ``--exempt`` globs are skipped.
 
-Files at ``--warn`` lines or more (default 280) but within the cap are listed
+Files at ``--warn`` lines or more (default 280) but within the cap are reported
 as a WARNING and do not fail the check (#133). They are the ones about to be
-trimmed to fit; the listing is the prompt to split them by responsibility the
-next time they are touched instead.
+trimmed to fit; the warning is the prompt to split them by responsibility the
+next time they are touched instead. It prints a count and the
+``WARN_LISTING_LIMIT`` files closest to the cap; ``--verbose`` lists them all.
 
 By default scans the git working tree — tracked files plus untracked files
 that aren't gitignored — so a brand-new oversized file fails the check
@@ -17,6 +18,7 @@ before it's committed (#204). ``--no-git`` walks the filesystem instead
 Usage:
     uv run python scripts/check_file_size.py
     uv run python scripts/check_file_size.py --max 200 --warn 180
+    uv run python scripts/check_file_size.py --verbose
     uv run python scripts/check_file_size.py --root some/subdir --no-git
 """
 
@@ -31,6 +33,8 @@ from pathlib import Path
 
 DEFAULT_MAX_LINES = 300
 DEFAULT_WARN_LINES = 280
+#: How many near-cap files the warning names without ``--verbose``.
+WARN_LISTING_LIMIT = 10
 COVERED_SUFFIXES = {".py", ".ts", ".tsx"}
 # The framework repo also exempts packages/ui and packages/i18n; neither
 # exists here. No module source is exempt — that's the point of adopting
@@ -166,6 +170,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help=f"warn (without failing) at this many lines (default: {DEFAULT_WARN_LINES})",
     )
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=f"list every near-cap file, not just the {WARN_LISTING_LIMIT} closest",
+    )
+    parser.add_argument(
         "--root",
         type=Path,
         default=Path.cwd(),
@@ -203,11 +212,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         root=args.root,
     )
     if near:
+        shown = near if args.verbose else near[:WARN_LISTING_LIMIT]
         print(
             f"WARNING: {len(near)} file(s) at {args.warn}+ of {args.max} lines"
             " — split by responsibility when you next touch them:"
         )
-        _print_listing(near, args.root)
+        _print_listing(shown, args.root)
+        if len(shown) < len(near):
+            print(f"  … and {len(near) - len(shown)} more (--verbose lists them all)")
     if not violations:
         print(f"OK: no files exceed {args.max} lines.")
         return 0

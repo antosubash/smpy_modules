@@ -61,7 +61,13 @@ def _undeclared(mixin: type, host: type) -> set[str]:
     """Members *mixin* uses on ``self`` that neither its MRO nor *host* defines."""
     used = _self_members(ast.parse(textwrap.dedent(inspect.getsource(mixin))))
     own = {name for klass in mixin.__mro__ if klass is not object for name in vars(klass)}
-    return used - own - set(host.__annotations__) - set(vars(host))
+    declared = {
+        name
+        for klass in host.__mro__
+        if klass is not object
+        for name in (*vars(klass), *inspect.get_annotations(klass))
+    }
+    return used - own - declared
 
 
 @pytest.mark.parametrize("mixin", MIXINS, ids=lambda m: m.__name__)

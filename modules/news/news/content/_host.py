@@ -3,13 +3,13 @@
 The mixin chain (workflow → trash → revisions) reaches for ``self.db`` and
 ``self.get_article``, neither of which it defines. :class:`ArticlesHost` writes
 that contract down (#133). :class:`~news.content._revisions.RevisionsMixin`, the
-root of the chain, inherits :data:`HostBase`, which a type checker sees as the
-Protocol and the interpreter sees as ``object`` — so a call to a member the
-host does not declare is a type error, and the MRO is unchanged.
+root of the chain, inherits :data:`HostBase`, which a type checker would see as
+the Protocol and the interpreter sees as ``object``, so the MRO is unchanged.
 
-``tests/test_content_host.py`` asserts that ``ArticlesService`` satisfies it, so
-a host member that is renamed or dropped fails a test even without a type
-checker in CI. Add a member here before a mixin starts using it.
+No type checker runs in CI, so the enforcement is ``tests/test_content_host.py``:
+an AST scan fails when a mixin uses a member the Protocol does not declare, and
+an ``isinstance`` check fails when ``ArticlesService`` stops supplying one. Add a
+member here before a mixin starts using it.
 """
 
 from __future__ import annotations

@@ -30,7 +30,7 @@ from sqlmodel import select
 from pagebuilder import redirects
 from pagebuilder.contracts.events import PageDeleted
 from pagebuilder.models import Page, PageRevision, PageStatus
-from pagebuilder.service._host import HostBase
+from pagebuilder.service._host import TrashHostBase
 
 #: How long a trashed page is recoverable before the sweep removes it.
 RETENTION_DAYS = 30
@@ -49,8 +49,8 @@ def trash_expired(now: datetime) -> ColumnElement[bool]:
     )
 
 
-class TrashMixin(HostBase):
-    """Soft-delete behaviour for :class:`PagesService`; see ``_host.PagesHost``."""
+class TrashMixin(TrashHostBase):
+    """Soft-delete behaviour for :class:`PagesService`; see ``_host.TrashHost``."""
 
     async def _trashed_or_404(self, page_id: int) -> Page:
         """The page, but only if it is actually in the trash.

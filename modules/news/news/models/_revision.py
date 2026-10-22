@@ -1,9 +1,8 @@
 """The audit trail: one row per status transition, and what it snapshotted.
 
-Its own file rather than a second class in :mod:`news.models._article`, which
-is near the repo's 300-line cap now that an article carries its own language.
-The split is along the obvious seam — the article is the live document, this is
-the history behind it.
+Its own file rather than a second class in :mod:`news.models._article`, because
+the two change for different reasons. The split is along the obvious seam —
+the article is the live document, this is the history behind it.
 """
 
 from __future__ import annotations

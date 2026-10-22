@@ -7,7 +7,8 @@ The body and the workflow live next door in :mod:`news.endpoints.api.body` and
 :mod:`news.endpoints.api.workflow`, which is a split by *authority* rather than
 by tidiness — publishing is gated on ``news.publish``, and an autosave must not
 be able to reach a slug. An article's tags and its translations have modules of
-their own for the ordinary reason: this file is near the repo's 300-line cap.
+their own because each is a separate resource with its own routes, not a field
+of the article this module writes.
 """
 
 from __future__ import annotations

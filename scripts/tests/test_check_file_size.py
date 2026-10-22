@@ -75,3 +75,21 @@ def test_exempt_and_uncovered_files_are_not_warned_about(tmp_path, capsys):
 
     assert _run(tmp_path) == 0
     assert "WARNING" not in capsys.readouterr().out
+
+
+def test_the_warning_names_only_the_closest_files_unless_verbose(tmp_path, capsys):
+    limit = check_file_size.WARN_LISTING_LIMIT
+    for i in range(limit + 2):
+        _file(tmp_path, f"near{i:02d}.py", 281 + i)
+
+    assert _run(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert f"WARNING: {limit + 2} file(s) at 280+ of 300 lines" in out
+    assert f"{281 + limit + 1}  near{limit + 1:02d}.py" in out
+    assert "281  near00.py" not in out
+    assert "… and 2 more (--verbose lists them all)" in out
+
+    assert _run(tmp_path, "--verbose") == 0
+    out = capsys.readouterr().out
+    assert "281  near00.py" in out
+    assert "more (--verbose" not in out
