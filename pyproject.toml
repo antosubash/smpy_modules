@@ -8,6 +8,12 @@ dependencies = []
 # Workspace root: not built or installed itself.
 [tool.uv]
 package = false
+# Lock-only: published modules keep their own ranges. SQLModel 0.0.45 maps a
+# bare `datetime` field to its tz-aware `UTCDateTime`, which retypes the
+# framework's `users_refresh_token` timestamps (alembic check fails on
+# Postgres) and rejects naive values on write. Hold it until the framework
+# ships the matching revision for the host to port.
+constraint-dependencies = ["sqlmodel<0.0.45"]
 
 [tool.uv.workspace]
 members = ["host", "modules/*"]
