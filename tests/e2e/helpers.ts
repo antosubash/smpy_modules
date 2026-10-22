@@ -28,7 +28,7 @@ export async function clickAndConfirm(
   // unlocks. This helper is used for teardown, where the friction is not what
   // is under test, so it reads the phrase the dialog is asking for and types
   // it. That the gate EXISTS is asserted directly by the tests that care —
-  // trash.spec.ts for purge, qa-findings.spec.ts for a published delete — so
+  // trash.spec.ts for purge, page-list-delete.spec.ts for a published delete — so
   // satisfying it here cannot hide its absence.
   //
   // Scoped to the phrase label, not just any <code>: the published-delete
