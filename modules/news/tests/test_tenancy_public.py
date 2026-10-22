@@ -156,5 +156,6 @@ async def test_public_api_cache_varies_on_the_configured_tenant_header() -> None
     app = FastAPI()
     app.add_middleware(TenantMiddleware, header="X-Tenant-ID")
     response = Response()
-    cache(response, SimpleNamespace(app=app, state=SimpleNamespace(), scope={}), include_drafts=False)
+    request = SimpleNamespace(app=app, state=SimpleNamespace(), scope={})
+    cache(response, request, include_drafts=False)
     assert _vary(response) == ["Cookie", "X-Tenant-ID"]

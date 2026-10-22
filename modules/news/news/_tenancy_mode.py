@@ -100,23 +100,21 @@ def _fixed_tenant(entry: Any) -> str | None:
 
 
 def _framework_mode(app: Any) -> TenancyMode | None:
-    """The framework's own answer for *app*, or ``None`` without one.
+    """The framework's own public answer (0.0.36+), or ``None`` without one.
 
-    ``tenancy_mode`` (0.0.36+) says ``SINGLE`` for any app built outside
-    ``create_app``, so its ``SINGLE`` is an answer only on an app
-    ``create_app`` built — one carrying ``state.sm``. On 0.0.35, which lacks
-    it, ``state.sm`` alone is the answer ``SINGLE``: a multi-tenant
-    ``create_app`` stack carries a visible ``TenantMiddleware``, which
-    :func:`detect_mode` reads first.
+    ``tenancy_mode`` says ``SINGLE`` for any app built outside ``create_app``,
+    so its ``SINGLE`` is an answer only on an app ``create_app`` built — one
+    carrying ``state.sm``. On 0.0.35, which lacks it, there is none:
+    ``state.sm`` alone is not taken as ``SINGLE``, so a child mounted under a
+    foreign parent there fails closed rather than binding the default.
     """
-    built = getattr(app.state, "sm", None) is not None
     try:
         from simple_module_hosting.tenancy import tenancy_mode
     except ImportError:
-        return TenancyMode.SINGLE if built else None
+        return None
     if str(tenancy_mode(app)) == TenancyMode.MULTI:
         return TenancyMode.MULTI
-    return TenancyMode.SINGLE if built else None
+    return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
 
 
 def detect_mode(app: Any) -> TenancyMode:

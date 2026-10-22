@@ -165,3 +165,24 @@ async def test_media_through_a_parents_mount(tmp_path):
     assert (await _get(parent, "/child/media/photo.jpg")).status_code == 404
     response = await _get(parent, "/child/media/photo.jpg", "tenant-a")
     assert response.content == b"tenant-a"
+
+
+def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
+    """No public ``tenancy_mode`` to ask: ``state.sm`` alone is no answer, so
+    a mounted child with no upstream tenant is refused, not handed default."""
+    import sys
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    monkeypatch.setitem(sys.modules, "simple_module_hosting.tenancy", None)  # ImportError
+    app = FastAPI()
+    app.state.sm = SimpleNamespace()
+    scope = {"app_root_path": "", "root_path": "/child"}
+    request = SimpleNamespace(app=app, state=SimpleNamespace(tenant_id=None), scope=scope)
+    with pytest.raises(HTTPException) as refused:
+        tenancy.resolve_admin(request)
+    assert refused.value.status_code == 403
+    assert tenancy.resolve_public(request) is None
+    request.scope = {}  # not mounted: the app's own single-tenant answer stands
+    assert tenancy.resolve_admin(request) == DEFAULT_TENANT

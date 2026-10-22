@@ -200,8 +200,12 @@ class MediaFiles(StaticFiles):
     def _own_prefix(self, scope: Scope) -> str:
         """The path the serving app mounted this at — that mount is not a
         parent's; not found, ``""``, so any mount counts (fails closed)."""
-        routes = getattr(scope.get("app"), "routes", None) or ()
-        return next((r.path for r in routes if getattr(r, "app", None) is self), "")
+        found = getattr(self, "_mount_prefix", None)
+        if found is None:
+            routes = getattr(scope.get("app"), "routes", None) or ()
+            found = next((r.path for r in routes if getattr(r, "app", None) is self), None)
+            self._mount_prefix = found  # once found, a mount does not move
+        return found or ""
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         scoped = _tenant_path(path, scope, self._own_prefix(scope))

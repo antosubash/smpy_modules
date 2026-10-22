@@ -153,9 +153,10 @@ async def render_public_page(
         if not signed_in:
             response.headers["ETag"] = etag
         response.headers["Vary"] = public_cache.VARY
-        # On a multi-tenant host the tenant can come from the session, not the Host.
-        vary_on_tenant(response, request)
         response.headers["Cache-Control"] = cache_control
+        # On a multi-tenant host the tenant can come from the session, not the
+        # Host. After Cache-Control: it may mark the response private (#192).
+        vary_on_tenant(response, request)
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
         response.headers["Content-Language"] = page.locale
