@@ -185,3 +185,38 @@ async def test_the_gigs_row_is_in_the_collections_table(collided, client):
         globals_ = (await session.execute(shared)).scalars().all()
     assert len(found) == 1, "the gig row is not in the collection's table"
     assert len(globals_) == 1, "the hall row is not in the shared table"
+
+
+async def test_a_nested_expand_across_the_collision_is_not_a_cycle(client):
+    """``gig.venue -> hall`` where the gig shares the hall's uuid (#81).
+
+    The cycle set used to key on the uuid alone, so the hall — a different
+    record in a different table set — read as already on its own chain:
+    flagged ``cycle`` and its ``owner`` never expanded.
+    """
+    await make_type(client, "person", [field("name", "text")])
+    await make_type(
+        client, "hall", [field("name", "text"), field("owner", "relation", target_type="person")]
+    )
+    await make_type(
+        client,
+        "gig",
+        [field("name", "text"), field("venue", "relation", target_type="hall")],
+        collection="events",
+    )
+    owner = await make_record(client, "person", {"name": "Owner"})
+    hall = await make_record(
+        client, "hall", {"name": "Barbican", "owner": {"type": "person", "uuid": owner["uuid"]}}
+    )
+    gig = await make_record(
+        client, "gig", {"name": "Clash", "venue": {"type": "hall", "uuid": hall["uuid"]}}
+    )
+    await _collide(client.db_state, gig["uuid"], hall["uuid"])
+
+    read = await client.get(
+        f"{API}/gig/records/{hall['uuid']}?expand=venue.owner", headers=roles(ADMIN)
+    )
+    assert read.status_code == 200, read.text
+    (venue,) = read.json()["expanded"]["venue"]
+    assert (venue["display_title"], venue["cycle"]) == ("Barbican", False)
+    assert venue["expanded"]["owner"][0]["display_title"] == "Owner"

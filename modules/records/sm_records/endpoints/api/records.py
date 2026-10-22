@@ -92,8 +92,8 @@ async def list_records(
     ``records.edit`` (``deps.parse_trashed``); every item comes back with
     ``is_deleted: true``, so the shape needs nothing new.
 
-    ``?expand=a,b`` resolves those relation fields for the whole page in one
-    query each (design §9) — never per row, which is the difference between a
+    ``?expand=a,b.c`` resolves those relation paths for the whole page in one
+    query per hop (design §9) — never per row, which is the difference between a
     list screen and fifty round trips.
 
     ``?after=<cursor>`` pages by keyset instead of ``OFFSET`` and
@@ -121,7 +121,14 @@ async def list_records(
     except CursorError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     expanded = (
-        await expand_service.expand(db, rtype, result.items, expand, roles=caller_roles(request))
+        await expand_service.expand(
+            db,
+            rtype,
+            result.items,
+            expand,
+            roles=caller_roles(request),
+            max_refs=settings.max_expand_refs,
+        )
         if expand
         else None
     )
@@ -169,13 +176,15 @@ async def get_record(
     request: Request,
     rtype: RecordType = Depends(load_allowed_type),
     db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
     expand: list[str] = Depends(parse_expand),
     with_translations: bool = Query(default=False, alias=constants.TRANSLATIONS_PARAM),
 ) -> RecordRead:
-    """One record, with ``?expand=`` resolving the relation fields it names
-    to depth one (design §9). A key that is not a relation field of the type
-    is a 400 naming it — ``services.expand`` refuses it with the same
-    ``QueryError`` the filter grammar uses for an unknown field.
+    """One record, with ``?expand=`` resolving the relation paths it names
+    (design §9, #81 — ``author.publisher`` reads two levels). A key that is
+    not a relation field of the type is a 400 naming it —
+    ``services.expand`` refuses it with the same ``QueryError`` the filter
+    grammar uses for an unknown field.
 
     ``?translations=true`` adds the record's translation group — itself and
     every sibling, trash included (Phase 5 §4.4). One extra query, and opt-in
@@ -192,7 +201,14 @@ async def get_record(
     """
     record = await record_service.get_record(db, rtype, uuid)
     expanded = (
-        await expand_service.expand(db, rtype, [record], expand, roles=caller_roles(request))
+        await expand_service.expand(
+            db,
+            rtype,
+            [record],
+            expand,
+            roles=caller_roles(request),
+            max_refs=settings.max_expand_refs,
+        )
         if expand
         else None
     )
