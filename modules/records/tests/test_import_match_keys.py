@@ -1,17 +1,10 @@
-"""Phase 5 core review — the import and expansion halves. Each test failed
-before its fix.
+"""How an import matches its rows to existing records.
 
-Three findings:
-
-* an import row whose match key resolved nothing but whose ``uuid`` is already
-  here is a row error — reported by the dry run, refused or skipped by the
-  apply — and never an ``IntegrityError`` escaping the report as a 500;
-* a relation nobody filled in expands to nothing rather than to one phantom
-  ``dangling`` reference reading ``uuid: "None"``;
-* ``match_by=slug`` matches on the canonical (slugified) form of the cell,
-  which is the only form a write ever stores.
-
-The schema half is in ``test_review_fixes_round5.py``.
+An import row whose match key resolved nothing but whose ``uuid`` is already
+here is a row error — reported by the dry run, refused or skipped by the apply
+— and never an ``IntegrityError`` escaping the report as a 500; and
+``match_by=slug`` matches on the canonical (slugified) form of the cell, which
+is the only form a write ever stores.
 """
 
 from __future__ import annotations
@@ -24,13 +17,12 @@ from sm_records.models import RecordType
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service
 from sm_records.services.errors import ImportRefused
-from sm_records.services.expand import expand
 from sm_records.services.import_ import ImportOptions, import_records
 
-from tests.round5_helpers import rel, text
+from tests.field_builders import text
 
 # ---------------------------------------------------------------------------
-# 2 — a stale match key over an existing uuid is a row error, not a 500
+# a stale match key over an existing uuid is a row error, not a 500
 # ---------------------------------------------------------------------------
 
 
@@ -115,74 +107,7 @@ async def test_on_error_skip_skips_the_row_and_writes_nothing(db, settings):
 
 
 # ---------------------------------------------------------------------------
-# 3 — an empty relation expands to nothing
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("many", [False, True])
-@pytest.mark.parametrize("stored", [None, []])
-async def test_an_empty_relation_expands_to_no_entries(db, settings, many, stored):
-    """``validate_payload`` dumps every declared key, so *every* record of a
-    type with a relation nobody filled in holds ``None`` under it — which used
-    to expand to one ``dangling`` chip reading ``uuid: "None"``."""
-    await type_service.create_type(
-        db, key="person", label="Person", settings=settings, fields_raw=[text("name")]
-    )
-    memo = await type_service.create_type(
-        db,
-        key="memo",
-        label="Memo",
-        settings=settings,
-        fields_raw=[text("title"), rel("about", "person", many=many)],
-    )
-    record = await record_service.create_record(
-        db, memo, data={"title": "nothing here"}, settings=settings
-    )
-    assert record.data["about"] is None
-    if stored is not None:
-        # ``[]`` is what a to-many holds once the last reference is removed,
-        # and what a to-one can hold on a row written before
-        # ``_check_ref_list``. Neither validates as *input* on a to-one, so it
-        # is written the way such a row got there.
-        record.data = {**record.data, "about": stored}
-        db.add(record)
-        await db.flush()
-    out = await expand(db, memo, [record], ["about"])
-    assert out[record.uuid]["about"] == []
-
-
-async def test_an_unparsable_entry_inside_a_list_still_keeps_its_slot(db, settings):
-    """The positional rule M4 added is about entries *inside* a non-empty
-    list, and it stays: the expansion is rendered beside ``data[key]``."""
-    person = await type_service.create_type(
-        db, key="person", label="Person", settings=settings, fields_raw=[text("name")]
-    )
-    memo = await type_service.create_type(
-        db,
-        key="memo",
-        label="Memo",
-        settings=settings,
-        fields_raw=[text("title"), rel("about", "person", many=True)],
-    )
-    ada = await record_service.create_record(db, person, data={"name": "Ada"}, settings=settings)
-    record = await record_service.create_record(
-        db,
-        memo,
-        data={"title": "m", "about": [{"type": "person", "uuid": ada.uuid}]},
-        settings=settings,
-    )
-    # Written behind the module's back, the way a row that predates
-    # ``_check_ref_list`` looks.
-    record.data = {"title": "m", "about": [None, {"type": "person", "uuid": ada.uuid}]}
-    db.add(record)
-    await db.flush()
-
-    out = await expand(db, memo, [record], ["about"])
-    assert [ref.dangling for ref in out[record.uuid]["about"]] == [True, False]
-
-
-# ---------------------------------------------------------------------------
-# 4 — match_by=slug matches the canonical form
+# match_by=slug matches the canonical form
 # ---------------------------------------------------------------------------
 
 

@@ -1,6 +1,6 @@
-"""Phase 4 review, the read surface: ``allowed_roles`` and the referrers panel.
+"""``allowed_roles`` on the read surface, and the referrers panel.
 
-Every test here failed before its fix. The theme is one decision — **design
+The theme is one decision — **design
 §10's narrowing applies to reads, with the same refusal writes get** — and its
 consequences for the panel that counts what points at a record.
 

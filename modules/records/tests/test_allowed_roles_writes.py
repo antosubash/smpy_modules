@@ -1,4 +1,4 @@
-"""Regressions for the QA pass's F4 — ``allowed_roles`` and the wide writes.
+"""``allowed_roles`` and the wide writes.
 
 A type's ``allowed_roles`` narrows the static ``records.edit`` /
 ``records.manage_types`` permissions (README § Permissions), and narrowing has
