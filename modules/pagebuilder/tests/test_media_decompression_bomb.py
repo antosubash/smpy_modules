@@ -156,7 +156,7 @@ async def test_an_animated_canvas_over_the_limit_is_refused(
     assert _stored_files(tmp_path) == []
 
 
-def test_gif_canvas_walks_extensions_and_tolerates_truncation(tmp_path: Path) -> None:
+async def test_gif_canvas_walks_extensions_and_tolerates_truncation(tmp_path: Path) -> None:
     # Pillow writes loop/duration extensions on every animated GIF; the walk
     # must step over them, and a cut-off file must not raise.
     path = tmp_path / "a.gif"
@@ -165,7 +165,43 @@ def test_gif_canvas_walks_extensions_and_tolerates_truncation(tmp_path: Path) ->
     spliced = _animated_gif_with_larger_second_frame()
     path.write_bytes(spliced)
     assert gif_canvas_size(path) == (20, 20)
+    # Pillow skips a stray byte between blocks, so the walk must too.
+    first = _gif(10, 10)
+    padded = first[:-1] + b"\x00" + spliced[len(first) - 1 :]
+    path.write_bytes(padded)
+    assert gif_canvas_size(path) == (20, 20)
     path.write_bytes(spliced[: len(spliced) // 2])
     assert gif_canvas_size(path) is not None
     path.write_bytes(_png(4, 4))
     assert gif_canvas_size(path) is None
+    path.write_bytes(b"GIF89a")
+    assert gif_canvas_size(path) is None
+
+
+def _disguised(kind: str) -> bytes:
+    spliced = _animated_gif_with_larger_second_frame()
+    cut = len(_gif(10, 10)) - 1  # where the 20x20 frame starts
+    if kind == "junk":
+        # Bytes that open no block, which Pillow steps over one at a time.
+        return spliced[:cut] + b"\x00\x01\x02junk" + spliced[cut:]
+    # Cut inside the large frame's pixel data, trailer gone.
+    return spliced[: cut + 15]
+
+
+@pytest.mark.parametrize("kind", ["junk", "truncated"])
+async def test_a_large_gif_frame_cannot_hide_behind_junk_or_truncation(
+    authed_client: AsyncClient, tmp_path: Path, monkeypatch, kind: str
+) -> None:
+    # The walk must find every frame Pillow would: if it stopped earlier, the
+    # 20x20 frame would pass unseen (security review on #222).
+    content = _disguised(kind)
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    with Image.open(io.BytesIO(content)) as image:
+        assert image.size == (10, 10)
+        with pytest.raises(Image.DecompressionBombError):
+            image.seek(1)
+
+    response = await _upload_as(authed_client, content, "image/gif")
+
+    assert response.status_code == 413, (kind, response.text)
+    assert _stored_files(tmp_path) == []

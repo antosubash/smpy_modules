@@ -9,56 +9,63 @@ Walking the block structure finds every frame's extent without decoding any
 pixel data: each data sub-block is skipped by its length byte. APNG and
 animated WebP need no such walk: their frames must lie inside the canvas,
 which Pillow and libwebp enforce, so the canvas size already bounds them.
+
+The walk follows Pillow's reader (``GifImageFile._seek``) rather than the
+spec, so the two cannot disagree about which frames exist: a byte that
+introduces no block is skipped, not treated as the end, and only the ``;``
+trailer or the end of the file stops it. A frame counts as soon as its
+descriptor is read, which is also when Pillow checks its size.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import BinaryIO
+
+# The next block introducer: extension, image descriptor, or trailer. Pillow
+# steps over any other byte one at a time; searching for the next one is the
+# same walk without a Python-level loop per byte of junk.
+_INTRODUCER = re.compile(rb"[!,;]")
 
 
-def _skip_sub_blocks(fh: BinaryIO) -> bool:
-    """Skip a chain of length-prefixed sub-blocks; ``False`` if truncated."""
-    while True:
-        size = fh.read(1)
-        if not size:
-            return False
-        if size[0] == 0:
-            return True
-        fh.seek(size[0], 1)
+def _u16(data: bytes, pos: int) -> int:
+    return int.from_bytes(data[pos : pos + 2], "little")
 
 
 def _color_table_size(flags: int) -> int:
     return 3 << ((flags & 7) + 1) if flags & 0x80 else 0
 
 
+def _skip_sub_blocks(data: bytes, pos: int) -> int:
+    """Position after a chain of length-prefixed sub-blocks (or past the end)."""
+    while pos < len(data) and data[pos]:
+        pos += 1 + data[pos]
+    return pos + 1
+
+
 def gif_canvas_size(source: Path) -> tuple[int, int] | None:
     """The logical screen grown to cover every frame, or ``None`` if not a GIF.
 
-    A truncated or malformed file stops the walk and returns what was seen so
-    far; deciding whether the file decodes at all is Pillow's job.
+    Reads the whole file: uploads are already capped by ``media_max_bytes``.
     """
-    with source.open("rb") as fh:
-        header = fh.read(13)
-        if len(header) < 13 or header[:6] not in (b"GIF87a", b"GIF89a"):
-            return None
-        width = int.from_bytes(header[6:8], "little")
-        height = int.from_bytes(header[8:10], "little")
-        fh.seek(_color_table_size(header[10]), 1)
-        while True:
-            introducer = fh.read(1)
-            if introducer == b"!":  # extension: label, then sub-blocks
-                if not fh.read(1) or not _skip_sub_blocks(fh):
-                    break
-            elif introducer == b",":  # image descriptor
-                desc = fh.read(9)
-                if len(desc) < 9:
-                    break
-                x0, y0, w, h = (int.from_bytes(desc[i : i + 2], "little") for i in range(0, 8, 2))
-                width, height = max(width, x0 + w), max(height, y0 + h)
-                fh.seek(_color_table_size(desc[8]), 1)
-                if not fh.read(1) or not _skip_sub_blocks(fh):  # LZW code size
-                    break
-            else:  # trailer, EOF, or garbage
-                break
+    data = source.read_bytes()
+    if len(data) < 13 or data[:6] not in (b"GIF87a", b"GIF89a"):
+        return None
+    width, height = _u16(data, 6), _u16(data, 8)
+    pos = 13 + _color_table_size(data[10])
+    while (match := _INTRODUCER.search(data, pos)) is not None:
+        pos = match.start() + 1
+        introducer = match.group()
+        if introducer == b";":
+            break
+        if introducer == b"!":  # extension: one label byte, then sub-blocks
+            pos = _skip_sub_blocks(data, pos + 1)
+            continue
+        if pos + 9 > len(data):  # truncated image descriptor: no frame
+            break
+        x0, y0, w, h = (_u16(data, pos + i) for i in range(0, 8, 2))
+        width, height = max(width, x0 + w), max(height, y0 + h)
+        # Local colour table, then the LZW code size byte, then the data.
+        pos += 9 + _color_table_size(data[pos + 8]) + 1
+        pos = _skip_sub_blocks(data, pos)
     return width, height
