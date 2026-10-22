@@ -14,6 +14,7 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 import { useEffect, useState } from 'react';
+import { useDateLocale } from '../../../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../../../utils/api';
 import { keys } from '../../../utils/i18n';
 
@@ -51,6 +52,7 @@ export function RelatedRender({
   currentSlug,
 }: RelatedProps & { currentSlug?: string }) {
   const [items, setItems] = useState<ArticleRead[] | null>(null);
+  const locale = useDateLocale();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,7 +81,7 @@ export function RelatedRender({
       {title && <h2 className="mb-3 text-sm font-semibold tracking-tight">{title}</h2>}
       <ul className="space-y-2">
         {items.map((article) => {
-          const dated = formatArticleDate(article.published_at);
+          const dated = formatArticleDate(article.published_at, locale);
           return (
             <li key={article.id}>
               <a href={article.url} className="underline underline-offset-2">

@@ -179,7 +179,7 @@
     "nothing_synced": "Noch keine Stripe-Abonnements",
     "unprocessed_webhooks": "Unverarbeitete Webhooks: {count}",
     "reconcile_every": "Geplanter Abgleich: alle {minutes} Min.",
-    "reconcile_off": "Geplanter Abgleich: aus — `smpy billing reconcile` ausführen oder reconcile_interval_minutes setzen",
+    "reconcile_off": "Geplanter Abgleich: aus — „smpy billing reconcile“ ausführen oder reconcile_interval_minutes setzen",
     "reconcile_not_running": "Geplanter Abgleich: eingestellt, läuft aber nicht — Stripe ist nicht der aktive Anbieter"
   },
   "subscriptions_table": {

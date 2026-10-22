@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { UploadIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { keys, useT } from '../../utils/i18n';
+import { formatNumber } from '../../utils/locale';
 
 import {
   type MediaApi,
@@ -12,8 +13,8 @@ import {
 
 type Progress = { name: string; percent: number };
 
-function percentLabel(percent: number): string {
-  return new Intl.NumberFormat(undefined, { style: 'percent' }).format(percent / 100);
+function percentLabel(percent: number, locale: string | undefined): string {
+  return formatNumber(percent / 100, locale, { style: 'percent' });
 }
 
 /**
@@ -34,7 +35,7 @@ export function MediaUpload({
   api: MediaApi;
   onUploaded: (file: MediaFile) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const input = useRef<HTMLInputElement>(null);
   const handle = useRef<UploadHandle | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -98,7 +99,7 @@ export function MediaUpload({
           <span className="truncate text-xs text-muted-foreground">
             {t(keys.records.media.uploading, {
               name: progress.name,
-              percent: percentLabel(progress.percent),
+              percent: percentLabel(progress.percent, locale),
             })}
           </span>
           <progress

@@ -3,6 +3,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageRevisionRead, RevisionDiff, RevisionEvent } from '../../utils/api';
+import { formatTimestamp } from '../../utils/dates';
 import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { DiffSummary } from '../DiffSummary';
@@ -38,7 +39,7 @@ export function RevisionHistoryPanel({
   onCompare,
   onRestore,
 }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   // The raw event name is the fallback for a value the map does not know —
   // it is not translatable, and saying it is truer than saying nothing.
   const eventLabel = (event: RevisionEvent) =>
@@ -64,7 +65,7 @@ export function RevisionHistoryPanel({
                   <span className="font-medium">{eventLabel(r.event)}</span>
                   <span className="ml-2">{r.title}</span>
                   <span className="ml-2 text-muted-foreground">
-                    {new Date(r.created_at).toLocaleString()}
+                    {formatTimestamp(r.created_at, locale)}
                   </span>
                   {r.created_by && (
                     <span className="ml-2 text-muted-foreground">
@@ -108,7 +109,7 @@ export function RevisionHistoryPanel({
                       title={t(keys.pagebuilder.history.restore_title)}
                       description={t(keys.pagebuilder.history.restore_description, {
                         event: eventLabel(r.event),
-                        when: new Date(r.created_at).toLocaleString(),
+                        when: formatTimestamp(r.created_at, locale),
                       })}
                       confirmLabel={t(keys.pagebuilder.history.restore)}
                       onConfirm={() => onRestore(r.id)}

@@ -9,6 +9,7 @@ import { type Alternate, LanguageSwitch } from '../components/LanguageSwitch';
 import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
 import { useDocumentLang } from '../hooks/useDocumentLang';
 import { formatArticleDate } from '../utils/api';
+import { useT } from '../utils/i18n';
 
 /** What a reader gets at `{public_route_prefix}/{slug}`.
  *
@@ -128,8 +129,9 @@ export default function PublicArticle({
 }: Props) {
   useAnchorOnArrival();
   useDocumentLang(locale);
+  const { locale: consoleLocale } = useT();
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
-  const dated = formatArticleDate(published_at ?? null);
+  const dated = formatArticleDate(published_at ?? null, locale ?? consoleLocale);
 
   return (
     <div>

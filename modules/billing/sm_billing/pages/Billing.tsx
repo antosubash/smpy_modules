@@ -27,7 +27,7 @@ interface Props {
 }
 
 function Billing() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const c = keys.billing.page;
   const { status, plans, can_manage, restore, csrf_token, checkout } = usePage<{
     props: Props;
@@ -181,7 +181,7 @@ function Billing() {
             ? t(c.confirm_downgrade_description)
             : t(c.confirm_change_description, {
                 plan: pending?.plan.name ?? '',
-                price: pending ? priceLabel(pending.plan, interval) : '',
+                price: pending ? priceLabel(pending.plan, interval, locale) : '',
               })
         }
         confirmLabel={pending?.cta === 'downgrade' ? t(c.confirm_downgrade) : t(c.confirm_change)}
