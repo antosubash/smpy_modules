@@ -33,7 +33,8 @@ def settings(settings, tmp_path):
     Postgres (``SM_TEST_DATABASE_URL``) already gives each session its own.
     """
     if is_sqlite(settings.database_url):
-        settings.database_url = f"sqlite+aiosqlite:///{tmp_path / 'billing.db'}"
+        url = f"sqlite+aiosqlite:///{tmp_path / 'billing.db'}"
+        return settings.model_copy(update={"database_url": url})
     return settings
 
 
