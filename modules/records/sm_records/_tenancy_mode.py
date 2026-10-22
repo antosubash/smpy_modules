@@ -19,6 +19,9 @@ __all__ = [
     "configure",
     "detect_mode",
     "mode_of",
+    "mounted",
+    "request_mode",
+    "scope_mode",
     "tenant_header",
 ]
 
@@ -91,17 +94,56 @@ def _fixed_tenant(entry: Any) -> str | None:
     return (_kwargs(entry) or {}).get("fixed") if entry else None
 
 
-def _framework_says_multi(app: Any) -> bool:
-    """Whether the framework's own public answer (0.0.36+) is ``MULTI``.
+def _opaque_middleware(app: Any) -> bool:
+    """Whether the stack has an entry built by a factory rather than a class.
 
-    It says ``SINGLE`` for any app built outside ``create_app``, so only its
-    ``MULTI`` is evidence; on 0.0.35, which lacks it, there is none.
+    ``Middleware(factory)`` hides what it installs — a ``TenantMiddleware``
+    composed inside it is invisible to :func:`_tenant_middleware`.
+    """
+    return any(not isinstance(e.cls, type) for e in getattr(app, "user_middleware", None) or ())
+
+
+def _framework_mode(app: Any) -> TenancyMode | None:
+    """The framework's own public answer (0.0.36+), or ``None`` without one.
+
+    ``tenancy_mode`` says ``SINGLE`` for any app built outside ``create_app``,
+    so its ``SINGLE`` is an answer only on an app ``create_app`` built — one
+    carrying ``state.sm``. On 0.0.35, which lacks it, there is none:
+    ``state.sm`` alone is not taken as ``SINGLE``, so a child mounted under a
+    foreign parent there fails closed rather than binding the default.
     """
     try:
         from simple_module_hosting.tenancy import tenancy_mode
     except ImportError:
-        return False
-    return str(tenancy_mode(app)) == TenancyMode.MULTI
+        return None
+    if str(tenancy_mode(app)) == TenancyMode.MULTI:
+        return TenancyMode.MULTI
+    return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
+
+
+def mounted(scope: Mapping[str, Any]) -> bool:
+    """Whether this request reached the app through a parent's ``Mount``.
+
+    Starlette's ``Mount`` keeps the outermost ``root_path`` as
+    ``app_root_path`` and extends ``root_path``; a proxy's ``--root-path``
+    alone sets no ``app_root_path``.
+    """
+    outer = scope.get("app_root_path")
+    return outer is not None and scope.get("root_path", "") != outer
+
+
+def scope_mode(app: Any, scope: Mapping[str, Any], stored: TenancyMode) -> TenancyMode:
+    """*stored* (the app's mode), unless it says ``SINGLE`` for a mounted app
+    the framework has no answer for — the parent may well be multi-tenant and
+    nothing visible from here says otherwise, so that is ``MULTI`` (#210, the
+    rule news and pagebuilder follow since #192)."""
+    ambiguous = mounted(scope) and _framework_mode(app) is None
+    return TenancyMode.MULTI if stored is TenancyMode.SINGLE and ambiguous else stored
+
+
+def request_mode(request: Any, stored: TenancyMode) -> TenancyMode:
+    """:func:`scope_mode` for a ``Request``."""
+    return scope_mode(request.app, getattr(request, "scope", None) or {}, stored)
 
 
 def detect_mode(app: Any) -> TenancyMode:
@@ -111,16 +153,20 @@ def detect_mode(app: Any) -> TenancyMode:
     Fails safe (#125): an entry whose arguments are not recognised counts as
     ``MULTI`` — reads stay filtered, and a fixed middleware still puts its one
     tenant on ``request.state``, which is all ``MULTI`` resolution reads — as
-    does the framework's own ``tenancy_mode`` saying ``MULTI``.
+    does the framework's own ``tenancy_mode`` saying ``MULTI``, and a stack
+    with a factory-built entry the framework has no answer for (#210).
     """
     entry = _tenant_middleware(app)
-    if _framework_says_multi(app):
+    framework = _framework_mode(app)
+    if framework is TenancyMode.MULTI:
         return TenancyMode.MULTI
-    if entry is None:
-        return TenancyMode.SINGLE
-    if _kwargs(entry) is None:
+    if entry is not None:
+        if _kwargs(entry) is None:
+            return TenancyMode.MULTI
+        return TenancyMode.SINGLE if _fixed_tenant(entry) else TenancyMode.MULTI
+    if framework is None and _opaque_middleware(app):
         return TenancyMode.MULTI
-    return TenancyMode.SINGLE if _fixed_tenant(entry) else TenancyMode.MULTI
+    return TenancyMode.SINGLE
 
 
 def _warn_if_unrecognised(app: Any) -> None:
