@@ -349,23 +349,21 @@ on the `records_*` tables to the organisation's id, or inserting a
 neither records nor this documentation has tested; do it on a copy first. A
 single-tenant host is unaffected: it keeps running in `default`.
 
-A user with no membership, the bootstrap admin included, is refused with
-`403 tenant_required` on every records admin screen rather than shown another
-tenant's data by accident. Records never falls back to a guessed tenant.
+The admin surface binds the tenant the framework resolved for the request
+(`request.state.tenant_id`) — the same rule as pagebuilder, news and billing
+(#112). With the tenants module that is the active membership: the session's
+chosen organisation, or the one an API client names in `X-Tenant-ID` *among
+its own memberships*. A user with no membership, the bootstrap admin included,
+resolves no tenant and is refused with `403 tenant_required` on every records
+admin screen rather than shown another tenant's data by accident. Records
+never falls back to a guessed tenant.
 
-An `admin` with no membership can be let act in whatever tenant a request's
-`X-Tenant-ID` header names, instead of being refused — the
-`admin_header_tenant` setting (default off; see [Settings](#settings)). A user
-who *does* have an active tenant always gets that one; the header never
-overrides it.
-
-**The setting serves API and headless clients only** — a script, `curl`, an
-integration that sends `X-Tenant-ID` on every request. The browser admin
-screens never send the header (neither Inertia visits nor the pages' own
-`fetch` calls do; only the public widget does), so a user without a
-membership who opens `/admin/records` in a browser gets `403 tenant_required`
-on every screen **with the setting on or off**. For a person working in the
-browser the fix is to make them a member of an organisation (above).
+The `admin_header_tenant` setting, which let an `admin` with no membership act
+in whatever tenant the header named, is gone: it was the one place a module
+let a signed-in user pick a tenant the framework had refused them. A stored
+value is ignored (the settings class drops unknown keys). An operator who
+administers several organisations becomes a member of each and switches, or
+sends `X-Tenant-ID` naming one of them.
 
 ### Anonymous and headless reads
 
@@ -465,7 +463,6 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `reindex_batch_size` | `500` | no | Records per batch in a rebuild, and the export's page size |
 | `reindex_stale_after_seconds` | `900` (15 min) | no | How old a `reindex_pending` entry may get before `/health/ready` degrades |
 | `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry may get. `0` re-reads on every page request |
-| `admin_header_tenant` | `false` | no | Multi-tenant hosts: let an `admin` with no tenant of their own work in the tenant their `X-Tenant-ID` header names — API and headless clients only; the browser screens never send the header and stay `403`. Off, they get `403 tenant_required` |
 
 Everything not marked *restart* is read per request and takes effect on save.
 
@@ -1301,8 +1298,9 @@ workarounds the fixes make redundant; the rows say which. What records changed i
   locale check) runs under the framework's `all_tenants()` waiver — without
   it a strict host refused the read and failed to boot.
 * `tenant_scope` binds through the framework's `tenant_context`.
-* `admin_header_tenant` reads the tenant header itself: since #358 the
-  framework resolves it for anonymous requests only.
+* `resolve_admin` follows the framework-resolved tenant (#112): since #358
+  the framework never lets a signed-in user pick a tenant outside their memberships, so the
+  hole the old per-user rule guarded against is closed upstream.
 * A `TenantMiddleware(fixed=…)` (#359's `default_tenant`) is single mode, and a
   fixed tenant other than `default` is refused at boot.
 
@@ -1339,7 +1337,7 @@ this module.
 | [#355](https://github.com/antosubash/simple_module_python/issues/355) | `MultiTenantMixin`: reads with no tenant bound return every tenant's rows | `install_guard` raises `TenantUnbound` on any unbound ORM statement over an owned mapper, instead of trusting a tenant happens to be set (`tenancy.py`, design §A.4) |
 | [#356](https://github.com/antosubash/simple_module_python/issues/356) | `MultiTenantMixin`: unbound flush skips the tenant-change check, letting a row move silently | The same guard's `before_flush` refuses an unbound create, update or delete of an owned row |
 | [#357](https://github.com/antosubash/simple_module_python/issues/357) | `MultiTenantMixin`: bulk `insert()` is not stamped with `tenant_id` | Records never bulk-inserts an owned (mixin) table — only the derived index/reduce tables, which carry no `tenant_id` column at all (design §B) |
-| [#358](https://github.com/antosubash/simple_module_python/issues/358) | `TenantMiddleware`: the header chooses the tenant for *any* authenticated user with no tenant of their own | `resolve_admin` ignores the header for a signed-in user and answers `403 tenant_required`, unless the operator turned the module's own `admin_header_tenant` setting on for `admin` users |
+| [#358](https://github.com/antosubash/simple_module_python/issues/358) | `TenantMiddleware`: the header chooses the tenant for *any* authenticated user with no tenant of their own | Fixed upstream in 0.0.35. `resolve_admin` binds the framework-resolved tenant (#112), which for a signed-in user is never one picked by header outside their memberships; with none resolved it answers `403 tenant_required` |
 | [#359](https://github.com/antosubash/simple_module_python/issues/359) | No default-tenant setting or `tenant_scope` helper for `MultiTenantMixin` | `sm_records.tenancy.DEFAULT_TENANT` (a constant, not a setting — see design §A.3) and `tenant_scope()` (always resets, refuses re-binding to a different tenant) are the module's own |
 | [#360](https://github.com/antosubash/simple_module_python/issues/360) | `users`: no tenant management — `UserCreate`/`UserUpdate` and `create_admin` have no `tenant_id` | Closed upstream as not planned (the premise predates the tenants module). 0.0.36 retires `users_user.tenant_id` (#381); membership is managed by the `tenants` module, so there is nothing to assign by SQL — see [Assigning tenants to users](#assigning-tenants-to-users) |
 | [#361](https://github.com/antosubash/simple_module_python/issues/361) | `file_storage`: `StoredFile` is not tenant-scoped | Closed upstream as not planned, but 0.0.36 does scope `StoredFile` (PR #393: `MultiTenantMixin`, ids from another tenant `404`, listings count the active tenant only). Records stores a `media` value as a string of at most 500 characters and never looks the file up, so it still accepts another tenant's id; the picker and the download URL go through `file_storage`, which now answers `404` for it |
