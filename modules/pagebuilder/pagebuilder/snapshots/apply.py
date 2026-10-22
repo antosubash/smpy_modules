@@ -259,6 +259,8 @@ async def apply_bundle(
         await redirects.record(
             db, page_id=page.id, old_slug=old_slug, new_slug=page.slug, locale=locale
         )
+        # `record` also clears any redirect from the page's own address.
+        redirects_kept.discard((locale, page.slug))
         redirects_kept.add((locale, old_slug))
 
     layout = from_sentinels(documents.layout, name_to_url)
