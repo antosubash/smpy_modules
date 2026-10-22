@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sm_billing.admin import connection_changes
 from sm_billing.errors import BillingError
 from sm_billing.plans import PlanError, PlanService
-from sm_billing.schemas import ConnectionIn, PlanIn
+from sm_billing.schemas import MAX_AMOUNT, ConnectionIn, PlanIn
 
 ADMIN = "/api/billing/admin"
 BIG = 2_000_000_000
@@ -201,15 +201,22 @@ async def test_return_url_rejected_over_http(app, admin, raw):
 
 
 async def test_legacy_out_of_range_plan_still_lists(app, admin):
-    """Bounds guard writes, never reads: a row stored before them must not 500 the admin."""
+    """Bounds guard writes, never reads: a row stored before them must not 500 the admin.
+
+    Above ``MAX_AMOUNT`` but inside the column: ``amount_month`` is an
+    ``INTEGER``, which Postgres holds to 32 bits where SQLite would store
+    anything, so a larger "legacy" value is a row no Postgres host can have.
+    """
+    over_bound = MAX_AMOUNT + 100_000_000
+    assert over_bound < 2**31
     async with app.state.sm.db.session_factory() as session:
         await make_plan(
-            session, "legacy", amount_month=9_999_999_999_900, limits={"tenants.seats": 10**20}
+            session, "legacy", amount_month=over_bound, limits={"tenants.seats": 10**20}
         )
         await session.commit()
     response = await admin.get(f"{ADMIN}/plans")
     assert response.status_code == 200, response.text
     legacy = next(p for p in response.json() if p["key"] == "legacy")
-    assert legacy["amount_month"] == 9_999_999_999_900
+    assert legacy["amount_month"] == over_bound
     page = await admin.get("/admin/billing/plans", headers={"X-Inertia": "true"})
     assert page.status_code == 200
