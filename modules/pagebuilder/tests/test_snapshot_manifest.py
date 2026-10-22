@@ -235,3 +235,11 @@ def test_a_file_outside_every_section_is_refused_on_upload(tmp_path):
     data = _zip(_with(news), **{"extra/x.json": b"{}"})
     with pytest.raises(BundleError, match="belongs to no section"):
         read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_os_junk_from_a_hand_rezip_is_skipped_not_refused(tmp_path):
+    junk = {"__MACOSX/._layout.json": b"\x00", ".DS_Store": b"\x00", "pages/Thumbs.db": b""}
+    out = tmp_path / "out"
+    read_zip(_zip(_with(), **junk), out, BlobStore(tmp_path / "blobs"))
+    assert not (out / "__MACOSX").exists()
+    assert not (out / ".DS_Store").exists()

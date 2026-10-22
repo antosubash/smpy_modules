@@ -42,6 +42,18 @@ __all__ = ["BundleError", "read_zip", "write_zip"]
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
 
+_OS_JUNK = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
+
+
+def _is_os_junk(name: str) -> bool:
+    """Files an OS adds when someone re-zips a bundle by hand.
+
+    Skipped rather than extracted, and so never held to the rule that every
+    member belongs to a section: refusing a bundle because Finder added
+    ``__MACOSX/`` would fail an honest upload over something nothing reads.
+    """
+    return name.startswith("__MACOSX/") or PurePosixPath(name).name in _OS_JUNK
+
 
 def _safe_relative(name: str) -> PurePosixPath:
     """Reject any entry that would write outside the destination."""
@@ -124,7 +136,7 @@ def read_zip(
         extracted = 0
         for info in archive.infolist():
             name = info.filename
-            if name.endswith("/"):
+            if name.endswith("/") or _is_os_junk(name):
                 continue
             relative = _safe_relative(name)
             members.append(name)

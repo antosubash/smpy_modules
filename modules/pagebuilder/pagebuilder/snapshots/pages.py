@@ -8,7 +8,7 @@ the whole list at once and notice what is missing from it.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, overload
 
 from pagebuilder import locales
 from pagebuilder.models import Page, PageStatus
@@ -150,7 +150,11 @@ def apply_payload(page: Page, payload: dict[str, Any]) -> None:
         setattr(page, field, datetime.fromisoformat(raw) if raw else None)
 
 
-def _instant(value: datetime | None) -> datetime | None:
+@overload
+def as_utc(value: datetime) -> datetime: ...
+@overload
+def as_utc(value: None) -> None: ...
+def as_utc(value: datetime | None) -> datetime | None:
     # SQLite hands back naive datetimes for timezone-aware columns.
     if value is None or value.tzinfo is not None:
         return value
@@ -170,7 +174,7 @@ def page_state(page: Page) -> tuple[Any, ...]:
         page.parent_id,
         page.deleted_at is None,
         *(getattr(page, field) for field in PAGE_FIELDS),
-        *(_instant(getattr(page, field)) for field in _DATETIME_FIELDS),
+        *(as_utc(getattr(page, field)) for field in _DATETIME_FIELDS),
     )
 
 
@@ -181,5 +185,5 @@ def page_identity(page: Page) -> dict[str, Any]:
     insert, so a page made by hand after a restore-created one was purged
     would inherit its marker; no two rows share both id and ``created_at``.
     """
-    created = _instant(page.created_at)
+    created = as_utc(page.created_at)
     return {"id": page.id, "created_at": created.isoformat() if created else None}

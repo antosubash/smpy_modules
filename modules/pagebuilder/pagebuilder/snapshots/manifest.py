@@ -56,7 +56,9 @@ FORMAT_MINOR = 1
 
 PAGEBUILDER_SECTION = "pagebuilder"
 PAGEBUILDER_SECTION_VERSION = 1
-_SECTION_VERSIONS: dict[str, frozenset[int]] = {PAGEBUILDER_SECTION: frozenset({1})}
+_SECTION_VERSIONS: dict[str, frozenset[int]] = {
+    PAGEBUILDER_SECTION: frozenset({PAGEBUILDER_SECTION_VERSION})
+}
 """The sections this build restores, and which of their versions."""
 
 PAGEBUILDER_PATHS = (LAYOUT_NAME, REDIRECTS_NAME, f"{PAGES_DIR}/", f"{MEDIA_DIR}/")

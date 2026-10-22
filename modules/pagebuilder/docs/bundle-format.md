@@ -121,6 +121,8 @@ Reading rules:
 - The `pagebuilder` section's `paths` may only name its own root-level paths.
 - Every file in the archive other than `manifest.json` must belong to exactly
   one section: a file no section claims, or one two sections claim, is a 422.
+  Files an OS adds when a bundle is re-zipped by hand (`__MACOSX/`,
+  `.DS_Store`, `Thumbs.db`, `desktop.ini`) are skipped, not extracted.
 
 ### Adding a section (not built)
 

@@ -32,14 +32,14 @@ markers — the audit row is the only record there is.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.models import ImportStatus, Page, PageRedirect, PendingImport
-from pagebuilder.snapshots.pages import page_identity
+from pagebuilder.snapshots.pages import as_utc, page_identity
 
 APPLIED_KEY = "applied"
 """The key under ``PendingImport.plan`` the apply writes its outcome to."""
@@ -55,11 +55,6 @@ _CREATION_SLACK = timedelta(hours=1)
 created is always a little younger than the decision. A page born more than
 this after it was made by someone else.
 """
-
-
-def _aware(value: datetime) -> datetime:
-    # SQLite hands back naive datetimes for timezone-aware columns.
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 async def _slugs_of(db: AsyncSession, page: Page) -> set[str]:
@@ -89,7 +84,7 @@ def _inferred(
 ) -> str | None:
     """Best-effort outcome for an import that predates ``applied``."""
     pages = plan.get("pages") or {}
-    created = _aware(page.created_at)
+    created = as_utc(page.created_at)
     for bucket, change in _CHANGES.items():
         hit = any(
             entry.get("locale") == page.locale and entry.get("slug") in slugs
@@ -118,7 +113,7 @@ async def restore_markers(db: AsyncSession, page: Page) -> list[dict[str, Any]]:
     for staged in result.scalars().all():
         if staged.decided_at is None:
             continue
-        restored_at = _aware(staged.decided_at)
+        restored_at = as_utc(staged.decided_at)
         plan = staged.plan or {}
         if APPLIED_KEY in plan:
             change = _recorded(plan[APPLIED_KEY], page)
