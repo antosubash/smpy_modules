@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Three findings from the QA of #132, end to end.
@@ -18,7 +18,7 @@ import { csrfHeader, login, uniqueSlug } from './helpers';
 const EMPTY = { root: { props: { title: 'x', width: 'full' } }, content: [], zones: {} };
 
 async function createPage(page: Page, slug: string) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: { title: `Lang ${slug}`, slug, draft_data: EMPTY },
