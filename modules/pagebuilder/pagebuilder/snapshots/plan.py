@@ -21,6 +21,7 @@ from pagebuilder.diff import block_diff
 from pagebuilder.models import Page, PageRedirect
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.format import LAYOUT_NAME, PAGES_DIR, REDIRECTS_NAME
+from pagebuilder.snapshots.match import PageMatch, match_live
 from pagebuilder.snapshots.pages import (
     PAGE_FIELDS,
     PageKey,
@@ -128,15 +129,11 @@ async def build_plan(
     documents = await read_documents(bundle_dir)
     bundled = documents.pages
 
-    # Unfiltered on purpose, and split here rather than in SQL: `apply_bundle`
-    # matches slugs against *every* page, trashed included, because restoring
-    # content under a claimed slug revives that row. Classifying a trashed
-    # slug as "new" would promise an approver a fresh page while apply
-    # silently overwrites recoverable content.
-    result = await db.execute(select(Page))
-    every = {(page.locale, page.slug): page for page in result.scalars().all()}
-    live = {key: page for key, page in every.items() if page.deleted_at is None}
-    trashed = {key: page for key, page in every.items() if page.deleted_at is not None}
+    # Unfiltered on purpose: a trashed page still holds its slug and its group
+    # in the unique indexes, and restoring onto it revives it — classifying it
+    # as "new" would promise a fresh page while apply overwrites recoverable
+    # content. The matcher is apply's own, so this describes the rows it writes.
+    match = await match_live(db, bundled)
 
     new: list[dict[str, Any]] = []
     overwritten: list[dict[str, Any]] = []
@@ -145,13 +142,16 @@ async def build_plan(
     for key in sorted(bundled):
         locale, slug = key
         payload = bundled[key]
-        page = live.get(key) or trashed.get(key)
-        entry = {"slug": slug, "locale": locale, "title": payload.get("title")}
+        page = match.rows.get(key)
+        entry: dict[str, Any] = {"slug": slug, "locale": locale, "title": payload.get("title")}
         if page is None:
             new.append(entry)
             continue
-        if key in trashed:
+        trashed = page.deleted_at is not None
+        if trashed:
             entry["revived"] = True
+        if key in match.renames:
+            entry["renamed_from"] = match.renames[key]
         incoming_draft = from_sentinels(payload.get("draft_data"), name_to_url)
         incoming_published = from_sentinels(payload.get("published_data"), name_to_url)
         content_differs = (
@@ -162,10 +162,12 @@ async def build_plan(
             )
             or ("status" in payload and payload["status"] != page.status.value)
         )
-        # A trashed page is never "unchanged": apply clears `deleted_at`, so
-        # even byte-identical content means the page comes back to the site.
+        # Neither a trashed nor a renamed page is ever "unchanged": apply
+        # clears `deleted_at` and moves the slug back, so even byte-identical
+        # content means the page changes.
         fields_differ = _fields_differ(payload, page, name_to_url)
-        if key not in trashed and not content_differs and not fields_differ:
+        moved = trashed or key in match.renames
+        if not moved and not content_differs and not fields_differ:
             unchanged.append(entry)
             continue
         blocks = block_diff(page.draft_data, incoming_draft)
@@ -179,18 +181,10 @@ async def build_plan(
         )
 
     untouched = [
-        {"slug": slug, "locale": locale, "title": page.title}
-        for (locale, slug), page in sorted(live.items())
-        if (locale, slug) not in bundled
+        {"slug": page.slug, "locale": page.locale, "title": page.title}
+        for page in sorted(match.untouched, key=lambda p: (p.locale, p.slug))
+        if page.deleted_at is None
     ]
-
-    # Not `set(bundled) | set(live)`: `apply_bundle`'s `_restore_pages`
-    # resolves redirect targets against *every* page id, trashed included,
-    # because reviving a page under a claimed slug is deliberate there. Using
-    # the trash-filtered `live` here would tell an approver a redirect will be
-    # dropped as "target missing" when apply would actually keep it pointing
-    # at a trashed page.
-    resolvable = set(bundled) | set(every)
 
     return {
         "pages": {
@@ -200,7 +194,7 @@ async def build_plan(
             "untouched": untouched,
         },
         "layout": _layout_plan(documents.layout, name_to_url),
-        "redirects": await _redirect_plan(db, documents.redirects, resolvable),
+        "redirects": await _redirect_plan(db, documents.redirects, match),
     }
 
 
@@ -224,7 +218,7 @@ def _layout_plan(raw_layout: dict[str, Any], name_to_url: dict[str, str]) -> dic
 
 
 async def _redirect_plan(
-    db: AsyncSession, bundled: list[dict[str, str]], known_pages: set[PageKey]
+    db: AsyncSession, bundled: list[dict[str, str]], match: PageMatch
 ) -> dict[str, Any]:
     """Which redirects a restore would add, remove, or drop as unresolvable.
 
@@ -237,7 +231,12 @@ async def _redirect_plan(
     them and joins them into a sentence. One consequence is deliberate: a slug
     retired in two languages appears twice, which is two redirects and so two
     entries — deduplicating would undercount the work a restore is about to do.
+
+    Targets resolve against the addresses pages hold *after* the restore, and
+    a page the restore moves back to its old slug also leaves a redirect at
+    the newer one — apply records both, so both are counted here.
     """
+    known_pages = match.final_keys()
     result = await db.execute(select(PageRedirect.locale, PageRedirect.from_slug))
     existing = {(locale, from_slug) for locale, from_slug in result}
 
@@ -249,6 +248,7 @@ async def _redirect_plan(
 
     dropped = [source(r) for r in bundled if target(r) not in known_pages]
     keepable = {source(r) for r in bundled if target(r) in known_pages}
+    keepable |= set(match.rename_redirects())
     # `removed` and `dropped` are shown side by side, so they have to be
     # disjoint: a redirect that exists today *and* is in the bundle with a
     # missing target is one redirect, not two. It is reported as dropped —
