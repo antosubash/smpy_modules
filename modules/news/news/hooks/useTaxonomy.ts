@@ -5,9 +5,11 @@ import {
   createCategory,
   createTag,
   deleteCategory,
+  deleteTag,
   listManagedCategories,
   listTags,
   mergeTags as mergeTagsRequest,
+  renameTag as renameTagRequest,
   reorderCategories,
   type TagRead,
   updateCategory,
@@ -102,6 +104,22 @@ export function useTaxonomy() {
     [run],
   );
 
+  /** Same contract as `saveCategory`: the result keeps a refused name editable. */
+  const renameTag = useCallback(
+    async (id: number, name: string) => {
+      try {
+        await run(() => renameTagRequest(id, name));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [run],
+  );
+
+  /** Rejects on failure, so the confirmation stays open and shows why. */
+  const removeTag = useCallback((id: number) => run(() => deleteTag(id)), [run]);
+
   return {
     categories,
     tags,
@@ -114,5 +132,7 @@ export function useTaxonomy() {
     persistOrder,
     addTag,
     mergeTags,
+    renameTag,
+    removeTag,
   };
 }
