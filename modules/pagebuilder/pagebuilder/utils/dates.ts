@@ -22,7 +22,12 @@ export function formatTimestamp(
   options?: Intl.DateTimeFormatOptions,
 ): string {
   if (!iso) return '';
-  const date = new Date(NAIVE.test(iso) ? `${iso}Z` : iso);
+  const date = parseInstant(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString(intlLocale(locale), options);
+}
+
+/** *iso* as a `Date`, reading a zone-less timestamp as UTC (see above). */
+export function parseInstant(iso: string): Date {
+  return new Date(NAIVE.test(iso) ? `${iso}Z` : iso);
 }

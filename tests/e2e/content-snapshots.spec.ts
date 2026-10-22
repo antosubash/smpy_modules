@@ -96,6 +96,16 @@ test.describe('Content snapshots', () => {
     });
     expect((await reverted.json()).title).toBe('Before the snapshot');
 
+    // The page's own history says why it changed (#79): no revision was
+    // written, so the marker is read back from the approved import.
+    const history = await (
+      await page.request.get(`/api/pagebuilder/pages/${created.id}/revisions`)
+    ).json();
+    const [marker] = history.restores as { snapshot_id: number }[];
+    await page.goto(`/pagebuilder/${created.id}/edit`);
+    await page.getByRole('button', { name: /history \(\d+\)/i }).click();
+    await expect(page.getByText(`Restored from snapshot #${marker.snapshot_id}`)).toBeVisible();
+
     await page.request.delete(`/api/pagebuilder/pages/${created.id}`, { headers });
   });
 
