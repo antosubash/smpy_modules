@@ -138,6 +138,22 @@ async def test_a_restore_of_a_record_restored_meanwhile_is_a_409(file_db):
         await second.rollback()
 
 
+async def test_a_trash_of_a_record_trashed_meanwhile_is_a_409(file_db):
+    """Not a second trash: no second revision, no second reduce decrement."""
+    type_id, uuids = await seed(file_db)
+    async with file_db.session_factory() as first, file_db.session_factory() as second:
+        rtype_a = await first.get(RecordType, type_id)
+        rtype_b = await second.get(RecordType, type_id)
+        record_a = await get_record(first, rtype_a, uuids["live-0"])
+        record_b = await get_record(second, rtype_b, uuids["live-0"])
+        await _lifecycle.soft_delete_record(first, rtype_a, record_a, settings=SETTINGS)
+        await first.commit()
+        with pytest.raises(Conflict, match="is in the trash"):
+            await _lifecycle.soft_delete_record(second, rtype_b, record_b, settings=SETTINGS)
+        await second.rollback()
+    assert await count(file_db, None, type_id, trashed=True) == 2
+
+
 async def test_a_purge_that_deletes_fewer_rows_than_it_selected_is_refused(file_db):
     """The affected-row check: ids nobody can delete any more are a 409 (and
     the caller's rollback), never ``RecordPurged`` for a row that is gone."""
