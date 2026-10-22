@@ -64,12 +64,18 @@ def test_slug_bound_is_one_number() -> None:
 
 
 def _family(
-    tmp_path: Path, first: str, second: str, suffix: str = ".py", renames=({}, {}), **kwargs
+    tmp_path: Path,
+    first: str,
+    second: str,
+    suffix: str = ".py",
+    renames=({}, {}),
+    per_copy=({}, {}),
+    **kwargs,
 ) -> Family:
     copies = []
-    for name, source, rename in zip("ab", (first, second), renames, strict=True):
+    for name, source, rename, extra in zip("ab", (first, second), renames, per_copy, strict=True):
         (tmp_path / f"{name}{suffix}").write_text(source, encoding="utf-8")
-        copies.append(Copy(str(tmp_path / f"{name}{suffix}"), rename))
+        copies.append(Copy(str(tmp_path / f"{name}{suffix}"), rename, **extra))
     return Family("probe", tuple(copies), **kwargs)
 
 
@@ -114,3 +120,85 @@ def test_a_typescript_change_is_drift(tmp_path: Path) -> None:
     a = "export const X = /^a$/;\n"
     b = "export const X = /^b$/;\n"
     assert len(problems(_family(tmp_path, a, b, suffix=".ts"))) == 1
+
+
+# --- masked messages hide only themselves (codex review of #204) -------------
+
+_CRYPTO = 'ENC_PREFIX = "{prefix}"\n\ndef warn(field):\n    log("{module} setting %r", field)\n'
+_MESSAGES = ({"messages": ("AI setting %r",)}, {"messages": ("Billing setting %r",)})
+
+
+def test_a_listed_message_is_masked(tmp_path: Path) -> None:
+    a = _CRYPTO.format(prefix="enc:v1:", module="AI")
+    b = _CRYPTO.format(prefix="enc:v1:", module="Billing")
+    assert problems(_family(tmp_path, a, b, per_copy=_MESSAGES)) == []
+
+
+def test_a_protocol_constant_is_still_compared(tmp_path: Path) -> None:
+    a = _CRYPTO.format(prefix="enc:v1:", module="AI")
+    b = _CRYPTO.format(prefix="enc:v2:", module="Billing")
+    found = problems(_family(tmp_path, a, b, per_copy=_MESSAGES))
+    assert len(found) == 1 and "'ENC_PREFIX' has drifted" in found[0]
+
+
+def test_an_f_string_expression_is_still_compared(tmp_path: Path) -> None:
+    a = 'def f(x, y):\n    return f"A {x!r}"\n'
+    b = 'def f(x, y):\n    return f"B {y!r}"\n'
+    per_copy = ({"messages": ("A ",)}, {"messages": ("B ",)})
+    found = problems(_family(tmp_path, a, b, per_copy=per_copy))
+    assert len(found) == 1 and "'f' has drifted" in found[0]
+
+
+def test_a_message_no_longer_there_fails(tmp_path: Path) -> None:
+    per_copy = ({"messages": ("gone",)}, {})
+    found = problems(_family(tmp_path, "X = 1\n", "X = 1\n", per_copy=per_copy))
+    assert found == [f"{tmp_path / 'a.py'}: `messages` lists 'gone', which is not there"]
+
+
+# --- `own` belongs to one copy -----------------------------------------------
+
+
+def test_an_own_declaration_another_copy_gains_fails(tmp_path: Path) -> None:
+    a = "def f(): pass\ndef g(): return 1\n"
+    b = "def f(): pass\ndef g(): return 2\n"
+    found = problems(_family(tmp_path, a, b, per_copy=({"own": {"g": "a only"}}, {})))
+    assert found == [f"'g' is `own` to {tmp_path / 'a.py'}, but {tmp_path / 'b.py'} has it too"]
+
+
+def test_an_own_declaration_stays_exempt_in_its_copy(tmp_path: Path) -> None:
+    a = "def f(): pass\ndef g(): pass\n"
+    assert (
+        problems(_family(tmp_path, a, "def f(): pass\n", per_copy=({"own": {"g": "a"}}, {}))) == []
+    )
+
+
+# --- TypeScript literals are compared as written -------------------------------
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        ("export const X = 'a + b';\n", "export const X = 'a+b';\n"),
+        ('export const X = "a, }";\n', 'export const X = "a}";\n'),
+        ("export const X = `${x} + y`;\n", "export const X = `${x}+y`;\n"),
+        ("export const X = /a b/;\n", "export const X = /ab/;\n"),
+        ("export const X = 'x //y';\n", "export const X = 'x ';\n"),
+        ("export const X = '/* a */b';\n", "export const X = 'b';\n"),
+    ],
+    ids=[
+        "string",
+        "string-comma",
+        "template",
+        "regex",
+        "line-comment-in-string",
+        "block-in-string",
+    ],
+)
+def test_a_typescript_literal_change_is_drift(tmp_path: Path, a: str, b: str) -> None:
+    assert len(problems(_family(tmp_path, a, b, suffix=".ts"))) == 1
+
+
+def test_typescript_division_and_regex_are_told_apart(tmp_path: Path) -> None:
+    a = "export const X = (a / b) / c;\nexport const R = /x/g;\n"
+    b = "export const X = (a/b)/c;\nexport const R = /x/g;\n"
+    assert problems(_family(tmp_path, a, b, suffix=".ts")) == []

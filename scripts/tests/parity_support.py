@@ -28,6 +28,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import ts_tokens
+
 REPO = Path(__file__).resolve().parents[2]
 
 
@@ -37,12 +39,16 @@ class Copy:
 
     ``rename`` maps an identifier in this copy onto the family's canonical
     spelling, applied to whole words of the normalised code. ``own`` names the
-    declarations only this copy has, each with the reason.
+    declarations only this copy has, each with the reason; another copy that
+    gains one fails. ``messages`` are the string literals (or an f-string's
+    literal parts) that name this copy's module, masked before comparing —
+    every other string, a protocol constant above all, is compared as written.
     """
 
     path: str
     rename: Mapping[str, str] = field(default_factory=dict)
     own: Mapping[str, str] = field(default_factory=dict)
+    messages: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -53,16 +59,12 @@ class Family:
     every copy and match — the file is a copy as a whole. A tuple restricts the
     comparison to those names (``Class.method`` reaches into a class), for files
     that only partly overlap.
-
-    ``mask_strings`` replaces every string literal before comparing, for copies
-    whose messages name their own module but whose logic must not differ.
     """
 
     name: str
     copies: tuple[Copy, ...]
     differ: Mapping[str, str] = field(default_factory=dict)
     shared: tuple[str, ...] | None = None
-    mask_strings: bool = False
 
     @property
     def is_typescript(self) -> bool:
@@ -73,8 +75,8 @@ class Family:
 
 
 class _Normalise(ast.NodeTransformer):
-    def __init__(self, mask_strings: bool) -> None:
-        self.mask_strings = mask_strings
+    def __init__(self, messages: tuple[str, ...]) -> None:
+        self.messages = messages
 
     def visit(self, node: ast.AST) -> ast.AST:
         """Drop the docstring of every function and class before visiting it."""
@@ -89,12 +91,9 @@ class _Normalise(ast.NodeTransformer):
         return super().visit(node)
 
     def visit_Constant(self, node: ast.Constant) -> ast.AST:
-        if self.mask_strings and isinstance(node.value, str):
-            return ast.Constant("<str>")
+        if isinstance(node.value, str) and node.value in self.messages:
+            return ast.Constant("<message>")
         return node
-
-    def visit_JoinedStr(self, node: ast.JoinedStr) -> ast.AST:
-        return ast.Constant("<str>") if self.mask_strings else self.generic_visit(node)
 
 
 def _assigned_names(node: ast.stmt) -> list[str]:
@@ -119,21 +118,25 @@ def _python_decls(source: str) -> dict[str, ast.AST]:
     return decls
 
 
-def _python_code(node: ast.AST, mask_strings: bool) -> str:
-    return ast.unparse(_Normalise(mask_strings).visit(copy.deepcopy(node)))
+def _python_code(node: ast.AST, messages: tuple[str, ...]) -> str:
+    return ast.unparse(_Normalise(messages).visit(copy.deepcopy(node)))
+
+
+def _string_literals(source: str) -> set[str]:
+    """Every string constant, f-string parts included, so a stale message shows."""
+    return {
+        node.value
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
 
 
 # --- TypeScript ---------------------------------------------------------------
 
-_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
-# A `//` that starts a line or follows whitespace. `https://` has a colon in
-# front of it, so a URL in a string survives.
-_LINE_COMMENT = re.compile(r"(^|\s)//.*$", re.MULTILINE)
 _TS_DECL = re.compile(
     r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?"
     r"(?:function\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)"
 )
-_PUNCTUATION = re.compile(r"\s*([(){}\[\],;:=<>+*/|&?!.])\s*")
 
 
 def _ts_decls(source: str) -> dict[str, str]:
@@ -142,7 +145,7 @@ def _ts_decls(source: str) -> dict[str, str]:
     A declaration starts at column 0 and runs to the next line that does;
     a closing bracket at column 0 still belongs to the one above it.
     """
-    code = _LINE_COMMENT.sub(r"\1", _BLOCK_COMMENT.sub("", source))
+    code = ts_tokens.strip_comments(source)
     chunks: list[list[str]] = []
     for line in code.splitlines():
         if not line.strip():
@@ -159,13 +162,6 @@ def _ts_decls(source: str) -> dict[str, str]:
     return decls
 
 
-def _ts_code(text: str) -> str:
-    """Whitespace- and trailing-comma-insensitive, so Biome's wrapping is noise."""
-    flat = re.sub(r"\s+", " ", text)
-    flat = re.sub(r",\s*([)\]}])", r"\1", flat)
-    return _PUNCTUATION.sub(r"\1", flat).strip()
-
-
 # --- comparison ---------------------------------------------------------------
 
 
@@ -179,10 +175,10 @@ def normalised(family: Family, member: Copy) -> dict[str, str]:
     """Every declaration of one copy, reduced to comparable code."""
     source = (REPO / member.path).read_text(encoding="utf-8")
     if family.is_typescript:
-        raw = {name: _ts_code(text) for name, text in _ts_decls(source).items()}
+        raw = {name: ts_tokens.code(text) for name, text in _ts_decls(source).items()}
     else:
         raw = {
-            name: _python_code(node, family.mask_strings)
+            name: _python_code(node, member.messages)
             for name, node in _python_decls(source).items()
         }
     rename = member.rename
@@ -192,19 +188,25 @@ def normalised(family: Family, member: Copy) -> dict[str, str]:
 def problems(family: Family) -> list[str]:
     """Everything wrong with one family: drift, missing copies, stale allowances."""
     decls = {m.path: normalised(family, m) for m in family.copies}
-    found: list[str] = []
+    found = _stale_allowances(family, decls)
     # An `own` entry is written as the copy spells it; compare it as renamed.
-    own = {m.path: {_rename(n, m.rename) for n in m.own} for m in family.copies}
+    owners: dict[str, list[str]] = {}
     for member in family.copies:
-        for name in sorted(own[member.path]):
-            if name not in decls[member.path]:
-                found.append(f"{member.path}: `own` lists {name!r}, which is not there")
-    allowed_own = set().union(*own.values())
+        for name in member.own:
+            owners.setdefault(_rename(name, member.rename), []).append(member.path)
     if family.shared is not None:
         names = set(family.shared) | set(family.differ)
     else:
-        names = {n for d in decls.values() for n in d if "." not in n} - allowed_own
+        names = {n for d in decls.values() for n in d if "." not in n}
     for name in sorted(names):
+        if name in owners:
+            others = [p for p in decls if p not in owners[name] and name in decls[p]]
+            if others:
+                found.append(
+                    f"{name!r} is `own` to {', '.join(owners[name])}, "
+                    f"but {', '.join(others)} has it too"
+                )
+            continue
         missing = [m.path for m in family.copies if name not in decls[m.path]]
         if missing:
             found.append(f"{name!r} is missing from {', '.join(missing)}")
@@ -219,6 +221,21 @@ def problems(family: Family) -> list[str]:
         for other in family.copies[1:]:
             if decls[other.path][name] != bodies[0]:
                 found.append(_diff(name, first, other.path, bodies[0], decls[other.path][name]))
+    return found
+
+
+def _stale_allowances(family: Family, decls: dict[str, dict[str, str]]) -> list[str]:
+    """`own` entries and masked messages that name something no longer there."""
+    found: list[str] = []
+    for member in family.copies:
+        for name in sorted(member.own):
+            if _rename(name, member.rename) not in decls[member.path]:
+                found.append(f"{member.path}: `own` lists {name!r}, which is not there")
+        if member.messages:
+            strings = _string_literals((REPO / member.path).read_text(encoding="utf-8"))
+            for message in member.messages:
+                if message not in strings:
+                    found.append(f"{member.path}: `messages` lists {message!r}, which is not there")
     return found
 
 

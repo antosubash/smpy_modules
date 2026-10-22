@@ -74,10 +74,13 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "slugify (TypeScript)",
         (
-            Copy(f"{NEWS}/utils/slugify.ts", own={
-                "SLUG_PATTERN": "News' article screen lets an author type a slug; "
-                "pagebuilder's editors only ever derive one.",
-            }),
+            Copy(
+                f"{NEWS}/utils/slugify.ts",
+                own={
+                    "SLUG_PATTERN": "News' article screen lets an author type a slug; "
+                    "pagebuilder's editors only ever derive one.",
+                },
+            ),
             Copy(f"{PB}/utils/slugify.ts"),
         ),
     ),
@@ -85,11 +88,14 @@ FAMILIES: tuple[Family, ...] = (
         "CSRF token sharing (Python)",
         (
             Copy(f"{NEWS}/csrf.py"),
-            Copy(f"{PB}/csrf.py", own={
-                "_check": "Pagebuilder alone keeps `csrf_protect`, for a host that guards "
-                "writes above the app, so it wraps the framework check instead of mounting it.",
-                "verify_csrf_if_configured": "See `_check`.",
-            }),
+            Copy(
+                f"{PB}/csrf.py",
+                own={
+                    "_check": "Pagebuilder alone keeps `csrf_protect`, for a host that guards "
+                    "writes above the app, so it wraps the framework check instead of mounting it.",
+                    "verify_csrf_if_configured": "See `_check`.",
+                },
+            ),
             Copy(f"{AI}/csrf.py"),
             Copy(f"{RECORDS}/csrf.py"),
         ),
@@ -98,10 +104,13 @@ FAMILIES: tuple[Family, ...] = (
         "CSRF token store (TypeScript)",
         (
             Copy(f"{NEWS}/utils/csrf.ts"),
-            Copy(f"{PB}/utils/csrf.ts", own={
-                "isCsrfRefusalBody": "Media uploads go through XHR, which hands back a raw "
-                "body rather than a Response.",
-            }),
+            Copy(
+                f"{PB}/utils/csrf.ts",
+                own={
+                    "isCsrfRefusalBody": "Media uploads go through XHR, which hands back a raw "
+                    "body rather than a Response.",
+                },
+            ),
             Copy(f"{AI}/utils/csrf.ts"),
             Copy(f"{RECORDS}/utils/csrf.ts"),
         ),
@@ -109,21 +118,29 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "admin HTTP client",
         (
-            Copy(f"{NEWS}/utils/http.ts", _AS_MODULE, own={
-                "HttpError": "News' callers tell a stale write (409) from a vanished "
-                "article (404); pagebuilder's throw a plain Error.",
-                "isHttpStatus": "See HttpError.",
-                "errorFrom": "News' errorMessage, returning an HttpError; "
-                "scripts/http-error-parity.test.ts holds the two to the same messages.",
-                "describeError": "News words the common Pydantic errors itself; pagebuilder "
-                "shows Pydantic's own msg. A wording upgrade pagebuilder can adopt, not drift.",
-                "read": "News splits GET from writes; pagebuilder has one `request`.",
-                "write": "See read.",
-            }),
-            Copy(f"{PB}/utils/request.ts", _AS_MODULE, own={
-                "errorMessage": "See news' errorFrom.",
-                "request": "See news' read.",
-            }),
+            Copy(
+                f"{NEWS}/utils/http.ts",
+                _AS_MODULE,
+                own={
+                    "HttpError": "News' callers tell a stale write (409) from a vanished "
+                    "article (404); pagebuilder's throw a plain Error.",
+                    "isHttpStatus": "See HttpError.",
+                    "errorFrom": "News' errorMessage, returning an HttpError; "
+                    "scripts/http-error-parity.test.ts holds the two to the same messages.",
+                    "describeError": "News words the common Pydantic errors itself; pagebuilder "
+                    "shows Pydantic's own msg. A wording upgrade pagebuilder can adopt, not drift.",
+                    "read": "News splits GET from writes; pagebuilder has one `request`.",
+                    "write": "See read.",
+                },
+            ),
+            Copy(
+                f"{PB}/utils/request.ts",
+                _AS_MODULE,
+                own={
+                    "errorMessage": "See news' errorFrom.",
+                    "request": "See news' read.",
+                },
+            ),
         ),
         differ={
             "fromValidationErrors": "News delegates each entry to describeError.",
@@ -132,11 +149,19 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "secret encryption",
         (
-            Copy(f"{AI}/crypto.py", {"AiKeyUnreadableError": "KeyUnreadableError"}, own={
-                "_dotenv_secret": "The AI module also runs in a Celery worker with no app, "
-                "so it falls back to SM_SECRET_KEY from the environment and .env.",
-                "explicit_secret": "See _dotenv_secret.",
-            }),
+            Copy(
+                f"{AI}/crypto.py",
+                {"AiKeyUnreadableError": "KeyUnreadableError"},
+                own={
+                    "_dotenv_secret": "The AI module also runs in a Celery worker with no app, "
+                    "so it falls back to SM_SECRET_KEY from the environment and .env.",
+                    "explicit_secret": "See _dotenv_secret.",
+                },
+                messages=(
+                    "AI setting %r is stored unencrypted; re-save it via the AI "
+                    "settings page to encrypt it.",
+                ),
+            ),
             Copy(
                 f"{BILLING}/crypto.py",
                 {"BillingKeyUnreadableError": "KeyUnreadableError"},
@@ -144,9 +169,12 @@ FAMILIES: tuple[Family, ...] = (
                     "BillingKeyUnreadableError": "AI keeps its error in sm_ai.contracts.errors, "
                     "where its API maps it to a response.",
                 },
+                messages=(
+                    "Billing setting %r is stored unencrypted; re-save it on "
+                    "/admin/billing/connection to encrypt it.",
+                ),
             ),
         ),
-        mask_strings=True,
         differ={
             "_fernet": "Billing reads no environment, so it has no fallback after the provider.",
         },
@@ -161,13 +189,17 @@ FAMILIES: tuple[Family, ...] = (
                     "contextlib.suppress": "suppress",
                     "PagebuilderSettings": "Settings",
                 },
+                messages=("pagebuilder.scheduler.stop_failed",),
             ),
-            Copy(f"{NEWS}/scheduler.py", {"NewsSettings": "Settings"}),
+            Copy(
+                f"{NEWS}/scheduler.py",
+                {"NewsSettings": "Settings"},
+                messages=("news.scheduler.stop_failed",),
+            ),
         ),
         # `_run` and `_due_tenants` are the per-tenant tick, left for the
         # tenancy family (see the module docstring).
         shared=("Scheduler.__init__", "Scheduler.start", "Scheduler.stop"),
-        mask_strings=True,
     ),
     Family(
         "test scaffolding: default tenant",
