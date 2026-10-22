@@ -4,14 +4,13 @@
   "private": true,
   "description": "Frontend assets for the AI module",
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@inertiajs/react": "^3.7.0",
+    "@inertiajs/react": "^3.9.1",
     "@simple-module-py/ui": "*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "sonner": "^2.0.0"
   },
   "devDependencies": {
     "@simple-module-py/tsconfig": "*"
-  },
-  "dependencies": {}
+  }
 }
