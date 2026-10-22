@@ -176,3 +176,23 @@ async def test_a_child_app_detected_single_still_binds_the_parents_tenant():
             # Nothing upstream: the single-tenant default fills the gap.
             assert (await client.get(path)).json() == {"tenant": "default"}
     assert current_tenant_id.get() is None
+
+
+def test_a_child_app_detected_single_keeps_another_tenants_public_answer_private():
+    """The public cache follows the same rule: a SINGLE detection serving the
+    default tenant is shareable, but one serving a tenant upstream resolved is
+    tenant-specific, so it must never be marked ``public`` for a shared cache."""
+    from types import SimpleNamespace
+
+    from sm_records.endpoints.api._public_cache import _tenancy
+
+    child = FastAPI()
+    configure(child)
+    assert detect_mode(child) is TenancyMode.SINGLE
+
+    def request(tenant: str | None) -> SimpleNamespace:
+        return SimpleNamespace(app=child, state=SimpleNamespace(tenant_id=tenant, user=None))
+
+    assert _tenancy(request(None)) == (None, False)  # type: ignore[arg-type]
+    assert _tenancy(request("default")) == (None, False)  # type: ignore[arg-type]
+    assert _tenancy(request("acme"))[1] is True  # type: ignore[arg-type]

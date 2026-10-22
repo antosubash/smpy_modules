@@ -57,8 +57,9 @@ membership — never `user.tenant_id`, never a header a module reads itself);
 none resolved → 403 `tenant_required` for admin, 404 for public. The rule is
 applied per request, and a tenant already resolved upstream always wins: a
 `single` detection supplies `"default"` only when nothing upstream bound one,
-so a mis-detected child app fails closed (#192, #196). The
-scheduler opens one session per tenant under `tenant_context`. News has its
+so a mis-detected child app fails closed — and a public answer for another
+tenant is never shareable-cached (records #196; pagebuilder and news #192).
+The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
 code `tenant_required`); billing reads the same `request.state.tenant_id`
