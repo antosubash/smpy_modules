@@ -166,7 +166,7 @@ async def _build_app(
     # ``X-Inertia: true`` without needing the real host templates.
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
-    (templates_dir / "index.html").write_text("<html></html>")
+    (templates_dir / "index.html").write_text('<html lang="en"></html>')  # host shell's (#187)
     inertia_config = InertiaConfig(
         environment="development",
         version="1.0",
