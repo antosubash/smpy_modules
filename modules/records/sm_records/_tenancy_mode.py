@@ -102,16 +102,25 @@ def _framework_says_multi(app: Any) -> bool:
     return str(tenancy_mode(app)) == TenancyMode.MULTI
 
 
-def _pinned_tenant(app: Any) -> str | None:
-    """The one tenant a single-tenant host runs every request in, or ``None``.
+def _pinned_tenants(app: Any) -> tuple[str, ...]:
+    """Every tenant the host pins its requests to, distinct, in order found.
 
-    A ``create_app`` host (one carrying ``state.sm``) answers through the
-    framework's public ``single_tenant_id`` — its ``default_tenant``, else
-    ``"default"``; an app built outside it, through the stack's ``fixed``.
+    Both sources count (#212): a ``create_app`` host's public
+    ``single_tenant_id`` (its ``default_tenant``, else ``"default"``), and an
+    explicit ``TenantMiddleware(fixed=...)`` in the stack. Requests follow the
+    middleware and background work the framework's answer, so ``configure``
+    refuses any pin other than ``DEFAULT_TENANT`` — and with it two that
+    disagree — rather than let the two drift apart.
     """
-    if getattr(app.state, "sm", None) is not None and not _framework_says_multi(app):
-        return single_tenant_id(app)
-    return _fixed_tenant(_tenant_middleware(app))
+    pins = (
+        [single_tenant_id(app)]
+        if getattr(app.state, "sm", None) is not None and not _framework_says_multi(app)
+        else []
+    )
+    fixed = _fixed_tenant(_tenant_middleware(app))
+    if fixed is not None:
+        pins.append(fixed)
+    return tuple(dict.fromkeys(pins))
 
 
 def detect_mode(app: Any) -> TenancyMode:
@@ -169,11 +178,13 @@ def configure(app: Any) -> TenancyMode:
     run in :data:`DEFAULT_TENANT`, where the migration put existing rows, so
     the framework would bind one tenant and records another.
     """
-    fixed = _pinned_tenant(app)
-    if fixed is not None and fixed != DEFAULT_TENANT:
+    pins = _pinned_tenants(app)
+    fixed = next((pin for pin in pins if pin != DEFAULT_TENANT), None)
+    if fixed is not None:
         raise RuntimeError(
             f"records: the host pins every request to default_tenant={fixed!r}, but records "
-            f"runs a single-tenant host in {DEFAULT_TENANT!r}. Unset default_tenant, set it "
+            f"runs a single-tenant host in {DEFAULT_TENANT!r}. Unset default_tenant and any "
+            f"TenantMiddleware(fixed=...), set them "
             f"to {DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)

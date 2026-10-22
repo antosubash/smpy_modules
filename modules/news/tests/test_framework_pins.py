@@ -130,6 +130,21 @@ def test_a_create_app_hosts_pinned_tenant_is_the_frameworks_answer():
         tenancy.configure(_create_app_host("acme"))
 
 
+def test_an_explicit_fixed_pin_must_agree_with_the_frameworks_answer():
+    """``single_tenant_id`` says ``"default"`` but the stack pins ``"acme"``:
+    requests would follow the middleware and background work the framework,
+    so startup refuses the split (#212)."""
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    split = _create_app_host(None)
+    split.add_middleware(TenantMiddleware, fixed="acme")
+    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+        tenancy.configure(split)
+    agreeing = _create_app_host(None)
+    agreeing.add_middleware(TenantMiddleware, fixed="default")
+    assert tenancy.configure(agreeing) is TenancyMode.SINGLE
+
+
 def test_the_recorded_vary_headers_come_from_the_framework():
     from simple_module_hosting.middleware import TenantMiddleware
 

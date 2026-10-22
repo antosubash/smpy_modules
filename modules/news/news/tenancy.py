@@ -49,7 +49,7 @@ from news._tenancy_mode import (  # noqa: F401 - tests read the private names he
     _tenant_middleware,
     _warn_if_unrecognised,
     detect_mode,
-    pinned_tenant,
+    pinned_tenants,
     request_mode,
     upstream_tenant,
 )
@@ -90,12 +90,14 @@ def configure(app: Any) -> TenancyMode:
     under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
     news's data would sit in another.
     """
-    fixed = pinned_tenant(app)
-    if fixed is not None and fixed != DEFAULT_TENANT:
+    pins = pinned_tenants(app)
+    fixed = next((pin for pin in pins if pin != DEFAULT_TENANT), None)
+    if fixed is not None:
         raise RuntimeError(
             f"news: the host pins every request to default_tenant={fixed!r}, but "
             f"news runs a single-tenant host in {DEFAULT_TENANT!r}. Unset "
-            f"default_tenant, set it to {DEFAULT_TENANT!r}, or turn multi_tenant on"
+            f"default_tenant and any TenantMiddleware(fixed=...), set them to "
+            f"{DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)
     _warn_if_unrecognised(app)
