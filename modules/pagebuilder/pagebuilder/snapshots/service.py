@@ -142,6 +142,7 @@ class SnapshotService:
             raise
 
         snapshot.manifest = manifest
+        snapshot.format_version = manifest["format_version"]  # the bundle's, not ours
         snapshot.size_bytes = len(data)
         for bundle_name, entry in index.items():
             self.db.add(

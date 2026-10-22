@@ -27,10 +27,9 @@ from pagebuilder.snapshots.format import (
     MANIFEST_NAME,
     MEDIA_DIR,
     MEDIA_INDEX_NAME,
-    READABLE_VERSIONS,
     REDIRECTS_NAME,
-    is_readable,
 )
+from pagebuilder.snapshots.manifest import check_manifest
 from pagebuilder.snapshots.validate import (
     BundleError,
     check_documents,
@@ -59,19 +58,6 @@ def _safe_relative(name: str) -> PurePosixPath:
     if not name or candidate == PurePosixPath("."):
         raise BundleError(f"unsafe path in bundle: {name!r}")
     return candidate
-
-
-def _require_manifest(payload: Any) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise BundleError("manifest.json is not an object")
-    version = payload.get("format_version")
-    if not is_readable(version):
-        readable = ", ".join(str(v) for v in sorted(READABLE_VERSIONS))
-        raise BundleError(
-            f"unsupported bundle format version {version!r}; "
-            f"this build reads version {readable}"
-        )
-    return payload
 
 
 def write_zip(
@@ -162,7 +148,7 @@ def read_zip(
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
-    manifest = _require_manifest(load_document(manifest_path, MANIFEST_NAME))
+    manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME))
 
     index_path = dest / MEDIA_DIR / MEDIA_INDEX_NAME
     index = load_document(index_path, MEDIA_INDEX_NAME) if index_path.is_file() else {}
