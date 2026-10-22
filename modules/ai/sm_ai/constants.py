@@ -21,7 +21,8 @@ LAZY_SETTINGS_RETRY_SECONDS: Final = 5.0
 # Upper bound on one worker-side settings read, connect included.
 LAZY_SETTINGS_READ_TIMEOUT_SECONDS: Final = 5.0
 # Where the host stores the secret it generated when SM_SECRET_KEY is unset
-# (``simple_module_hosting._secret_key``; both names are private there).
+# (``simple_module_hosting._secret_key``; both names are private there, and
+# tests/test_framework_pins.py fails when either moves, #125).
 HOST_SETTINGS_PACKAGE: Final = "host"
 HOST_SECRET_FIELD: Final = "secret_key"
 

@@ -49,7 +49,7 @@ export function RecordRevisions({
   currentVersion: number;
   onRestored: (restored: RecordRead) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<RecordRevision[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -167,7 +167,7 @@ export function RecordRevisions({
                       {rev.display_title}
                     </p>
                     <p className="text-muted-foreground">
-                      {formatDateTime(rev.created_at)}
+                      {formatDateTime(rev.created_at, locale)}
                       {rev.created_by ? ` · ${rev.created_by}` : ''}
                     </p>
                   </button>

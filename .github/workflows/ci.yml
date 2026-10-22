@@ -482,7 +482,7 @@ jobs:
       # The opt-in specs that need an active organisation. The default `e2e`
       # job runs single-tenant and skips them.
       - name: Run multi-tenant Playwright tests
-        run: npm run test:e2e -- billing-tenant news-tenant
+        run: npm run test:e2e -- billing-tenant news-tenant records-tenant
 
       - name: Upload Playwright report
         if: always()
@@ -545,6 +545,12 @@ jobs:
 
       - name: Package metadata
         run: uv run python scripts/check_metadata.py
+
+      # CLAUDE.md's honour-system rules (#135): no exact framework pin in a
+      # published module, nothing but real pages under pages/, and sibling
+      # extra floors that carry a `# floor: <reason>` comment.
+      - name: CLAUDE.md rules
+        run: uv run python scripts/check_rules.py
 
       - name: READMEs
         run: uv run python scripts/check_readmes.py

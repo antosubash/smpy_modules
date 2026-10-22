@@ -1,4 +1,5 @@
 import { keys, translate } from './i18n';
+import { intlLocale } from './locale';
 import type { Interval, Plan, Status, SubscriptionStatus } from './types';
 
 /**
@@ -10,25 +11,35 @@ export function clipName(name: string, max = 40): string {
   return name.length > max ? `${name.slice(0, max - 1)}…` : name;
 }
 
-/** Minor units → localized currency string; '' when there is no amount. */
-export function formatMoney(minor: number | null, currency: string, locale?: string): string {
+/**
+ * Minor units → localized currency string; '' when there is no amount.
+ *
+ * `locale` is the console's (`useT().locale`), never left to the browser: a
+ * German console on an English browser would otherwise read `€19.00` (#189).
+ */
+export function formatMoney(
+  minor: number | null,
+  currency: string,
+  locale: string | undefined,
+): string {
   if (minor === null || minor === undefined) return '';
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'currency',
     currency: currency.toUpperCase(),
   }).format(minor / 100);
 }
 
-export function formatDate(iso: string | null, locale?: string): string {
+/** A date in the console's locale (`useT().locale`); '' when there is none. */
+export function formatDate(iso: string | null, locale: string | undefined): string {
   if (!iso) return '';
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium' }).format(new Date(iso));
 }
 
 export function priceFor(plan: Plan, interval: Interval): string | null {
   return interval === 'month' ? plan.stripe_price_month : plan.stripe_price_year;
 }
 
-export function priceLabel(plan: Plan, interval: Interval, locale?: string): string {
+export function priceLabel(plan: Plan, interval: Interval, locale: string | undefined): string {
   const p = keys.billing.price;
   if (plan.pricing_model === 'free') return translate(p.free);
   if (!priceFor(plan, interval)) {

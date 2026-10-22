@@ -143,7 +143,7 @@ def cache(response: Response, request: Request, *, include_drafts: bool) -> None
         PRIVATE_CACHE_CONTROL if include_drafts else PUBLIC_CACHE_CONTROL
     )
     response.headers["Vary"] = "Cookie"
-    tenancy.vary_on_tenant(response, request.app)
+    tenancy.vary_on_tenant(response, request)
 
 
 async def read_one(db: AsyncSession, article_id: int) -> ArticleRead:

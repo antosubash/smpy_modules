@@ -1,11 +1,22 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mount } from '../../test-dom';
 import type { PublicRecordItem } from '../../utils/public-api';
-import { FieldValues } from './FieldValues';
 import { publicMediaSrc } from './format';
 import type { RecordsListProps } from './types';
+
+// The Inertia page the widget sits on: `locale` on the public viewer,
+// `page.locale` in the editor. Reset after each test.
+const pageProps: { locale?: string; page?: { locale: string } } = {};
+vi.mock('@inertiajs/react', () => ({ usePage: () => ({ props: pageProps }) }));
+
+const { FieldValues } = await import('./FieldValues');
+
+afterEach(() => {
+  delete pageProps.locale;
+  delete pageProps.page;
+});
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const TEMPLATE = '/api/file-storage/files/{id}/download';
@@ -83,6 +94,41 @@ describe('FieldValues — a media value on the public page', () => {
     expect(view.host.textContent).not.toContain(ID);
     // The other fields are untouched.
     expect(view.host.textContent).toContain('Caption: Low tide');
+    await view.unmount();
+  });
+});
+
+describe('FieldValues — dates follow the page language (#189)', () => {
+  const dated: PublicRecordItem = { ...item, data: { day: '2026-03-01' } };
+  const dateProps = (locale: string) =>
+    ({
+      locale,
+      fieldMeta: [{ key: 'day', type: 'date', label: 'Day', choices: [] }],
+    }) as unknown as RecordsListProps;
+
+  it("writes a German public page's dates in German", async () => {
+    pageProps.locale = 'de';
+    const view = await mount(
+      <FieldValues item={dated} props={dateProps('')} mediaUrlTemplate={null} />,
+    );
+    expect(view.host.textContent).toContain('Day: 01.03.2026');
+    await view.unmount();
+  });
+
+  it("uses the edited page's language in the editor canvas", async () => {
+    pageProps.page = { locale: 'de' };
+    const view = await mount(
+      <FieldValues item={dated} props={dateProps('en')} mediaUrlTemplate={null} />,
+    );
+    expect(view.host.textContent).toContain('Day: 01.03.2026');
+    await view.unmount();
+  });
+
+  it("falls back to the widget's language off a page", async () => {
+    const view = await mount(
+      <FieldValues item={dated} props={dateProps('de')} mediaUrlTemplate={null} />,
+    );
+    expect(view.host.textContent).toContain('Day: 01.03.2026');
     await view.unmount();
   });
 });
