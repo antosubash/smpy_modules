@@ -166,13 +166,17 @@ export function translate(key: string, params?: TranslateParams): string {
  * because a key outside its generated union might not resolve. The default is
  * the English text — see `english` above for why it is not the key itself.
  */
-export function useT(): { t: Translate } {
-  const { t } = useFrameworkT();
+export function useT(): { t: Translate; locale: string | undefined } {
+  const { t, i18n } = useFrameworkT();
+  // The console's language, for `Intl` date and number formatting: the
+  // browser's own locale is not the one the console speaks (#189).
+  const locale = i18n?.language || undefined;
   return useMemo(
     () => ({
       t: (key: string, params?: TranslateParams) =>
         t(key, { defaultValue: english[key] ?? key, ...params }),
+      locale,
     }),
-    [t],
+    [t, locale],
   );
 }

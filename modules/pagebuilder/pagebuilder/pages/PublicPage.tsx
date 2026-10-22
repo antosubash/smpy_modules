@@ -7,6 +7,7 @@ import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { migrateContent } from '../components/migrateContent';
 import { getPuckConfig } from '../components/puckConfig';
 import { type SiteNav, SiteNavProvider } from '../components/widgets/_internal/site-nav-context';
+import { useDocumentLang } from '../hooks/useDocumentLang';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {
@@ -65,6 +66,9 @@ export default function PublicPage({
   site_nav,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
+  // The server writes `<html lang>` for a fresh document; this covers an
+  // Inertia visit between languages, which keeps the old shell (#187).
+  useDocumentLang(locale ?? undefined);
   // The design pack is a site-wide branding setting: one site, one look. Its
   // CSS is scoped to a root class, applied here around the *whole* document so
   // the header and footer adopt it too — a class on the page root alone would

@@ -231,3 +231,23 @@ async def test_schedule_swallows_a_failure_so_a_background_task_cannot_escape(
     assert await schedule(db_state, type_id, settings) == 0
 
     assert set((await fresh_type(db, type_id)).reindex_pending) == {"price"}
+
+
+async def test_a_type_deleted_during_its_rebuild_is_not_an_error(db, settings, field_def):
+    """The runner's last step locks the type row; one that is gone by then is a
+    quiet return ("its markers went with it"), not the lock's ``Conflict``."""
+    from sm_records.services.reindex_runner import _clear_rebuilt
+    from sqlalchemy import delete
+
+    rtype = await type_service.create_type(
+        db,
+        key="product",
+        label="Product",
+        fields_raw=[field_def("price", "text")],
+        settings=settings,
+    )
+    await db.commit()
+    await db.execute(delete(RecordType).where(RecordType.id == rtype.id))
+    await db.commit()
+
+    await _clear_rebuilt(db, rtype, ["price"], rtype.schema_version)

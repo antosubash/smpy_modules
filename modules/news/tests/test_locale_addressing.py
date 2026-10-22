@@ -15,11 +15,26 @@ from __future__ import annotations
 
 import pytest
 from factories import make_article
+from fastapi.routing import iter_route_contexts
 from news import redirects
 from news.content import ArticlesService
 from news.models import NewsCategory
 
 pytestmark = pytest.mark.asyncio
+
+
+def _route_paths(app) -> set[str]:
+    """Every path the app serves, view routes included.
+
+    Not ``app.routes``: since FastAPI 0.141 ``include_router`` wraps the
+    sub-router in one lazily-resolved ``_IncludedRouter`` with no ``path``.
+    Not the OpenAPI schema: from framework 0.0.37 (the nightly newest-framework
+    run; the host pins 0.0.36) view routers are included with
+    ``include_in_schema=False``, so the schema lists only ``/api/...`` (#186).
+    ``iter_route_contexts`` ships with the FastAPI 0.141 every lock here
+    resolves, so it is imported unguarded.
+    """
+    return {r.path for r in iter_route_contexts(app.routes) if r.path}
 
 
 class TestRoutesAreMountedPerLanguage:
@@ -31,17 +46,10 @@ class TestRoutesAreMountedPerLanguage:
     no longer describes what is public.
     """
 
-    def _paths(self, client) -> set[str]:
-        # Read off the OpenAPI schema rather than walking ``app.routes``:
-        # FastAPI 0.136 wraps an included router in an opaque
-        # ``_IncludedRouter`` with no ``path``, so the route list no longer
-        # answers "what is mounted where" — the schema does.
-        return set(client.app.openapi()["paths"])
-
     async def test_each_language_gets_its_own_viewer(
         self, bilingual_public_client
     ) -> None:
-        paths = self._paths(bilingual_public_client)
+        paths = _route_paths(bilingual_public_client.app)
 
         assert "/news/{slug}" in paths
         assert "/de/news/{slug}" in paths
@@ -52,7 +60,7 @@ class TestRoutesAreMountedPerLanguage:
         """The reading surface, not just the leaf. An archive that existed only
         in the default language would leave every German article reachable but
         unbrowsable."""
-        paths = self._paths(bilingual_public_client)
+        paths = _route_paths(bilingual_public_client.app)
 
         assert {"/de/news/", "/de/news/category/{slug}", "/de/news/tag/{slug}"} <= paths
 
@@ -63,7 +71,7 @@ class TestRoutesAreMountedPerLanguage:
         river. A sitemap is one document telling a crawler what exists, so there
         is one — publishing it twice would be duplicate content pointing at
         duplicate content."""
-        paths = self._paths(bilingual_public_client)
+        paths = _route_paths(bilingual_public_client.app)
 
         assert {"/news/feed.xml", "/de/news/feed.xml"} <= paths
         assert "/news/sitemap.xml" in paths
@@ -74,7 +82,7 @@ class TestRoutesAreMountedPerLanguage:
     ) -> None:
         """Serving the article at both would put one document at two addresses;
         404 would be correct and useless."""
-        assert "/en/news/{slug}" in self._paths(bilingual_public_client)
+        assert "/en/news/{slug}" in _route_paths(bilingual_public_client.app)
 
         response = await bilingual_public_client.get(
             "/en/news/budget", follow_redirects=False
@@ -120,7 +128,7 @@ class TestRoutesAreMountedPerLanguage:
 
         assert response.status_code == 404
         assert "Budget" not in response.text
-        assert "/fr/news/{slug}" not in self._paths(bilingual_public_client)
+        assert "/fr/news/{slug}" not in _route_paths(bilingual_public_client.app)
 
     async def test_a_configured_language_does_not_borrow_anothers_article(
         self, bilingual_public_client
@@ -147,7 +155,7 @@ class TestRoutesAreMountedPerLanguage:
     ) -> None:
         """One language means the bare prefix is the only address there is, so
         there is no second spelling for an alias to collapse."""
-        paths = set(anon_client.app.openapi()["paths"])
+        paths = _route_paths(anon_client.app)
 
         assert "/news/{slug}" in paths
         assert "/en/news/{slug}" not in paths

@@ -14,6 +14,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
 import { approvePage, type PageRead, rejectPage } from '../utils/api';
+import { formatTimestamp } from '../utils/dates';
 import { keys, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
 
@@ -34,7 +35,7 @@ interface Props {
  * the editor header + history panel).
  */
 export default function PendingReview() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { pages } = props;
   const defaultLocale = props.default_locale ?? 'en';
@@ -86,7 +87,7 @@ export default function PendingReview() {
                 <TableCell className="font-medium">{p.title}</TableCell>
                 <TableCell className="font-mono text-sm text-muted-foreground">{p.slug}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {p.updated_at ? new Date(p.updated_at).toLocaleString() : '—'}
+                  {formatTimestamp(p.updated_at, locale) || '—'}
                 </TableCell>
                 <TableCell className="space-x-1 text-right">
                   <Button

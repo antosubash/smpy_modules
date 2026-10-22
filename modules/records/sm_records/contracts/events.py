@@ -47,6 +47,7 @@ __all__ = [
     "RecordTrashed",
     "RecordTypeChanged",
     "RecordTypeDeleted",
+    "RecordTypeMoved",
     "RecordUpdated",
 ]
 
@@ -177,3 +178,24 @@ class RecordTypeDeleted(Event):
     type_key: str
     tenant_id: str
     purged: int
+
+
+@dataclass
+class RecordTypeMoved(Event):
+    """A type and every record of it moved to another table set (#82) —
+    ``PUT /types/{key}`` with a changed ``collection``.
+
+    No record event accompanies it: a subscriber addresses a record by
+    ``(tenant_id, type_key, uuid)`` and none of the three changed. What did
+    change is the table and every row id, which matters only to a host that
+    reads the module's tables directly — which is who this is for.
+    ``source``/``target`` are collection names, ``None`` for the shared
+    tables, and ``moved`` counts every record, trash included. It is followed
+    by the ``RecordTypeChanged`` every accepted type write produces.
+    """
+
+    type_key: str
+    tenant_id: str
+    source: str | None
+    target: str | None
+    moved: int

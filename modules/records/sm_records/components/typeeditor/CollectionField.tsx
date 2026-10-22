@@ -12,9 +12,10 @@ const ID = 'type-editor-collection';
  *
  * - **New type, host declares collections** — a select, because this is the
  *   only request that may set it.
- * - **Existing type in a collection** — read-only text. A `PATCH` that changes
- *   it is a 409, so an editable control would offer an action that cannot
- *   succeed.
+ * - **Existing type in a collection** — read-only text. Changing it *moves*
+ *   every record of the type into other tables (#82), which is an operation
+ *   to ask for through the API on purpose, not a side effect of saving a
+ *   label edit with the whole form.
  * - **Anything else** — nothing at all. On a host that declares no collection
  *   there is nothing to choose, and a disabled select saying "Shared tables"
  *   would be a control for a feature that host does not have. That is the

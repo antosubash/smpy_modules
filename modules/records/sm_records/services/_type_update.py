@@ -26,6 +26,7 @@ from sm_records.services._schema import (
     pointers_moved,
     write_type_row,
 )
+from sm_records.services._type_move import check_target, move_type
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.schema_change import apply as apply_schema_change
 from sm_records.settings import RecordsSettings
@@ -66,23 +67,18 @@ _UNSET = object()
 ``null``", which is a legal value meaning the global tables."""
 
 
-def _check_collection_unchanged(rtype: RecordType, changes: dict[str, Any]) -> None:
-    """``collection`` is set at creation and never after — Phase 5 §6.2.
+def _requested_move(rtype: RecordType, changes: dict[str, Any]) -> tuple[bool, str | None]:
+    """Whether this edit moves the type to another collection, and where (#82).
 
-    A 409 and not the 422 ``_EDITABLE`` would otherwise give, because this is
-    not a malformed request: the caller asked for something coherent that this
-    module will not do. Moving a populated type between collections means
-    copying its records, revisions and index rows into other tables and
-    re-pointing every reference at them, with no rollback story — so the
-    refusal is the honest answer and the message says exactly that.
-
-    An echo of the current value is dropped rather than refused: clients send
-    back the whole type they just read, and a 409 for changing nothing would
-    make every save of an unmodified form fail.
+    An echo of the current value is not a move: clients send back the whole
+    type they just read, and an unmodified form must save as a no-op. A
+    changed value is handed to :func:`~._type_move.move_type`, which copies
+    the type's rows into the target table set in this transaction.
     """
     sent = changes.pop("collection", _UNSET)
-    if sent is not _UNSET and sent != rtype.collection:
-        raise Conflict("moving a populated type between collections is not supported")
+    if sent is _UNSET or sent == rtype.collection:
+        return False, None
+    return True, sent
 
 
 async def _check_translatable(
@@ -151,7 +147,7 @@ async def update_type(
     than folded into ``**changes`` because they are not columns.
     """
     await _check_translatable(db, rtype, settings, changes.get("translatable"))
-    _check_collection_unchanged(rtype, changes)
+    moving, target = _requested_move(rtype, changes)
     unknown = sorted(set(changes) - _EDITABLE)
     if unknown:
         problem = (
@@ -174,7 +170,17 @@ async def update_type(
     else:
         defs = field_defs(rtype)
 
-    if fields is not None or pointers_moved(rtype, changes):
+    if moving:
+        check_target(target)
+        if fields is not None or pointers_moved(rtype, changes):
+            # A schema change runs over the records where they are, and a
+            # move copies them as they are; one request doing both would have
+            # to pick an order the caller never stated. Two requests state it.
+            raise Conflict(
+                "moving a type between collections and changing its schema are "
+                "separate edits; send them as two requests"
+            )
+    elif fields is not None or pointers_moved(rtype, changes):
         # Including the trash: a trashed record still holds content these
         # fields describe, and a restore reads it back under them.
         held = await record_count(db, rtype, include_deleted=True)
@@ -206,6 +212,9 @@ async def update_type(
     )
 
     await bump_or_conflict(db, RecordType, rtype.id, expected_version, f"record type {rtype.key!r}")
+    if moving:
+        await move_type(db, rtype, target)
+        changes["collection"] = target
     await write_type_row(
         db,
         rtype,

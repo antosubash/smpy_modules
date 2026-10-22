@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type Overrides, Puck } from '@puckeditor/core';
-import '@puckeditor/core/puck.css';
+import '../components/body/puck-editor.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useMemo } from 'react';
