@@ -35,7 +35,7 @@ from collections.abc import AsyncIterator, Mapping
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
-from simple_module_db import current_tenant_id, tenant_context
+from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
 
 from news._tenancy_mode import (  # noqa: F401 - tests read the private names here
     _KNOWN_KWARGS,
@@ -240,7 +240,18 @@ async def bind_public(request: Request) -> AsyncIterator[str]:
 
 
 def search_tenant() -> str:
-    """The tenant a cross-module read runs in: the bound one, else the
-    single-tenant host's. A host with multi_tenant off binds none, and
-    an unfiltered read there would be every tenant's rows."""
-    return current_tenant_id.get() or DEFAULT_TENANT
+    """The tenant a cross-module read runs in: the one bound for this request,
+    else 403 ``tenant_required`` (#210).
+
+    Pagebuilder's tables are filtered only while a tenant is bound, so the
+    read pins one itself. The bound tenant is :func:`bind_admin`'s, which
+    already applied :func:`resolve_admin`'s rule — upstream tenant first,
+    :data:`DEFAULT_TENANT` only for a genuinely single-tenant request. With
+    nothing bound there is no request to tell the mode from, and falling back
+    to the default would read that tenant's pages and media on a multi-tenant
+    host, so it refuses instead.
+    """
+    tenant = current_tenant_id.get()
+    if is_valid_tenant_id(tenant):
+        return tenant
+    raise HTTPException(status_code=403, detail=TENANT_REQUIRED)
