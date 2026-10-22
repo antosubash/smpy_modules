@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+from pagebuilder.media_gif import gif_canvas_size
 from PIL import Image
 
 API = "/api/pagebuilder/uploads"
@@ -65,12 +66,106 @@ async def test_an_image_at_the_limit_still_uploads(
     assert len(_stored_files(tmp_path)) == 1
 
 
-async def test_a_disabled_limit_accepts_any_size(
-    authed_client: AsyncClient, monkeypatch
-) -> None:
+async def test_a_disabled_limit_accepts_any_size(authed_client: AsyncClient, monkeypatch) -> None:
     # A host may switch Pillow's guard off (``MAX_IMAGE_PIXELS = None``).
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", None)
 
     response = await _upload(authed_client, _png(20, 20))
 
     assert response.status_code == 201, response.text
+
+
+def _gif(width: int, height: int) -> bytes:
+    buf = io.BytesIO()
+    Image.new("P", (width, height), 0).save(buf, format="GIF")
+    return buf.getvalue()
+
+
+def _animated_gif_with_larger_second_frame() -> bytes:
+    """A 10x10 logical screen whose second frame is 20x20.
+
+    Pillow will not write this, so the second frame's image descriptor and
+    data are spliced out of a 20x20 GIF and appended before the trailer.
+    Pillow grows the canvas to 20x20 when it reaches that frame.
+    """
+    first = _gif(10, 10)
+    larger = _gif(20, 20)
+    descriptor = b",\x00\x00\x00\x00\x14\x00\x14\x00"
+    frame = larger[larger.index(descriptor) : -1]
+    return first[:-1] + frame + b";"
+
+
+async def _upload_as(client: AsyncClient, content: bytes, ctype: str):  # type: ignore[no-untyped-def]
+    return await client.post(API, files={"file": ("anim", content, ctype)})
+
+
+async def test_a_gif_frame_larger_than_the_screen_is_refused(
+    authed_client: AsyncClient, tmp_path: Path, monkeypatch
+) -> None:
+    # ``Image.open`` reports only the 10x10 logical screen; the second frame
+    # alone is over the limit, and Pillow raises ``DecompressionBombError``
+    # on seeking to it.
+    content = _animated_gif_with_larger_second_frame()
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    with Image.open(io.BytesIO(content)) as image:
+        assert image.size == (10, 10)
+        assert image.is_animated
+        with pytest.raises(Image.DecompressionBombError):
+            image.seek(1)
+
+    response = await _upload_as(authed_client, content, "image/gif")
+
+    assert response.status_code == 413, response.text
+    assert response.json()["detail"]["code"] == "image_too_many_pixels"
+    assert _stored_files(tmp_path) == []
+
+
+async def test_an_animated_gif_within_the_limit_still_uploads(
+    authed_client: AsyncClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 400)
+
+    response = await _upload_as(
+        authed_client, _animated_gif_with_larger_second_frame(), "image/gif"
+    )
+
+    assert response.status_code == 201, response.text
+    # The stored dimensions stay the logical screen's, as before.
+    assert (response.json()["width"], response.json()["height"]) == (10, 10)
+
+
+def _animated(fmt: str, side: int) -> bytes:
+    buf = io.BytesIO()
+    frames = [Image.new("RGB", (side, side), c) for c in ("red", "blue")]
+    frames[0].save(buf, format=fmt, save_all=True, append_images=frames[1:])
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize(("fmt", "ctype"), [("PNG", "image/png"), ("WEBP", "image/webp")])
+async def test_an_animated_canvas_over_the_limit_is_refused(
+    authed_client: AsyncClient, tmp_path: Path, monkeypatch, fmt: str, ctype: str
+) -> None:
+    # APNG and animated WebP frames must lie inside the canvas (Pillow and
+    # libwebp reject one that does not), so the canvas size bounds them all.
+    content = _animated(fmt, 12)
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+
+    response = await _upload_as(authed_client, content, ctype)
+
+    assert response.status_code == 413, response.text
+    assert _stored_files(tmp_path) == []
+
+
+def test_gif_canvas_walks_extensions_and_tolerates_truncation(tmp_path: Path) -> None:
+    # Pillow writes loop/duration extensions on every animated GIF; the walk
+    # must step over them, and a cut-off file must not raise.
+    path = tmp_path / "a.gif"
+    path.write_bytes(_animated("GIF", 8))
+    assert gif_canvas_size(path) == (8, 8)
+    spliced = _animated_gif_with_larger_second_frame()
+    path.write_bytes(spliced)
+    assert gif_canvas_size(path) == (20, 20)
+    path.write_bytes(spliced[: len(spliced) // 2])
+    assert gif_canvas_size(path) is not None
+    path.write_bytes(_png(4, 4))
+    assert gif_canvas_size(path) is None

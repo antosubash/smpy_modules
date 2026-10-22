@@ -16,6 +16,8 @@ from typing import Any
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
 
+from pagebuilder.media_gif import gif_canvas_size
+
 logger = logging.getLogger(__name__)
 
 _EXT_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
@@ -141,6 +143,11 @@ def process_image(
             src_w, src_h = image.size
             if _exceeds_pixel_limit(src_w, src_h):
                 raise TooManyPixelsError(f"{src_w}x{src_h} exceeds Image.MAX_IMAGE_PIXELS")
+            # A later GIF frame may lie outside the logical screen, and Pillow
+            # grows the canvas to fit it; the canvas is what decoding needs.
+            canvas = gif_canvas_size(source) if image.format == "GIF" else None
+            if canvas is not None and _exceeds_pixel_limit(*canvas):
+                raise TooManyPixelsError(f"GIF canvas {canvas} exceeds Image.MAX_IMAGE_PIXELS")
             if src_w <= 0 or src_h <= 0:
                 return src_w or None, src_h or None, {}
             # Capture dimensions even for animated images — the
