@@ -58,10 +58,19 @@ def _request(app: FastAPI, tenant: object = None) -> SimpleNamespace:
     return SimpleNamespace(app=app, state=SimpleNamespace(tenant_id=tenant))
 
 
-def test_single_mode_resolves_default_whatever_the_request_says():
+def test_single_mode_resolves_default_without_an_upstream_tenant():
     app = FastAPI()
-    assert tenancy.resolve_admin(_request(app, "acme")) == DEFAULT_TENANT
+    assert tenancy.resolve_admin(_request(app, None)) == DEFAULT_TENANT
     assert tenancy.resolve_public(_request(app, None)) == DEFAULT_TENANT
+
+
+def test_an_upstream_tenant_wins_over_single_mode():
+    """The mode only fills a gap (#192): a wrong SINGLE fails closed."""
+    app = FastAPI()
+    assert tenancy.resolve_admin(_request(app, "acme")) == "acme"
+    assert tenancy.resolve_public(_request(app, "acme")) == "acme"
+    with tenant_context("beta"):
+        assert tenancy.resolve_admin(_request(app, None)) == "beta"
 
 
 def test_multi_mode_uses_the_resolved_tenant():
@@ -70,6 +79,7 @@ def test_multi_mode_uses_the_resolved_tenant():
     assert tenancy.resolve_public(_request(app, "acme")) == "acme"
 
 
+@pytest.mark.unbound_tenant
 @pytest.mark.parametrize("value", [None, "", "x" * 51, "../etc"])
 def test_multi_mode_without_a_tenant(value):
     app = _app()

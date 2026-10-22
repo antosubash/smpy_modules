@@ -148,14 +148,18 @@ def _serving_tenant(scope: Scope) -> str | None:
     """The tenant whose directory this request may read.
 
     ``StaticFiles`` is a bare ASGI mount, so no router dependency binds a
-    tenant: the mode comes off the app and the tenant off the context var that
-    ``TenantMiddleware`` binds around the whole stack.
+    tenant: the tenant comes off the context var that ``TenantMiddleware``
+    binds around the whole stack (or ``state.tenant_id``), and only with none
+    does a single-tenant app's mode supply the default (#192).
     """
+    state = scope.get("state") or {}
+    for tenant in (state.get("tenant_id"), current_tenant_id.get()):
+        if is_valid_tenant_id(tenant):
+            return tenant
     app = scope.get("app")
     if app is None or mode_of(app) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    tenant = current_tenant_id.get()
-    return tenant if is_valid_tenant_id(tenant) else None
+    return None
 
 
 def _tenant_path(path: str, scope: Scope) -> str | None:

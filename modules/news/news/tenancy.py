@@ -12,7 +12,11 @@ is built once at boot, so a later edit of ``multi_tenant`` does not reach it
 until a restart.
 
 * ``SINGLE`` — no ``TenantMiddleware``, or one ``fixed`` to
-  :data:`DEFAULT_TENANT`. Everything runs in :data:`DEFAULT_TENANT`.
+  :data:`DEFAULT_TENANT`. Everything runs in :data:`DEFAULT_TENANT` —
+  *unless something upstream already resolved a tenant for the request*,
+  which always wins (#192): the mode only fills a gap, so a wrong ``SINGLE``
+  (a child app mounted under a multi-tenant parent) fails closed. Detection
+  and the request-time rule live in :mod:`news._tenancy_mode`.
 * ``MULTI`` — every entry point runs in the tenant the framework resolved
   (``request.state.tenant_id``: subdomain for visitors, membership for
   members). The admin surface refuses a request with none (403
@@ -27,12 +31,26 @@ its own ``tenant_id`` predicate (there are none today).
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Mapping
-from enum import StrEnum
+from collections.abc import AsyncIterator
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
-from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
+from simple_module_db import current_tenant_id, tenant_context
+
+from news._tenancy_mode import (  # noqa: F401 - tests read the private names here
+    _KNOWN_KWARGS,
+    _PACKAGE,
+    DEFAULT_TENANT,
+    TenancyMode,
+    _fixed_tenant,
+    _framework_mode,
+    _kwargs,
+    _tenant_middleware,
+    _warn_if_unrecognised,
+    detect_mode,
+    request_mode,
+    upstream_tenant,
+)
 
 __all__ = [
     "DEFAULT_TENANT",
@@ -52,116 +70,12 @@ __all__ = [
 
 _log = logging.getLogger("simple_module.news")
 
-_PACKAGE = "news"
-
-DEFAULT_TENANT: Final = "default"
-"""The tenant of a single-tenant host, and of every row that predates tenancy.
-
-A constant, not a setting: the ``tenant_id`` migration backfills this literal,
-and records uses the same one, so one host has one notion of it."""
-
 TENANT_REQUIRED: Final = "tenant_required"
 """The 403 detail for an admin request that resolved no tenant."""
 
 _NOT_FOUND: Final = "Article not found"
 """What the public viewer answers for an unknown slug — and, word for word, for
 a request that resolved no tenant."""
-
-
-class TenancyMode(StrEnum):
-    SINGLE = "single"
-    MULTI = "multi"
-
-
-_KNOWN_KWARGS: Final = frozenset({"fixed", "header"})
-"""The ``TenantMiddleware`` keywords read here. Both are framework internals
-(#125); ``tests/test_framework_pins.py`` fails when either stops existing."""
-
-_UNREADABLE: Final = (
-    "{pkg}: cannot read the app's middleware stack (app.user_middleware, or "
-    "its entries' .cls, is gone), so it cannot tell a single-tenant host from "
-    "a multi-tenant one. Refusing to guess: a wrong 'single' leaves every "
-    "read unfiltered (#125)"
-)
-
-
-def _tenant_middleware(app: Any) -> Any:
-    """The ``TenantMiddleware`` entry of the built stack, or ``None``.
-
-    Raises on a real Starlette app whose stack has no readable shape: finding
-    no entry would read as ``SINGLE``, and ``SINGLE`` reads are unfiltered. A
-    test double without a stack is simply single-tenant.
-    """
-    from simple_module_hosting.middleware import TenantMiddleware
-    from starlette.applications import Starlette
-
-    entries = getattr(app, "user_middleware", None)
-    if entries is None or any(not hasattr(e, "cls") for e in entries):
-        if isinstance(app, Starlette):
-            raise RuntimeError(_UNREADABLE.format(pkg=_PACKAGE))
-        return None
-    return next(
-        (e for e in entries if isinstance(e.cls, type) and issubclass(e.cls, TenantMiddleware)),
-        None,
-    )
-
-
-def _kwargs(entry: Any) -> dict[str, Any] | None:
-    """*entry*'s keywords, or ``None`` when their shape is not one read here
-    (positional arguments, or a keyword outside :data:`_KNOWN_KWARGS`)."""
-    kwargs = getattr(entry, "kwargs", None)
-    if not isinstance(kwargs, Mapping) or getattr(entry, "args", ()):
-        return None
-    return dict(kwargs) if set(kwargs) <= _KNOWN_KWARGS else None
-
-
-def _fixed_tenant(entry: Any) -> str | None:
-    """The tenant a single-tenant host pins every request to, or ``None``."""
-    return (_kwargs(entry) or {}).get("fixed") if entry else None
-
-
-def _framework_says_multi(app: Any) -> bool:
-    """Whether the framework's own public answer (0.0.36+) is ``MULTI``.
-
-    It says ``SINGLE`` for any app built outside ``create_app``, so only its
-    ``MULTI`` is evidence; on 0.0.35, which lacks it, there is none.
-    """
-    try:
-        from simple_module_hosting.tenancy import tenancy_mode
-    except ImportError:
-        return False
-    return str(tenancy_mode(app)) == TenancyMode.MULTI
-
-
-def detect_mode(app: Any) -> TenancyMode:
-    """``MULTI`` iff ``TenantMiddleware`` is in the stack and resolves tenants
-    per request; a ``fixed`` one is a single-tenant host.
-
-    Fails safe (#125): an entry whose arguments are not recognised counts as
-    ``MULTI`` — reads stay filtered, and a fixed middleware still puts its one
-    tenant on ``request.state``, which is all ``MULTI`` resolution reads — as
-    does the framework's own ``tenancy_mode`` saying ``MULTI``.
-    """
-    entry = _tenant_middleware(app)
-    if _framework_says_multi(app):
-        return TenancyMode.MULTI
-    if entry is None:
-        return TenancyMode.SINGLE
-    if _kwargs(entry) is None:
-        return TenancyMode.MULTI
-    return TenancyMode.SINGLE if _fixed_tenant(entry) else TenancyMode.MULTI
-
-
-def _warn_if_unrecognised(app: Any) -> None:
-    entry = _tenant_middleware(app)
-    if entry is not None and _kwargs(entry) is None:
-        _log.warning(
-            "%s: TenantMiddleware was installed with arguments this version does not "
-            "recognise (args=%r, kwargs=%r); running multi-tenant so reads stay filtered",
-            _PACKAGE,
-            getattr(entry, "args", None),
-            getattr(entry, "kwargs", None),
-        )
 
 
 def configure(app: Any) -> TenancyMode:
@@ -236,27 +150,28 @@ def mode_of(app: Any) -> TenancyMode:
     return mode if isinstance(mode, TenancyMode) else detect_mode(app)
 
 
-def _resolved(request: Any) -> str | None:
-    tenant = getattr(request.state, "tenant_id", None)
-    return tenant if is_valid_tenant_id(tenant) else None
-
-
 def resolve_admin(request: Any) -> str:
     """The admin surface's tenant; 403 ``tenant_required`` in MULTI mode
-    when the framework resolved none."""
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    when nothing upstream resolved one.
+
+    A tenant already on the request always wins — the mode only fills a gap
+    (#192), so a wrong ``SINGLE`` binds the parent's tenant, not the default.
+    """
+    tenant = upstream_tenant(request)
+    if tenant is not None:
+        return tenant
+    if request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    tenant = _resolved(request)
-    if tenant is None:
-        raise HTTPException(status_code=403, detail=TENANT_REQUIRED)
-    return tenant
+    raise HTTPException(status_code=403, detail=TENANT_REQUIRED)
 
 
 def resolve_public(request: Any) -> str | None:
-    """The anonymous surface's tenant, or ``None``."""
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    """The anonymous surface's tenant, or ``None``. An upstream tenant wins
+    over the mode, as in :func:`resolve_admin`."""
+    tenant = upstream_tenant(request)
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    return _resolved(request)
+    return tenant
 
 
 async def bind_admin(request: Request) -> AsyncIterator[str]:

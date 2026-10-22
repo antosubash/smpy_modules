@@ -16,12 +16,20 @@ import news.tenancy
 import pagebuilder.tenancy
 import pytest
 import sm_records._tenancy_mode
+import sm_records.tenancy
+from fastapi import Request
+from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, create_app
 
 _DETECTORS = {
     "pagebuilder": pagebuilder.tenancy,
     "news": news.tenancy,
     "records": sm_records._tenancy_mode,
+}
+_RESOLVERS = {
+    "pagebuilder": pagebuilder.tenancy,
+    "news": news.tenancy,
+    "records": sm_records.tenancy,
 }
 
 # Every row spells out all three settings, so a developer's .env cannot move it.
@@ -71,3 +79,38 @@ def test_the_header_readers_agree(host):
     # tenant_vary reads the stored mode, which needs on_startup; detect on the fly.
     for detector in (pagebuilder.tenancy, news.tenancy):
         assert detector.tenant_vary(app) == expected
+
+
+def test_create_app_still_leaves_state_sm(host):
+    """pagebuilder's and news' ``_framework_mode`` take the framework's SINGLE
+    as an answer only on an app carrying ``state.sm`` (#192); without it a
+    factory-built stack entry would turn every host MULTI."""
+    app, _mode, _header = host
+    assert getattr(app.state, "sm", None) is not None, "create_app no longer sets app.state.sm"
+    for detector in (pagebuilder.tenancy, news.tenancy):
+        assert detector._framework_mode(app) is not None
+
+
+async def test_the_resolvers_agree_on_a_real_request(host, monkeypatch):
+    """One anonymous request through the stack ``create_app`` built (#192): every
+    module's public resolver lands on the tenant the framework's own middleware
+    put on the request — ``default`` on a single-tenant host, the header's
+    tenant when one is configured, none otherwise.
+
+    The tenants module's resolver is set aside so ``TenantMiddleware`` falls
+    through to its header, which is what the ``multi, header`` row exercises."""
+    app, mode, header = host
+    monkeypatch.setattr(app.state, "tenant_resolver", None, raising=False)
+    # Under /health/: the setup gate lets it through on a host with no admin yet.
+    path = f"/health/_parity_probe_{mode}_{header or 'none'}"
+    app.state.public_routes.add_exact(path)  # anonymous, as a visitor is
+
+    @app.get(path)
+    async def probe(request: Request) -> dict:
+        return {name: module.resolve_public(request) for name, module in _RESOLVERS.items()}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        response = await client.get(path, headers={"X-Tenant-ID": "acme"})
+    assert response.status_code == 200, response.text
+    expected = "default" if mode == "single" else "acme" if header else None
+    assert response.json() == dict.fromkeys(_RESOLVERS, expected)
