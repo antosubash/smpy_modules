@@ -148,7 +148,7 @@ def test_an_explicit_fixed_pin_must_agree_with_the_frameworks_answer():
 # --- menu registry ------------------------------------------------------------
 
 
-def test_the_splice_reaches_all_items():
+def test_remove_reaches_all_items():
     """Behaviour, not just names: a removed entry leaves the *sorted* view."""
     registry = MenuRegistry()
     hub = MenuItem(label="Hub", url="/hub", order=1, section=MenuSection.ADMIN_SIDEBAR)

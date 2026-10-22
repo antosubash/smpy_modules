@@ -291,7 +291,7 @@ Which tenant a request acts for depends on the host:
   an editor with no tenant gets 403. Custom domains are not supported yet.
 
 The scheduler publishes due pages tenant by tenant, each in its own session.
-Requires framework `0.0.35` or later, and the host migration that adds
+Requires framework `0.0.36` or later, and the host migration that adds
 `tenant_id` (`make migration` picks it up like any other model change).
 
 ## Content snapshots
