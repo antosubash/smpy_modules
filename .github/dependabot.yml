@@ -18,8 +18,12 @@
 
 version: 2
 updates:
+  # The workflows, plus the local composite actions under .github/actions,
+  # which a `directory: /` entry does not look inside.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     groups:

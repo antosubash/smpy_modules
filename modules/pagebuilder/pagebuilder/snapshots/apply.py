@@ -30,7 +30,13 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import from_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.media_match import match_existing
-from pagebuilder.snapshots.pages import MEDIA_FIELDS, PageKey, apply_payload
+from pagebuilder.snapshots.pages import (
+    MEDIA_FIELDS,
+    PageKey,
+    apply_payload,
+    page_identity,
+    page_state,
+)
 from pagebuilder.snapshots.plan import read_documents, redirect_locale
 
 
@@ -73,11 +79,7 @@ async def _restore_media(
                 file=BytesIO(data),
                 filename=original,
                 headers=Headers(
-                    {
-                        "content-type": entry.get(
-                            "content_type", "application/octet-stream"
-                        )
-                    }
+                    {"content-type": entry.get("content_type", "application/octet-stream")}
                 ),
             )
             asset = await service.upload(upload, folder=entry.get("folder"))
@@ -89,8 +91,12 @@ async def _restore_media(
 
 async def _restore_pages(
     db: AsyncSession, bundled: dict[PageKey, dict[str, Any]], name_to_url: dict[str, str]
-) -> tuple[dict[PageKey, Page], dict[PageKey, int], int, int]:
-    """Pass one: upsert every page. Returns ``({key: page}, {key: id}, created, updated)``.
+) -> tuple[dict[PageKey, Page], dict[PageKey, int], set[PageKey], dict[PageKey, tuple]]:
+    """Pass one: upsert every page.
+
+    Returns ``({key: page}, {key: id}, created keys, {existing key: state
+    before})`` — the last two are what :func:`applied_outcomes` turns into the
+    restore's audit record.
 
     Keyed by ``(locale, slug)`` because that is what the unique index is on:
     matching on the bare slug would make a German ``about`` overwrite the
@@ -107,8 +113,8 @@ async def _restore_pages(
     result = await db.execute(select(Page))
     by_key = {(page.locale, page.slug): page for page in result.scalars().all()}
 
-    created = 0
-    updated = 0
+    created: set[PageKey] = set()
+    before: dict[PageKey, tuple] = {}
     for key in sorted(bundled):
         locale, slug = key
         payload = dict(bundled[key])
@@ -123,16 +129,36 @@ async def _restore_pages(
             page = Page(slug=slug, locale=locale, title=payload.get("title", slug))
             db.add(page)
             by_key[key] = page
-            created += 1
+            created.add(key)
         else:
-            updated += 1
+            before[key] = page_state(page)
         apply_payload(page, payload)
         # Restoring content under a claimed slug brings the page back.
         page.deleted_at = None
 
     await db.flush()
     ids = {key: page.id for key, page in by_key.items() if page.id}
-    return by_key, ids, created, updated
+    return by_key, ids, created, before
+
+
+def applied_outcomes(
+    by_key: dict[PageKey, Page], created: set[PageKey], before: dict[PageKey, tuple]
+) -> dict[str, list[dict[str, Any]]]:
+    """``{"created": [...], "overwritten": [...]}`` — the pages this apply wrote.
+
+    Each entry is :func:`page_identity`, not ``(locale, slug)``: a slug is
+    reused after a purge and rewritten by a rename, an identity is neither. A
+    page whose state came out identical to what it went in as is in neither
+    list. Called after the parent pass, so ``parent_id`` is final.
+    """
+    return {
+        "created": [page_identity(by_key[key]) for key in sorted(created)],
+        "overwritten": [
+            page_identity(page)
+            for key, page in sorted(by_key.items())
+            if key in before and page_state(page) != before[key]
+        ],
+    }
 
 
 async def _resolve_parents(
@@ -189,9 +215,7 @@ async def _restore_redirects(
         if page_id is None:
             dropped.append(row.get("from_slug", ""))
             continue
-        db.add(
-            PageRedirect(from_slug=row["from_slug"], locale=locale, page_id=page_id)
-        )
+        db.add(PageRedirect(from_slug=row["from_slug"], locale=locale, page_id=page_id))
         kept += 1
     await db.flush()
     return kept, dropped
@@ -206,16 +230,19 @@ async def apply_bundle(
     *,
     note: str | None = None,
 ) -> dict[str, Any]:
-    """Restore *bundle_dir* onto the live site. Does not commit."""
+    """Restore *bundle_dir* onto the live site. Does not commit.
+
+    The result's ``applied`` key is for the caller's audit record, not for the
+    response: it names the pages this apply actually wrote, by id.
+    """
     name_to_url, media_added = await _restore_media(db, settings, blobs, index)
 
     documents = await read_documents(bundle_dir)
     bundled = documents.pages
-    by_key, ids, created, updated = await _restore_pages(db, bundled, name_to_url)
+    by_key, ids, created, before = await _restore_pages(db, bundled, name_to_url)
     await _resolve_parents(db, bundled, by_key, ids)
-    redirects_kept, redirects_dropped = await _restore_redirects(
-        db, documents.redirects, ids
-    )
+    applied = applied_outcomes(by_key, created, before)
+    redirects_kept, redirects_dropped = await _restore_redirects(db, documents.redirects, ids)
 
     layout = from_sentinels(documents.layout, name_to_url)
     await LayoutService(db).update(
@@ -225,8 +252,9 @@ async def apply_bundle(
     )
 
     return {
-        "pages_created": created,
-        "pages_updated": updated,
+        "pages_created": len(created),
+        "pages_updated": len(before),
+        "applied": applied,
         "media_added": media_added,
         "redirects": redirects_kept,
         "redirects_dropped": redirects_dropped,

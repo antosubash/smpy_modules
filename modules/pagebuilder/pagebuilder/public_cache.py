@@ -98,9 +98,13 @@ def viewer_key(request: Request) -> str:
     return f"{ui_locale}:{who}"
 
 
-def cache_control(request: Request, settings: PagebuilderSettings) -> str:
-    if signed_in(request):
-        return SIGNED_IN_CACHE_CONTROL
+def cache_control(settings: PagebuilderSettings) -> str:
+    """The policy for an *anonymous* response; a signed-in one is never kept.
+
+    Takes no request on purpose, matching news' ``cache_control``: whether the
+    response is a signed-in one is the caller's question (:func:`signed_in`),
+    and it is asked once there rather than in each helper.
+    """
     parts = [f"max-age={settings.public_cache_max_age}"]
     if settings.public_cache_swr > 0:
         parts.append(f"stale-while-revalidate={settings.public_cache_swr}")

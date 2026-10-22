@@ -25,8 +25,6 @@ from pagebuilder.contracts.schemas import (
     MediaAssetListResponse,
     PageListResponse,
     PageRead,
-    PageRevisionListResponse,
-    PageRevisionRead,
     StatusFilter,
 )
 from pagebuilder.deps import get_media_service, get_settings
@@ -169,7 +167,8 @@ async def admin_pending(
 @router.get("/new", response_model=None)
 async def admin_new(inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(
-        _PAGE_EDITOR, {"page": None, "revisions": [], **_locale_props()}
+        _PAGE_EDITOR,
+        {"page": None, "revisions": [], "restores": [], **_locale_props()},
     )
 
 
@@ -181,15 +180,13 @@ async def admin_edit(
 ) -> InertiaResponse:
     service = PagesService(db)
     page = await service.get_page(page_id)
-    revisions = await service.list_revisions(page_id)
-    revisions_payload = PageRevisionListResponse(
-        items=[PageRevisionRead.model_validate(r) for r in revisions]
-    )
+    history = (await service.revision_history(page_id)).model_dump(mode="json")
     return await inertia.render(
         _PAGE_EDITOR,
         {
             "page": (await service.detail(page)).model_dump(mode="json"),
-            "revisions": revisions_payload.model_dump(mode="json")["items"],
+            "revisions": history["items"],
+            "restores": history["restores"],
             **_locale_props(),
         },
     )

@@ -41,6 +41,7 @@ def _shared() -> Any:
 _pg = _shared()
 
 arm_reset = _pg.arm_reset
+USING_POSTGRES: bool = _pg.USING_POSTGRES
 
 
 async def make_db_state() -> Any:
