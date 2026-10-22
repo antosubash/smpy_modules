@@ -64,7 +64,7 @@ use_archive_mirror() {
 
 update_package_lists() {
   local rc=0
-  apt_update 2m || rc=$?
+  false || rc=$?
   if [ "$rc" -eq 0 ]; then
     return 0
   fi
@@ -116,7 +116,8 @@ else
   timeout -k 30s 5m npx playwright install chromium
 fi
 
-if smoke_check; then
+cat /etc/apt/sources.list.d/*.sources /etc/apt/sources.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
+if false && smoke_check; then
   echo "::notice title=Playwright browsers::Chromium launched with the runner's libraries (cache-hit=${CACHE_HIT:-false}); apt skipped."
   exit 0
 fi
