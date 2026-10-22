@@ -323,8 +323,8 @@ jobs:
     # test 138 of 143 at 15m17s and was cancelled with the last file still to
     # go), and from 25 when the records specs took the suite from 149 tests to
     # 257 — 24 `records-*.spec.ts` files, 108 tests. At the same measured ~7s a
-    # test that is ~30 minutes of tests alone, and `uv sync`, `npm ci`,
-    # `make sync-module-deps`, `make gen-pages`, the Playwright browser install
+    # test that is ~30 minutes of tests alone, and the e2e-setup action
+    # (`uv sync`, `npm ci`, the bundle build, the Playwright browser install)
     # and up to 180s of `webServer` boot all sit inside this ceiling too. 45
     # covers that with room for a slow runner and the odd retry, without going
     # near the billable runaway this ceiling exists to stop.
@@ -333,72 +333,32 @@ jobs:
     # way: `playwright.config.ts` sets `workers: 1` / `fullyParallel: false` on
     # purpose, because every spec runs against the one host and the one SQLite
     # database `start-test-server.sh` builds. A second worker is a second
-    # writer to that database, not a second suite.
+    # writer to that database, not a second suite — sharding needs a host and
+    # a database per shard (#119).
     timeout-minutes: 45
+    env:
+      # The production bundle, served by uvicorn without --reload (#119).
+      E2E_BUNDLE: "1"
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+      - uses: ./.github/actions/e2e-setup
         with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
+          python-version: ${{ env.PYTHON_VERSION }}
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-
-      - name: Sync Python workspace
-        run: uv sync --locked --all-packages --all-extras
-
-      - name: Install npm workspace
-        run: npm ci
-
-      - name: Sync module JS deps into host
-        run: make sync-module-deps
-
-      - name: Generate pages manifest
-        run: make gen-pages
-
-      # Cache Chromium + system deps between runs so we don't redownload
-      # ~290 MB every PR push. Key on the Playwright version so a bump
-      # invalidates the cache automatically.
-      - name: Resolve Playwright version
-        id: pw-version
-        run: |
-          v=$(node -p "require('@playwright/test/package.json').version")
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      # Step-level timeout so a hung mirror / stalled apt can't sit for
-      # the full job budget. 8 min is comfortably above the normal ~2 min
-      # cold install but well below `timeout-minutes` at the job level.
-      - name: Install Playwright browsers
-        timeout-minutes: 8
-        run: |
-          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
-            # Browsers cached — only refresh OS-level deps (fast).
-            npx playwright install-deps chromium
-          else
-            npx playwright install chromium --with-deps
-          fi
+          uv-version: ${{ env.UV_VERSION }}
 
       # `--max-failures=1` aborts the suite on the first failing test so a
-      # broken build doesn't drag the whole runner out to the job timeout.
+      # broken build doesn't drag the whole runner out to the job timeout. A
+      # test that needed its retry fails the run too (`failOnFlakyTests`).
       - name: Run Playwright tests
         run: npm run test:e2e -- --max-failures=1
+
+      # Lists every flaky and failed test in the job summary, and fails the
+      # job on a flaky one (#119).
+      - name: Flaky and failed tests
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e_report_summary.mjs
 
       - name: Upload Playwright report
         if: always()
@@ -419,70 +379,24 @@ jobs:
     timeout-minutes: 20
     env:
       E2E_MULTI_TENANT: "1"
+      E2E_BUNDLE: "1"
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+      - uses: ./.github/actions/e2e-setup
         with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
+          python-version: ${{ env.PYTHON_VERSION }}
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-
-      - name: Sync Python workspace
-        run: uv sync --locked --all-packages --all-extras
-
-      - name: Install npm workspace
-        run: npm ci
-
-      - name: Sync module JS deps into host
-        run: make sync-module-deps
-
-      - name: Generate pages manifest
-        run: make gen-pages
-
-      # Cache Chromium + system deps between runs so we don't redownload
-      # ~290 MB every PR push. Key on the Playwright version so a bump
-      # invalidates the cache automatically.
-      - name: Resolve Playwright version
-        id: pw-version
-        run: |
-          v=$(node -p "require('@playwright/test/package.json').version")
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      # Step-level timeout so a hung mirror / stalled apt can't sit for
-      # the full job budget. 8 min is comfortably above the normal ~2 min
-      # cold install but well below `timeout-minutes` at the job level.
-      - name: Install Playwright browsers
-        timeout-minutes: 8
-        run: |
-          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
-            # Browsers cached — only refresh OS-level deps (fast).
-            npx playwright install-deps chromium
-          else
-            npx playwright install chromium --with-deps
-          fi
+          uv-version: ${{ env.UV_VERSION }}
 
       # The opt-in specs that need an active organisation. The default `e2e`
       # job runs single-tenant and skips them.
       - name: Run multi-tenant Playwright tests
         run: npm run test:e2e -- billing-tenant news-tenant
+
+      - name: Flaky and failed tests
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e_report_summary.mjs
 
       - name: Upload Playwright report
         if: always()

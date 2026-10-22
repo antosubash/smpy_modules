@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Entry point used by playwright.config.ts → webServer.command.
-# Resets the test SQLite database, runs migrations, then hands off to
-# `make dev`. Keeping this in a script (instead of chaining inside the
+# Resets the test SQLite database, runs migrations, then hands off to the
+# server: `make dev` by default, or — with E2E_BUNDLE=1, which CI sets — a
+# plain uvicorn (no --reload) serving the production bundle. Keeping this in a script (instead of chaining inside the
 # Playwright config) lets us share the same logic across CI and local
 # runs and gives Playwright a single PID to wait on / kill.
 set -euo pipefail
@@ -103,6 +104,23 @@ uv run python scripts/set_setting.py sm_records \
 # other request resolves exactly as it did before.
 if [[ "${SM_MULTI_TENANT:-}" == "true" ]]; then
   uv run python scripts/set_setting.py tenants subdomain_base localhost
+fi
+
+# E2E_BUNDLE=1: the build users get (#119). No Vite dev server and no
+# --reload — playwright.config.ts sets SM_ENVIRONMENT=production for this
+# mode, which is what makes the host read host/static/dist's manifest instead
+# of pointing the page at a dev server. The bundle is built beforehand (CI's
+# e2e-setup action, or `make e2e-bundle`) rather than here, so a build failure
+# reports as a build failure and not as a webServer timeout. A missing
+# manifest would boot fine and render every page without its scripts, which
+# reads as 250 unrelated test failures, so refuse up front instead.
+if [[ "${E2E_BUNDLE:-}" == "1" ]]; then
+  manifest="host/static/dist/.vite/manifest.json"
+  if [[ ! -f "${manifest}" ]]; then
+    echo "E2E_BUNDLE=1 needs the production bundle (${manifest}); run \`npm run build\` first" >&2
+    exit 1
+  fi
+  exec uv run --project host uvicorn main:app --app-dir host --port "${API_PORT:?}"
 fi
 
 exec make dev

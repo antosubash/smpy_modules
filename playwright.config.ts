@@ -31,13 +31,28 @@ const APP_URL = `http://localhost:${API_PORT}`;
 const DATABASE_URL =
   process.env.SM_DATABASE_URL?.trim() || `sqlite+aiosqlite:///${TEST_DB_PATH}`;
 
+// E2E_BUNDLE=1 (CI, or `make e2e-bundle`) runs the suite against the
+// production bundle served by a plain uvicorn instead of `make dev`'s Vite dev
+// server and --reload (#119) — see start-test-server.sh. Locally the dev
+// server stays the default, so a spec can be iterated on without a rebuild.
+const BUNDLE = process.env.E2E_BUNDLE === '1';
+
+// Every retry is reported, and in CI fails the job (`failOnFlakyTests`). The
+// one retry is there so the report can tell a flake (passed on retry, marked
+// "flaky") from a regression (failed twice), not so a flake can go green —
+// scripts/e2e_report_summary.mjs lists both in the job summary (#119).
+const CI = !!process.env.CI;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  forbidOnly: CI,
+  retries: CI ? 1 : 0,
+  failOnFlakyTests: CI,
+  reporter: CI
+    ? [['github'], ['list'], ['json', { outputFile: 'playwright-report/results.json' }]]
+    : 'list',
   timeout: 60_000,
   expect: { timeout: 10_000 },
 
@@ -57,9 +72,10 @@ export default defineConfig({
 
   webServer: {
     // `make dev` already orchestrates the API (uvicorn on API_PORT) and the
-    // Vite dev server (UI_PORT). Our wrapper resets the test SQLite DB and
-    // runs migrations before `make dev` boots so the host's bootstrap
-    // logic can seed the admin user on first start.
+    // Vite dev server (UI_PORT); with E2E_BUNDLE=1 it is uvicorn alone. Our
+    // wrapper resets the test SQLite DB and runs migrations before the server
+    // boots so the host's bootstrap logic can seed the admin user on first
+    // start.
     command: './tests/e2e/start-test-server.sh',
     url: APP_URL,
     reuseExistingServer: !process.env.CI,
@@ -67,7 +83,11 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      SM_ENVIRONMENT: 'development',
+      // Anything outside development/testing makes the host reference the
+      // built assets (host/static/dist) rather than a Vite dev url, and turns
+      // on what a deployment runs with: strict CSP, strict module discovery,
+      // Secure cookies (which Chromium honours on http://localhost).
+      SM_ENVIRONMENT: BUNDLE ? 'production' : 'development',
       // Set here as a real env var so it takes precedence over the repo-root
       // .env (which points at host/app.db). This is what keeps an e2e run
       // from touching the development database. See DATABASE_URL above for
@@ -75,7 +95,15 @@ export default defineConfig({
       SM_DATABASE_URL: DATABASE_URL,
       SM_USERS_BOOTSTRAP_EMAIL: TEST_ADMIN_EMAIL,
       SM_USERS_BOOTSTRAP_PASSWORD: TEST_ADMIN_PASSWORD,
-      SM_VITE_DEV_URL: `http://localhost:${UI_PORT}`,
+      // Production refuses to boot on the users module's placeholder token
+      // secrets, and CI has no .env for `make env` to have filled them in.
+      ...(BUNDLE
+        ? {
+            E2E_BUNDLE: '1',
+            SM_USERS_RESET_PASSWORD_TOKEN_SECRET: 'e2e-reset-secret-not-for-production-use',
+            SM_USERS_VERIFICATION_TOKEN_SECRET: 'e2e-verify-secret-not-for-production-use',
+          }
+        : { SM_VITE_DEV_URL: `http://localhost:${UI_PORT}` }),
       SM_PROJECT_ROOT: REPO_ROOT,
       SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
       // The console speaks English and German, so `console-de.spec.ts` can
