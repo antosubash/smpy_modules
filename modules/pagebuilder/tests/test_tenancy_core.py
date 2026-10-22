@@ -73,7 +73,7 @@ def test_resolving_middleware_is_multi():
 
 
 def test_configure_refuses_a_host_pinned_elsewhere():
-    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+    with pytest.raises(RuntimeError, match=r"TenantMiddleware\(fixed='acme'\)"):
         tenancy.configure(_app(fixed="acme"))
 
 

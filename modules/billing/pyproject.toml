@@ -8,15 +8,16 @@ license = "MIT"
 authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
 keywords = ["simple-module", "billing", "saas", "stripe", "subscriptions", "tenants"]
 # Ranges, never `==`: an exact framework pin makes a published module
-# uninstallable in any host running a newer framework build. 0.0.35 is the
-# first release carrying ``simple_module_tenants`` and its entitlements seam.
+# uninstallable in any host running a newer framework build. 0.0.35 was the
+# first release carrying ``simple_module_tenants`` and its entitlements seam;
+# the floor is 0.0.36 like every other module here (#211).
 dependencies = [
-    "simple_module_core>=0.0.35,<0.1",
-    "simple_module_db>=0.0.35,<0.1",
+    "simple_module_core>=0.0.36,<0.1",
+    "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
-    "simple_module_inertia>=0.0.35,<0.1",
-    "simple_module_settings>=0.0.35,<0.1",
-    "simple_module_tenants>=0.0.35,<0.1",
+    "simple_module_inertia>=0.0.36,<0.1",
+    "simple_module_settings>=0.0.36,<0.1",
+    "simple_module_tenants>=0.0.36,<0.1",
     "stripe>=16,<17",
     "cryptography>=42",
     "typer>=0.12",
@@ -35,7 +36,7 @@ billing = "sm_billing.module:BillingModule"
 billing = "sm_billing.cli:app"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

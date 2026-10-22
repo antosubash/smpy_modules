@@ -27,10 +27,9 @@ from pagebuilder.snapshots.format import (
     MANIFEST_NAME,
     MEDIA_DIR,
     MEDIA_INDEX_NAME,
-    READABLE_VERSIONS,
     REDIRECTS_NAME,
-    is_readable,
 )
+from pagebuilder.snapshots.manifest import check_manifest, check_members
 from pagebuilder.snapshots.validate import (
     BundleError,
     check_documents,
@@ -42,6 +41,18 @@ __all__ = ["BundleError", "read_zip", "write_zip"]
 
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
+
+_OS_JUNK = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
+
+
+def _is_os_junk(name: str) -> bool:
+    """Files an OS adds when someone re-zips a bundle by hand.
+
+    Skipped rather than extracted, and so never held to the rule that every
+    member belongs to a section: refusing a bundle because Finder added
+    ``__MACOSX/`` would fail an honest upload over something nothing reads.
+    """
+    return name.startswith("__MACOSX/") or PurePosixPath(name).name in _OS_JUNK
 
 
 def _safe_relative(name: str) -> PurePosixPath:
@@ -59,19 +70,6 @@ def _safe_relative(name: str) -> PurePosixPath:
     if not name or candidate == PurePosixPath("."):
         raise BundleError(f"unsafe path in bundle: {name!r}")
     return candidate
-
-
-def _require_manifest(payload: Any) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise BundleError("manifest.json is not an object")
-    version = payload.get("format_version")
-    if not is_readable(version):
-        readable = ", ".join(str(v) for v in sorted(READABLE_VERSIONS))
-        raise BundleError(
-            f"unsupported bundle format version {version!r}; "
-            f"this build reads version {readable}"
-        )
-    return payload
 
 
 def write_zip(
@@ -132,21 +130,21 @@ def read_zip(
         shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
     stored: dict[str, bytes] = {}
+    members: list[str] = []
 
     with archive:
         extracted = 0
         for info in archive.infolist():
             name = info.filename
-            if name.endswith("/"):
+            if name.endswith("/") or _is_os_junk(name):
                 continue
             relative = _safe_relative(name)
+            members.append(name)
             # Checked against the header before reading: `ZipExtFile` stops at
             # the declared size, so a member cannot quietly exceed it.
             extracted += info.file_size
             if max_extracted_bytes is not None and extracted > max_extracted_bytes:
-                raise BundleError(
-                    f"bundle expands to more than {max_extracted_bytes} bytes"
-                )
+                raise BundleError(f"bundle expands to more than {max_extracted_bytes} bytes")
             payload = archive.read(name)
             if name.startswith(_BLOB_PREFIX):
                 expected = relative.name
@@ -162,7 +160,8 @@ def read_zip(
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
-    manifest = _require_manifest(load_document(manifest_path, MANIFEST_NAME))
+    manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME))
+    check_members(manifest, members)
 
     index_path = dest / MEDIA_DIR / MEDIA_INDEX_NAME
     index = load_document(index_path, MEDIA_INDEX_NAME) if index_path.is_file() else {}
@@ -184,9 +183,7 @@ def read_zip(
         if entry["sha256"] not in stored and not blobs.exists(entry["sha256"])
     )
     if missing_blobs:
-        raise BundleError(
-            "bundle is missing the bytes for: " + ", ".join(missing_blobs)
-        )
+        raise BundleError("bundle is missing the bytes for: " + ", ".join(missing_blobs))
 
     check_documents(dest, index)
 

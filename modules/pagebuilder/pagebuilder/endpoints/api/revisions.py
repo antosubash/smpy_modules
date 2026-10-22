@@ -10,7 +10,6 @@ from pagebuilder.contracts.schemas import (
     PageDetail,
     PageRevisionDetail,
     PageRevisionListResponse,
-    PageRevisionRead,
     RevisionDiffResponse,
 )
 from pagebuilder.endpoints.api._deps import require_edit
@@ -24,10 +23,7 @@ async def list_revisions(
     page_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> PageRevisionListResponse:
-    service = PagesService(db)
-    await service.get_page(page_id)
-    revisions = await service.list_revisions(page_id)
-    return PageRevisionListResponse(items=[PageRevisionRead.model_validate(r) for r in revisions])
+    return await PagesService(db).revision_history(page_id)
 
 
 @router.get(

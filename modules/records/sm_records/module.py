@@ -63,6 +63,7 @@ class RecordsModule(ModuleBase):
         self.menu_registry: MenuRegistry | None = None
         self._type_menu_items: list[MenuItem] = []
         self._menu_dirty = False
+        self._menu_suppressed = False  # a mounted request with no tenancy answer (#210)
         self._menu_synced_at = 0.0
 
     def register_settings(self, app: FastAPI) -> None:

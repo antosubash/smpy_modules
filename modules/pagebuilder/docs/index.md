@@ -20,6 +20,7 @@ Start with the document that matches what you are trying to do.
 | A developer calling the pagebuilder API, or presenting pages from another module | [api-reference.md](api-reference.md) |
 | An operator installing it, configuring languages and the public site, or answering "why does this page 404?" | [operations.md](operations.md) |
 | A developer changing the module or adding blocks | [architecture.md](architecture.md) |
+| Anyone writing, reading or hand-editing a snapshot `.zip` | [bundle-format.md](bundle-format.md) |
 
 ### [user-guide.md](user-guide.md) — for editors, publishers and approvers
 
@@ -52,6 +53,12 @@ The tables, how a request binds a tenant, why boot-time settings are read in
 page (claims, redirects, nav, ETag), how snapshots are captured and applied, the
 frontend's block registry and i18n, and the contributor rules: the 300-line cap
 and what may live under `pagebuilder/pages/`.
+
+### [bundle-format.md](bundle-format.md) — the snapshot `.zip`
+
+The bundle's layout, the versioned manifest (`format_version`, `contents`),
+which versions this build reads, how an unknown one is refused, and how another
+module could add a section later.
 
 ## The module in one paragraph
 

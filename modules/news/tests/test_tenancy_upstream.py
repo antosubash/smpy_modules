@@ -45,6 +45,11 @@ def _module_app() -> FastAPI:
     async def admin(tenant: str = Depends(tenancy.bind_admin)) -> dict:
         return {"tenant": tenant, "bound": current_tenant_id.get()}
 
+    @app.get("/search")
+    async def search(tenant: str = Depends(tenancy.bind_admin)) -> dict:
+        # What the admin search pins pagebuilder's sections to (#210).
+        return {"tenant": tenancy.search_tenant(), "bound": current_tenant_id.get()}
+
     @app.get("/public")
     async def public(tenant: str = Depends(tenancy.bind_public)) -> dict:
         return {"tenant": tenant, "bound": current_tenant_id.get()}
@@ -73,7 +78,7 @@ def _mounted_under_a_multi_tenant_parent() -> FastAPI:
     return parent
 
 
-@pytest.mark.parametrize("surface", ["admin", "public"])
+@pytest.mark.parametrize("surface", ["admin", "public", "search"])
 async def test_a_mounted_child_binds_the_parents_tenant(surface):
     response = await _get(_mounted_under_a_multi_tenant_parent(), f"/child/{surface}", "tenant-a")
     assert response.status_code == 200, response.text
@@ -84,9 +89,29 @@ async def test_a_mounted_child_with_no_upstream_tenant_refuses():
     """Nothing visible says the parent is single-tenant, so it is not."""
     parent = _mounted_under_a_multi_tenant_parent()
     admin = await _get(parent, "/child/admin")
+    search = await _get(parent, "/child/search")
     public = await _get(parent, "/child/public")
     assert (admin.status_code, admin.json()["detail"]) == (403, tenancy.TENANT_REQUIRED)
+    assert (search.status_code, search.json()["detail"]) == (403, tenancy.TENANT_REQUIRED)
     assert public.status_code == 404
+
+
+async def test_a_multi_tenant_host_refuses_a_search_with_no_tenant():
+    """#210: never the default tenant's pages and media — 403, as the admin."""
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    app = _module_app()
+    app.add_middleware(TenantMiddleware, header="x-tenant")
+    assert tenancy.detect_mode(app) is TenancyMode.MULTI
+    response = await _get(app, "/search")
+    assert (response.status_code, response.json()["detail"]) == (403, tenancy.TENANT_REQUIRED)
+
+
+async def test_an_upstream_tenant_is_what_a_search_reads():
+    app = _module_app()
+    app.add_middleware(HeaderTenant)
+    response = await _get(app, "/search", "tenant-c")
+    assert response.json() == {"tenant": "tenant-c", "bound": "tenant-c"}
 
 
 def _factory(app):
@@ -103,7 +128,7 @@ async def test_a_factory_built_middleware_is_multi():
     assert response.json() == {"tenant": "tenant-b", "bound": "tenant-b"}
 
 
-@pytest.mark.parametrize("surface", ["admin", "public"])
+@pytest.mark.parametrize("surface", ["admin", "public", "search"])
 async def test_a_single_tenant_host_still_binds_the_default(surface):
     response = await _get(_module_app(), f"/{surface}")
     assert response.status_code == 200, response.text
@@ -125,24 +150,21 @@ async def test_a_single_tenant_host_keeps_its_shared_cache():
     assert response.headers["cache-control"] == "public, max-age=60"
 
 
-def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
-    """No public ``tenancy_mode`` to ask: ``state.sm`` alone is no answer, so
-    a mounted child with no upstream tenant is refused, not handed default."""
-    import sys
+def test_a_mounted_child_without_its_own_framework_answer_fails_closed():
+    """No ``state.sm``, so ``tenancy_mode``'s ``SINGLE`` is no answer: a
+    mounted child with no upstream tenant is refused, not handed default."""
     from types import SimpleNamespace
 
     from fastapi import HTTPException
 
-    monkeypatch.setitem(sys.modules, "simple_module_hosting.tenancy", None)  # ImportError
     app = FastAPI()
-    app.state.sm = SimpleNamespace()
     scope = {"app_root_path": "", "root_path": "/child"}
     request = SimpleNamespace(app=app, state=SimpleNamespace(tenant_id=None), scope=scope)
     with pytest.raises(HTTPException) as refused:
         tenancy.resolve_admin(request)
     assert refused.value.status_code == 403
     assert tenancy.resolve_public(request) is None
-    request.scope = {}  # not mounted: the app's own single-tenant answer stands
+    app.state.sm = SimpleNamespace()  # built by create_app: its SINGLE stands
     assert tenancy.resolve_admin(request) == DEFAULT_TENANT
 
 
