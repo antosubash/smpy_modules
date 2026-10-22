@@ -56,6 +56,8 @@ describe('SyncHealthBar', () => {
   });
 
   it('says a configured loop is not running', () => {
-    expect(render({ ...healthy, reconcile_running: false })).toContain('restart the app');
+    expect(render({ ...healthy, reconcile_running: false })).toContain(
+      'Stripe is not the active provider',
+    );
   });
 });

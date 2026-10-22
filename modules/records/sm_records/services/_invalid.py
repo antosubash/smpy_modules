@@ -61,6 +61,7 @@ from sqlalchemy.orm import attributes
 
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.services._common import mark_written, utcnow
+from sm_records.services._lock import lock_type
 from sm_records.tenancy import bound_tenant
 
 __all__ = ["Marker", "clear_on_write", "count_for_type", "write_marks"]
@@ -99,6 +100,13 @@ async def write_marks(
     set the type lives in (Phase 5 §6.3). See the module docstring for why
     they are core statements and what ``set_committed_value`` is doing here.
     """
+    if not any(record.id is not None for record in (*mark, *clear)):
+        return 0
+    # A rescan walks outside any other write, so it takes the type lock like
+    # every writer of these rows (``services._lock.lock_types``): a move
+    # committed since the batch was read is this ``409``, not an ``UPDATE``
+    # of rows that are no longer there.
+    await lock_type(db, rtype)
     cls = tables_for(rtype).record
     at = now or utcnow()
     touched = 0

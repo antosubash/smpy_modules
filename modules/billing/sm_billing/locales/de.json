@@ -180,7 +180,7 @@
     "unprocessed_webhooks": "Unverarbeitete Webhooks: {count}",
     "reconcile_every": "Geplanter Abgleich: alle {minutes} Min.",
     "reconcile_off": "Geplanter Abgleich: aus — „smpy billing reconcile“ ausführen oder reconcile_interval_minutes setzen",
-    "reconcile_not_running": "Geplanter Abgleich: eingestellt, läuft aber nicht — App neu starten"
+    "reconcile_not_running": "Geplanter Abgleich: eingestellt, läuft aber nicht — Stripe ist nicht der aktive Anbieter"
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
@@ -212,7 +212,7 @@
     "error_title": "Stripe ist konfiguriert, wird aber nicht verwendet",
     "error_description": "{error}. Die Abrechnung läuft über den manuellen Anbieter, bis dies behoben ist.",
     "manual_title": "Der manuelle Anbieter ist aktiv",
-    "manual_description": "Setzen Sie den Abrechnungsanbieter in den Einstellungen auf 'stripe' und starten Sie neu, um Zahlungen entgegenzunehmen.",
+    "manual_description": "Setzen Sie den Abrechnungsanbieter in den Einstellungen auf 'stripe', um Zahlungen entgegenzunehmen.",
     "webhook_title": "Webhook-Endpunkt",
     "webhook_description": "Fügen Sie diese URL in Stripe → Developers → Webhooks hinzu, mit den Ereignissen checkout.session.completed und customer.subscription.*.",
     "copy_webhook": "Webhook-URL kopieren",

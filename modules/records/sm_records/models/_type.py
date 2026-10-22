@@ -75,12 +75,10 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     code (:func:`sm_records.collections.declare_collection`); every read and
     write resolves it through ``models.tables_for(rtype)``.
 
-    **Set on create and never changed.** ``PUT /types/{key}`` refuses it with a
-    409:
-    moving a populated type between collections would mean copying its records,
-    revisions and index rows into other tables and re-pointing every reference
-    at them, with no rollback story — so the refusal is the honest answer, and
-    a host that wants the move exports and re-imports under a new type.
+    **Set on create, changed only by a move.** ``PUT /types/{key}`` with a
+    different value copies the type's records, revisions and index rows into
+    the target set in one transaction (:mod:`sm_records.services._type_move`).
+    References need no re-pointing: they name a target by uuid and type.
 
     Nullable with no backfill on purpose: that is what makes the migration
     additive and the feature inert on a host that never uses it (§6.5).

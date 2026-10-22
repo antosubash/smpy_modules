@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from sm_billing.live import follow_live_settings
+
+#: Every billing route first catches up with a provider switch saved on
+#: another worker, so none of them writes through a provider the database no
+#: longer names (#85).
+_LIVE = [Depends(follow_live_settings)]
 
 
 def include(api_router: APIRouter, view_router: APIRouter) -> None:
@@ -12,15 +19,15 @@ def include(api_router: APIRouter, view_router: APIRouter) -> None:
     from sm_billing.endpoints.views import router as views
     from sm_billing.endpoints.webhooks import router as webhooks
 
-    api_router.include_router(admin_api)
-    api_router.include_router(api)
+    api_router.include_router(admin_api, dependencies=_LIVE)
+    api_router.include_router(api, dependencies=_LIVE)
     # No CSRF on the webhook: Stripe has no session, the signature is the auth.
-    view_router.include_router(webhooks)
-    view_router.include_router(views)
+    view_router.include_router(webhooks, dependencies=_LIVE)
+    view_router.include_router(views, dependencies=_LIVE)
 
 
 def include_admin(admin_router: APIRouter) -> None:
     """Mount the platform-admin Inertia views under ``/admin/billing``."""
     from sm_billing.endpoints.admin_views import router as admin_views
 
-    admin_router.include_router(admin_views)
+    admin_router.include_router(admin_views, dependencies=_LIVE)

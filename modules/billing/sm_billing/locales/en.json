@@ -180,7 +180,7 @@
     "unprocessed_webhooks": "Unprocessed webhooks: {count}",
     "reconcile_every": "Scheduled reconcile: every {minutes} min",
     "reconcile_off": "Scheduled reconcile: off — run “smpy billing reconcile” or set reconcile_interval_minutes",
-    "reconcile_not_running": "Scheduled reconcile: configured but not running — restart the app"
+    "reconcile_not_running": "Scheduled reconcile: configured but not running — Stripe is not the active provider"
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
@@ -212,7 +212,7 @@
     "error_title": "Stripe is configured but not in use",
     "error_description": "{error}. Billing runs on the manual provider until this is fixed.",
     "manual_title": "The manual provider is active",
-    "manual_description": "Set the billing provider to 'stripe' on the Settings screen and restart to take payments.",
+    "manual_description": "Set the billing provider to 'stripe' on the Settings screen to take payments.",
     "webhook_title": "Webhook endpoint",
     "webhook_description": "Add this URL in Stripe → Developers → Webhooks, with the events checkout.session.completed and customer.subscription.*.",
     "copy_webhook": "Copy webhook URL",
