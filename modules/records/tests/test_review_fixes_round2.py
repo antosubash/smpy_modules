@@ -13,8 +13,8 @@ from types import SimpleNamespace
 
 from simple_module_core.health import HealthStatus
 from sm_records.health import stale_reindex_check
-from sm_records.index import reindex as reindex_mod
 from sm_records.models import IndexText, RecordType
+from sm_records.services import reindex_runner as runner_mod
 from sm_records.services import types as type_service
 from sm_records.services.reindex_runner import run_pending
 from sm_records.settings import RecordsSettings
@@ -69,17 +69,18 @@ async def test_a_marker_added_during_a_rebuild_is_not_erased_by_it(db_state, mon
             session.add(row)
             await session.commit()
 
-    # Wrapped at the batch, which is the unit the rebuild writes in.
-    real, raced = reindex_mod.reindex_batch, []
+    # Between two of the run's transactions: each opens with the type lock
+    # (#82), so a change can only commit in the gap before the next one —
+    # here, before the lock that follows the first batch's commit.
+    real, calls = runner_mod.lock_type, []
 
-    async def racing(db, records, rtype_, **kwargs):
-        out = await real(db, records, rtype_, **kwargs)
-        if not raced:
-            raced.append(True)
+    async def racing(db, rtype_):
+        calls.append(True)
+        if len(calls) == 2:
             await commit_a_second_change()
-        return out
+        await real(db, rtype_)
 
-    monkeypatch.setattr(reindex_mod, "reindex_batch", racing)
+    monkeypatch.setattr(runner_mod, "lock_type", racing)
     await run_pending(db_state, rtype.id, settings=RecordsSettings())
 
     # The fields moved underneath this run, so it clears nothing at all: what
