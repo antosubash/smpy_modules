@@ -146,8 +146,10 @@ async def render_public_page(
     )
     # Signed-in or not, and in which UI language, decide the bytes (#94). A
     # signed-in page is never kept, so it gets no validator and no 304.
-    cache_control = public_cache.cache_control(request, settings)
     signed_in = public_cache.signed_in(request)
+    cache_control = (
+        public_cache.SIGNED_IN_CACHE_CONTROL if signed_in else public_cache.cache_control(settings)
+    )
 
     def apply_headers(response: Response) -> Response:
         if not signed_in:
