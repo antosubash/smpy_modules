@@ -19,6 +19,8 @@ __all__ = [
     "configure",
     "detect_mode",
     "mode_of",
+    "mounted",
+    "request_mode",
     "tenant_header",
 ]
 
@@ -102,6 +104,38 @@ def _framework_says_multi(app: Any) -> bool:
     except ImportError:
         return False
     return str(tenancy_mode(app)) == TenancyMode.MULTI
+
+
+def _framework_answers(app: Any) -> bool:
+    """Whether the framework itself can say what *app* is: its public
+    ``tenancy_mode`` exists (0.0.36+) and *app* is one ``create_app`` built
+    (it carries ``state.sm``). A bare child app has no such answer."""
+    try:
+        from simple_module_hosting.tenancy import tenancy_mode  # noqa: F401
+    except ImportError:
+        return False
+    return getattr(app.state, "sm", None) is not None
+
+
+def mounted(scope: Mapping[str, Any]) -> bool:
+    """Whether this request reached the app through a parent's ``Mount``.
+
+    Starlette's ``Mount`` keeps the outermost ``root_path`` as
+    ``app_root_path`` and extends ``root_path``; a proxy's ``--root-path``
+    alone sets no ``app_root_path``.
+    """
+    outer = scope.get("app_root_path")
+    return outer is not None and scope.get("root_path", "") != outer
+
+
+def request_mode(request: Any, stored: TenancyMode) -> TenancyMode:
+    """*stored* (the app's mode), unless it says ``SINGLE`` for a mounted app
+    the framework has no answer for — the parent may well be multi-tenant and
+    nothing visible from here says otherwise, so that is ``MULTI`` (#210, the
+    rule news and pagebuilder follow since #192)."""
+    scope = getattr(request, "scope", None) or {}
+    ambiguous = mounted(scope) and not _framework_answers(request.app)
+    return TenancyMode.MULTI if stored is TenancyMode.SINGLE and ambiguous else stored
 
 
 def detect_mode(app: Any) -> TenancyMode:

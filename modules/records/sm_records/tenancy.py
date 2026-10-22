@@ -53,6 +53,7 @@ from sm_records._tenancy_mode import (
     configure,
     detect_mode,
     mode_of,
+    request_mode,
     tenant_header,
 )
 from sm_records.services.errors import TenantRequired
@@ -169,7 +170,7 @@ def resolve_admin(request: Any) -> str:
     if not single and getattr(request.state, "user", None) is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     tenant = _resolved(request)
-    if tenant is None and single:
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
     if tenant is None:
         raise TenantRequired(
@@ -184,7 +185,7 @@ def resolve_public(request: Any) -> str | None:
     with the same 404 an unknown type gets, so it is no oracle. An upstream
     tenant wins over the mode, as in :func:`resolve_admin`."""
     tenant = _resolved(request)
-    if tenant is None and mode_of(request.app) is TenancyMode.SINGLE:
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
     return tenant
 
