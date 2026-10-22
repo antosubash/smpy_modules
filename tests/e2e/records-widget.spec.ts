@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 import {
   apiCreateRecord,
   apiCreateTranslation,
@@ -28,7 +28,7 @@ async function createPublishedPage(
   slug: string,
   blockProps: Record<string, unknown>,
 ): Promise<number> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const draftData = {
     root: { props: { title, width: 'full' } },
     content: [

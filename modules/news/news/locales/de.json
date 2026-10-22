@@ -266,13 +266,25 @@
   },
   "tags": {
     "heading": "Schlagwörter",
-    "description": "Frei wählbar und beim Schreiben angelegt. Wählen Sie zwei aus, um sie zusammenzuführen.",
+    "description": "Frei wählbar und beim Schreiben angelegt. Wählen Sie eines aus, um es umzubenennen oder zu löschen, oder zwei, um sie zusammenzuführen.",
     "find_or_create": "Schlagwort suchen oder erstellen",
     "create": "Erstellen",
     "merge_summary": "{source} mit {target} zusammenführen",
     "merge": "Zusammenführen",
     "no_match": "Kein Schlagwort passt zu „{query}“. Erstellen Sie es oben.",
-    "empty": "Noch keine Schlagwörter. Sie erscheinen hier, sobald Autoren sie Artikeln hinzufügen."
+    "empty": "Noch keine Schlagwörter. Sie erscheinen hier, sobald Autoren sie Artikeln hinzufügen.",
+    "selected_summary_one": "{name} ist an {count} Artikel vergeben",
+    "selected_summary_other": "{name} ist an {count} Artikel vergeben",
+    "rename": "Umbenennen",
+    "name_label": "Name des Schlagworts",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "delete_title": "Schlagwort „{name}“ löschen?",
+    "delete_unused": "Kein Artikel verwendet dieses Schlagwort, daher ändert sich sonst nichts.",
+    "delete_detaching_one": "{count} Artikel verliert dieses Schlagwort. Der Artikel selbst bleibt unverändert – nur die Markierung entfällt.",
+    "delete_detaching_other": "{count} Artikel verlieren dieses Schlagwort. Die Artikel selbst bleiben unverändert – nur die Markierung entfällt.",
+    "delete_confirm": "Schlagwort löschen"
   },
   "trash": {
     "title": "Papierkorb",
