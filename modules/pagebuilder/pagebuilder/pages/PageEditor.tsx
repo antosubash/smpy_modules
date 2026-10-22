@@ -18,7 +18,7 @@ import { useIsNarrow } from '../hooks/useIsNarrow';
 import { usePageRevisions } from '../hooks/usePageRevisions';
 import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
-import type { PageDetail, PageRevisionRead } from '../utils/api';
+import type { PageDetail, PageRestoreMarker, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
 import { keys, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
@@ -31,6 +31,8 @@ const PUBLIC_PREFIX = '/p';
 interface Props {
   page: PageDetail | null;
   revisions: PageRevisionRead[];
+  /** Bulk snapshot restores that wrote this page (#79). */
+  restores?: PageRestoreMarker[];
   /** Every language the site publishes in, and the one that serves at the
    *  unprefixed public URL. Server-rendered so the Languages tab paints with
    *  the first response instead of correcting itself a moment later. */
@@ -136,7 +138,7 @@ export default function PageEditor() {
         isDirty={isDirty}
         lastSavedAt={lastSavedAt}
         autosaveError={autosaveError}
-        revisionCount={revisions.length}
+        revisionCount={revisions.length + (props.restores?.length ?? 0)}
         busy={busy}
         message={message}
         onToggleSettings={() => setShowSettings((v) => !v)}
@@ -171,6 +173,7 @@ export default function PageEditor() {
       {showHistory && (
         <RevisionHistoryPanel
           revisions={revisions}
+          restores={props.restores ?? []}
           activeDiff={revisionActions.activeDiff}
           diffError={revisionActions.diffError}
           busy={busy}

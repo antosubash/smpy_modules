@@ -11,8 +11,14 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.contracts.schemas import (
+    PageRestoreMarker,
+    PageRevisionListResponse,
+    PageRevisionRead,
+)
 from pagebuilder.diff import revision_diff
 from pagebuilder.models import Page, PageRevision, RevisionEvent
+from pagebuilder.snapshots.history import restore_markers
 
 
 class RevisionsMixin:
@@ -49,7 +55,6 @@ class RevisionsMixin:
         self.db.add(revision)
         return revision
 
-
     async def list_revisions(self, page_id: int) -> list[PageRevision]:
         result = await self.db.execute(
             select(PageRevision)
@@ -57,6 +62,20 @@ class RevisionsMixin:
             .order_by(PageRevision.id.desc())
         )
         return list(result.scalars().all())
+
+    async def revision_history(self, page_id: int) -> PageRevisionListResponse:
+        """The page's revisions plus the bulk restores that wrote it.
+
+        One builder for both the JSON endpoint and the editor's Inertia props,
+        so the history panel reads the same thing whichever way it loaded.
+        """
+        page = await self.get_page(page_id)
+        revisions = await self.list_revisions(page_id)
+        markers = await restore_markers(self.db, page)
+        return PageRevisionListResponse(
+            items=[PageRevisionRead.model_validate(r) for r in revisions],
+            restores=[PageRestoreMarker.model_validate(m) for m in markers],
+        )
 
     async def get_revision(self, page_id: int, revision_id: int) -> PageRevision:
         revision = await self.db.get(PageRevision, revision_id)
