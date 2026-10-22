@@ -15,7 +15,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._claims import claim, due_candidates, release, retire_missed_windows
 from news.content._fresh import claim_status
@@ -40,10 +39,9 @@ class WorkflowMixin(TrashMixin):
     load-bearing: every transition records a revision, so a sibling arrangement
     puts this class first in the MRO and its type-narrowing stub for
     ``_record_revision`` shadows the real implementation. Chaining them says
-    what is actually true — workflow *needs* revisions.
+    what is actually true — workflow *needs* revisions. What the chain needs
+    from the composing class is :class:`~news.content._host.ArticlesHost`.
     """
-
-    db: AsyncSession
 
     async def _transition(
         self,
