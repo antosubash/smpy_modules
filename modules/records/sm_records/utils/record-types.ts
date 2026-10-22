@@ -76,6 +76,10 @@ export type ExpandedRef = {
   status: string | null;
   dangling: boolean;
   restricted: boolean;
+  /** Resolved, but already on its own chain above — not expanded again. */
+  cycle?: boolean;
+  /** The next level of a dotted `?expand=a.b`; null where the path ends. */
+  expanded?: Record<string, ExpandedRef[]> | null;
 };
 
 /** One record pointing at the record being read, and what deleting the

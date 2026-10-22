@@ -1,9 +1,10 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 import type { TagRead } from '../../utils/taxonomyApi';
+import { TagActions } from './TagActions';
 
 const TAG_INPUT_ID = 'news-tag-find-or-create';
 /** At or below this many uses a tag is faded — it is probably a stray spelling
@@ -16,22 +17,36 @@ interface Props {
   onCreate: (name: string) => Promise<unknown>;
   /** Fold `sourceId` into `targetId`. The source row is removed. */
   onMerge: (targetId: number, sourceId: number) => Promise<unknown>;
+  onRename: (id: number, name: string) => Promise<boolean>;
+  onDelete: (id: number) => Promise<unknown>;
 }
 
-/** Tags: create by typing, tidy up by merging.
+/** Tags: create by typing, tidy up by selecting.
  *
- * There is no rename-in-place here on purpose. Tags are made while writing, so
- * the failure mode is duplicates rather than bad names — "urban" and "Urban
- * trees" both existing is the thing worth fixing, and merge is what fixes it.
+ * One selected chip can be renamed or deleted (a mistyped tag otherwise stays
+ * on the site, #174); two can be merged, which is what fixes the commoner
+ * failure — "urban" and "Urban trees" both existing.
  *
  * Selection is capped at two. A merge has a direction (the second selection is
  * folded into the first), and an n-way merge would make that direction
  * impossible to show.
  */
-export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
+export function TagPanel({ tags, busy, onCreate, onMerge, onRename, onDelete }: Props) {
   const { t } = useT();
   const [draft, setDraft] = useState('');
-  const [selected, setSelected] = useState<number[]>([]);
+  const [picked, setPicked] = useState<number[]>([]);
+  // Only ids still listed: a tag deleted or merged away must not linger as a
+  // selection that the next click would pair with something.
+  const selected = picked.filter((id) => tags.some((tag) => tag.id === id));
+  // And forget them for good once the list moves on: SQLite reuses ids, so the
+  // next tag created can come back under a deleted one's id and would otherwise
+  // appear already selected.
+  useEffect(() => {
+    setPicked((all) => {
+      const listed = all.filter((id) => tags.some((tag) => tag.id === id));
+      return listed.length === all.length ? all : listed;
+    });
+  }, [tags]);
 
   const filtered = draft.trim()
     ? tags.filter((t) => t.name.toLowerCase().includes(draft.trim().toLowerCase()))
@@ -39,26 +54,28 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
   const exact = tags.some((t) => t.name.toLowerCase() === draft.trim().toLowerCase());
 
   const toggle = (id: number) => {
-    setSelected((current) =>
-      current.includes(id)
+    setPicked((all) => {
+      const current = all.filter((x) => tags.some((tag) => tag.id === x));
+      return current.includes(id)
         ? current.filter((x) => x !== id)
         : // Keep the most recent two: selecting a third should move the
           // selection along rather than silently refuse the click.
-          [...current, id].slice(-2),
-    );
+          [...current, id].slice(-2);
+    });
   };
 
   const merge = async () => {
     const [target, source] = selected;
     try {
       await onMerge(target, source);
-      setSelected([]);
+      setPicked([]);
     } catch {
       // Surfaced in the page's banner. The selection stays so the merge can be
       // retried without re-picking both chips.
     }
   };
 
+  const single = selected.length === 1 ? tags.find((t) => t.id === selected[0]) : undefined;
   const targetName = tags.find((t) => t.id === selected[0])?.name;
   const sourceName = tags.find((t) => t.id === selected[1])?.name;
 
@@ -98,6 +115,17 @@ export function TagPanel({ tags, busy, onCreate, onMerge }: Props) {
           {t(keys.news.tags.create)}
         </Button>
       </form>
+
+      {single && (
+        // Keyed by id so switching chips drops a half-typed rename of the last one.
+        <TagActions
+          key={single.id}
+          tag={single}
+          busy={busy}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      )}
 
       {selected.length === 2 && (
         <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 p-2 text-sm">

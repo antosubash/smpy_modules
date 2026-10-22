@@ -38,6 +38,27 @@ and Vite on `UI_PORT` (default 5050). Run it in the background and log to a file
 - Login: the bootstrap admin from `SM_USERS_BOOTSTRAP_EMAIL`/`_PASSWORD`, created
   on first start against an empty users table. Pick your own values; none are committed.
 
+## Docker (`compose.yaml`)
+The host alone in a container: API + pre-built UI, `SM_ENVIRONMENT=production`,
+migrations on every start. No Postgres service — never add one.
+- Needs `.env` (`make env`) with `SM_SECRET_KEY`, `SM_USERS_RESET_PASSWORD_TOKEN_SECRET`
+  and `SM_USERS_VERIFICATION_TOKEN_SECRET` (production refuses to boot on the
+  users module's placeholders — the error names them), plus
+  `SM_USERS_BOOTSTRAP_EMAIL`/`_PASSWORD` for the first admin.
+- `SMPY_PORT=8091 docker compose up -d --build` (default port 8090; container
+  listens on 8000). First build ~2 min, start to healthy ~15 s:
+  `docker inspect -f '{{.State.Health.Status}}' smpy-modules-host-1`, then
+  `curl -fsS http://localhost:8091/health`.
+- DB: SQLite in volume `smpy-data` (`/app/var/app.db`, plus pagebuilder media);
+  uploads in `smpy-uploads`. Shared Postgres: add `-f compose.yaml -f compose.devnet.yaml`
+  (joins external `devnet`, needs dev-services up) and
+  `SMPY_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/smpy_modules`
+  (the database must exist there).
+- `SMPY_*`, not `SM_*`: compose overrides `.env`'s `SM_DATABASE_URL`/`SM_ENVIRONMENT`.
+- One-off: `docker compose run --rm host python scripts/set_setting.py …`.
+- Stop: `docker compose down` (`-v` drops data); remove the image with
+  `docker image rm smpy-modules-host:dev`.
+
 ## Stop / reset
 - `make kill` (honours `API_PORT`/`UI_PORT` — pass the same values you started with).
 - Reset data: stop, delete `host/app.db`, `make migrate`.

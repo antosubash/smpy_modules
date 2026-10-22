@@ -1,121 +1,172 @@
-"""CSRF enforcement on the AI settings API.
+"""CSRF enforcement on the AI settings API (#126).
 
-The app here mounts SessionMiddleware + CsrfCookieMiddleware and wires the
-routers exactly as ``AiModule.register_routes`` does, so this covers the
-mint → cookie-mirror → verify chain end to end. The bare app used in
-``test_api.py`` has no session, which exercises the documented skip path.
+The check is the framework's ``RequiresCsrf``, the one billing, news, records
+and pagebuilder use. The app here mounts SessionMiddleware and wires the
+routers through ``AiModule.register_routes``, so the token travels the real
+way: the settings screen shares it as the ``csrf_token`` Inertia prop, and the
+test sends it back. The bare app in ``test_ai_api.py`` has no session, which
+exercises the framework's documented no-session exemption.
 """
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
 import pytest_asyncio
 from ai_test_stubs import GrantAll
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, FastAPI
+from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
+from simple_module_hosting.csrf import CSRF_HEADER
+from simple_module_hosting.permissions import PERMISSION_DENIED_PREFIX
+from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from sm_ai import constants, services
-from sm_ai.security import CsrfCookieMiddleware, mint_csrf_token, verify_csrf
+from sm_ai.csrf import CSRF_PROP
+from sm_ai.module import AiModule
 from sm_ai.service import AiService
 from sm_ai.settings import AiSettings
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 SECRET = "test-secret-key-for-csrf"
+SETTINGS = f"{constants.ROUTE_PREFIX_API}/settings"
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
-@pytest_asyncio.fixture
-async def csrf_client(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
+class DenyWrites(BaseHTTPMiddleware):
+    """Like ``GrantAll``, but the user may open the screen and not change it.
+
+    ``ai.manage`` gates both, so the permission is granted for safe methods
+    only: what matters is that a write with a real token reaches the
+    permission check and is refused there.
+    """
+
+    async def dispatch(self, request, call_next):
+        request.state.user = SimpleNamespace(id="u", email="u@example.com", name="U", roles=[])
+        allowed = request.method in ("GET", "HEAD", "OPTIONS")
+        request.state.resolved_permissions = {constants.PERM_MANAGE} if allowed else set()
+        return await call_next(request)
+
+
+def _app(tmp_path, auth: type[BaseHTTPMiddleware]) -> FastAPI:
     from simple_module_db.deps import get_db
-    from sm_ai.endpoints.api import router as api_router
 
     services.install(services.AiServices(settings=AiSettings()))
+    app = FastAPI()
+    app.add_middleware(auth)
+    app.add_middleware(SessionMiddleware, secret_key=SECRET)
+    app.dependency_overrides[get_db] = lambda: None
+    (tmp_path / "index.html").write_text("<html></html>")
+    app.state.inertia_dependency = inertia_dependency_factory(
+        InertiaConfig(
+            environment="development",
+            version="1.0",
+            dev_url="http://localhost:5050",
+            templates=Jinja2Templates(directory=str(tmp_path)),
+            root_template_filename="index.html",
+            entrypoint_filename="main.tsx",
+            root_directory=".",
+        )
+    )
+    api = APIRouter(prefix=constants.ROUTE_PREFIX_API)
+    view = APIRouter(prefix=constants.VIEW_PREFIX)
+    AiModule().register_routes(api, view)
+    app.include_router(api)
+    app.include_router(view)
+    return app
+
+
+async def _client(monkeypatch, tmp_path, auth: type[BaseHTTPMiddleware]):
+    """A client whose ``apply`` calls are recorded on ``client.applied``."""
+    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
+    applied: list[dict] = []
 
     async def _fake_apply(self, changes):
+        applied.append(changes)
         return self.current()
 
     monkeypatch.setattr(AiService, "apply", _fake_apply)
-
-    app = FastAPI()
-    # Middleware runs bottom-up: session first, then the cookie mirror, then auth.
-    app.add_middleware(GrantAll)
-    app.add_middleware(CsrfCookieMiddleware)
-    app.add_middleware(SessionMiddleware, secret_key=SECRET)
-    app.dependency_overrides[get_db] = lambda: None
-
-    api = APIRouter(prefix=constants.ROUTE_PREFIX_API)
-    api.include_router(api_router, dependencies=[Depends(verify_csrf)])
-    app.include_router(api)
-
-    view = APIRouter(prefix=constants.VIEW_PREFIX, dependencies=[Depends(mint_csrf_token)])
-
-    @view.get("/")
-    async def admin_view() -> dict:  # stands in for the Inertia page render
-        return {}
-
-    app.include_router(view)
-
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=_app(tmp_path, auth))
     async with AsyncClient(transport=transport, base_url="http://test") as http:
+        http.applied = applied
         yield http
     services.reset()
 
 
-async def _bootstrap_csrf(client: AsyncClient) -> str:
-    """Hit the admin view so the token is minted + mirrored; return it."""
-    response = await client.get(constants.MENU_URL)
-    assert response.status_code == 200
-    token = response.cookies.get(constants.CSRF_COOKIE)
-    assert token, "CSRF cookie not set by admin view"
+@pytest_asyncio.fixture
+async def csrf_client(monkeypatch, tmp_path):
+    async for http in _client(monkeypatch, tmp_path, GrantAll):
+        yield http
+
+
+@pytest_asyncio.fixture
+async def denied_client(monkeypatch, tmp_path):
+    async for http in _client(monkeypatch, tmp_path, DenyWrites):
+        yield http
+
+
+async def _token_from_screen(client: AsyncClient) -> str:
+    response = await client.get(constants.MENU_URL, headers=INERTIA)
+    assert response.status_code == 200, response.text
+    token = response.json()["props"][CSRF_PROP]
+    assert token
     return token
 
 
 class TestCsrf:
-    async def test_put_without_token_returns_403(self, csrf_client):
-        await _bootstrap_csrf(csrf_client)
+    async def test_put_without_token_is_refused_and_writes_nothing(self, csrf_client):
+        await _token_from_screen(csrf_client)
+        res = await csrf_client.put(SETTINGS, json={"chat_model": "x"})
+        assert res.status_code == 403
+        assert "CSRF" in res.json()["detail"]
+        assert csrf_client.applied == []
+
+    async def test_put_with_wrong_token_is_refused(self, csrf_client):
+        await _token_from_screen(csrf_client)
         res = await csrf_client.put(
-            f"{constants.ROUTE_PREFIX_API}/settings", json={"chat_model": "x"}
+            SETTINGS, json={"chat_model": "x"}, headers={CSRF_HEADER: "not-the-real-token"}
         )
         assert res.status_code == 403
+        assert csrf_client.applied == []
 
-    async def test_put_with_wrong_token_returns_403(self, csrf_client):
-        await _bootstrap_csrf(csrf_client)
+    async def test_put_with_the_screens_token_succeeds(self, csrf_client):
+        token = await _token_from_screen(csrf_client)
         res = await csrf_client.put(
-            f"{constants.ROUTE_PREFIX_API}/settings",
-            json={"chat_model": "x"},
-            headers={"X-CSRF-Token": "not-the-real-token"},
+            SETTINGS, json={"chat_model": "claude-opus-5"}, headers={CSRF_HEADER: token}
         )
-        assert res.status_code == 403
+        assert res.status_code == 200, res.text
+        assert csrf_client.applied and csrf_client.applied[0]["chat_model"] == "claude-opus-5"
 
-    async def test_put_with_valid_token_succeeds(self, csrf_client):
-        token = await _bootstrap_csrf(csrf_client)
-        res = await csrf_client.put(
-            f"{constants.ROUTE_PREFIX_API}/settings",
-            json={"chat_model": "claude-opus-5"},
-            headers={"X-CSRF-Token": token},
-        )
-        assert res.status_code == 200
-
-    async def test_test_endpoint_requires_token(self, csrf_client):
-        await _bootstrap_csrf(csrf_client)
+    @pytest.mark.parametrize("path", ["test", "models"])
+    async def test_slot_actions_require_the_token(self, csrf_client, path):
+        await _token_from_screen(csrf_client)
         res = await csrf_client.post(
-            f"{constants.ROUTE_PREFIX_API}/test", json={"slot": constants.SLOT_CHAT}
+            f"{constants.ROUTE_PREFIX_API}/{path}", json={"slot": constants.SLOT_CHAT}
         )
         assert res.status_code == 403
 
-    async def test_safe_methods_skip_csrf(self, csrf_client):
-        await _bootstrap_csrf(csrf_client)
-        res = await csrf_client.get(f"{constants.ROUTE_PREFIX_API}/settings")
-        assert res.status_code == 200
-class TestClientConstantsPinned:
-    def test_ts_client_matches_python_csrf_constants(self):
-        # utils/api.ts cannot import constants.py, so its cookie and header
-        # literals are pinned here (same convention as the _PAGE_SETTINGS
-        # pin in test_ai_api.py) — a rename in constants.py must fail a
-        # Python test, not silently 403 every save in the browser.
-        from pathlib import Path
+    @pytest.mark.parametrize("method", ["GET", "HEAD", "OPTIONS"])
+    async def test_safe_methods_are_not_checked(self, csrf_client, method):
+        res = await csrf_client.request(method, SETTINGS)
+        assert res.status_code != 403
 
-        import sm_ai
+    async def test_no_cookie_mirrors_the_token(self, csrf_client):
+        res = await csrf_client.get(constants.MENU_URL, headers=INERTIA)
+        names = {c.split("=", 1)[0] for c in res.headers.get_list("set-cookie")}
+        assert "sm_ai_csrf" not in names
 
-        source = (Path(sm_ai.__file__).parent / "utils" / "api.ts").read_text()
-        assert f"const CSRF_COOKIE = '{constants.CSRF_COOKIE}'" in source
-        assert "'X-CSRF-Token'" in source
-        assert constants.CSRF_HEADER == "x-csrf-token"  # header match is case-insensitive
+
+class TestTokenIsNotAPermission:
+    async def test_a_valid_token_without_ai_manage_is_refused_by_the_permission_check(
+        self, denied_client
+    ):
+        token = await _token_from_screen(denied_client)
+        res = await denied_client.put(
+            SETTINGS, json={"chat_model": "x"}, headers={CSRF_HEADER: token}
+        )
+        assert res.status_code == 403, res.text
+        detail = res.json()["detail"]
+        assert "CSRF" not in detail
+        assert detail == f"{PERMISSION_DENIED_PREFIX}{constants.PERM_MANAGE}"
+        assert denied_client.applied == []

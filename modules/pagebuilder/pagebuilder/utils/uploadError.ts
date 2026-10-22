@@ -1,5 +1,6 @@
 /** Turn a rejected upload into a sentence in the console's language. */
 
+import { isCsrfRefusalBody } from './csrf';
 import { keys, translate } from './i18n';
 
 /**
@@ -33,9 +34,16 @@ export function uploadErrorMessage(status: number): string {
   return translate(keys.pagebuilder.errors.upload_failed, { status });
 }
 
-/** The rejection for a non-2xx upload response. */
-export const uploadRejected = (status: number) =>
-  new UploadError(uploadErrorMessage(status), status);
+/** The rejection for a non-2xx upload response. A stale CSRF token is the one
+ *  403 whose body is read: it is not a missing permission, and reloading the
+ *  page fixes it, so the person is told that instead. */
+export const uploadRejected = (status: number, body = '') =>
+  new UploadError(
+    isCsrfRefusalBody(status, body)
+      ? translate(keys.pagebuilder.errors.csrf_failed)
+      : uploadErrorMessage(status),
+    status,
+  );
 
 /** The rejection for an upload that never got a response. */
 export const uploadNetworkError = () =>

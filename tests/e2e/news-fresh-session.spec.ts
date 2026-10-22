@@ -5,36 +5,26 @@ import { login } from './helpers';
 /**
  * "New article" from a session that has never touched pagebuilder.
  *
- * This is deliberately the one news flow that does NOT go through
- * `csrfHeader()`. That helper starts with `page.goto('/pagebuilder/')`, which
- * makes pagebuilder's CsrfCookieMiddleware mirror the session token into a
- * readable cookie — so every other spec primes the cookie before it does
- * anything, and none of them can see it missing.
- *
  * Creating an article once POSTed to pagebuilder's CSRF-protected page API from
- * the browser. A user who clicked News in the sidebar and then "New article"
- * had never requested a pagebuilder path, so the cookie was unset and the POST
- * came back 403 with no page and no article — the module's documented primary
- * flow, broken on a fresh login. It then became one request to news' own API,
- * which created the page and attached the article server-side.
+ * the browser, with a token pagebuilder only mirrored into a cookie once a
+ * `/pagebuilder` path had been requested. A user who clicked News in the
+ * sidebar and then "New article" had never requested one, so the POST came
+ * back 403 with no page and no article — the module's documented primary flow,
+ * broken on a fresh login. It then became one request to news' own API, which
+ * creates the page and attaches the article server-side.
  *
- * There is no page in it at all now. The cookie assertion below is kept even so:
- * it is the cheapest possible statement that this flow touches nothing of
- * pagebuilder's, and it would fail the moment something reached back across.
+ * Every module now checks the one framework token, shared on every module's
+ * screens (#126), so there is no per-module cookie left to be missing. The
+ * spec keeps the shape that caught the bug: nothing before the click may
+ * request a `/pagebuilder` path.
  */
 test.describe('News — first visit of a session', () => {
   test('creates an article without having visited Pages first', async ({ page }) => {
     await login(page);
 
-    // Straight to News. Nothing above may request a /pagebuilder path, or the
-    // cookie gets primed and this test stops testing anything.
+    // Straight to News. Nothing above may request a /pagebuilder path.
     await page.goto('/admin/news/');
     await expect(page.getByRole('heading', { name: 'News' })).toBeVisible();
-
-    const cookieBefore = (await page.context().cookies()).find(
-      (c) => c.name === 'pagebuilder_csrf',
-    );
-    expect(cookieBefore, 'precondition: the CSRF cookie must not be primed yet').toBeUndefined();
 
     const title = `Fresh session ${Date.now().toString(36)}`;
     await page.getByRole('button', { name: 'New article' }).click();

@@ -1,0 +1,20 @@
+# Optional overlay: also join `devnet`, the network of the shared dev-services
+# stack (CLAUDE.md, "Local database"), so the host can reach its Postgres as
+# `postgres:5432`. Requires that stack to be running (`make up` there).
+#
+#   SMPY_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/smpy_modules \
+#     docker compose -f compose.yaml -f compose.devnet.yaml up -d --build
+#
+# The smpy_modules database has to exist: add it to dev-services'
+# init/01-databases.sql, or create it once by hand. Without this file the stack
+# needs nothing external and runs on SQLite.
+
+services:
+  host:
+    networks:
+      - default
+      - devnet
+
+networks:
+  devnet:
+    external: true

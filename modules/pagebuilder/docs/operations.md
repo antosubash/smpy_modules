@@ -65,8 +65,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `content_locales` ● | `["en"]` | Languages a page may be written in; JSON array |
 | `default_content_locale` ● | `en` | Served unprefixed; must be in `content_locales` or boot fails |
 | `requires_auth` | `true` | Require a signed-in user on `/pagebuilder/*` and `/api/pagebuilder/*`. Turn off only behind an authenticating proxy. |
-| `csrf_protect` | `true` | Require `X-CSRF-Token` on mutating admin requests |
-| `csrf_cookie_name` | `pagebuilder_csrf` | JS-readable cookie mirroring the token |
+| `csrf_protect` | `true` | Require the framework's `X-CSRF-Token` on mutating admin requests |
 | `media_root` ● | `var/pagebuilder/media` | Relative paths anchor to the project root (`SM_PROJECT_ROOT`, else the nearest dir with `pyproject.toml`, `.env` or `alembic.ini`), never the cwd |
 | `media_url_prefix` ● | `/media/pagebuilder` | Where media is served |
 | `media_max_bytes` | `10485760` | 10 MB per upload |
@@ -203,7 +202,7 @@ the other leaves pages pointing at missing images.
 | Boot fails: `default_content_locale … is not in content_locales` | inconsistent settings | Fix with `scripts/set_setting.py` |
 | Boot fails: `pins every request to default_tenant=…` | host fixed to another tenant | Unset `default_tenant`, set it to `default`, or turn multi-tenancy on |
 | Admin API 403 `tenant_required` | multi-tenant host, no organisation selected | Select an organisation / use its subdomain |
-| Every POST 403 `Invalid or missing CSRF token` | client not sending `X-CSRF-Token` | Read the token from the `csrf.token` prop or the `pagebuilder_csrf` cookie |
+| Every POST 403 `CSRF token missing or invalid` | client not sending `X-CSRF-Token`, or the session changed | Reload the screen; scripted clients read the token from the `csrf_token` prop of any pagebuilder screen |
 | Images 404 on public pages | `media_root` differs between processes, or files not deployed | Compare the logged `pagebuilder.media_root`; set an absolute path or `SM_PROJECT_ROOT` |
 | Upload 415 | type not allowed, or contents don't match the declared type | Re-export the image; add the type to `media_allowed_content_types` |
 | Canonical or sitemap URLs show an internal host | proxy rewrites `Host` | Set `public_base_url` |

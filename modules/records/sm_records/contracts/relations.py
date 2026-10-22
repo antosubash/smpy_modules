@@ -2,10 +2,10 @@
 wire (design doc §9, Phase 4).
 
 Two questions, two shapes. *Forward*: "what does this relation point at?" is
-:class:`ExpandedRef`, filled only under an explicit ``?expand=`` and only to
-depth one. *Reverse*: "what points at this record?" is :class:`ReferrerRead`,
-a single indexed query over ``records_index_ref`` that the delete dialog and
-the editor's "Referenced by" panel both read.
+:class:`ExpandedRef`, filled only under an explicit ``?expand=``, nested under
+its own ``expanded`` for a dotted path. *Reverse*: "what points at this
+record?" is :class:`ReferrerRead`, a single indexed query over
+``records_index_ref`` that the delete dialog and the editor's "Referenced by" panel both read.
 """
 
 from __future__ import annotations
@@ -32,6 +32,10 @@ class ExpandedRef(SQLModel):
 
     ``type_key`` and ``uuid`` are always present: they are the stored value,
     echoed so a client can render a list without re-reading ``data``.
+
+    A dotted ``?expand=a.b`` fills :attr:`expanded` on a *resolved* ``a``
+    only — a dangling or restricted target has no relations to read, and a
+    restricted one must not reveal whether it has any.
     """
 
     type_key: str
@@ -41,6 +45,17 @@ class ExpandedRef(SQLModel):
     status: str | None = None
     dangling: bool = False
     restricted: bool = False
+    cycle: bool = False
+    """Resolved, but the target is already on the chain above this entry —
+    the record being read, or a target an outer level expanded. It is not
+    expanded again, so its :attr:`expanded` stays ``None`` even under a path
+    that names more levels: a graph has cycles, and walking one only repeats
+    what the response already holds."""
+    expanded: dict[str, list[ExpandedRef]] | None = None
+    """The next level of a dotted ``?expand=``: field key of the *target's*
+    type -> its references, under the same rules as ``RecordRead.expanded``.
+    ``None`` where the path ends, and on a dangling, restricted or cycle
+    entry."""
 
 
 class ReferrerRead(SQLModel):
@@ -85,6 +100,7 @@ def expanded_ref(
     target: Record | None,
     *,
     restricted: bool = False,
+    cycle: bool = False,
 ) -> ExpandedRef:
     """Build one :class:`ExpandedRef`. ``target`` is ``None`` when the row is
     trashed or gone; ``restricted`` wins over a found row, so a caller who may
@@ -99,6 +115,7 @@ def expanded_ref(
         display_title=target.display_title,
         slug=target.slug,
         status=target.status.value,
+        cycle=cycle,
     )
 
 
