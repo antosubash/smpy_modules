@@ -110,4 +110,4 @@ runs:
       shell: bash
       env:
         CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
-      run: timeout -k 30s 20m "$GITHUB_ACTION_PATH/install-browsers.sh"
+      run: timeout -k 30s 20m bash "$GITHUB_ACTION_PATH/install-browsers.sh"
