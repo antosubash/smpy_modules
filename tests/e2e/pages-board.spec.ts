@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The pages board — the default view.
@@ -14,7 +14,7 @@ async function makePage(
   page: Page,
   { publish = false, publishAt = null }: { publish?: boolean; publishAt?: string | null } = {},
 ) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const slug = uniqueSlug('board');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
@@ -126,7 +126,7 @@ test.describe('Pages board', () => {
 
   test('a template is not listed as a draft', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const slug = uniqueSlug('tpl');
     await page.request.post('/api/pagebuilder/pages', {
       headers,

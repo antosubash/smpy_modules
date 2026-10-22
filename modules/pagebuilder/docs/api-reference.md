@@ -8,10 +8,15 @@ router-level dependencies, in this order:
 2. **Tenant binding** (`tenancy.bind_admin`) — single-tenant host: tenant
    `"default"`; multi-tenant host: the tenant the framework resolved, or
    `403 tenant_required`.
-3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` needs the session token in an
-   `X-CSRF-Token` header, else `403 Invalid or missing CSRF token` (when
-   `csrf_protect` is on). The admin views expose it as the Inertia shared prop
-   `csrf.token` and in a JS-readable cookie (`pagebuilder_csrf` by default).
+3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` (media uploads included)
+   needs the session's CSRF token in an `X-CSRF-Token` header, else `403`
+   (when `csrf_protect` is on). The check is the framework's `RequiresCsrf`,
+   the one billing, news and records use, so one token serves every module.
+   Every pagebuilder screen shares it as the `csrf_token` Inertia prop
+   (`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
+   sends it from there. There is no CSRF cookie. Reads need no token. It runs
+   before any permission check, so a write without a token is refused as CSRF
+   even for a user who also lacks the permission.
 
 "Permission" below is the extra `RequiresPermission` check on top; **auth** means
 any signed-in user. Errors are `{"detail": "<message>"}`; the table is at the end.
@@ -252,6 +257,19 @@ An old slug answers 301 to the page's current address. See
 **Contracts.** DTOs are exported from `pagebuilder.contracts`; anything else in
 the package may change without a major version.
 
+**`search_pages(db, pattern, *, tenant_id, include_drafts, limit, locale=None)`**
+and **`search_media(db, pattern, *, tenant_id, limit)`** (`pagebuilder.contracts`)
+return `(hits, total)` — `PageSearchHit` / `MediaSearchHit`, newest first, at
+most `limit`, plus the full match count. `limit` is an `int` from 1 to
+`MAX_SEARCH_LIMIT` (100); anything else — `None`, a negative, an oversized
+value — raises `ValueError` before any query runs. `pattern` is a SQL `LIKE` pattern
+escaped with `\`. The caller names the tenant and the contract pins it with a
+`WHERE`, so a host with no tenant bound still reads one tenant's rows; a strict
+session with none bound answers `([], 0)`. Pages match title, slug and draft
+body, never trashed, unpublished only with `include_drafts`, every language
+unless `locale` is given; media match the uploaded or stored filename. News'
+admin search is the consumer (#130).
+
 **`PageDeleted(page_id, slug)`** (`pagebuilder.contracts.events`) is published
 on the event bus when a page is *purged* — not when it is trashed, since a
 restore would otherwise come back without what other modules dropped. A module
@@ -280,7 +298,7 @@ release; omit it.
 |---|---|---|
 | 401 | `Not authenticated` | no user and `requires_auth` on |
 | 403 | `tenant_required` | multi-tenant host, admin request with no tenant |
-| 403 | `Invalid or missing CSRF token` | mutating request without the header |
+| 403 | `CSRF token missing or invalid — …` | mutating request without the session's token |
 | 403 | (framework) | missing permission |
 | 404 | `Page not found` / `Revision not found` / `Asset not found` / `Snapshot not found` / `Import not found` | unknown id, trashed page, other tenant's row |
 | 409 | `Slug already in use in <locale>` | create, update |

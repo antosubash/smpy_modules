@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 const CONTENT = [
   '## Partners',
@@ -31,7 +31,7 @@ test.describe('Pagebuilder Markdown seeded through the API', () => {
 
   test('keeps the create fields and renders images and nested lists', async ({ page }) => {
     const slug = uniqueSlug('md-seed');
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,
       data: {
@@ -88,7 +88,7 @@ test.describe('Pagebuilder Markdown seeded through the API', () => {
     page,
   }) => {
     const slug = uniqueSlug('og-fallback');
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,
       data: {

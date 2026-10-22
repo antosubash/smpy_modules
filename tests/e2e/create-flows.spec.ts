@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The two create dialogs.
@@ -33,7 +33,7 @@ test.describe('New page', () => {
 
   test('start-from copies an existing page into the new one', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const sourceSlug = uniqueSlug('src');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,
@@ -70,7 +70,7 @@ test.describe('New page', () => {
 
   test('a parent can be chosen and does not change the URL', async ({ page }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const parentSlug = uniqueSlug('parent');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,

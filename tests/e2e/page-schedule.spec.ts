@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The editor's schedule fields, in a browser that is not on UTC.
@@ -24,7 +24,7 @@ test('a saved schedule keeps the time that was entered', async ({ page }) => {
   await login(page);
   const slug = uniqueSlug('schedule-tz');
   const created = await page.request.post('/api/pagebuilder/pages', {
-    headers: await csrfHeader(page),
+    headers: await moduleCsrfHeader(page, '/pagebuilder/'),
     data: {
       title: `Schedule ${slug}`,
       slug,
