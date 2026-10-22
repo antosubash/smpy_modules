@@ -15,7 +15,9 @@ import re
 
 from fastapi import Response
 
-_HTML_LANG = re.compile(rb"""(<html\b[^>]*?\blang=)(["'])([^"']*)\2""", re.IGNORECASE)
+# ``\s`` before ``lang``, not ``\b``: ``xml:lang=`` and ``data-lang=`` are
+# other attributes, and ``\b`` would match inside either.
+_HTML_LANG = re.compile(rb"""(<html\b[^>]*?\slang=)(["'])([^"']*)\2""", re.IGNORECASE)
 
 
 def set_html_lang(response: Response, locale: str) -> Response:

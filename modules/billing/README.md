@@ -88,11 +88,11 @@ Billing settings are stored in the database. They are registered with
 
 | Setting | Notes |
 |---|---|
-| `provider` | `manual` (the default) or `stripe`. Read at startup, so changing it needs a restart. |
+| `provider` | `manual` (the default) or `stripe`. Takes effect on save, no restart. |
 | `stripe_secret_key` | `sk_…`. Stored as `enc:v1:<fernet>`, encrypted with the app's `secret_key`. |
 | `stripe_webhook_secret` | `whsec_…`, encrypted the same way. |
 | `return_base_url` | Origin that Stripe returns visitors to. If empty, the request's own origin is used. |
-| `reconcile_interval_minutes` | `0` (off) or N: re-read every subscription not synced for N minutes, on a loop inside the app. Read at startup. |
+| `reconcile_interval_minutes` | `0` (off) or N: re-read every subscription not synced for N minutes, on a loop inside the app. Takes effect on save, no restart. |
 
 - **manual.** There is no payment. Admins assign a plan and status on
   **Admin → Billing → Subscriptions**. Setting `unpaid` suspends the tenant.

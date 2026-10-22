@@ -1,10 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type Overrides, Puck } from '@puckeditor/core';
-// Not `puck.css`: that one starts with `@import "https://rsms.me/inter/inter.css"`,
-// which the host's production CSP blocks — and a blocked import fails Vite's
-// CSS preload, so the page chunk never loads and the editor renders blank
-// (#119). Same rules, minus the remote font.
-import '@puckeditor/core/no-external.css';
+import '../components/body/puck-editor.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useMemo } from 'react';
