@@ -7,9 +7,10 @@
 // marks that "flaky", and without this nothing anyone reads would say so: the
 // run is green and the flake accumulates unseen. Every flaky and every failed
 // test is listed in $GITHUB_STEP_SUMMARY (stdout when that is unset), and the
-// script exits 1 when any test was flaky — the same gate as
-// `failOnFlakyTests` in playwright.config.ts, kept here too so that removing
-// one of them does not quietly let flakes pass again.
+// script exits 1 when any test was flaky or failed — the same gates as
+// `failOnFlakyTests` in playwright.config.ts and Playwright's own exit code,
+// kept here too so that removing (or `continue-on-error`-ing) one of them does
+// not quietly let a flake or a failure pass.
 //
 // A missing report means Playwright never got as far as writing one (the
 // webServer did not boot, say); the Playwright step has already failed with
@@ -99,7 +100,7 @@ function main() {
   }
   if (failed.length) parts.push('', '#### Failed', '', table(failed));
   emit(parts.join('\n'));
-  return flaky.length ? 1 : 0;
+  return flaky.length || failed.length ? 1 : 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());

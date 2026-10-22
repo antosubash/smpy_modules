@@ -88,7 +88,10 @@ runs:
 
     # Composite steps cannot carry `timeout-minutes`; `timeout` stands in for
     # it, so a hung mirror or stalled apt cannot sit out the whole job budget.
-    # 8 min is well above the normal ~2 min cold install.
+    # 8 min is well above the normal ~2 min cold install. On expiry it SIGTERMs
+    # the install's process group and exits 124, which fails the step (bash
+    # runs with -e). `-k 30s` follows with SIGKILL: without it, a child that
+    # ignores SIGTERM keeps `timeout` waiting for as long as the child runs.
     - name: Install Playwright browsers
       shell: bash
       env:
@@ -96,7 +99,7 @@ runs:
       run: |
         if [ "$CACHE_HIT" = "true" ]; then
           # Browsers cached — only refresh OS-level deps (fast).
-          timeout 8m npx playwright install-deps chromium
+          timeout -k 30s 8m npx playwright install-deps chromium
         else
-          timeout 8m npx playwright install chromium --with-deps
+          timeout -k 30s 8m npx playwright install chromium --with-deps
         fi

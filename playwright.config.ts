@@ -78,7 +78,9 @@ export default defineConfig({
     // start.
     command: './tests/e2e/start-test-server.sh',
     url: APP_URL,
-    reuseExistingServer: !process.env.CI,
+    // Never in bundle mode: a dev stack already on API_PORT would be reused
+    // and the run would pass without ever loading the bundle.
+    reuseExistingServer: !CI && !BUNDLE,
     timeout: 180_000,
     stdout: 'pipe',
     stderr: 'pipe',
