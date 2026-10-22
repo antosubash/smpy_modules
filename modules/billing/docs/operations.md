@@ -97,13 +97,15 @@ reconcile loop in the running process; no restart.
   with the old secret get 400 until the Stripe endpoint uses the new one.
 - A request already in flight finishes with the provider it started with.
 
-Still needing a restart:
-
-- **Other workers.** The settings hot-swap is per process. With several
-  workers or instances, the one that served the save switches at once; the
-  others keep their old settings, provider and loop until they restart.
-- **`scripts/set_setting.py`** writes the database only; the running app reads
-  that value at its next boot.
+- **Other workers and instances.** The framework's hot-swap reaches only the
+  process that served the save. Every other one re-reads the stored provider
+  fields (one indexed query) before each billing request, webhook, seat push
+  and reconcile tenant, and rebuilds when they differ — so a worker never
+  writes through a provider the database no longer names. Its reconcile loop
+  starts, stops or re-times at its next tick (or its next billing request).
+- **`scripts/set_setting.py`** writes the database only. The provider fields
+  are picked up the same way, at the next billing request; any other billing
+  setting written that way is read at the next boot.
 
 To try it locally with test keys:
 

@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
-import time
-
 import pytest
 from api_helpers import arm_csrf
+from api_helpers import signed_stripe_event as _signed
 from sm_billing import constants as c
 from sm_billing import live, startup
 from sm_billing.providers.manual import ManualProvider
@@ -45,16 +41,6 @@ async def _connect(admin, webhook_secret: str = WHSEC) -> None:
         CONNECTION, json={"stripe_secret_key": "sk_test_1", "stripe_webhook_secret": webhook_secret}
     )
     assert response.status_code == 200, response.text
-
-
-def _signed(secret: str) -> tuple[bytes, dict[str, str]]:
-    """A Stripe event nothing acts on, signed the way Stripe signs."""
-    body = json.dumps(
-        {"id": "evt_live", "object": "event", "type": "invoice.created", "data": {"object": {}}}
-    ).encode()
-    ts = int(time.time())
-    sig = hmac.new(secret.encode(), f"{ts}.{body.decode()}".encode(), hashlib.sha256).hexdigest()
-    return body, {"stripe-signature": f"t={ts},v1={sig}"}
 
 
 async def test_manual_to_stripe_to_manual_without_restart(app, admin):

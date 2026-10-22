@@ -41,6 +41,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import or_, select, update
 
 from sm_billing import constants as c
+from sm_billing import live
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.models import Subscription
 from sm_billing.reconcile import ReconcileReport, reconcile_one
@@ -110,6 +111,27 @@ async def _release(factory: Any, row_id: int, stamp: datetime, previous: datetim
         await finalize_session(session)
 
 
+async def _claim_safely(
+    factory: Any, row_id: int, cutoff: datetime, stamp: datetime, previous: datetime | None
+) -> bool:
+    """:func:`_claim`, handing the row back if a cancel lands around its commit.
+
+    Re-timing or stopping the loop cancels this task. Cancelled after the
+    claim committed but before it returned, the stamp would stay with nobody
+    to finish or release it, and the replacement loop would skip that tenant
+    for a whole interval. So the claim runs shielded and, on cancel, its
+    outcome is awaited and a won claim released before the cancel propagates.
+    """
+    claim = asyncio.ensure_future(_claim(factory, row_id, cutoff, stamp))
+    try:
+        return await asyncio.shield(claim)
+    except asyncio.CancelledError:
+        with suppress(Exception):
+            if await claim:
+                await asyncio.shield(_release(factory, row_id, stamp, previous))
+        raise
+
+
 async def reconcile_stale(
     app: FastAPI, max_age: timedelta, failing: set[int] | None = None
 ) -> ReconcileReport:
@@ -129,8 +151,11 @@ async def reconcile_stale(
     pause, provider_errors = PACE_SECONDS, 0
     rows = sorted(await _stale(factory, cutoff), key=lambda r: r[0] in failing)  # stable
     for row_id, tenant_id, subscription_id, previous in rows:
+        if await live.ensure_current(app):
+            report.skipped = "settings changed"  # the next tick runs on the new ones
+            break
         stamp = datetime.now(UTC)
-        if not await _claim(factory, row_id, cutoff, stamp):
+        if not await _claim_safely(factory, row_id, cutoff, stamp, previous):
             continue  # another instance has it, or a webhook just synced it
         try:
             pushed = await reconcile_one(app, tenant_id, subscription_id)
@@ -205,6 +230,10 @@ class ReconcileScheduler:
         if task is None:
             return
         task.cancel()
+        if task is asyncio.current_task():
+            # The loop itself noticed a switch saved on another worker
+            # (``live.ensure_current``): it ends at its next await.
+            return
         # Logged, never raised: the host calls every module's ``on_shutdown`` in
         # a bare loop, so an exception here would skip the rest and the engine
         # disposal after it.

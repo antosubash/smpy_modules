@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from api_helpers import arm_csrf, create_tenant, page_props
 from fake_provider import FakeProvider
-from helpers import make_plan, make_tenant
+from helpers import make_plan, make_tenant, store_settings
 from sm_billing import crypto
 from sm_billing.contracts.provider import PriceInfo, SubscriptionSnapshot
 from sm_billing.providers.stripe import StripeProvider
@@ -188,9 +188,7 @@ async def test_connection_encrypts_and_masks(app, admin):
 
 async def test_connection_save_rebuilds_stripe_provider(app, admin):
     # Stripe was chosen at startup but fell back to manual for lack of secrets.
-    app.state.sm_billing.settings = app.state.sm_billing.settings.model_copy(
-        update={"provider": "stripe"}
-    )
+    await store_settings(app, provider="stripe")
     app.state.sm_billing.provider_error = "missing"
     await admin.put(
         f"{ADMIN}/connection",
@@ -203,9 +201,7 @@ async def test_connection_save_rebuilds_stripe_provider(app, admin):
 
 async def test_connection_save_switches_to_a_chosen_stripe(app, admin):
     # The setting says stripe while manual still runs: the save completes it (#85).
-    app.state.sm_billing.settings = app.state.sm_billing.settings.model_copy(
-        update={"provider": "stripe"}
-    )
+    await store_settings(app, provider="stripe")
     await admin.put(
         f"{ADMIN}/connection",
         json={"stripe_secret_key": "sk_test_1", "stripe_webhook_secret": "whsec_1"},
