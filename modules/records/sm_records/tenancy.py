@@ -156,9 +156,11 @@ def resolve_admin(request: Any) -> str:
     Multi mode binds the tenant the framework resolved — the member's active
     organisation, not ``user.tenant_id`` — so records edits the same tenant as
     the member's pages and news. The framework never lets a signed-in user pick
-    a tenant by header (``TenantMiddleware`` reads it for anonymous requests
-    only, since 0.0.35), so following its answer hands a tenant-less user
-    nothing: they resolve no tenant and get :class:`TenantRequired`. No user at
+    a tenant they are not a member of by header (``TenantMiddleware`` reads it
+    raw for anonymous requests only, since 0.0.35; the tenants module honours
+    it only among the user's active memberships), so following its answer
+    hands a tenant-less user nothing: they resolve no tenant and get
+    :class:`TenantRequired`. No user at
     all is a 401 — the framework's ``AuthMiddleware`` answers first in
     production, and an anonymous request's header tenant never reaches the
     admin surface.
