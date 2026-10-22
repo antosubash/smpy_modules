@@ -35,6 +35,7 @@ from __future__ import annotations
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
+from sm_records.constants import EXPAND_DEPTH_CAP
 from sm_records.settings_boot import BootSettings
 
 __all__ = ["RecordsSettings"]
@@ -75,6 +76,22 @@ class RecordsSettings(BootSettings):
     max_in_values: int = Field(default=200, ge=1)
     """Most values one ``filter=<field>:in:a,b`` term lists; two thousand
     was ``Expression tree is too large`` — to an anonymous caller."""
+
+    max_expand_depth: int = Field(default=3, ge=1, le=EXPAND_DEPTH_CAP)
+    """How deep one ``?expand=`` path may reach: ``author`` is one level,
+    ``author.publisher`` two. Deeper is a ``400``. At most ``EXPAND_DEPTH_CAP``
+    (5) whatever is stored — every level is another statement per path."""
+
+    max_expand_paths: int = Field(default=50, ge=1)
+    """Most distinct hops one ``?expand=`` names, counting every prefix once
+    (``a.b,a.c`` is three: ``a``, ``a.b``, ``a.c``). Each is one batched
+    statement, so this bounds a read's statement count; over it is a ``400``."""
+
+    max_expand_refs: int = Field(default=1000, ge=1)
+    """Most references one read resolves *below* depth one, summed over every
+    level. Depth one is bounded by the page and the payload as it always was;
+    each level past it multiplies, so a page that would resolve more than this
+    is a ``400`` naming the path that crossed it, before that level is read."""
 
     max_payload_bytes: int = 262144
     """Reject a record write whose ``data`` payload, serialized, exceeds this

@@ -32,8 +32,16 @@ from pagebuilder.contracts.schemas import (
     PageUpdate,
     RevisionDiffResponse,
 )
+from pagebuilder.contracts.search import (
+    MAX_SEARCH_LIMIT,
+    MediaSearchHit,
+    PageSearchHit,
+    search_media,
+    search_pages,
+)
 
 __all__ = [
+    "MAX_SEARCH_LIMIT",
     "BlockChange",
     "LayoutDetail",
     "LayoutRead",
@@ -45,6 +53,7 @@ __all__ = [
     "MediaAssetListResponse",
     "MediaAssetRead",
     "MediaAssetVariant",
+    "MediaSearchHit",
     "MetadataChange",
     "PageCreate",
     "PageDetail",
@@ -56,8 +65,11 @@ __all__ = [
     "PageRevisionListResponse",
     "PageRevisionRead",
     "PageScheduleRequest",
+    "PageSearchHit",
     "PageTranslationCreate",
     "PageTranslationRead",
     "PageUpdate",
     "RevisionDiffResponse",
+    "search_media",
+    "search_pages",
 ]

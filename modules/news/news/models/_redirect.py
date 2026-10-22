@@ -7,7 +7,7 @@ from sqlalchemy import Index
 from sqlmodel import Field
 
 from news import locales
-from news.constants import MAX_LOCALE_LEN, MAX_SLUG_LEN
+from news.constants import MAX_LOCALE_LEN, MAX_SLUG_LEN, MAX_TAG_LEN
 from news.models._base import ARTICLE_TABLE, Base
 
 
@@ -50,3 +50,30 @@ class NewsArticleRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[uns
     article_id: int = Field(
         foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE"
     )
+
+
+class NewsTagRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
+    """A tag's old slug, kept so ``/news/tag/<old>`` follows a rename (#174).
+
+    The same reasoning as :class:`NewsArticleRedirect`: a tag archive is a
+    public, crawlable address, and renaming the tag moves its slug. No locale —
+    a tag is not per-language, so neither is its slug; every language's archive
+    redirects to the same new slug under its own prefix.
+
+    Unique per ``(tenant_id, from_slug)``: one old address names one tag.
+    """
+
+    __tablename__ = "news_tag_redirects"
+
+    __table_args__ = (
+        Index(
+            "ix_news_tag_redirects_tenant_from_slug",
+            "tenant_id",
+            "from_slug",
+            unique=True,
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    from_slug: str = Field(max_length=MAX_TAG_LEN)
+    tag_id: int = Field(foreign_key="news_tags.id", index=True, ondelete="CASCADE")

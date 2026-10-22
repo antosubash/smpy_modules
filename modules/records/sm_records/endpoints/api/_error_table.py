@@ -57,6 +57,18 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         400,
+        "`?expand=` resolving more than `max_expand_refs` references below depth one",
+        '`{"detail", "field", "reason": "expand_budget"}`',
+    ),
+    ErrorRow(
+        400,
+        "An `?expand=` path with an empty or over-long segment, deeper than "
+        "`max_expand_depth`, more than `max_expand_paths` hops, or an `expand` value "
+        "too long to be any of those",
+        '`{"detail"}`',
+    ),
+    ErrorRow(
+        400,
         "A malformed filter term, or `in` over `max_in_values`",
         '`{"detail"}`',
     ),

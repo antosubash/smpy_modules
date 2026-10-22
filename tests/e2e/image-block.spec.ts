@@ -11,12 +11,12 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { clickAndConfirm, csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
+import { clickAndConfirm, login, moduleCsrfHeader, publishWithNote, uniqueSlug } from './helpers';
 
 const FIXTURE_PATH = fileURLToPath(new URL('./fixtures/hero-1024x768.png', import.meta.url));
 
 async function createPageWithImage(page: Page, title: string, slug: string): Promise<number> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   // Empty-src Image block — picker will be exercised by the test.
   const draftData = {
     root: { props: { title } },
@@ -64,7 +64,7 @@ async function selectBlockFromOutline(page: Page, name: string): Promise<void> {
  * previously-failed run doesn't cascade.
  */
 async function clearPagebuilderState(page: Page): Promise<void> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const [pages, uploads] = await Promise.all([
     page.request.get('/api/pagebuilder/pages').then((r) => r.json()),
     page.request.get('/api/pagebuilder/uploads').then((r) => r.json()),

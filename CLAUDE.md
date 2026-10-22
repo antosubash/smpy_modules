@@ -54,14 +54,18 @@ and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
 and all modules follow one rule: single-tenant host → `"default"`; multi →
 the tenant the framework resolved (`request.state.tenant_id`, the active
 membership — never `user.tenant_id`, never a header a module reads itself);
-none resolved → 403 `tenant_required` for admin, 404 for public. The
+none resolved → 403 `tenant_required` for admin, 404 for public. The rule is
+applied per request, and a tenant already resolved upstream always wins: a
+`single` detection supplies `"default"` only when nothing upstream bound one,
+so a mis-detected child app fails closed (#192, #196). The
 scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`, and a tenant already resolved upstream beats a
-`single` detection, so a mis-detected child app fails closed); billing reads the same `request.state.tenant_id`
-through `context.billing_context`. Code outside pagebuilder that reads its
-tables (news' search) pins `tenant_id` itself.
+code `tenant_required`); billing reads the same `request.state.tenant_id`
+through `context.billing_context`. Another module reads pagebuilder only
+through `pagebuilder.contracts` (news' search calls
+`search_pages`/`search_media`, #130); the caller names the tenant and the
+contract pins `tenant_id` itself.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
