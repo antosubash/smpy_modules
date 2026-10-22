@@ -141,9 +141,16 @@ function collectOptimizeIncludes(): string[] {
 // too, so every consumer agrees on which port the UI took.
 const uiPort = Number(resolvePort([process.env.SM_UI_PORT], DEFAULT_UI_PORT));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
   root: import.meta.dirname,
+  // The built bundle is served from the framework's `/static` mount under
+  // `dist/` (outDir below). The entry script's URL comes from the manifest and
+  // is prefixed by the framework, but the URLs Vite writes *into* the bundle —
+  // lazy page chunks, modulepreload links, CSS assets — use `base`. Left at
+  // "/", a production build requests `/assets/…` and every page but the entry
+  // 404s. The dev server keeps "/", where Vite serves from its own origin.
+  base: command === 'build' ? '/static/dist/' : '/',
   resolve: {
     dedupe: [...REACT_CORE_DEPS, '@simple-module-py/ui', '@simple-module-py/i18n'],
   },
@@ -170,4 +177,4 @@ export default defineConfig({
       allow: [fsRoot, ...moduleFsAllow],
     },
   },
-});
+}));

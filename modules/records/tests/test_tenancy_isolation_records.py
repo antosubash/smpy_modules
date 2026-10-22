@@ -226,3 +226,29 @@ async def test_expand_never_reaches_into_another_tenant(two_tenants):
     foreign, dangling = await point_at(ACME_ONLY), await point_at(NO_UUID)
     assert foreign == {**dangling, "uuid": ACME_ONLY}
     assert "acme" not in str(foreign)
+
+
+async def test_a_nested_expand_never_reaches_into_another_tenant(two_tenants):
+    """#81: every hop runs on the request's tenant-bound session. ``globex``'s
+    ``SAME`` is made to point at ``acme``'s record; two levels down from
+    ``GLOBEX_REF`` that reads as dangling, and the level above is
+    ``globex``'s copy of the shared uuid, never ``acme``'s."""
+    table = Record.__table__
+    with tenant_scope(GLOBEX):
+        async with two_tenants.db_state.session_factory() as session:  # type: ignore[attr-defined]
+            await session.execute(
+                update(table)
+                .where(table.c.tenant_id == GLOBEX, table.c.uuid == SAME)
+                .values(data={"title": "globex same", "score": 1, "link": link(ACME_ONLY)})
+            )
+            await session.commit()
+    resp = await two_tenants.get(f"{RECORDS}/{GLOBEX_REF}?expand=link.link", headers=G)
+    assert resp.status_code == 200, resp.text
+    (same,) = resp.json()["expanded"]["link"]
+    assert (same["uuid"], same["display_title"]) == (SAME, "globex same")
+    (foreign,) = same["expanded"]["link"]
+    assert (foreign["uuid"], foreign["dangling"], foreign["display_title"]) == (
+        ACME_ONLY,
+        True,
+        None,
+    )
