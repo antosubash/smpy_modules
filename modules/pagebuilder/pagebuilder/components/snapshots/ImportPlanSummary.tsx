@@ -1,8 +1,14 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
-import { keys, translate, useT } from '../../utils/i18n';
+import { keys, useT } from '../../utils/i18n';
 import type { ImportPlan, PagePlanEntry } from '../../utils/snapshotsApi';
-import { describeLayoutSide, overwriteWarning, planTotals, untouchedNote } from './planSummary';
+import {
+  describeLayoutSide,
+  describeOverwrite,
+  overwriteWarning,
+  planTotals,
+  untouchedNote,
+} from './planSummary';
 
 /** One bucket of the plan, hidden entirely when it is empty.
  *
@@ -43,23 +49,6 @@ function Group({
   );
 }
 
-/** How a page's blocks differ, when it is one being overwritten.
- *
- *  Through `translate` rather than a hook: `Group` takes this as a plain
- *  callback, so it runs outside a component body. */
-function blockSummary(entry: PagePlanEntry): string | null {
-  const parts: string[] = [];
-  if (entry.added) parts.push(`+${entry.added}`);
-  if (entry.removed) parts.push(`−${entry.removed}`);
-  if (entry.changed) parts.push(`~${entry.changed}`);
-  const blocks = parts.length
-    ? translate(keys.pagebuilder.plan.block_changes, { changes: parts.join(' ') })
-    : translate(keys.pagebuilder.plan.metadata_only);
-  // Worth saying out loud: this slug looks free, but the page under it is in
-  // the trash and the restore overwrites and un-bins it.
-  return entry.revived ? translate(keys.pagebuilder.plan.revived, { blocks }) : blocks;
-}
-
 /**
  * What applying this bundle would do, ordered by what is at stake.
  *
@@ -87,7 +76,7 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
         title={t(keys.pagebuilder.plan.group_overwritten)}
         entries={plan.pages.overwritten}
         tone="warning"
-        describe={blockSummary}
+        describe={describeOverwrite}
       />
       <Group title={t(keys.pagebuilder.plan.group_created)} entries={plan.pages.new} />
       <Group title={t(keys.pagebuilder.plan.group_unchanged)} entries={plan.pages.unchanged} />
