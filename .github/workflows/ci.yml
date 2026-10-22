@@ -375,8 +375,10 @@ jobs:
     name: E2E (multi-tenant)
     runs-on: ubuntu-latest
     # Two specs against a host with SM_MULTI_TENANT=true and every module
-    # enabled. Most of the budget is setup and the webServer boot.
-    timeout-minutes: 20
+    # enabled. Most of the budget is setup and the webServer boot; 30 rather
+    # than 20 so the browser install's own 20-min cap (e2e-setup) is what
+    # fires on a stalled apt mirror, not the job's.
+    timeout-minutes: 30
     env:
       E2E_MULTI_TENANT: "1"
       E2E_BUNDLE: "1"
