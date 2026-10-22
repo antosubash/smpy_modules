@@ -12,9 +12,8 @@ they are in :mod:`news.integrations.pagebuilder`: this module is reachable from
 asserts it.
 
 A sibling of :mod:`news.integrations.pagebuilder` rather than part of it,
-because that file is at the repo's 300-line cap and because these are the only
-functions behind the seam that answer a question about configuration rather
-than about data.
+because these are the only functions behind the seam that answer a question
+about configuration rather than about data.
 """
 
 from __future__ import annotations

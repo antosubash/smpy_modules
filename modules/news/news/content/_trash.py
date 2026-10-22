@@ -1,14 +1,12 @@
 """The trash: soft-delete and restore.
 
-Split from :mod:`news.content._workflow` to keep it inside the 300-line cap.
+Split from :mod:`news.content._workflow`, which is about status changes.
 Neither changes status, so neither records a revision.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content._revisions import RevisionsMixin
 from news.models import NewsArticle
@@ -23,8 +21,6 @@ def _elapsed(value: datetime | None, now: datetime) -> bool:
 
 class TrashMixin(RevisionsMixin):
     """Trash behaviour for :class:`ArticlesService`."""
-
-    db: AsyncSession
 
     async def trash(self, article_id: int) -> NewsArticle:
         """Soft-delete. The slug stays claimed — see ``NewsArticle.deleted_at``."""

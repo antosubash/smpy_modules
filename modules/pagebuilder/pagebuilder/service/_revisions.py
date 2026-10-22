@@ -1,14 +1,12 @@
 """Revision recording, history, diffing, and restore.
 
-Mixed into :class:`~pagebuilder.service.PagesService`. Split out to keep each
-file focused; the methods are unchanged and still rely on ``self.db`` and
-``self.get_page`` from the composing class.
+Mixed into :class:`~pagebuilder.service.PagesService`. What it needs from the
+composing class is declared by :class:`~pagebuilder.service._host.PagesHost`.
 """
 
 from __future__ import annotations
 
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.contracts.schemas import (
@@ -18,16 +16,12 @@ from pagebuilder.contracts.schemas import (
 )
 from pagebuilder.diff import revision_diff
 from pagebuilder.models import Page, PageRevision, RevisionEvent
+from pagebuilder.service._host import HostBase
 from pagebuilder.snapshots.history import restore_markers
 
 
-class RevisionsMixin:
+class RevisionsMixin(HostBase):
     """Revision behaviour for :class:`PagesService`."""
-
-    db: AsyncSession
-
-    async def get_page(self, page_id: int) -> Page:  # pragma: no cover - provided by PagesService
-        raise NotImplementedError
 
     def _record_revision(
         self,

@@ -16,7 +16,6 @@ from copy import deepcopy
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder import locales
@@ -26,6 +25,7 @@ from pagebuilder.contracts.schemas import (
     PageTranslationRead,
 )
 from pagebuilder.models import NOT_TRASHED, Page, PageStatus
+from pagebuilder.service._host import HostBase
 
 # How many "-2", "-3"… variants to try when the source's slug is already taken
 # in the target language. Far past any honest collision; it exists so a
@@ -34,10 +34,9 @@ _MAX_SLUG_ATTEMPTS = 20
 _SLUG_MAX_LEN = 200
 
 
-class TranslationsMixin:
-    """Sibling lookups and translation creation. Mixed into ``PagesService``."""
-
-    db: AsyncSession
+class TranslationsMixin(HostBase):
+    """Sibling lookups and translation creation. Mixed into ``PagesService``;
+    see ``_host.PagesHost`` for what it needs from it."""
 
     async def list_translations(self, group: str) -> list[Page]:
         """Every page in ``group``, the source included — trashed ones too.
@@ -100,7 +99,7 @@ class TranslationsMixin:
         is created would publish untranslated copy at a URL that did not exist
         a second earlier.
         """
-        source = await self.get_page(page_id)  # type: ignore[attr-defined]
+        source = await self.get_page(page_id)
         locale = locales.resolve(data.locale)
         if locale is None:
             raise HTTPException(
