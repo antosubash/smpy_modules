@@ -1,7 +1,11 @@
 # Content snapshots — import / export with approval — design
 
 Date: 2026-08-28
-Status: implemented (pagebuilder `snapshots/`). Snapshots v2 — a "restored from snapshot" marker and a bundle format — is not built.
+Status: implemented (pagebuilder `snapshots/`). Snapshots v2 (#79) is built:
+page history shows "Restored from snapshot #N", read from the pages the
+apply recorded on the approved import's own row, and the manifest is versioned with a `contents` list of
+sections (`modules/pagebuilder/docs/bundle-format.md`). The per-module
+contribution hook that would add other sections (#80) is not built.
 
 ## Context
 
@@ -77,7 +81,7 @@ snapshot, and the two admin pages that drive all of it.
   who approved it, when, which snapshot, and the plan they saw. The cost is
   that a page's own history panel does not explain a change a bulk restore
   made — surfacing "restored from snapshot #N" there is the v2 fix, and it is
-  a read-side change, not more rows.
+  a read-side change, not more rows (built in #79: `snapshots/history.py`).
 - **Deleting live pages absent from a bundle.** Restore never deletes; pages on
   the site but not in the snapshot are left alone and reported. No `--prune`
   equivalent until there is a demonstrated need.

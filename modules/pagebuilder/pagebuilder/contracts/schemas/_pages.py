@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
@@ -234,8 +234,24 @@ class PageRevisionDetail(PageRevisionRead):
     data: PuckData
 
 
+class PageRestoreMarker(BaseModel):
+    """A bulk snapshot restore that wrote this page.
+
+    Not a revision — there is no page state behind it to compare or restore —
+    so a list of its own beside ``items``, derived on read from the approved
+    import. The client interleaves the two by time.
+    """
+
+    import_id: int
+    snapshot_id: int
+    change: Literal["created", "overwritten"]
+    restored_at: datetime
+    restored_by: str | None
+
+
 class PageRevisionListResponse(BaseModel):
     items: list[PageRevisionRead]
+    restores: list[PageRestoreMarker] = Field(default_factory=list)
 
 
 class PageRejectRequest(BaseModel):

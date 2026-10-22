@@ -113,6 +113,12 @@ revisions. **Restore as draft** copies a revision's title, meta description,
 social image and blocks into the draft; the live page is untouched until you
 publish.
 
+A snapshot restore (see Import / Export) writes no revision, so the list also
+shows **Restored from snapshot #N** at the time it was applied and by whom,
+with "The restore created this page." when the page did not exist before. It
+has no **Compare** or **Restore as draft**: to undo it, restore the automatic
+snapshot taken just before it.
+
 ### Slugs and redirects
 
 Changing the URL of a saved page leaves a permanent (301) redirect from the old
@@ -236,6 +242,10 @@ exports it as a `.zip`; **Upload bundle…** adds a `.zip` from another site.
 snapshot of the current site, so it can be undone. Restoring never deletes: a
 page on the site but absent from the snapshot is left alone, and a redirect whose
 target page is missing is dropped and listed.
+
+A bundle from a newer build with a format this one does not understand is
+refused on upload with a message naming the version; the format is described in
+[bundle-format.md](bundle-format.md).
 
 ## The block palette
 

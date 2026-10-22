@@ -26,6 +26,8 @@ def _common(request: Request) -> dict:
         "can_manage": grants(resolved_permissions_for(request), c.PERM_PLATFORM_MANAGE),
         "provider": services.provider.name if services.provider else "",
         "checkout_available": bool(services.provider and services.provider.supports_checkout),
+        # Why a chosen ``stripe`` fell back to ``manual``; "" when it did not (#200).
+        "provider_error": services.provider_error,
     }
 
 

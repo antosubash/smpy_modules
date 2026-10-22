@@ -16,10 +16,10 @@ import asyncio
 import json
 import shutil
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from simple_module_db import current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -36,7 +36,6 @@ from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import bundle_names, to_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.format import (
-    FORMAT_VERSION,
     LAYOUT_NAME,
     MANIFEST_NAME,
     MEDIA_DIR,
@@ -44,6 +43,7 @@ from pagebuilder.snapshots.format import (
     PAGES_DIR,
     REDIRECTS_NAME,
 )
+from pagebuilder.snapshots.manifest import manifest_header
 from pagebuilder.snapshots.pages import MEDIA_FIELDS, page_to_payload
 
 
@@ -270,8 +270,7 @@ async def capture(
     missing = sorted(missing + vanished)
 
     manifest = {
-        "format_version": FORMAT_VERSION,
-        "created_at": datetime.now(UTC).isoformat(),
+        **manifest_header(current_tenant_id.get()),
         "pages": pages,
         "layout": layout_counts,
         "counts": {
