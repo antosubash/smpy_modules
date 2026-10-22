@@ -143,6 +143,43 @@ test.describe('Content snapshots', () => {
     await page.request.delete(`/api/pagebuilder/pages/${orphan.id}`, { headers });
   });
 
+  test('a page renamed since the snapshot moves back (#205)', async ({ page }) => {
+    await login(page);
+    const headers = await clearPendingImport(page);
+    const original = uniqueSlug('before');
+    const renamed = uniqueSlug('after');
+    const created = await createPage(page, headers, original, 'Renamed later');
+
+    await page.goto(CONTENT);
+    await page.getByRole('button', { name: 'Take snapshot' }).click();
+    await expect(page.getByRole('button', { name: 'Restore…' }).first()).toBeEnabled();
+    const moved = await page.request.put(`/api/pagebuilder/pages/${created.id}`, {
+      headers,
+      data: { slug: renamed },
+    });
+    expect(moved.status()).toBe(200);
+
+    await page.goto(CONTENT);
+    await page.getByRole('button', { name: 'Restore…' }).first().click();
+    await expect(page).toHaveURL(new RegExp(`${REVIEW}$`));
+    // It used to be listed as a new page, and applying it then failed.
+    await expect(page.getByText(`moves back from /${renamed}`)).toBeVisible();
+
+    await page.getByRole('button', { name: /approve & apply/i }).click();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: /^apply$/i })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${CONTENT}$`));
+
+    const restored = await page.request.get(`/api/pagebuilder/pages/${created.id}`, {
+      headers: { Accept: 'application/json' },
+    });
+    expect((await restored.json()).slug).toBe(original);
+
+    await page.request.delete(`/api/pagebuilder/pages/${created.id}`, { headers });
+  });
+
   test('only one restore can be staged at a time', async ({ page }) => {
     await login(page);
     const headers = await clearPendingImport(page);

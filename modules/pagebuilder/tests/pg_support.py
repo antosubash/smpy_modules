@@ -48,8 +48,12 @@ arm_reset = _pg.arm_reset
 USING_POSTGRES: bool = _pg.USING_POSTGRES
 
 
-async def make_db_state() -> Any:
-    """A ``DatabaseState`` with an empty pagebuilder schema, on either backend."""
+async def make_db_state(*, file: Path | None = None) -> Any:
+    """A ``DatabaseState`` with an empty pagebuilder schema, on either backend.
+
+    ``file`` gives SQLite a file database with a connection per session, for a
+    test that races transactions; see the shared ``make_db_state``.
+    """
     from pagebuilder.models import Base
 
-    return await _pg.make_db_state(Base.metadata)
+    return await _pg.make_db_state(Base.metadata, file=file)

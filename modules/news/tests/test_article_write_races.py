@@ -4,14 +4,18 @@ atomic transitions and optimistic concurrency."""
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 
 import pytest
+import pytest_asyncio
+from conftest import ROLE_EDITOR, _client
 from factories import make_article
 from fastapi import HTTPException
 from news.constants import ROUTE_PREFIX_API
 from news.content import ArticlesService
 from news.content._fresh import STALE_DETAIL, claim_status
 from news.models import ArticleStatus
+from stub_auth import stub_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,6 +30,18 @@ async def _article(client, slug: str, status: ArticleStatus = ArticleStatus.DRAF
 async def _revisions(client, article_id: int) -> list[str]:
     response = await client.get(f"{ARTICLES}/{article_id}/revisions")
     return [row["event"] for row in response.json()]
+
+
+@pytest_asyncio.fixture
+async def racing_client(tmp_path) -> AsyncIterator:
+    """``editor_client`` on a file database: a connection per request (#209).
+
+    On the shared in-memory connection two "concurrent" requests are one
+    transaction — neither waits for the other's write, and one closing rolls
+    back the other's — so a race there proves nothing either way.
+    """
+    async for client in _client(stub_user((ROLE_EDITOR,)), db_file=tmp_path / "races.db"):
+        yield client
 
 
 # ── BUG-001 ──────────────────────────────────────────────────────────
@@ -159,11 +175,11 @@ async def test_unpublishing_a_draft_is_a_409(editor_client) -> None:
     assert response.status_code == 409
 
 
-async def test_a_transition_claim_loses_to_an_earlier_one(editor_client) -> None:
+async def test_a_transition_claim_loses_to_an_earlier_one(racing_client) -> None:
     """Two requests that both read the article as SUBMITTED: only the first
     claim matches a row, so the second gets a 409 and records nothing."""
-    article_id = await _article(editor_client, "claims", ArticleStatus.SUBMITTED_FOR_REVIEW)
-    factory = editor_client.db_state.session_factory
+    article_id = await _article(racing_client, "claims", ArticleStatus.SUBMITTED_FOR_REVIEW)
+    factory = racing_client.db_state.session_factory
     async with factory() as one, factory() as two:
         a = await ArticlesService(one).get_article(article_id)
         b = await ArticlesService(two).get_article(article_id)
@@ -180,15 +196,15 @@ async def test_a_transition_claim_loses_to_an_earlier_one(editor_client) -> None
         assert lost.value.status_code == 409
 
 
-async def test_parallel_approves_record_one_revision(editor_client) -> None:
-    article_id = await _article(editor_client, "parallel", ArticleStatus.SUBMITTED_FOR_REVIEW)
+async def test_parallel_approves_record_one_revision(racing_client) -> None:
+    article_id = await _article(racing_client, "parallel", ArticleStatus.SUBMITTED_FOR_REVIEW)
     results = await asyncio.gather(
-        *(editor_client.post(f"{ARTICLES}/{article_id}/approve") for _ in range(5)),
+        *(racing_client.post(f"{ARTICLES}/{article_id}/approve") for _ in range(5)),
         return_exceptions=True,
     )
     codes = [getattr(r, "status_code", None) for r in results]
-    assert codes.count(200) == 1, codes
-    assert (await _revisions(editor_client, article_id)).count("approve") == 1
+    assert sorted(codes) == [200, 409, 409, 409, 409], codes
+    assert (await _revisions(racing_client, article_id)).count("approve") == 1
 
 
 # ── BUG-020 ──────────────────────────────────────────────────────────

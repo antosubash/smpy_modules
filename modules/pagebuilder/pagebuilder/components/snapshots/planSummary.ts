@@ -9,7 +9,7 @@
  */
 
 import { keys, translate } from '../../utils/i18n';
-import type { ImportPlan, Snapshot } from '../../utils/snapshotsApi';
+import type { ImportPlan, PagePlanEntry, Snapshot } from '../../utils/snapshotsApi';
 
 export interface PlanTotals {
   created: number;
@@ -67,6 +67,29 @@ export function untouchedNote(plan: ImportPlan): string | null {
   const { untouched } = planTotals(plan);
   if (untouched === 0) return null;
   return pluralize(keys.pagebuilder.plan.untouched, untouched);
+}
+
+/**
+ * How a page being overwritten changes: its blocks, and whether it moves.
+ *
+ * Two facts worth saying out loud beyond the blocks. A revived page's slug
+ * looks free, but the page under it is in the trash and the restore un-bins
+ * it. A renamed page is listed under its snapshot slug, but today it lives at
+ * another one — without naming that, an approver looking for the page they
+ * know would not find it, and would not learn its address is about to change.
+ */
+export function describeOverwrite(entry: PagePlanEntry): string {
+  const parts: string[] = [];
+  if (entry.added) parts.push(`+${entry.added}`);
+  if (entry.removed) parts.push(`−${entry.removed}`);
+  if (entry.changed) parts.push(`~${entry.changed}`);
+  let blocks = parts.length
+    ? translate(keys.pagebuilder.plan.block_changes, { changes: parts.join(' ') })
+    : translate(keys.pagebuilder.plan.metadata_only);
+  if (entry.renamed_from) {
+    blocks = translate(keys.pagebuilder.plan.renamed_from, { blocks, slug: entry.renamed_from });
+  }
+  return entry.revived ? translate(keys.pagebuilder.plan.revived, { blocks }) : blocks;
 }
 
 /** "12 pages · 3 redirects · 11 media" — a snapshot's contents in one line. */

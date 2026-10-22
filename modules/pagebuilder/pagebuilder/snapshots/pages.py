@@ -167,9 +167,12 @@ def page_state(page: Page) -> tuple[Any, ...]:
     Read at apply time, so the restore's audit record says what the apply
     actually changed rather than what the plan predicted when it was staged —
     a page edited between staging and approval is overwritten even though its
-    plan entry said "unchanged".
+    plan entry said "unchanged". The slug is part of it because a restore
+    moves a renamed page back: that is a write even when the content is
+    byte-identical.
     """
     return (
+        page.slug,
         page.status,
         page.parent_id,
         page.deleted_at is None,

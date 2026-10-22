@@ -45,6 +45,9 @@ export interface PagePlanEntry {
   changed?: number;
   /** The live page under this slug is in the trash; restoring brings it back. */
   revived?: boolean;
+  /** The page was renamed since the snapshot: its slug today. Restoring moves
+   *  it back to `slug` and redirects this one to it. */
+  renamed_from?: string;
 }
 
 export interface ImportPlan {

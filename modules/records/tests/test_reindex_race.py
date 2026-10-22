@@ -9,14 +9,15 @@ edit committed in between used to have its index rows deleted and replaced by
 a projection of the payload the rebuild had read — permanently, until somebody
 reindexed again.
 
-**Two sessions, and therefore Postgres only.** Not because SQLite is exempt in
-principle but because it is untestable here: ``tests.pg_support`` builds the
-SQLite database on a ``StaticPool`` over ``:memory:``, so two
-``session_factory()`` calls are two sessions on *one connection* and there is
-no interleaving to arrange. The second test additionally needs real row locks,
-which SQLite does not have at all — there, only the version comparison in
-:func:`sm_records.index._batch.current_batch` applies, and
-``run_pending``'s ``database is locked`` retry covers the rest.
+**Two sessions, so two connections.** ``racing_db`` is a file database on
+SQLite (#209) and the suite's own database on Postgres: on the shared
+in-memory ``StaticPool`` connection two ``session_factory()`` calls are one
+transaction and there is no interleaving to arrange. The first and third tests
+hold on both backends — the version comparison in
+:func:`sm_records.index._batch.current_batch` is what they exercise. The second
+is Postgres only: it proves the batch takes a *row* lock, and on SQLite the
+editor waits on the database's write lock whatever the batch locks, so it would
+pass with the lock removed.
 """
 
 from __future__ import annotations
@@ -36,19 +37,13 @@ from sqlalchemy import select
 
 from tests.pg_support import USING_POSTGRES
 
-pytestmark = pytest.mark.skipif(
-    not USING_POSTGRES,
-    reason="the interleaving needs two connections (SQLite here is one StaticPool "
-    "connection) and the second test needs FOR UPDATE; "
-    "set RECORDS_TEST_URL=postgresql+asyncpg://…",
-)
-
 SETTINGS = RecordsSettings()
 
 
 @pytest_asyncio.fixture
-async def seeded(db_state) -> Any:
+async def seeded(racing_db) -> Any:
     """A type with one indexed text field and one record holding ``old``."""
+    db_state = racing_db
     async with db_state.session_factory() as session:
         rtype = RecordType(
             key="gadget",
@@ -122,6 +117,11 @@ async def test_a_batch_does_not_write_over_an_edit_committed_since_it_was_read(s
     assert await _indexed(state, type_id) == [("name", "new")]
 
 
+@pytest.mark.skipif(
+    not USING_POSTGRES,
+    reason="needs FOR UPDATE: on SQLite the batch's writes block the editor whether or "
+    "not it locked the row; set SM_TEST_DATABASE_URL=postgresql+asyncpg://…",
+)
 async def test_an_edit_that_starts_mid_batch_waits_and_wins(seeded):
     """The other half of the interleaving, and the half that needs the lock.
 
@@ -160,7 +160,7 @@ async def test_an_edit_that_starts_mid_batch_waits_and_wins(seeded):
 
 
 async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was_read(
-    db_state,
+    racing_db,
 ):
     """``services._titles.recompute_titles`` has the same read-then-write
     shape and the same commit-per-batch, so it had the same hole.
@@ -176,6 +176,7 @@ async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was
     """
     from sm_records.services._titles import recompute_titles
 
+    db_state = racing_db
     async with db_state.session_factory() as session:
         rtype = RecordType(
             key="part",
