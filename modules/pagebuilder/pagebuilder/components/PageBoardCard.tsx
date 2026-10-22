@@ -10,7 +10,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
 const PUBLIC_PREFIX = '/p';
 
-/** "1 Sep, 09:00" — how a scheduled draft's flip time reads. */
+/** "1 Sep, 09:00" — when a scheduled draft flips itself. */
 const WHEN: Intl.DateTimeFormatOptions = {
   day: 'numeric',
   month: 'short',

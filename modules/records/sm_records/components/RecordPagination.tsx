@@ -10,9 +10,9 @@ import { cursorPagerParts } from './RecordCursorPager';
  *  the count (F4, `RecordsSettings.max_count`). Two calls and not one
  *  interpolation, for the reason `filterErrorMessage` above gives: the
  *  untranslated-string check reads `t()` calls, not a string chosen before
- *  one. `count` is formatted here rather than passed as a number so the
- *  ceiling reads as "10,000+" — which is also why this takes the loose
- *  `Translate` type the file already defines. */
+ *  one. Every number is formatted here, in the console locale (#189), and
+ *  `count` goes in as a string so the ceiling reads as "10,000+" — which is
+ *  also why this takes the loose `Translate` type the file already defines. */
 function pageInfo(
   t: Translate,
   start: number,
