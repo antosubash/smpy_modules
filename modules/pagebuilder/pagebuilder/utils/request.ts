@@ -9,6 +9,7 @@
 
 import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
+import { validationMessage } from './slugRule';
 
 export const BASE = '/api/pagebuilder';
 
@@ -25,7 +26,14 @@ export function fromValidationErrors(detail: unknown): string | null {
   if (!Array.isArray(detail) || detail.length === 0) return null;
   const parts: string[] = [];
   for (const entry of detail) {
-    const item = entry as { loc?: unknown; msg?: unknown };
+    const item = entry as { loc?: unknown; msg?: unknown; type?: unknown };
+    // A rejection this module can explain in the author's language replaces
+    // pydantic's English, field prefix and all: the sentence names the field.
+    const known = validationMessage(item);
+    if (known) {
+      parts.push(known);
+      continue;
+    }
     const field = Array.isArray(item.loc)
       ? item.loc.filter((p) => p !== 'body' && typeof p !== 'number').join('.')
       : '';

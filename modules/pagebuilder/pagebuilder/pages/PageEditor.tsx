@@ -1,5 +1,5 @@
 import { type Data, Puck } from '@puckeditor/core';
-import '@puckeditor/core/puck.css';
+import '../components/editor/puck-editor.css';
 import { Head, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useMemo, useState } from 'react';

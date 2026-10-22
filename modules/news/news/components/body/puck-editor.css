@@ -1,0 +1,22 @@
+/* Puck's stylesheet, with its font served by this bundle.
+ *
+ * `@puckeditor/core/puck.css` opens with `@import "https://rsms.me/inter/inter.css"`,
+ * which the console's CSP (`font-src 'self' https://fonts.gstatic.com`) blocks,
+ * so the article body editor logged a violation and fell back to the system
+ * font stack. `no-external.css` is the same stylesheet without that import;
+ * Inter comes from `@fontsource-variable/inter`, whose files Vite emits beside
+ * the rest of the bundle — same origin, so the CSP stays as it is.
+ *
+ * A copy of pagebuilder's `components/editor/puck-editor.css` (#188): the two
+ * modules do not depend on each other. Change them together.
+ *
+ * Puck names the family `Inter` / `InterVariable`; Fontsource names it
+ * `Inter Variable`. Puck sets the variable inside `@layer puck-tokens`, so this
+ * unlayered rule wins over both of its declarations.
+ */
+@import "@puckeditor/core/no-external.css";
+@import "@fontsource-variable/inter/wght.css";
+
+:root {
+  --puck-font-family: "Inter Variable", var(--puck-fallback-font-stack);
+}

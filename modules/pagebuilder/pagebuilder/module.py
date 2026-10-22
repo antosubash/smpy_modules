@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from simple_module_core import ModuleBase, ModuleMeta
+from simple_module_core.csp import CspSourceRegistry
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
@@ -265,6 +266,12 @@ class PagebuilderModule(ModuleBase):
         """
         base = Path(str(importlib.resources.files(__package__) / "locales"))
         return {_LOCALE_NAMESPACE: base}
+
+    def register_csp_sources(self, registry: CspSourceRegistry) -> None:
+        """The editor's bundled font, from the Vite origin in dev; see dev_csp."""
+        from pagebuilder.dev_csp import vite_font_source
+
+        registry.add_provider(vite_font_source)
 
     def static_mounts(self) -> dict[str, Path]:
         pkg_root = Path(str(importlib.resources.files("pagebuilder")))
