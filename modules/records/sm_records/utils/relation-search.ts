@@ -1,10 +1,9 @@
 /**
  * What the relation picker asks for when someone types — F9.
  *
- * Its own module rather than a closure inside `RelationPicker.tsx`: the
- * component is at the 300-line cap, and "which query finds a record by its
- * title, and what that costs" is a self-contained decision worth reading on
- * its own.
+ * Its own module rather than a closure inside `RelationPicker.tsx`: "which
+ * query finds a record by its title, and what that costs" is a self-contained
+ * decision worth reading on its own.
  */
 
 import { buildFilterParam } from './api';

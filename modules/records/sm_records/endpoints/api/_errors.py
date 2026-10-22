@@ -143,7 +143,8 @@ async def _error_page(request: Request, exc: Exception) -> Response:
     older framework that does not export the function — must still get an
     answer rather than an ``AttributeError`` on top of the original refusal.
     The JSON body is that fallback, which is exactly what this route class
-    used to send unconditionally.
+    used to send unconditionally. ``tests/test_framework_pins.py`` pins the
+    private name and its signature (#125).
     """
     config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
     if config is None:
