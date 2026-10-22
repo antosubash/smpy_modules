@@ -201,7 +201,7 @@ async def _resolve_parents(
 
 async def _restore_redirects(
     db: AsyncSession, rows: list[dict[str, str]], ids: dict[PageKey, int]
-) -> tuple[int, list[str]]:
+) -> tuple[set[PageKey], list[str]]:
     """Rebuild the redirect table, dropping any whose target does not exist.
 
     A redirect resolves within its own language: ``(locale, from_slug)`` is
@@ -213,7 +213,7 @@ async def _restore_redirects(
     rather than stored pointing at nothing.
     """
     await db.execute(delete(PageRedirect))
-    kept = 0
+    kept: set[PageKey] = set()
     dropped: list[str] = []
     for row in rows:
         locale = redirect_locale(row)
@@ -222,7 +222,7 @@ async def _restore_redirects(
             dropped.append(row.get("from_slug", ""))
             continue
         db.add(PageRedirect(from_slug=row["from_slug"], locale=locale, page_id=page_id))
-        kept += 1
+        kept.add((locale, row["from_slug"]))
     await db.flush()
     return kept, dropped
 
@@ -252,13 +252,14 @@ async def apply_bundle(
     applied = applied_outcomes(by_key, created, before)
     redirects_kept, redirects_dropped = await _restore_redirects(db, documents.redirects, ids)
     # After the rebuild, which would otherwise wipe them: a page moved back to
-    # its snapshot slug keeps the address it was renamed to working.
+    # its snapshot slug keeps the address it was renamed to working. One that
+    # replaces a bundle redirect from the same address is still one redirect.
     for (locale, old_slug), page in sorted(match.rename_redirects().items()):
         assert page.id is not None
         await redirects.record(
             db, page_id=page.id, old_slug=old_slug, new_slug=page.slug, locale=locale
         )
-        redirects_kept += 1
+        redirects_kept.add((locale, old_slug))
 
     layout = from_sentinels(documents.layout, name_to_url)
     await LayoutService(db).update(
@@ -272,6 +273,6 @@ async def apply_bundle(
         "pages_updated": len(before),
         "applied": applied,
         "media_added": media_added,
-        "redirects": redirects_kept,
+        "redirects": len(redirects_kept),
         "redirects_dropped": redirects_dropped,
     }

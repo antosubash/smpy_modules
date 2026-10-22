@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pagebuilder.models import Page
 from pagebuilder.snapshots.match import match_pages
-from test_snapshot_rename import _page, _pages, _rename, _restore, _snapshot
+from test_snapshot_rename import _page, _pages, _redirects, _rename, _restore, _snapshot
 
 
 @pytest.mark.asyncio
@@ -75,3 +75,20 @@ async def test_the_plan_does_not_count_a_group_the_restore_keeps(snapshot_db):
 
     assert [e["slug"] for e in plan["pages"]["unchanged"]] == ["about"]
     assert plan["applied"]["overwritten"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_bundle_redirect_replaced_by_a_rename_redirect_is_counted_once(snapshot_db):
+    session = snapshot_db.session
+    page = await _page(session, "old")
+    other = await _page(session, "b")
+    await _rename(session, other, "newer")
+    await _rename(session, other, "b")  # leaves newer → other
+    snapshot_id = await _snapshot(snapshot_db)
+    await _rename(session, page, "newer")
+
+    _, result = await _restore(snapshot_db, snapshot_id)
+
+    redirects = await _redirects(session)
+    assert redirects == {("en", "newer"): page.id}
+    assert result["redirects"] == len(redirects)
