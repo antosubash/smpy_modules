@@ -38,7 +38,9 @@ class Copy:
     """One copy of a helper file.
 
     ``rename`` maps an identifier in this copy onto the family's canonical
-    spelling, applied to whole words of the normalised code. ``own`` names the
+    spelling, applied to whole words of the normalised code — string literals
+    included, deliberately, so ``'/api/news'`` and ``'/api/pagebuilder'`` agree;
+    keep the map to names that only ever mean the module. ``own`` names the
     declarations only this copy has, each with the reason; another copy that
     gains one fails. ``messages`` are the string literals (or an f-string's
     literal parts) that name this copy's module, masked before comparing —
@@ -143,19 +145,22 @@ def _ts_decls(source: str) -> dict[str, str]:
     """Top-level declarations, keyed by name, each with its full text.
 
     A declaration starts at column 0 and runs to the next line that does;
-    a closing bracket at column 0 still belongs to the one above it.
+    a closing bracket at column 0 still belongs to the one above it. An import
+    is a chunk of its own, wrapped lines included, and is then dropped.
     """
     code = ts_tokens.strip_comments(source)
     chunks: list[list[str]] = []
     for line in code.splitlines():
         if not line.strip():
             continue
-        if line[0] not in " \t}])" and not line.startswith("import "):
+        if line[0] not in " \t}])":
             chunks.append([line])
-        elif chunks and not line.startswith("import "):
+        elif chunks:
             chunks[-1].append(line)
     decls: dict[str, str] = {}
     for chunk in chunks:
+        if chunk[0].startswith("import "):
+            continue
         match = _TS_DECL.match(chunk[0])
         name = match.group(1) if match else chunk[0]
         decls[name] = "\n".join(chunk)

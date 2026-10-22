@@ -202,3 +202,9 @@ def test_typescript_division_and_regex_are_told_apart(tmp_path: Path) -> None:
     a = "export const X = (a / b) / c;\nexport const R = /x/g;\n"
     b = "export const X = (a/b)/c;\nexport const R = /x/g;\n"
     assert problems(_family(tmp_path, a, b, suffix=".ts")) == []
+
+
+def test_a_wrapped_import_after_a_declaration_is_not_part_of_it(tmp_path: Path) -> None:
+    a = "export const X = 1;\nimport {\n  a,\n  b,\n} from './m';\n"
+    b = "export const X = 1;\nimport { a } from './m';\n"
+    assert problems(_family(tmp_path, a, b, suffix=".ts")) == []
