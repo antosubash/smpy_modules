@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { csrfHeader, login, moduleCsrfHeader, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * An article has its own public address — and now its own viewer behind it.
@@ -68,7 +68,7 @@ test.describe('News — the public article address', () => {
     // The two modules own separate prefixes over separate tables. Neither
     // answers for the other, and this is the half that used to need a claim.
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const slug = uniqueSlug('e2e-plain');
     const created = await page.request.post('/api/pagebuilder/pages', {
       headers,

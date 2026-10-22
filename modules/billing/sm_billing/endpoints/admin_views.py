@@ -54,6 +54,7 @@ async def subscriptions_page(
             "rows": [r.model_dump(mode="json") for r in rows],
             "plans": plans,
             "status_filter": status or "",
+            "sync_health": (await admin.sync_health(db, request.app)).model_dump(mode="json"),
         },
     )
 

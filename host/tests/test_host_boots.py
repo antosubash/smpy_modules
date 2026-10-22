@@ -7,8 +7,23 @@ minimal app instead of the real host.
 
 from __future__ import annotations
 
+import asyncio
+import importlib
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from simple_module_hosting import Settings, create_app
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "host"))
+
+# What ``main.py`` imports before ``create_app``, imported here for the same
+# reason: the records module seals its collection registry in the first app it
+# builds, and ``booted_host`` imports ``main`` after the fixtures above built one.
+import records_collections  # noqa: E402, F401
 
 
 @pytest.fixture
@@ -55,3 +70,69 @@ def test_ai_routes_mounted(app):
     paths = set(app.openapi()["paths"])
     assert "/api/ai/settings" in paths
     assert "/api/ai/test" in paths
+
+
+# Every distributable module in this repo. The subscriber check below is only
+# evidence if each of them is booted, so it asserts that first.
+REPO_MODULES = {"Ai", "Billing", "News", "PageBuilder", "Records"}
+
+
+def _migrate(url: str) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"],
+        cwd=REPO,
+        env={**os.environ, "SM_DATABASE_URL": url},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+
+@pytest.fixture
+def booted_host(tmp_path, monkeypatch):
+    """The demo host's own ``main:app``, against a migrated database of its own.
+
+    Imported fresh with ``SM_DATABASE_URL`` pointing at ``tmp_path``, and
+    taken back out of ``sys.modules`` afterwards, so neither the developer's
+    ``host/app.db`` nor another test's import is involved.
+    """
+    url = f"sqlite+aiosqlite:///{tmp_path / 'host.db'}"
+    _migrate(url)
+    monkeypatch.setenv("SM_DATABASE_URL", url)
+    sys.modules.pop("main", None)
+    try:
+        yield importlib.import_module("main").app
+    finally:
+        sys.modules.pop("main", None)
+
+
+def test_no_module_subscribes_to_record_events(booted_host):
+    """The evidence behind GH #157's "leave publishing inline" call.
+
+    Record events publish at commit, inside the request, so whatever subscribes
+    adds its time to every record write's response. Today nothing does, and a
+    publish with no listener returns before gathering anything. When this
+    fails, a module started listening: check that its handler is cheap, or
+    hands its work off, before updating the expectation.
+
+    Read inside the host's lifespan, since a module may subscribe from
+    ``on_startup`` as well as from ``register_event_handlers``. ``_emitter`` is
+    read because ``EventBus`` has no public way to list listeners.
+    """
+    from sm_records.contracts import events
+
+    app = booted_host
+
+    async def listening_inside_lifespan() -> set[str]:
+        async with app.router.lifespan_context(app):
+            assert app.state.migration["is_current"]
+            assert _module_names(app) >= REPO_MODULES
+            bus = app.state.sm.event_bus
+            return {
+                name
+                for name in events.__all__
+                if bus._emitter.listeners(bus._event_key(getattr(events, name)))
+            }
+
+    assert asyncio.run(listening_inside_lifespan()) == set()

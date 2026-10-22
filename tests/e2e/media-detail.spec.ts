@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Media asset detail — screen 2e.
@@ -20,7 +20,7 @@ function pngBytes(): Buffer {
 }
 
 async function upload(page: Page) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const name = `${uniqueSlug('asset')}.png`;
   const created = await page.request.post('/api/pagebuilder/uploads', {
     headers,
@@ -33,7 +33,7 @@ async function upload(page: Page) {
 }
 
 async function pageUsing(page: Page, url: string, title: string) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {
@@ -108,7 +108,7 @@ test.describe('Media asset detail', () => {
     const asset = await upload(page);
     await pageUsing(page, asset.url, 'Still using it');
 
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const refused = await page.request.delete(`/api/pagebuilder/uploads/${asset.id}/checked`, {
       headers,
     });

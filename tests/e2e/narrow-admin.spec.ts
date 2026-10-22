@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, publishWithNote, uniqueSlug } from './helpers';
 
 /**
  * The admin shell below 900px — screen 2i.
@@ -21,7 +21,7 @@ const BLOCKS = [
 ];
 
 async function makePage(page: Page, slug: string): Promise<number> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {

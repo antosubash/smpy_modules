@@ -70,8 +70,9 @@ only). The host hydrates them at **lifespan start**, after app construction. So:
   public prefixes (one per content locale, trailing `/` so `/p` never exempts
   `/pagebuilder/`), mounts one `locale_router` per locale, the default-locale
   alias, the SEO router and the media mount.
-- `CsrfCookieMiddleware` is always installed and checks `csrf_protect` per
-  request.
+- The CSRF check is the framework's `RequiresCsrf`, wrapped in `csrf.py` so
+  `csrf_protect` is read per request. The view router shares the token as the
+  `csrf_token` prop; there is no middleware and no cookie.
 
 Any field read in `on_startup` is marked `json_schema_extra=_RESTART`. Adding a
 field means adding it to the class; there is no env var to add.
@@ -219,7 +220,7 @@ one — ignoring trashed pages.
 |---|---|
 | `module.py`, `boot.py` | registration hooks; startup wiring |
 | `settings.py`, `locales.py` | DB-backed settings; content-locale helpers |
-| `tenancy.py`, `security.py`, `permissions.py` | tenant binding; auth/CSRF; permissions and roles |
+| `tenancy.py`, `access.py`, `csrf.py`, `permissions.py` | tenant binding; admin route dependencies; CSRF; permissions and roles |
 | `models/`, `contracts/` | tables; public DTOs and `PageDeleted` |
 | `service/` | `PagesService` (CRUD, workflow, revisions, trash, translations) |
 | `layout_service.py`, `site_nav.py`, `redirects.py` | layout; nav flags; old slugs |

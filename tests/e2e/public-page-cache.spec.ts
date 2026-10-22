@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * #94: a published page is not the same bytes for every visitor.
@@ -45,7 +45,7 @@ test.describe('Public page cache', () => {
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     await login(page);
-    await putHeader(page, await csrfHeader(page), false);
+    await putHeader(page, await moduleCsrfHeader(page, '/pagebuilder/'), false);
     await page.close();
   });
 
@@ -54,7 +54,7 @@ test.describe('Public page cache', () => {
     page,
   }) => {
     await login(page);
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     await putHeader(page, headers, true);
     const slug = uniqueSlug('e2e-relang');
     const draft = {

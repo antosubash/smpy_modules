@@ -8,10 +8,15 @@ router-level dependencies, in this order:
 2. **Tenant binding** (`tenancy.bind_admin`) — single-tenant host: tenant
    `"default"`; multi-tenant host: the tenant the framework resolved, or
    `403 tenant_required`.
-3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` needs the session token in an
-   `X-CSRF-Token` header, else `403 Invalid or missing CSRF token` (when
-   `csrf_protect` is on). The admin views expose it as the Inertia shared prop
-   `csrf.token` and in a JS-readable cookie (`pagebuilder_csrf` by default).
+3. **CSRF** — every `POST`/`PUT`/`PATCH`/`DELETE` (media uploads included)
+   needs the session's CSRF token in an `X-CSRF-Token` header, else `403`
+   (when `csrf_protect` is on). The check is the framework's `RequiresCsrf`,
+   the one billing, news and records use, so one token serves every module.
+   Every pagebuilder screen shares it as the `csrf_token` Inertia prop
+   (`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
+   sends it from there. There is no CSRF cookie. Reads need no token. It runs
+   before any permission check, so a write without a token is refused as CSRF
+   even for a user who also lacks the permission.
 
 "Permission" below is the extra `RequiresPermission` check on top; **auth** means
 any signed-in user. Errors are `{"detail": "<message>"}`; the table is at the end.
@@ -293,7 +298,7 @@ release; omit it.
 |---|---|---|
 | 401 | `Not authenticated` | no user and `requires_auth` on |
 | 403 | `tenant_required` | multi-tenant host, admin request with no tenant |
-| 403 | `Invalid or missing CSRF token` | mutating request without the header |
+| 403 | `CSRF token missing or invalid — …` | mutating request without the session's token |
 | 403 | (framework) | missing permission |
 | 404 | `Page not found` / `Revision not found` / `Asset not found` / `Snapshot not found` / `Import not found` | unknown id, trashed page, other tenant's row |
 | 409 | `Slug already in use in <locale>` | create, update |
