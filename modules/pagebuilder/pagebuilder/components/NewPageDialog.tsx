@@ -22,9 +22,11 @@ import { keys, useT } from '../utils/i18n';
 import { localeLabel, localePrefix } from '../utils/locale';
 import { createPage, listPages, listTemplates } from '../utils/pagesApi';
 import { slugify } from '../utils/slugify';
+import { isValidSlug, SLUG_MAX_LENGTH } from '../utils/slugRule';
 
 const TITLE_ID = 'new-page-title';
 const SLUG_ID = 'new-page-slug';
+const SLUG_ERROR_ID = 'new-page-slug-error';
 const START_ID = 'new-page-start';
 const PARENT_ID = 'new-page-parent';
 const LOCALE_ID = 'new-page-locale';
@@ -71,6 +73,8 @@ export function NewPageDialog({
   const [error, setError] = useState<string | null>(null);
 
   const slug = slugOverride ?? slugify(title);
+  // Said here rather than left to the 422: the API would refuse it (#188).
+  const slugValid = isValidSlug(slug);
 
   useEffect(() => {
     if (!open) return;
@@ -132,7 +136,7 @@ export function NewPageDialog({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (title.trim() && slug && !pending) void create();
+            if (title.trim() && slugValid && !pending) void create();
           }}
         >
           <DialogHeader>
@@ -191,10 +195,18 @@ export function NewPageDialog({
                 <Input
                   id={SLUG_ID}
                   value={slug}
+                  maxLength={SLUG_MAX_LENGTH}
                   disabled={pending}
+                  aria-invalid={(slug !== '' && !slugValid) || undefined}
+                  aria-describedby={slug !== '' && !slugValid ? SLUG_ERROR_ID : undefined}
                   onChange={(e) => setSlugOverride(e.target.value)}
                 />
               </div>
+              {slug !== '' && !slugValid && (
+                <p id={SLUG_ERROR_ID} className="text-xs text-destructive" data-testid="slug-error">
+                  {t(keys.pagebuilder.settings.slug_invalid)}
+                </p>
+              )}
             </div>
 
             <div className="grid gap-2">
@@ -259,7 +271,7 @@ export function NewPageDialog({
             <Button type="button" variant="outline" disabled={pending} onClick={() => reset(false)}>
               {t(keys.pagebuilder.new_page.cancel)}
             </Button>
-            <Button type="submit" disabled={pending || !title.trim() || !slug}>
+            <Button type="submit" disabled={pending || !title.trim() || !slugValid}>
               {pending
                 ? t(keys.pagebuilder.new_page.creating)
                 : t(keys.pagebuilder.new_page.create)}
