@@ -136,3 +136,29 @@ def test_still_rejects_a_redirect_slug_repeated_within_one_language(tmp_path):
     }
     with pytest.raises(BundleError, match="repeats from_slug 'info'"):
         read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_rejects_two_pages_in_one_translation_group_and_language(tmp_path):
+    """A restore matches by the pair, so the second document has no row (#205)."""
+    files = _minimal() | {
+        "pages/a.json": _page("home", translation_group="g1"),
+        "pages/b.json": _page("start", translation_group="g1"),
+    }
+    with pytest.raises(BundleError, match="repeats translation_group 'g1' in en"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+
+
+def test_accepts_one_translation_group_across_languages(tmp_path):
+    files = _minimal() | {
+        "pages/en.json": _page("about", locale="en", translation_group="g1"),
+        "pages/de.json": _page("ueber", locale="de", translation_group="g1"),
+    }
+    read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+    assert (tmp_path / "out" / "pages" / "de.json").is_file()
+
+
+@pytest.mark.parametrize("group", ["", 7, "x" * 33])
+def test_rejects_an_unreadable_translation_group(tmp_path, group):
+    files = _minimal() | {"pages/a.json": _page("home", translation_group=group)}
+    with pytest.raises(BundleError, match="unreadable translation_group"):
+        read_zip(_zip(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))

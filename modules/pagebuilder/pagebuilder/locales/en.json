@@ -1193,6 +1193,7 @@
     "redirect_count_other": "{count} redirects",
     "redirects": "Redirects",
     "redirects_dropped": "{count} dropped — target missing",
+    "renamed_from": "{blocks} · moves back from /{slug}",
     "revived": "{blocks} · revived from trash",
     "site_layout": "Site layout",
     "source_manual": "Taken here",

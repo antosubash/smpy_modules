@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from pagebuilder import locales
-from pagebuilder.models import PageStatus, SnapshotMedia
+from pagebuilder.models import Page, PageStatus, SnapshotMedia
 from pagebuilder.snapshots.assets import collect_sentinels
 from pagebuilder.snapshots.format import (
     LAYOUT_NAME,
@@ -104,6 +104,7 @@ _MEDIA_FIELD_LIMITS = tuple(
     (field, _width(field))
     for field in ("original_filename", "content_type", "folder")
 )
+_GROUP_WIDTH: int = Page.__table__.columns["translation_group"].type.length
 
 
 def check_media_entry(name: str, entry: dict[str, Any]) -> None:
@@ -165,6 +166,7 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
     """
     referenced: set[str] = set()
     seen_pages: set[tuple[str, str]] = set()
+    seen_groups: set[tuple[str, str]] = set()
     for document in sorted((dest / PAGES_DIR).glob("*.json")):
         label = f"{PAGES_DIR}/{document.name}"
         payload = load_document(document, label)
@@ -181,6 +183,16 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
                 f"{label} repeats slug {payload['slug']!r} in {page_key[0]}"
             )
         seen_pages.add(page_key)
+        # One page per language per group, as the live index has it: a restore
+        # matches by the pair, so two documents claiming it have one row to
+        # land on between them and the second would trip the constraint.
+        group = payload.get("translation_group")
+        if group is not None:
+            if not isinstance(group, str) or not group or len(group) > _GROUP_WIDTH:
+                raise BundleError(f"{label} has an unreadable translation_group")
+            if (group, page_key[0]) in seen_groups:
+                raise BundleError(f"{label} repeats translation_group {group!r} in {page_key[0]}")
+            seen_groups.add((group, page_key[0]))
         referenced |= collect_sentinels(payload)
     layout = dest / LAYOUT_NAME
     if layout.is_file():

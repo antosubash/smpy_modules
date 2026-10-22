@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ImportPlan, Snapshot } from '../../utils/snapshotsApi';
 import {
   contentsLine,
+  describeOverwrite,
   missingMediaWarning,
   overwriteWarning,
   planTotals,
@@ -129,5 +130,23 @@ describe('missingMediaWarning', () => {
       manifest: { ...snapshot().manifest, missing_media: ['hero.jpg'] },
     });
     expect(missingMediaWarning(s)).toContain('hero.jpg');
+  });
+});
+
+describe('describeOverwrite', () => {
+  it('counts block changes', () => {
+    expect(describeOverwrite({ slug: 'a', title: 'A', added: 2, changed: 1 })).toBe('+2 ~1 blocks');
+  });
+
+  it('names the slug a renamed page moves back from', () => {
+    const entry = { slug: 'old', title: 'Old', renamed_from: 'newer' };
+    expect(describeOverwrite(entry)).toBe('metadata only · moves back from /newer');
+  });
+
+  it('says a renamed, trashed page is both moved and revived', () => {
+    const entry = { slug: 'old', title: 'Old', renamed_from: 'newer', revived: true };
+    expect(describeOverwrite(entry)).toBe(
+      'metadata only · moves back from /newer · revived from trash',
+    );
   });
 });
