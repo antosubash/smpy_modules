@@ -23,7 +23,8 @@ not flip anything, that a claim abandoned by a dying process goes back with its
 transaction rather than wedging the article, and that a refused transition hands
 its claim back so a later tick retries. What it does not establish is that the
 engine serialises the two writes; that is Postgres' row lock and SQLite's writer
-lock, and it is asserted in the module docstring, not here.
+lock, exercised with real connections on a file database in
+``test_scheduler_claim_edges.py`` (#209).
 """
 
 from __future__ import annotations

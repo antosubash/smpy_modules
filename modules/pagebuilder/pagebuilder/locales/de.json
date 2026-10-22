@@ -1193,6 +1193,7 @@
     "redirect_count_other": "{count} Weiterleitungen",
     "redirects": "Weiterleitungen",
     "redirects_dropped": "{count} verworfen – Ziel fehlt",
+    "renamed_from": "{blocks} · zieht von /{slug} zurück",
     "revived": "{blocks} · aus dem Papierkorb wiederhergestellt",
     "site_layout": "Website-Layout",
     "source_manual": "Hier erstellt",
