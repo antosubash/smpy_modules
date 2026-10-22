@@ -52,17 +52,26 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup and redirect takes a locale; adding one
 that does not is how `/de/p/x` starts serving the English page.
 
-**Every pagebuilder and news entry point binds a tenant (#38).** Their tables carry
-`MultiTenantMixin`, and the framework filters them only while a tenant is
-bound — on a host with `multi_tenant` off nothing is bound and a read is
-*unfiltered*. Routers get `tenancy.bind_admin`/`bind_public` (single-tenant
-host → `"default"`, multi → the resolved tenant, 404 for anonymous without
-one); the scheduler opens one session per tenant under `tenant_context`.
-News has its own copy, `news.tenancy` (admin with no tenant in multi mode →
-403 `tenant_required`), and its scheduler ticks per tenant the same way.
-Another module reads pagebuilder only through `pagebuilder.contracts`
-(news' search calls `search_pages`/`search_media`, #130); the caller names the
-tenant and the contract pins `tenant_id` itself.
+**Every pagebuilder, news and records entry point binds a tenant (#38, #112).**
+Their tables carry `MultiTenantMixin`, and the framework filters them only
+while a tenant is bound — on a host with `multi_tenant` off nothing is bound
+and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
+and all modules follow one rule: single-tenant host → `"default"`; multi →
+the tenant the framework resolved (`request.state.tenant_id`, the active
+membership — never `user.tenant_id`, never a header a module reads itself);
+none resolved → 403 `tenant_required` for admin, 404 for public. The rule is
+applied per request, and a tenant already resolved upstream always wins: a
+`single` detection supplies `"default"` only when nothing upstream bound one,
+so a mis-detected child app fails closed — and a public answer for another
+tenant is never shareable-cached (records #196; pagebuilder and news #192).
+The scheduler opens one session per tenant under `tenant_context`. News has its
+own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
+records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
+code `tenant_required`); billing reads the same `request.state.tenant_id`
+through `context.billing_context`. Another module reads pagebuilder only
+through `pagebuilder.contracts` (news' search calls
+`search_pages`/`search_media`, #130); the caller names the tenant and the
+contract pins `tenant_id` itself.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
@@ -208,7 +217,7 @@ the target fails without it.
   repo is canonical; that one is frozen.
 - **The demo host defaults to single-tenant.** Every module is tenant-aware,
   so `SM_MULTI_TENANT=true` boots with all of them enabled. The multi-tenant
-  e2e specs (`billing-tenant`, `news-tenant`) are opt-in with
+  e2e specs (`billing-tenant`, `news-tenant`, `records-tenant`) are opt-in with
   `E2E_MULTI_TENANT=1` and run in their own CI job, `E2E (multi-tenant)`;
   `start-test-server.sh` sets `tenants.subdomain_base=localhost` for that run,
   so `<org-slug>.localhost` addresses an organisation's public site.
