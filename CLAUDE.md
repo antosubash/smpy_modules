@@ -210,7 +210,7 @@ the target fails without it.
   repo is canonical; that one is frozen.
 - **The demo host defaults to single-tenant.** Every module is tenant-aware,
   so `SM_MULTI_TENANT=true` boots with all of them enabled. The multi-tenant
-  e2e specs (`billing-tenant`, `news-tenant`) are opt-in with
+  e2e specs (`billing-tenant`, `news-tenant`, `records-tenant`) are opt-in with
   `E2E_MULTI_TENANT=1` and run in their own CI job, `E2E (multi-tenant)`;
   `start-test-server.sh` sets `tenants.subdomain_base=localhost` for that run,
   so `<org-slug>.localhost` addresses an organisation's public site.

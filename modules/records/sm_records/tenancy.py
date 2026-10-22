@@ -160,8 +160,8 @@ def resolve_admin(request: Any) -> str:
     raw for anonymous requests only, since 0.0.35; the tenants module honours
     it only among the user's active memberships), so following its answer
     hands a tenant-less user nothing: they resolve no tenant and get
-    :class:`TenantRequired`. No user at
-    all is a 401 — the framework's ``AuthMiddleware`` answers first in
+    :class:`TenantRequired`. No user at all is a 401 in multi mode — the
+    framework's ``AuthMiddleware`` answers first in
     production, and an anonymous request's header tenant never reaches the
     admin surface.
     """
