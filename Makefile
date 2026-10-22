@@ -107,9 +107,9 @@ lint:
 
 env:
 	@test -f .env || (cp .env.example .env && \
-	  python3 -c "import pathlib, secrets; p=pathlib.Path('.env'); \
-	  p.write_text(p.read_text().replace('replace-me-with-a-generated-secret', secrets.token_urlsafe(32)))" && \
-	  echo ".env created with a generated SM_SECRET_KEY")
+	  python3 -c "import pathlib, re, secrets; p=pathlib.Path('.env'); \
+	  p.write_text(re.sub('replace-me-with-a-generated-secret', lambda _: secrets.token_urlsafe(32), p.read_text()))" && \
+	  echo ".env created with generated secrets (SM_SECRET_KEY, SM_USERS_*_TOKEN_SECRET)")
 
 # First-party modules the host installs from PyPI that also live in the
 # framework repo. Linking core/db/hosting alone is not enough when the work

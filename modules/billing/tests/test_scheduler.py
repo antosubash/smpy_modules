@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fake_provider import FakeProvider
-from helpers import make_plan, make_sub, make_tenant
+from helpers import make_plan, make_sub, make_tenant, store_settings
 from simple_module_db import current_tenant_id
 from sm_billing import scheduler, startup
 from sm_billing.contracts.provider import SubscriptionSnapshot
@@ -151,7 +151,7 @@ async def test_enabled_without_a_syncing_provider_starts_no_task(app):
 
 
 async def test_enabled_starts_a_loop_that_ticks_and_stops(app, fake, pauses, monkeypatch):
-    app.state.sm_billing.settings.reconcile_interval_minutes = 30
+    await store_settings(app, reconcile_interval_minutes=30)
     await _tenants(app, fake, 1)
     ticked = asyncio.Event()
     real = scheduler.reconcile_stale
