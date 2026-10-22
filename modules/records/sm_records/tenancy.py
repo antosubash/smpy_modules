@@ -217,7 +217,8 @@ def view_props(request: Any) -> dict[str, str]:
     """``tenant`` and ``tenancy_mode`` for every records screen: read-only, so
     the UI can say which tenant an admin is working in (§J). Called inside
     :func:`bind_admin`'s scope, so the tenant is the one the request runs in."""
-    return {"tenant": bound_tenant(), "tenancy_mode": mode_of(request.app).value}
+    mode = request_mode(request, mode_of(request.app))
+    return {"tenant": bound_tenant(), "tenancy_mode": mode.value}
 
 
 def all_tenants(stmt: Any) -> Any:
