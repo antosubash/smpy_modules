@@ -117,16 +117,18 @@ must not import a sibling optional module.
 
 The write API can change `chat_base_url` and so send the stored key to
 another server. A forged cross-site `PUT` is therefore the threat.
-`security.py` (adapted from pagebuilder's, not imported):
+The defence is the framework's, `simple_module_hosting.csrf`, the same one
+billing, news, records and pagebuilder use:
 
-- `mint_csrf_token`, a view-router dependency, puts a random token in the
-  session;
-- `CsrfCookieMiddleware` copies it to the `sm_ai_csrf` cookie on responses
-  under `/ai` and `/api/ai`. It is a middleware because FastAPI doesn't merge
-  a dependency's cookie writes into a returned `Response`;
-- `verify_csrf`, an API-router dependency, compares `X-CSRF-Token` in
-  constant time (as bytes) on `POST`/`PUT`/`PATCH`/`DELETE`. With no session
-  mounted it skips the check and logs a warning once.
+- the API router carries `RequiresCsrf()`, which checks `X-CSRF-Token` against
+  the session's token on `POST`/`PUT`/`PATCH`/`DELETE` and skips the check when
+  no session is mounted;
+- `csrf.py`'s `share_csrf_token`, a view-router dependency, shares
+  `get_csrf_token(request)` as the `csrf_token` Inertia prop;
+- `utils/csrf.ts` keeps the latest prop value (the server-rendered page, then
+  every Inertia navigation) and `utils/api.ts` sends it on every write.
+
+There is no middleware and no cookie.
 
 ## Consuming from another module
 
@@ -175,9 +177,9 @@ async def summarise(text: str) -> Summary | None:
 
 
 async def index(chunks: list[str]) -> None:
-    embedder = resolve_embedder()        # AiNotConfiguredError until the slot is set
+    embedder = resolve_embedder()  # AiNotConfiguredError until the slot is set
     result = await embedder.embed_documents(chunks)
-    ...                                  # store vectors; width = embedding_dim()
+    ...  # store vectors; width = embedding_dim()
 ```
 
 - Catch `AiNotConfiguredError` where "AI is off" is a valid state, and let
@@ -200,7 +202,7 @@ async def index(chunks: list[str]) -> None:
 | `resolve.py` | slot validation and model / embedder construction |
 | `crypto.py` | `enc:v1:` Fernet layer |
 | `service.py`, `deps.py` | read with secrets masked; build and apply changes |
-| `security.py` | CSRF mint, verify, cookie mirror |
+| `csrf.py` | shares the framework CSRF token with the settings page |
 | `contracts/` | the public surface (`__init__.py`), errors, API DTOs |
 | `endpoints/` | `api.py` (settings, test), `views.py` (`Ai/Settings`) |
 | `pages/Settings.tsx`, `components/SlotCard.tsx`, `utils/` | the settings page (only real Inertia pages under `pages/`) |

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The three gaps the QA browser pass found, each pinned.
@@ -18,7 +18,7 @@ function pngBytes(): Buffer {
 }
 
 async function uploadAsset(page: Page) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const name = `${uniqueSlug('qa-asset')}.png`;
   const created = await page.request.post('/api/pagebuilder/uploads', {
     headers,
@@ -32,7 +32,7 @@ async function makePage(
   page: Page,
   { slug, publish = false, blocks = [] as unknown[] },
 ): Promise<number> {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {
@@ -71,7 +71,7 @@ test.describe('QA: the media library honours the in-use refusal', () => {
     // The library grid used to call the *unchecked* delete, so the whole
     // "refuses while in use" guarantee could be walked around by deleting from
     // the grid instead of from the asset's own page.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const refused = await page.request.delete(`/api/pagebuilder/uploads/${asset.id}/checked`, {
       headers,
     });

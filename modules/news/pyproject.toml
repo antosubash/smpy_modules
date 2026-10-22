@@ -51,6 +51,10 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.35,<0.1"]
 # ``pagebuilder-blocks.ts``, which only pagebuilder's own ``puck-blocks.ts``
 # globs in — added in 0.0.12. On an older neighbour nothing crashes, but the
 # NewsFeed block silently drops out of the palette.
+#
+# 0.0.12 is also the first with ``pagebuilder.contracts.search_pages`` /
+# ``search_media`` (#130), which the search screen's Pages and Media sections
+# call; on an older neighbour that screen would fail with an AttributeError.
 pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.1"]
 
 [build-system]
