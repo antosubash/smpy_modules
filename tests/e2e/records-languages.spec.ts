@@ -6,6 +6,7 @@ import {
   apiCreateTranslation,
   apiGetType,
   saveType,
+  saveTypeAndWait,
   seedTextType,
 } from './records-helpers';
 
@@ -58,7 +59,9 @@ test.describe('Records — languages', () => {
 
     await page.goto(`/admin/records/types/${key}`);
     await page.getByTestId('records-translatable-toggle').click();
-    await saveType(page);
+    // The error's absence holds before the PUT returns too, so it cannot be
+    // what the read below waits on (#224).
+    await saveTypeAndWait(page, key);
 
     await expect(page.getByTestId('records-translatable-error')).toHaveCount(0);
     expect((await apiGetType(page, key)).translatable).toBe(false);

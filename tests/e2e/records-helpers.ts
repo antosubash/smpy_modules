@@ -98,6 +98,27 @@ export async function saveType(page: Page): Promise<void> {
 }
 
 /**
+ * Save an existing type and wait for the server to answer the write.
+ *
+ * For a spec that reloads or reads the type back over the API next: neither
+ * waits for anything, so after a bare `saveType` either can run while the
+ * PUT is still in flight and see the pre-save row (#224). Nothing on screen
+ * proves the write landed for a metadata-only change — "Preview changes" is
+ * disabled before and after one, because it only tracks the schema
+ * (`schemaIsDirty`). Asserts the write succeeded, so a refused save fails here
+ * rather than as a confusing stale value later.
+ */
+export async function saveTypeAndWait(page: Page, key: string): Promise<void> {
+  const written = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      new URL(res.url()).pathname === `/api/records/types/${key}`,
+  );
+  await saveType(page);
+  expect((await written).ok()).toBe(true);
+}
+
+/**
  * Wait for a schema write to land, without relying on a toast.
  *
  * `TypeEditor` re-seeds its draft from the server's response on success, so
