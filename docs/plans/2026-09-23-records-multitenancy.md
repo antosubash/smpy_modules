@@ -1,3 +1,5 @@
+> **Superseded in part (#112/#192):** the `admin_header_tenant` setting and the `user.tenant_id` admin rule described below were removed; see `modules/records/docs/operations.md`.
+
 # Records — multi-tenancy
 
 **Status: implemented**, across Phases 1–7 below (see "Implementation notes"

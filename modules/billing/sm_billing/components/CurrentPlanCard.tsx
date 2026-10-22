@@ -23,7 +23,7 @@ interface Props {
 
 /** The plan in force, its renewal or end date, seats, and the payment-trouble banner. */
 export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const sub = status.subscription;
   const { used, limit } = status.seats;
   const seats = seatsLabel(used, limit);
@@ -65,7 +65,7 @@ export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
             {sub?.status === 'trialing' && sub.trial_end && (
               <div className="flex gap-2">
                 <dt className="text-muted-foreground">{t(keys.billing.current_plan.trial_ends)}</dt>
-                <dd>{formatDate(sub.trial_end)}</dd>
+                <dd>{formatDate(sub.trial_end, locale)}</dd>
               </div>
             )}
             {sub?.current_period_end && (
@@ -75,7 +75,7 @@ export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
                     ? t(keys.billing.current_plan.ends_on)
                     : t(keys.billing.current_plan.renews_on)}
                 </dt>
-                <dd>{formatDate(sub.current_period_end)}</dd>
+                <dd>{formatDate(sub.current_period_end, locale)}</dd>
               </div>
             )}
           </dl>

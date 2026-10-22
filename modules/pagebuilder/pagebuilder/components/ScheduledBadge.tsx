@@ -1,4 +1,5 @@
 import type { PageStatus } from '../utils/api';
+import { formatTimestamp } from '../utils/dates';
 import { keys, useT } from '../utils/i18n';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
  * can drop this in unconditionally.
  */
 export function ScheduledBadge({ status, publishAt, unpublishAt }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const target =
     status === 'draft' && publishAt
       ? { kind: 'publish' as const, at: publishAt }
@@ -30,10 +31,10 @@ export function ScheduledBadge({ status, publishAt, unpublishAt }: Props) {
   return (
     <span
       className="ml-2 inline-block text-xs font-medium px-2 py-1 rounded bg-blue-100 text-blue-800"
-      title={new Date(target.at).toLocaleString()}
+      title={formatTimestamp(target.at, locale)}
       data-testid="scheduled-badge"
     >
-      {label} {new Date(target.at).toLocaleString()}
+      {label} {formatTimestamp(target.at, locale)}
     </span>
   );
 }

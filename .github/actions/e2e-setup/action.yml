@@ -1,0 +1,118 @@
+# Everything an e2e job needs before `playwright test` (#119): the Python and
+# npm workspaces, the module pages manifest, the production bundle the suite
+# runs against (E2E_BUNDLE=1), and Chromium. Shared by ci.yml's `e2e` and
+# `e2e-multi-tenant` jobs, which used to carry ~70 identical lines each.
+#
+# Third-party actions are pinned to a commit, as in release.yml; Dependabot
+# updates them here too (.github/dependabot.yml lists this directory).
+#
+# Caches are scoped to e2e. uv's carries an `e2e` suffix and the browsers' key
+# an `e2e-` prefix, so neither is shared with another workflow: release.yml
+# restores no cache at all, and framework-latest.yml never saves one. The npm
+# cache (setup-node) is the exception: its key is the lockfile hash, shared
+# with ci.yml's other Node jobs.
+
+name: E2E setup
+description: Install the workspaces, build the production bundle and install Chromium.
+
+inputs:
+  python-version:
+    description: Python version for uv to install.
+    required: true
+  node-version:
+    description: Node.js version.
+    required: true
+  uv-version:
+    description: Exact uv version (ci.yml's UV_VERSION).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      with:
+        version: ${{ inputs.uv-version }}
+        enable-cache: true
+        cache-suffix: e2e
+
+    - name: Set up Python
+      shell: bash
+      env:
+        PYTHON_VERSION: ${{ inputs.python-version }}
+      run: uv python install "$PYTHON_VERSION"
+
+    - name: Set up Node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Sync Python workspace
+      shell: bash
+      run: uv sync --locked --all-packages --all-extras
+
+    - name: Install npm workspace
+      shell: bash
+      run: npm ci
+
+    - name: Sync module JS deps into host
+      shell: bash
+      run: make sync-module-deps
+
+    - name: Generate pages manifest
+      shell: bash
+      run: make gen-pages
+
+    # Once per job, before the server starts: start-test-server.sh serves this
+    # bundle and refuses to boot without it.
+    - name: Build production bundle
+      shell: bash
+      run: npm run build
+
+    # Chromium + system deps are cached between runs so ~290 MB isn't
+    # downloaded on every push. Keyed on the Playwright version, so a bump
+    # invalidates the cache.
+    - name: Resolve Playwright version
+      id: pw-version
+      shell: bash
+      run: |
+        v=$(node -p "require('@playwright/test/package.json').version")
+        echo "version=$v" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Playwright browsers
+      id: pw-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: e2e-playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+    # The Azure Ubuntu mirror stalls now and then mid-download (three 8-min
+    # timeouts in one day, on ~26 MB of fonts/xvfb for install-deps). apt's
+    # default is to wait on a stalled connection indefinitely and never retry;
+    # this makes each request time out after 30s and retry up to 5 times, so a
+    # stall costs seconds rather than the step.
+    - name: Make apt retry stalled downloads
+      shell: bash
+      run: |
+        printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "30";' \
+          'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
+
+    # Composite steps cannot carry `timeout-minutes`; `timeout` stands in for
+    # it, so a mirror that keeps failing cannot sit out the whole job budget.
+    # 20 min leaves room for apt's retries above the normal ~2 min cold
+    # install. On expiry it SIGTERMs the install's process group and exits 124,
+    # which fails the step (bash runs with -e). `-k 30s` follows with SIGKILL:
+    # without it, a child that ignores SIGTERM keeps `timeout` waiting for as
+    # long as the child runs.
+    - name: Install Playwright browsers
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
+      run: |
+        if [ "$CACHE_HIT" = "true" ]; then
+          # Browsers cached — only refresh OS-level deps (fast).
+          timeout -k 30s 20m npx playwright install-deps chromium
+        else
+          timeout -k 30s 20m npx playwright install chromium --with-deps
+        fi

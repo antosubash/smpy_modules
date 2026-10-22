@@ -378,7 +378,6 @@ variables are read. Configure on the Settings screen or with
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
 | `menu_refresh_seconds` | 5 | no |
-| `admin_header_tenant` | `false` | no |
 
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
@@ -666,15 +665,15 @@ setting alone does not install `TenantMiddleware`. From there:
   legacy rows in `default` belong to no organisation — see
   [Assigning tenants to users](docs/operations.md#assigning-tenants-to-users)
   before switching a populated install.
-- A user with no active tenant (no membership) — the bootstrap admin included — gets `403` with
+- The admin screens and API work in the tenant the framework resolved for
+  the request — the user's active organisation — exactly as pagebuilder,
+  news and billing do (#112), so a member edits records in the same
+  organisation as their pages and articles. A user with no active tenant (no
+  membership) — the bootstrap admin included — gets `403` with
   `"code": "tenant_required"` on every records admin screen, even with a
-  header sent: records never guesses. The `admin_header_tenant` setting
-  (default off) lets a user holding `admin` with no tenant of their own act
-  in the tenant their `X-Tenant-ID` header names — **from an API or headless
-  client that can send that header, only**. The browser admin screens never
-  send it, so for such a user every screen stays `403` with the setting on;
-  the fix for a person working in the browser is to make them a member of an
-  organisation.
+  header sent: records never guesses, and the framework never lets a
+  signed-in user pick a tenant they are not a member of by header. The fix is
+  to make them a member of an organisation.
 - Anonymous readers and headless clients name their tenant with that header
   (or, where the tenants module's `subdomain_base` is set, by subdomain);
   with none, the public API answers its ordinary `404`, the same one an

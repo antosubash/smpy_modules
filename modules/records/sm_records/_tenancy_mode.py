@@ -7,6 +7,7 @@ Design: ``docs/plans/2026-09-23-records-multitenancy.md`` §A.3.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Final
 
@@ -23,6 +24,9 @@ __all__ = [
 
 logger = logging.getLogger("sm_records.tenancy")
 
+_PACKAGE: Final = "records"
+"""The prefix of this file's messages."""
+
 DEFAULT_TENANT: Final = "default"
 """The tenant of a single-tenant host, and of every row that predates tenancy.
 
@@ -35,12 +39,46 @@ class TenancyMode(StrEnum):
     MULTI = "multi"
 
 
-def _tenant_middleware(app: Any) -> Any:
-    """The ``TenantMiddleware`` entry of the built stack, or ``None``."""
-    from simple_module_hosting.middleware import TenantMiddleware
+_KNOWN_KWARGS: Final = frozenset({"fixed", "header"})
+"""The ``TenantMiddleware`` keywords read here. Both are framework internals
+(#125); ``tests/test_framework_pins.py`` fails when either stops existing."""
 
-    entries = getattr(app, "user_middleware", ())
-    return next((e for e in entries if getattr(e, "cls", None) is TenantMiddleware), None)
+_UNREADABLE: Final = (
+    "{pkg}: cannot read the app's middleware stack (app.user_middleware, or "
+    "its entries' .cls, is gone), so it cannot tell a single-tenant host from "
+    "a multi-tenant one. Refusing to guess: a wrong 'single' leaves every "
+    "read unfiltered (#125)"
+)
+
+
+def _tenant_middleware(app: Any) -> Any:
+    """The ``TenantMiddleware`` entry of the built stack, or ``None``.
+
+    Raises on a real Starlette app whose stack has no readable shape: finding
+    no entry would read as ``SINGLE``, and ``SINGLE`` reads are unfiltered. A
+    test double without a stack is simply single-tenant.
+    """
+    from simple_module_hosting.middleware import TenantMiddleware
+    from starlette.applications import Starlette
+
+    entries = getattr(app, "user_middleware", None)
+    if entries is None or any(not hasattr(e, "cls") for e in entries):
+        if isinstance(app, Starlette):
+            raise RuntimeError(_UNREADABLE.format(pkg=_PACKAGE))
+        return None
+    return next(
+        (e for e in entries if isinstance(e.cls, type) and issubclass(e.cls, TenantMiddleware)),
+        None,
+    )
+
+
+def _kwargs(entry: Any) -> dict[str, Any] | None:
+    """*entry*'s keywords, or ``None`` when their shape is not one read here
+    (positional arguments, or a keyword outside :data:`_KNOWN_KWARGS`)."""
+    kwargs = getattr(entry, "kwargs", None)
+    if not isinstance(kwargs, Mapping) or getattr(entry, "args", ()):
+        return None
+    return dict(kwargs) if set(kwargs) <= _KNOWN_KWARGS else None
 
 
 def _fixed_tenant(entry: Any) -> str | None:
@@ -50,21 +88,60 @@ def _fixed_tenant(entry: Any) -> str | None:
     on a host that sets ``default_tenant`` without ``multi_tenant``: the
     middleware is in the stack, but there is only ever one tenant.
     """
-    return (getattr(entry, "kwargs", None) or {}).get("fixed") if entry else None
+    return (_kwargs(entry) or {}).get("fixed") if entry else None
+
+
+def _framework_says_multi(app: Any) -> bool:
+    """Whether the framework's own public answer (0.0.36+) is ``MULTI``.
+
+    It says ``SINGLE`` for any app built outside ``create_app``, so only its
+    ``MULTI`` is evidence; on 0.0.35, which lacks it, there is none.
+    """
+    try:
+        from simple_module_hosting.tenancy import tenancy_mode
+    except ImportError:
+        return False
+    return str(tenancy_mode(app)) == TenancyMode.MULTI
 
 
 def detect_mode(app: Any) -> TenancyMode:
-    """``MULTI`` iff the framework's ``TenantMiddleware`` is in the built stack
-    and resolves tenants per request; a ``fixed`` one is a single-tenant host."""
+    """``MULTI`` iff ``TenantMiddleware`` is in the stack and resolves tenants
+    per request; a ``fixed`` one is a single-tenant host.
+
+    Fails safe (#125): an entry whose arguments are not recognised counts as
+    ``MULTI`` — reads stay filtered, and a fixed middleware still puts its one
+    tenant on ``request.state``, which is all ``MULTI`` resolution reads — as
+    does the framework's own ``tenancy_mode`` saying ``MULTI``.
+    """
     entry = _tenant_middleware(app)
-    return TenancyMode.SINGLE if entry is None or _fixed_tenant(entry) else TenancyMode.MULTI
+    if _framework_says_multi(app):
+        return TenancyMode.MULTI
+    if entry is None:
+        return TenancyMode.SINGLE
+    if _kwargs(entry) is None:
+        return TenancyMode.MULTI
+    return TenancyMode.SINGLE if _fixed_tenant(entry) else TenancyMode.MULTI
+
+
+def _warn_if_unrecognised(app: Any) -> None:
+    entry = _tenant_middleware(app)
+    if entry is not None and _kwargs(entry) is None:
+        logger.warning(
+            "%s: TenantMiddleware was installed with arguments this version does not "
+            "recognise (args=%r, kwargs=%r); running multi-tenant so reads stay filtered",
+            _PACKAGE,
+            getattr(entry, "args", None),
+            getattr(entry, "kwargs", None),
+        )
 
 
 def tenant_header(app: Any) -> str | None:
     """The header that middleware resolves a tenant from — its own ``header``
     argument, as the host passed it — or ``None`` (single mode, or no header)."""
-    entry = _tenant_middleware(app)
-    header = (getattr(entry, "kwargs", None) or {}).get("header") if entry else None
+    # Straight off the keywords, not through ``_kwargs``: its ``None`` for an
+    # unknown keyword would drop the header and fail the cache key open.
+    kwargs = getattr(_tenant_middleware(app), "kwargs", None)
+    header = kwargs.get("header") if isinstance(kwargs, Mapping) else None
     return header or None
 
 
@@ -90,6 +167,7 @@ def configure(app: Any) -> TenancyMode:
             f"to {DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)
+    _warn_if_unrecognised(app)
     services = getattr(app.state, constants.PACKAGE, None)
     if services is not None:
         services.tenancy = mode

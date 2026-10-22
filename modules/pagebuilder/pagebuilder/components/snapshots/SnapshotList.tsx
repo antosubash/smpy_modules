@@ -1,16 +1,11 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { formatTimestamp } from '../../utils/dates';
 import { keys, useT } from '../../utils/i18n';
 import { formatBytes } from '../../utils/mediaFormat';
 import { downloadUrl, type Snapshot } from '../../utils/snapshotsApi';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { contentsLine, missingMediaWarning, sourceLabel } from './planSummary';
-
-function taken(snapshot: Snapshot): string {
-  if (!snapshot.created_at) return '';
-  const when = new Date(snapshot.created_at);
-  return Number.isNaN(when.getTime()) ? '' : when.toLocaleString();
-}
 
 /**
  * The restore points, newest first.
@@ -35,7 +30,7 @@ export function SnapshotList({
   onRestore: (snapshot: Snapshot) => Promise<unknown>;
   onDelete: (snapshot: Snapshot) => Promise<unknown>;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   if (snapshots.length === 0) {
     return (
       <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -61,7 +56,7 @@ export function SnapshotList({
                 {contentsLine(snapshot)} · {formatBytes(snapshot.size_bytes)}
               </p>
               <p className="text-xs text-muted-foreground">
-                {taken(snapshot)}
+                {formatTimestamp(snapshot.created_at, locale)}
                 {snapshot.created_by ? ` · ${snapshot.created_by}` : ''}
               </p>
               {missing && <p className="text-xs text-amber-700">{missing}</p>}

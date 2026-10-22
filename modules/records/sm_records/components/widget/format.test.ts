@@ -8,44 +8,49 @@ function meta(type: string, overrides: Partial<FieldMetaEntry> = {}): FieldMetaE
 
 describe('formatPublicValue', () => {
   it('renders null/undefined as a dash regardless of type', () => {
-    expect(formatPublicValue(meta('text'), null)).toBe('—');
-    expect(formatPublicValue(meta('number'), undefined)).toBe('—');
+    expect(formatPublicValue(meta('text'), null, 'en-US')).toBe('—');
+    expect(formatPublicValue(meta('number'), undefined, 'en-US')).toBe('—');
   });
 
   it('renders booleans as ✓/–', () => {
-    expect(formatPublicValue(meta('boolean'), true)).toBe('✓');
-    expect(formatPublicValue(meta('boolean'), false)).toBe('–');
+    expect(formatPublicValue(meta('boolean'), true, 'en-US')).toBe('✓');
+    expect(formatPublicValue(meta('boolean'), false, 'en-US')).toBe('–');
   });
 
   it('renders number/integer verbatim (no float round trip)', () => {
     // `number` arrives as a string on the wire (design §7.3) — formatting
     // must not run it through parseFloat/String.
-    expect(formatPublicValue(meta('number'), '9.99000')).toBe('9.99000');
-    expect(formatPublicValue(meta('integer'), 42)).toBe('42');
+    expect(formatPublicValue(meta('number'), '9.99000', 'en-US')).toBe('9.99000');
+    expect(formatPublicValue(meta('integer'), 42, 'en-US')).toBe('42');
   });
 
   it('formats a date at UTC midnight, independent of the viewer zone', () => {
     // en-US medium date formatting is locale-dependent in shape but not in
     // which calendar day it names; assert the day survives, not the exact
     // string, so this test isn't coupled to the CI runner's ICU data.
-    const out = formatPublicValue(meta('date'), '2026-01-15');
+    const out = formatPublicValue(meta('date'), '2026-01-15', 'en-US');
     expect(out).toContain('2026');
     expect(out).not.toBe('2026-01-15');
   });
 
   it('formats a datetime', () => {
-    const out = formatPublicValue(meta('datetime'), '2026-01-15T10:30:00Z');
+    const out = formatPublicValue(meta('datetime'), '2026-01-15T10:30:00Z', 'en-US');
     expect(out).toContain('2026');
   });
 
+  it('writes dates in the locale it is handed, not the browser one (#189)', () => {
+    expect(formatPublicValue(meta('date'), '2026-01-15', 'de')).toBe('15.01.2026');
+    expect(formatPublicValue(meta('date'), '2026-01-15', 'en-US')).toBe('Jan 15, 2026');
+  });
+
   it('falls back to the raw string for an unparseable date/datetime', () => {
-    expect(formatPublicValue(meta('date'), 'not-a-date')).toBe('not-a-date');
+    expect(formatPublicValue(meta('date'), 'not-a-date', 'en-US')).toBe('not-a-date');
   });
 
   it('maps a select value through its choices, falling back to the raw value', () => {
     const field = meta('select', { choices: [{ value: 'a', label: 'Alpha' }] });
-    expect(formatPublicValue(field, 'a')).toBe('Alpha');
-    expect(formatPublicValue(field, 'orphaned')).toBe('orphaned');
+    expect(formatPublicValue(field, 'a', 'en-US')).toBe('Alpha');
+    expect(formatPublicValue(field, 'orphaned', 'en-US')).toBe('orphaned');
   });
 
   it('joins multiselect values through their choices', () => {
@@ -55,12 +60,12 @@ describe('formatPublicValue', () => {
         { value: 'b', label: 'Beta' },
       ],
     });
-    expect(formatPublicValue(field, ['a', 'b'])).toBe('Alpha, Beta');
-    expect(formatPublicValue(field, [])).toBe('—');
+    expect(formatPublicValue(field, ['a', 'b'], 'en-US')).toBe('Alpha, Beta');
+    expect(formatPublicValue(field, [], 'en-US')).toBe('—');
   });
 
   it('renders a relation as its stored type:uuid, never expanded', () => {
-    expect(formatPublicValue(meta('relation'), { type: 'author', uuid: 'abc-123' })).toBe(
+    expect(formatPublicValue(meta('relation'), { type: 'author', uuid: 'abc-123' }, 'en-US')).toBe(
       'author:abc-123',
     );
   });
@@ -70,19 +75,19 @@ describe('formatPublicValue', () => {
       { type: 'author', uuid: 'a1' },
       { type: 'author', uuid: 'a2' },
     ];
-    expect(formatPublicValue(meta('relation'), value)).toBe('author:a1, author:a2');
+    expect(formatPublicValue(meta('relation'), value, 'en-US')).toBe('author:a1, author:a2');
   });
 
   it('truncates a long default-branch value (text/longtext/json/media)', () => {
     const long = 'x'.repeat(100);
-    expect(formatPublicValue(meta('longtext'), long)).toBe(`${'x'.repeat(80)}…`);
-    expect(formatPublicValue(meta('text'), 'short')).toBe('short');
+    expect(formatPublicValue(meta('longtext'), long, 'en-US')).toBe(`${'x'.repeat(80)}…`);
+    expect(formatPublicValue(meta('text'), 'short', 'en-US')).toBe('short');
   });
 
   it("formats sensibly without meta, from the value's own runtime type", () => {
-    expect(formatPublicValue(undefined, true)).toBe('✓');
-    expect(formatPublicValue(undefined, 42)).toBe('42');
-    expect(formatPublicValue(undefined, 'hello')).toBe('hello');
+    expect(formatPublicValue(undefined, true, 'en-US')).toBe('✓');
+    expect(formatPublicValue(undefined, 42, 'en-US')).toBe('42');
+    expect(formatPublicValue(undefined, 'hello', 'en-US')).toBe('hello');
   });
 });
 

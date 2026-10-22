@@ -27,7 +27,7 @@ const POLL_MS = 5000;
  * poll outlive the rebuild.
  */
 export function ReindexStatus({ type }: { type: TypeRead }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [pending, setPending] = useState(false);
   const entries = pendingEntries(type.reindex_pending);
   const polling = shouldPoll(entries);
@@ -68,7 +68,7 @@ export function ReindexStatus({ type }: { type: TypeRead }) {
                 // The raw ISO string used to be printed here while every
                 // other timestamp in the module goes through the viewer's
                 // own locale (R11).
-                time: formatDateTime(entry.since),
+                time: formatDateTime(entry.since, locale),
               })}
             </li>
           ))}

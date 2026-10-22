@@ -3,6 +3,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 
 import type { PageRead } from '../utils/api';
+import { formatTimestamp } from '../utils/dates';
 import { keys, useT } from '../utils/i18n';
 import { localeLabel, publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -38,7 +39,7 @@ export function PageListRow({
   publicPrefix,
   onDelete,
 }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const address = publicPath(publicPrefix, page.slug, page.locale, defaultLocale);
   return (
     <TableRow>
@@ -58,7 +59,7 @@ export function PageListRow({
         </span>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
-        {page.updated_at ? new Date(page.updated_at).toLocaleString() : '—'}
+        {formatTimestamp(page.updated_at, locale) || '—'}
       </TableCell>
       <TableCell className="space-x-1 text-right">
         {/* Stays an <a>: the e2e selects it with getByRole('link'). */}

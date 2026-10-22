@@ -5,6 +5,7 @@
 
 import type { Translate } from './i18n';
 import { keys } from './i18n';
+import { formatNumber } from './locale';
 
 /**
  * U16: "Download CSV"/"Download JSON" disclosed nothing about *how much* —
@@ -26,10 +27,18 @@ export function exportScopeLabel(
     filtered,
     count,
     capped = false,
-  }: { trashed: boolean; filtered: boolean; count: number; capped?: boolean },
+    locale,
+  }: {
+    trashed: boolean;
+    filtered: boolean;
+    count: number;
+    capped?: boolean;
+    /** The console's (`useT().locale`), for the capped count's digits. */
+    locale?: string;
+  },
 ): string {
   if (capped) {
-    const total = `${count.toLocaleString()}+`;
+    const total = `${formatNumber(count, locale)}+`;
     if (trashed) {
       return t(keys.records.io.scope_trashed_capped, {
         total,

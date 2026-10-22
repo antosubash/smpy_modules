@@ -54,7 +54,7 @@ export default function PublicIndex({
   feed_url,
   locale,
 }: Props) {
-  const { t } = useT();
+  const { t, locale: consoleLocale } = useT();
   useDocumentLang(locale);
   const copy = keys.news.public;
   return (
@@ -110,7 +110,7 @@ export default function PublicIndex({
         ) : (
           <ul className="space-y-8">
             {items.map((article) => {
-              const dated = formatArticleDate(article.published_at);
+              const dated = formatArticleDate(article.published_at, locale ?? consoleLocale);
               return (
                 <li key={article.id}>
                   <article>
