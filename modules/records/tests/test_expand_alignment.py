@@ -1,111 +1,29 @@
-"""Phase 4 review, the index and payload halves. Each test failed before its fix.
+"""``?expand=`` lines up with the payload it is rendered beside.
 
-Two subjects here, the provider half is in
-``test_review_fixes_round4_providers.py``:
-
-* a provider registered *after* a type was stored must not take that type
-  offline (the blocker: the virtual-key refusal ran on every read);
-* an expansion must line up with the payload it is rendered beside, and must
-  resolve only against the target type the field declares.
+An expansion resolves only against the target type the field declares, keeps
+a slot for every entry the payload holds, and expands a relation nobody filled
+in to nothing rather than to one phantom ``dangling`` reference.
 """
 
 from __future__ import annotations
 
-import logging
-
 import pytest
-from sm_records.index import IndexEntry, IndexKind, VirtualField, register_index_provider
 from sm_records.models import Record
 from sm_records.schema.compile import PayloadValidationError
+from sm_records.services import records as record_service
+from sm_records.services import types as type_service
+from sm_records.services.expand import expand
 from sqlalchemy import select
 
 from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_VIEWER, roles
+from tests.field_builders import rel, text
 from tests.relation_helpers import field, library, make_record, make_type
 
 API = "/api/records"
 
 
-def indexed(key: str, type_: str = "text") -> dict:
-    """``relation_helpers.field`` puts its kwargs in ``options``, and
-    ``indexed`` is a flag beside them."""
-    return {**field(key, type_), "indexed": True}
-
-
-def yielding(*entries):
-    def _provider(record, rtype):
-        for kind, key, value in entries:
-            yield IndexEntry(kind=kind, field_key=key, value=value)
-
-    return _provider
-
-
 # ---------------------------------------------------------------------------
-# B1 — a shadowing virtual key must not take a stored type offline
-# ---------------------------------------------------------------------------
-
-
-async def test_a_type_declaring_a_later_virtual_key_still_reads(client):
-    await make_type(
-        client,
-        "product",
-        [field("name", "text"), indexed("bucket")],
-        is_public=True,
-    )
-    created = await make_record(client, "product", {"name": "P", "bucket": "declared"})
-    await client.app.state.records_module.on_startup(client.app)
-
-    register_index_provider(
-        yielding((IndexKind.TEXT, "bucket", "from-provider")),
-        fields=[VirtualField("bucket", IndexKind.TEXT)],
-    )
-
-    listed = await client.get(f"{API}/types/product/records", headers=roles(ADMIN))
-    one = await client.get(f"{API}/types/product/records/{created['uuid']}", headers=roles(ADMIN))
-    anonymous = await client.get(f"{API}/public/product")
-    assert (listed.status_code, one.status_code, anonymous.status_code) == (200, 200, 200)
-    assert listed.json()["total"] == 1
-
-
-async def test_the_declared_field_wins_the_filter_over_the_virtual_one(client, caplog):
-    """``index.query._resolve``'s promise, now reachable at all: the type's own
-    definition decides the filter — its kind, its ``many`` reading — and the
-    collision is one warning per type rather than a refusal. The provider's
-    rows land in the same table under the same key and are therefore still
-    matched by a value filter; that is the cost of not breaking a type that
-    works, and it is why the collision is logged."""
-    await make_type(client, "product", [field("name", "text"), indexed("bucket")])
-    await make_record(client, "product", {"name": "P", "bucket": "declared"})
-    register_index_provider(
-        yielding((IndexKind.TEXT, "bucket", "from-provider")),
-        fields=[VirtualField("bucket", IndexKind.TEXT)],
-    )
-    # Rewritten with the provider registered, so both projections have rows.
-    listed = await client.get(f"{API}/types/product/records", headers=roles(ADMIN))
-    uuid = listed.json()["items"][0]["uuid"]
-    await client.put(
-        f"{API}/types/product/records/{uuid}",
-        json={"data": {"name": "P", "bucket": "declared"}, "expected_version": 1},
-        headers=roles(ADMIN),
-    )
-
-    async def total(value: str) -> int:
-        resp = await client.get(
-            f"{API}/types/product/records",
-            params=[("filter", f"bucket:eq:{value}")],
-            headers=roles(ADMIN),
-        )
-        assert resp.status_code == 200, resp.text
-        return resp.json()["total"]
-
-    with caplog.at_level(logging.WARNING):
-        assert await total("declared") == 1
-        assert await total("declared") == 1
-    warned = [rec for rec in caplog.records if "also projects" in rec.getMessage()]
-    assert len(warned) == 1, "once per type, not once per request"
-
-
-# ---------------------------------------------------------------------------
-# M2 / M4 — what ``?expand=`` resolves, and what it lines up with
+# what ``?expand=`` resolves, and what it lines up with
 # ---------------------------------------------------------------------------
 
 
@@ -204,3 +122,70 @@ def test_the_compiled_validator_names_the_offending_entry():
     with pytest.raises(PayloadValidationError) as exc:
         validate_payload(model, {"author": ["not-an-object"]})
     assert exc.value.errors[0]["field"] == "author"
+
+
+# ---------------------------------------------------------------------------
+# an empty relation expands to nothing
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("many", [False, True])
+@pytest.mark.parametrize("stored", [None, []])
+async def test_an_empty_relation_expands_to_no_entries(db, settings, many, stored):
+    """``validate_payload`` dumps every declared key, so *every* record of a
+    type with a relation nobody filled in holds ``None`` under it — which used
+    to expand to one ``dangling`` chip reading ``uuid: "None"``."""
+    await type_service.create_type(
+        db, key="person", label="Person", settings=settings, fields_raw=[text("name")]
+    )
+    memo = await type_service.create_type(
+        db,
+        key="memo",
+        label="Memo",
+        settings=settings,
+        fields_raw=[text("title"), rel("about", "person", many=many)],
+    )
+    record = await record_service.create_record(
+        db, memo, data={"title": "nothing here"}, settings=settings
+    )
+    assert record.data["about"] is None
+    if stored is not None:
+        # ``[]`` is what a to-many holds once the last reference is removed,
+        # and what a to-one can hold on a row written before
+        # ``_check_ref_list``. Neither validates as *input* on a to-one, so it
+        # is written the way such a row got there.
+        record.data = {**record.data, "about": stored}
+        db.add(record)
+        await db.flush()
+    out = await expand(db, memo, [record], ["about"])
+    assert out[record.uuid]["about"] == []
+
+
+async def test_an_unparsable_entry_inside_a_list_still_keeps_its_slot(db, settings):
+    """The positional rule M4 added is about entries *inside* a non-empty
+    list, and it stays: the expansion is rendered beside ``data[key]``."""
+    person = await type_service.create_type(
+        db, key="person", label="Person", settings=settings, fields_raw=[text("name")]
+    )
+    memo = await type_service.create_type(
+        db,
+        key="memo",
+        label="Memo",
+        settings=settings,
+        fields_raw=[text("title"), rel("about", "person", many=True)],
+    )
+    ada = await record_service.create_record(db, person, data={"name": "Ada"}, settings=settings)
+    record = await record_service.create_record(
+        db,
+        memo,
+        data={"title": "m", "about": [{"type": "person", "uuid": ada.uuid}]},
+        settings=settings,
+    )
+    # Written behind the module's back, the way a row that predates
+    # ``_check_ref_list`` looks.
+    record.data = {"title": "m", "about": [None, {"type": "person", "uuid": ada.uuid}]}
+    db.add(record)
+    await db.flush()
+
+    out = await expand(db, memo, [record], ["about"])
+    assert [ref.dangling for ref in out[record.uuid]["about"]] == [True, False]
