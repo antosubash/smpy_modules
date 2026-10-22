@@ -164,10 +164,10 @@ async def search(
     for page in pages:
         results.pages.append(
             SearchHit(
-                id=page.id or 0,
+                id=page.id,
                 title=page.title,
                 subtitle=f"{page.slug} · {page.status.value}",
-                url=pagebuilder.page_editor_path(page.id or 0),
+                url=pagebuilder.page_editor_path(page.id),
                 excerpt=excerpt(page.draft_data, q),
             )
         )
@@ -179,7 +179,7 @@ async def search(
     for asset in assets:
         results.media.append(
             SearchHit(
-                id=asset.id or 0,
+                id=asset.id,
                 title=asset.original_filename,
                 subtitle=asset.content_type,
                 url=pagebuilder.media_library_path(),

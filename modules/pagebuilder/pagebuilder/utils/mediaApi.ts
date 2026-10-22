@@ -1,7 +1,8 @@
 /** Media library calls, upload progress, and srcset helpers. */
 
+import { csrfHeaders } from './csrf';
 import { keys, translate } from './i18n';
-import { BASE, CSRF_COOKIE, readCookie, request } from './request';
+import { BASE, request } from './request';
 import type {
   MediaAssetDetail,
   MediaAssetRead,
@@ -55,8 +56,9 @@ export const uploadMedia = (
     xhr.open('POST', `${BASE}/uploads`);
     xhr.withCredentials = true;
     xhr.responseType = 'text';
-    const token = readCookie(CSRF_COOKIE);
-    if (token) xhr.setRequestHeader('X-CSRF-Token', token);
+    for (const [name, value] of Object.entries(csrfHeaders('POST'))) {
+      xhr.setRequestHeader(name, value);
+    }
     xhr.setRequestHeader('Accept', 'application/json');
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -65,7 +67,7 @@ export const uploadMedia = (
     }
     xhr.onload = () => {
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(uploadRejected(xhr.status));
+        reject(uploadRejected(xhr.status, xhr.responseText));
         return;
       }
       try {

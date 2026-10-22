@@ -25,11 +25,13 @@ index lists German articles, at German addresses, and says so in its
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import RedirectResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news import tag_redirects, tenancy
 from news.authors import resolve as resolve_author
 from news.endpoints.public._archive import render_archive
 from news.endpoints.public._paging import page_param
@@ -117,9 +119,18 @@ def index_router(locale: str) -> APIRouter:
         Unknown tags render an empty archive rather than 404ing: a tag can be
         removed from the last article carrying it, and the URL that was
         published while it existed should say "nothing here now", not "never
-        existed".
+        existed". A renamed tag's old slug 301s to its new one.
         """
         name = await db.scalar(select(NewsTag.name).where(NewsTag.slug == slug))
+        if name is None and (moved := await tag_redirects.resolve(db, slug)):
+            # Renamed: the old address follows it. Keyed on the tenant like
+            # the article redirect, because the table is per tenant.
+            target = public_tag_path(moved, locale)
+            if request.url.query:
+                target = f"{target}?{request.url.query}"
+            return tenancy.vary_on_tenant(
+                RedirectResponse(target, status_code=301), request.app
+            )
         return await render_archive(
             request=request,
             inertia=inertia,

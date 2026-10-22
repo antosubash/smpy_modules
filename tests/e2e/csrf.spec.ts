@@ -2,106 +2,95 @@ import { expect, test } from '@playwright/test';
 
 import { clickAndConfirm, login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
+/** 1×1 transparent PNG — the upload endpoint sniffs content, not the name. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+
 /**
- * Issue #10 — CSRF protection.
+ * Issue #10, #126 — pagebuilder's CSRF protection.
  *
- * The token is per-session and surfaced two ways:
- *  - Inertia shared prop ``csrf.token`` on every admin Inertia view.
- *  - Non-``HttpOnly`` cookie ``pagebuilder_csrf`` (``SameSite=Strict``,
- *    ``Path=/``) that ``utils/api.ts`` reads via ``document.cookie`` and
- *    sends as ``X-CSRF-Token`` on every mutating request.
- *
- * These tests assert the cookie metadata, the prop ↔ cookie pairing,
- * the 403 path when the header is missing/wrong, and the end-to-end
- * flow through the UI's own ``fetch`` wrapper.
+ * The check is the framework's `RequiresCsrf`, the one every module uses
+ * since #126. Every pagebuilder screen shares the session's token as the
+ * `csrf_token` Inertia prop; `utils/csrf.ts` keeps it and the fetch and
+ * upload helpers send it as `X-CSRF-Token`. The `pagebuilder_csrf` cookie and
+ * the middleware that mirrored it are gone. The AI module's half is in
+ * `csrf-ai.spec.ts`.
  */
-test.describe('CSRF protection', () => {
+test.describe('CSRF protection — pagebuilder', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
-  test('admin view sets the pagebuilder_csrf cookie with safe defaults', async ({
+  test('the screen shares the token as a prop, and no cookie mirrors it', async ({
     page,
     context,
   }) => {
     await page.goto('/pagebuilder/');
-    const cookies = await context.cookies();
-    const csrf = cookies.find((c) => c.name === 'pagebuilder_csrf');
-    expect(csrf, 'pagebuilder_csrf cookie missing on admin view').toBeDefined();
-    // SameSite=Strict prevents the cookie from leaking on cross-site nav.
-    expect(csrf!.sameSite).toBe('Strict');
-    // Must be readable by JS — that's the whole point: utils/api.ts reads
-    // it via document.cookie. HttpOnly would defeat the design.
-    expect(csrf!.httpOnly).toBe(false);
-    expect(csrf!.path).toBe('/');
-    expect(csrf!.value.length).toBeGreaterThan(20);
-  });
-
-  test('cookie value matches the csrf.token Inertia shared prop', async ({ page, context }) => {
-    await page.goto('/pagebuilder/');
-    const inertiaToken = await page.evaluate(() => {
-      const el = document.getElementById('app');
-      const raw = el?.getAttribute('data-page') ?? '{}';
-      const data = JSON.parse(raw) as { props?: { csrf?: { token?: string } } };
-      return data.props?.csrf?.token ?? null;
+    const prop = await page.evaluate(() => {
+      const raw = document.querySelector('script[data-page="app"]')?.textContent ?? '{}';
+      return (JSON.parse(raw) as { props?: { csrf_token?: string } }).props?.csrf_token ?? '';
     });
-    const cookies = await context.cookies();
-    const cookieToken = cookies.find((c) => c.name === 'pagebuilder_csrf')?.value;
-    expect(inertiaToken).toBeTruthy();
-    expect(cookieToken).toBe(inertiaToken);
+    expect(prop.length).toBeGreaterThan(20);
+    const names = (await context.cookies()).map((c) => c.name);
+    expect(names).not.toContain('pagebuilder_csrf');
   });
 
-  test('POST without X-CSRF-Token is rejected with 403', async ({ page }) => {
-    await page.goto('/pagebuilder/');
-    // ``page.request`` shares the auth cookie + session cookie but lets
-    // us craft the request manually so we can omit the CSRF header.
+  test('a write without the token is refused with 403 and creates nothing', async ({ page }) => {
+    const slug = uniqueSlug('no-csrf');
     const response = await page.request.post('/api/pagebuilder/pages', {
-      data: { title: 'no-csrf', slug: uniqueSlug('no-csrf'), draft_data: {} },
-      headers: { 'content-type': 'application/json' },
+      data: { title: 'no-csrf', slug, draft_data: {} },
     });
     expect(response.status()).toBe(403);
     expect(await response.text()).toContain('CSRF');
+    const listed = await page.request.get(`/api/pagebuilder/pages?search=${slug}`);
+    expect(((await listed.json()) as { items: unknown[] }).items).toEqual([]);
   });
 
-  test('POST with a wrong X-CSRF-Token is rejected with 403', async ({ page }) => {
-    await page.goto('/pagebuilder/');
+  test('a wrong token is refused with 403', async ({ page }) => {
     const response = await page.request.post('/api/pagebuilder/pages', {
       data: { title: 'wrong', slug: uniqueSlug('wrong'), draft_data: {} },
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': 'definitely-not-the-real-token',
-      },
+      headers: { 'X-CSRF-Token': 'definitely-not-the-real-token' },
     });
     expect(response.status()).toBe(403);
   });
 
-  test('POST with the cookie token succeeds (constant-time match)', async ({ page, context }) => {
-    await page.goto('/pagebuilder/');
-    const token = (await context.cookies()).find((c) => c.name === 'pagebuilder_csrf')!.value;
-    const slug = uniqueSlug('csrf-ok');
+  test('a media upload needs the token too', async ({ page }) => {
+    const file = { name: `${uniqueSlug('csrf')}.png`, mimeType: 'image/png', buffer: PNG };
+    const refused = await page.request.post('/api/pagebuilder/uploads', { multipart: { file } });
+    expect(refused.status()).toBe(403);
+
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+    const accepted = await page.request.post('/api/pagebuilder/uploads', {
+      multipart: { file },
+      headers,
+    });
+    expect(accepted.status(), await accepted.text()).toBe(201);
+    const { id } = (await accepted.json()) as { id: number };
+    const removed = await page.request.delete(`/api/pagebuilder/uploads/${id}`, { headers });
+    expect(removed.ok()).toBe(true);
+  });
+
+  test("the screen's token is accepted — and so is any module screen's", async ({ page }) => {
+    // One framework token per session: the news screen's opens pagebuilder too.
+    const headers = await moduleCsrfHeader(page, '/admin/news/');
+    expect(headers).toEqual(await moduleCsrfHeader(page, '/pagebuilder/'));
     const response = await page.request.post('/api/pagebuilder/pages', {
-      data: { title: 'csrf ok', slug, draft_data: {} },
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': token,
-      },
+      data: { title: 'csrf ok', slug: uniqueSlug('csrf-ok'), draft_data: {} },
+      headers,
     });
     expect(response.status()).toBe(201);
-    // Clean up the page so the test is idempotent.
     const created = (await response.json()) as { id: number };
-    const del = await page.request.delete(`/api/pagebuilder/pages/${created.id}`, {
-      headers: { 'x-csrf-token': token },
-    });
+    const del = await page.request.delete(`/api/pagebuilder/pages/${created.id}`, { headers });
     expect(del.status()).toBe(204);
   });
 
   test('the editor UI sends the token automatically (full save round-trip)', async ({ page }) => {
-    // The whole point of the cookie route: utils/api.ts reads
-    // document.cookie and attaches X-CSRF-Token to every fetch. If that
-    // wiring breaks, "Save draft" 403s and the editor never reaches
-    // /pagebuilder/<id>/edit. The pagebuilder.spec.ts CRUD test
-    // already exercises this implicitly; here we assert it explicitly
-    // with an isolated, minimal flow so a regression is easier to bisect.
+    // If the client stops sending the token, "Save draft" 403s and the editor
+    // never reaches /pagebuilder/<id>/edit. Every UI-driven pagebuilder spec
+    // exercises this implicitly; this one isolates it so a regression is easy
+    // to bisect.
     const slug = uniqueSlug('csrf-ui');
     await page.goto('/pagebuilder/new');
     await page.getByPlaceholder('Page title').fill(`CSRF UI ${slug}`);
@@ -109,16 +98,31 @@ test.describe('CSRF protection', () => {
     await page.getByRole('button', { name: /save draft/i }).click();
     await expect(page).toHaveURL(/\/pagebuilder\/\d+\/edit$/, { timeout: 15_000 });
 
-    // Clean up.
-    // Teardown deletes through the table, so ask for it —
-    // the board is the default view now.
-    // Search for it: the table pages at 20 rows, so on a database with any
-    // history the row would not be on the first page.
+    // Clean up through the table (the board is the default view), searching
+    // so the row is on the first page whatever else the database holds.
     await page.goto(`/pagebuilder/?view=list&search=${slug}`);
     await clickAndConfirm(
       page,
       page.locator('tr', { hasText: `CSRF UI ${slug}` }).getByRole('button', { name: /^delete$/i }),
     );
+  });
+
+  test('a stale token on an upload reads as "reload", not as a missing permission', async ({
+    page,
+  }) => {
+    await page.goto('/pagebuilder/media');
+    // What a session that changed under an open tab looks like to the server.
+    await page.route('**/api/pagebuilder/uploads', (route) =>
+      route.continue({ headers: { ...route.request().headers(), 'x-csrf-token': 'stale' } }),
+    );
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ name: `${uniqueSlug('stale')}.png`, mimeType: 'image/png', buffer: PNG });
+    await expect(
+      page.locator('[data-sonner-toast]').getByText(/security token is out of date/),
+    ).toBeVisible();
+    await expect(page.getByText(/do not have permission to upload/)).toHaveCount(0);
   });
 });
 

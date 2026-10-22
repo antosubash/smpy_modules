@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from sm_billing.contracts.provider import BillingProvider
+    from sm_billing.scheduler import ReconcileScheduler
 
 
 @dataclass
@@ -26,6 +27,8 @@ class BillingServices:
     provider: BillingProvider | None = None
     #: Why the configured provider could not be used (shown on the admin screens).
     provider_error: str = ""
+    #: The periodic reconcile loop, when ``reconcile_interval_minutes`` started one.
+    scheduler: ReconcileScheduler | None = None
 
 
 def current_provider(app: FastAPI) -> BillingProvider:

@@ -92,6 +92,7 @@ Billing settings are stored in the database. They are registered with
 | `stripe_secret_key` | `sk_…`. Stored as `enc:v1:<fernet>`, encrypted with the app's `secret_key`. |
 | `stripe_webhook_secret` | `whsec_…`, encrypted the same way. |
 | `return_base_url` | Origin that Stripe returns visitors to. If empty, the request's own origin is used. |
+| `reconcile_interval_minutes` | `0` (off) or N: re-read every subscription not synced for N minutes, on a loop inside the app. Read at startup. |
 
 - **manual.** There is no payment. Admins assign a plan and status on
   **Admin → Billing → Subscriptions**. Setting `unpaid` suspends the tenant.
@@ -148,7 +149,9 @@ smpy billing reconcile [--tenant ID]
 
 Re-fetches every Stripe subscription and pushes any drift in per-seat
 quantity. It is safe to run while the app is live and safe to run twice. Use
-it after missed webhooks or a Stripe outage.
+it after missed webhooks or a Stripe outage. Set `reconcile_interval_minutes`
+to have the app do it on a schedule, safely across several instances — see
+[operations](docs/operations.md#scheduled-reconcile).
 
 ## Permissions
 
