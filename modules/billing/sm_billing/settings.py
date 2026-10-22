@@ -53,7 +53,7 @@ class BillingSettings(DbBackedSettings):
         description=(
             "Re-read every Stripe subscription not synced within this many minutes, "
             "on a loop inside the app — the safety net for missed webhooks and failed "
-            "seat pushes. 0 turns the loop off (run `smpy billing reconcile` from cron "
+            "seat pushes. 0 turns the loop off (run “smpy billing reconcile” from cron "
             "instead). 60 is a sensible value."
         ),
         json_schema_extra=_RESTART_ONLY,

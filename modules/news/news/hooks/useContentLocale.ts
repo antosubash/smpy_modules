@@ -34,5 +34,5 @@ export function useContentLocale(): string | undefined {
 export function useDateLocale(): string | undefined {
   const content = useContentLocale();
   const { locale } = useT();
-  return content ?? locale;
+  return content || locale;
 }

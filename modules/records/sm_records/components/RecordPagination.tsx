@@ -23,8 +23,8 @@ function pageInfo(
 ): string {
   if (capped) {
     return t(keys.records.records.page_info_capped, {
-      start,
-      end,
+      start: formatNumber(start, locale),
+      end: formatNumber(end, locale),
       count: formatNumber(total, locale),
     });
   }
