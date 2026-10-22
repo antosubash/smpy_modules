@@ -71,7 +71,7 @@ test.describe('Records — collections', () => {
     await expect(select).toHaveValue('');
     await expect(select.locator('option')).toHaveText(['Shared tables', COLLECTION]);
     await expect(
-      field.getByText('Gives this type its own document and index tables. Chosen once'),
+      field.getByText('Gives this type its own document and index tables. It can be moved'),
     ).toBeVisible();
 
     await select.selectOption(COLLECTION);
@@ -83,13 +83,15 @@ test.describe('Records — collections', () => {
     await saveType(page);
 
     await expect(page).toHaveURL(new RegExp(`/admin/records/types/${key}$`));
-    // §6.2: moving a populated type between collections is a 409, so the
-    // control stops being a control once the type exists.
+    // A move copies every record (#82), so it is an API operation and not
+    // something a form save does on the side: read-only once the type exists.
     const frozen = page.locator('#type-editor-collection');
     await expect(frozen).toHaveValue(COLLECTION);
     await expect(frozen).toBeDisabled();
     await expect(
-      page.getByText("A type can't be moved between collections once it is created."),
+      page.getByText(
+        'Moving this type to another collection copies all of its records into the new tables. That is done through the API, not from this form.',
+      ),
     ).toBeVisible();
 
     expect((await apiGetType(page, key)).collection).toBe(COLLECTION);

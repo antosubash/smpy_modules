@@ -91,7 +91,7 @@ A banner explains when the manual provider is active, or when Stripe is
 configured but not usable (a missing secret, or one that can't be decrypted
 because the app's secret key changed). Saving new secrets takes effect
 immediately; switching between manual and Stripe is a setting on the Settings
-screen and needs a restart.
+screen and also takes effect when saved.
 
 ## The organisation's Billing page (`/billing/`)
 
