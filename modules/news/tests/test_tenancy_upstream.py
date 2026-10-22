@@ -144,3 +144,19 @@ def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
     assert tenancy.resolve_public(request) is None
     request.scope = {}  # not mounted: the app's own single-tenant answer stands
     assert tenancy.resolve_admin(request) == DEFAULT_TENANT
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        (None, "private"),
+        ("public, max-age=60, s-maxage=600", "private, max-age=60"),
+        ("private, no-store", "private, no-store"),
+    ],
+)
+def test_make_private_keeps_every_other_directive(before, after):
+    response = JSONResponse({})
+    if before is not None:
+        response.headers["Cache-Control"] = before
+    tenancy._make_private(response)
+    assert response.headers["cache-control"] == after
