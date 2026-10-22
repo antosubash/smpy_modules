@@ -1125,8 +1125,8 @@ Differences that matter:
 - **Write serialization.** The per-type lock is `SELECT … FOR UPDATE` on
   PostgreSQL and a write against the type row on SQLite, because `FOR UPDATE`
   locks nothing there. Every writer of a type's rows — record writes, trash,
-  restore, purge, empty-trash, schema changes, collection moves — takes it
-  first, and an operation that needs several (a cascading delete) takes them
+  restore, purge, empty-trash, schema changes, collection moves, and every
+  transaction of a reindex or reduce rebuild — takes it first, and an operation that needs several (a cascading delete) takes them
   in ascending type id. On PostgreSQL a lock needed out of that order is taken
   `NOWAIT` and a held one is a retryable `409`, so two of these never
   deadlock.

@@ -98,12 +98,8 @@ async def _clear_rebuilt(
 ) -> None:
     """Clear the markers this run actually rebuilt — see :func:`run_pending`.
 
-    The lock is taken here rather than for the whole run: holding a type's row
-    ``FOR UPDATE`` across a rebuild of every record would block every write to
-    the type for its duration, and the rebuild is idempotent precisely so it
-    does not need that. It is held for the read-modify-write of one JSON
-    column, which is the only part that races.
-    """
+    Called holding the type lock (:func:`_rebuild`); taken again so it never
+    runs without: the read-modify-write of one JSON column is what races."""
     try:
         await lock_type(session, rtype)
     except Conflict:
@@ -206,15 +202,38 @@ async def _run_pending_once(db_state, type_id: int, *, settings: RecordsSettings
 
 
 async def _rebuild(session: AsyncSession, rtype: RecordType, *, settings: RecordsSettings) -> int:
-    """The body of :func:`_run_pending_once`, inside the type's tenant."""
+    """The body of :func:`_run_pending_once`, inside the type's tenant.
+
+    Every transaction of the run opens with the type lock (#82) — the first,
+    and each one after a per-batch commit — so the order is type, records,
+    index and reduce rows, as for every writer (``services._lock``), and the
+    lock's collection re-read keeps a rebuild off a table set a move emptied.
+    A type deleted meanwhile ends the run quietly; a moved one is a Conflict.
+    """
+    type_id = rtype.id  # read now: the rollback below expires the instance
+    try:
+        return await _rebuild_locked(session, rtype, settings=settings)
+    except Conflict:
+        await session.rollback()
+        if await reload(session, RecordType, type_id) is None:
+            return 0
+        raise
+
+
+async def _rebuild_locked(
+    session: AsyncSession, rtype: RecordType, *, settings: RecordsSettings
+) -> int:
+    await lock_type(session, rtype)
+
+    async def relock() -> None:
+        await session.commit()
+        await lock_type(session, rtype)
+
     pending = pending_map(rtype)
     if not pending:
-        # Nothing is pending for the *map* indexes — but a reduce index
-        # carries no marker and never will: registering or changing a spec
-        # is the host deploying code, not a schema edit this module can
-        # see (Phase 5 §5.2). So the operator who pressed "reindex", or
-        # ran the CLI against this type, still has work here, and it is
-        # this. With no spec registered it issues no statements at all.
+        # Nothing pending for the map indexes, but a reduce index carries no
+        # marker (a spec is deployed code, Phase 5 §5.2), so a "reindex" still
+        # rebuilds it — under the lock taken above. No spec: no statements.
         if await rebuild_type(session, rtype, batch_size=settings.reindex_batch_size):
             mark_written(session)
             await session.commit()
@@ -236,15 +255,12 @@ async def _rebuild(session: AsyncSession, rtype: RecordType, *, settings: Record
         batch_size=settings.reindex_batch_size,
         field_keys=field_keys or None,
         touched=touched,
-        # Commit per batch. SQLite has one write lock for the whole file,
-        # so a rebuild that held its transaction for every record of a big
-        # type would refuse every concurrent write for that whole time;
-        # a partial rebuild is safe here precisely because the markers are
-        # cleared last, so an interrupted run is repeated rather than lost.
-        after_batch=session.commit,
+        # Commit per batch (and lock again): one batch of the write lock at a
+        # time; partial is safe because the markers are cleared last.
+        after_batch=relock,
     )
     if REINDEX_ALL in pending:
-        await recompute_titles(session, rtype, settings.reindex_batch_size)
+        await recompute_titles(session, rtype, settings.reindex_batch_size, after_batch=relock)
 
     await _clear_rebuilt(session, rtype, keys, started_at_schema)
     # Every statement the rebuild issues is core DML, which never fires the
