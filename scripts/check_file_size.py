@@ -4,6 +4,11 @@ Counts physical lines (``len(text.splitlines())``) so a trailing newline
 does not change the total. Exits 1 if any covered file exceeds ``--max``
 (default 300). Exempt paths matching ``--exempt`` globs are skipped.
 
+Files at ``--warn`` lines or more (default 280) but within the cap are listed
+as a WARNING and do not fail the check (#133). They are the ones about to be
+trimmed to fit; the listing is the prompt to split them by responsibility the
+next time they are touched instead.
+
 By default scans the git working tree — tracked files plus untracked files
 that aren't gitignored — so a brand-new oversized file fails the check
 before it's committed (#204). ``--no-git`` walks the filesystem instead
@@ -11,7 +16,7 @@ before it's committed (#204). ``--no-git`` walks the filesystem instead
 
 Usage:
     uv run python scripts/check_file_size.py
-    uv run python scripts/check_file_size.py --max 200
+    uv run python scripts/check_file_size.py --max 200 --warn 180
     uv run python scripts/check_file_size.py --root some/subdir --no-git
 """
 
@@ -21,10 +26,11 @@ import argparse
 import fnmatch
 import subprocess
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
 DEFAULT_MAX_LINES = 300
+DEFAULT_WARN_LINES = 280
 COVERED_SUFFIXES = {".py", ".ts", ".tsx"}
 # The framework repo also exempts packages/ui and packages/i18n; neither
 # exists here. No module source is exempt — that's the point of adopting
@@ -70,19 +76,42 @@ def find_violations(
     relative to ``root`` (so patterns like ``packages/ui/**`` work even
     when ``paths`` are absolute).
     """
+    return _sized(paths, exemptions, root, lambda lines: lines > max_lines)
+
+
+def find_near_cap(
+    paths: Iterable[Path],
+    *,
+    warn_lines: int,
+    max_lines: int,
+    exemptions: Iterable[str],
+    root: Path | None = None,
+) -> list[tuple[Path, int]]:
+    """Return (path, line_count) pairs in ``[warn_lines, max_lines]``, largest first.
+
+    Files over the cap are violations, not warnings, so they are left out here.
+    """
+    return _sized(paths, exemptions, root, lambda lines: warn_lines <= lines <= max_lines)
+
+
+def _sized(
+    paths: Iterable[Path],
+    exemptions: Iterable[str],
+    root: Path | None,
+    keep: Callable[[int], bool],
+) -> list[tuple[Path, int]]:
     exempt_tuple = tuple(exemptions)
-    violations: list[tuple[Path, int]] = []
+    found: list[tuple[Path, int]] = []
     for path in paths:
         if not is_covered(path):
             continue
-        match_target = _relative_for_match(path, root)
-        if is_exempt(match_target, exempt_tuple):
+        if is_exempt(_relative_for_match(path, root), exempt_tuple):
             continue
         lines = count_lines(path)
-        if lines > max_lines:
-            violations.append((path, lines))
-    violations.sort(key=lambda v: v[1], reverse=True)
-    return violations
+        if keep(lines):
+            found.append((path, lines))
+    found.sort(key=lambda v: v[1], reverse=True)
+    return found
 
 
 def _relative_for_match(path: Path, root: Path | None) -> Path:
@@ -131,6 +160,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help=f"max allowed lines per file (default: {DEFAULT_MAX_LINES})",
     )
     parser.add_argument(
+        "--warn",
+        type=int,
+        default=DEFAULT_WARN_LINES,
+        help=f"warn (without failing) at this many lines (default: {DEFAULT_WARN_LINES})",
+    )
+    parser.add_argument(
         "--root",
         type=Path,
         default=Path.cwd(),
@@ -160,15 +195,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         exemptions=exemptions,
         root=args.root,
     )
+    near = find_near_cap(
+        candidates,
+        warn_lines=args.warn,
+        max_lines=args.max,
+        exemptions=exemptions,
+        root=args.root,
+    )
+    if near:
+        print(
+            f"WARNING: {len(near)} file(s) at {args.warn}+ of {args.max} lines"
+            " — split by responsibility when you next touch them:"
+        )
+        _print_listing(near, args.root)
     if not violations:
         print(f"OK: no files exceed {args.max} lines.")
         return 0
     print(f"FAIL: {len(violations)} file(s) exceed {args.max} lines:")
-    width = max(len(str(v[1])) for v in violations)
-    for path, lines in violations:
-        rel = path.relative_to(args.root) if path.is_absolute() else path
-        print(f"  {lines:>{width}}  {rel.as_posix()}")
+    _print_listing(violations, args.root)
     return 1
+
+
+def _print_listing(found: list[tuple[Path, int]], root: Path) -> None:
+    width = max(len(str(v[1])) for v in found)
+    for path, lines in found:
+        rel = path.relative_to(root) if path.is_absolute() else path
+        print(f"  {lines:>{width}}  {rel.as_posix()}")
 
 
 if __name__ == "__main__":
