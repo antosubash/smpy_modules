@@ -126,7 +126,7 @@ def article_router(locale: str) -> APIRouter:
                 # tenant: key it on whatever picks the tenant, like the page.
                 return tenancy.vary_on_tenant(
                     RedirectResponse(public_article_path(moved, locale), status_code=301),
-                    request.app,
+                    request,
                 )
             raise HTTPException(status_code=404, detail="Article not found")
 

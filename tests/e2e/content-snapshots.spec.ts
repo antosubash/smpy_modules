@@ -96,6 +96,16 @@ test.describe('Content snapshots', () => {
     });
     expect((await reverted.json()).title).toBe('Before the snapshot');
 
+    // The page's own history says why it changed (#79): no revision was
+    // written, so the marker is read back from the approved import.
+    const history = await (
+      await page.request.get(`/api/pagebuilder/pages/${created.id}/revisions`)
+    ).json();
+    const [marker] = history.restores as { snapshot_id: number }[];
+    await page.goto(`/pagebuilder/${created.id}/edit`);
+    await page.getByRole('button', { name: /history \(\d+\)/i }).click();
+    await expect(page.getByText(`Restored from snapshot #${marker.snapshot_id}`)).toBeVisible();
+
     await page.request.delete(`/api/pagebuilder/pages/${created.id}`, { headers });
   });
 
@@ -131,6 +141,43 @@ test.describe('Content snapshots', () => {
     expect(survived.status()).toBe(200);
 
     await page.request.delete(`/api/pagebuilder/pages/${orphan.id}`, { headers });
+  });
+
+  test('a page renamed since the snapshot moves back (#205)', async ({ page }) => {
+    await login(page);
+    const headers = await clearPendingImport(page);
+    const original = uniqueSlug('before');
+    const renamed = uniqueSlug('after');
+    const created = await createPage(page, headers, original, 'Renamed later');
+
+    await page.goto(CONTENT);
+    await page.getByRole('button', { name: 'Take snapshot' }).click();
+    await expect(page.getByRole('button', { name: 'Restore…' }).first()).toBeEnabled();
+    const moved = await page.request.put(`/api/pagebuilder/pages/${created.id}`, {
+      headers,
+      data: { slug: renamed },
+    });
+    expect(moved.status()).toBe(200);
+
+    await page.goto(CONTENT);
+    await page.getByRole('button', { name: 'Restore…' }).first().click();
+    await expect(page).toHaveURL(new RegExp(`${REVIEW}$`));
+    // It used to be listed as a new page, and applying it then failed.
+    await expect(page.getByText(`moves back from /${renamed}`)).toBeVisible();
+
+    await page.getByRole('button', { name: /approve & apply/i }).click();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: /^apply$/i })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${CONTENT}$`));
+
+    const restored = await page.request.get(`/api/pagebuilder/pages/${created.id}`, {
+      headers: { Accept: 'application/json' },
+    });
+    expect((await restored.json()).slug).toBe(original);
+
+    await page.request.delete(`/api/pagebuilder/pages/${created.id}`, { headers });
   });
 
   test('only one restore can be staged at a time', async ({ page }) => {

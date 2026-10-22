@@ -12,7 +12,11 @@ is built once at boot, so a later edit of ``multi_tenant`` does not reach it
 until a restart.
 
 * ``SINGLE`` — no ``TenantMiddleware``, or one ``fixed`` to
-  :data:`DEFAULT_TENANT`. Everything runs in :data:`DEFAULT_TENANT`.
+  :data:`DEFAULT_TENANT`. Everything runs in :data:`DEFAULT_TENANT` —
+  *unless something upstream already resolved a tenant for the request*,
+  which always wins (#192): the mode only fills a gap, so a wrong ``SINGLE``
+  (a child app mounted under a multi-tenant parent) fails closed. Detection
+  and the request-time rule live in :mod:`news._tenancy_mode`.
 * ``MULTI`` — every entry point runs in the tenant the framework resolved
   (``request.state.tenant_id``: subdomain for visitors, membership for
   members). The admin surface refuses a request with none (403
@@ -27,12 +31,28 @@ its own ``tenant_id`` predicate (there are none today).
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
-from enum import StrEnum
+from collections.abc import AsyncIterator, Mapping
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
 from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
+from simple_module_hosting.tenancy import tenant_vary as recorded_vary
+
+from news._tenancy_mode import (  # noqa: F401 - tests read the private names here
+    _KNOWN_KWARGS,
+    _PACKAGE,
+    DEFAULT_TENANT,
+    TenancyMode,
+    _fixed_tenant,
+    _framework_mode,
+    _kwargs,
+    _tenant_middleware,
+    _warn_if_unrecognised,
+    detect_mode,
+    request_mode,
+    stray_pins,
+    upstream_tenant,
+)
 
 __all__ = [
     "DEFAULT_TENANT",
@@ -43,6 +63,7 @@ __all__ = [
     "configure",
     "detect_mode",
     "mode_of",
+    "request_vary",
     "resolve_admin",
     "resolve_public",
     "search_tenant",
@@ -52,45 +73,12 @@ __all__ = [
 
 _log = logging.getLogger("simple_module.news")
 
-_PACKAGE = "news"
-
-DEFAULT_TENANT: Final = "default"
-"""The tenant of a single-tenant host, and of every row that predates tenancy.
-
-A constant, not a setting: the ``tenant_id`` migration backfills this literal,
-and records uses the same one, so one host has one notion of it."""
-
 TENANT_REQUIRED: Final = "tenant_required"
 """The 403 detail for an admin request that resolved no tenant."""
 
 _NOT_FOUND: Final = "Article not found"
 """What the public viewer answers for an unknown slug — and, word for word, for
 a request that resolved no tenant."""
-
-
-class TenancyMode(StrEnum):
-    SINGLE = "single"
-    MULTI = "multi"
-
-
-def _tenant_middleware(app: Any) -> Any:
-    """The ``TenantMiddleware`` entry of the built stack, or ``None``."""
-    from simple_module_hosting.middleware import TenantMiddleware
-
-    entries = getattr(app, "user_middleware", ())
-    return next((e for e in entries if getattr(e, "cls", None) is TenantMiddleware), None)
-
-
-def _fixed_tenant(entry: Any) -> str | None:
-    """The tenant a single-tenant host pins every request to, or ``None``."""
-    return (getattr(entry, "kwargs", None) or {}).get("fixed") if entry else None
-
-
-def detect_mode(app: Any) -> TenancyMode:
-    """``MULTI`` iff ``TenantMiddleware`` is in the stack and resolves tenants
-    per request; a ``fixed`` one is a single-tenant host."""
-    entry = _tenant_middleware(app)
-    return TenancyMode.SINGLE if entry is None or _fixed_tenant(entry) else TenancyMode.MULTI
 
 
 def configure(app: Any) -> TenancyMode:
@@ -102,14 +90,16 @@ def configure(app: Any) -> TenancyMode:
     under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
     news's data would sit in another.
     """
-    fixed = _fixed_tenant(_tenant_middleware(app))
-    if fixed is not None and fixed != DEFAULT_TENANT:
+    stray = stray_pins(app)
+    if stray is not None:
         raise RuntimeError(
-            f"news: the host pins every request to default_tenant={fixed!r}, but "
+            f"news: the host pins every request to {stray}, but "
             f"news runs a single-tenant host in {DEFAULT_TENANT!r}. Unset "
-            f"default_tenant, set it to {DEFAULT_TENANT!r}, or turn multi_tenant on"
+            f"default_tenant and any TenantMiddleware(fixed=...), set them to "
+            f"{DEFAULT_TENANT!r}, or turn multi_tenant on"
         )
     mode = detect_mode(app)
+    _warn_if_unrecognised(app)
     services = getattr(app.state, _PACKAGE, None)
     if services is not None:
         services.tenancy = mode
@@ -140,20 +130,61 @@ def tenant_vary(app: Any) -> tuple[str, ...]:
     same Host + URL answers with different tenants' content and a shared
     cache has to key on them too.
     """
-    if mode_of(app) is TenancyMode.SINGLE:
-        return ()
-    header = (getattr(_tenant_middleware(app), "kwargs", None) or {}).get("header")
+    return () if mode_of(app) is TenancyMode.SINGLE else _multi_vary(app)
+
+
+def _multi_vary(app: Any) -> tuple[str, ...]:
+    """``Cookie``, plus the tenant header read straight off the entry's
+    keywords — not through :func:`_kwargs`, whose ``None`` for an unknown
+    keyword would drop the header and fail the cache key open."""
+    kwargs = getattr(_tenant_middleware(app), "kwargs", None)
+    header = kwargs.get("header") if isinstance(kwargs, Mapping) else None
     return ("Cookie", header) if header else ("Cookie",)
 
 
-def vary_on_tenant(response: Any, app: Any) -> Any:
-    """Append :func:`tenant_vary` to *response*'s ``Vary``; a no-op in SINGLE."""
+def request_vary(request: Any) -> tuple[str, ...]:
+    """:func:`tenant_vary` for one request, following the resolvers (#192).
+
+    A tenant upstream chose, or a request-level ``MULTI``, varies like
+    ``MULTI`` even on an app detected ``SINGLE`` (a child mounted under a
+    multi-tenant parent), plus whatever headers the framework recorded as
+    having picked it (its public ``tenant_vary``).
+    """
+    app = request.app
+    tenant = upstream_tenant(request)
+    single = request_mode(request, mode_of(app)) is TenancyMode.SINGLE
+    if single and tenant in (None, DEFAULT_TENANT):
+        return ()
+    recorded = recorded_vary(request)
+    return tuple(dict.fromkeys(_multi_vary(app) + recorded))
+
+
+def vary_on_tenant(response: Any, request: Any) -> Any:
+    """Append :func:`request_vary` to *response*'s ``Vary``; a no-op for a
+    single-tenant host serving its default tenant.
+
+    An app detected ``SINGLE`` that serves another tenant has no cache key it
+    can trust — the parent's resolver is invisible from here — so the
+    response is also marked ``private``, out of every shared cache.
+    """
     listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
     seen = {f.lower() for f in listed}
-    added = [f for f in tenant_vary(app) if f.lower() not in seen]
+    added = [f for f in request_vary(request) if f.lower() not in seen]
     if added:
         response.headers["Vary"] = ", ".join(listed + added)
+    tenant = upstream_tenant(request)
+    if mode_of(request.app) is TenancyMode.SINGLE and tenant not in (None, DEFAULT_TENANT):
+        _make_private(response)
     return response
+
+
+def _make_private(response: Any) -> None:
+    kept = [
+        d.strip()
+        for d in response.headers.get("cache-control", "").split(",")
+        if d.strip() and d.strip().split("=")[0].lower() not in ("public", "private", "s-maxage")
+    ]
+    response.headers["Cache-Control"] = ", ".join(["private", *kept])
 
 
 def mode_of(app: Any) -> TenancyMode:
@@ -164,27 +195,28 @@ def mode_of(app: Any) -> TenancyMode:
     return mode if isinstance(mode, TenancyMode) else detect_mode(app)
 
 
-def _resolved(request: Any) -> str | None:
-    tenant = getattr(request.state, "tenant_id", None)
-    return tenant if is_valid_tenant_id(tenant) else None
-
-
 def resolve_admin(request: Any) -> str:
     """The admin surface's tenant; 403 ``tenant_required`` in MULTI mode
-    when the framework resolved none."""
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    when nothing upstream resolved one.
+
+    A tenant already on the request always wins — the mode only fills a gap
+    (#192), so a wrong ``SINGLE`` binds the parent's tenant, not the default.
+    """
+    tenant = upstream_tenant(request)
+    if tenant is not None:
+        return tenant
+    if request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    tenant = _resolved(request)
-    if tenant is None:
-        raise HTTPException(status_code=403, detail=TENANT_REQUIRED)
-    return tenant
+    raise HTTPException(status_code=403, detail=TENANT_REQUIRED)
 
 
 def resolve_public(request: Any) -> str | None:
-    """The anonymous surface's tenant, or ``None``."""
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    """The anonymous surface's tenant, or ``None``. An upstream tenant wins
+    over the mode, as in :func:`resolve_admin`."""
+    tenant = upstream_tenant(request)
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    return _resolved(request)
+    return tenant
 
 
 async def bind_admin(request: Request) -> AsyncIterator[str]:
@@ -211,7 +243,18 @@ async def bind_public(request: Request) -> AsyncIterator[str]:
 
 
 def search_tenant() -> str:
-    """The tenant a cross-module read runs in: the bound one, else the
-    single-tenant host's. A host with multi_tenant off binds none, and
-    an unfiltered read there would be every tenant's rows."""
-    return current_tenant_id.get() or DEFAULT_TENANT
+    """The tenant a cross-module read runs in: the one bound for this request,
+    else 403 ``tenant_required`` (#210).
+
+    Pagebuilder's tables are filtered only while a tenant is bound, so the
+    read pins one itself. The bound tenant is :func:`bind_admin`'s, which
+    already applied :func:`resolve_admin`'s rule — upstream tenant first,
+    :data:`DEFAULT_TENANT` only for a genuinely single-tenant request. With
+    nothing bound there is no request to tell the mode from, and falling back
+    to the default would read that tenant's pages and media on a multi-tenant
+    host, so it refuses instead.
+    """
+    tenant = current_tenant_id.get()
+    if is_valid_tenant_id(tenant):
+        return tenant
+    raise HTTPException(status_code=403, detail=TENANT_REQUIRED)

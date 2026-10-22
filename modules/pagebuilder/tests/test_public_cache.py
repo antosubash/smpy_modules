@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
-from pagebuilder.public_cache import cache_control, etag_for, viewer_key
+from pagebuilder.public_cache import cache_control, etag_for, signed_in, viewer_key
 from pagebuilder.settings import PagebuilderSettings
 
 _WHEN = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
@@ -48,15 +48,19 @@ def test_the_viewer_key_does_not_leak_the_user_id() -> None:
     assert "alice" not in key
 
 
-def test_a_signed_in_response_is_private() -> None:
-    policy = cache_control(_request(user=SimpleNamespace(id=7)), PagebuilderSettings())  # type: ignore[arg-type]
-    assert policy == "private, no-store"
+def test_signed_in_is_whether_the_request_carries_a_user() -> None:
+    assert signed_in(_request(user=SimpleNamespace(id=7)))  # type: ignore[arg-type]
+    assert not signed_in(_request())  # type: ignore[arg-type]
 
 
-def test_an_anonymous_response_stays_public() -> None:
+def test_the_anonymous_policy_is_public() -> None:
     settings = PagebuilderSettings(public_cache_max_age=60, public_cache_swr=600)
-    policy = cache_control(_request(), settings)  # type: ignore[arg-type]
-    assert policy == "public, max-age=60, stale-while-revalidate=600"
+    assert cache_control(settings) == "public, max-age=60, stale-while-revalidate=600"
+
+
+def test_no_stale_while_revalidate_when_it_is_off() -> None:
+    settings = PagebuilderSettings(public_cache_max_age=60, public_cache_swr=0)
+    assert cache_control(settings) == "public, max-age=60"
 
 
 async def _publish(client: AsyncClient, slug: str = "hello") -> None:

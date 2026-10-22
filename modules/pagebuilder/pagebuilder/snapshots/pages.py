@@ -7,8 +7,8 @@ the whole list at once and notice what is missing from it.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, overload
 
 from pagebuilder import locales
 from pagebuilder.models import Page, PageStatus
@@ -148,3 +148,45 @@ def apply_payload(page: Page, payload: dict[str, Any]) -> None:
     for field in _DATETIME_FIELDS:
         raw = payload.get(field)
         setattr(page, field, datetime.fromisoformat(raw) if raw else None)
+
+
+@overload
+def as_utc(value: datetime) -> datetime: ...
+@overload
+def as_utc(value: None) -> None: ...
+def as_utc(value: datetime | None) -> datetime | None:
+    # SQLite hands back naive datetimes for timezone-aware columns.
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=UTC)
+
+
+def page_state(page: Page) -> tuple[Any, ...]:
+    """Everything a restore can write onto *page*, for a before/after compare.
+
+    Read at apply time, so the restore's audit record says what the apply
+    actually changed rather than what the plan predicted when it was staged —
+    a page edited between staging and approval is overwritten even though its
+    plan entry said "unchanged". The slug is part of it because a restore
+    moves a renamed page back: that is a write even when the content is
+    byte-identical.
+    """
+    return (
+        page.slug,
+        page.status,
+        page.parent_id,
+        page.deleted_at is None,
+        *(getattr(page, field) for field in PAGE_FIELDS),
+        *(as_utc(getattr(page, field)) for field in _DATETIME_FIELDS),
+    )
+
+
+def page_identity(page: Page) -> dict[str, Any]:
+    """What a restore's audit record names a page by: its id *and* birth.
+
+    The id alone is not enough. SQLite hands a purged page's id to the next
+    insert, so a page made by hand after a restore-created one was purged
+    would inherit its marker; no two rows share both id and ``created_at``.
+    """
+    created = as_utc(page.created_at)
+    return {"id": page.id, "created_at": created.isoformat() if created else None}

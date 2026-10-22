@@ -990,7 +990,9 @@
     "restore_description": "Alles Ungespeicherte im Editor wird durch die Version „{event}“ vom {when} überschrieben. Die Live-Seite bleibt unverändert, bis Sie erneut veröffentlichen.",
     "restore_title": "Aktuellen Entwurf ersetzen?",
     "restore_trigger": "Als Entwurf wiederherstellen",
-    "restored": "Version als Entwurf wiederhergestellt."
+    "restored": "Version als Entwurf wiederhergestellt.",
+    "restored_created": "Die Wiederherstellung hat diese Seite angelegt.",
+    "restored_from_snapshot": "Aus Snapshot #{id} wiederhergestellt"
   },
   "import_review": {
     "applied": "Snapshot wiederhergestellt",
@@ -1191,6 +1193,7 @@
     "redirect_count_other": "{count} Weiterleitungen",
     "redirects": "Weiterleitungen",
     "redirects_dropped": "{count} verworfen – Ziel fehlt",
+    "renamed_from": "{blocks} · zieht von /{slug} zurück",
     "revived": "{blocks} · aus dem Papierkorb wiederhergestellt",
     "site_layout": "Website-Layout",
     "source_manual": "Hier erstellt",

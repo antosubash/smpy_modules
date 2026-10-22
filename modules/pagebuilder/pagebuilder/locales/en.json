@@ -990,7 +990,9 @@
     "restore_description": "Everything unsaved in the editor is overwritten by the \"{event}\" revision from {when}. The live page is untouched until you publish again.",
     "restore_title": "Replace the current draft?",
     "restore_trigger": "Restore as draft",
-    "restored": "Revision restored to draft."
+    "restored": "Revision restored to draft.",
+    "restored_created": "The restore created this page.",
+    "restored_from_snapshot": "Restored from snapshot #{id}"
   },
   "import_review": {
     "applied": "Snapshot restored",
@@ -1191,6 +1193,7 @@
     "redirect_count_other": "{count} redirects",
     "redirects": "Redirects",
     "redirects_dropped": "{count} dropped — target missing",
+    "renamed_from": "{blocks} · moves back from /{slug}",
     "revived": "{blocks} · revived from trash",
     "site_layout": "Site layout",
     "source_manual": "Taken here",

@@ -12,12 +12,14 @@ import ast
 import pathlib
 
 import pytest
+from fastapi import HTTPException
 from news import search_service
 from news.integrations import pagebuilder as pb
+from news.tenancy import TENANT_REQUIRED
 from simple_module_db import tenant_context
 
 #: Unbound: the suite otherwise binds "default", and each test here states the
-#: tenant it runs in — none (a single-tenant host) or one it binds itself.
+#: tenant it runs in — the one it binds itself, or none (which is refused).
 pytestmark = [
     pytest.mark.skipif(not pb.available(), reason="pagebuilder is an optional extra"),
     pytest.mark.unbound_tenant,
@@ -51,12 +53,13 @@ async def _page(db, slug: str, *, tenant: str = "default", published: bool = Tru
 
 
 async def test_another_tenants_media_is_not_searched(db) -> None:
-    """No tenant bound is a single-tenant host: the framework filters nothing,
-    so the search must pin itself to the default tenant."""
+    """A single-tenant request binds the default tenant (``bind_admin``); the
+    framework still filters nothing there, so the search pins it itself."""
     ours = await _asset(db, "basalt-ours.png")
     await _asset(db, "basalt-theirs.png", tenant="other")
 
-    results = await search_service.search(db, "basalt")
+    with tenant_context("default"):
+        results = await search_service.search(db, "basalt")
 
     assert [(hit.id, hit.title) for hit in results.media] == [(ours.id, "basalt-ours.png")]
     assert results.media[0].subtitle == "image/png"
@@ -80,16 +83,20 @@ async def test_a_bound_tenant_sees_only_its_own_media_and_pages(db) -> None:
     assert results.page_total == 1
 
 
-async def test_a_strict_session_with_no_tenant_finds_no_media(db, db_state) -> None:
+@pytest.mark.parametrize("section", ["pages", "media"])
+async def test_nothing_bound_is_refused_not_read_as_the_default(db, section) -> None:
+    """#210: with no tenant bound the seam cannot tell a single-tenant host
+    from a multi-tenant one, so it refuses rather than read the default's."""
     await _asset(db, "schist.png")
-    db_state.tenant_strict = True
-    try:
-        hits, total = await pb.search_media(db, "%schist%", limit=10)
-    finally:
-        db_state.tenant_strict = False
-
-    assert hits == []
-    assert total == 0
+    await _page(db, "schist")
+    call = (
+        pb.search_media(db, "%schist%", limit=10)
+        if section == "media"
+        else pb.search_pages(db, "%schist%", include_drafts=True, limit=10)
+    )
+    with pytest.raises(HTTPException) as refused:
+        await call
+    assert (refused.value.status_code, refused.value.detail) == (403, TENANT_REQUIRED)
 
 
 async def test_drafts_are_left_out_unless_asked_for(db) -> None:
@@ -98,8 +105,9 @@ async def test_drafts_are_left_out_unless_asked_for(db) -> None:
     published = await _page(db, "marble-live")
     await _page(db, "marble-draft", published=False)
 
-    editor = await search_service.search(db, "marble")
-    reader = await search_service.search(db, "marble", include_drafts=False)
+    with tenant_context("default"):
+        editor = await search_service.search(db, "marble")
+        reader = await search_service.search(db, "marble", include_drafts=False)
 
     assert editor.page_total == 2
     assert [hit.id for hit in reader.pages] == [published.id]

@@ -131,7 +131,7 @@ async def render_public_page(
         if moved_to is not None:
             target = locales.public_path(prefix, moved_to, locale)
             # A 301 is cacheable by default; key it on what picks the tenant.
-            return vary_on_tenant(RedirectResponse(target, status_code=301), request.app)
+            return vary_on_tenant(RedirectResponse(target, status_code=301), request)
         raise HTTPException(status_code=404, detail="Page not found")
 
     layout = await LayoutService(db).get()
@@ -147,16 +147,19 @@ async def render_public_page(
     )
     # Signed-in or not, and in which UI language, decide the bytes (#94). A
     # signed-in page is never kept, so it gets no validator and no 304.
-    cache_control = public_cache.cache_control(request, settings)
     signed_in = public_cache.signed_in(request)
+    cache_control = (
+        public_cache.SIGNED_IN_CACHE_CONTROL if signed_in else public_cache.cache_control(settings)
+    )
 
     def apply_headers(response: Response) -> Response:
         if not signed_in:
             response.headers["ETag"] = etag
         response.headers["Vary"] = public_cache.VARY
-        # On a multi-tenant host the tenant can come from the session, not the Host.
-        vary_on_tenant(response, request.app)
         response.headers["Cache-Control"] = cache_control
+        # On a multi-tenant host the tenant can come from the session, not the
+        # Host. After Cache-Control: it may mark the response private (#192).
+        vary_on_tenant(response, request)
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
         response.headers["Content-Language"] = page.locale

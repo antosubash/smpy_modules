@@ -132,7 +132,9 @@ ROLE_AUTHOR = "news-author"
 ROLE_VIEWER = "news-viewer"
 
 
-async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI, Any]:
+async def _build_app(
+    user: Any, *, mount_public: bool = False, db_file: Path | None = None
+) -> tuple[FastAPI, Any]:
     module = NewsModule()
     app = FastAPI()
 
@@ -142,7 +144,7 @@ async def _build_app(user: Any, *, mount_public: bool = False) -> tuple[FastAPI,
     app.include_router(api_router)
     app.include_router(view_router)
 
-    db_state = await make_db_state()
+    db_state = await make_db_state(file=db_file)  # a file: racing requests (#209)
 
     registry = PermissionRegistry()
     registry.add_group("News", [PERM_VIEW, PERM_EDIT, PERM_PUBLISH])
@@ -207,8 +209,10 @@ async def db(db_state) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-async def _client(user: Any, *, mount_public: bool = False) -> AsyncIterator[AsyncClient]:
-    app, state = await _build_app(user, mount_public=mount_public)
+async def _client(
+    user: Any, *, mount_public: bool = False, db_file: Path | None = None
+) -> AsyncIterator[AsyncClient]:
+    app, state = await _build_app(user, mount_public=mount_public, db_file=db_file)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]

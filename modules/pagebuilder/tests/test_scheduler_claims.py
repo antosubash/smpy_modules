@@ -16,6 +16,8 @@ statement boundary instead — both replicas take their shortlist, one claims an
 flips, then the other claims — which establishes the half that is ours: winning
 a claim makes the row stop matching, a loser flips nothing, an abandoned claim
 goes back with its transaction, and a refused transition hands its claim back.
+Genuinely concurrent ticks, on separate connections to a file database, are in
+``test_scheduler_claim_edges.py`` (#209).
 """
 
 from __future__ import annotations

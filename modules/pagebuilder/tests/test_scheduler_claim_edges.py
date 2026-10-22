@@ -1,5 +1,5 @@
 """The claim's edges: what changes in the gap, which windows retire, which
-tenant a claim can reach, and — on Postgres — two genuinely concurrent ticks.
+tenant a claim can reach, and two genuinely concurrent ticks.
 
 Split from ``test_scheduler_claims.py`` to keep both under the line cap.
 """
@@ -12,9 +12,9 @@ from datetime import timedelta
 import pytest
 from page_helpers import EARLIER, NOW, PUBLISH_CLAIM, make_page, publish_revisions
 from pagebuilder.models import Page, PageStatus
-from pagebuilder.service import PagesService
+from pagebuilder.service import PagesService, _workflow
 from pagebuilder.service._claims import claim, due_candidates
-from pg_support import USING_POSTGRES, make_db_state
+from pg_support import make_db_state
 from simple_module_db import tenant_context
 from sqlalchemy import select
 
@@ -106,20 +106,60 @@ async def test_a_claim_cannot_reach_another_tenants_page() -> None:
         await state.engine.dispose()
 
 
-@pytest.mark.skipif(
-    not USING_POSTGRES,
-    reason="SQLite's StaticPool shares one connection, so two ticks are not two "
-    "transactions; set SM_TEST_DATABASE_URL=postgresql+asyncpg://…",
-)
-async def test_two_concurrent_ticks_publish_once() -> None:
+async def test_two_concurrent_ticks_publish_once(tmp_path) -> None:
     """The half the staged tests cannot prove: the engine serialising the two
     claims. Each tick is its own session and connection, committing at the end,
-    and the loser blocks on the winner's row lock then matches nothing."""
-    state = await make_db_state()
+    and the loser blocks on the winner's lock — the row lock on Postgres,
+    SQLite's write lock on a file database (#209) — then matches nothing."""
+    state = await make_db_state(file=tmp_path / "ticks.db")
     factory = state.session_factory
     try:
         async with factory() as db:
             page_id = (await make_page(db, "stampede", publish_at=EARLIER)).id
+            await db.commit()
+
+        async def tick() -> int:
+            async with factory() as db:
+                flipped = await PagesService(db).process_due(NOW)
+                await db.commit()
+                return len(flipped)
+
+        assert sorted(await asyncio.gather(tick(), tick(), tick())) == [0, 0, 1]
+        async with factory() as db:
+            assert await publish_revisions(db, page_id) == 1
+    finally:
+        await state.engine.dispose()
+
+
+async def test_ticks_that_all_shortlisted_the_row_publish_it_once(tmp_path, monkeypatch) -> None:
+    """The claim itself, with every tick past the shortlist before any claims.
+
+    On SQLite the test above never reaches the claim: each tick's first
+    statement, ``retire_missed_windows``, is an ``UPDATE``, so it takes the
+    database's write lock and the next tick waits for the whole first tick to
+    commit, then shortlists nothing. Here the retire step is skipped (it has
+    nothing to retire) and the ticks wait at a barrier once each has read its
+    shortlist, so three ticks hold the same due row and the conditional
+    ``UPDATE`` alone decides who flips it — on either backend.
+    """
+    state = await make_db_state(file=tmp_path / "claims.db")
+    factory = state.session_factory
+    barrier = asyncio.Barrier(3)
+
+    async def nothing_to_retire(*_args, **_kwargs) -> int:
+        return 0
+
+    async def shortlist_then_wait(db, *, column, **kwargs):
+        rows = await due_candidates(db, column=column, **kwargs)
+        if column is Page.publish_at:
+            await asyncio.wait_for(barrier.wait(), timeout=10)
+        return rows
+
+    monkeypatch.setattr(_workflow, "retire_missed_windows", nothing_to_retire)
+    monkeypatch.setattr(_workflow, "due_candidates", shortlist_then_wait)
+    try:
+        async with factory() as db:
+            page_id = (await make_page(db, "shortlisted", publish_at=EARLIER)).id
             await db.commit()
 
         async def tick() -> int:

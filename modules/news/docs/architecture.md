@@ -113,7 +113,8 @@ while it is bound:
 - `bind_public` — every public router. SINGLE → `default`; MULTI → the
   resolved tenant, else 404 with the same message as an unknown slug.
 - `search_tenant()` — cross-module reads of pagebuilder's tables pin
-  `tenant_id` explicitly, falling back to `default`.
+  `tenant_id` explicitly: the tenant `bind_admin` bound, else **403
+  `tenant_required`** — never a fallback to `default` (#210).
 
 Public responses add `Vary: Cookie` (plus the tenant header) in MULTI mode
 via `vary_on_tenant`, since the same URL can serve different tenants.

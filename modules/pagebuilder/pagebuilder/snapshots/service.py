@@ -38,8 +38,9 @@ from pagebuilder.snapshots.archive import BundleError, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BLOBS_DIR, BlobStore, tenant_store
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME, is_readable
+from pagebuilder.snapshots.match import RestoreConflictError, match_live
 from pagebuilder.snapshots.media_match import preview_urls
-from pagebuilder.snapshots.plan import build_plan
+from pagebuilder.snapshots.plan import build_plan, read_documents
 
 _SNAPSHOTS_DIR = "snapshots"
 _PRE_RESTORE_NOTE = "Automatic snapshot taken before restoring"
@@ -64,9 +65,7 @@ class SnapshotService:
         return self.root / _SNAPSHOTS_DIR / str(snapshot_id)
 
     async def list(self) -> list[ContentSnapshot]:
-        result = await self.db.execute(
-            select(ContentSnapshot).order_by(ContentSnapshot.id.desc())
-        )
+        result = await self.db.execute(select(ContentSnapshot).order_by(ContentSnapshot.id.desc()))
         return list(result.scalars().all())
 
     async def get(self, snapshot_id: int) -> ContentSnapshot:
@@ -84,16 +83,12 @@ class SnapshotService:
     async def take(
         self, note: str | None = None, source: SnapshotSource = SnapshotSource.MANUAL
     ) -> ContentSnapshot:
-        snapshot = ContentSnapshot(
-            note=note, source=source, format_version=FORMAT_VERSION
-        )
+        snapshot = ContentSnapshot(note=note, source=source, format_version=FORMAT_VERSION)
         self.db.add(snapshot)
         await self.db.flush()
 
         try:
-            result = await capture(
-                self.db, self.settings, self.dir_for(snapshot.id), self.blobs
-            )
+            result = await capture(self.db, self.settings, self.dir_for(snapshot.id), self.blobs)
             snapshot.manifest = result.manifest
             snapshot.size_bytes = result.size_bytes
             for row in result.media:
@@ -142,6 +137,7 @@ class SnapshotService:
             raise
 
         snapshot.manifest = manifest
+        snapshot.format_version = manifest["format_version"]  # the bundle's, not ours
         snapshot.size_bytes = len(data)
         for bundle_name, entry in index.items():
             self.db.add(
@@ -198,9 +194,7 @@ class SnapshotService:
         # Reference-counted: only bytes no surviving snapshot names are dropped.
         result = await self.db.execute(select(SnapshotMedia.sha256))
         # Off the event loop: a scan of the whole shared blob store.
-        await asyncio.to_thread(
-            self.blobs.delete_unreferenced, keep={sha for (sha,) in result}
-        )
+        await asyncio.to_thread(self.blobs.delete_unreferenced, keep={sha for (sha,) in result})
 
     async def pending(self) -> PendingImport | None:
         result = await self.db.execute(
@@ -222,8 +216,7 @@ class SnapshotService:
         if not is_readable(snapshot.format_version):
             raise HTTPException(
                 status_code=422,
-                detail=f"Snapshot uses unsupported format version "
-                f"{snapshot.format_version}",
+                detail=f"Snapshot uses unsupported format version {snapshot.format_version}",
             )
         bundle = self.dir_for(snapshot.id)
         rows = await self.media_rows(snapshot.id)
@@ -233,18 +226,19 @@ class SnapshotService:
         # declines to reuse, telling an approver a page is unchanged while
         # its image is about to change underneath them.
         name_to_url = await preview_urls(self.db, self.settings, rows)
-        plan = await build_plan(self.db, bundle, name_to_url)
+        try:
+            plan = await build_plan(self.db, bundle, name_to_url)
+        except RestoreConflictError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
         staged = PendingImport(snapshot_id=snapshot.id, plan=plan)
         self.db.add(staged)
         try:
             await self.db.flush()
         except IntegrityError as exc:
-            # The check above is not atomic with this insert: two concurrent
-            # requests can both see no pending import. The partial unique
-            # index on `status` is the real backstop — this turns the race's
-            # loser into the same 409 the check above gives the common case,
-            # instead of a raw 500.
+            # The check above is not atomic with this insert; the partial
+            # unique index on `status` is the real backstop, and this turns the
+            # race's loser into the same 409 instead of a raw 500.
             await self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -275,11 +269,15 @@ class SnapshotService:
 
     async def approve(self, import_id: int, actor: str | None) -> dict[str, Any]:
         staged = await self._decide(import_id, actor, ImportStatus.APPROVED)
-        # Before anything is overwritten, so the previous state is one click
-        # away rather than gone.
-        pre_restore = await self.take(
-            _PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE
-        )
+        # Re-run, not trusted from staging (pages move in between), and before
+        # the pre-restore snapshot so a refusal writes nothing; it stays pending.
+        try:
+            documents = await read_documents(self.dir_for(staged.snapshot_id))
+            await match_live(self.db, documents.pages)
+        except RestoreConflictError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        # Before anything is overwritten, so the previous state is one click away.
+        pre_restore = await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
 
         try:
             snapshot = await self.get(staged.snapshot_id)
@@ -291,6 +289,9 @@ class SnapshotService:
                 self._index_for(snapshot.id),
                 note=f"Restored snapshot #{snapshot.id}",
             )
+            # By page id, on the import's own audit row: `history.py` reads
+            # the markers from here. Reassigned so the JSON column sees it.
+            staged.plan = {**(staged.plan or {}), "applied": result.pop("applied")}
             await self.db.flush()
         except Exception:
             # `take` guards its own capture; this covers the apply below.

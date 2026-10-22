@@ -41,10 +41,15 @@ def _shared() -> Any:
 _pg = _shared()
 
 arm_reset = _pg.arm_reset
+USING_POSTGRES: bool = _pg.USING_POSTGRES
 
 
-async def make_db_state() -> Any:
-    """A ``DatabaseState`` holding news' tables — and pagebuilder's, if installed."""
+async def make_db_state(*, file: Path | None = None) -> Any:
+    """A ``DatabaseState`` holding news' tables — and pagebuilder's, if installed.
+
+    ``file`` gives SQLite a file database with a connection per session, for a
+    test that races transactions; see the shared ``make_db_state``.
+    """
     from news.models import Base as NewsBase
 
     metadatas = [NewsBase.metadata]
@@ -54,4 +59,4 @@ async def make_db_state() -> Any:
         pass
     else:
         metadatas.insert(0, PagebuilderBase.metadata)
-    return await _pg.make_db_state(*metadatas)
+    return await _pg.make_db_state(*metadatas, file=file)

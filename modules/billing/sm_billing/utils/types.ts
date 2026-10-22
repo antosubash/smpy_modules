@@ -93,4 +93,6 @@ export interface AdminCommon {
   can_manage: boolean;
   provider: string;
   checkout_available: boolean;
+  /** Why a chosen ``stripe`` fell back to ``manual``; "" when it did not. */
+  provider_error: string;
 }
