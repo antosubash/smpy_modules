@@ -9,6 +9,7 @@ import pytest
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub, make_tenant, store_settings
 from simple_module_db import current_tenant_id
+from simple_module_test.database import is_sqlite
 from sm_billing import scheduler, startup
 from sm_billing.contracts.provider import SubscriptionSnapshot
 from sm_billing.models import Subscription
@@ -16,6 +17,24 @@ from sqlalchemy import select
 from tenants.constants import TenantStatus
 
 HOUR = timedelta(hours=1)
+
+
+@pytest.fixture
+def settings(settings, tmp_path):
+    """A file database on SQLite, so each session gets its own connection (#207).
+
+    In-memory aiosqlite runs on SQLAlchemy's ``StaticPool``: one connection
+    shared by every session. Two ticks interleaved on it are not two
+    transactions — when one tick's session closes, its reset-on-return
+    ``ROLLBACK`` also undoes the other tick's claim ``UPDATE``, which has
+    already reported ``rowcount == 1``; the row is stale again and the second
+    tick claims it too. A file database pools real connections, so a claim is
+    serialised by SQLite's write lock (``busy_timeout``) as it is on a host.
+    Postgres (``SM_TEST_DATABASE_URL``) already gives each session its own.
+    """
+    if is_sqlite(settings.database_url):
+        settings.database_url = f"sqlite+aiosqlite:///{tmp_path / 'billing.db'}"
+    return settings
 
 
 class BindingProvider(FakeProvider):
