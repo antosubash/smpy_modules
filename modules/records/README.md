@@ -378,7 +378,6 @@ variables are read. Configure on the Settings screen or with
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
 | `menu_refresh_seconds` | 5 | no |
-| `admin_header_tenant` | `false` | no |
 
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
@@ -666,15 +665,15 @@ setting alone does not install `TenantMiddleware`. From there:
   legacy rows in `default` belong to no organisation — see
   [Assigning tenants to users](docs/operations.md#assigning-tenants-to-users)
   before switching a populated install.
-- A user with no active tenant (no membership) — the bootstrap admin included — gets `403` with
+- The admin screens and API work in the tenant the framework resolved for
+  the request — the user's active organisation — exactly as pagebuilder,
+  news and billing do (#112), so a member edits records in the same
+  organisation as their pages and articles. A user with no active tenant (no
+  membership) — the bootstrap admin included — gets `403` with
   `"code": "tenant_required"` on every records admin screen, even with a
-  header sent: records never guesses. The `admin_header_tenant` setting
-  (default off) lets a user holding `admin` with no tenant of their own act
-  in the tenant their `X-Tenant-ID` header names — **from an API or headless
-  client that can send that header, only**. The browser admin screens never
-  send it, so for such a user every screen stays `403` with the setting on;
-  the fix for a person working in the browser is to make them a member of an
-  organisation.
+  header sent: records never guesses, and the framework never lets a
+  signed-in user pick a tenant they are not a member of by header. The fix is
+  to make them a member of an organisation.
 - Anonymous readers and headless clients name their tenant with that header
   (or, where the tenants module's `subdomain_base` is set, by subdomain);
   with none, the public API answers its ordinary `404`, the same one an
@@ -838,15 +837,41 @@ An undeclared name is a `422` naming what *is* declared. Omitting it — or
 sending `null` — puts the type in the shared tables, which is what every type
 created before this existed carries.
 
-**A type cannot be moved between collections.** `PUT /api/records/types/{key}`
-answers a changed `collection` with a `409` and the sentence *"moving a
-populated type between collections is not supported"*. It would mean copying
-the type's records, revisions and index rows into other tables and re-pointing
-every reference at them, with no rollback story; the honest answer is to export
-the type, delete it and re-import under a new one. An echo of the current value
-is accepted, so a client that sends back the whole type it just read still
-saves. The type editor shows the collection read-only once the type exists and
-offers the declared set only on the "new type" form.
+**Moving a type between collections** (#82) is `PUT /api/records/types/{key}`
+with a changed `collection` (`null` is the shared tables). The type's records,
+trash included, their revisions and their six kinds of index rows are copied
+into the target set and deleted from the source **inside the request's one
+transaction** — a failure anywhere rolls the whole move back, which is the
+rollback story. Nothing else has to change, and that is what makes the move
+safe: a relation names its target by `(uuid, type)` and both survive, so
+inbound references, `?expand=`, the referrers panel and `restrict` follow the
+type to its new tables untouched; the type's own outbound references are index
+rows and move with it; the reduce table, type revisions, settings and
+permissions are global and keyed by type id. What changes is every row id, so
+an `?after=` cursor taken before the move should be dropped, and a host
+reading the tables directly gets a `RecordTypeMoved` event after the commit.
+
+The move is refused before a row is written when the target is undeclared
+(`422`), and with a `409` when `expected_version` is stale, when it is sent
+together with a schema change (two requests), while a reindex of the type is
+outstanding, or when one of its uuids is already in the target set. An echo of
+the current value is not a move, so a client that sends back the whole type it
+just read still saves.
+
+**Concurrent writes.** Two moves of one type cannot both run: the second fails
+the version guard (`409`). A record write that loaded the type before a move
+committed is refused with a `409` to retry, because the type lock re-reads
+`collection` once it is held — otherwise it would write into the tables the
+type just left. The same holds for every lifecycle operation: a trash, restore,
+purge or empty-trash takes the type lock before touching a row (a trash locks
+every type its `cascade`/`set_null` relations can reach, in id order), so one
+racing a move either runs entirely before it — and is moved with the type — or
+waits for it and is refused with a `409`; a purge never reports success for a
+record the move carried away. A record already purged or restored by a
+concurrent request is a `404`/`409`, not a second event. A `mode=update` type import refuses a changed
+`collection` with a `409` — a file must not move a type on the side. The type
+editor shows the collection read-only once the type exists: a move is an API
+operation, not a by-product of saving the form.
 
 ### What stays global
 
@@ -1407,7 +1432,8 @@ class MyModule(ModuleBase):
 ```
 
 The set is `RecordCreated`, `RecordUpdated`, `RecordTrashed`,
-`RecordRestored`, `RecordPurged`, `RecordTypeChanged` and `RecordTypeDeleted`
+`RecordRestored`, `RecordPurged`, `RecordTypeChanged`, `RecordTypeDeleted`
+and `RecordTypeMoved`
 — see
 [docs/architecture.md § Extension points](docs/architecture.md#extension-points)
 for what each carries and why. Seven properties are worth knowing before you

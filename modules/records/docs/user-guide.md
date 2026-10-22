@@ -247,7 +247,7 @@ and both disabled with *"Add a field first."* until there is one.
 | **Translatable** | *"Records can exist in several languages ({locales}); each translation is its own record with its own slug."* Only meaningful when the install is configured with more than one content language. |
 | **Show in sidebar** | Adds the type's own entry to the admin sidebar. Off by default. Not a schema change: no classification, no dry run, no revision. **On a multi-tenant host this control is replaced by a note** — see [Which tenant you are working in](#which-tenant-you-are-working-in). |
 | **Allowed roles** | Narrows who may use this type's records. See below. |
-| **Collection** | Which table set holds this type's records. **Chosen once** — *"A type can't be moved between collections once it is created."* The default is **Shared tables**. Only collections the host declared in code appear here. |
+| **Collection** | Which table set holds this type's records. Chosen when the type is created and read-only in this form afterwards — moving a type copies every record, so it is done through the API (*"Moving this type to another collection copies all of its records into the new tables. That is done through the API, not from this form."*). The default is **Shared tables**. Only collections the host declared in code appear here. |
 
 Turning **Translatable** *off* while records exist in another language is
 refused with a count: those records would stay in the database, keep their slug

@@ -232,20 +232,6 @@ class RecordsSettings(BootSettings):
     owned it — from a support ticket into an alert.
     """
 
-    admin_header_tenant: bool = False
-    """Multi-tenant hosts only: let a user holding ``admin`` who has **no tenant
-    of their own** work in the tenant their ``X-Tenant-ID`` header names.
-
-    Off, such a user gets a 403 ``tenant_required`` on every records screen,
-    header or not: the framework lets any tenant-less user pick a tenant by
-    header, and records refuses to follow it by default. Turn it on for an
-    operator's API or headless client that administers several tenants.
-    **It does nothing for a browser:** the admin screens never send the header,
-    so a tenant-less user there stays 403 whatever this says — assign the user
-    a tenant instead. Ignored on a single-tenant host, where everything is the
-    ``default`` tenant.
-    """
-
     def clamp_page_size(self, requested: int | None) -> int:
         """The page size a list endpoint actually uses.
 

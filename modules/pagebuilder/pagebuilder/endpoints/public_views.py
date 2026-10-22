@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import locales, public_cache, redirects, site_nav
 from pagebuilder.deps import get_settings
+from pagebuilder.html_lang import set_html_lang
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.og_image import og_image
 from pagebuilder.service import PagesService
@@ -170,32 +171,36 @@ async def render_public_page(
     canonical = page.canonical_url or _absolute_page_url(
         request, settings, slug, prefix, page.locale
     )
-    return apply_headers(
-        await inertia.render(
-            _PAGE_PUBLIC,
-            {
-                # The SEO panel promises "blank uses the page title".
-                "title": (page.meta_title or "").strip() or page.title,
-                "data": page.published_data,
-                "meta_description": page.meta_description,
-                "og_image": og_image(
-                    page.og_image, page.published_data, _public_base_url(request, settings)
-                ),
-                "canonical_url": canonical,
-                "og_url": canonical,
-                "index_in_search": page.index_in_search,
-                "json_ld": page.json_ld,
-                "site_name": settings.site_name,
-                "twitter_handle": settings.twitter_handle,
-                "locale": page.locale,
-                "alternates": await _alternates(
-                    db, request, settings, page.translation_group
-                ),
-                **public_layout_props(layout),
-                "site_nav": nav,
-            },
-        )
+    rendered = await inertia.render(
+        _PAGE_PUBLIC,
+        {
+            # The SEO panel promises "blank uses the page title".
+            "title": (page.meta_title or "").strip() or page.title,
+            "data": page.published_data,
+            "meta_description": page.meta_description,
+            "og_image": og_image(
+                page.og_image, page.published_data, _public_base_url(request, settings)
+            ),
+            "canonical_url": canonical,
+            "og_url": canonical,
+            "index_in_search": page.index_in_search,
+            "json_ld": page.json_ld,
+            "site_name": settings.site_name,
+            "twitter_handle": settings.twitter_handle,
+            "locale": page.locale,
+            "alternates": await _alternates(
+                db, request, settings, page.translation_group
+            ),
+            **public_layout_props(layout),
+            "site_nav": nav,
+        },
     )
+    # A full document carries the host shell, whose `lang` is the host's. An
+    # Inertia visit is a JSON page object with no shell to rewrite, and the
+    # page's own text could hold something shaped like the tag.
+    if variant == "html":
+        set_html_lang(rendered, page.locale)
+    return apply_headers(rendered)
 
 
 def locale_router(locale: str) -> APIRouter:

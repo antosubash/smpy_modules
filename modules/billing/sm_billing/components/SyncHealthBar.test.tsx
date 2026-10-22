@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
+
+import { updateI18n } from '@simple-module-py/i18n';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { SyncHealth } from '../utils/types';
 import { SyncHealthBar } from './SyncHealthBar';
 
@@ -18,6 +20,23 @@ const healthy: SyncHealth = {
 const render = (health: SyncHealth) => renderToStaticMarkup(<SyncHealthBar health={health} />);
 
 describe('SyncHealthBar', () => {
+  afterEach(() => updateI18n({ locale: 'en', messages: {} }));
+
+  it('formats the oldest sync in the console locale (#189)', () => {
+    expect(render({ ...healthy, oldest_synced_at: '2026-01-02T12:00:00Z' })).toContain(
+      'Jan 2, 2026',
+    );
+    updateI18n({ locale: 'de', messages: {} });
+    expect(render({ ...healthy, oldest_synced_at: '2026-01-02T12:00:00Z' })).toContain(
+      '02.01.2026',
+    );
+  });
+
+  it('shows no markdown backticks', () => {
+    const html = render({ ...healthy, reconcile_interval_minutes: 0, reconcile_running: false });
+    expect(html).not.toContain('`');
+  });
+
   it('shows the oldest sync and the reconcile interval', () => {
     const html = render(healthy);
     expect(html).toContain('Oldest sync:');
@@ -37,6 +56,8 @@ describe('SyncHealthBar', () => {
   });
 
   it('says a configured loop is not running', () => {
-    expect(render({ ...healthy, reconcile_running: false })).toContain('restart the app');
+    expect(render({ ...healthy, reconcile_running: false })).toContain(
+      'Stripe is not the active provider',
+    );
   });
 });

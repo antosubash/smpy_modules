@@ -6,9 +6,11 @@ signed-in user's ``tenant_id``. ``acme`` and ``globex`` each hold a public
 type keyed ``post`` with one published record.
 
 * A user with a tenant works in it, and a header cannot move them.
+* The admin surface follows the tenant the *framework* resolved, not the
+  user's ``tenant_id`` (#112): with a resolver registered (the tenants
+  module's membership lookup) its answer is final, as in pagebuilder and news.
 * A user with **no** tenant is 403 ``tenant_required`` on the API and on the
-  screens, with or without a header — unless ``admin_header_tenant`` is on and
-  they hold ``admin``, in which case the header's tenant is theirs.
+  screens, with or without a header.
 * An anonymous read with no tenant is the public surface's one 404, body and
   all; with a header it reads that tenant only.
 
@@ -31,7 +33,6 @@ from sm_records.tenancy import tenant_scope
 
 from tests.app_harness import (
     ADMIN,
-    ROLE_MANAGER,
     TEST_TENANT_HEADER,
     build_app,
     roles,
@@ -118,34 +119,6 @@ async def test_a_user_without_a_tenant_is_refused_header_or_not(multi, method, p
     if path.startswith("/api/"):
         assert response.json()["code"] == "tenant_required"
     assert current_tenant_id.get() is None
-
-
-def _header_tenant(client: AsyncClient, on: bool) -> None:
-    settings = getattr(client.app.state, constants.PACKAGE).settings  # type: ignore[attr-defined]
-    settings.admin_header_tenant = on
-
-
-async def test_admin_header_tenant_lets_an_admin_without_a_tenant_use_the_header(multi):
-    _header_tenant(multi, True)
-    assert await _type_labels(multi, _as(None, header="globex")) == ["globex"]
-    screen = await multi.get("/admin/records/", headers={**_as(None, header="acme"), **_INERTIA})
-    assert screen.status_code == 200
-    assert screen.json()["props"]["tenant"] == "acme"
-    # Their own tenant still wins when they have one — the setting is only
-    # for the account that has none.
-    assert await _type_labels(multi, _as("acme", header="globex")) == ["acme"]
-
-
-@pytest.mark.parametrize(
-    ("role", "header"),
-    [(ADMIN, None), (ADMIN, "not a tenant"), (ROLE_MANAGER, "acme")],
-    ids=["admin-no-header", "admin-bad-header", "non-admin"],
-)
-async def test_admin_header_tenant_still_refuses_everyone_else(multi, role, header):
-    _header_tenant(multi, True)
-    response = await multi.get("/api/records/types", headers=_as(None, role, header=header))
-    assert response.status_code == 403
-    assert response.json()["code"] == "tenant_required"
 
 
 async def test_the_screens_say_which_tenant_and_mode(multi):

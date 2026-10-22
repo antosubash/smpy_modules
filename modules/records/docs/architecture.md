@@ -62,7 +62,8 @@ unique per tenant, and so are record uuids.
 carry a yield dependency — `bind_admin` or `bind_public` — as their *first*
 dependency, so it is entered before `get_db` and still bound when `get_db`
 commits on the way out. A single-tenant host (no `TenantMiddleware`) binds
-`default`; a multi-tenant one binds the user's own tenant or refuses with
+`default`; a multi-tenant one binds the framework-resolved tenant (the active
+organisation, as pagebuilder, news and billing do) or refuses with
 `tenant_required`, and the public API binds the framework-resolved tenant or
 answers its `404`. A guard installed on the host's session class at startup
 turns any records ORM statement or flush with no tenant bound into
@@ -313,6 +314,7 @@ this module departs from the repo's SQLModel rule.
 | `RecordPurged` | `DELETE …/purge`, and one per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
 | `RecordTypeChanged` | `PUT /types/{key}`, a schema rollback, a `mode=update` type import | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
+| `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
 
 Three decisions are worth the sentence they cost. **Publishing is a status
 transition, not its own event**: `RecordUpdated` carries the status pair rather

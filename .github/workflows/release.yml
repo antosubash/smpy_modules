@@ -1,7 +1,18 @@
 # Lockstep release: one version, one tag, every module published.
 #
-# The tag reaches origin only in `finalize`, after every publish has
-# succeeded, so a failed build never strands an orphan tag.
+# Order of events (docs/releasing.md has the failure modes):
+#   resolve      version + package list; refuses unless the dispatched commit
+#                is main's and CI on it is green (waits if CI is still running),
+#                and refuses a version that is already tagged or staged (#115).
+#   build        commits the bump on top of the dispatched commit, builds every
+#                package from that commit, and only then pushes it to the
+#                staging branch `release/v<version>`. Nothing reaches PyPI from
+#                a commit origin does not have.
+#   publish-pypi one job per package.
+#   finalize     tags the staged commit, lands the bump on main (fast-forward,
+#                or re-applied on top of a main that moved meanwhile), creates
+#                the GitHub release and deletes the staging branch. Every step
+#                is idempotent, so a failed finalize is fixed by re-running it.
 #
 # One-time PyPI setup per module, at https://pypi.org/manage/account/publishing/
 #   PyPI project name = simple_module_<name>
@@ -14,12 +25,15 @@
 # `resolve` job, so a new module is published without editing this file
 # (#118) — it still needs the one-time Trusted Publishing setup above.
 #
-# `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
-# steps which float on their major. That is deliberate: setup-uv stopped
-# publishing major/minor tags at v8 (as a supply-chain hardening measure), so
-# `@v9` does not resolve. Dependabot proposes new releases. uv itself is
+# Every action here is pinned to a full commit SHA, with its tag in a comment,
+# unlike ci.yml's floating majors: this workflow holds the PyPI publishing
+# identity and write access to main, so a moved tag must not change what it
+# runs. Dependabot updates SHA pins and their comments together. uv itself is
 # pinned by `UV_VERSION` below, which Dependabot does not track; keep it equal
 # to ci.yml's (#120).
+#
+# Nothing here restores a dependency cache (see the build job), and
+# publish-pypi uploads only files whose sha256 the build job recorded.
 
 name: release
 
@@ -36,9 +50,14 @@ on:
         required: false
         type: string
 
+# Each job asks for what it needs; nothing gets write access by default.
 permissions:
-  contents: write
-  id-token: write
+  contents: read
+
+# Two releases at once would race for the same version and for main.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: "3.12"
@@ -49,12 +68,23 @@ jobs:
   # Resolve the release version once and share it with every downstream job.
   resolve:
     runs-on: ubuntu-latest
+    # Long enough to wait out a CI run still in progress on the dispatched
+    # commit (its e2e job alone may take 45 minutes).
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      actions: read # list CI runs for the dispatched commit
     outputs:
       version: ${{ steps.compute.outputs.version }}
       packages: ${{ steps.packages.outputs.packages }}
+      # The one commit this release ships. CI is verified on it below, and
+      # every later job checks out exactly this SHA — never the branch, which
+      # may have moved since the check.
+      sha: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
       # Inputs reach the shell as environment variables, never as ${{ }}
       # interpolated into the script body — otherwise a crafted `version`
@@ -111,40 +141,133 @@ jobs:
           echo "packages=${packages}" >> "$GITHUB_OUTPUT"
           echo "Publishing: ${packages}"
 
-  # Bump versions in the working tree only (no commit), build, upload.
+      # A release ships the dispatched commit, so it must be main's: finalize
+      # lands the bump on main, and a release cut from a branch would put code
+      # on PyPI that main never had.
+      - name: Require main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::release must be dispatched from main, not $GITHUB_REF"
+          exit 1
+
+      # A version that is already tagged was already released (PyPI would
+      # refuse it anyway, but only after the build); a staged one is a
+      # previous attempt that never finished — see docs/releasing.md.
+      - name: Refuse a version already tagged or staged
+        env:
+          RELEASE_VERSION: ${{ steps.compute.outputs.version }}
+        run: |
+          if git ls-remote --exit-code origin "refs/tags/v$RELEASE_VERSION" >/dev/null; then
+            echo "::error::tag v$RELEASE_VERSION already exists; release the next version"
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/heads/release/v$RELEASE_VERSION" >/dev/null; then
+            echo "::error::branch release/v$RELEASE_VERSION exists from an earlier attempt." \
+              "If nothing from it reached PyPI, delete the branch and dispatch again;" \
+              "if something did, re-run that attempt's failed jobs instead (docs/releasing.md)"
+            exit 1
+          fi
+
+      # Green CI on the exact commit being released (#115): every ci.yml
+      # `push` or manual `workflow_dispatch` run on that SHA, each as its
+      # latest attempt, must have concluded `success` — the bot's release
+      # commit triggers no CI of its own, hence the manual trigger. A
+      # pull-request run tested a merge ref, not this SHA, and does not count.
+      # A run still going is waited for rather than make the releaser come
+      # back. scripts/release_ci_gate.py holds the rules and explains why all
+      # runs count, not the newest; scripts/tests covers it.
+      - name: Require green CI on the dispatched commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deadline=$((SECONDS + 60 * 70))
+          while :; do
+            # A transient API failure is retried like a pending run, not fatal.
+            rc=2
+            if gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=100" \
+              > "$RUNNER_TEMP/ci-runs.json"; then
+              rc=0
+              python3 scripts/release_ci_gate.py "$GITHUB_SHA" < "$RUNNER_TEMP/ci-runs.json" || rc=$?
+            else
+              echo "::warning::could not list CI runs; retrying"
+            fi
+            case $rc in
+              0) echo "CI is green on $GITHUB_SHA"; exit 0 ;;
+              2) ;;
+              *) echo "::error::CI on $GITHUB_SHA is not green (runs listed above)"; exit 1 ;;
+            esac
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::CI on $GITHUB_SHA is still running after 70 minutes"
+              exit 1
+            fi
+            echo "CI on $GITHUB_SHA is still running; waiting"
+            sleep 30
+          done
+
+  # Commit the bump, build from that commit, then stage it on origin. The
+  # push is last, so a failed build leaves nothing behind on origin.
   build:
     needs: resolve
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the staging branch
+    outputs:
+      # sha256 of every file publish-pypi may upload or run, recorded here
+      # and re-checked there before anything reaches PyPI.
+      manifest: ${{ steps.manifest.outputs.manifest }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
 
+      # Belt and braces: the bump below must sit on the verified commit.
+      - name: Confirm the checked-out commit
+        env:
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
+          # No dependency caches in a release build: caches saved on main are
+          # restorable by every workflow, so restoring one would let a run that
+          # resolved other versions (framework-latest.yml, say) feed this build.
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
+          # setup-node turns npm caching on by itself when package.json
+          # names a packageManager; say no explicitly. `npm ci` below
+          # installs fresh from package-lock.json.
+          package-manager-cache: false
 
       # `--locked` fails the release if uv.lock disagrees with the manifests,
       # rather than building from a silently re-resolved set (#114).
       - name: Sync workspace
         run: uv sync --locked --all-packages --all-extras
 
-      - name: Bump versions (working tree only)
+      # The bump rewrites every workspace package's version, and uv.lock
+      # records them. Re-lock so the release commit carries a lockfile that
+      # matches its manifests; otherwise the next `uv sync --locked` in CI
+      # fails and every local `uv run` dirties the tree (#114).
+      - name: Commit the version bump
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
-        run: uv run python scripts/bump_version.py "$RELEASE_VERSION"
+        run: |
+          uv run python scripts/bump_version.py "$RELEASE_VERSION"
+          uv lock
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release v$RELEASE_VERSION"
 
       - name: Install npm workspace
         run: npm ci
@@ -157,11 +280,40 @@ jobs:
       - name: Build wheels + sdists
         run: uv build --all-packages --out-dir dist-py
 
-      - uses: actions/upload-artifact@v7
+      # The PyPI check script travels with the artifacts, so publish-pypi
+      # checks out nothing: every file it uploads or runs comes from this job
+      # and is in the manifest.
+      - name: Record the artifact manifest
+        id: manifest
+        run: |
+          mkdir -p release-tools
+          cp scripts/release_pypi_check.py release-tools/
+          find dist-py release-tools -type f -print0 | sort -z \
+            | xargs -0 sha256sum > "$RUNNER_TEMP/SHA256SUMS"
+          cat "$RUNNER_TEMP/SHA256SUMS"
+          {
+            echo "manifest<<SHA256SUMS_EOF"
+            cat "$RUNNER_TEMP/SHA256SUMS"
+            echo "SHA256SUMS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-py
-          path: dist-py/
+          path: |
+            dist-py/
+            release-tools/
           retention-days: 14
+
+      # The commit every artifact above was built from, on origin before any
+      # of them reaches PyPI. `finalize` tags exactly this commit, so whatever
+      # happens to main in the meantime, the published version has its source
+      # in git (#115). A new branch name, so the push cannot be rejected by a
+      # moved main; `resolve` already refused one that exists.
+      - name: Stage the release commit
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: git push origin "HEAD:refs/heads/release/v$RELEASE_VERSION"
 
   publish-pypi:
     needs: [resolve, build]
@@ -174,10 +326,24 @@ jobs:
       matrix:
         package: ${{ fromJSON(needs.resolve.outputs.packages) }}
     steps:
-      - uses: actions/download-artifact@v8
+      # This run's artifact (download-artifact reads another run's only when
+      # given a run id), then proof it is byte-for-byte what `build` recorded:
+      # the same files, the same sha256, nothing added.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-py
-          path: dist-py
+          path: .
+
+      - name: Verify the artifacts against the build manifest
+        env:
+          MANIFEST: ${{ needs.build.outputs.manifest }}
+        run: |
+          test -n "$MANIFEST" || { echo "::error::build recorded no manifest"; exit 1; }
+          printf '%s\n' "$MANIFEST" > "$RUNNER_TEMP/SHA256SUMS"
+          sha256sum --check --strict "$RUNNER_TEMP/SHA256SUMS"
+          diff <(awk '{print $2}' "$RUNNER_TEMP/SHA256SUMS" | sort) \
+               <(find dist-py release-tools -type f | sort) \
+            || { echo "::error::downloaded files differ from the build manifest"; exit 1; }
 
       # uv writes wheels under the normalised (hyphenated) distribution name
       # while the sdist may use either form, so match both.
@@ -194,57 +360,144 @@ jobs:
           test -n "$(ls -A upload)" || {
             echo "::error::no artifacts found for $PACKAGE"; exit 1; }
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      # A re-run after a partial upload (the wheel accepted, the sdist not,
+      # or the response lost) must not fail on the files PyPI already has,
+      # or the version is stuck half-published — hence `skip-existing`
+      # below. That skips by filename alone, so first make sure every file
+      # PyPI already has for this version is byte-identical to this build.
+      - name: Check files already on PyPI match this build
+        env:
+          PACKAGE: ${{ matrix.package }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: python3 release-tools/release_pypi_check.py "$PACKAGE" "$RELEASE_VERSION" upload
+
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: upload
+          skip-existing: true
 
-  # Only now does anything reach origin.
+  # Tag the staged commit, land the bump on main, release. Each step checks
+  # whether it already happened, so re-running a failed finalize is safe.
   finalize:
     needs: [resolve, publish-pypi]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+      VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
+          # setup-uv caches by default on hosted runners; not in a release.
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      - name: Bump versions
-        env:
-          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
-        run: uv run python scripts/bump_version.py "$RELEASE_VERSION"
-
-      # The bump rewrites every workspace package's version, and uv.lock
-      # records them. Re-lock so the release commit carries a lockfile that
-      # matches its manifests; otherwise the next `uv sync --locked` in CI
-      # fails and every local `uv run` dirties the tree (#114). `git add -A`
-      # below commits it with the bump.
-      - name: Re-lock
-        run: uv lock
-
-      - name: Commit and tag
-        env:
-          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+      - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Release v$RELEASE_VERSION"
-          # The tag must be annotated and pushed by explicit refspec.
-          # `--follow-tags` silently skips lightweight tags, so it pushed the
-          # commit and nothing else, and `gh release create` then refused to
-          # act on a tag origin had never seen.
-          git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION"
-          git push --atomic origin HEAD:main "refs/tags/v$RELEASE_VERSION"
+
+      # Tags never race with main, so this push cannot be rejected by a merge
+      # that landed during the release. The tag must be annotated and pushed by
+      # explicit refspec: `--follow-tags` silently skips lightweight tags, and
+      # `gh release create` then refused to act on a tag origin had never seen.
+      #
+      # The staged commit comes from the staging branch, or — on a re-run
+      # after that branch was already deleted — from the tag itself.
+      - name: Tag the staged commit
+        run: |
+          branch="refs/heads/release/v$RELEASE_VERSION"
+          tag="refs/tags/v$RELEASE_VERSION"
+          has_tag=false
+          if git fetch origin "+$tag:$tag" 2>/dev/null; then has_tag=true; fi
+          if git fetch origin "+$branch:refs/remotes/origin/release/v$RELEASE_VERSION" 2>/dev/null; then
+            staged=$(git rev-parse "origin/release/v$RELEASE_VERSION")
+          elif $has_tag; then
+            staged=$(git rev-parse "$tag^{commit}")
+          else
+            echo "::error::neither release/v$RELEASE_VERSION nor v$RELEASE_VERSION exists on origin"
+            exit 1
+          fi
+          # Only ever tag the bump commit built on the CI-verified SHA: a
+          # staged commit with any other parent is not what CI passed.
+          parent=$(git rev-parse "$staged^")
+          if [ "$parent" != "$VERIFIED_SHA" ]; then
+            echo "::error::staged $staged sits on $parent, not the CI-verified $VERIFIED_SHA"
+            exit 1
+          fi
+          echo "STAGED=$staged" >> "$GITHUB_ENV"
+          if $has_tag; then
+            tagged=$(git rev-parse "$tag^{commit}")
+            if [ "$tagged" != "$staged" ]; then
+              echo "::error::v$RELEASE_VERSION already tags $tagged, not the staged $staged"
+              exit 1
+            fi
+            echo "v$RELEASE_VERSION already tags $staged"
+          else
+            git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION" "$staged"
+            git push origin "$tag"
+          fi
+
+      # Fast-forward main to the staged commit when nothing landed meanwhile,
+      # so the tag is on main's history. When main moved, the staged commit's
+      # parent is stale; rather than rebase it (uv.lock conflicts with any
+      # dependency change), re-apply the bump to the new main — the script and
+      # `uv lock` are deterministic, and the tag already records exactly what
+      # was published. Retried, because main can move again between the fetch
+      # and the push; never forced.
+      - name: Land the bump on main
+        run: |
+          staged="$STAGED"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            current=$(git show origin/main:pyproject.toml \
+              | python3 -c 'import sys, tomllib; print(tomllib.load(sys.stdin.buffer)["project"]["version"])')
+            if [ "$current" = "$RELEASE_VERSION" ]; then
+              echo "main is already at $RELEASE_VERSION"
+              exit 0
+            fi
+            if git merge-base --is-ancestor origin/main "$staged"; then
+              git push origin "$staged:refs/heads/main" && exit 0
+            else
+              git checkout -q -B land origin/main
+              uv run python scripts/bump_version.py "$RELEASE_VERSION"
+              uv lock
+              git add -A
+              git commit -m "Release v$RELEASE_VERSION" \
+                -m "Re-applied on top of main; v$RELEASE_VERSION tags the commit that was built ($staged)."
+              git push origin HEAD:refs/heads/main && exit 0
+            fi
+            echo "push to main rejected (attempt $attempt); retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::could not land the bump on main. v$RELEASE_VERSION is tagged and" \
+            "published; re-run this job, or bump main by hand to $RELEASE_VERSION"
+          exit 1
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
-        run: gh release create "v$RELEASE_VERSION" --generate-notes
+        run: |
+          if gh release view "v$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "release v$RELEASE_VERSION already exists"
+          else
+            gh release create "v$RELEASE_VERSION" --verify-tag --generate-notes
+          fi
+
+      # Last, so a failure above leaves the staged commit where a re-run finds
+      # it. The tag keeps the commit reachable.
+      - name: Delete the staging branch
+        run: |
+          if git ls-remote --exit-code origin "refs/heads/release/v$RELEASE_VERSION" >/dev/null; then
+            git push origin --delete "release/v$RELEASE_VERSION"
+          fi

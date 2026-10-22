@@ -73,7 +73,7 @@ export function RecordIoMenu({
    *  in full to be answered with a 413. */
   maxImportBytes?: number;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const input = useRef<HTMLInputElement>(null);
   const { file, report, phase, options, busy, limitText, pick, changeOptions, apply, close } =
     useRecordImport(typeKey, maxImportBytes);
@@ -95,6 +95,7 @@ export function RecordIoMenu({
     filtered,
     count: recordCount,
     capped: recordCountCapped,
+    locale,
   });
 
   return (

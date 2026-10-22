@@ -119,9 +119,10 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         403,
-        "*Multi-tenant hosts* — the signed-in account has no tenant of its own",
-        '`{"detail", "code": "tenant_required"}` — even when a tenant header was sent, '
-        "unless `admin_header_tenant` is on and the account holds `admin`",
+        "*Multi-tenant hosts* — the framework resolved no tenant (no active organisation) "
+        "for the signed-in account",
+        '`{"detail", "code": "tenant_required"}` — a tenant header does not change it: '
+        "the framework never lets a signed-in user pick a tenant outside their memberships",
     ),
     ErrorRow(
         404,
@@ -176,7 +177,9 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
     ),
     ErrorRow(
         409,
-        "A changed `collection` on `PUT /types/{key}`",
+        "A `collection` move on `PUT /types/{key}` that cannot run (stale version, sent with "
+        "a schema change, a reindex outstanding, a uuid already in the target), or a changed "
+        "`collection` in a `mode=update` type import",
         '`{"detail"}`',
     ),
     ErrorRow(
