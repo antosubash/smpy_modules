@@ -26,7 +26,7 @@ export function TypeRevisions({
   type: TypeRead;
   onRestored: (result: TypeRead) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<TypeRevision[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -135,7 +135,7 @@ export function TypeRevisions({
                       })}
                     </p>
                     <p className="text-muted-foreground">
-                      {formatDateTime(rev.created_at)}
+                      {formatDateTime(rev.created_at, locale)}
                       {rev.created_by ? ` · ${rev.created_by}` : ''}
                     </p>
                   </div>

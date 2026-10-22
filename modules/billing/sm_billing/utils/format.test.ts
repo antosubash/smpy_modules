@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { clipName, formatMoney, isActivated, planCta, priceLabel, statusTone } from './format';
+import {
+  clipName,
+  formatDate,
+  formatMoney,
+  isActivated,
+  planCta,
+  priceLabel,
+  statusTone,
+} from './format';
 import type { Plan, Status } from './types';
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
@@ -60,13 +68,26 @@ describe('formatMoney', () => {
     expect(formatMoney(0, 'usd', 'en-US')).toBe('$0.00');
   });
   it('returns an empty string for a missing amount', () => {
-    expect(formatMoney(null, 'eur')).toBe('');
+    expect(formatMoney(null, 'eur', 'en-US')).toBe('');
+  });
+});
+
+describe('formatDate', () => {
+  it('formats in the locale it is given, not the browser one (#189)', () => {
+    expect(formatDate('2026-01-02T12:00:00Z', 'en-US')).toBe('Jan 2, 2026');
+    expect(formatDate('2026-01-02T12:00:00Z', 'de')).toBe('02.01.2026');
+  });
+  it('formats money the German way under a German console', () => {
+    expect(formatMoney(1900, 'eur', 'de').replace(/\s/g, ' ')).toBe('19,00 €');
+  });
+  it('returns an empty string for a missing date', () => {
+    expect(formatDate(null, 'de')).toBe('');
   });
 });
 
 describe('priceLabel', () => {
   it('shows free plans as Free', () => {
-    expect(priceLabel(free, 'month')).toBe('Free');
+    expect(priceLabel(free, 'month', 'en-US')).toBe('Free');
   });
   it('adds per seat and the interval', () => {
     const seat = plan({ pricing_model: 'per_seat' });
@@ -74,7 +95,9 @@ describe('priceLabel', () => {
     expect(priceLabel(plan(), 'year', 'en-US')).toBe('€190.00 / year');
   });
   it('says when an interval is not sold', () => {
-    expect(priceLabel(plan({ stripe_price_year: null }), 'year')).toBe('Not available yearly');
+    expect(priceLabel(plan({ stripe_price_year: null }), 'year', 'en-US')).toBe(
+      'Not available yearly',
+    );
   });
 });
 

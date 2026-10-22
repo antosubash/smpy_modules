@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { keys, useT } from '../utils/i18n';
+import { formatNumber } from '../utils/locale';
 
 import type { ExpandedRef, FieldDef } from '../utils/types';
 import { EMPTY_CELL as DASH, formatCalendarDate, formatDateTime } from '../utils/values';
@@ -102,7 +103,7 @@ export function RecordCell({
    *  expand this column. */
   expanded?: ExpandedRef[];
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">{DASH}</span>;
   }
@@ -137,20 +138,24 @@ export function RecordCell({
       // for a payload from a build old enough to have stored something
       // else under the key.
       const n = typeof value === 'number' ? value : Number(value);
-      return <span>{Number.isFinite(n) ? n.toLocaleString() : String(value)}</span>;
+      return <span>{Number.isFinite(n) ? formatNumber(n, locale) : String(value)}</span>;
     }
 
     case 'date':
       // A bare calendar day, fixed in UTC so it cannot shift a day for a
       // viewer west of UTC — `formatCalendarDate` (utils/values.ts).
-      return <span>{typeof value === 'string' ? formatCalendarDate(value) : String(value)}</span>;
+      return (
+        <span>{typeof value === 'string' ? formatCalendarDate(value, locale) : String(value)}</span>
+      );
 
     case 'datetime':
       // ISO datetime (design doc §7.3), rendered in the viewer's own zone —
       // `formatDateTime` (utils/values.ts) is the one place that formatting
       // lives, shared with the envelope's own `published_at`/`updated_at`
       // timestamps in `RecordTable`/`RecordCardList`.
-      return <span>{typeof value === 'string' ? formatDateTime(value) : String(value)}</span>;
+      return (
+        <span>{typeof value === 'string' ? formatDateTime(value, locale) : String(value)}</span>
+      );
 
     case 'select':
       return <span>{choiceLabel(field, value)}</span>;

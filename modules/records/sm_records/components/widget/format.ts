@@ -44,7 +44,11 @@ function choiceLabel(meta: FieldMetaEntry, raw: unknown): string {
  *  (link a relation, read `useT()`). `meta` is `undefined` for a value whose
  *  field definition wasn't baked in (an older saved block, or a schema
  *  change since); it still renders, just without type-specific formatting. */
-export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unknown): string {
+export function formatPublicValue(
+  meta: FieldMetaEntry | undefined,
+  value: unknown,
+  locale: string | undefined,
+): string {
   if (value === null || value === undefined) return DASH;
   const type = meta?.type ?? typeof value;
 
@@ -58,9 +62,9 @@ export function formatPublicValue(meta: FieldMetaEntry | undefined, value: unkno
       // value.
       return String(value);
     case 'date':
-      return typeof value === 'string' ? formatCalendarDate(value) : String(value);
+      return typeof value === 'string' ? formatCalendarDate(value, locale) : String(value);
     case 'datetime':
-      return typeof value === 'string' ? formatDateTime(value) : String(value);
+      return typeof value === 'string' ? formatDateTime(value, locale) : String(value);
     case 'select':
       return meta ? choiceLabel(meta, value) : String(value);
     case 'multiselect': {

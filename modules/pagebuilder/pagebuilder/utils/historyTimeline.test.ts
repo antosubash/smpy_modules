@@ -27,6 +27,23 @@ const shape = (entries: ReturnType<typeof buildHistory>) =>
   entries.map((e) => (e.kind === 'revision' ? `r${e.revision.id}` : `s${e.marker.snapshot_id}`));
 
 describe('buildHistory', () => {
+  it('reads a zone-less revision time as UTC, whatever the viewer zone', () => {
+    const tz = process.env.TZ;
+    process.env.TZ = 'Europe/Berlin';
+    try {
+      // 10:00 UTC revision; the restore was 08:30 UTC. Read as Berlin local
+      // time the revision would be 08:00 UTC and sort below the marker.
+      const entries = buildHistory(
+        [revision(2, '2026-10-02T10:00:00')],
+        [marker(7, '2026-10-02T10:30:00+02:00')],
+      );
+      expect(shape(entries)).toEqual(['r2', 's7']);
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
+
   it('interleaves markers by time, newest first', () => {
     const entries = buildHistory(
       [revision(3, '2026-10-03T00:00:00Z'), revision(1, '2026-10-01T00:00:00Z')],

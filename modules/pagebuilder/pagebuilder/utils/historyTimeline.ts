@@ -1,5 +1,6 @@
 /** Revisions and restore markers merged into one newest-first history. */
 
+import { parseInstant } from './dates';
 import type { PageRestoreMarker, PageRevisionRead } from './types';
 
 export type HistoryEntry =
@@ -11,7 +12,9 @@ export type HistoryEntry =
     }
   | { kind: 'restore'; marker: PageRestoreMarker };
 
-const when = (iso: string) => new Date(iso).getTime();
+// Revisions arrive without a zone and markers with one; both are UTC, and
+// comparing them as written would shift every revision by the viewer's offset.
+const when = (iso: string) => parseInstant(iso).getTime();
 
 /**
  * Interleave by time. Both inputs arrive newest-first; revisions keep their

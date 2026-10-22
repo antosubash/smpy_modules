@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { keys, useT } from '../../utils/i18n';
 
 import { fetchPublicRecords, type PublicRecordItem } from '../../utils/public-api';
-import { FieldValues, publicValue } from './FieldValues';
+import { FieldValues, publicValue, useDateLocale } from './FieldValues';
 import { buildRecordHref } from './format';
 import type { RecordsListProps } from './types';
 
@@ -124,6 +124,7 @@ function CardsLayout({ items, props, media }: LayoutProps) {
 
 function TableLayout({ items, props, media }: LayoutProps) {
   const { t } = useT();
+  const locale = useDateLocale(props);
   return (
     <table className="w-full text-left text-sm">
       <thead>
@@ -150,7 +151,7 @@ function TableLayout({ items, props, media }: LayoutProps) {
             </td>
             {props.fieldMeta.map((meta) => (
               <td key={meta.key} className="py-2 pr-4" style={BODY_STYLE}>
-                {publicValue(meta, item, media)}
+                {publicValue(meta, item, media, locale)}
               </td>
             ))}
           </tr>

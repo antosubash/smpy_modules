@@ -1264,6 +1264,7 @@
     "show_in_footer": "Show in footer",
     "show_in_header": "Show in header nav",
     "slug_help": "Changing this leaves a redirect from the old URL.",
+    "slug_invalid": "Use only lowercase letters (a–z), digits (0–9) and hyphens, starting with a letter or digit.",
     "slug_moved": "Saving leaves a permanent redirect from {from}, so existing links keep working.",
     "title": "Title",
     "url": "URL",
