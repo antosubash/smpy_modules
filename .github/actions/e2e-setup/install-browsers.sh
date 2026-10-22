@@ -35,13 +35,18 @@
 set -euo pipefail
 
 FORCE=${E2E_FORCE_APT:-}
-ARCHIVE_URI=http://archive.ubuntu.com/ubuntu/
+case $(dpkg --print-architecture) in
+  amd64 | i386) ARCHIVE_URI=http://archive.ubuntu.com/ubuntu/ ;;
+  *) ARCHIVE_URI=http://ports.ubuntu.com/ubuntu-ports/ ;;
+esac
 if [ -f /etc/apt/apt-mirrors.txt ]; then
   DEFAULT_URI=mirror+file:/etc/apt/apt-mirrors.txt
 else
   DEFAULT_URI=$ARCHIVE_URI
 fi
 mirror_switched=false
+deps_complete=false
+pkgs=()
 
 log() { echo "[install-browsers] $*"; }
 
@@ -122,11 +127,19 @@ update_package_lists() {
   switch_to_archive
 }
 
-missing_packages() {
-  # Uses $APT_CONFIG (apt-get install -s). Exits 1 when something is missing,
-  # and lists the missing packages one per line, indented by two spaces.
-  timeout -k 10s 60s npx playwright install-deps --dry-run chromium 2>&1 |
-    tee /dev/stderr | sed -n -E 's/^  ([a-z0-9][a-z0-9.+-]*)$/\1/p' || true
+# Sets $pkgs to what `install-deps --dry-run` reports missing (uses
+# $APT_CONFIG: it runs `apt-get install -s`) and $deps_complete to true when it
+# says nothing is. The dry run exits 1 when something is missing, and lists the
+# packages one per line, indented by two spaces.
+scan_missing() {
+  local out
+  out=$(timeout -k 10s 60s npx playwright install-deps --dry-run chromium 2>&1) || true
+  printf '%s\n' "$out" >&2
+  deps_complete=false
+  if grep -q 'All system dependencies are installed' <<<"$out"; then
+    deps_complete=true
+  fi
+  mapfile -t pkgs < <(sed -n -E 's/^  ([a-z0-9][a-z0-9.+-]*)$/\1/p' <<<"$out")
 }
 
 apt_install() {
@@ -137,14 +150,22 @@ apt_install() {
 install_system_deps() {
   setup_apt_config
   update_package_lists
-  local pkgs
-  mapfile -t pkgs < <(missing_packages)
+  scan_missing
+  if [ "$deps_complete" = true ]; then
+    # Every library is present, so apt has nothing to fix: the first launch
+    # failure was something else (or a one-off). Skip apt; the smoke check
+    # that follows is the retry, and it fails the step if Chromium still
+    # cannot start. This is also what E2E_FORCE_APT=1 does on a healthy image.
+    log "dry run reports every system dependency installed; nothing to install"
+    return 0
+  fi
   if [ "${#pkgs[@]}" -eq 0 ] && [ "$mirror_switched" = false ]; then
     # Chromium did not launch, yet the dry run named nothing to install. With
     # no usable package lists it cannot resolve anything, so try the archive.
     log "dry run listed no missing packages on the default mirror"
     switch_to_archive
-    mapfile -t pkgs < <(missing_packages)
+    scan_missing
+    [ "$deps_complete" = true ] && return 0
   fi
   if [ "${#pkgs[@]}" -eq 0 ]; then
     # Still nothing, or output this parser doesn't recognise. More apt would
@@ -160,6 +181,8 @@ install_system_deps() {
     return 1
   fi
   log "apt-get install failed or timed out on the default mirror"
+  # A timeout can land mid-dpkg; finish any half-configured packages first.
+  timeout -k 10s 3m sudo dpkg --configure -a || true
   switch_to_archive
   apt_install "${pkgs[@]}"
 }
@@ -178,5 +201,8 @@ fi
 
 log "Chromium did not launch (or E2E_FORCE_APT=$FORCE); installing system dependencies"
 install_system_deps
-smoke_check
+if ! smoke_check; then
+  echo "::error title=Playwright browsers::Chromium still cannot launch after installing system dependencies (archive mirror fallback=${mirror_switched})."
+  exit 1
+fi
 echo "::notice title=Playwright browsers::Installed system dependencies via apt (cache-hit=${CACHE_HIT:-false}, archive mirror fallback=${mirror_switched})."
