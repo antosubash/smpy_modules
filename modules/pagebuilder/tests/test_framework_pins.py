@@ -6,9 +6,14 @@ its ``fixed``/``header`` keywords, and Starlette's ``user_middleware`` entry
 shape. Each test here fails, with a message naming the call site, the moment
 one of them changes — in CI on the framework bump, not in production.
 
-Public replacement in framework 0.0.36+: ``simple_module_hosting.tenancy``
-(``tenancy_mode``, ``single_tenant_id``, ``require_tenant``) — moving to it
-needs the ``simple_module_hosting`` floor raised to 0.0.36.
+Since the 0.0.36 floor (#211) the framework's public answers come first:
+``tenancy_mode`` for the mode and ``single_tenant_id`` for a ``create_app``
+host's pinned tenant. The stack reading stays as the fallback for an app
+built outside ``create_app`` (whose ``tenancy_mode`` is always ``SINGLE``),
+and for the tenant header the public cache key varies on, which has no
+public replacement yet. ``require_tenant`` is not used: it binds
+``single_tenant_id`` whatever an upstream layer resolved, which breaks the
+request-time rule of #192.
 """
 
 from __future__ import annotations
@@ -104,10 +109,35 @@ def test_an_unreadable_stack_refuses_to_guess():
 
 
 def test_the_frameworks_own_multi_wins():
-    pytest.importorskip("simple_module_hosting.tenancy")
     app = FastAPI()  # no TenantMiddleware at all
     app.state.sm = SimpleNamespace(tenancy="multi")
     assert tenancy.detect_mode(app) is TenancyMode.MULTI
+
+
+def _create_app_host(default_tenant_id):
+    app = FastAPI()
+    app.state.sm = SimpleNamespace(
+        tenancy="single", db=SimpleNamespace(default_tenant_id=default_tenant_id)
+    )
+    app.state.pagebuilder = SimpleNamespace()
+    return app
+
+
+def test_a_create_app_hosts_pinned_tenant_is_the_frameworks_answer():
+    """``single_tenant_id``, not the stack: no ``TenantMiddleware`` here."""
+    assert tenancy.configure(_create_app_host(None)) is TenancyMode.SINGLE
+    with pytest.raises(RuntimeError, match="default_tenant='acme'"):
+        tenancy.configure(_create_app_host("acme"))
+
+
+def test_the_recorded_vary_headers_come_from_the_framework():
+    from simple_module_hosting.middleware import TenantMiddleware
+
+    app = FastAPI()
+    app.add_middleware(TenantMiddleware, header="X-Tenant-ID")
+    state = SimpleNamespace(tenant_id="acme", tenant_vary=("Host",))
+    request = SimpleNamespace(app=app, state=state, scope={})
+    assert tenancy.request_vary(request) == ("Cookie", "X-Tenant-ID", "Host")
 
 
 # --- no shared or premature cache ---------------------------------------------

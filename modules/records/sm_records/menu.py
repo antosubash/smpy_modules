@@ -8,8 +8,8 @@ install with thirty of them.
 
 The awkward part is that types are created at runtime and the framework's
 ``MenuRegistry`` is not. It is filled once, during app construction, by each
-module's ``register_menu_items`` hook; it has ``add``/``add_many`` and no
-remove, no provider hook and no invalidation anyone else can reach. Meanwhile
+module's ``register_menu_items`` hook, and has ``add``/``add_many`` and
+(since core 0.0.36) ``remove`` — but no hook that rebuilds it. Meanwhile
 ``InertiaLayoutDataMiddleware`` calls ``get_for_user`` on that one instance for
 every request, so whatever is in it *is* the sidebar.
 
@@ -18,7 +18,7 @@ So this module keeps the registry's contents honest itself:
 * :func:`type_menu_items` turns types into items and is pure — the whole of
   what an entry looks like, testable without a registry or a database.
 * :func:`sync_type_menu` replaces the items this module put there last time
-  with the ones it wants now. It is the only place that reaches inside the
+  with the ones it wants now. It is the only place that removes from the
   registry, and it identifies *our* items by the list we kept, never by URL:
   a host that adds its own ``/admin/records/...`` entry must survive a sync.
 * :func:`refresh` decides when that is worth doing — on demand after a type
@@ -178,12 +178,9 @@ def sync_type_menu(
     list and never by URL or by value, so a host that contributed its own
     ``/admin/records/...`` entry keeps it, and so does this module's hub item.
 
-    The registry has no remove; upstream: antosubash/simple_module_python#340
-    (MenuRegistry: no way to remove items or contribute them dynamically).
-    Until that lands, the splice below is the whole of this module's reach
-    into framework internals: one function, and it restores the registry's own
-    invariant by invalidating the sorted cache it keeps beside ``_items``.
-    ``tests/test_framework_pins.py`` fails when either name changes (#125).
+    Removal goes through the registry's public ``remove`` (core 0.0.36,
+    upstream antosubash/simple_module_python#340), which also drops the
+    sorted cache ``all_items`` serves.
     """
     items = type_menu_items(types)
     if list(previous) == items:
@@ -192,8 +189,7 @@ def sync_type_menu(
         # warm for the request that is about to read it.
         return list(previous)
     ours = {id(item) for item in previous}
-    registry._items[:] = [item for item in registry._items if id(item) not in ours]
-    registry._invalidate()
+    registry.remove(lambda item: id(item) in ours)
     registry.add_many(items)
     return items
 

@@ -36,6 +36,7 @@ from typing import Any, Final
 
 from fastapi import HTTPException, Request
 from simple_module_db import current_tenant_id, tenant_context
+from simple_module_hosting.tenancy import tenant_vary as recorded_vary
 
 from news._tenancy_mode import (  # noqa: F401 - tests read the private names here
     _KNOWN_KWARGS,
@@ -48,6 +49,7 @@ from news._tenancy_mode import (  # noqa: F401 - tests read the private names he
     _tenant_middleware,
     _warn_if_unrecognised,
     detect_mode,
+    pinned_tenant,
     request_mode,
     upstream_tenant,
 )
@@ -88,7 +90,7 @@ def configure(app: Any) -> TenancyMode:
     under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
     news's data would sit in another.
     """
-    fixed = _fixed_tenant(_tenant_middleware(app))
+    fixed = pinned_tenant(app)
     if fixed is not None and fixed != DEFAULT_TENANT:
         raise RuntimeError(
             f"news: the host pins every request to default_tenant={fixed!r}, but "
@@ -144,15 +146,15 @@ def request_vary(request: Any) -> tuple[str, ...]:
 
     A tenant upstream chose, or a request-level ``MULTI``, varies like
     ``MULTI`` even on an app detected ``SINGLE`` (a child mounted under a
-    multi-tenant parent), plus whatever headers the framework recorded on
-    ``request.state.tenant_vary`` as having picked it.
+    multi-tenant parent), plus whatever headers the framework recorded as
+    having picked it (its public ``tenant_vary``).
     """
     app = request.app
     tenant = upstream_tenant(request)
     single = request_mode(request, mode_of(app)) is TenancyMode.SINGLE
     if single and tenant in (None, DEFAULT_TENANT):
         return ()
-    recorded = tuple(getattr(request.state, "tenant_vary", ()) or ())
+    recorded = recorded_vary(request)
     return tuple(dict.fromkeys(_multi_vary(app) + recorded))
 
 

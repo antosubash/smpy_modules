@@ -26,6 +26,7 @@ from enum import StrEnum
 from typing import Any, Final
 
 from simple_module_db import current_tenant_id, is_valid_tenant_id
+from simple_module_hosting.tenancy import single_tenant_id, tenancy_mode
 
 _log = logging.getLogger("simple_module.news")
 
@@ -100,21 +101,29 @@ def _fixed_tenant(entry: Any) -> str | None:
 
 
 def _framework_mode(app: Any) -> TenancyMode | None:
-    """The framework's own public answer (0.0.36+), or ``None`` without one.
+    """The framework's own public answer (``simple_module_hosting.tenancy``),
+    or ``None`` without one.
 
     ``tenancy_mode`` says ``SINGLE`` for any app built outside ``create_app``,
     so its ``SINGLE`` is an answer only on an app ``create_app`` built — one
-    carrying ``state.sm``. On 0.0.35, which lacks it, there is none:
-    ``state.sm`` alone is not taken as ``SINGLE``, so a child mounted under a
-    foreign parent there fails closed rather than binding the default.
+    carrying ``state.sm``. An app without it (a child mounted under a foreign
+    parent, a bare test app) has no answer, and the stack reading decides.
     """
-    try:
-        from simple_module_hosting.tenancy import tenancy_mode
-    except ImportError:
-        return None
     if str(tenancy_mode(app)) == TenancyMode.MULTI:
         return TenancyMode.MULTI
     return TenancyMode.SINGLE if getattr(app.state, "sm", None) is not None else None
+
+
+def pinned_tenant(app: Any) -> str | None:
+    """The one tenant a single-tenant host runs every request in, or ``None``.
+
+    A ``create_app`` host answers through the framework's public
+    ``single_tenant_id`` (its ``default_tenant``, else ``"default"``); an app
+    built outside it, through the stack's ``fixed`` keyword.
+    """
+    if _framework_mode(app) is TenancyMode.SINGLE:
+        return single_tenant_id(app)
+    return _fixed_tenant(_tenant_middleware(app))
 
 
 def detect_mode(app: Any) -> TenancyMode:

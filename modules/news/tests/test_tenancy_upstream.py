@@ -125,24 +125,21 @@ async def test_a_single_tenant_host_keeps_its_shared_cache():
     assert response.headers["cache-control"] == "public, max-age=60"
 
 
-def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
-    """No public ``tenancy_mode`` to ask: ``state.sm`` alone is no answer, so
-    a mounted child with no upstream tenant is refused, not handed default."""
-    import sys
+def test_a_mounted_child_without_its_own_framework_answer_fails_closed():
+    """No ``state.sm``, so ``tenancy_mode``'s ``SINGLE`` is no answer: a
+    mounted child with no upstream tenant is refused, not handed default."""
     from types import SimpleNamespace
 
     from fastapi import HTTPException
 
-    monkeypatch.setitem(sys.modules, "simple_module_hosting.tenancy", None)  # ImportError
     app = FastAPI()
-    app.state.sm = SimpleNamespace()
     scope = {"app_root_path": "", "root_path": "/child"}
     request = SimpleNamespace(app=app, state=SimpleNamespace(tenant_id=None), scope=scope)
     with pytest.raises(HTTPException) as refused:
         tenancy.resolve_admin(request)
     assert refused.value.status_code == 403
     assert tenancy.resolve_public(request) is None
-    request.scope = {}  # not mounted: the app's own single-tenant answer stands
+    app.state.sm = SimpleNamespace()  # built by create_app: its SINGLE stands
     assert tenancy.resolve_admin(request) == DEFAULT_TENANT
 
 

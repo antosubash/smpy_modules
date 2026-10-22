@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Final
 
+from simple_module_hosting.tenancy import single_tenant_id, tenancy_mode
+
 from sm_records import constants
 
 __all__ = [
@@ -92,16 +94,24 @@ def _fixed_tenant(entry: Any) -> str | None:
 
 
 def _framework_says_multi(app: Any) -> bool:
-    """Whether the framework's own public answer (0.0.36+) is ``MULTI``.
+    """Whether the framework's own public answer (``tenancy_mode``) is ``MULTI``.
 
     It says ``SINGLE`` for any app built outside ``create_app``, so only its
-    ``MULTI`` is evidence; on 0.0.35, which lacks it, there is none.
+    ``MULTI`` is evidence of the mode.
     """
-    try:
-        from simple_module_hosting.tenancy import tenancy_mode
-    except ImportError:
-        return False
     return str(tenancy_mode(app)) == TenancyMode.MULTI
+
+
+def _pinned_tenant(app: Any) -> str | None:
+    """The one tenant a single-tenant host runs every request in, or ``None``.
+
+    A ``create_app`` host (one carrying ``state.sm``) answers through the
+    framework's public ``single_tenant_id`` — its ``default_tenant``, else
+    ``"default"``; an app built outside it, through the stack's ``fixed``.
+    """
+    if getattr(app.state, "sm", None) is not None and not _framework_says_multi(app):
+        return single_tenant_id(app)
+    return _fixed_tenant(_tenant_middleware(app))
 
 
 def detect_mode(app: Any) -> TenancyMode:
@@ -159,7 +169,7 @@ def configure(app: Any) -> TenancyMode:
     run in :data:`DEFAULT_TENANT`, where the migration put existing rows, so
     the framework would bind one tenant and records another.
     """
-    fixed = _fixed_tenant(_tenant_middleware(app))
+    fixed = _pinned_tenant(app)
     if fixed is not None and fixed != DEFAULT_TENANT:
         raise RuntimeError(
             f"records: the host pins every request to default_tenant={fixed!r}, but records "
