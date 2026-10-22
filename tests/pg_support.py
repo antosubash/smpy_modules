@@ -45,6 +45,7 @@ there.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from simple_module_db.listeners import register_listeners
@@ -130,15 +131,27 @@ async def _truncate_all(conn: Any) -> None:
     await conn.execute(text(f"TRUNCATE {', '.join(names)} RESTART IDENTITY CASCADE"))
 
 
-async def make_db_state(*metadatas: MetaData) -> Any:
+async def make_db_state(*metadatas: MetaData, file: Path | None = None) -> Any:
     """A ``DatabaseState`` holding ``metadatas``' tables and no rows.
 
     The one call every database fixture in the repo makes. On SQLite it is
     byte-for-byte what those fixtures did inline before: ``StaticPool``, so
     every session in a test talks to the same ``:memory:`` database.
+
+    **``file`` is for a test that races transactions (#209).** ``StaticPool``
+    serves every session the *same* connection, so two "concurrent" sessions
+    are one transaction: neither waits for the other, and one closing issues a
+    ``ROLLBACK`` that silently undoes the other's uncommitted write. Given a
+    path, SQLite gets a file database on the default pool instead — one
+    connection per session, WAL and ``busy_timeout`` from ``init_db`` — so a
+    write waits for SQLite's lock the way it does on a host. Ignored on
+    Postgres, where every session already has a connection of its own.
     """
     if not USING_POSTGRES:
-        state = init_db(SQLITE_URL, poolclass=StaticPool)
+        if file is not None:
+            state = init_db(f"sqlite+aiosqlite:///{file}")
+        else:
+            state = init_db(SQLITE_URL, poolclass=StaticPool)
         register_listeners(state)
         async with state.engine.begin() as conn:
             for metadata in metadatas:

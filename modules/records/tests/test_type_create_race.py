@@ -17,7 +17,6 @@ from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, roles
-from tests.pg_support import USING_POSTGRES
 
 
 async def test_losing_the_insert_race_is_a_conflict(db, db_state):
@@ -47,15 +46,14 @@ async def test_losing_the_insert_race_is_a_conflict(db, db_state):
     assert [t.key for t in await type_service.list_types(db)] == ["racer"]
 
 
-@pytest.mark.skipif(
-    not USING_POSTGRES,
-    reason="SQLite's StaticPool shares one connection, so concurrent requests are not "
-    "concurrent transactions; set SM_TEST_DATABASE_URL=postgresql+asyncpg://…",
-)
-async def test_concurrent_creates_give_one_201_and_the_rest_409(client):
+async def test_concurrent_creates_give_one_201_and_the_rest_409(racing_client):
+    """Real concurrency: a connection per request on SQLite too (#209)."""
     body = {"key": "stampede", "label": "Stampede"}
     resps = await asyncio.gather(
-        *(client.post("/api/records/types", json=body, headers=roles(ADMIN)) for _ in range(5))
+        *(
+            racing_client.post("/api/records/types", json=body, headers=roles(ADMIN))
+            for _ in range(5)
+        )
     )
     statuses = sorted(r.status_code for r in resps)
     assert statuses == [201, 409, 409, 409, 409], statuses
