@@ -144,7 +144,7 @@ set with `publish_at >= unpublish_at` is
 
 | Route | Permission | Returns |
 |---|---|---|
-| `GET /pages/{id}/revisions` | auth | `{"items": [PageRevisionRead]}`, newest first |
+| `GET /pages/{id}/revisions` | auth | `{"items": [PageRevisionRead], "restores": [PageRestoreMarker]}`, both newest first |
 | `GET /pages/{id}/revisions/{rev}` | auth | `PageRevisionRead` + `data` |
 | `GET /pages/{id}/revisions/{before}/diff/{after}` | auth | `RevisionDiffResponse` |
 | `POST /pages/{id}/revisions/{rev}/restore` | `pagebuilder.edit` | `PageDetail`; copies title, meta description, social image and blocks into the draft |
@@ -228,8 +228,15 @@ asset's URL (current or pre-tenancy flat URL).
 | `POST /imports/{id}/approve` | `pagebuilder.approve` | `ImportApplyResponse` |
 | `POST /imports/{id}/reject` | `pagebuilder.approve` | `{"note"?}` → `PendingImportRead` |
 
+`PageRestoreMarker`: `import_id`, `snapshot_id`, `change` (`created` |
+`overwritten`), `restored_at`, `restored_by` — one per approved snapshot restore
+that wrote the page. Not a revision: there is nothing to diff or restore.
+
 `SnapshotRead`: `id`, `note`, `source` (`manual` | `upload` | `pre_restore`),
-`format_version`, `manifest`, `size_bytes`, `created_at`, `created_by`.
+`format_version` (the bundle's major — an upload keeps the one it arrived with),
+`manifest` (see [bundle-format.md](bundle-format.md)), `size_bytes`,
+`created_at`, `created_by`. Upload is 422 for an unknown `format_version` or a
+required section this build cannot restore.
 `PendingImportRead`: `id`, `snapshot_id`, `plan`, `status` (`pending` |
 `approved` | `rejected`), `note`, `created_*`, `decided_at`, `decided_by`.
 `ImportApplyResponse`: `pages_created`, `pages_updated`, `media_added`,

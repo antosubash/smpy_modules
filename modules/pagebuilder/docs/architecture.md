@@ -151,10 +151,12 @@ one — ignoring trashed pages.
   as JSON documents, media URLs rewritten to `asset://<name>` sentinels, media
   bytes into a per-tenant content-addressed blob store shared across snapshots.
   `FORMAT_VERSION` is 2; versions 1 and 2 are readable (v1 pages are read as the
-  default locale).
+  default locale). The manifest (`manifest.py`) also names the format, the
+  writing package version, the tenant and a `contents` list of sections — see
+  [bundle-format.md](bundle-format.md).
 - **Upload** validates the zip at the boundary (`archive.py`, `validate.py`):
   entry names stay inside the destination, the manifest declares a readable
-  format, every blob hashes to its name, the expanded size stays under
+  major and no required section this build lacks (`manifest.check_manifest`), every blob hashes to its name, the expanded size stays under
   `snapshot_max_extracted_bytes`.
 - **Restore** computes a plan (`plan.py`) and parks it as a `PendingImport`.
   **Approve** takes a `pre_restore` snapshot, then `apply.apply_bundle`: media
@@ -162,6 +164,11 @@ one — ignoring trashed pages.
   revived, not duplicated), parents and redirects resolved by slug in a second
   pass, the layout saved through `LayoutService`. No page revisions are written;
   the `pre_restore` snapshot is the before-state. Nothing is deleted.
+- **History marker.** A page's revision list also returns `restores`, derived on
+  read by `history.restore_markers` from approved `PendingImport` rows whose
+  plan created or overwrote the page (matched by `(locale, slug)`, and through
+  the page's redirects if it was renamed since). Nothing is stored for it, so
+  deleting a snapshot — which deletes its imports — removes its markers too.
 
 ## Frontend
 
