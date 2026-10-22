@@ -54,6 +54,7 @@ from sm_records.models import RecordType, tables_for
 from sm_records.services._claims import lock_type
 from sm_records.services._common import mark_written, reload, type_resolver
 from sm_records.services._titles import recompute_titles
+from sm_records.services.errors import Conflict
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import tenant_scope
 
@@ -103,7 +104,14 @@ async def _clear_rebuilt(
     does not need that. It is held for the read-modify-write of one JSON
     column, which is the only part that races.
     """
-    await lock_type(session, rtype)
+    try:
+        await lock_type(session, rtype)
+    except Conflict:
+        # The lock refuses a type deleted while the rebuild ran; that is not an
+        # error here (below), whereas a move or a busy lock still is.
+        if await reload(session, RecordType, rtype.id) is None:
+            return
+        raise
     fresh = await reload(session, RecordType, rtype.id)
     if fresh is None:  # the type was deleted while the rebuild ran; its markers went with it
         return

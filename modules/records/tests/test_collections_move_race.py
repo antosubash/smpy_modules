@@ -24,6 +24,7 @@ from sm_records.models import RecordType
 from sm_records.services import _lifecycle
 from sm_records.services._delete_locks import DeleteGraph, check_delete_plan
 from sm_records.services._empty_trash import _purge_ids, empty_trash
+from sm_records.services._type_update import update_type
 from sm_records.services.errors import Conflict, NotFound
 from sm_records.services.records import create_record, get_deleted_record, get_record
 
@@ -163,3 +164,26 @@ async def test_a_delete_plan_reaching_an_unlocked_type_is_refused(file_db):
         read_only_moved = DeleteGraph(frozenset(), {type_id: "events"})
         with pytest.raises(Conflict, match="this delete reads moved"):
             await check_delete_plan(db, read_only_moved, [])
+
+
+async def test_a_reindex_marked_after_the_type_was_read_still_refuses_the_move(file_db):
+    """``cli reindex`` marks a type pending without bumping its version, so the
+    move reads the marker under the lock rather than off its own row."""
+    type_id, _ = await seed(file_db)
+    async with file_db.session_factory() as mover:
+        stale = await mover.get(RecordType, type_id)
+        async with file_db.session_factory() as marker:
+            fresh = await marker.get(RecordType, type_id)
+            fresh.reindex_pending = {"name": "2026-10-22T00:00:00+00:00"}
+            await marker.commit()
+        assert not stale.reindex_pending
+        with pytest.raises(Conflict, match="reindex outstanding"):
+            await update_type(
+                mover,
+                stale,
+                expected_version=stale.version,
+                settings=SETTINGS,
+                collection="events",
+            )
+        await mover.rollback()
+    assert await count(file_db, "events", type_id) == 0

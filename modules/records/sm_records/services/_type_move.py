@@ -115,11 +115,14 @@ async def move_type(db: AsyncSession, rtype: RecordType, target: str | None) -> 
     per-tenant uuid rule makes impossible for rows this module wrote and
     which would otherwise surface as an ``IntegrityError``.
     """
-    if rtype.reindex_pending:
+    await lock_type(db, rtype)
+    # Read under the lock, not off the instance: ``cli reindex`` marks a type
+    # pending without bumping its version, so the caller's row can be stale.
+    pending = await db.scalar(select(RecordType.reindex_pending).where(RecordType.id == rtype.id))
+    if pending:
         raise Conflict(
             f"type {rtype.key!r} has a reindex outstanding; move it once the reindex finishes"
         )
-    await lock_type(db, rtype)
     source, dest = tables_for(rtype), table_set(target)
     src, dst = source.record.__table__, dest.record.__table__
     tenant = rtype.tenant_id
