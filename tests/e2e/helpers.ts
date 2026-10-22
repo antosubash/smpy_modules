@@ -114,3 +114,33 @@ export async function logout(page: Page) {
 export function uniqueSlug(prefix = 'e2e-page') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
+
+/** Create a pagebuilder page through the API (optionally published) and return its id. */
+export async function makePage(
+  page: Page,
+  { slug, publish = false, blocks = [] as unknown[] },
+): Promise<number> {
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+  const created = await page.request.post('/api/pagebuilder/pages', {
+    headers,
+    data: {
+      title: `QA ${slug}`,
+      slug,
+      draft_data: {
+        root: { props: { title: `QA ${slug}`, width: 'full' } },
+        content: blocks,
+        zones: {},
+      },
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const id = (await created.json()).id as number;
+  if (publish) {
+    const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
+      headers,
+      data: {},
+    });
+    expect(published.ok(), await published.text()).toBeTruthy();
+  }
+  return id;
+}

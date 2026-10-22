@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
+import { login, makePage, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * The media library's refusals: an asset a page still uses cannot be deleted
@@ -30,35 +30,6 @@ async function uploadAsset(page: Page) {
     url: string;
     original_filename: string;
   };
-}
-
-async function makePage(
-  page: Page,
-  { slug, publish = false, blocks = [] as unknown[] },
-): Promise<number> {
-  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: `QA ${slug}`,
-      slug,
-      draft_data: {
-        root: { props: { title: `QA ${slug}`, width: 'full' } },
-        content: blocks,
-        zones: {},
-      },
-    },
-  });
-  expect(created.status(), await created.text()).toBe(201);
-  const id = (await created.json()).id as number;
-  if (publish) {
-    const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers,
-      data: {},
-    });
-    expect(published.ok(), await published.text()).toBeTruthy();
-  }
-  return id;
 }
 
 test.describe('the media library honours the in-use refusal', () => {

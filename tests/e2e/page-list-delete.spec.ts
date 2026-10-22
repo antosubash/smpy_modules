@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
+import { login, makePage, uniqueSlug } from './helpers';
 
 /**
  * Deleting a page from the list view asks for what the board card asks for: a
@@ -8,35 +8,6 @@ import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
  *
  * A protection only one of two doors honours is not a protection.
  */
-
-async function makePage(
-  page: Page,
-  { slug, publish = false, blocks = [] as unknown[] },
-): Promise<number> {
-  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
-  const created = await page.request.post('/api/pagebuilder/pages', {
-    headers,
-    data: {
-      title: `QA ${slug}`,
-      slug,
-      draft_data: {
-        root: { props: { title: `QA ${slug}`, width: 'full' } },
-        content: blocks,
-        zones: {},
-      },
-    },
-  });
-  expect(created.status(), await created.text()).toBe(201);
-  const id = (await created.json()).id as number;
-  if (publish) {
-    const published = await page.request.post(`/api/pagebuilder/pages/${id}/publish`, {
-      headers,
-      data: {},
-    });
-    expect(published.ok(), await published.text()).toBeTruthy();
-  }
-  return id;
-}
 
 test.describe('deleting a published page from the list view', () => {
   test('demands the slug typed, exactly as the board card does', async ({ page }) => {
