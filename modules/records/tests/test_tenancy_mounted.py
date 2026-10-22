@@ -10,7 +10,6 @@ registry, drops its default-tenant per-type entries for the same reason.
 
 from __future__ import annotations
 
-import sys
 from types import SimpleNamespace
 from typing import Any
 
@@ -64,12 +63,12 @@ def _request(app: FastAPI, scope: dict) -> SimpleNamespace:
 
 
 @pytest.mark.unbound_tenant
-def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
-    """No public ``tenancy_mode`` to ask: ``state.sm`` alone is no answer, so
-    a mounted child with no upstream tenant is refused, not handed default."""
-    monkeypatch.setitem(sys.modules, "simple_module_hosting.tenancy", None)  # ImportError
+def test_a_mounted_child_without_a_framework_answer_fails_closed():
+    """A child ``create_app`` did not build (no ``state.sm``) has no framework
+    answer, so mounted with no upstream tenant it is refused, not handed
+    default; one ``create_app`` built answers ``SINGLE`` itself (0.0.36 floor,
+    #211 — the 0.0.35 no-``tenancy_mode`` case no longer exists)."""
     app = FastAPI()
-    app.state.sm = SimpleNamespace()
     request = _request(app, {"app_root_path": "", "root_path": "/child"})
     with pytest.raises(TenantRequired):
         resolve_admin(request)
@@ -77,6 +76,9 @@ def test_on_framework_0_0_35_a_mounted_child_fails_closed(monkeypatch):
     request.scope = {}  # not mounted: the app's own single-tenant answer stands
     assert resolve_admin(request) == "default"
     assert resolve_public(request) == "default"
+    app.state.sm = SimpleNamespace(tenancy="single")
+    request.scope = {"app_root_path": "", "root_path": "/child"}
+    assert resolve_admin(request) == "default"
 
 
 def _hub() -> MenuItem:
