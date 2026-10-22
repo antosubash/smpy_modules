@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.metadata
 
+from fastapi.routing import iter_route_contexts
 from pagebuilder.module import PagebuilderModule
 from simple_module_core.menu import MenuRegistry, MenuSection
 
@@ -27,15 +28,16 @@ class TestMeta:
 
 
 def _registered_paths(app) -> set[str]:
-    """Enumerate a module's routes.
+    """Enumerate every route the app serves, view routes included.
 
-    Reads the OpenAPI schema rather than walking ``app.routes``. Since
-    FastAPI 0.141, ``include_router`` no longer copies the sub-router's
-    routes onto the parent — it wraps them in a single lazily-resolved
-    ``_IncludedRouter`` with no ``path`` attribute, so walking
-    ``app.routes`` finds nothing for any included router.
+    Not ``app.routes``: since FastAPI 0.141 ``include_router`` wraps the
+    sub-router in one lazily-resolved ``_IncludedRouter`` with no ``path``.
+    Not the OpenAPI schema either: framework 0.0.37 includes view routers with
+    ``include_in_schema=False`` (Inertia pages are not JSON API), so the schema
+    lists only ``/api/...`` (#186). ``iter_route_contexts`` resolves the
+    included routers into their final, prefixed paths.
     """
-    return set(app.openapi()["paths"])
+    return {r.path for r in iter_route_contexts(app.routes) if r.path}
 
 
 class TestRoutes:
@@ -71,8 +73,8 @@ class TestMenu:
         paths = _registered_paths(build_test_app(PagebuilderModule))
         for item in self._sidebar(roles=["admin"]):
             url = item["url"]
-            # "/pagebuilder/" is also served at the bare prefix, which is how
-            # the schema records it — accept either form.
+            # "/pagebuilder/" is also served at the bare prefix, which is the
+            # form the route table records — accept either.
             assert url in paths or url.rstrip("/") in paths, f"{url} is not a registered route"
 
     def test_visible_without_a_pagebuilder_role(self):

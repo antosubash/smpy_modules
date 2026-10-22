@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from simple_module_hosting import Settings, create_app
 
 REPO = Path(__file__).resolve().parents[2]
@@ -54,10 +55,10 @@ def test_pagebuilder_registered(app):
 
 
 def test_pagebuilder_routes_mounted(app):
-    # Read the OpenAPI schema rather than walking app.routes: since FastAPI
-    # 0.141 an included router is wrapped in a single _IncludedRouter with no
-    # `path`, so app.routes exposes nothing for it.
-    paths = set(app.openapi()["paths"])
+    # Resolve the route table rather than reading app.routes (since FastAPI
+    # 0.141 an included router is one _IncludedRouter with no `path`) or the
+    # OpenAPI schema (framework 0.0.37 leaves view routes out of it, #186).
+    paths = {r.path for r in iter_route_contexts(app.routes) if r.path}
     assert "/api/pagebuilder/pages" in paths
     assert "/pagebuilder/media" in paths
 
