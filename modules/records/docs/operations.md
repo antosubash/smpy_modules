@@ -49,7 +49,7 @@ view_prefix="/admin/records", depends_on=["Settings"],
 requires_framework=">=1.0,<2.0")`. It depends on the framework's **Settings**
 module so that `app.state.settings.module_registry` exists by the time
 `register_settings` runs. Python dependencies are declared with **ranges**
-(`simple_module_core>=0.0.35,<0.1` and the same for `db`, `hosting` and
+(`simple_module_core>=0.0.36,<0.1` and the same for `db`, `hosting` and
 `settings`), never exact pins.
 
 Then generate and apply the migration:
@@ -1038,15 +1038,15 @@ request.
 records: could not read the sidebar types; keeping the previous entries
 ```
 
-**This is the only place the module reaches into framework internals** — the
-registry has no remove and no dynamic provider hook. Framework 0.0.36 added
-both (upstream [#340](https://github.com/antosubash/simple_module_python/issues/340)):
-`MenuRegistry.remove(predicate)` for static items, and
+**Removal goes through the registry's public `MenuRegistry.remove(predicate)`**
+(core 0.0.36, upstream [#340](https://github.com/antosubash/simple_module_python/issues/340)),
+so the sync no longer reaches into framework internals. The same release added
+a dynamic provider hook,
 `MenuRegistry.add_provider(fn)` from `register_menu_items`, where
 `fn(request)` returns the items for that request (sync or async) and runs after
 auth and tenant resolution, so a per-tenant sidebar becomes possible. Records
-has **not** adopted it: the splice above is still what runs, and moving to a
-provider is separate work.
+has **not** adopted the provider: the remove-and-add sync above is still what
+runs, and moving to a provider is separate work.
 
 ---
 
@@ -1320,7 +1320,7 @@ single-tenant host and the CLI, which do not run strict.
 | [#337](https://github.com/antosubash/simple_module_python/issues/337) | Two `RequiresPermission` classes; the hosting one silently ignores per-user grants | Fixed in 0.0.36: the hosting checker honours direct grants, and `permissions.deps` re-exports it. `deps.py` now uses it alone; its old preference for the `permissions` class called it with that class's 0.0.35 signature and broke every records route on 0.0.36 |
 | [#338](https://github.com/antosubash/simple_module_python/issues/338) | `AdminLayout` mounts no `<Toaster>`, so `toast.*()` is swallowed on every admin page | Fixed in 0.0.36 (`SidebarLayout` mounts one). The module's own `RecordsToaster` is removed: with both mounted, every toast showed twice |
 | [#339](https://github.com/antosubash/simple_module_python/issues/339) | The SQLite engine is left at driver defaults: rollback journal, implicit 5 s busy timeout, foreign keys **off** — a [comment](https://github.com/antosubash/simple_module_python/issues/339#issuecomment-5795747765) adds that the tenancy migration's composite `(type_id, tenant_id)` FK is therefore unenforced on a SQLite host | `on_delete` is enforced in the application rather than by FK cascades, and the reindex runner retries a short bounded backoff on `database is locked`; the composite type FK is proven only by tests that turn `PRAGMA foreign_keys=ON` themselves — a SQLite production host gets no such guarantee |
-| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically — a [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | `sm_records.menu.sync_type_menu` splices the registry's item list by object identity — one function, the module's only reach into framework internals; on a multi-tenant host it syncs no per-type items at all rather than leak one tenant's labels to another ([The sidebar sync](#the-sidebar-sync)). Framework 0.0.36 (PR #407) adds `MenuRegistry.add_provider(fn)` (`fn(request)` returns items per request, after tenant resolution) and `MenuRegistry.remove(predicate)`. Records has not adopted it |
+| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically — a [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | `sm_records.menu.sync_type_menu` removes its own items from the registry by object identity through the public `MenuRegistry.remove` (0.0.36; it spliced the private list before); on a multi-tenant host it syncs no per-type items at all rather than leak one tenant's labels to another ([The sidebar sync](#the-sidebar-sync)). Framework 0.0.36 (PR #407) adds `MenuRegistry.add_provider(fn)` (`fn(request)` returns items per request, after tenant resolution) and `MenuRegistry.remove(predicate)`. Records uses `remove`; it has not adopted the provider |
 | [#341](https://github.com/antosubash/simple_module_python/issues/341) | `AdminLayout`/`SidebarLayout` have no skip link, and five chrome tab stops precede the first page control | Fixed in 0.0.36 (PR #400): `SidebarLayout`, and so `AdminLayout`, renders a "skip to content" link to `#main` ahead of the chrome. Nothing to work around; the module's own per-type sidebar entries still add tab stops before the page |
 | [#342](https://github.com/antosubash/simple_module_python/issues/342) | Migrations autogenerated on SQLite are not portable to Postgres (boolean defaults as `text('0')`, expression indexes invisible, enum types left behind on downgrade), and every check reports them clean | This host's revisions were corrected by hand (`ed06f4584f6b`, `4cf1b4c9f8f9`, `b98d8185ecef`, `d2b7a1c4e905`); see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 2 (fixed upstream in 0.0.36 for new revisions; existing ones are unchanged) |
 | [#343](https://github.com/antosubash/simple_module_python/issues/343) | `simple_module_test` fixtures hard-code in-memory SQLite, so a module suite cannot run on Postgres | The repo-root `tests/pg_support.py` and `SM_TEST_DATABASE_URL` do it for `records`, `pagebuilder` and `news`; see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 3 and § 13 |

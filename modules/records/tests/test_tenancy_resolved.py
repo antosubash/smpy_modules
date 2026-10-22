@@ -152,8 +152,17 @@ async def test_a_child_app_detected_single_still_binds_the_parents_tenant():
     """Fail closed at request time (#192): the child app has no
     ``TenantMiddleware`` of its own, so its detection says SINGLE, but the
     parent's middleware resolved a tenant first — that one is bound, never
-    ``default``."""
+    ``default``. With nothing upstream it is refused (#210): nothing visible
+    from the child says the parent is single-tenant."""
+    from fastapi.responses import JSONResponse
+    from sm_records.services.errors import RecordsError
+
     child = FastAPI()
+
+    @child.exception_handler(RecordsError)
+    async def refused(_request, exc: RecordsError) -> JSONResponse:
+        return JSONResponse({"refused": type(exc).__name__}, status_code=exc.status_code)
+
     for path, dependency in (("/admin", bind_admin), ("/public", bind_public)):
         router = APIRouter(dependencies=[Depends(dependency)])
 
@@ -173,8 +182,29 @@ async def test_a_child_app_detected_single_still_binds_the_parents_tenant():
         for path in ("/child/admin", "/child/public"):
             got = await client.get(path, headers={_ACTIVE: "acme"})
             assert got.json() == {"tenant": "acme"}, path
-            # Nothing upstream: the single-tenant default fills the gap.
-            assert (await client.get(path)).json() == {"tenant": "default"}
+        # Nothing upstream: refused, never the default tenant's rows.
+        admin, public = await client.get("/child/admin"), await client.get("/child/public")
+        assert (admin.status_code, admin.json()) == (403, {"refused": "TenantRequired"})
+        assert (public.status_code, public.json()) == (404, {"refused": "NotFound"})
+    assert current_tenant_id.get() is None
+
+
+async def test_an_unmounted_single_tenant_app_still_binds_the_default():
+    """The mount check only fills a gap the framework cannot answer: an app
+    served directly, detected single, binds ``default`` as before."""
+    app = FastAPI()
+    for path, dependency in (("/admin", bind_admin), ("/public", bind_public)):
+        router = APIRouter(dependencies=[Depends(dependency)])
+
+        @router.get(path)
+        async def seen() -> dict:
+            return {"tenant": current_tenant_id.get()}
+
+        app.include_router(router)
+    configure(app)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        for path in ("/admin", "/public"):
+            assert (await client.get(path)).json() == {"tenant": "default"}, path
     assert current_tenant_id.get() is None
 
 

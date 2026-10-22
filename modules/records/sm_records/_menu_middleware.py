@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from sm_records import constants, menu
+from sm_records._tenancy_mode import TenancyMode, scope_mode
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only
     from sm_records.module import RecordsModule
@@ -52,9 +53,21 @@ class MenuSyncMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and _renders_a_sidebar(scope.get("path", "")):
+            if _ambiguous(scope):
+                # Mounted under a parent nothing here can see (#210): the
+                # default tenant's type labels must not reach its tenants, so
+                # the per-type entries go, for the life of the process.
+                self.module._menu_suppressed = True
             async with self._lock:
                 await menu.refresh(self.module)
         await self.app(scope, receive, send)
+
+
+def _ambiguous(scope: Scope) -> bool:
+    """Whether this request reached a single-detected app through a mount the
+    framework cannot answer for — :func:`sm_records.tenancy.request_mode`'s rule."""
+    app = scope.get("app")
+    return app is not None and scope_mode(app, scope, TenancyMode.SINGLE) is TenancyMode.MULTI
 
 
 def _renders_a_sidebar(path: str) -> bool:
