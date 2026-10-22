@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
 import { AssignDialog } from '../components/AssignDialog';
+import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
 import { SubscriptionsTable } from '../components/SubscriptionsTable';
 import { SyncHealthBar } from '../components/SyncHealthBar';
 import { ADMIN_API, api } from '../utils/api';
@@ -44,6 +45,7 @@ function Subscriptions() {
     can_manage,
     checkout_available,
     provider,
+    provider_error,
   } = usePage<{ props: Props }>().props as unknown as Props;
   const [assigning, setAssigning] = useState<SubscriptionRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,6 +91,11 @@ function Subscriptions() {
         }
       >
         <AdminNav active="subscriptions" />
+        {provider_error && (
+          <div className="mb-4">
+            <ProviderFallbackBanner error={provider_error} />
+          </div>
+        )}
         {checkout_available && <SyncHealthBar health={sync_health} />}
         <div className="mb-4 flex max-w-xs items-center gap-2">
           <Label htmlFor="status-filter" className="shrink-0">
