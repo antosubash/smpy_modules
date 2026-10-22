@@ -205,3 +205,52 @@ async def test_a_large_gif_frame_cannot_hide_behind_junk_or_truncation(
 
     assert response.status_code == 413, (kind, response.text)
     assert _stored_files(tmp_path) == []
+
+
+def _with_extension_before_second_frame(extension: bytes) -> bytes:
+    # After the first frame, so ``Image.open`` still succeeds and the walk
+    # (not Pillow's opening) is what meets the extension.
+    spliced = _animated_gif_with_larger_second_frame()
+    cut = len(_gif(10, 10)) - 1
+    return spliced[:cut] + extension + spliced[cut:]
+
+
+@pytest.mark.parametrize(
+    "extension",
+    [
+        pytest.param(b"!\xf9\x00", id="control-extension-without-data"),
+        pytest.param(b"!\xff\x0bNETSCAPE2.0\x00", id="netscape-without-data"),
+    ],
+)
+async def test_a_gif_pillow_would_read_differently_is_refused(
+    authed_client: AsyncClient, tmp_path: Path, extension: bytes
+) -> None:
+    # Pillow reads past the terminator of these extensions, so where the next
+    # block starts is ambiguous; the walk refuses rather than guess (#222).
+    content = _with_extension_before_second_frame(extension)
+
+    response = await _upload_as(authed_client, content, "image/gif")
+
+    assert response.status_code == 415, response.text
+    assert _stored_files(tmp_path) == []
+
+
+async def test_a_pillow_written_animated_gif_still_uploads(authed_client: AsyncClient) -> None:
+    # Loop (NETSCAPE2.0) and per-frame control extensions, as real encoders write.
+    response = await _upload_as(authed_client, _animated("GIF", 8), "image/gif")
+
+    assert response.status_code == 201, response.text
+
+
+async def test_an_unexpected_processing_error_leaves_no_file(
+    authed_client: AsyncClient, tmp_path: Path, monkeypatch
+) -> None:
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("pagebuilder.media_service.process_image", boom)
+
+    with pytest.raises(RuntimeError):
+        await _upload(authed_client, _png(4, 4))
+
+    assert _stored_files(tmp_path) == []

@@ -15,6 +15,18 @@ spec, so the two cannot disagree about which frames exist: a byte that
 introduces no block is skipped, not treated as the end, and only the ``;``
 trailer or the end of the file stops it. A frame counts as soon as its
 descriptor is read, which is also when Pillow checks its size.
+
+Two layouts make Pillow read past a sub-block terminator, so it and a spec
+reader would disagree about where the next block starts: an extension other
+than a comment whose first sub-block is the terminator, and a NETSCAPE2.0
+extension with no data sub-block. Neither appears in a GIF any real encoder
+writes, so rather than mimic the over-read the walk refuses the file
+(:class:`AmbiguousGifError`).
+
+Letting Pillow itself enumerate the frames was the alternative. ``seek``
+decodes every frame before the next, which would make each animated upload a
+full decode — up to ``MAX_IMAGE_PIXELS`` per frame — where today none is
+decoded; the header-only path that skips decoding is private API.
 """
 
 from __future__ import annotations
@@ -26,6 +38,12 @@ from pathlib import Path
 # steps over any other byte one at a time; searching for the next one is the
 # same walk without a Python-level loop per byte of junk.
 _INTRODUCER = re.compile(rb"[!,;]")
+_COMMENT_LABEL = 0xFE
+_APPLICATION_LABEL = 0xFF
+
+
+class AmbiguousGifError(Exception):
+    """The GIF's block layout is one Pillow would read differently."""
 
 
 def _u16(data: bytes, pos: int) -> int:
@@ -43,10 +61,25 @@ def _skip_sub_blocks(data: bytes, pos: int) -> int:
     return pos + 1
 
 
+def _skip_extension(data: bytes, pos: int) -> int:
+    """Position after the extension whose label is at ``pos``."""
+    if pos + 1 >= len(data):
+        return len(data)
+    label, first = data[pos], data[pos + 1]
+    if first == 0 and label != _COMMENT_LABEL:
+        raise AmbiguousGifError(f"extension 0x{label:02x} has no data sub-block")
+    if label == _APPLICATION_LABEL and data[pos + 2 : pos + 2 + first].startswith(b"NETSCAPE2.0"):
+        after_first = pos + 2 + first
+        if after_first < len(data) and data[after_first] == 0:
+            raise AmbiguousGifError("NETSCAPE2.0 extension has no data sub-block")
+    return _skip_sub_blocks(data, pos + 1)
+
+
 def gif_canvas_size(source: Path) -> tuple[int, int] | None:
     """The logical screen grown to cover every frame, or ``None`` if not a GIF.
 
     Reads the whole file: uploads are already capped by ``media_max_bytes``.
+    Raises :class:`AmbiguousGifError` for a layout Pillow reads differently.
     """
     data = source.read_bytes()
     if len(data) < 13 or data[:6] not in (b"GIF87a", b"GIF89a"):
@@ -59,7 +92,7 @@ def gif_canvas_size(source: Path) -> tuple[int, int] | None:
         if introducer == b";":
             break
         if introducer == b"!":  # extension: one label byte, then sub-blocks
-            pos = _skip_sub_blocks(data, pos + 1)
+            pos = _skip_extension(data, pos)
             continue
         if pos + 9 > len(data):  # truncated image descriptor: no frame
             break

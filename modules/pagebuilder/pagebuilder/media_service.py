@@ -30,6 +30,7 @@ from pagebuilder.media_files import (
     resolve_media_root,
     tenant_media_dir,
 )
+from pagebuilder.media_gif import AmbiguousGifError
 from pagebuilder.media_images import (
     CONTENT_TYPE_EXTENSIONS,
     SNIFF_BYTES,
@@ -227,6 +228,17 @@ class MediaService:
                     "message": "Image dimensions exceed the pixel limit",
                 },
             ) from None
+        except AmbiguousGifError:
+            # A GIF whose frames cannot be counted the way Pillow counts them
+            # is refused like any file that is not a valid image.
+            target.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=415, detail="GIF structure could not be verified"
+            ) from None
+        except BaseException:
+            # Anything unexpected must not leave an unlisted file behind.
+            target.unlink(missing_ok=True)
+            raise
 
         asset = MediaAsset(
             filename=filename,
