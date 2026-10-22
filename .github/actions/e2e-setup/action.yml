@@ -98,21 +98,16 @@ runs:
         printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "30";' \
           'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
 
-    # Composite steps cannot carry `timeout-minutes`; `timeout` stands in for
-    # it, so a mirror that keeps failing cannot sit out the whole job budget.
-    # 20 min leaves room for apt's retries above the normal ~2 min cold
-    # install. On expiry it SIGTERMs the install's process group and exits 124,
-    # which fails the step (bash runs with -e). `-k 30s` follows with SIGKILL:
-    # without it, a child that ignores SIGTERM keeps `timeout` waiting for as
-    # long as the child runs.
+    # Even with those retries, one apt call could still stall for the step's
+    # full 20 minutes (#215). install-browsers.sh now skips apt whenever
+    # Chromium already launches, gives each apt phase its own timeout, and
+    # switches off the Azure mirror when it fails. The whole step keeps its
+    # 20-minute cap. Composite steps cannot carry `timeout-minutes`, so
+    # `timeout` enforces it: on expiry it SIGTERMs the script's process group
+    # and exits 124. `-k 30s` follows with SIGKILL, because a child that
+    # ignores SIGTERM would otherwise keep `timeout` waiting.
     - name: Install Playwright browsers
       shell: bash
       env:
         CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
-      run: |
-        if [ "$CACHE_HIT" = "true" ]; then
-          # Browsers cached — only refresh OS-level deps (fast).
-          timeout -k 30s 20m npx playwright install-deps chromium
-        else
-          timeout -k 30s 20m npx playwright install chromium --with-deps
-        fi
+      run: timeout -k 30s 20m "$GITHUB_ACTION_PATH/install-browsers.sh"
