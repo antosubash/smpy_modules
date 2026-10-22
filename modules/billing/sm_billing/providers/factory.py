@@ -33,7 +33,8 @@ def build_provider(settings: BillingSettings) -> tuple[BillingProvider, str]:
         secret = crypto.decrypt_value(settings.stripe_secret_key, "stripe_secret_key")
         webhook = crypto.decrypt_value(settings.stripe_webhook_secret, "stripe_webhook_secret")
     except crypto.BillingKeyUnreadableError as exc:
-        error = str(exc)
+        # The locale templates append their own full stop after ``{error}``.
+        error = str(exc).rstrip(". ")
     else:
         missing = [
             name

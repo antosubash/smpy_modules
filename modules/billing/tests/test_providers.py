@@ -87,3 +87,16 @@ async def test_startup_installs_manual_provider(app):
     services = app.state.sm_billing
     assert isinstance(services.provider, ManualProvider)
     assert services.provider_error == ""
+
+
+def test_unreadable_secret_reason_has_no_trailing_full_stop():
+    # The screens write "{error}. Plans are ..."; a reason already ending in "." doubles it.
+    crypto.set_secret_provider(lambda: "one")
+    stored = crypto.encrypt_value("sk_test")
+    crypto.set_secret_provider(lambda: "two")
+    try:
+        _, error = build_provider(BillingSettings(provider="stripe", stripe_secret_key=stored))
+    finally:
+        crypto.set_secret_provider(lambda: "")
+    assert "stripe_secret_key" in error
+    assert not error.endswith(".")
