@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from pagebuilder import locales
-from pagebuilder.models import PageStatus, SnapshotMedia
+from pagebuilder.models import Page, PageStatus, SnapshotMedia
 from pagebuilder.snapshots.assets import collect_sentinels
 from pagebuilder.snapshots.format import (
     LAYOUT_NAME,
@@ -104,6 +104,7 @@ _MEDIA_FIELD_LIMITS = tuple(
     (field, _width(field))
     for field in ("original_filename", "content_type", "folder")
 )
+_GROUP_WIDTH: int = Page.__table__.columns["translation_group"].type.length
 
 
 def check_media_entry(name: str, entry: dict[str, Any]) -> None:
@@ -187,7 +188,7 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
         # land on between them and the second would trip the constraint.
         group = payload.get("translation_group")
         if group is not None:
-            if not isinstance(group, str) or not group or len(group) > 32:
+            if not isinstance(group, str) or not group or len(group) > _GROUP_WIDTH:
                 raise BundleError(f"{label} has an unreadable translation_group")
             if (group, page_key[0]) in seen_groups:
                 raise BundleError(f"{label} repeats translation_group {group!r} in {page_key[0]}")
