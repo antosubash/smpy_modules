@@ -31,8 +31,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from simple_module_core import ModuleBase, ModuleMeta
+from simple_module_core.csp import CspSourceRegistry
 from simple_module_core.events import EventBus
-from simple_module_core.menu import MenuItem, MenuRegistry
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
@@ -136,55 +137,15 @@ class NewsModule(ModuleBase):
         )
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
-        # Roles stay empty: filtering is a plain intersection with no admin
-        # bypass, so a non-empty list hides the entry from everyone outside it.
-        registry.add_many(
-            [
-                MenuItem(
-                    label=constants.MENU_LABEL_ARTICLES,
-                    label_key=constants.MENU_LABEL_KEY_ARTICLES,
-                    url=constants.MENU_URL,
-                    icon=constants.MENU_ICON,
-                    order=100,
-                    group=constants.MENU_GROUP,
-                    group_key=constants.MENU_GROUP_KEY,
-                ),
-                MenuItem(
-                    label=constants.MENU_LABEL_CATEGORIES,
-                    label_key=constants.MENU_LABEL_KEY_CATEGORIES,
-                    url=constants.MENU_URL_CATEGORIES,
-                    icon=constants.MENU_ICON_CATEGORIES,
-                    order=110,
-                    group=constants.MENU_GROUP,
-                    group_key=constants.MENU_GROUP_KEY,
-                ),
-                # In the rail rather than behind a filter on the list: a trashed
-                # article keeps its slug claimed, so an author who bins one and
-                # cannot find it tries to recreate it and is told the URL is
-                # taken by something they cannot see.
-                MenuItem(
-                    label=constants.MENU_LABEL_TRASH,
-                    label_key=constants.MENU_LABEL_KEY_TRASH,
-                    url=constants.MENU_URL_TRASH,
-                    icon=constants.MENU_ICON_TRASH,
-                    order=120,
-                    group=constants.MENU_GROUP,
-                    group_key=constants.MENU_GROUP_KEY,
-                ),
-                # Its own group: where pagebuilder is installed the screen
-                # searches pages and media as well, so listing it under News
-                # would say something untrue about what it covers.
-                MenuItem(
-                    label=constants.MENU_LABEL_SEARCH,
-                    label_key=constants.MENU_LABEL_KEY_SEARCH,
-                    url=constants.ADMIN_SEARCH_URL,
-                    icon=constants.MENU_ICON_SEARCH,
-                    order=10,
-                    group=constants.MENU_GROUP_SEARCH,
-                    group_key=constants.MENU_GROUP_KEY_SEARCH,
-                ),
-            ]
-        )
+        from news.menu import menu_items
+
+        registry.add_many(menu_items())
+
+    def register_csp_sources(self, registry: CspSourceRegistry) -> None:
+        """The article editor's bundled font, from the Vite origin in dev; see dev_csp."""
+        from news.dev_csp import vite_font_source
+
+        registry.add_provider(vite_font_source)
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Re-publish the settings when an operator saves them.

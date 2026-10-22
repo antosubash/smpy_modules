@@ -1,4 +1,3 @@
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';

@@ -47,6 +47,12 @@ describe('validationMessage', () => {
 });
 
 describe('fromValidationErrors with a slug mismatch', () => {
+  it("falls back to pydantic's text if the error type is ever renamed", () => {
+    const renamed = { ...PATTERN_MISMATCH, type: 'string_regex_mismatch' };
+
+    expect(fromValidationErrors([renamed])).toBe(`slug: ${PATTERN_MISMATCH.msg}`);
+  });
+
   it('shows the sentence, without the regex or a field prefix', () => {
     const message = fromValidationErrors([PATTERN_MISMATCH]);
 

@@ -8,7 +8,9 @@ English, whatever its ``hreflang`` alternates said.
 from __future__ import annotations
 
 import pytest
+from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
+from pagebuilder.html_lang import set_html_lang
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,3 +61,34 @@ class TestHtmlLang:
 
         assert response.json()["props"]["locale"] == "de"
         assert "data-shell-lang" not in response.text
+
+
+class TestRewrite:
+    """``set_html_lang`` on its own: what it writes and what it refuses to touch."""
+
+    @staticmethod
+    def _shell(body: bytes) -> HTMLResponse:
+        return HTMLResponse(content=body)
+
+    async def test_a_hostile_locale_cannot_leave_the_attribute(self) -> None:
+        # Stored locales are pattern-checked; this is the second line behind it.
+        response = set_html_lang(
+            self._shell(b'<html lang="en"><body></body></html>'), 'de" onload="x'
+        )
+
+        assert response.body.startswith(
+            b'<html lang="de&quot; onload=&quot;x" data-shell-lang="en">'
+        )
+
+    async def test_only_the_shell_tag_is_rewritten(self) -> None:
+        body = b'<html lang="en"><body>&lt;html lang="fr"&gt;<html lang="fr"></body></html>'
+
+        patched = set_html_lang(self._shell(body), "de").body
+
+        assert patched.count(b"data-shell-lang") == 1
+        assert patched.endswith(b'<html lang="fr"></body></html>')
+
+    async def test_a_shell_without_lang_is_left_alone(self) -> None:
+        body = b"<html><body></body></html>"
+
+        assert set_html_lang(self._shell(body), "de").body == body

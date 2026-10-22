@@ -174,13 +174,19 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
     origin: `http://localhost:${uiPort}`,
     fs: {
-      // The workspace root too: `host/client_app/node_modules` exists (npm
-      // keeps a non-hoisted copy there), so `fsRoot` stops at the host and
-      // the hoisted root `node_modules` was outside the allow list. Modules
+      // The workspace's hoisted `node_modules` too: `host/client_app/node_modules`
+      // exists (npm keeps a non-hoisted copy there), so `fsRoot` stops at the
+      // host and the root `node_modules` was outside the allow list. Modules
       // are fine — Vite serves what the module graph imports — but an asset a
       // stylesheet points at is checked against this list, which is how the
-      // editor's bundled Inter came back 403 under `vite dev` (#188).
-      allow: [fsRoot, searchForWorkspaceRoot(import.meta.dirname), ...moduleFsAllow],
+      // editor's bundled Inter came back 403 under `vite dev` (#188). Only
+      // `node_modules`, not the workspace root: that holds `host/app.db`,
+      // uploads and the venv, none of which fs.deny's defaults cover.
+      allow: [
+        fsRoot,
+        path.join(searchForWorkspaceRoot(import.meta.dirname), 'node_modules'),
+        ...moduleFsAllow,
+      ],
     },
   },
 }));
