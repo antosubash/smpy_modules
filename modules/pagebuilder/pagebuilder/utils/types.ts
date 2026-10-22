@@ -106,6 +106,17 @@ export interface PageRevisionRead {
   created_by: string | null;
 }
 
+/** A bulk snapshot restore that wrote the page. Derived from the approved
+ *  import, not a revision: there is no page state behind it to compare or
+ *  restore. Mirrors `PageRestoreMarker`. */
+export interface PageRestoreMarker {
+  import_id: number;
+  snapshot_id: number;
+  change: 'created' | 'overwritten';
+  restored_at: string;
+  restored_by: string | null;
+}
+
 export interface MediaAssetVariant {
   filename: string;
   url: string;

@@ -3,8 +3,8 @@
 **Status:** Parity reached, with two documented exceptions. Widgets match at
 **56**, the diverged primitives are aligned, `translation/` is ported in full
 and `blocksToHtml` with it (§9–§13). Not ported: `htmlToBlocks` and
-`isPuckContent` — §13 says why, and it is a judgement worth revisiting rather
-than an oversight.
+`isPuckContent` — §13 says why; HTML import was decided against on 2026-10-22
+(#84).
 **Date:** 2026-08-05
 **Source of truth for the target:** `<path-to>/IIASA.GeoWiki/frontend/packages/pagebuilder`
 (package `@geowiki/pagebuilder`, on Puck `0.21.3`).
@@ -508,6 +508,13 @@ for a capability nothing calls. It is the same judgement made in §9 about
 `is-puck-content` and for the same reason. **If a route ever needs to import
 HTML pages, this is the thing to build** — the note is here so the decision is
 visible rather than looking like an omission.
+
+**Decided against, 2026-10-22 (#84).** The question was reopened as #84 and the
+owner settled it: HTML import is not wanted, so `htmlToBlocks` and
+`isPuckContent` stay unported and no `jsdom` dependency or HTML→markdown
+converter is added. This is no longer a held judgement to revisit; reopening it
+needs a concrete route that imports HTML pages, and then the paragraph above is
+the cost to plan for.
 
 ## 14. Measurement
 

@@ -30,7 +30,7 @@ reconcile, troubleshooting) and [architecture](docs/architecture.md).
 pip install simple_module_billing
 ```
 
-The package depends on `simple_module_tenants>=0.0.35`. The host has to run
+The package depends on `simple_module_tenants>=0.0.36`. The host has to run
 with `SM_MULTI_TENANT=true`, because the tenant billing screen needs an active
 organisation. Billing ships SQLModel tables but no migrations. Autogenerate a
 revision in the host and give its first revision

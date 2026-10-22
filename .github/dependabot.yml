@@ -18,8 +18,12 @@
 
 version: 2
 updates:
+  # The workflows, plus the local composite actions under .github/actions,
+  # which a `directory: /` entry does not look inside.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     groups:
@@ -47,6 +51,10 @@ updates:
     ignore:
       - dependency-name: "simple_module_*"
       - dependency-name: "simple-module-*"
+      # Held by `constraint-dependencies` in the root pyproject.toml (#170):
+      # 0.0.45 retypes bare `datetime` columns. Drop both together.
+      - dependency-name: "sqlmodel"
+        versions: [">=0.0.45"]
     groups:
       uv:
         patterns: ["*"]

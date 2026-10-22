@@ -48,6 +48,7 @@ async def test_admin_views_render(admin):
     assert plans["known_limit_keys"] == ["tenants.seats"]
     subs = await page_props(admin, "/admin/billing/subscriptions")
     assert subs["rows"] == []
+    assert subs["provider_error"] == ""
     conn = await page_props(admin, "/admin/billing/connection")
     assert conn["connection"]["webhook_path"] == "/billing/webhooks/stripe"
 
@@ -184,6 +185,14 @@ async def test_connection_encrypts_and_masks(app, admin):
     assert keep.json()["has_secret_key"] is True
     cleared = await admin.put(f"{ADMIN}/connection", json={"clear_webhook_secret": True})
     assert cleared.json()["has_webhook_secret"] is False
+
+
+async def test_subscriptions_screen_says_why_stripe_fell_back(app, admin):
+    # #200: the reason was only on the connection screen.
+    app.state.sm_billing.provider_error = "provider is 'stripe' but stripe_secret_key is not set"
+    subs = await page_props(admin, "/admin/billing/subscriptions")
+    assert subs["provider"] == "manual"
+    assert subs["provider_error"] == "provider is 'stripe' but stripe_secret_key is not set"
 
 
 async def test_connection_save_rebuilds_stripe_provider(app, admin):

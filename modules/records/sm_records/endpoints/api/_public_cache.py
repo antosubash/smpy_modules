@@ -68,7 +68,14 @@ from fastapi import Request, Response
 
 from sm_records import constants
 from sm_records.settings import RecordsSettings
-from sm_records.tenancy import TenancyMode, mode_of, tenant_header
+from sm_records.tenancy import (
+    DEFAULT_TENANT,
+    TenancyMode,
+    mode_of,
+    request_mode,
+    resolve_public,
+    tenant_header,
+)
 
 __all__ = ["NO_STORE", "apply", "error_headers"]
 
@@ -115,11 +122,20 @@ def _tenancy(request: Request) -> tuple[str | None, bool]:
     """``(header to name in Vary, whether the answer is private)``.
 
     Single mode: ``(None, False)`` — every read is ``default``, whoever asks.
+    Unless an upstream layer resolved another tenant (a wrongly detected
+    ``SINGLE``, see :func:`~sm_records.tenancy.resolve_public`): that answer is
+    tenant-specific, so it is private and names the header when there is one.
     """
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    single = mode_of(request.app) is TenancyMode.SINGLE
+    # A mounted child's ``default`` may be the parent's tenant of that name,
+    # not this host's only one (#210): only a request-level SINGLE is shared.
+    shared = request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE
+    if shared and resolve_public(request) == DEFAULT_TENANT:
         return None, False
     services = getattr(request.app.state, constants.PACKAGE, None)
     header = getattr(services, "tenant_header", None) or tenant_header(request.app)
+    if single:
+        return header, True
     return header, getattr(request.state, "user", None) is not None
 
 

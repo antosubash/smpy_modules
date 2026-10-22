@@ -10,7 +10,7 @@
    ```
 
    It needs `simple_module_core`, `_db`, `_hosting`, `_inertia` and
-   `_settings` (`>=0.0.35,<0.1`), which it pulls in itself. Nothing else is
+   `_settings` (`>=0.0.36,<0.1`), which it pulls in itself. Nothing else is
    required.
 
 2. Migrations live in the host. Autogenerate after installing, read the

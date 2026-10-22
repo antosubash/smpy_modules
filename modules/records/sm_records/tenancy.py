@@ -11,14 +11,18 @@ stack is built once at boot, so a later edit of ``multi_tenant`` does not
 reach it until a restart.
 
 * ``SINGLE`` (no ``TenantMiddleware``, or one ``fixed`` to :data:`DEFAULT_TENANT`)
-  — everything runs in :data:`DEFAULT_TENANT`,
-  whatever a user's ``tenant_id`` or a header says.
-* ``MULTI`` — the admin surface runs in the *user's own* tenant and refuses a
-  user with none (403 ``tenant_required``), even when a header named one —
-  unless the operator turned ``admin_header_tenant`` on, which lets an
-  ``admin`` act in the header's tenant; the public surface runs in the
-  framework-resolved tenant and answers 404 without one. Neither ever falls
-  back to :data:`DEFAULT_TENANT`.
+  — everything runs in :data:`DEFAULT_TENANT`, whatever a user's
+  ``tenant_id`` or a header says — *unless something upstream already
+  resolved a tenant for the request*, which always wins: the mode only fills
+  a gap, so a wrong ``SINGLE`` detection fails closed rather than binding
+  every request to the default.
+* ``MULTI`` — every entry point runs in the tenant the framework resolved
+  (``request.state.tenant_id``: subdomain for visitors, membership for
+  members), the rule pagebuilder, news and billing follow too (#112). The
+  admin surface refuses a signed-in request with none (403
+  ``tenant_required``, pagebuilder's status and code); the public surface
+  answers it with the same 404 an unknown type gets. Neither ever falls back
+  to :data:`DEFAULT_TENANT`.
 
 **Binding rules.** :func:`tenant_scope` is the only way this module sets the
 contextvar: it always resets (a bare ``set()`` in awaited code leaks into the
@@ -43,19 +47,18 @@ from fastapi import HTTPException, Request
 from simple_module_db import tenant_context
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 
-from sm_records import constants
 from sm_records._tenancy_mode import (
     DEFAULT_TENANT,
     TenancyMode,
     configure,
     detect_mode,
     mode_of,
+    request_mode,
     tenant_header,
 )
 from sm_records.services.errors import TenantRequired
 
 __all__ = [
-    "ADMIN_ROLE",
     "ALL_TENANTS",
     "DEFAULT_TENANT",
     "TENANT_RE",
@@ -86,10 +89,6 @@ framework's filter still applies."""
 TENANT_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,49}$")
 """What a tenant id may be: at most 50 characters (the mixin's column width),
 starting alphanumeric. A header failing it is *no tenant*, never a 500."""
-
-ADMIN_ROLE: Final = "admin"
-"""The role ``admin_header_tenant`` lets act in the header's tenant — the
-framework's own wildcard role (``DEFAULT_ROLE_PERMISSIONS``)."""
 
 
 class TenantUnbound(RuntimeError):  # noqa: N818 - the design's name for it
@@ -135,60 +134,60 @@ def bound_tenant() -> str:
     return tenant
 
 
-def _header_tenant_for(request: Any, user: Any) -> str | None:
-    """The header's tenant for an ``admin`` with none of their own, when the
-    operator opted in with ``admin_header_tenant``; otherwise ``None``.
+def _resolved(request: Any) -> str | None:
+    """The tenant something upstream already chose for this request, or ``None``.
 
-    Off by default. For operators who administer several tenants from one
-    account, and only for holders of the ``admin`` role. Records reads the
-    header itself: since framework 0.0.35 (#358) ``TenantMiddleware`` resolves
-    it for anonymous requests only, so ``request.state.tenant_id`` is ``None``
-    for every signed-in user without a tenant.
+    ``request.state.tenant_id`` (``TenantMiddleware``'s answer), else the
+    framework's tenant contextvar if an enclosing layer bound one. Both
+    resolvers consult this *before* the mode, so the mode only ever fills a
+    gap: a mode detection that wrongly says ``SINGLE`` (a mounted child app, a
+    composed middleware stack — see #125/#192) still binds the tenant the
+    parent resolved instead of handing every request :data:`DEFAULT_TENANT`.
     """
-    services = getattr(request.app.state, constants.PACKAGE, None)
-    if not getattr(getattr(services, "settings", None), "admin_header_tenant", False):
-        return None
-    if ADMIN_ROLE not in (getattr(user, "roles", None) or ()):
-        return None
-    header = getattr(services, "tenant_header", None)
-    tenant = request.headers.get(header) if header else None
-    return tenant if valid_tenant(tenant) else None
+    tenant = getattr(request.state, "tenant_id", None)
+    if valid_tenant(tenant):
+        return tenant
+    bound = current_tenant_id.get()
+    return bound if valid_tenant(bound) else None
 
 
 def resolve_admin(request: Any) -> str:
-    """The admin surface's tenant (§A.3's table).
+    """The admin surface's tenant (§A.3's table, as revised by #112).
 
-    Multi mode binds the **user's own** ``tenant_id``, never the header: the
-    framework lets a tenant-less user pick any tenant by header (FACT 3-prime), and
-    the legacy data sits in :data:`DEFAULT_TENANT`, so guessing would hand the
-    bootstrap admin that tenant. The one exception is opt-in
-    (:func:`_header_tenant_for`). No user at all is the framework's 401 — its
-    ``AuthMiddleware`` answers first in production.
+    Multi mode binds the tenant the framework resolved — the member's active
+    organisation, not ``user.tenant_id`` — so records edits the same tenant as
+    the member's pages and news. The framework never lets a signed-in user pick
+    a tenant they are not a member of by header (``TenantMiddleware`` reads it
+    raw for anonymous requests only, since 0.0.35; the tenants module honours
+    it only among the user's active memberships), so following its answer
+    hands a tenant-less user nothing: they resolve no tenant and get
+    :class:`TenantRequired`. No user at all is a 401 in multi mode — the
+    framework's ``AuthMiddleware`` answers first in
+    production, and an anonymous request's header tenant never reaches the
+    admin surface.
     """
-    if mode_of(request.app) is TenancyMode.SINGLE:
-        return DEFAULT_TENANT
-    user = getattr(request.state, "user", None)
-    if user is None:
+    single = mode_of(request.app) is TenancyMode.SINGLE
+    if not single and getattr(request.state, "user", None) is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    tenant = getattr(user, "tenant_id", None)
-    if valid_tenant(tenant):
-        return tenant
-    header = _header_tenant_for(request, user) if tenant is None else None
-    if header is not None:
-        return header
-    raise TenantRequired(
-        "this account has no tenant; an administrator has to assign one before "
-        "it can use records on a multi-tenant host"
-    )
+    tenant = _resolved(request)
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
+        return DEFAULT_TENANT
+    if tenant is None:
+        raise TenantRequired(
+            "no organisation is active for this account; pick one (or have an "
+            "administrator assign one) before using records on a multi-tenant host"
+        )
+    return tenant
 
 
 def resolve_public(request: Any) -> str | None:
     """The anonymous surface's tenant, or ``None`` — which the caller answers
-    with the same 404 an unknown type gets, so it is no oracle."""
-    if mode_of(request.app) is TenancyMode.SINGLE:
+    with the same 404 an unknown type gets, so it is no oracle. An upstream
+    tenant wins over the mode, as in :func:`resolve_admin`."""
+    tenant = _resolved(request)
+    if tenant is None and request_mode(request, mode_of(request.app)) is TenancyMode.SINGLE:
         return DEFAULT_TENANT
-    tenant = getattr(request.state, "tenant_id", None)
-    return tenant if valid_tenant(tenant) else None
+    return tenant
 
 
 async def bind_admin(request: Request) -> AsyncIterator[str]:
@@ -218,7 +217,8 @@ def view_props(request: Any) -> dict[str, str]:
     """``tenant`` and ``tenancy_mode`` for every records screen: read-only, so
     the UI can say which tenant an admin is working in (§J). Called inside
     :func:`bind_admin`'s scope, so the tenant is the one the request runs in."""
-    return {"tenant": bound_tenant(), "tenancy_mode": mode_of(request.app).value}
+    mode = request_mode(request, mode_of(request.app))
+    return {"tenant": bound_tenant(), "tenancy_mode": mode.value}
 
 
 def all_tenants(stmt: Any) -> Any:
