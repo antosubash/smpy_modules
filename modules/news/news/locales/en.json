@@ -266,13 +266,25 @@
   },
   "tags": {
     "heading": "Tags",
-    "description": "Freeform, and made while writing. Select two to merge them.",
+    "description": "Freeform, and made while writing. Select one to rename or delete it, or two to merge them.",
     "find_or_create": "Find or create a tag",
     "create": "Create",
     "merge_summary": "Merge {source} into {target}",
     "merge": "Merge",
     "no_match": "No tag matches \"{query}\". Create it above.",
-    "empty": "No tags yet. They appear here as writers add them to articles."
+    "empty": "No tags yet. They appear here as writers add them to articles.",
+    "selected_summary_one": "{name} is on {count} article",
+    "selected_summary_other": "{name} is on {count} articles",
+    "rename": "Rename",
+    "name_label": "Tag name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "delete_title": "Delete tag \"{name}\"?",
+    "delete_unused": "No article uses this tag, so nothing else changes.",
+    "delete_detaching_one": "{count} article will lose this tag. The article itself is not changed — only the label comes off.",
+    "delete_detaching_other": "{count} articles will lose this tag. The articles themselves are not changed — only the label comes off.",
+    "delete_confirm": "Delete tag"
   },
   "trash": {
     "title": "Trash",
