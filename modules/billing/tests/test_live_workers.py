@@ -167,3 +167,12 @@ async def test_retiming_mid_claim_hands_the_claim_back(app, monkeypatch):
     assert stamp is None  # handed back: the new loop's first tick takes it
     assert fake.calls == []
     await startup.stop_reconcile(app)
+
+
+async def test_a_save_not_yet_committed_is_not_reverted(app):
+    # The framework hot-swaps before the saving request commits: memory is
+    # ahead of the database, and a concurrent request must not roll it back.
+    services = _billing(app)
+    services.settings = services.settings.model_copy(update={"provider": c.PROVIDER_STRIPE})
+    assert await live.ensure_current(app) is False
+    assert services.settings.provider == c.PROVIDER_STRIPE

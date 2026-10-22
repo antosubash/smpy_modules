@@ -35,6 +35,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from fastapi import Request
+from pydantic import ValidationError
 
 from sm_billing import constants as c
 
@@ -101,14 +102,36 @@ async def ensure_current(app: FastAPI) -> bool:
 
     Returns ``True`` when something was rebuilt. Cheap when nothing changed:
     one indexed read of the settings table, no lock.
+
+    A field is followed only when the *database* moved since the last read
+    (``stored_seen``), never merely because memory and database differ: the
+    framework hot-swaps a save's settings before its request commits, so on the
+    worker that took the save memory is briefly ahead of the database, and
+    reverting to the stored value there would undo the save it just made.
     """
     services = getattr(app.state, c.PACKAGE, None)
     if services is None or services.provider is None:
         return False
-    stored = await _stored(app)
+    services.read_seq += 1
+    ticket = services.read_seq
+    try:
+        stored = await _stored(app)
+    except ValidationError:
+        # A value written around the Settings screen that the class rejects:
+        # keep running on what is loaded rather than 500 every billing route,
+        # the connection screen that could fix it included.
+        logger.warning("billing: stored settings do not validate; keeping the loaded ones")
+        return False
     async with services.reload_lock:
+        if ticket < services.applied_seq:
+            return False  # a read taken after this one was already applied
+        services.applied_seq = ticket
         current = services.settings
-        changed = {f for f, value in stored.items() if getattr(current, f) != value}
+        seen = services.stored_seen
+        if seen is None:
+            seen = {f: getattr(current, f) for f in stored}
+        services.stored_seen = stored
+        changed = {f for f, v in stored.items() if v != seen[f] and getattr(current, f) != v}
         if not changed:
             return False  # in step, or a concurrent caller already caught up
         # Field names only: the values include the (encrypted) Stripe secrets.

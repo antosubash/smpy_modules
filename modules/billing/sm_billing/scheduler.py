@@ -149,6 +149,9 @@ async def reconcile_stale(
     cutoff = datetime.now(UTC) - max_age
     failing = set() if failing is None else failing
     pause, provider_errors = PACE_SECONDS, 0
+    if await live.ensure_current(app):  # also on a tick with nothing stale: re-time the loop
+        report.skipped = "settings changed"
+        return report
     rows = sorted(await _stale(factory, cutoff), key=lambda r: r[0] in failing)  # stable
     for row_id, tenant_id, subscription_id, previous in rows:
         if await live.ensure_current(app):

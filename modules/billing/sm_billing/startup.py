@@ -16,6 +16,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from sm_billing import constants as c
+from sm_billing import live
 from sm_billing.entitlements import PlanEntitlements
 from sm_billing.plans import seed_default_plan
 
@@ -33,6 +34,7 @@ async def run(app: FastAPI) -> None:
     from sm_billing.providers.factory import install_provider
 
     install_provider(services)
+    services.stored_seen = {f: getattr(services.settings, f) for f in live.LOOP_FIELDS}
     start_reconcile(app)
 
 

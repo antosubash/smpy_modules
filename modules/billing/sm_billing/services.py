@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sm_billing import constants as c
 from sm_billing.errors import BillingError
@@ -33,6 +33,13 @@ class BillingServices:
     scheduler: ReconcileScheduler | None = None
     #: Serialises live reloads: two saves at once must not both start a loop.
     reload_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    #: The provider/loop fields as ``sm_billing.live`` last read them from the
+    #: database (``None`` until its first read). Only a move of the *database*
+    #: is followed, so a save not yet committed is not reverted.
+    stored_seen: dict[str, Any] | None = None
+    #: Ticket counters ordering concurrent database reads in ``live.ensure_current``.
+    read_seq: int = 0
+    applied_seq: int = 0
 
 
 def current_provider(app: FastAPI) -> BillingProvider:
