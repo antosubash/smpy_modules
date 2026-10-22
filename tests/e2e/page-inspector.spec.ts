@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, publishWithNote, uniqueSlug } from './helpers';
 
 /**
  * The tabbed page inspector — screen 2h.
@@ -11,7 +11,7 @@ import { csrfHeader, login, publishWithNote, uniqueSlug } from './helpers';
  */
 
 async function openEditor(page: Page, slug: string) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {
@@ -141,7 +141,7 @@ test.describe('Page inspector', () => {
 
     // #109: the old address forwards only while the page is live. A cached
     // 301 to a 404 would outlive the republish, so unpublished means 404 here.
-    const headers = await csrfHeader(page);
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     await page.request.post(`/api/pagebuilder/pages/${id}/unpublish`, { headers, data: {} });
     expect((await page.request.get(`/p/${slug}`, { maxRedirects: 0 })).status()).toBe(404);
     await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });

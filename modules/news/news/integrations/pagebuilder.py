@@ -70,18 +70,19 @@ def available() -> bool:
     return True
 
 
-def _models() -> Any:
-    """Pagebuilder's tables, or ``None``.
+def _contract() -> Any:
+    """Pagebuilder's public search contract, or ``None``.
 
-    Imported inside the call rather than at module scope: at module scope an
-    ImportError here would take news down on a host that simply chose not to
-    install the neighbour.
+    :mod:`pagebuilder.contracts` and nothing deeper: its tables, status enum and
+    tenant column are its own to change (#130). Imported inside the call rather
+    than at module scope: at module scope an ImportError here would take news
+    down on a host that simply chose not to install the neighbour.
     """
     if not available():
         return None
-    from pagebuilder.models import NOT_TRASHED, MediaAsset, Page
+    from pagebuilder import contracts
 
-    return NOT_TRASHED, Page, MediaAsset
+    return contracts
 
 
 # ── Links into pagebuilder's own screens ──────────────────────────────
@@ -124,73 +125,22 @@ async def search_pages(
 
     Articles are no longer pages, so nothing has to be excluded from this the
     way it once did. The two sections cannot double-count because they are two
-    different tables.
+    different tables. The tenant is news' to choose (:func:`search_tenant`);
+    pinning it, and everything else about the query, is pagebuilder's.
     """
-    models = _models()
-    if models is None:
+    contract = _contract()
+    if contract is None:
         return [], 0
-    not_trashed, page, _ = models
-    tenant = search_tenant()
-
-    from simple_module_db import MissingTenantError
-    from sqlalchemy import Text, cast, func, or_, select
-
-    stmt = select(page).where(
-        not_trashed,
-        page.tenant_id == tenant,
-        or_(
-            page.title.ilike(pattern, escape="\\"),
-            page.slug.ilike(pattern, escape="\\"),
-            # The body. A LIKE against the JSON column cast to text, evaluated
-            # in the database — loading the blocks to search them in Python is
-            # what made listings scale with content size rather than row count.
-            # The cast is explicit: `func.cast` with an untyped target compiles
-            # to NullType and the whole statement fails at DDL generation.
-            cast(page.draft_data, Text).ilike(pattern, escape="\\"),
-        ),
+    return await contract.search_pages(
+        db, pattern, tenant_id=search_tenant(), include_drafts=include_drafts, limit=limit
     )
-    if not include_drafts:
-        stmt = stmt.where(page.status == "published")
-
-    try:
-        total = int(
-            await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-        )
-        rows = (
-            await db.execute(stmt.order_by(page.id.desc()).limit(limit))
-        ).scalars()
-    except MissingTenantError:
-        return [], 0
-    return list(rows), total
 
 
 async def search_media(
     db: AsyncSession, pattern: str, *, limit: int
 ) -> tuple[list[Any], int]:
     """Media assets matching ``pattern``. ``([], 0)`` without pagebuilder."""
-    models = _models()
-    if models is None:
+    contract = _contract()
+    if contract is None:
         return [], 0
-    _, _, media_asset = models
-    tenant = search_tenant()
-
-    from simple_module_db import MissingTenantError
-    from sqlalchemy import func, or_, select
-
-    stmt = select(media_asset).where(
-        media_asset.tenant_id == tenant,
-        or_(
-            media_asset.original_filename.ilike(pattern, escape="\\"),
-            media_asset.filename.ilike(pattern, escape="\\"),
-        )
-    )
-    try:
-        total = int(
-            await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-        )
-        rows = (
-            await db.execute(stmt.order_by(media_asset.id.desc()).limit(limit))
-        ).scalars()
-    except MissingTenantError:
-        return [], 0
-    return list(rows), total
+    return await contract.search_media(db, pattern, tenant_id=search_tenant(), limit=limit)

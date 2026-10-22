@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { seedArticle } from './article-helpers';
-import { login } from './helpers';
+import { login, moduleCsrfHeader } from './helpers';
 
 /**
  * The categories + tags screen.
@@ -185,5 +185,61 @@ test.describe('News tags', () => {
 
     await expect(page.getByRole('button', { name: new RegExp(fold) })).toHaveCount(0);
     await expect(page.getByRole('button', { name: new RegExp(keep) })).toBeVisible();
+  });
+
+  test('a mistyped tag can be renamed, keeping its article (#174)', async ({ page }) => {
+    const stamp = Date.now().toString(36);
+    const typo = `urbn${stamp}`;
+    const fixed = `urban${stamp}`;
+    const { articleId } = await seedArticle(page, { prefix: 'e2e-tag-rename' });
+    const tagged = await page.request.put(`/api/news/articles/${articleId}/tags`, {
+      headers: await moduleCsrfHeader(page),
+      data: { tags: [typo] },
+    });
+    expect(tagged.ok()).toBe(true);
+    await page.goto(CATEGORIES_URL);
+
+    await page.getByRole('button', { name: new RegExp(typo) }).click();
+    const actions = page.getByTestId('tag-actions');
+    await expect(actions).toContainText(`${typo} is on 1 article`);
+    await actions.getByRole('button', { name: /^rename$/i }).click();
+    await actions.getByLabel('Tag name').fill(fixed);
+    await actions.getByRole('button', { name: /^save$/i }).click();
+
+    await expect(page.getByRole('button', { name: new RegExp(`^${fixed}`) })).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(typo) })).toHaveCount(0);
+    const onArticle = await page.request.get(`/api/news/articles/${articleId}/tags`);
+    expect(await onArticle.json()).toEqual([fixed]);
+    // The archive URL published under the old slug follows the rename.
+    const old = await page.request.get(`/news/tag/${typo}`, { maxRedirects: 0 });
+    expect(old.status()).toBe(301);
+    expect(old.headers().location).toBe(`/news/tag/${fixed}`);
+  });
+
+  test('deleting a used tag says how many articles lose it, then detaches it', async ({ page }) => {
+    const doomed = `doomed${Date.now().toString(36)}`;
+    const { articleId } = await seedArticle(page, { prefix: 'e2e-tag-delete' });
+    await page.request.put(`/api/news/articles/${articleId}/tags`, {
+      headers: await moduleCsrfHeader(page),
+      data: { tags: [doomed] },
+    });
+    await page.goto(CATEGORIES_URL);
+
+    await page.getByRole('button', { name: new RegExp(doomed) }).click();
+    await page
+      .getByTestId('tag-actions')
+      .getByRole('button', { name: /^delete$/i })
+      .click();
+
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText('1 article will lose this tag');
+    await dialog.getByRole('button', { name: /delete tag/i }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await expect(page.getByRole('button', { name: new RegExp(doomed) })).toHaveCount(0);
+    // The article survives without the label.
+    const onArticle = await page.request.get(`/api/news/articles/${articleId}/tags`);
+    expect(onArticle.ok()).toBe(true);
+    expect(await onArticle.json()).toEqual([]);
   });
 });

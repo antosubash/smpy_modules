@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 test.describe('Pagebuilder editor chrome', () => {
   test.beforeEach(async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('Pagebuilder editor chrome', () => {
   test('a document without a root title opens under the page title', async ({ page }) => {
     const title = `Seeded ${uniqueSlug('chrome')}`;
     const created = await page.request.post('/api/pagebuilder/pages', {
-      headers: await csrfHeader(page),
+      headers: await moduleCsrfHeader(page, '/pagebuilder/'),
       data: { title, slug: uniqueSlug('chrome'), draft_data: { content: [], root: { props: {} } } },
     });
     expect(created.status(), await created.text()).toBe(201);

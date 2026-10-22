@@ -110,17 +110,14 @@ class AiModule(ModuleBase):
         )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
+        from simple_module_hosting.csrf import RequiresCsrf
+
+        from sm_ai.csrf import share_csrf_token
         from sm_ai.endpoints.api import router as api
         from sm_ai.endpoints.views import router as views
-        from sm_ai.security import mint_csrf_token, verify_csrf
 
         # The write surface can redirect chat_base_url and thereby point the
-        # stored provider key at an attacker's server — CSRF is enforced on
-        # the API (unsafe methods) and the token minted on the admin view.
-        api_router.include_router(api, dependencies=[Depends(verify_csrf)])
-        view_router.include_router(views, dependencies=[Depends(mint_csrf_token)])
-
-    def register_middleware(self, app: FastAPI) -> None:
-        from sm_ai.security import CsrfCookieMiddleware
-
-        app.add_middleware(CsrfCookieMiddleware)
+        # stored provider key at an attacker's server. So the framework's CSRF
+        # check runs on every write, and the view shares the token it wants.
+        api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
+        view_router.include_router(views, dependencies=[Depends(share_csrf_token)])

@@ -771,6 +771,52 @@ For an in-process caller, call
 `sm_records.seed.seed_database(db_state, settings, records=…, seed=…,
 reset=…)` directly instead of shelling out.
 
+### Event subscribers: `--app`
+
+`seed` and `import --apply` publish the same domain events an HTTP write does
+(`RecordCreated`, `RecordUpdated`, `RecordPurged`, `RecordTypeDeleted`), to
+the bus their session carries. A standalone process has no host and so no bus:
+**without `--app` the writes reach no subscriber**, and the command says so on
+stderr before it writes:
+
+```
+records seed: WARNING: no --app given, so these writes reach no event subscriber.
+```
+
+Pass the host's ASGI app, as `uvicorn` would take it, to publish to its
+subscribers:
+
+```bash
+python -m sm_records.cli seed --app main:app --app-dir host            # the demo host
+python -m sm_records.cli import --type order order.json --apply --app main:app --app-dir host
+python -m sm_records.cli seed --app simple_module_hosting:create_app   # the framework's app, no host file
+```
+
+The CLI imports the app and runs its **lifespan** — never its HTTP server —
+around the command, then writes with `app.state.sm.event_bus`, so every handler
+a module registered in `register_event_handlers` hears the writes in the state
+its `on_startup` left it (settings hydrated, tenancy mode fixed). It also picks
+up whatever the host's entry point declares at import, which is how `seed
+--app main:app` seeds the `event` type of the demo host's `events` collection.
+The database is the app's, and so is the connection: the write goes through
+`app.state.sm.db`, with the session listeners and tenant configuration the app
+set up, not through an engine of the CLI's. A `--database-url` that restates it
+(a relative SQLite path, another query order) is accepted; one that names
+another database is refused, with any password masked. The lifespan is left
+normally however the command ends — a refused import, an error, Ctrl-C — so
+every module's `on_shutdown` runs. The lifespan is the host's own, costs
+included: a database behind head fails it (`make migrate` first), and
+pagebuilder's scheduler, if enabled, runs for the length of the command.
+
+**What a write without `--app` skips** is exactly the host's subscribers and
+nothing of the module's own: the record, its revisions and its index rows are
+written inline by the services whether anyone listens or not, so no `reindex`
+is owed afterwards. As of 0.0.11 no module in this repository and no framework
+module subscribes to any records event (`host/tests/test_host_boots.py` pins
+that for the demo host), so on the demo host a bus-less write misses nothing
+today; a host that adds a subscriber — a search index, a webhook, a cache —
+is what `--app` is for.
+
 ---
 
 ## Health checks

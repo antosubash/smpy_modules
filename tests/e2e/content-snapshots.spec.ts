@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { csrfHeader, login, uniqueSlug } from './helpers';
+import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /**
  * Content snapshots — Import / Export.
@@ -20,7 +20,7 @@ const REVIEW = '/pagebuilder/content/review';
 /** Clear the site-wide gate — at most one import is pending at a time, so a
  *  leftover from a previous run would block every test in this file. */
 async function clearPendingImport(page: import('@playwright/test').Page) {
-  const headers = await csrfHeader(page);
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const pending = await (await page.request.get('/api/pagebuilder/imports/pending')).json();
   if (pending) {
     await page.request.post(`/api/pagebuilder/imports/${pending.id}/reject`, {
