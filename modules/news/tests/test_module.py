@@ -73,6 +73,8 @@ class TestRoutes:
         copying each route up, so ``app.routes`` lists none of them.
         """
         app = build_test_app(NewsModule)
+        # Only /api/... paths, which stay in the schema on every framework
+        # (view routes left it in 0.0.37, #186).
         paths = set(app.openapi()["paths"])
         assert f"{constants.ROUTE_PREFIX_API}/articles" in paths
         assert f"{constants.ROUTE_PREFIX_API}/categories" in paths
@@ -121,9 +123,7 @@ class TestMenu:
         filing it under News would say something untrue about what it covers."""
         registry = MenuRegistry()
         NewsModule().register_menu_items(registry)
-        item = next(
-            i for i in registry.all_items if i.url == constants.ADMIN_SEARCH_URL
-        )
+        item = next(i for i in registry.all_items if i.url == constants.ADMIN_SEARCH_URL)
         assert item.group != constants.MENU_GROUP
 
     def test_menu_url_ends_in_a_slash(self):
