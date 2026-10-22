@@ -164,6 +164,8 @@
     "head_title": "Billing subscriptions",
     "description_stripe": "Every organisation and its Stripe subscription.",
     "description_manual": "Provider: {provider}. Assign plans by hand; nobody is charged.",
+    "fallback_title": "Stripe is configured but not in use",
+    "fallback_description": "{error}. Plans are assigned by hand, and nobody is charged, until this is fixed on the Stripe connection tab.",
     "status": "Status",
     "all": "All",
     "empty_title": "No organisations",
