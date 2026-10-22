@@ -111,7 +111,16 @@ Reading rules:
   half of what the bundle says belongs together would be worse than not
   restoring it.
 - An **optional** section this build does not know is ignored. Its `paths`
-  must all sit under `<section>/`, so its files can never be read as pages.
+  must all sit under `<section>/`, so its files can never be read as pages,
+  and its name may not be one pagebuilder uses at the root: `pagebuilder`,
+  `pages`, `media`, `blobs`, `layout`, `redirects` and `manifest` are
+  reserved.
+- Every declared path is relative, uses forward slashes and has no empty,
+  `.` or `..` component. `news/../pages/` is refused as written, not
+  normalised and then compared.
+- The `pagebuilder` section's `paths` may only name its own root-level paths.
+- Every file in the archive other than `manifest.json` must belong to exactly
+  one section: a file no section claims, or one two sections claim, is a 422.
 
 ### Adding a section (not built)
 

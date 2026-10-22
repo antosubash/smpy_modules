@@ -2,8 +2,8 @@
 
 Date: 2026-08-28
 Status: implemented (pagebuilder `snapshots/`). Snapshots v2 (#79) is built:
-page history shows "Restored from snapshot #N", derived on read from the
-approved import, and the manifest is versioned with a `contents` list of
+page history shows "Restored from snapshot #N", read from the pages the
+apply recorded on the approved import's own row, and the manifest is versioned with a `contents` list of
 sections (`modules/pagebuilder/docs/bundle-format.md`). The per-module
 contribution hook that would add other sections (#80) is not built.
 

@@ -33,8 +33,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pagebuilder.snapshots.format import (
+    BLOBS_DIR,
     FORMAT_VERSION,
     LAYOUT_NAME,
+    MANIFEST_NAME,
     MEDIA_DIR,
     PAGES_DIR,
     READABLE_VERSIONS,
@@ -58,6 +60,21 @@ _SECTION_VERSIONS: dict[str, frozenset[int]] = {PAGEBUILDER_SECTION: frozenset({
 """The sections this build restores, and which of their versions."""
 
 PAGEBUILDER_PATHS = (LAYOUT_NAME, REDIRECTS_NAME, f"{PAGES_DIR}/", f"{MEDIA_DIR}/")
+"""Every root-level path pagebuilder reads. A file in a bundle belongs to
+exactly one section, and these are the pagebuilder section's, whatever its
+manifest entry says."""
+
+RESERVED_SECTION_NAMES = frozenset(
+    {
+        PAGEBUILDER_SECTION,
+        PAGES_DIR,
+        MEDIA_DIR,
+        BLOBS_DIR,
+        *(name.removesuffix(".json") for name in (LAYOUT_NAME, REDIRECTS_NAME, MANIFEST_NAME)),
+    }
+)
+"""Names no other section may take. A section's files live under
+``<section>/``, so one named ``pages`` would have its files read as pages."""
 
 _SECTION_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _PACKAGE = "simple_module_pagebuilder"
@@ -116,6 +133,24 @@ def _major(payload: dict[str, Any]) -> int:
     return version
 
 
+def _check_path(section: str, path: str) -> None:
+    """A declared path is relative, forward-slashed and never climbs.
+
+    Checked as written rather than normalised: ``news/../pages/`` normalises
+    to a path inside ``pages/``, and a reader that compared prefixes before
+    normalising would hand it to the news section.
+    """
+    parts = path.removesuffix("/").split("/")
+    if (
+        not path
+        or "\\" in path
+        or path.startswith("/")
+        or ":" in parts[0]
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        raise BundleError(f"section {section!r} declares an unsafe path: {path!r}")
+
+
 def _check_section(entry: Any, seen: set[str]) -> None:
     if not isinstance(entry, dict):
         raise BundleError("manifest contents entry is not an object")
@@ -134,6 +169,8 @@ def _check_section(entry: Any, seen: set[str]) -> None:
     paths = entry.get("paths", [])
     if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
         raise BundleError(f"section {name!r} paths must be a list of strings")
+    for path in paths:
+        _check_path(name, path)
 
     known = _SECTION_VERSIONS.get(name)
     if known is None:
@@ -143,10 +180,16 @@ def _check_section(entry: Any, seen: set[str]) -> None:
             )
         # Ignored, but confined: a section that claimed pagebuilder's paths
         # would have its files read as pages.
+        if name in RESERVED_SECTION_NAMES:
+            raise BundleError(f"section name {name!r} is reserved for pagebuilder")
         stray = [p for p in paths if not p.startswith(f"{name}/")]
         if stray:
             raise BundleError(f"section {name!r} claims paths outside {name}/: {stray}")
         return
+    if name == PAGEBUILDER_SECTION:
+        stray = [p for p in paths if p not in PAGEBUILDER_PATHS]
+        if stray:
+            raise BundleError(f"the pagebuilder section claims paths it does not own: {stray}")
     if version not in known:
         raise BundleError(f"unsupported version {version} of the {name!r} section")
 
@@ -174,3 +217,29 @@ def check_manifest(payload: Any) -> dict[str, Any]:
         if PAGEBUILDER_SECTION not in seen:
             raise BundleError("bundle has no pagebuilder section to restore")
     return {**payload, "format_version": major}
+
+
+def _owns(paths: list[str] | tuple[str, ...], member: str) -> bool:
+    return any(member.startswith(p) if p.endswith("/") else member == p for p in paths)
+
+
+def check_members(manifest: dict[str, Any], members: list[str]) -> None:
+    """Every archive member except the manifest belongs to exactly one section.
+
+    The manifest's paths are only a claim; this holds them to what the zip
+    actually carries. A file no section owns is one nothing will read — most
+    likely a bundle assembled by hand from the wrong tree — and a file two
+    sections own is one of them reading the other's data.
+    """
+    sections: dict[str, list[str] | tuple[str, ...]] = {PAGEBUILDER_SECTION: PAGEBUILDER_PATHS}
+    for entry in manifest.get("contents") or []:
+        if entry["section"] != PAGEBUILDER_SECTION:
+            sections[entry["section"]] = entry.get("paths", [])
+    for member in members:
+        if member == MANIFEST_NAME:
+            continue
+        owners = [name for name, paths in sections.items() if _owns(paths, member)]
+        if not owners:
+            raise BundleError(f"bundle file {member!r} belongs to no section in the manifest")
+        if len(owners) > 1:
+            raise BundleError(f"bundle file {member!r} is claimed by sections {owners}")

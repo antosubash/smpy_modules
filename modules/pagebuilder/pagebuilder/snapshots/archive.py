@@ -29,7 +29,7 @@ from pagebuilder.snapshots.format import (
     MEDIA_INDEX_NAME,
     REDIRECTS_NAME,
 )
-from pagebuilder.snapshots.manifest import check_manifest
+from pagebuilder.snapshots.manifest import check_manifest, check_members
 from pagebuilder.snapshots.validate import (
     BundleError,
     check_documents,
@@ -118,6 +118,7 @@ def read_zip(
         shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
     stored: dict[str, bytes] = {}
+    members: list[str] = []
 
     with archive:
         extracted = 0
@@ -126,13 +127,12 @@ def read_zip(
             if name.endswith("/"):
                 continue
             relative = _safe_relative(name)
+            members.append(name)
             # Checked against the header before reading: `ZipExtFile` stops at
             # the declared size, so a member cannot quietly exceed it.
             extracted += info.file_size
             if max_extracted_bytes is not None and extracted > max_extracted_bytes:
-                raise BundleError(
-                    f"bundle expands to more than {max_extracted_bytes} bytes"
-                )
+                raise BundleError(f"bundle expands to more than {max_extracted_bytes} bytes")
             payload = archive.read(name)
             if name.startswith(_BLOB_PREFIX):
                 expected = relative.name
@@ -149,6 +149,7 @@ def read_zip(
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
     manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME))
+    check_members(manifest, members)
 
     index_path = dest / MEDIA_DIR / MEDIA_INDEX_NAME
     index = load_document(index_path, MEDIA_INDEX_NAME) if index_path.is_file() else {}
@@ -170,9 +171,7 @@ def read_zip(
         if entry["sha256"] not in stored and not blobs.exists(entry["sha256"])
     )
     if missing_blobs:
-        raise BundleError(
-            "bundle is missing the bytes for: " + ", ".join(missing_blobs)
-        )
+        raise BundleError("bundle is missing the bytes for: " + ", ".join(missing_blobs))
 
     check_documents(dest, index)
 

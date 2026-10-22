@@ -164,11 +164,17 @@ one — ignoring trashed pages.
   revived, not duplicated), parents and redirects resolved by slug in a second
   pass, the layout saved through `LayoutService`. No page revisions are written;
   the `pre_restore` snapshot is the before-state. Nothing is deleted.
-- **History marker.** A page's revision list also returns `restores`, derived on
-  read by `history.restore_markers` from approved `PendingImport` rows whose
-  plan created or overwrote the page (matched by `(locale, slug)`, and through
-  the page's redirects if it was renamed since). Nothing is stored for it, so
-  deleting a snapshot — which deletes its imports — removes its markers too.
+- **History marker.** A page's revision list also returns `restores`, read by
+  `history.restore_markers` from approved `PendingImport` rows. At approval the
+  apply writes `plan["applied"]` onto that same row — the pages it created and
+  the pages whose state it actually changed, each as `{id, created_at}` — and
+  the marker matches the page by that identity, so a rename, a later restore
+  replacing the redirects, or a purged slug made again by hand cannot move it.
+  (`created_at` is there because SQLite reuses a purged page's id.) Rows
+  approved before `applied` existed fall back, best-effort, to the staged
+  plan's `(locale, slug)` buckets plus the page's redirects. No table or column
+  is added for it, so deleting a snapshot — which deletes its imports —
+  removes its markers too.
 
 ## Frontend
 

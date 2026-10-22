@@ -236,9 +236,12 @@ that wrote the page. Not a revision: there is nothing to diff or restore.
 `format_version` (the bundle's major — an upload keeps the one it arrived with),
 `manifest` (see [bundle-format.md](bundle-format.md)), `size_bytes`,
 `created_at`, `created_by`. Upload is 422 for an unknown `format_version` or a
-required section this build cannot restore.
+required section this build cannot restore, and for a manifest whose sections
+do not account for the archive (see bundle-format.md, *Reading rules*).
 `PendingImportRead`: `id`, `snapshot_id`, `plan`, `status` (`pending` |
 `approved` | `rejected`), `note`, `created_*`, `decided_at`, `decided_by`.
+Once approved, `plan.applied` is `{created: [{id, created_at}], overwritten: [...]}`
+— what the apply actually wrote, which the history markers read.
 `ImportApplyResponse`: `pages_created`, `pages_updated`, `media_added`,
 `redirects`, `redirects_dropped` (slugs). Deciding an import twice is 409
 `Import already decided`. Self-approval is allowed.

@@ -16,6 +16,7 @@ from pagebuilder.snapshots.manifest import (
     FORMAT_NAME,
     PAGEBUILDER_PATHS,
     check_manifest,
+    check_members,
     manifest_header,
 )
 
@@ -168,3 +169,69 @@ async def test_an_upload_records_the_bundles_own_major(authed_client):
     )
     assert response.status_code == 201, response.text
     assert response.json()["format_version"] == 1
+
+
+# --- section ownership (Codex review) ---------------------------------------
+
+
+def _with(*sections: dict) -> dict:
+    return {"format_version": 2, "contents": [_section("pagebuilder"), *sections]}
+
+
+@pytest.mark.parametrize("name", ["pages", "media", "layout", "redirects", "blobs", "manifest"])
+def test_an_optional_section_may_not_take_a_pagebuilder_name(name):
+    # `pages` with `pages/` passes the own-prefix rule; the name is the hole.
+    section = _section(name, required=False, paths=[f"{name}/"])
+    with pytest.raises(BundleError, match="reserved"):
+        check_manifest(_with(section))
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "news/../pages/",
+        "../news/",
+        "news/./x.json",
+        "news//x.json",
+        "/news/",
+        "news\\pages\\",
+        "C:/news/",
+        "",
+    ],
+)
+def test_a_section_path_that_could_escape_is_refused(path):
+    section = _section("news", required=False, paths=[path])
+    with pytest.raises(BundleError, match="unsafe path"):
+        check_manifest(_with(section))
+
+
+def test_the_pagebuilder_section_may_not_claim_another_sections_paths():
+    contents = [_section("pagebuilder", paths=["news/"])]
+    with pytest.raises(BundleError, match="does not own"):
+        check_manifest({"format_version": 2, "contents": contents})
+
+
+def test_every_member_belongs_to_exactly_one_section():
+    manifest = check_manifest(_with(_section("news", required=False, paths=["news/"])))
+    check_members(manifest, ["manifest.json", "layout.json", "pages/a.json", "news/x.json"])
+    with pytest.raises(BundleError, match="belongs to no section"):
+        check_members(manifest, ["notes.txt"])
+    # Unreachable through `check_manifest`, which confines each section to
+    # its own prefix — guarded anyway, since this is the line that matters.
+    overlapping = {"contents": [_section("news", paths=["pages/"])]}
+    with pytest.raises(BundleError, match="claimed by sections"):
+        check_members(overlapping, ["pages/a.json"])
+
+
+def test_an_optional_sections_files_upload_and_are_ignored(tmp_path):
+    news = _section("news", required=False, paths=["news/"])
+    data = _zip(_with(news), **{"news/x.json": b'{"not": "a page"}'})
+    manifest, _ = read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
+    assert [s["section"] for s in manifest["contents"]] == ["pagebuilder", "news"]
+
+
+def test_a_file_outside_every_section_is_refused_on_upload(tmp_path):
+    news = _section("news", required=False, paths=["news/"])
+    data = _zip(_with(news), **{"extra/x.json": b"{}"})
+    with pytest.raises(BundleError, match="belongs to no section"):
+        read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
