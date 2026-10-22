@@ -45,7 +45,7 @@ function limitLines(plan: Plan, t: Translate): string[] {
 }
 
 export function PlanCard({ plan, interval, cta, canManage, busy, onChoose }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const actionable = canManage && cta !== 'current' && cta !== 'unavailable';
   return (
     <Card
@@ -61,7 +61,7 @@ export function PlanCard({ plan, interval, cta, canManage, busy, onChoose }: Pro
           )}
         </CardTitle>
         <CardDescription className="text-base font-medium text-foreground">
-          {priceLabel(plan, interval)}
+          {priceLabel(plan, interval, locale)}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 space-y-3 text-sm">

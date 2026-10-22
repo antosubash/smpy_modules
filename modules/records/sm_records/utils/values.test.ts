@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { FieldDef } from './types';
 import {
   buildPayload,
+  formatCalendarDate,
   formatDateTime,
   isoToLocalInput,
   localInputToIso,
@@ -104,14 +105,26 @@ describe('formatDateTime', () => {
   // next to a schema `datetime` field formatted with `Intl.DateTimeFormat` —
   // this is the one function both now go through.
   it('formats an ISO datetime with a locale date and short time, not the raw string', () => {
-    const out = formatDateTime('2026-09-21T06:16:27.404600+00:00');
+    const out = formatDateTime('2026-09-21T06:16:27.404600+00:00', 'en-US');
     expect(out).not.toBe('2026-09-21T06:16:27.404600+00:00');
     expect(out).not.toContain('T');
     expect(out).toMatch(/2026/);
   });
 
   it('hands unparseable text back rather than inventing a display value', () => {
-    expect(formatDateTime('not a date')).toBe('not a date');
+    expect(formatDateTime('not a date', 'en-US')).toBe('not a date');
+  });
+
+  it('formats in the locale it is handed (#189)', () => {
+    const out = formatDateTime('2026-09-21T12:00:00+00:00', 'de');
+    expect(out).toMatch(/^21\.09\.2026, \d{2}:\d{2}$/);
+  });
+});
+
+describe('formatCalendarDate', () => {
+  it('formats a calendar day in the locale it is handed (#189)', () => {
+    expect(formatCalendarDate('2026-09-21', 'de')).toBe('21.09.2026');
+    expect(formatCalendarDate('2026-09-21', 'en-US')).toBe('Sep 21, 2026');
   });
 });
 

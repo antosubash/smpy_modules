@@ -26,7 +26,7 @@ const MODEL: Record<Plan['pricing_model'], string> = {
 };
 
 export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const c = keys.billing.plans_table;
   return (
     <Table>
@@ -57,9 +57,9 @@ export function PlansTable({ plans, canManage, onEdit, onArchive }: Props) {
             </TableCell>
             <TableCell>{t(MODEL[plan.pricing_model])}</TableCell>
             <TableCell className="text-sm">
-              {priceLabel(plan, 'month')}
+              {priceLabel(plan, 'month', locale)}
               {plan.stripe_price_year && (
-                <div className="text-muted-foreground">{priceLabel(plan, 'year')}</div>
+                <div className="text-muted-foreground">{priceLabel(plan, 'year', locale)}</div>
               )}
             </TableCell>
             <TableCell>{plan.limits['tenants.seats'] ?? t(c.unlimited)}</TableCell>

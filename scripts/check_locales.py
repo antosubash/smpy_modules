@@ -12,6 +12,12 @@ Rules for each ``modules/<name>/<package>/locales/<lang>.json`` other than
     renders a literal brace or loses the value.
   * No translated string is blank where the English is not.
 
+And for every catalogue, ``en.json`` included:
+  * No string carries a Markdown code span (a backtick-delimited run). The
+    console renders catalogue text as plain text, so the reader sees the
+    backticks (#189); name a command or setting in quotes instead. A lone
+    backtick ("Press the ` key") is content, not Markdown, and passes.
+
 Exit 0 if all pass, 1 otherwise.
 """
 
@@ -25,6 +31,8 @@ from pathlib import Path
 
 SOURCE = "en.json"
 PLACEHOLDER = re.compile(r"\{\{?\s*[\w.]+\s*\}?\}")
+# A pair of backticks around something: Markdown's inline code span.
+CODE_SPAN = re.compile(r"`[^`\n]+`")
 
 
 def compare(en: object, other: object, where: str) -> list[str]:
@@ -48,12 +56,21 @@ def compare(en: object, other: object, where: str) -> list[str]:
     return errors
 
 
+def markdown(node: object, where: str) -> list[str]:
+    """Every string under ``node`` holding a code span its reader would see."""
+    if isinstance(node, dict):
+        return [e for key, value in node.items() for e in markdown(value, f"{where}.{key}")]
+    if isinstance(node, str) and CODE_SPAN.search(node):
+        return [f"{where}: contains a backtick code span (rendered literally; use quotes)"]
+    return []
+
+
 def check_dir(locales: Path) -> list[str]:
     source = locales / SOURCE
     if not source.is_file():
         return []
     en = json.loads(source.read_text(encoding="utf-8"))
-    errors: list[str] = []
+    errors = [f"{source}: {e}" for e in markdown(en, source.stem)]
     for path in sorted(locales.glob("*.json")):
         if path.name == SOURCE:
             continue
@@ -63,6 +80,7 @@ def check_dir(locales: Path) -> list[str]:
             errors.append(f"{path}: invalid JSON: {exc}")
             continue
         errors += [f"{path}: {e}" for e in compare(en, other, path.stem)]
+        errors += [f"{path}: {e}" for e in markdown(other, path.stem)]
     return errors
 
 

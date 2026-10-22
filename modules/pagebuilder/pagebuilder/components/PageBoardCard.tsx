@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
 import type { PageRead } from '../utils/api';
+import { formatTimestamp } from '../utils/dates';
 import { keys, translate, useT } from '../utils/i18n';
 import { publicPath } from '../utils/locale';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -10,17 +11,12 @@ import { ConfirmDialog } from './ConfirmDialog';
 const PUBLIC_PREFIX = '/p';
 
 /** "1 Sep, 09:00" — when a scheduled draft flips itself. */
-function whenLabel(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const WHEN: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+};
 
 /** "in 21d" / "2d ago", from a full timestamp.
  *
@@ -60,14 +56,14 @@ export function PageBoardCard({
   onPublish,
   onUnpublish,
 }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const scheduled = stage === 'scheduled';
   const published = page.status === 'published';
   const address = publicPath(PUBLIC_PREFIX, page.slug, page.locale, defaultLocale);
 
   const meta = scheduled
     ? t(keys.pagebuilder.card.publishes, {
-        when: whenLabel(page.publish_at),
+        when: formatTimestamp(page.publish_at, locale, WHEN),
         relative: relative(page.publish_at),
       })
     : `${address}${page.updated_at ? ` · ${relative(page.updated_at)}` : ''}`;

@@ -29,7 +29,7 @@ import { keys, useT } from '../utils/i18n';
  * see.
  */
 export default function Trash() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.news.trash;
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
   // Purge needs `news.publish` on the backend, the same pair a hard delete
@@ -100,7 +100,9 @@ export default function Trash() {
                 <p className="truncate font-medium">{article.title}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {article.url}
-                  {article.published_at ? ` · ${formatArticleDate(article.published_at)}` : ''}
+                  {article.published_at
+                    ? ` · ${formatArticleDate(article.published_at, locale)}`
+                    : ''}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">

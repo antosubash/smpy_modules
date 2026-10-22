@@ -48,7 +48,7 @@ export function ArticleRow({
   onTrash,
   onPublish,
 }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const row = keys.news.row;
   const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(article.category);
@@ -56,7 +56,7 @@ export function ArticleRow({
 
   const dirty = category !== article.category || date !== toDateInput(article.published_at);
   const isDraft = article.status === 'draft';
-  const dateLabel = formatArticleDate(article.published_at) || t(row.no_date);
+  const dateLabel = formatArticleDate(article.published_at, locale) || t(row.no_date);
 
   const save = () => {
     onSave(article.id, category, date ? `${date}T00:00:00Z` : null);
