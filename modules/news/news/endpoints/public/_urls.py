@@ -152,4 +152,4 @@ def apply_cache(
         response.headers["Vary"] = ", ".join(
             listed + [f for f in PER_VIEWER_VARY if f.lower() not in seen]
         )
-    return tenancy.vary_on_tenant(response, request.app)
+    return tenancy.vary_on_tenant(response, request)
