@@ -40,9 +40,11 @@ def _errors(root: Path) -> str:
 # --- pins ---------------------------------------------------------------
 
 
-def test_framework_range_passes(tmp_path):
+def test_ranges_wildcards_and_third_party_pins_pass(tmp_path):
+    """``==0.0.*`` is a prefix range; an exact pin on httpx is not this rule."""
     root = _repo(tmp_path)
-    _module(root, "a", 'dependencies = ["simple_module_core>=0.0.35,<0.1"]\n')
+    deps = '"simple_module_core>=0.0.35,<0.1", "simple_module_db==0.0.*", "httpx==0.27.0"'
+    _module(root, "a", f"dependencies = [{deps}]\n")
     assert check_rules.check(root) == []
 
 
@@ -65,12 +67,6 @@ def test_exact_pin_in_extra_or_dev_group_fails(tmp_path):
     assert "simple_module_test==0.0.36" in errors
 
 
-def test_exact_pin_on_third_party_is_not_this_rule(tmp_path):
-    root = _repo(tmp_path)
-    _module(root, "a", 'dependencies = ["httpx==0.27.0"]\n')
-    assert check_rules.check(root) == []
-
-
 def test_pin_is_caught_under_any_spelling_of_the_name(tmp_path):
     for name in ("Simple_Module_Core", "simple-module-core", "simple.module.core"):
         root = _repo(tmp_path / name)
@@ -82,12 +78,6 @@ def test_floor_equal_to_ceiling_is_an_exact_pin(tmp_path):
     root = _repo(tmp_path)
     _module(root, "a", 'dependencies = ["simple_module_core>=0.0.36,<=0.0.36"]\n')
     assert "pins exactly" in _errors(root)
-
-
-def test_wildcard_equality_is_a_range(tmp_path):
-    root = _repo(tmp_path)
-    _module(root, "a", 'dependencies = ["simple_module_core==0.0.*"]\n')
-    assert check_rules.check(root) == []
 
 
 def test_host_is_exempt(tmp_path):
@@ -137,10 +127,18 @@ def test_npm_workspace_and_alias_pins_fail(tmp_path):
 
 
 def test_npm_ranges_pass(tmp_path):
-    specs = (
-        "1.2.3||2.0.0,^1.2.3,~1.2.3,>=1.2.3 <2,1.2.x,1.2.3 - 1.4.0,workspace:*,workspace:^,"
-        "npm:@simple-module-py/ui@^1.2.3,npm:react@19.0.0"
-    ).split(",")
+    specs = [
+        "1.2.3||2.0.0",
+        "^1.2.3",
+        "~1.2.3",
+        ">=1.2.3 <2",
+        "1.2.x",
+        "1.2.3 - 1.4.0",
+        "workspace:*",
+        "workspace:^",
+        "npm:@simple-module-py/ui@^1.2.3",
+        "npm:react@19.0.0",
+    ]
     root = _repo(tmp_path)
     deps = {f"@simple-module-py/p{i}": spec for i, spec in enumerate(specs)}
     _module(root, "a", package={"dependencies": deps})
