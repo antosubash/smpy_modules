@@ -38,8 +38,9 @@ from pagebuilder.snapshots.archive import BundleError, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BLOBS_DIR, BlobStore, tenant_store
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION, MEDIA_DIR, MEDIA_INDEX_NAME, is_readable
+from pagebuilder.snapshots.match import RestoreConflictError, match_live
 from pagebuilder.snapshots.media_match import preview_urls
-from pagebuilder.snapshots.plan import build_plan
+from pagebuilder.snapshots.plan import build_plan, read_documents
 
 _SNAPSHOTS_DIR = "snapshots"
 _PRE_RESTORE_NOTE = "Automatic snapshot taken before restoring"
@@ -225,18 +226,19 @@ class SnapshotService:
         # declines to reuse, telling an approver a page is unchanged while
         # its image is about to change underneath them.
         name_to_url = await preview_urls(self.db, self.settings, rows)
-        plan = await build_plan(self.db, bundle, name_to_url)
+        try:
+            plan = await build_plan(self.db, bundle, name_to_url)
+        except RestoreConflictError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
         staged = PendingImport(snapshot_id=snapshot.id, plan=plan)
         self.db.add(staged)
         try:
             await self.db.flush()
         except IntegrityError as exc:
-            # The check above is not atomic with this insert: two concurrent
-            # requests can both see no pending import. The partial unique
-            # index on `status` is the real backstop — this turns the race's
-            # loser into the same 409 the check above gives the common case,
-            # instead of a raw 500.
+            # The check above is not atomic with this insert; the partial
+            # unique index on `status` is the real backstop, and this turns the
+            # race's loser into the same 409 instead of a raw 500.
             await self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -267,6 +269,13 @@ class SnapshotService:
 
     async def approve(self, import_id: int, actor: str | None) -> dict[str, Any]:
         staged = await self._decide(import_id, actor, ImportStatus.APPROVED)
+        # Re-run, not trusted from staging (pages move in between), and before
+        # the pre-restore snapshot so a refusal writes nothing; it stays pending.
+        try:
+            documents = await read_documents(self.dir_for(staged.snapshot_id))
+            await match_live(self.db, documents.pages)
+        except RestoreConflictError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
         # Before anything is overwritten, so the previous state is one click away.
         pre_restore = await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
 
