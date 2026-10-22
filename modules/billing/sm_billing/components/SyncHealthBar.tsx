@@ -9,7 +9,7 @@ import type { SyncHealth } from '../utils/types';
  * reconcile is on. A missed webhook shows up here before a customer reports it.
  */
 export function SyncHealthBar({ health }: { health: SyncHealth }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const c = keys.billing.sync_health;
   const minutes = health.reconcile_interval_minutes;
   const reconcile =
@@ -25,7 +25,7 @@ export function SyncHealthBar({ health }: { health: SyncHealth }) {
     >
       <span>
         {health.oldest_synced_at
-          ? t(c.oldest_synced, { date: formatDate(health.oldest_synced_at) })
+          ? t(c.oldest_synced, { date: formatDate(health.oldest_synced_at, locale) })
           : t(c.nothing_synced)}
       </span>
       {health.never_synced > 0 && (

@@ -29,7 +29,7 @@ export function ConflictPanel({
   /** Re-saves the form's own (unread) values against `current.version`. */
   onOverwrite: () => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   return (
     <Card className="border-destructive/50" data-testid="records-conflict-panel">
       <CardHeader>
@@ -49,7 +49,7 @@ export function ConflictPanel({
             <p className="mt-1 font-medium">{current.display_title}</p>
             <p className="text-sm text-muted-foreground">
               {t(keys.records.records.updated_at)}:{' '}
-              {formatDateTime(current.updated_at ?? current.created_at)}
+              {formatDateTime(current.updated_at ?? current.created_at, locale)}
             </p>
           </div>
           <div>

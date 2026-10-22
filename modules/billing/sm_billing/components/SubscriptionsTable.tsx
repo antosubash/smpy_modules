@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAssign }: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const c = keys.billing.subscriptions_table;
   return (
     <Table>
@@ -80,7 +80,7 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
                 </span>
               )}
             </TableCell>
-            <TableCell>{formatDate(row.current_period_end) || '—'}</TableCell>
+            <TableCell>{formatDate(row.current_period_end, locale) || '—'}</TableCell>
             <TableCell className="sticky right-0 bg-background text-right">
               {canManage && mode === 'assign' && (
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => onAssign(row)}>

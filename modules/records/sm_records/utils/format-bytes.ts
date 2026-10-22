@@ -4,6 +4,8 @@
  * it).
  */
 
+import { intlLocale } from './locale';
+
 const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
 
 /** `217 B` — the byte symbol in the layout of the viewer's `kB`. CLDR's
@@ -11,9 +13,9 @@ const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
  *  "2 kB"; review 4, ux F13) and its narrow form drops the space ("217B"),
  *  so this takes the narrow symbol ("B", "o", "Б") and puts it where the
  *  short kilobyte puts its own. */
-function formatWholeBytes(value: number): string {
+function formatWholeBytes(value: number, locale: string): string {
   const format = (unit: string, unitDisplay: 'short' | 'narrow') =>
-    new Intl.NumberFormat(undefined, {
+    new Intl.NumberFormat(locale, {
       style: 'unit',
       unit,
       unitDisplay,
@@ -25,17 +27,18 @@ function formatWholeBytes(value: number): string {
   return parts.map((part) => (part.type === 'unit' ? symbol : part.value)).join('');
 }
 
-/** `1.5 MB` in the viewer's locale — `Intl` supplies the unit words, so
- *  there is nothing here to translate. */
-export function formatBytes(bytes: number): string {
+/** `1.5 MB` in `locale`, the console's (`useT().locale`) — `Intl` supplies
+ *  the unit words, so there is nothing here to translate. */
+export function formatBytes(bytes: number, consoleLocale: string | undefined): string {
+  const locale = intlLocale(consoleLocale);
   let value = Math.max(0, bytes);
   let unit = 0;
   while (value >= 1024 && unit < UNITS.length - 1) {
     value /= 1024;
     unit += 1;
   }
-  if (unit === 0) return formatWholeBytes(value);
-  return new Intl.NumberFormat(undefined, {
+  if (unit === 0) return formatWholeBytes(value, locale);
+  return new Intl.NumberFormat(locale, {
     style: 'unit',
     unit: UNITS[unit],
     unitDisplay: 'short',
