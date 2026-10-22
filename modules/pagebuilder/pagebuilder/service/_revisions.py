@@ -43,7 +43,6 @@ class RevisionsMixin(HostBase):
         self.db.add(revision)
         return revision
 
-
     async def list_revisions(self, page_id: int) -> list[PageRevision]:
         result = await self.db.execute(
             select(PageRevision)

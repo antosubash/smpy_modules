@@ -1,10 +1,10 @@
 """``PagesService``'s mixins declare what they need from it, and it supplies it.
 
 Two halves of one contract (#133). The AST scan catches a mixin that starts
-using a ``self.<member>`` neither it nor :class:`PagesHost` defines; the
-``isinstance``/signature checks catch ``PagesService`` dropping or reshaping a
-member the Protocol promises. No type checker runs in CI, so these are what
-make the Protocol more than a comment.
+using a ``self.<member>`` (or ``getattr(self, "<member>")``) neither it nor
+:class:`PagesHost` defines; the ``isinstance``/signature checks catch
+``PagesService`` dropping or reshaping a member the Protocol promises. No type
+checker runs in CI, so these are what make the Protocol more than a comment.
 """
 
 from __future__ import annotations
@@ -25,16 +25,42 @@ from pagebuilder.service._workflow import WorkflowMixin
 MIXINS = (WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
 
 
+_REFLECTION = frozenset({"getattr", "hasattr", "setattr"})
+
+
+def _self_members(tree: ast.AST) -> set[str]:
+    """Every ``self.<name>`` and ``getattr/hasattr/setattr(self, "<name>")``.
+
+    A reflective call whose name is not a string literal cannot be checked, so
+    it is reported as ``<dynamic getattr>`` (etc.) and fails the scan.
+    """
+    used: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "self"
+        ):
+            used.add(node.attr)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in _REFLECTION
+            and len(node.args) >= 2
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "self"
+        ):
+            name = node.args[1]
+            if isinstance(name, ast.Constant) and isinstance(name.value, str):
+                used.add(name.value)
+            else:
+                used.add(f"<dynamic {node.func.id}>")
+    return used
+
+
 def _undeclared(mixin: type, host: type) -> set[str]:
-    """``self.<name>`` uses in *mixin* that neither its MRO nor *host* defines."""
-    tree = ast.parse(textwrap.dedent(inspect.getsource(mixin)))
-    used = {
-        node.attr
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Attribute)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "self"
-    }
+    """Members *mixin* uses on ``self`` that neither its MRO nor *host* defines."""
+    used = _self_members(ast.parse(textwrap.dedent(inspect.getsource(mixin))))
     own = {name for klass in mixin.__mro__ if klass is not object for name in vars(klass)}
     return used - own - set(host.__annotations__) - set(vars(host))
 
@@ -50,6 +76,32 @@ def test_the_scan_notices_an_undeclared_member() -> None:
             return self.not_on_the_host  # type: ignore[attr-defined]
 
     assert _undeclared(Leaky, PagesHost) == {"not_on_the_host"}
+
+
+def test_the_scan_notices_a_literal_reflective_lookup() -> None:
+    class Leaky(RevisionsMixin):
+        def peek(self) -> object:
+            if hasattr(self, "probed"):
+                setattr(self, "written", 1)  # noqa: B010
+            return getattr(self, "not_on_the_host")  # noqa: B009
+
+    assert _undeclared(Leaky, PagesHost) == {"probed", "written", "not_on_the_host"}
+
+
+def test_the_scan_rejects_a_dynamic_reflective_lookup() -> None:
+    class Leaky(RevisionsMixin):
+        def peek(self, name: str) -> object:
+            return getattr(self, name)
+
+    assert _undeclared(Leaky, PagesHost) == {"<dynamic getattr>"}
+
+
+def test_a_reflective_lookup_of_a_declared_member_passes() -> None:
+    class Fine(RevisionsMixin):
+        def peek(self) -> object:
+            return getattr(self, "db")  # noqa: B009
+
+    assert _undeclared(Fine, PagesHost) == set()
 
 
 def test_pages_service_satisfies_the_host_protocol() -> None:
