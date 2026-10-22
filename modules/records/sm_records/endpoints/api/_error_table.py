@@ -122,7 +122,7 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
         "*Multi-tenant hosts* — the framework resolved no tenant (no active organisation) "
         "for the signed-in account",
         '`{"detail", "code": "tenant_required"}` — a tenant header does not change it: '
-        "the framework never lets a signed-in user pick a tenant by header",
+        "the framework never lets a signed-in user pick a tenant outside their memberships",
     ),
     ErrorRow(
         404,

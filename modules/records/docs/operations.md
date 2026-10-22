@@ -1287,7 +1287,7 @@ workarounds the fixes make redundant; the rows say which. What records changed i
   it a strict host refused the read and failed to boot.
 * `tenant_scope` binds through the framework's `tenant_context`.
 * `resolve_admin` follows the framework-resolved tenant (#112): since #358
-  the framework never lets a signed-in user pick a tenant by header, so the
+  the framework never lets a signed-in user pick a tenant outside their memberships, so the
   hole the old per-user rule guarded against is closed upstream.
 * A `TenantMiddleware(fixed=…)` (#359's `default_tenant`) is single mode, and a
   fixed tenant other than `default` is refused at boot.
