@@ -59,9 +59,9 @@ def _route_paths(app) -> set[str]:
 
     Not ``app.routes``: since FastAPI 0.141 ``include_router`` wraps the
     sub-router in one lazily-resolved ``_IncludedRouter`` with no ``path``.
-    Not the OpenAPI schema: from framework 0.0.37 (the nightly newest-framework
-    run; the host pins 0.0.36) view routers are included with
-    ``include_in_schema=False``, so the schema lists only ``/api/...`` (#186).
+    Not the OpenAPI schema: since framework 0.0.37 view routers are included
+    with ``include_in_schema=False``, so the schema lists only ``/api/...``
+    (#186).
     ``iter_route_contexts`` ships with the FastAPI 0.141 every lock here
     resolves, so it is imported unguarded.
     """

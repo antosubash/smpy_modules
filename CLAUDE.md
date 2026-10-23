@@ -13,7 +13,7 @@ development app that mounts them; it is never published.
 
 **Pin policy differs by role.** Published modules depend on the framework with
 *ranges* (`simple_module_core>=0.0.36,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.36`). Never give a published module an `==` pin —
+(`simple_module_hosting==0.0.38`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 `scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any
 requirement on another module of this repo (news' `pagebuilder` extra) without
@@ -43,6 +43,18 @@ empty `alembic merge heads` revision (see `52ce60faa542`, `d3a2801784b0`);
 `scripts/check_migration_heads.py` fails CI until one exists. `make migrate`
 runs `upgrade heads`, which would hide a split — don't rely on it to notice.
 Downgrading *through* a merge point is ambiguous with `-1`; name the parent.
+
+**Framework tables are this host's to migrate too.** The framework's own
+revisions live in its repo's host, not in the wheels, so a framework bump means
+porting each new one into this history unchanged (see the `(framework 0.0.3x)`
+revisions, e.g. `307543b6146a`…`b65e04cf65d7` for 0.0.37/0.0.38) and then
+`alembic check` on SQLite *and* Postgres. SQLModel is unpinned since 0.0.38
+(framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
+`timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
+`users_refresh_token` columns on Postgres. And since 0.0.37 the soft-delete and
+tenant criteria reach Core statements on `Model.__table__` (subqueries,
+`INSERT … SELECT`, DML) — a Core statement that must see the trash needs
+`include_deleted=True` like an ORM one.
 
 **A page's language is fixed for its lifetime.** Slugs are unique per
 `(tenant_id, locale, slug)`, and a rename records a redirect scoped to that locale.
@@ -179,14 +191,16 @@ the target fails without it.
   translation's key tree or placeholders drift from `en.json` — add a key to
   every catalogue at once. The demo host speaks both
   (`SM_I18N_SUPPORTED_LOCALES` in `.env.example`; the `locale` cookie picks
-  one, written by `host/locale_switch.py` because framework 0.0.36 has no
-  `/i18n/set-locale` route for its own switcher). The console chrome is German
-  too, through `host/locales/overrides/de.json`: since 0.0.36 the framework
-  ships the `ui` catalogue inside `simple_module_hosting` (English and Spanish
-  only) and ignores any `packages/ui/locales`, so a host's German is an
-  override, and `host/tests/test_ui_locales.py` fails when a framework bump
-  adds a `ui` key it lacks. The framework modules' screens (users, settings,
-  …) ship English only and fall back to it.
+  one, written by the framework's own `POST /i18n/set-locale`, which
+  `create_app` mounts since 0.0.37 — the host's copy, `host/locale_switch.py`,
+  is gone). The console chrome is German too: the framework ships the `ui`
+  catalogue inside `simple_module_hosting` (German included since 0.0.38) and
+  ignores any `packages/ui/locales`. `host/locales/overrides/de.json` keeps
+  only the labels the host words differently, and
+  `host/tests/test_ui_locales.py` fails when a framework bump leaves a `ui`
+  key without German, drops a key an override names, or makes an override
+  redundant. The framework modules' screens (users, settings, …) ship German
+  since 0.0.38 as well.
 
   news, pagebuilder, ai, billing and records call
   `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each

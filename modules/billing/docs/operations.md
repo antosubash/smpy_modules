@@ -7,7 +7,7 @@
 
    ```toml
    dependencies = [
-       "simple_module_tenants==0.0.36",
+       "simple_module_tenants==0.0.38",
        "simple_module_billing",
    ]
    ```

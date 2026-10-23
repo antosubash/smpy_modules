@@ -32,7 +32,8 @@ _PACKAGE = "pagebuilder"
 #: the editor renders as its own key.
 _LOCALE_NAMESPACE = _PACKAGE
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it is
-#: what guarantees ``app.state.settings.module_registry`` exists by the time
+#: what guarantees the settings registry (``app.state.module_settings_registry`` since
+#: framework 0.0.38, ``app.state.settings.module_registry`` before) exists by the time
 #: ``register_settings`` runs — the host topo-sorts modules on this field.
 _MODULE_SETTINGS = "Settings"
 

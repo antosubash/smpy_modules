@@ -31,7 +31,8 @@ keyset batches of :data:`MOVE_BATCH` for the two tenant-owned tables (see
 :func:`_copy_batched`), the id mapping made by joining the two record tables
 on ``(tenant_id, uuid)`` — unique per tenant across every table set — then
 one ``DELETE`` per table. Core statements over ``__table__`` are invisible to the
-tenancy guard (``_tenant_guard``), so every one of them carries an explicit
+tenancy guard (``_tenant_guard``) and, before framework 0.0.37, to the framework's
+tenant criteria too, so every one of them carries an explicit
 ``tenant_id`` predicate (tenancy design §E); the index tables carry no tenant
 column and are reached only through a tenant-scoped record id.
 
@@ -57,7 +58,11 @@ from sm_records.services.errors import Conflict, ValidationFailed
 __all__ = ["check_target", "move_type"]
 
 _ALL_ROWS = {"include_deleted": True}
-"""Every statement here reads the trash too: a trashed record moves with its type."""
+"""Every statement here reads the trash too: a trashed record moves with its type.
+
+The DML and ``INSERT … SELECT`` sources need it as much as the reads: since
+framework 0.0.37 the soft-delete criteria reach Core statements on
+``Model.__table__``, subqueries included."""
 
 MOVE_BATCH = 500
 """Rows per insert when copying a tenant-owned table (see :func:`_copy_batched`)."""
@@ -205,10 +210,16 @@ async def _copy_rows(
         else:
             # No tenant column, so nothing for the framework's insert guard to
             # stamp: one ``INSERT … SELECT``, scoped through ``pairs``.
-            await db.execute(insert(to_table).from_select([*names, "record_id"], rows))
+            await db.execute(
+                insert(to_table).from_select([*names, "record_id"], rows),
+                execution_options=_ALL_ROWS,
+            )
 
     old_ids = select(src.c.id).where(mine)
     for from_cls, _ in children:
         from_table = from_cls.__table__
-        await db.execute(delete(from_table).where(from_table.c.record_id.in_(old_ids)))
-    await db.execute(delete(src).where(mine))
+        await db.execute(
+            delete(from_table).where(from_table.c.record_id.in_(old_ids)),
+            execution_options=_ALL_ROWS,
+        )
+    await db.execute(delete(src).where(mine), execution_options=_ALL_ROWS)

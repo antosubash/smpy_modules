@@ -1,9 +1,11 @@
 """The admin chrome speaks every language the demo host does.
 
-Framework 0.0.36 ships the ``ui`` catalogue inside ``simple_module_hosting``
-(``ui_locales/``), English and Spanish only. German comes from this host's
-``host/locales/overrides/de.json`` (see the README there). A framework upgrade
-that adds a ``ui`` label would otherwise reach a German console as English,
+The framework ships the ``ui`` catalogue inside ``simple_module_hosting``
+(``ui_locales/``); since 0.0.38 that includes German (upstream #492). This
+host's ``host/locales/overrides/de.json`` only keeps the handful of labels it
+words differently (see the README there). A framework upgrade that adds a
+``ui`` label without German, or drops one an override still names, would
+otherwise reach a German console as English, or as a skipped override,
 unnoticed.
 """
 
@@ -38,8 +40,13 @@ def _english() -> dict[str, str]:
     return _flatten(json.loads((UI_CATALOG / "en.json").read_text()))
 
 
-def _german() -> dict[str, str]:
+def _overrides() -> dict[str, str]:
     return _flatten(json.loads(GERMAN.read_text())["ui"])
+
+
+def _german() -> dict[str, str]:
+    """What a German console shows: the framework's German, then the host's."""
+    return _flatten(json.loads((UI_CATALOG / "de.json").read_text())) | _overrides()
 
 
 def test_every_ui_key_the_package_uses_is_in_the_catalog():
@@ -54,13 +61,21 @@ def test_every_ui_key_the_package_uses_is_in_the_catalog():
     assert used, "the ui package uses no keys.ui.* — has its i18n moved?"
     # A plural key is used by its stem and stored with ``_one``/``_other``.
     known = {re.sub(r"_(zero|one|two|few|many|other)$", "", k) for k in _english()}
-    assert sorted(used - known) == []
+    # A section taken whole (``const e = keys.ui.error_page``) is not a leaf.
+    sections = {k.rsplit(".", 1)[0] for k in known if "." in k}
+    assert sorted(used - known - sections) == []
 
 
 def test_german_covers_exactly_the_framework_catalog():
     english, german = _english(), _german()
     assert sorted(english.keys() - german.keys()) == [], "untranslated ui keys"
     assert sorted(german.keys() - english.keys()) == [], "keys the framework no longer has"
+
+
+def test_every_override_changes_the_framework_german():
+    """An override equal to the framework's own German is dead weight."""
+    shipped = _flatten(json.loads((UI_CATALOG / "de.json").read_text()))
+    assert sorted(k for k, v in _overrides().items() if shipped.get(k) == v) == []
 
 
 def test_german_keeps_every_placeholder():
@@ -78,4 +93,5 @@ def test_the_host_serves_the_ui_namespace_in_german():
     registry, _ = build_i18n_registry(settings, [], ROOT)
     assert registry.messages("en").get("ui.sidebar.open") == "Open sidebar"
     assert registry.messages("de").get("ui.sidebar.open") == "Seitenleiste öffnen"
+    assert registry.messages("de").get("ui.nav_groups.content") == "Inhalte"
     assert registry.unknown_override_keys == {}
