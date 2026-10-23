@@ -72,10 +72,12 @@ def pair_rows(tables: TableSet, record: Record) -> Subquery:
     removed out of band — by a migration, by a script, by anything that did
     not go through ``hard_delete_record`` — leaves its ref rows behind, and
     counting those made the editor's badge disagree with the panel that
-    could not resolve them. **Core tables, not the mapped classes**, so the
-    framework's soft-delete criteria never attach: a *trashed* referrer is
-    listed here and flagged (``ReferrerRead.is_deleted``), which is the
-    panel's contract and the opposite of the delete path's.
+    could not resolve them. A *trashed* referrer is listed here and flagged
+    (``ReferrerRead.is_deleted``), which is the panel's contract and the
+    opposite of the delete path's — so every statement over these rows runs
+    with ``include_deleted``: since framework 0.0.37 the soft-delete criteria
+    reach Core statements on ``Model.__table__`` too, and Core tables alone no
+    longer keep them off.
 
     Self-references are dropped here rather than after the fact, and "itself"
     is a row in *this* set with this id — two collections number their
@@ -131,7 +133,8 @@ async def set_counts(db: AsyncSession, rows: Subquery, blocked: list[int]) -> Se
             func.count(distinct(rows.c.rid)),
             func.count(),
         )
-    row = (await db.execute(select(*columns).select_from(rows))).one()
+    stmt = select(*columns).select_from(rows).execution_options(include_deleted=True)
+    row = (await db.execute(stmt)).one()
     return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
 
 
@@ -154,6 +157,7 @@ async def pair_page(
     if blocked:
         stmt = stmt.where(rows.c.tid.notin_(blocked))
     stmt = stmt.order_by(rows.c.rid, rows.c.fk).limit(limit).offset(offset)
+    stmt = stmt.execution_options(include_deleted=True)
     return [(int(rid), str(field_key)) for rid, field_key in (await db.execute(stmt)).all()]
 
 

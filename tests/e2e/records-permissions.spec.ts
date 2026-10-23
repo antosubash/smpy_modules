@@ -11,7 +11,8 @@ import { seedTextType, uniqueTypeKey } from './records-helpers';
  * permissions).
  *
  * **A narrower role could not be built from the browser.** This host seeds
- * exactly one role row (`admin`); `PUT /api/users/admin/{id}/roles` only
+ * two role rows (`admin`, and since framework 0.0.37 `user`, which holds no
+ * records permission); `PUT /api/users/admin/{id}/roles` only
  * resolves role *names that already exist*, and nothing in the users or
  * permissions API creates one. So "a role with `records.view` but not
  * `records.manage_types`" is not constructible here, and the closest

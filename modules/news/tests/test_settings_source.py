@@ -16,6 +16,18 @@ from news.settings import NewsSettings
 from settings.module_registry import ModuleSettingsRegistry
 
 
+def _registry(app):
+    """Where the class was registered.
+
+    ``app.state.module_settings_registry`` since framework 0.0.38 (the
+    mechanism moved into ``simple_module_core.module_settings``), the
+    settings plugin's ``app.state.settings.module_registry`` before it.
+    """
+    return getattr(app.state, "module_settings_registry", None) or (
+        app.state.settings.module_registry
+    )
+
+
 def test_the_env_var_is_ignored(monkeypatch):
     monkeypatch.setenv("SM_NEWS_PUBLIC_ROUTE_PREFIX", "/from-env")
     assert NewsSettings().public_route_prefix == "/news"
@@ -32,7 +44,7 @@ def test_register_settings_publishes_the_class_for_hydration():
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     NewsModule().register_settings(app)
 
-    registry = app.state.settings.module_registry
+    registry = _registry(app)
     assert registry.get(constants.PACKAGE) is NewsSettings
     assert isinstance(app.state.news.settings, NewsSettings)
 

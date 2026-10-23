@@ -12,6 +12,18 @@ from sm_ai import constants, services
 from sm_ai.module import AiModule
 
 
+def _registry(app):
+    """Where the class was registered.
+
+    ``app.state.module_settings_registry`` since framework 0.0.38 (the
+    mechanism moved into ``simple_module_core.module_settings``), the
+    settings plugin's ``app.state.settings.module_registry`` before it.
+    """
+    return getattr(app.state, "module_settings_registry", None) or (
+        app.state.settings.module_registry
+    )
+
+
 class TestMeta:
     def test_meta(self):
         assert AiModule.meta.name == constants.MODULE_NAME
@@ -30,7 +42,7 @@ class TestRegisterSettings:
         app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
         try:
             AiModule().register_settings(app)
-            assert app.state.settings.module_registry.get(constants.PACKAGE) is not None
+            assert _registry(app).get(constants.PACKAGE) is not None
             state_services = getattr(app.state, constants.PACKAGE)
             # The module-global holder and app.state hold the SAME instance —
             # that identity is what makes hot reload visible to contracts.
@@ -46,7 +58,7 @@ class TestRegisterSettings:
         app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
         try:
             AiModule().register_settings(app)
-            registry = app.state.settings.module_registry
+            registry = _registry(app)
             assert registry.manage_url(constants.PACKAGE) == constants.MENU_URL
         finally:
             services.reset()

@@ -37,6 +37,7 @@ from sm_records.models import Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import configure, install_guard
+from sqlmodel import select
 
 from tests.harness_auth import (  # noqa: F401 - re-exported: tests import them from here
     ADMIN,
@@ -213,9 +214,14 @@ async def seed_record(db_state: Any, rtype: RecordType, data: dict, **cols: Any)
             **cols,
         )
         session.add(record)
+        await session.flush()
+        record_id = record.id
         await session.commit()
-        await session.refresh(record)
-        return record
+        # Not ``session.refresh``: since framework 0.0.37 the soft-delete
+        # filter reaches a refresh too, so a record seeded already trashed
+        # would come back "could not refresh instance".
+        stmt = select(Record).where(Record.id == record_id)
+        return (await session.execute(stmt.execution_options(include_deleted=True))).scalar_one()
 
 
 def field(key: str, type_: str = "text", **options: Any) -> dict:

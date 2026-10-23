@@ -22,6 +22,18 @@ from settings.module_registry import ModuleSettingsRegistry
 PACKAGE = "pagebuilder"
 
 
+def _registry(app):
+    """Where the class was registered.
+
+    ``app.state.module_settings_registry`` since framework 0.0.38 (the
+    mechanism moved into ``simple_module_core.module_settings``), the
+    settings plugin's ``app.state.settings.module_registry`` before it.
+    """
+    return getattr(app.state, "module_settings_registry", None) or (
+        app.state.settings.module_registry
+    )
+
+
 @pytest.mark.parametrize(
     ("env_var", "field", "default"),
     [
@@ -38,7 +50,7 @@ def test_environment_variables_are_ignored(monkeypatch, env_var, field, default)
 
 def test_a_dotenv_file_is_ignored(monkeypatch, tmp_path):
     """Including the repo root's, which pydantic-settings would read itself."""
-    (tmp_path / ".env").write_text('SM_PAGEBUILDER_PUBLIC_ROUTE_PREFIX=/from-dotenv\n')
+    (tmp_path / ".env").write_text("SM_PAGEBUILDER_PUBLIC_ROUTE_PREFIX=/from-dotenv\n")
     monkeypatch.chdir(tmp_path)
     assert PagebuilderSettings().public_route_prefix == "/p"
 
@@ -55,7 +67,7 @@ def test_register_settings_publishes_the_class_for_hydration():
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     PagebuilderModule().register_settings(app)
 
-    assert app.state.settings.module_registry.get(PACKAGE) is PagebuilderSettings
+    assert _registry(app).get(PACKAGE) is PagebuilderSettings
     assert isinstance(app.state.pagebuilder.settings, PagebuilderSettings)
 
 

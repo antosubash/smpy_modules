@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -16,7 +16,6 @@ members = [
     "simple-module-records",
     "smpy-modules-host",
 ]
-constraints = [{ name = "sqlmodel", specifier = "<0.0.45" }]
 
 [[package]]
 name = "aiofiles"
@@ -1842,16 +1841,16 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-auth"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "itsdangerous" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/97/9fa2b56013be9ec24b37992a1ab5dc7ddf0c4f89ade3686f2acdd2834176/simple_module_auth-0.0.36.tar.gz", hash = "sha256:57cf62e1d5dd0d73ab11d6d646591e380ee091c6785fc8d7d2578e17058be45e", size = 15622, upload-time = "2026-10-13T09:06:08.397Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/85/ee7b0bbf5b705e9c396fa91c99cef1918777df0668573171bd2966bca2f7/simple_module_auth-0.0.38.tar.gz", hash = "sha256:94ab75dbb87352492bd7361525209ab4d95eecae7408fda3117f5ccd2bdd2ecb", size = 20680, upload-time = "2026-10-23T04:57:52.219Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/0d/15fa4c97e9368f48fd8c47252e065b43b350d20d523f3474c7e790424670/simple_module_auth-0.0.36-py3-none-any.whl", hash = "sha256:c5e09a91314070000c01483656d6f00350f2f43e579f3a8870fa04ed521676aa", size = 13385, upload-time = "2026-10-13T09:06:07.241Z" },
+    { url = "https://files.pythonhosted.org/packages/67/77/2798cd7118ef8feaa7345c710f5d893c5ca6162932b27f16960050d00f50/simple_module_auth-0.0.38-py3-none-any.whl", hash = "sha256:08a8e28b3d5856440eccac44033f66483bdf2b524bf59fc8477f443e81e69a4d", size = 17679, upload-time = "2026-10-23T04:57:51.052Z" },
 ]
 
 [[package]]
@@ -1900,7 +1899,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-branding"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
@@ -1909,27 +1908,27 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/f8/1516af16a8de91d75bc114bbefc488b4393e4dd8a2fe4045e41e7554f853/simple_module_branding-0.0.36.tar.gz", hash = "sha256:dc9ed21ae942ee8956afbe04b9e56da8bfcef9ed30846355901699a6ad4accb4", size = 67859, upload-time = "2026-10-13T09:06:24.676Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/d8/1698587d63bf49997a64fbfff450bf67899c260b7c6d6892a4b18fd6b32c/simple_module_branding-0.0.38.tar.gz", hash = "sha256:552fb91cfa46a22a614aefea803a8d7d94fa7848755115ceace78c30965ab157", size = 71965, upload-time = "2026-10-23T04:57:52.883Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/47/b5eb958ad97316def9161b1a622c0f60eddba33c68976f162999f5737b89/simple_module_branding-0.0.36-py3-none-any.whl", hash = "sha256:c9e9bcba3fa3b9270876cbed37f4ac0b59c31ee3d7e2c05f632f95cd0b0c4f47", size = 58125, upload-time = "2026-10-13T09:06:23.421Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/f0/bb4c388a114a269f9986ae6c036b7c10c19c46d738a8af3671400e5f7c94/simple_module_branding-0.0.38-py3-none-any.whl", hash = "sha256:2b7860455c60fe4c7a02ac30c2cb45b1b6cf0d49fb8314c978e5b9e504cfeede", size = 62397, upload-time = "2026-10-23T04:57:51.484Z" },
 ]
 
 [[package]]
 name = "simple-module-cli"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/32/7e5e4c4a7ee17b8433034787841ca13168e3fe2041c0d20a1c5034c2f419/simple_module_cli-0.0.36.tar.gz", hash = "sha256:b31f4928167c5355ee8f903cb91440fbbba7e348abb9fe7d9ba2397d982fdb22", size = 143516, upload-time = "2026-10-13T09:06:07.093Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/76/01c8fc383c6f6022a282915a9d6778df6c3351d0445a1ac8253741e1d329/simple_module_cli-0.0.38.tar.gz", hash = "sha256:879cb306b21bfcb553b74ad40253b0b0e4c22a51374b2bf05a43b60c13632712", size = 179893, upload-time = "2026-10-23T04:58:14.083Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/da/86b3eb729b10fb9f3497ee066ceabf29c9d17607d07697484abbaab38f03/simple_module_cli-0.0.36-py3-none-any.whl", hash = "sha256:5ba12c23dfe666551e59734e08308869cab4433d468767b5835511f45223fff7", size = 196633, upload-time = "2026-10-13T09:06:05.724Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/0b/0e7f4685294783e89173524d48e33a12375a81615362c1ea8b53dd8b04c1/simple_module_cli-0.0.38-py3-none-any.whl", hash = "sha256:758c1053d5311b602dc324dea29616447d5e3e83385e5959e671daed72903c09", size = 256984, upload-time = "2026-10-23T04:58:12.497Z" },
 ]
 
 [[package]]
 name = "simple-module-core"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
@@ -1939,29 +1938,28 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyee" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ec/49/6c53855814522b38f7d5853225a6cb0f40bc64a20726e417c4c1bc0a7528/simple_module_core-0.0.36.tar.gz", hash = "sha256:fd61c229faf0ff66ded274ff604472ec60d3404d5e909ef1ba67e7fb2d7d4fe5", size = 109310, upload-time = "2026-10-13T09:06:06.877Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/06/c22e277ce3bd5b13b890b6d4be4594e6bd62b66b4b53218455c2a5a5abf7/simple_module_core-0.0.38.tar.gz", hash = "sha256:0f5f388ac6e5d70349e7ff8fa7f6ebd31e1cf59c84a1ada6dcd03ae39ce7555f", size = 151205, upload-time = "2026-10-23T04:57:57.472Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/6b/a05316596287b013f1525a4a8804291fd566565490808fd0eeeb0cab7616/simple_module_core-0.0.36-py3-none-any.whl", hash = "sha256:9e9ea8a4aeb15de39c56c70864f1b07ca983bf3f9e9d52b3a1e7358db241b9e9", size = 91969, upload-time = "2026-10-13T09:06:05.619Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/89/1589004f0b0664cf93f0df5e43dc6e252ba69f8c00d73202a355af20b135/simple_module_core-0.0.38-py3-none-any.whl", hash = "sha256:399190b9031c744f82480bc53ae67f3885e961bd07d552683c65abf64dba6416", size = 136073, upload-time = "2026-10-23T04:57:56.162Z" },
 ]
 
 [[package]]
 name = "simple-module-dashboard"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
-    { name = "simple-module-users" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/98/7f19cefbd6faed8d564f63d7bcaa83e7f44bdc9c0b43ab9daa26c1b81ed4/simple_module_dashboard-0.0.36.tar.gz", hash = "sha256:be4a03cafa01f3b37a9a8764149a078aa4e92cccd2c279bc821b41d0ae75f50d", size = 34047, upload-time = "2026-10-13T09:06:25.945Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/2d/cbf25a6f9ac6ce77d8873eba415a96c73c42abd2d81c4407f5891ea14cd0/simple_module_dashboard-0.0.38.tar.gz", hash = "sha256:f30c04b2d516b1409f933111700b1f5fedfea1326abbbf4f826d3d088a899c74", size = 35468, upload-time = "2026-10-23T04:57:55.761Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/46/ce4d353813b1b2e4cd289b8e2f5444b1c7417f3aa8d60461dff402c9b37c/simple_module_dashboard-0.0.36-py3-none-any.whl", hash = "sha256:95404d9ae5ac785b16750bf76e2812678585e108bead44b2e51eb669558d728a", size = 36049, upload-time = "2026-10-13T09:06:24.645Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/19/64b1106a475bacd22770f980c5d51916edae2859e2b78818ab4f606aec4a/simple_module_dashboard-0.0.38-py3-none-any.whl", hash = "sha256:ebbbce97eac994dd3358599c1fd028bea868eed5d718e85549b5e9a7754c7a3e", size = 37376, upload-time = "2026-10-23T04:57:54.478Z" },
 ]
 
 [[package]]
 name = "simple-module-db"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1972,14 +1970,14 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlmodel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/d8/6b7e4bd56860cbdabe99e5d23cfcd867d437539e8748ea1905a1f34a27b3/simple_module_db-0.0.36.tar.gz", hash = "sha256:39ed5673aa48aeb6ec1184735bed10367ef8a1272f7dab2d36cbd22ca418ef05", size = 64903, upload-time = "2026-10-13T09:06:17.029Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/9b/b74daa4edbdcb7b0740be62f04c61e7ab77468c18b8a123e3ba0bc17e8ca/simple_module_db-0.0.38.tar.gz", hash = "sha256:05f2366a801f3e1001e21044da38cf7728eb6cc3e8e85f82269f0a5e64d5a4ea", size = 106378, upload-time = "2026-10-23T04:57:57.97Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/60/e3e28790a514cdf71f2b4e9ad91a0c9c8c7a716cf42849b1df50eafc9e68/simple_module_db-0.0.36-py3-none-any.whl", hash = "sha256:7b6bf62eba76a2a1b13e46cf0baaa6e4ba9c08be9d4847631d9eb1d0382cbd08", size = 46464, upload-time = "2026-10-13T09:06:15.653Z" },
+    { url = "https://files.pythonhosted.org/packages/78/95/997f930f122bd24332d02855e2ace38049e69a0540488c5d38396461ee9d/simple_module_db-0.0.38-py3-none-any.whl", hash = "sha256:3c96335d36c51964935a441f548874f4415a0f5082f052833de7bc5ad0baa0c4", size = 78988, upload-time = "2026-10-23T04:57:55.864Z" },
 ]
 
 [[package]]
 name = "simple-module-file-storage"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1989,14 +1987,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/18/8c6ded2a60408df7a54ad16c81c31501c480b983040c373cfff4b66913c5/simple_module_file_storage-0.0.36.tar.gz", hash = "sha256:5d5427c605cab3fb96d2c8e98693755893db7c4f4f8b156848b65a7ae6546280", size = 90373, upload-time = "2026-10-13T09:06:11.081Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/bf/80dd88cb9b9ad57f6b1c1c26a85cb92654f08bf272063836537b8c2df31b/simple_module_file_storage-0.0.38.tar.gz", hash = "sha256:10b1981bf0481fa829fc5cd302b196fd36cde0bd552aa31298a6b02d15e46c89", size = 153038, upload-time = "2026-10-23T04:58:18.764Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/c2/9a370a3c678198060ce9649fd65dc9168970c234c4f156f733a1aefffc58/simple_module_file_storage-0.0.36-py3-none-any.whl", hash = "sha256:605936473e46ecce0ad5dcea31349e8a321c7d6c6fe43ca158a38c776d0ad123", size = 77467, upload-time = "2026-10-13T09:06:09.169Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/c1/45e299ef17f3026bd38420e78ba05a18a814c14e1838bf1862f072c6d94b/simple_module_file_storage-0.0.38-py3-none-any.whl", hash = "sha256:101e4eb5815ca8b76a65810b8a71b1478893ad3f94a8497f63774c3482e4d192", size = 127023, upload-time = "2026-10-23T04:58:17.293Z" },
 ]
 
 [[package]]
 name = "simple-module-hosting"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2011,23 +2009,37 @@ dependencies = [
     { name = "tomlkit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/af/4806b72b0f9bdb6a5314d3bd82a09862fc1d43eaec7a8b0c0797d1320f9b/simple_module_hosting-0.0.36.tar.gz", hash = "sha256:0fe14fe52fdfacde6577f55a3c44da603a3bfe2000c2b7b413be74b7e23ba77f", size = 194938, upload-time = "2026-10-13T09:06:17.248Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/ae/f5650df861fab631eee39369e969ba15593f43e359ccf8378a8c40511869/simple_module_hosting-0.0.38.tar.gz", hash = "sha256:9abfd5cf18ba0864dcc53208457d77bc11b3adaac741a7ee27930cfdb84ba83f", size = 281680, upload-time = "2026-10-23T04:57:50.813Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/e6/1c15377bcf689239877b2ceacf55667f0957a2deac47221bf4290b3bba0a/simple_module_hosting-0.0.36-py3-none-any.whl", hash = "sha256:bf82919c5bd1325bcad73cbb4c93155b636d64ad843c21af07ac9866c5b88743", size = 137911, upload-time = "2026-10-13T09:06:15.811Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/61/e3ec4134d36aab1f7967f7709928b4b4000cfb3c8478ed0cac476443d9f9/simple_module_hosting-0.0.38-py3-none-any.whl", hash = "sha256:3154b0cb8abc0bc21de4769a7887a11b4235bde2dca3d97cd90a3549790b99b8", size = 195882, upload-time = "2026-10-23T04:57:49.015Z" },
 ]
 
 [[package]]
 name = "simple-module-inertia"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
     { name = "jinja2" },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/7c/846245deaf64d65e163cf7e7b37164f5b11e236291382fb8c5f1b0f7593d/simple_module_inertia-0.0.36.tar.gz", hash = "sha256:28d4cf0cfb564f2fa9e30c8a96791d68fb9836d363ea18da36f4a8ec0b36b2dc", size = 19669, upload-time = "2026-10-13T09:06:15.337Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/3f/b5123c95e1a23149628623e7b477a298c9fac454dda517fea6d30c1371f4/simple_module_inertia-0.0.38.tar.gz", hash = "sha256:c19d04b31387a44ef8c846b01064cf13c7ea489bda88e1c8cff4a8ad544c38b9", size = 23480, upload-time = "2026-10-23T04:58:08.847Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/fd/fbda96eec653e79dbec21492541f03965f6eb19361c361f4e2e70b2c844e/simple_module_inertia-0.0.36-py3-none-any.whl", hash = "sha256:81d925305d36a7fc92576f037e79721b37f99d2d985ae12b9e2f1247025c58c7", size = 17959, upload-time = "2026-10-13T09:06:13.962Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/63/898cf1b0c4c65e083372f04bd9f833e5ce5b837f0155dd2af26056123fb1/simple_module_inertia-0.0.38-py3-none-any.whl", hash = "sha256:ce1df8d716766046cb8d266aaa54e912ddf9e84c9d8707fd2d78801503e8615c", size = 20956, upload-time = "2026-10-23T04:58:07.677Z" },
+]
+
+[[package]]
+name = "simple-module-mail"
+version = "0.0.38"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiosmtplib" },
+    { name = "simple-module-core" },
+    { name = "simple-module-settings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/2e/f2031406ea92b52a9a6013f2e7cf0fa25a329328b02579f2ce8ee96837d7/simple_module_mail-0.0.38.tar.gz", hash = "sha256:a84530a04df8b150f68a0f70744da04efc8cbbc69ac6e690ddd816866c8d6dcf", size = 9305, upload-time = "2026-10-23T08:00:27.217Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/09/4b/e7fd88e7ecf9ebb628daa860fe152a80467cf41f76e28ec522cbc7df824d/simple_module_mail-0.0.38-py3-none-any.whl", hash = "sha256:7299fd89cddb5ae51f90c32848eeb4e006d8d08b1f006a6a3b02cb07c7b0c6bd", size = 8505, upload-time = "2026-10-23T08:00:25.949Z" },
 ]
 
 [[package]]
@@ -2112,7 +2124,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-permissions"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -2121,9 +2133,9 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-users" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/9d/323aeedd9eac1b8746a6b8ed288188912c2758de5c081bff3c23bb208aed/simple_module_permissions-0.0.36.tar.gz", hash = "sha256:0f9d2aa7837406265a33d39f949b94b57b688c922ac414f96fcdfcbf6b7dac7f", size = 32510, upload-time = "2026-10-13T09:06:10.993Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/0c/2e3f37e4f6ef526b6d6cdc81939a6be625418c042478b164f4412d4b05ed/simple_module_permissions-0.0.38.tar.gz", hash = "sha256:66e2d746436ae13b8aa9133c9007cd8df49c2b231233feaec6d9dd05424498e2", size = 35168, upload-time = "2026-10-23T04:58:06.089Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/d0/ff6479feba44cfe6f0ce8b272f0d3626a596e796b75715d16c49b594583e/simple_module_permissions-0.0.36-py3-none-any.whl", hash = "sha256:aee9e5be5c89372441c64da07741deb27a662eb9ad9736f86cb6c1a243158cb0", size = 32432, upload-time = "2026-10-13T09:06:09.349Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/e3/c05bdcc9a4d1d680fdda36421c14000c4ac32e1689edee5ce47423dede99/simple_module_permissions-0.0.38-py3-none-any.whl", hash = "sha256:7e20cb040f9249d6cd66217d559b34f0ffa407bfe47b9ea01919600210f4477f", size = 35494, upload-time = "2026-10-23T04:58:05.006Z" },
 ]
 
 [[package]]
@@ -2193,7 +2205,7 @@ provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-settings"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
@@ -2201,14 +2213,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/1b/5d135d0f9bf04fe92b046d97a831e4eb9daadfedab2e27a94e4cdfeb2c9c/simple_module_settings-0.0.36.tar.gz", hash = "sha256:ca879ba91e2f3a51712a6d7b31bc4967d204331780a3fb89d652f3dcfec599bf", size = 97271, upload-time = "2026-10-13T09:06:16.147Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/6a/b41a01139674728d8a38e40ed27ca25532f0db074fc4958b18f84c3f0d10/simple_module_settings-0.0.38.tar.gz", hash = "sha256:f266af5ced5eab83a18283a5fcffcd2f952a2c1478f2f0d4ac431fce26d27a51", size = 114536, upload-time = "2026-10-23T04:57:58.756Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/79/18/c6c291afa00d2fb7b1d8479874bc264330c99119f2f5212ec800e9736e7a/simple_module_settings-0.0.36-py3-none-any.whl", hash = "sha256:096cd34b6ac3bbf379e2c4f0bef726e47296c5df9003ef36788661ed8295b8b0", size = 93825, upload-time = "2026-10-13T09:06:14.803Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/cd/9af5731e9aa973da78ed761789390cbe87fb99af4d059f92c3163fc27d77/simple_module_settings-0.0.38-py3-none-any.whl", hash = "sha256:e90db283854be6ce5d08d979f3b4f32505faafb2bb9c822ba6838d001279913b", size = 101088, upload-time = "2026-10-23T04:57:57.273Z" },
 ]
 
 [[package]]
 name = "simple-module-tenants"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -2220,14 +2232,14 @@ dependencies = [
     { name = "simple-module-inertia" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/75/c4/a1731f6ecbefe5da70b4b82f70142778806d67c1cefe8dbcb347e43869f3/simple_module_tenants-0.0.36.tar.gz", hash = "sha256:86d7fb4e251952e95462dc0a3cb0332b56874796a6c53a65da410283392fa8c7", size = 49467, upload-time = "2026-10-13T09:06:30.59Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/3d/33a9e977dc54d58026ca347f3794ffa758eb231a5d0f55f0385db64362b8/simple_module_tenants-0.0.38.tar.gz", hash = "sha256:860d84b60b00d4b36f83db65350f8d57b1743033b3f4edef4275093f9bfd3941", size = 63535, upload-time = "2026-10-23T04:57:55.021Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/de/287d9b2b4681a3e808ecb7fb99b84ae027ece1198bbc7635c9487f2ab9da/simple_module_tenants-0.0.36-py3-none-any.whl", hash = "sha256:0f7ab9e00dd415008fe8fc167942d06703d66fd6a851078b4d772e8f68218dab", size = 55790, upload-time = "2026-10-13T09:06:29.386Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/f6/8f9581dac3333c9eecc0a89d054088b1ef9f4766b88326d9daebb144ccda/simple_module_tenants-0.0.38-py3-none-any.whl", hash = "sha256:3cb61ade04e7aa4302e2c65d9683a655ea29d7e9aa81e36b0c467055081ab6f0", size = 66855, upload-time = "2026-10-23T04:57:53.396Z" },
 ]
 
 [[package]]
 name = "simple-module-test"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
@@ -2239,29 +2251,29 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "sqlalchemy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/47/72b06c15f2b5793f1c2b5fff7d31e354d215faf5d80b1e8d2a776e5e9aca/simple_module_test-0.0.36.tar.gz", hash = "sha256:6bcd5db721e5506a81f716442215a2dab1096ddeb95e1aba6e65373b7110fafd", size = 18895, upload-time = "2026-10-13T09:06:06.583Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/a4/ab2a74bbc64fa70b3861b417b2a263615f5aeb2772612da5c3b7b7d67885/simple_module_test-0.0.38.tar.gz", hash = "sha256:d0150a736396e8d1ae696c51e8720f81916cc3f81621c3023ef84b6461384982", size = 24781, upload-time = "2026-10-23T04:57:50.299Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/22/1aaf3d323630f29cdd8f3250ec5548f81368a98e22ef9e9982d8b72dbb76/simple_module_test-0.0.36-py3-none-any.whl", hash = "sha256:43e34f4630d947e2b899e8240645b2862def7d353f627df0a2afa4b66415c595", size = 21821, upload-time = "2026-10-13T09:06:05.19Z" },
+    { url = "https://files.pythonhosted.org/packages/97/37/86c8822a903ea131edb915a9205d3611ecc995e4f086a425fe8495370011/simple_module_test-0.0.38-py3-none-any.whl", hash = "sha256:23987ad60a8a4839d34fbf12d149f061da5eeb1d774693381124ff6a315e78cd", size = 26992, upload-time = "2026-10-23T04:57:49.15Z" },
 ]
 
 [[package]]
 name = "simple-module-users"
-version = "0.0.36"
+version = "0.0.38"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiosmtplib" },
     { name = "cachetools" },
     { name = "fastapi-users", extra = ["oauth", "sqlalchemy"] },
     { name = "simple-module-auth" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
+    { name = "simple-module-mail" },
     { name = "simple-module-settings" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/cc/21c3830a0cae4c09b6809607b9090feed69b2453bfde17c9169d07c2474f/simple_module_users-0.0.36.tar.gz", hash = "sha256:eac525708067dd01a113b38295428ad0aeb9514008accf4b15d580dd19ed6ac7", size = 225866, upload-time = "2026-10-13T09:06:31.977Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/39/a9/9df31c410e0ca46dd5883924387a1fbbead6804d459f09dc162b907ba224/simple_module_users-0.0.38.tar.gz", hash = "sha256:21b5616874b680c07c9d893414b77005f539ae4c47163bd1b1445797a05637e7", size = 269681, upload-time = "2026-10-23T04:57:54.473Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/1b/3d22711d1b2c71af30a3143db96ff0e0e38dfe1e810389b8a151a2033b33/simple_module_users-0.0.36-py3-none-any.whl", hash = "sha256:b915a6ab08e51c6c9d98b6f5a3a77d0b124472ad9bc10811fc6f0777d9568dd3", size = 205681, upload-time = "2026-10-13T09:06:30.389Z" },
+    { url = "https://files.pythonhosted.org/packages/53/1a/27b59977877411d057df7cd965f7dadac754d8279f6f433b5c7ff5359ec2/simple_module_users-0.0.38-py3-none-any.whl", hash = "sha256:7bb95286f11b545160525e7387e93ca46924ccf509f08620819a737c7aa4814c", size = 232547, upload-time = "2026-10-23T04:57:52.994Z" },
 ]
 
 [[package]]
@@ -2298,17 +2310,17 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "simple-module-ai", editable = "modules/ai" },
-    { name = "simple-module-auth", specifier = "==0.0.36" },
+    { name = "simple-module-auth", specifier = "==0.0.38" },
     { name = "simple-module-billing", editable = "modules/billing" },
-    { name = "simple-module-branding", specifier = "==0.0.36" },
-    { name = "simple-module-dashboard", specifier = "==0.0.36" },
-    { name = "simple-module-hosting", specifier = "==0.0.36" },
+    { name = "simple-module-branding", specifier = "==0.0.38" },
+    { name = "simple-module-dashboard", specifier = "==0.0.38" },
+    { name = "simple-module-hosting", specifier = "==0.0.38" },
     { name = "simple-module-news", editable = "modules/news" },
     { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
-    { name = "simple-module-permissions", specifier = "==0.0.36" },
+    { name = "simple-module-permissions", specifier = "==0.0.38" },
     { name = "simple-module-records", editable = "modules/records" },
-    { name = "simple-module-tenants", specifier = "==0.0.36" },
-    { name = "simple-module-users", specifier = "==0.0.36" },
+    { name = "simple-module-tenants", specifier = "==0.0.38" },
+    { name = "simple-module-users", specifier = "==0.0.38" },
 ]
 
 [package.metadata.requires-dev]
@@ -2319,8 +2331,8 @@ dev = [
     { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "simple-module-cli", specifier = "==0.0.36" },
-    { name = "simple-module-test", specifier = "==0.0.36" },
+    { name = "simple-module-cli", specifier = "==0.0.38" },
+    { name = "simple-module-test", specifier = "==0.0.38" },
 ]
 
 [[package]]
@@ -2380,16 +2392,16 @@ asyncio = [
 
 [[package]]
 name = "sqlmodel"
-version = "0.0.44"
+version = "0.0.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "sqlalchemy" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/39/24b128de75c4cfdb8bec6626a036b320ebdb89549f00a71c8e787fcac1ad/sqlmodel-0.0.44.tar.gz", hash = "sha256:1c9d9f5dc1076fb433c944acaa4dc3208daa75220617710245eef909beb245b9", size = 92331, upload-time = "2026-09-21T16:02:16.913Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/67/b2c0b771c89c023262dd8fb6ba2cdc6a004e5ff75dd5763051b38ccd133a/sqlmodel-0.0.48.tar.gz", hash = "sha256:5582e87e845e23bb1179a7d8b11a4f5e441b4494528a41ee2fe1d129ffe91543", size = 99329, upload-time = "2026-10-06T21:44:36.391Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/52/9e63eeaa4eedee5d59012e989a120d05f3adfbc9cdf2eb3ceb9151090aa2/sqlmodel-0.0.44-py3-none-any.whl", hash = "sha256:bae005203686681c612e4a6cd7ac568b020cc62780251cde0df955227e3f8efe", size = 29982, upload-time = "2026-09-21T16:02:15.651Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/76/6f8221eda15f28471c3887e5a75a62cd7338d20ac03e1e78a110a127d61e/sqlmodel-0.0.48-py3-none-any.whl", hash = "sha256:8d389bf735b03a17508e93e888c13a30ef1ddca22dd8e57add12317401e4112e", size = 31468, upload-time = "2026-10-06T21:44:35.326Z" },
 ]
 
 [[package]]

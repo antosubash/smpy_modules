@@ -8,7 +8,6 @@ via entry_points; add them to this host's pyproject.toml to install them.
 # host's record collections, whose tables have to be on ``Base.metadata``
 # before anything reads the metadata or builds the app. See the module.
 import records_collections  # noqa: F401
-from locale_switch import locale_switch_router
 from simple_module_hosting import Settings, create_app
 from simple_module_hosting.logging import setup_logging
 
@@ -20,8 +19,6 @@ setup_logging(
 )
 
 app = create_app(settings)
-# The framework's language switcher posts here; 0.0.35 ships no such route.
-app.include_router(locale_switch_router(settings))
 
 if __name__ == "__main__":
     import uvicorn

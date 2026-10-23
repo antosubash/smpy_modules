@@ -57,7 +57,11 @@ from sm_records.services.errors import Conflict, ValidationFailed
 __all__ = ["check_target", "move_type"]
 
 _ALL_ROWS = {"include_deleted": True}
-"""Every statement here reads the trash too: a trashed record moves with its type."""
+"""Every statement here reads the trash too: a trashed record moves with its type.
+
+The DML and ``INSERT … SELECT`` sources need it as much as the reads: since
+framework 0.0.37 the soft-delete criteria reach Core statements on
+``Model.__table__``, subqueries included."""
 
 MOVE_BATCH = 500
 """Rows per insert when copying a tenant-owned table (see :func:`_copy_batched`)."""
@@ -205,10 +209,16 @@ async def _copy_rows(
         else:
             # No tenant column, so nothing for the framework's insert guard to
             # stamp: one ``INSERT … SELECT``, scoped through ``pairs``.
-            await db.execute(insert(to_table).from_select([*names, "record_id"], rows))
+            await db.execute(
+                insert(to_table).from_select([*names, "record_id"], rows),
+                execution_options=_ALL_ROWS,
+            )
 
     old_ids = select(src.c.id).where(mine)
     for from_cls, _ in children:
         from_table = from_cls.__table__
-        await db.execute(delete(from_table).where(from_table.c.record_id.in_(old_ids)))
-    await db.execute(delete(src).where(mine))
+        await db.execute(
+            delete(from_table).where(from_table.c.record_id.in_(old_ids)),
+            execution_options=_ALL_ROWS,
+        )
+    await db.execute(delete(src).where(mine), execution_options=_ALL_ROWS)

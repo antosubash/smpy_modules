@@ -51,10 +51,6 @@ updates:
     ignore:
       - dependency-name: "simple_module_*"
       - dependency-name: "simple-module-*"
-      # Held by `constraint-dependencies` in the root pyproject.toml (#170):
-      # 0.0.45 retypes bare `datetime` columns. Drop both together.
-      - dependency-name: "sqlmodel"
-        versions: [">=0.0.45"]
     groups:
       uv:
         patterns: ["*"]

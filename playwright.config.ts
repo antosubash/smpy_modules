@@ -92,7 +92,10 @@ export default defineConfig({
     // boots so the host's bootstrap logic can seed the admin user on first
     // start.
     command: './tests/e2e/start-test-server.sh',
-    url: APP_URL,
+    // Not `/`: since framework 0.0.37 an anonymous request for a path no
+    // route matches is a 404 rather than a redirect to sign-in (upstream
+    // #473), and Playwright never counts a 404 as "up".
+    url: `${APP_URL}/health/live`,
     // Never in bundle mode: a dev stack already on API_PORT would be reused
     // and the run would pass without ever loading the bundle.
     reuseExistingServer: !CI && !BUNDLE,

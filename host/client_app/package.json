@@ -9,13 +9,13 @@
   },
   "dependencies": {
     "@inertiajs/react": "^3.9.1",
-    "@simple-module-py/i18n": "0.0.36",
-    "@simple-module-py/ui": "0.0.36",
+    "@simple-module-py/i18n": "0.0.38",
+    "@simple-module-py/ui": "0.0.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@simple-module-py/tsconfig": "0.0.36",
+    "@simple-module-py/tsconfig": "0.0.38",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

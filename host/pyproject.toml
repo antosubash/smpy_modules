@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "Demo host mounting every module in this repo"
 requires-python = ">=3.12"
 dependencies = [
-    "simple_module_hosting==0.0.36",
-    "simple_module_auth==0.0.36",
-    "simple_module_users==0.0.36",
-    "simple_module_dashboard==0.0.36",
-    "simple_module_permissions==0.0.36",
-    "simple_module_branding==0.0.36",
-    "simple_module_tenants==0.0.36",
+    "simple_module_hosting==0.0.38",
+    "simple_module_auth==0.0.38",
+    "simple_module_users==0.0.38",
+    "simple_module_dashboard==0.0.38",
+    "simple_module_permissions==0.0.38",
+    "simple_module_branding==0.0.38",
+    "simple_module_tenants==0.0.38",
     "simple_module_pagebuilder",
     "simple_module_news",
     "simple_module_ai",
@@ -40,8 +40,8 @@ workspace = true
 
 [dependency-groups]
 dev = [
-    "simple_module_test==0.0.36",
-    "simple-module-cli==0.0.36",
+    "simple_module_test==0.0.38",
+    "simple-module-cli==0.0.38",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "httpx>=0.27",
