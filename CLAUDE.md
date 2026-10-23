@@ -129,6 +129,13 @@ split out of a service declares what it needs from the composing class as a
 `Protocol` (`pagebuilder/service/_host.py`, `news/content/_host.py`) — add a
 member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 
+**Every e2e spec file stands alone.** CI shards the suite by file
+(`--shard=i/3`, one host and database per shard, #119), so a spec cannot rely
+on data or settings another file created. Seed what you need in the file
+itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. The
+`E2E (Playwright)` job merges the shards' reports and is the one status that
+covers all of them.
+
 ## Local database
 
 Local dev defaults to **SQLite** (`host/app.db`), so Postgres is optional. To

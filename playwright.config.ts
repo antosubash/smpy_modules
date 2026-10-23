@@ -45,13 +45,28 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // One worker against one host and one database: a second worker would be a
+  // second writer to the same SQLite file. Parallelism comes from CI-level
+  // `--shard=i/n` instead, each shard a separate job with its own host (#119).
+  // With fullyParallel off a shard gets whole files, so every spec file has to
+  // pass on a fresh database without any other file having run before it.
   fullyParallel: false,
   workers: 1,
   forbidOnly: CI,
   retries: CI ? 1 : 0,
   failOnFlakyTests: CI,
+  // CI runs the suite in shards (ci.yml's `e2e-shard` matrix), each on its own
+  // runner with its own host and SQLite file. Every shard writes a blob report;
+  // the `E2E (Playwright)` job merges them with `playwright merge-reports` into
+  // the one results.json the flaky/failed summary reads. The shard's own
+  // results.json stays for reading a single shard's artifact.
   reporter: CI
-    ? [['github'], ['list'], ['json', { outputFile: 'playwright-report/results.json' }]]
+    ? [
+        ['github'],
+        ['list'],
+        ['json', { outputFile: 'playwright-report/results.json' }],
+        ['blob', { outputDir: 'blob-report' }],
+      ]
     : 'list',
   timeout: 60_000,
   expect: { timeout: 10_000 },

@@ -7,10 +7,14 @@ test.describe('PageBuilder admin', () => {
     await login(page);
   });
 
-  test('lists pages and shows the empty state when none exist', async ({ page }) => {
+  test('lists pages with the new-page and media-library actions', async ({ page }) => {
     await page.goto('/pagebuilder/');
     await expect(page.getByRole('heading', { name: 'Pages' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /new page/i })).toBeVisible();
+    // The header's button. On a site with no pages yet the empty board offers
+    // a second "New page" under it, so the count depends on whether any other
+    // spec file created a page first — which a CI shard does not promise
+    // (#119). `.first()` is the header's, present either way.
+    await expect(page.getByRole('button', { name: /new page/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /media library/i })).toBeVisible();
   });
 

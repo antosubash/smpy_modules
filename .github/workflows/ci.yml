@@ -312,30 +312,30 @@ jobs:
       - name: Run vitest
         run: npx vitest run
 
-  e2e:
-    name: E2E (Playwright)
+  # The single-tenant suite, split into shards (#119). Each shard is its own
+  # runner, so it boots its own host via start-test-server.sh on its own
+  # throwaway SQLite file (host/test.db on that runner) — no shard shares a
+  # database with another. Inside a shard nothing changed: `playwright.config.ts`
+  # keeps `workers: 1` / `fullyParallel: false`, so a shard runs whole spec
+  # files in order. What sharding does require is that every spec file passes
+  # without the others having run first, since a shard sees only its share.
+  #
+  # Three shards: the unsharded suite's test step took 9-11 minutes on a
+  # ~40s cached setup, so each shard spends roughly as long setting up as
+  # testing. A fourth shard would buy little more and cost another setup.
+  e2e-shard:
+    name: E2E shard ${{ matrix.shard }}/${{ strategy.job-total }}
     runs-on: ubuntu-latest
-    # Hard ceiling so a hung webServer / runaway test can't burn 6h of
-    # billable runner time. Adjust upward only if the suite legitimately
-    # grows beyond this.
-    #
-    # Raised from 15 when the multilingual specs landed (a green run reached
-    # test 138 of 143 at 15m17s and was cancelled with the last file still to
-    # go), and from 25 when the records specs took the suite from 149 tests to
-    # 257 — 24 `records-*.spec.ts` files, 108 tests. At the same measured ~7s a
-    # test that is ~30 minutes of tests alone, and the e2e-setup action
-    # (`uv sync`, `npm ci`, the bundle build, the Playwright browser install)
-    # and up to 180s of `webServer` boot all sit inside this ceiling too. 45
-    # covers that with room for a slow runner and the odd retry, without going
-    # near the billable runaway this ceiling exists to stop.
-    #
-    # Not sharded, and the number is sized on the assumption that it stays that
-    # way: `playwright.config.ts` sets `workers: 1` / `fullyParallel: false` on
-    # purpose, because every spec runs against the one host and the one SQLite
-    # database `start-test-server.sh` builds. A second worker is a second
-    # writer to that database, not a second suite — sharding needs a host and
-    # a database per shard (#119).
-    timeout-minutes: 45
+    # A shard's tests run in about a third of the old 9-11 minutes. The budget
+    # is set by the browser install's own 20-min cap (e2e-setup), which should
+    # be what fires on a stalled apt mirror rather than this — the same
+    # reasoning as `e2e-multi-tenant` below. Was 45 for the unsharded suite.
+    timeout-minutes: 30
+    strategy:
+      # Let every shard finish, so one failure does not hide another's.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       # The production bundle, served by uvicorn without --reload (#119).
       E2E_BUNDLE: "1"
@@ -348,26 +348,100 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
 
-      # `--max-failures=1` aborts the suite on the first failing test so a
-      # broken build doesn't drag the whole runner out to the job timeout. A
-      # test that needed its retry fails the run too (`failOnFlakyTests`).
+      # `--max-failures=1` aborts the shard on the first failing test so a
+      # broken build doesn't drag the runner out to the job timeout. A test
+      # that needed its retry fails the shard too (`failOnFlakyTests`).
       - name: Run Playwright tests
-        run: npm run test:e2e -- --max-failures=1
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: npm run test:e2e -- --shard="$SHARD" --max-failures=1
+
+      # This shard's results, for the `e2e` job to merge into one report.
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 1
+          if-no-files-found: ignore
+
+      # Traces, screenshots and videos of this shard's failures.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # The one status that stands for the whole suite, under the name the
+  # unsharded job had. It merges the shards' blob reports, writes the
+  # flaky/failed summary from the merged report, and fails unless every shard
+  # passed — so a shard that never produced a report (setup failed, timed out)
+  # still fails it.
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: e2e-shard
+    if: ${{ !cancelled() }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # `playwright merge-reports` needs @playwright/test; no browsers needed.
+      - name: Install npm workspace
+        run: npm ci
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      # The merged report keeps every test's status, so a flake in any shard
+      # is still "flaky" here. JSON for the summary below, HTML to browse.
+      - name: Merge shard reports
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-report/results.json
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/html
+          PLAYWRIGHT_HTML_OPEN: never
+        run: |
+          if compgen -G "all-blob-reports/*.zip" > /dev/null; then
+            npx playwright merge-reports --reporter=json,html all-blob-reports
+          else
+            echo "No shard produced a blob report; see the shard jobs."
+          fi
 
       # Lists every flaky and failed test in the job summary, and fails the
-      # job on a flaky one (#119).
+      # job on a flaky one or a failure (#119). A missing report is not a
+      # failure here; the next step catches a shard that never wrote one.
       - name: Flaky and failed tests
-        if: ${{ !cancelled() }}
         run: node scripts/e2e_report_summary.mjs
+
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.e2e-shard.result }}
+        run: |
+          if [[ "$SHARDS" != "success" ]]; then
+            echo "::error::E2E shards: $SHARDS"
+            exit 1
+          fi
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          path: playwright-report/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -391,8 +465,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
 
-      # The opt-in specs that need an active organisation. The default `e2e`
-      # job runs single-tenant and skips them.
+      # The opt-in specs that need an active organisation. The `e2e-shard`
+      # jobs run single-tenant and skip them. Not sharded: the whole job takes
+      # about a minute, most of it setup.
       - name: Run multi-tenant Playwright tests
         run: npm run test:e2e -- billing-tenant news-tenant records-tenant
 

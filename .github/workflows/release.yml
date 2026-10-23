@@ -69,7 +69,7 @@ jobs:
   resolve:
     runs-on: ubuntu-latest
     # Long enough to wait out a CI run still in progress on the dispatched
-    # commit (its e2e job alone may take 45 minutes).
+    # commit (its e2e shards run in parallel, each well under 30 minutes).
     timeout-minutes: 75
     permissions:
       contents: read
