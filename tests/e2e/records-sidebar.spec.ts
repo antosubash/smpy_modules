@@ -6,7 +6,7 @@ import {
   apiDeleteType,
   apiGetType,
   apiUpdateType,
-  saveType,
+  saveTypeAndWait,
   seedTextType,
   uniqueTypeKey,
 } from './records-helpers';
@@ -87,8 +87,10 @@ test.describe('Records — sidebar entries', () => {
 
     await toggle.click();
     await expect(toggle).toBeChecked();
-    await saveType(page);
-    await expect(page.getByRole('button', { name: 'Preview changes' })).toBeDisabled();
+    // Wait for the PUT itself: "Preview changes" only tracks the schema, so
+    // it is disabled before and after a metadata-only save and proves
+    // nothing — a reload sent on it could render the pre-save row (#224).
+    await saveTypeAndWait(page, key);
 
     await page.reload();
     await expect(page.locator('#type-editor-show-in-menu')).toBeChecked();
