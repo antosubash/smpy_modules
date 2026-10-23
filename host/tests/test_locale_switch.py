@@ -26,9 +26,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "host"))
 
 
-@pytest.fixture
-def host_app(tmp_path, monkeypatch):
-    url = f"sqlite+aiosqlite:///{tmp_path / 'host.db'}"
+@pytest.fixture(scope="module")
+def migrated_url(tmp_path_factory) -> str:
+    """One migrated database for the module: the upgrade is ~6 s, not a per-test cost."""
+    url = f"sqlite+aiosqlite:///{tmp_path_factory.mktemp('locale') / 'host.db'}"
     env = {**os.environ, "SM_DATABASE_URL": url}
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"],
@@ -39,6 +40,12 @@ def host_app(tmp_path, monkeypatch):
         check=False,
     )
     assert result.returncode == 0, result.stderr[-2000:]
+    return url
+
+
+@pytest.fixture
+def host_app(migrated_url, monkeypatch):
+    url = migrated_url
     monkeypatch.setenv("SM_DATABASE_URL", url)
     monkeypatch.setenv("SM_I18N_SUPPORTED_LOCALES", '["en","de"]')
     # An admin, so the first-run wizard is complete and SetupMiddleware does
@@ -81,12 +88,20 @@ def test_german_sets_the_cookie_and_goes_back(host_app) -> None:
 def test_an_unsupported_locale_sets_nothing(host_app) -> None:
     response = _post(host_app, "fr", "http://test/ai/")
 
+    assert response.status_code == 422
     assert "locale" not in response.cookies
 
 
 @pytest.mark.parametrize(
     "referer",
-    ["https://evil.example/x", "//evil.example/x", "/\\evil.example", None],
+    [
+        "https://evil.example/x",
+        "//evil.example/x",
+        "javascript:alert(1)",
+        "http://test/\\evil.example",
+        "/\\evil.example",
+        None,
+    ],
 )
 def test_it_never_redirects_off_site(host_app, referer: str | None) -> None:
     response = _post(host_app, "de", referer)

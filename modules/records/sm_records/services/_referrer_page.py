@@ -85,12 +85,13 @@ def pair_rows(tables: TableSet, record: Record) -> Subquery:
     record holding a relation to itself would otherwise make its own
     ``restrict`` field refuse its own delete.
 
-    **The tenant is a predicate here, and nothing else would supply it.** Core
-    tables are exactly what keeps the soft-delete criteria off, and they keep
-    the tenant criteria off with them (tenancy design §E, FACT 1c/1d). The
-    target pair is tenant-bound by the composite foreign key, but a ref row
-    written out of band is not, so the referring rows are narrowed to the
-    bound tenant explicitly.
+    **The tenant stays an explicit predicate here.** Since framework 0.0.37 the
+    tenant criteria reach Core statements on ``Model.__table__`` as they do the
+    soft-delete ones (the predicate is now belt and braces on a framework that
+    adds it, and the only one on 0.0.36, which this module's range still
+    allows). The target pair is tenant-bound by the composite foreign key, but
+    a ref row written out of band is not, so the referring rows are narrowed to
+    the bound tenant explicitly.
     """
     ref = tables.index[IndexKind.REF].__table__
     rows = tables.record.__table__

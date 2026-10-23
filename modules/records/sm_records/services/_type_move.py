@@ -31,7 +31,8 @@ keyset batches of :data:`MOVE_BATCH` for the two tenant-owned tables (see
 :func:`_copy_batched`), the id mapping made by joining the two record tables
 on ``(tenant_id, uuid)`` — unique per tenant across every table set — then
 one ``DELETE`` per table. Core statements over ``__table__`` are invisible to the
-tenancy guard (``_tenant_guard``), so every one of them carries an explicit
+tenancy guard (``_tenant_guard``) and, before framework 0.0.37, to the framework's
+tenant criteria too, so every one of them carries an explicit
 ``tenant_id`` predicate (tenancy design §E); the index tables carry no tenant
 column and are reached only through a tenant-scoped record id.
 
