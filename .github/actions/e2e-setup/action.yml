@@ -1,6 +1,6 @@
 # Everything an e2e job needs before `playwright test` (#119): the Python and
 # npm workspaces, the module pages manifest, the production bundle the suite
-# runs against (E2E_BUNDLE=1), and Chromium. Shared by ci.yml's `e2e` and
+# runs against (E2E_BUNDLE=1), and Chromium. Shared by ci.yml's `e2e-shard` and
 # `e2e-multi-tenant` jobs, which used to carry ~70 identical lines each.
 #
 # Third-party actions are pinned to a commit, as in release.yml; Dependabot
