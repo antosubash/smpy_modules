@@ -23,6 +23,7 @@ from sm_records.settings import RecordsSettings
 
 from tests.app_harness import build_app
 from tests.i18n_helpers import use_locales
+from tests.pg_support import USING_POSTGRES
 
 
 @pytest.fixture
@@ -93,3 +94,25 @@ async def file_client(tmp_path, file_db) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]
         yield client
+
+
+@pytest.fixture
+def racing_db(request) -> Any:
+    """A database whose sessions are separate connections, on either backend.
+
+    :func:`file_db` on SQLite; the suite's own ``db_state`` on Postgres, where
+    every session already has a connection of its own — so a race test keeps
+    running against Postgres on the Postgres job instead of quietly becoming a
+    SQLite test there (#209).
+    """
+    return request.getfixturevalue("db_state" if USING_POSTGRES else "file_db")
+
+
+@pytest.fixture
+def racing_client(request) -> AsyncClient:
+    """:func:`file_client` on SQLite, the harness ``client`` on Postgres.
+
+    Both accept the ``roles(...)`` headers a test sends: ``file_client``
+    overrides the permission checks and ignores them.
+    """
+    return request.getfixturevalue("client" if USING_POSTGRES else "file_client")

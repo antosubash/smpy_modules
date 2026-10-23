@@ -62,6 +62,8 @@ from tests.shared_fixtures import (  # noqa: F401
     file_db,
     order_type,
     public_client,
+    racing_client,
+    racing_db,
     settings,
 )
 

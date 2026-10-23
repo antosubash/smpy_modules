@@ -1,8 +1,9 @@
-"""The two field builders both halves of the Phase 5 core-review suite use.
+"""Two field builders — an indexed ``text`` and a ``relation`` — shared by
+``test_relation_retarget_reindex.py``, ``test_preview_report_reuse.py``,
+``test_import_match_keys.py`` and ``test_expand_alignment.py``.
 
 Its own module rather than ``conftest.py`` because these are builders and not
-fixtures, and because the two test files are one suite split for the
-300-line cap — see ``test_review_fixes_round5.py``.
+fixtures.
 """
 
 from __future__ import annotations

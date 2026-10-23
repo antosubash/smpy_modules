@@ -1,16 +1,7 @@
-"""Phase 4 review, the provider extension point and the anonymous surface.
+"""The anonymous read surface: its grammar and the prefix it is served under.
 
-Each test failed before its fix. Two subjects:
-
-* a provider projects rows — it does not get to claim keys nothing can read,
-  write the wrong kind under one, or invent references (design §7.6 sells it
-  as *additive projection*, and §7.7's argument is that index bugs produce
-  wrong answers rather than slow ones);
-* the anonymous read grammar may only reach what the anonymous shape shows,
-  and the prefix that shape is served under may not swallow the admin API.
-
-The companion file ``test_review_fixes_round4.py`` holds the schema and
-expansion halves of the same review.
+The anonymous read grammar may only reach what the anonymous shape shows, and
+the prefix that shape is served under may not swallow the admin API.
 """
 
 from __future__ import annotations
@@ -20,85 +11,17 @@ import warnings
 
 import pytest
 from simple_module_core.public_routes import PublicRouteRegistry
-from sm_records.index import IndexKind, VirtualField, register_index_provider
-from sm_records.index import providers as registry
-from sm_records.models import IndexRef, IndexText
 from sm_records.settings import RecordsSettings
 from sm_records.settings_checks import check_public_route_prefix
-from sqlalchemy import func, select
 
 from tests.app_harness import ADMIN, roles
-from tests.relation_helpers import field, make_record, make_type
-from tests.test_review_fixes_round4 import API, indexed, yielding
+from tests.index_provider_helpers import indexed
+from tests.relation_helpers import make_record, make_type
+
+API = "/api/records"
 
 # ---------------------------------------------------------------------------
-# m5 / m6 / m7 — what a provider may claim, and what it may write
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "key", ["status", "position", "_orphaned", "id", "", "Not A Key", "x" * 65]
-)
-def test_register_refuses_a_virtual_key_nothing_could_read(key):
-    with pytest.raises(ValueError, match="virtual field"):
-        registry.register(yielding(), fields=[VirtualField(key, IndexKind.TEXT)])
-    assert key not in registry.virtual_fields()
-
-
-async def test_a_kind_that_disagrees_with_the_declaration_is_dropped_and_logged(
-    client, records_app, caplog
-):
-    _app, db_state = records_app
-    await make_type(client, "product", [field("name", "text")])
-    register_index_provider(
-        yielding((IndexKind.TEXT, "price_bucket", "100")),
-        fields=[VirtualField("price_bucket", IndexKind.NUMBER)],
-    )
-    with caplog.at_level(logging.WARNING):
-        for name in ("one", "two"):
-            await make_record(client, "product", {"name": name})
-
-    async with db_state.session_factory() as session:
-        rows = (
-            await session.execute(
-                select(func.count(IndexText.id)).where(IndexText.field_key == "price_bucket")
-            )
-        ).scalar_one()
-    assert rows == 0
-    logged = [rec for rec in caplog.records if "price_bucket" in rec.getMessage()]
-    assert len(logged) == 1, "once per provider and key, not once per record"
-
-
-async def test_a_provider_cannot_invent_a_reference(client, records_app):
-    """A ``REF`` row is load-bearing — it blocks deletes and fills the delete
-    dialog — so one naming a type id that does not exist is dropped."""
-    _app, db_state = records_app
-    await make_type(client, "author", [field("name", "text")])
-    await make_type(client, "note", [field("name", "text")])
-    author = await make_record(client, "author", {"name": "A"})
-
-    register_index_provider(
-        yielding((IndexKind.REF, "haunt", (author["uuid"], 99999))),
-        fields=[VirtualField("haunt", IndexKind.REF)],
-    )
-    await make_record(client, "note", {"name": "unrelated"})
-
-    async with db_state.session_factory() as session:
-        refs = (await session.execute(select(func.count(IndexRef.id)))).scalar_one()
-    assert refs == 0
-
-    panel = await client.get(
-        f"{API}/types/author/records/{author['uuid']}/referrers", headers=roles(ADMIN)
-    )
-    assert panel.json()["total"] == 0
-    deleted = await client.delete(
-        f"{API}/types/author/records/{author['uuid']}", headers=roles(ADMIN)
-    )
-    assert deleted.status_code == 204
-
-
-# ---------------------------------------------------------------------------
-# m4 — the anonymous grammar reaches only the anonymous shape
+# the anonymous grammar reaches only the anonymous shape
 # ---------------------------------------------------------------------------
 
 
@@ -144,7 +67,7 @@ async def test_the_columns_it_keeps_still_answer(published, query):
 
 
 # ---------------------------------------------------------------------------
-# M3 — the prefix an operator can type
+# the prefix an operator can type
 # ---------------------------------------------------------------------------
 
 
