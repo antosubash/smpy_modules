@@ -933,6 +933,7 @@
     "upload_toast_batch": "{count} files could not be uploaded.",
     "upload_toast_single": "Could not upload {name}: {message}",
     "upload_too_large": "This file is too large to upload.",
+    "upload_too_many_pixels": "This image has too many pixels to process. Scale it down and upload it again.",
     "upload_unsupported": "This file type is not supported. Upload a valid image."
   },
   "fields": {

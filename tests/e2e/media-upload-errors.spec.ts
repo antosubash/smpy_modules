@@ -1,3 +1,5 @@
+import { crc32, deflateSync } from 'node:zlib';
+
 import { expect, type Page, test } from '@playwright/test';
 
 import { login, uniqueSlug } from './helpers';
@@ -31,6 +33,32 @@ const huge = () => ({
   buffer: Buffer.concat([PNG, Buffer.alloc(11 * 1024 * 1024)]),
 });
 
+function chunk(type: string, data: Buffer): Buffer {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([len, body, crc]);
+}
+
+/** A few hundred bytes whose header claims 20000×20000 (400 megapixels, over
+ *  twice Pillow's limit): refused with 413 `image_too_many_pixels` (#221).
+ *  Pillow refuses it on reading the header, so the pixel data is never needed. */
+const bomb = () => {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(20000, 0);
+  ihdr.writeUInt32BE(20000, 4);
+  ihdr.set([8, 0, 0, 0, 0], 8); // 8-bit greyscale
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(Buffer.alloc(20001))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+  return { name: `${uniqueSlug('bomb')}.png`, mimeType: 'image/png', buffer: png };
+};
+
 async function uploadBatch(page: Page, files: ReturnType<typeof good>[]) {
   await page.locator('input[type=file]').first().setInputFiles(files);
 }
@@ -40,6 +68,7 @@ async function expectNoRawServerText(page: Page) {
   const body = await page.locator('main').innerText();
   expect(body).not.toContain('"detail"');
   expect(body).not.toContain('File contents do not match');
+  expect(body).not.toContain('Image dimensions exceed');
   expect(body).not.toMatch(/errors\.upload_|media\.uploaded/);
 }
 
@@ -60,6 +89,26 @@ test.describe('Media library upload errors', () => {
     ).toBeVisible();
     await expect(page.getByText('This file is too large to upload.')).toBeVisible();
     await expect(page.getByText('Uploaded 1 file.')).toBeVisible();
+    await expectNoRawServerText(page);
+  });
+
+  test('an image with too many pixels says so, in both languages', async ({ page, context }) => {
+    await page.goto('/pagebuilder/media');
+    await uploadBatch(page, [bomb()]);
+    await expect(
+      page.getByText('This image has too many pixels to process.', { exact: false }).first(),
+    ).toBeVisible();
+    await expect(page.getByText('This file is too large to upload.')).toHaveCount(0);
+    await expectNoRawServerText(page);
+
+    await context.addCookies([
+      { name: 'locale', value: 'de', url: new URL('/', page.url()).toString() },
+    ]);
+    await page.goto('/pagebuilder/media');
+    await uploadBatch(page, [bomb()]);
+    await expect(
+      page.getByText('Dieses Bild hat zu viele Pixel', { exact: false }).first(),
+    ).toBeVisible();
     await expectNoRawServerText(page);
   });
 

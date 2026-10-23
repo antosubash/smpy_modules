@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import logging
 import re
+import struct
 from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
+
+from pagebuilder.media_gif import gif_canvas_size
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +99,32 @@ def is_animated(image: Image.Image) -> bool:
     the issue's acceptance criteria explicitly say animated GIFs skip
     transcoding. ``getattr`` defends against formats where Pillow
     doesn't set ``is_animated`` at all.
+
+    Pillow reads the start of the second frame to answer, and a frame cut
+    short there (a bare ``!`` at the end, a descriptor missing its flags
+    byte) raises ``IndexError`` or ``struct.error`` rather than an
+    ``OSError``. Such a file is answered as animated: the upload completes,
+    keeps the first frame's size, and nothing is decoded or transcoded.
     """
-    return bool(getattr(image, "is_animated", False))
+    try:
+        return bool(getattr(image, "is_animated", False))
+    except (IndexError, struct.error):
+        return True
+
+
+class TooManyPixelsError(Exception):
+    """The image's pixel count is above Pillow's ``Image.MAX_IMAGE_PIXELS``.
+
+    Not one of the "skip processing" failures: the file is a decompression
+    bomb candidate, and the upload is refused rather than stored (#221).
+    """
+
+
+def _exceeds_pixel_limit(width: int, height: int) -> bool:
+    # Read at call time: a host (or a test) may lower it, or set it to None
+    # to switch the guard off, as Pillow itself allows.
+    limit = Image.MAX_IMAGE_PIXELS
+    return limit is not None and width * height > limit
 
 
 def process_image(
@@ -113,10 +140,24 @@ def process_image(
     ``(None, None, {})`` so the upload still completes — the original
     is served as-is and the Image block falls back to a plain
     ``<img src>``.
+
+    The one exception is an image above ``Image.MAX_IMAGE_PIXELS``, which
+    raises :class:`TooManyPixelsError` for the caller to refuse. Above twice
+    the limit Pillow itself raises ``DecompressionBombError`` (a bare
+    ``Exception``, not caught below); between one and two times it only
+    warns and would go on to decode the whole bitmap, so the same limit is
+    applied here and both cases are refused alike.
     """
     try:
         with Image.open(source) as image:
             src_w, src_h = image.size
+            if _exceeds_pixel_limit(src_w, src_h):
+                raise TooManyPixelsError(f"{src_w}x{src_h} exceeds Image.MAX_IMAGE_PIXELS")
+            # A later GIF frame may lie outside the logical screen, and Pillow
+            # grows the canvas to fit it; the canvas is what decoding needs.
+            canvas = gif_canvas_size(source) if image.format == "GIF" else None
+            if canvas is not None and _exceeds_pixel_limit(*canvas):
+                raise TooManyPixelsError(f"GIF canvas {canvas} exceeds Image.MAX_IMAGE_PIXELS")
             if src_w <= 0 or src_h <= 0:
                 return src_w or None, src_h or None, {}
             # Capture dimensions even for animated images — the
@@ -133,6 +174,8 @@ def process_image(
                 thumbnail_widths=thumbnail_widths,
                 webp_quality=webp_quality,
             )
+    except Image.DecompressionBombError as exc:
+        raise TooManyPixelsError(str(exc)) from exc
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         # Logged at INFO because this is expected for corrupt or
         # exotic-but-valid uploads — not a code bug.
