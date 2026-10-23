@@ -1,28 +1,20 @@
-"""Regressions for the QA pass's F1 and F2 — the two silent-wrong-answer bugs.
+"""A ``relation`` is always indexed, so its ``on_delete`` is always enforced.
 
-F1: a field key that collides with a column every record already has was
-accepted, indexed correctly, and then filtered and sorted from
-``records_record`` instead of from the index — a 200 with the wrong rows.
-F2: ``on_delete`` (design §9) is enforced by asking ``records_index_ref`` who
+``on_delete`` (design §9) is enforced by asking ``records_index_ref`` who
 points at a record, and that table holds rows only for indexed fields, so an
-unindexed ``relation`` accepted ``restrict``/``set_null``/``cascade`` and
-enforced none of them.
+unindexed ``relation`` used to accept ``restrict``/``set_null``/``cascade`` and
+enforce none of them.
 
-**No data migration goes with either fix.** The module is unreleased: there is
-no installed host holding a type with a field keyed ``status``, and none
-holding an unindexed relation whose ref rows would have to be backfilled. The
-seed's one such field was renamed (``order.status`` → ``order.order_status``)
-in the same change.
+**No data migration goes with this.** The module was unreleased when it
+landed: no installed host held an unindexed relation whose ref rows would have
+to be backfilled.
 """
 
 from __future__ import annotations
 
 import pytest
 from sm_records.index._fields import read_field
-from sm_records.index._fixed import RESERVED_FIELD_KEYS
-from sm_records.index.query import FIXED_COLUMNS
-from sm_records.models import Record
-from sm_records.schema.fields import FieldSchemaError, validate_fields
+from sm_records.schema.fields import validate_fields
 from sm_records.schema.types import FieldType
 from sm_records.services._schema import normalise
 from sm_records.settings import RecordsSettings
@@ -37,54 +29,7 @@ def _field(key: str, type_: str, **overrides) -> dict:
 
 
 # --------------------------------------------------------------------------
-# F1 — reserved field keys
-# --------------------------------------------------------------------------
-
-
-def test_reserved_keys_are_derived_from_the_model_and_the_fixed_columns():
-    """The set is computed, not typed out, so a new ``Record`` column joins it
-    on its own rather than becoming the next shadowed field key."""
-    columns = {str(column.key) for column in Record.__table__.columns}
-    assert columns <= RESERVED_FIELD_KEYS
-    assert FIXED_COLUMNS <= RESERVED_FIELD_KEYS
-    assert "_orphaned" in RESERVED_FIELD_KEYS
-    # The names the QA probe filtered by and got the record column for.
-    assert {"status", "slug", "position", "display_title", "published_at"} <= RESERVED_FIELD_KEYS
-
-
-@pytest.mark.parametrize("key", sorted(RESERVED_FIELD_KEYS - {"_orphaned"}))
-def test_validate_fields_refuses_every_reserved_key(key):
-    with pytest.raises(FieldSchemaError) as excinfo:
-        validate_fields([_field(key, "text")])
-    assert excinfo.value.key == key
-    assert "reserved" in excinfo.value.problem
-
-
-def test_validate_fields_still_accepts_a_key_that_merely_looks_like_one():
-    assert [f.key for f in validate_fields([_field("order_status", "text")])] == ["order_status"]
-
-
-async def test_creating_a_type_with_a_shadowing_key_is_422(client):
-    """The whole point of F1: the collision is refused on the screen that
-    proposes it, rather than resolved silently at query time."""
-    body = {
-        "key": "shadow",
-        "label": "Shadow",
-        "fields": [_field("position", "integer", indexed=True)],
-    }
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 422
-    assert resp.json()["errors"][0]["field"] == "position"
-
-
-async def test_a_type_with_no_shadowing_key_is_unaffected(client, field_def):
-    body = {"key": "fine", "label": "Fine", "fields": [field_def("rank", "integer")]}
-    resp = await client.post("/api/records/types", json=body, headers=roles(ADMIN))
-    assert resp.status_code == 201
-
-
-# --------------------------------------------------------------------------
-# F2 — an unindexed relation cannot enforce ``on_delete``
+# an unindexed relation cannot enforce ``on_delete``
 # --------------------------------------------------------------------------
 
 

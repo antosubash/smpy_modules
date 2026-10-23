@@ -21,7 +21,7 @@ from sm_records.index._fixed import (
     PUBLIC_FIXED_COLUMNS,
 )
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, roles, seed_record, seed_type
 from tests.invalid_support import TYPES, force_required_sku, type_with
 
 LIST = f"{TYPES}/product/records"
@@ -158,3 +158,34 @@ async def test_an_aggregate_groups_by_the_boolean_not_the_instant(client):
     assert resp.status_code == 200, resp.text
     groups = {str(row["value"]).lower(): row["count"] for row in resp.json()["groups"]}
     assert groups == {"true": 1, "false": 1}
+
+
+# A list page reads its rows but does not validate them
+
+API = "/api/records"
+
+
+def _field(key: str, type_: str = "text", **cols) -> dict:
+    return {"key": key, "type": type_, "label": key.title(), "indexed": True, **cols}
+
+
+async def test_a_list_does_not_validate_its_rows_but_a_single_read_does(client):
+    """``read_view`` ran the compiled validator per record, for a badge only
+    the editor shows — fifty pydantic passes per page."""
+    rtype = await seed_type(client.db_state, "r2list", [_field("price")], slug_field=None)
+    await seed_record(client.db_state, rtype, {"price": "oops"})
+    resp = await client.put(
+        f"{API}/types/r2list",
+        json={"expected_version": 1, "fields": [_field("price", "number")], "force": True},
+        headers=roles(ADMIN),
+    )
+    assert resp.status_code == 200, resp.text
+
+    listed = (await client.get(f"{API}/types/r2list/records", headers=roles(ADMIN))).json()["items"]
+    assert [item["invalid"] for item in listed] == [[]]
+    assert listed[0]["data"] == {"price": "oops"}
+
+    single = await client.get(
+        f"{API}/types/r2list/records/{listed[0]['uuid']}", headers=roles(ADMIN)
+    )
+    assert single.json()["invalid"] == [{"field": "price", "message": "not a number"}]

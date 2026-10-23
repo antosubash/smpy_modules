@@ -139,3 +139,8 @@ def test_plan_in_rejects_bad_keys(key):
 def test_plan_in_rejects_negative_limits():
     with pytest.raises(ValueError):
         PlanIn(key="x", name="X", pricing_model="free", limits={"tenants.seats": -1})
+
+
+async def test_plan_rows_unchanged(app):
+    async with app.state.sm.db.session_factory() as session:
+        assert len((await session.execute(select(Plan))).scalars().all()) == 1
