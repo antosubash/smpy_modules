@@ -94,10 +94,14 @@ def gif_canvas_size(source: Path) -> tuple[int, int] | None:
         if introducer == b"!":  # extension: one label byte, then sub-blocks
             pos = _skip_extension(data, pos)
             continue
-        if pos + 9 > len(data):  # truncated image descriptor: no frame
+        if pos + 8 > len(data):  # too short for an extent: no frame
             break
         x0, y0, w, h = (_u16(data, pos + i) for i in range(0, 8, 2))
         width, height = max(width, x0 + w), max(height, y0 + h)
+        if pos + 9 > len(data):
+            # Pillow grows its canvas from these eight bytes, bomb check
+            # included, before it fails on the missing flags byte.
+            break
         # Local colour table, then the LZW code size byte, then the data.
         pos += 9 + _color_table_size(data[pos + 8]) + 1
         pos = _skip_sub_blocks(data, pos)

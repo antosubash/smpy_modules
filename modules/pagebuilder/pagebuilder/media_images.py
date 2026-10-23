@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -98,8 +99,17 @@ def is_animated(image: Image.Image) -> bool:
     the issue's acceptance criteria explicitly say animated GIFs skip
     transcoding. ``getattr`` defends against formats where Pillow
     doesn't set ``is_animated`` at all.
+
+    Pillow reads the start of the second frame to answer, and a frame cut
+    short there (a bare ``!`` at the end, a descriptor missing its flags
+    byte) raises ``IndexError`` or ``struct.error`` rather than an
+    ``OSError``. Such a file is answered as animated: the upload completes,
+    keeps the first frame's size, and nothing is decoded or transcoded.
     """
-    return bool(getattr(image, "is_animated", False))
+    try:
+        return bool(getattr(image, "is_animated", False))
+    except (IndexError, struct.error):
+        return True
 
 
 class TooManyPixelsError(Exception):
