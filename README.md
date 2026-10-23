@@ -138,6 +138,9 @@ make lint        # ruff, biome, and the repo checks
 
 The e2e suite needs a browser once: `npx playwright install chromium --with-deps`.
 It resets `host/test.db` on every run and never touches `host/app.db`.
+CI splits it into three `--shard=i/3` jobs, each booting its own host on its
+own database, so every spec file must pass on a fresh database with no other
+file run first. `npx playwright test --shard=2/3` reproduces one shard locally.
 
 Three layers cover the code:
 
