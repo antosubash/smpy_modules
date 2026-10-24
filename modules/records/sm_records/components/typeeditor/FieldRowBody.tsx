@@ -8,17 +8,17 @@ import type { ValidationError } from '../../utils/types';
 import { fieldMessage } from './errors';
 import { FieldOptions } from './FieldOptions';
 import {
+  type FieldKeyError,
+  fieldKeyValid,
   indexable,
   indexedForced,
-  type KeyError,
-  keyValid,
   MAX_KEY_LEN,
   MAX_LABEL_LEN,
   uniqueAllowed,
 } from './rules';
 import { type EditableField, FIELD_TYPES, type TargetType } from './types';
 
-function keyErrorMessage(t: Translate, code: KeyError, key: string): string {
+function keyErrorMessage(t: Translate, code: FieldKeyError, key: string): string {
   return t(keys.records.type_editor.key_error[code], { key, max: MAX_KEY_LEN });
 }
 
@@ -57,7 +57,7 @@ export function FieldRowBody({
 }) {
   const { t } = useT();
   const idBase = `field-row-${index}`;
-  const keyError = field.key ? keyValid(field.key, siblingKeys) : null;
+  const keyError = field.key ? fieldKeyValid(field.key, siblingKeys) : null;
   const serverKeyError = fieldMessage(errors, field.key);
 
   return (

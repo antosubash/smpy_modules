@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   displayFieldAllowed,
+  fieldKeyValid,
   indexable,
   indexedForced,
   keyValid,
@@ -253,5 +254,18 @@ describe('pointer field types', () => {
       expect(slugFieldAllowed(type)).toBe(true);
     for (const type of ['integer', 'number', 'date', 'datetime', 'boolean', 'json', 'relation'])
       expect(slugFieldAllowed(type)).toBe(false);
+  });
+});
+
+describe('fieldKeyValid — the sm_ prefix (#101)', () => {
+  it('reserves sm_ for system fields on a field key, not on a type key', () => {
+    expect(fieldKeyValid('sm_email', [])).toBe('system_prefix');
+    expect(fieldKeyValid('smart', [])).toBeNull();
+    expect(keyValid('sm_email', [])).toBeNull();
+  });
+
+  it('reports the more basic problem first', () => {
+    expect(fieldKeyValid('sm_x', ['sm_x'])).toBe('duplicate');
+    expect(fieldKeyValid('', [])).toBe('required');
   });
 });

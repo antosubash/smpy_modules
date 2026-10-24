@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sm_records.constants import MAX_KEY_LEN, TYPE_KEY_PATTERN
+from sm_records.constants import MAX_KEY_LEN, SYSTEM_KEY_PREFIX, TYPE_KEY_PATTERN
 from sm_records.index._fixed import RESERVED_FIELD_KEYS
 from sm_records.index._registry import reduce_keys
 from sm_records.index.providers import virtual_fields
@@ -96,6 +96,15 @@ def validate_key(raw: dict[str, Any], seen: set[str], *, on_save: bool = False) 
             key,
             "key is reserved by a reduce provider: it names a maintained aggregate, which "
             "the aggregate endpoint resolves alongside this type's fields",
+        )
+        # Save-only for the same reason: a type stored before the prefix was
+        # reserved still loads. Only the server's own system entries carry
+        # ``system`` by the time this runs — ``normalise`` strips any a client
+        # sent and injects the canonical ones (``public_submissions.spec``).
+        require(
+            not key.startswith(SYSTEM_KEY_PREFIX) or raw.get("system"),
+            key,
+            f"the {SYSTEM_KEY_PREFIX} prefix is reserved for system fields",
         )
     require(KEY_RE.match(key), key, f"key must match {TYPE_KEY_PATTERN}")
     require(len(key) <= MAX_KEY_LEN, key, f"key must be at most {MAX_KEY_LEN} characters")

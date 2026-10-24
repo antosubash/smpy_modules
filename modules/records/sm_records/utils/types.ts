@@ -10,6 +10,8 @@
  * `TypeRead.show_in_menu` pushed this file over the 300-line cap.
  */
 
+import type { PublicSubmissionsConfig } from './public-submissions';
+
 /** Which tenancy shape the host runs (tenancy design §A.3, `sm_records.tenancy.
  *  TenancyMode`) — carried on every admin screen's props by `tenancy.view_props`
  *  alongside `tenant`. `'single'` is the only mode most hosts ever see, and
@@ -32,6 +34,9 @@ export type FieldDef = {
   help: string | null;
   constraints: Record<string, unknown>;
   options: Record<string, unknown>;
+  /** Set only on a public-submissions type's `sm_*` fields, which the server
+   *  injects and writes (#101); absent on every ordinary field. */
+  system?: 'readonly' | 'internal';
 };
 
 export type TypeRead = {
@@ -73,6 +78,8 @@ export type TypeRead = {
    *  "Records" hub (per-type sidebar entries design contract). Off by
    *  default. */
   show_in_menu: boolean;
+  /** Whether this type accepts submissions from the website, and how (#101). */
+  public_submissions: PublicSubmissionsConfig | null;
 };
 
 /** The classification a schema-`fields` diff falls into (design §8.2). */

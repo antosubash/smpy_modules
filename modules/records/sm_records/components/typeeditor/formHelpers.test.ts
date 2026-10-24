@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { defaultConfig } from '../../utils/public-submissions';
 import type { TypeRead } from '../../utils/types';
 import {
   buildChanges,
@@ -7,6 +8,7 @@ import {
   keyFromLabel,
   metadataFrom,
   pluralFromLabel,
+  presetDraft,
   stripUids,
   typeIsDirty,
   withUids,
@@ -37,6 +39,7 @@ function baseType(overrides: Partial<TypeRead> = {}): TypeRead {
     reindex_pending: {},
     translatable: false,
     show_in_menu: false,
+    public_submissions: null,
     ...overrides,
   };
 }
@@ -186,5 +189,52 @@ describe('keyFromLabel / pluralFromLabel — R19', () => {
     expect(pluralFromLabel('Person')).toBe('Person');
     expect(pluralFromLabel('Contact Person')).toBe('Contact Person');
     expect(pluralFromLabel('Child')).toBe('Child');
+  });
+});
+
+describe('public submissions in the draft (#101)', () => {
+  const plain = {
+    key: 'name',
+    type: 'text',
+    label: 'Name',
+    required: false,
+    unique: false,
+    indexed: false,
+    default: null,
+    help: null,
+    constraints: {},
+    options: {},
+  };
+
+  it('sends a changed config and nothing for an unchanged one', () => {
+    const config = { ...defaultConfig('form'), enabled: true };
+    const current = baseType({ public_submissions: config });
+    expect(buildChanges(current, metadataFrom(current), [])).toEqual({});
+    const values = { ...metadataFrom(current), publicSubmissions: { ...config, enabled: false } };
+    expect(buildChanges(current, values, [])).toEqual({
+      public_submissions: { ...config, enabled: false },
+    });
+  });
+
+  it('keeps a system flag, and adds none to an ordinary field', () => {
+    const fields = withUids([{ ...plain, key: 'sm_spam', system: 'readonly' }, plain]);
+    const [system, ordinary] = stripUids(fields);
+    expect(system.system).toBe('readonly');
+    expect('system' in ordinary).toBe(false);
+  });
+
+  it('a preset fills fields the admin can still rename, and an enabled config', () => {
+    const draft = presetDraft('form');
+    expect(draft.fields.map((f) => f.key)).toEqual([
+      'name',
+      'email',
+      'enquiry',
+      'message',
+      'triage',
+    ]);
+    expect(draft.fields.every((f) => !f.fromServer)).toBe(true);
+    expect(draft.values.publicSubmissions?.enabled).toBe(true);
+    const extra = extraCreateFields({ ...metadataFrom(null), ...draft.values });
+    expect(extra.public_submissions).toEqual(draft.values.publicSubmissions);
   });
 });

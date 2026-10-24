@@ -47,6 +47,10 @@ class TypeRead(SQLModel):
     locale (Phase 5 §4.1). ``false`` is what keeps the language UI off and the
     create path refusing any locale but the default."""
     allowed_roles: list[str]
+    public_submissions: dict[str, Any] | None
+    """Whether this type accepts submissions from the website, and how — the
+    stored ``contracts.public_submissions.PublicSubmissionsConfig``, read back
+    as a plain object so a row that predates a bound still reads."""
     record_count: int
     """Live records only — the number a list screen shows."""
     trashed_record_count: int
@@ -88,6 +92,9 @@ class TypeCreate(SQLModel):
     show_in_menu: bool = False
     translatable: bool = False
     allowed_roles: list[str] = SQLField(default_factory=list)
+    public_submissions: dict[str, Any] | None = None
+    """A ``PublicSubmissionsConfig``; checked by ``services.types.create_type``
+    so a refusal is the module's own 422 naming the field."""
     collection: str | None = None
     """The only request that may set it (Phase 5 §6.2). Validated against the
     host's declared collections by ``services.types.create_type``; ``None`` is
@@ -119,6 +126,8 @@ class TypeUpdate(SQLModel):
     show_in_menu: bool | None = None
     translatable: bool | None = None
     allowed_roles: list[str] | None = None
+    public_submissions: dict[str, Any] | None = None
+    """``null`` clears it, which is refused once a kind is set (409)."""
     collection: str | None = None
     """Declared only so a body carrying one is refused rather than dropped —
     a client sends back the whole type it read, and silently ignoring a changed
@@ -155,6 +164,7 @@ def type_read(
         show_in_menu=rtype.show_in_menu,
         translatable=rtype.translatable,
         allowed_roles=list(rtype.allowed_roles or []),
+        public_submissions=rtype.public_submissions,
         record_count=record_count,
         trashed_record_count=trashed_record_count,
         invalid_record_count=invalid_record_count,

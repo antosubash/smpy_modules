@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
 from sm_records.models import RecordType, tables_for
+from sm_records.public_submissions import config as submissions
 from sm_records.services._common import bump_or_conflict, record_count
 from sm_records.services._payload import field_defs
 from sm_records.services._schema import (
@@ -54,6 +55,9 @@ _EDITABLE = frozenset(
         "show_in_menu",
         "translatable",
         "allowed_roles",
+        # Operational like ``is_public``; its first ``kind`` alone is a schema
+        # change, adding the system fields (``public_submissions``).
+        "public_submissions",
     }
 )
 
@@ -159,9 +163,11 @@ async def update_type(
     check_type_text(changes, stored_label=rtype.label)
 
     fields_raw = changes.pop("fields_raw", None)
+    if await submissions.check_change(db, rtype, changes) and fields_raw is None:
+        fields_raw = list(rtype.fields or [])  # the first kind injects its fields
     fields: list[dict[str, Any]] | None = None
     if fields_raw is not None:
-        defs, fields = normalise(fields_raw, settings)
+        defs, fields = normalise(fields_raw, settings, kind=submissions.kind_of(rtype, changes))
         if fields == list(rtype.fields or []):
             # A normalised resend of the same list is not a change: the stored
             # form is the validator's dump, so comparing raw input would make a

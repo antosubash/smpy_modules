@@ -112,7 +112,10 @@ export function FieldList({
   const addField = () => {
     const uid = newFieldUid();
     setExpanded((prev) => new Set(prev).add(uid));
-    onChange([...fields, { key: '', uid, ...EMPTY_FIELD }]);
+    // Above the system fields (#101), which the server always keeps last.
+    const firstSystem = fields.findIndex((f) => f.system);
+    const at = firstSystem === -1 ? fields.length : firstSystem;
+    onChange([...fields.slice(0, at), { key: '', uid, ...EMPTY_FIELD }, ...fields.slice(at)]);
   };
   const toggle = (uid: string) =>
     setExpanded((prev) => {

@@ -115,6 +115,7 @@ async def create_from(
         translatable=body.translatable,
         allowed_roles=body.allowed_roles,
         collection=body.collection,
+        public_submissions=body.public_submissions,
         actor=who,
     )
     if body.show_in_menu:

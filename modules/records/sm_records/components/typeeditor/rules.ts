@@ -152,6 +152,20 @@ export function keyValid(key: string, existingKeys: readonly string[]): KeyError
   return null;
 }
 
+/** `sm_records.constants.SYSTEM_KEY_PREFIX`: every system field's key starts
+ *  with it, and `schema/_keys.py` refuses it on any ordinary field (#101). */
+export const SYSTEM_KEY_PREFIX = 'sm_';
+
+export type FieldKeyError = KeyError | 'system_prefix';
+
+/** `keyValid` for a *field* key, which also may not take the system prefix —
+ *  a type key may, so the type's own key input keeps using `keyValid`. */
+export function fieldKeyValid(key: string, existingKeys: readonly string[]): FieldKeyError | null {
+  const error = keyValid(key, existingKeys);
+  if (error === null && key.startsWith(SYSTEM_KEY_PREFIX)) return 'system_prefix';
+  return error;
+}
+
 export type FieldFlags = FieldTypeAndOptions & {
   required: boolean;
   unique: boolean;

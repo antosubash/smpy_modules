@@ -17,6 +17,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
 import { keys, useT } from '../utils/i18n';
+import { editableFields } from '../utils/public-submissions';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator } from '../utils/validation';
@@ -34,7 +35,9 @@ export function useRecordForm(
   initialData?: Record<string, unknown> | null,
 ) {
   const { t } = useT();
-  const fields = type.fields;
+  // The server's own `sm_*` fields are not the form's (#101): left out of the
+  // payload, an admin save carries their stored values over unchanged.
+  const fields = useMemo(() => editableFields(type.fields), [type.fields]);
   const seedData = record?.data ?? initialData ?? null;
 
   const [values, setValues] = useState<FormValues>(() => toFormValues(fields, seedData));

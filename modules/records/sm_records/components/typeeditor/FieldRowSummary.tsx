@@ -1,6 +1,13 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, XIcon } from 'lucide-react';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  LockIcon,
+  XIcon,
+} from 'lucide-react';
 import type { Ref } from 'react';
 import { keys, useT } from '../../utils/i18n';
 
@@ -46,11 +53,15 @@ export function FieldRowSummary({
   const { t } = useT();
   const unnamed = t(keys.records.type_editor.field_unnamed);
   const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
+  // A system field (#101) is the server's: it has no body to open and no
+  // controls, and the server would put it back exactly as it was anyway.
+  const system = Boolean(field.system);
 
   return (
     <div className="flex items-center gap-2">
       <button
         type="button"
+        disabled={system}
         // `flex-wrap` is what keeps a phone from scrolling sideways: the
         // badges and the type name are `shrink-0`, so the summary's
         // min-content width was the whole line (~450 px on a five-badge
@@ -64,11 +75,24 @@ export function FieldRowSummary({
         data-testid="records-field-toggle"
         onClick={onToggle}
       >
-        <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        {system ? (
+          <LockIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
         <span className="truncate font-mono text-sm font-medium" data-testid="records-field-key">
           {field.key || unnamed}
         </span>
         <span className="shrink-0 text-sm text-muted-foreground">{field.type}</span>
+        {system && (
+          <Badge
+            variant="outline"
+            className="shrink-0 font-normal"
+            data-testid="records-field-system"
+          >
+            {t(keys.records.public_submissions.system_badge)}
+          </Badge>
+        )}
         {field.required && (
           <Badge variant="secondary" className="shrink-0 font-normal">
             {t(keys.records.type_editor.field_required)}
@@ -91,7 +115,7 @@ export function FieldRowSummary({
         )}
       </button>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className={system ? 'hidden' : 'flex shrink-0 items-center gap-1'}>
         <Button
           type="button"
           ref={moveUpRef}

@@ -19,7 +19,7 @@ field type, which is consequently not indexable and therefore not queryable.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
@@ -79,6 +79,11 @@ class FieldDefinition(SQLModel):
     help: str | None = None
     constraints: dict[str, Any] = SQLField(default_factory=dict)
     options: dict[str, Any] = SQLField(default_factory=dict)
+    system: Literal["readonly", "internal"] | None = None
+    """Set only on the ``sm_*`` fields a public-submissions type carries
+    (``sm_records.public_submissions.spec``), which the server injects and
+    writes. Last, and left out of the stored form when unset, so an ordinary
+    field's stored dict is exactly what it was before the flag existed."""
 
 
 def _validate_choices(key: str, options: dict[str, Any]) -> None:
@@ -252,6 +257,8 @@ def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list
 
         _validate_options(key, field_type, options)
         _validate_constraints(key, field_type, constraints)
+        system = entry.get("system")
+        _require(system in (None, "readonly", "internal"), key, "system must be readonly/internal")
 
         field = FieldDefinition(
             key=key,
@@ -264,6 +271,7 @@ def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list
             help=entry.get("help"),
             constraints=dict(constraints),
             options=dict(options),
+            system=system,
         )
         if field_type is FieldType.RELATION:
             field.options.setdefault("many", False)

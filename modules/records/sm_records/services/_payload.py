@@ -100,6 +100,32 @@ def validate(
     return values, stored
 
 
+def carry_system(
+    defs: list[FieldDefinition],
+    data: dict[str, Any],
+    previous: dict[str, Any] | None,
+    system: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The payload a write validates, with every system value decided here.
+
+    Whatever the caller sent for an ``sm_*`` field is discarded: an update
+    keeps the stored value (the editor echoes the record back, so this is a
+    carry rather than a 422), a create (an admin's or an import's) has none.
+    ``system`` is the one way in — the internal argument of
+    ``services.records.create_record``/``update_record``, which only records'
+    own public-submissions code passes — and it may name system fields only.
+    """
+    keys = {field.key for field in defs if field.system}
+    unknown = sorted(set(system or {}) - keys)
+    if unknown:
+        raise ValueError(f"system= names fields that are not system fields: {unknown}")
+    if not keys:
+        return data
+    out = {key: value for key, value in data.items() if key not in keys}
+    out.update({key: value for key, value in (previous or {}).items() if key in keys})
+    return {**out, **(system or {})}
+
+
 def check_position(position: int | None) -> None:
     """Refuse a ``position`` the column cannot hold.
 

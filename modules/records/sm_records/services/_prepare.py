@@ -47,6 +47,7 @@ async def prepare(
     exclude_id: int | None,
     group: str,
     previous: dict[str, Any] | None = None,
+    system: dict[str, Any] | None = None,
 ) -> Prepared:
     """Validate, then the two checks no database constraint can make.
 
@@ -65,8 +66,13 @@ async def prepare(
     that leaves a ``unique`` value alone is not made to re-claim it. That is
     what keeps a record saveable after a ``unique`` flag was forced onto a
     field that already held duplicates.
+
+    ``system`` is the server's own system values (``_payload.carry_system``):
+    merged *before* validation, so they are checked like any value and a
+    required one (a newsletter's ``sm_email``) is satisfied by them.
     """
     defs = _payload.field_defs(rtype)
+    data = _payload.carry_system(defs, data, previous, system)
     values, stored = _payload.validate(
         rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
     )

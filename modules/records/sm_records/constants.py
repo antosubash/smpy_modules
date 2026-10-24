@@ -88,6 +88,10 @@ TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 """A type key or field key: lowercase identifier, URL- and JSON-safe."""
 MAX_KEY_LEN: Final = 64
 MAX_LABEL_LEN: Final = 200
+SYSTEM_KEY_PREFIX: Final = "sm_"
+"""Every system field's key starts with this, and no ordinary field's may: a
+type that accepts public submissions (#101) gets ``sm_*`` fields the server
+injects and writes (``sm_records.public_submissions.spec``)."""
 
 MAX_COLLECTION_NAME_LEN: Final = 22
 """A collection's name, which obeys ``TYPE_KEY_PATTERN`` too (Phase 5 §6.1).
