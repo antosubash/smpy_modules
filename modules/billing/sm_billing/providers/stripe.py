@@ -18,7 +18,11 @@ from typing import Any
 
 import stripe
 
-from sm_billing.constants import CHECKOUT_COMPLETED, PROVIDER_LIVE_STATUSES, PROVIDER_STRIPE
+from sm_billing.constants import (
+    CHECKOUT_COMPLETED,
+    PROVIDER_CHECKOUT_BLOCKING_STATUSES,
+    PROVIDER_STRIPE,
+)
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
@@ -129,12 +133,18 @@ class StripeProvider:
     async def expire_checkout(self, session_id: str) -> None:
         await self._call(self._v1.checkout.sessions.expire_async, session_id)
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        params = {"customer": customer_id, "status": "all", "limit": 100}
-        listing = await self._call(self._v1.subscriptions.list_async, params=params)
-        return [
-            s["id"] for s in listing.get("data", []) if s.get("status") in PROVIDER_LIVE_STATUSES
-        ]
+    async def live_subscription_ids(
+        self, customer_id: str, statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES
+    ) -> list[str]:
+        ids: list[str] = []
+        params: dict[str, Any] = {"customer": customer_id, "status": "all", "limit": 100}
+        while True:  # every page: a live one past the first 100 must not be missed
+            listing = await self._call(self._v1.subscriptions.list_async, params=dict(params))
+            data = listing.get("data", [])
+            ids += [s["id"] for s in data if s.get("status") in statuses]
+            if not listing.get("has_more") or not data:
+                return ids
+            params["starting_after"] = data[-1]["id"]
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         params = {"customer": customer_id, "return_url": return_url}

@@ -12,6 +12,7 @@ loop (``reconcile_interval_minutes``) drives the same ``reconcile_one`` from
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -20,7 +21,7 @@ from sqlalchemy import select
 from tenants.models import Tenant
 
 from sm_billing import constants as c
-from sm_billing.models import Subscription
+from sm_billing.models import Customer, Subscription
 from sm_billing.seats import push_quantity
 from sm_billing.services import current_provider
 from sm_billing.sync import resync
@@ -38,6 +39,8 @@ class ReconcileReport:
     pushed: int = 0
     errors: list[tuple[str, str]] = field(default_factory=list)
     skipped: str = ""
+    #: Deleted tenants whose provider leftovers the sweep canceled.
+    torn_down: int = 0
 
 
 async def _targets(app: FastAPI, tenant_id: str | None) -> list[tuple[str, str]]:
@@ -78,7 +81,8 @@ async def reconcile(app: FastAPI, *, tenant_id: str | None = None) -> ReconcileR
     if provider is None or not provider.supports_checkout:
         report.skipped = f"{getattr(provider, 'name', 'no')} provider"
         return report
-    for target_tenant, subscription_id in await _targets(app, tenant_id):
+    targets = await _targets(app, tenant_id)
+    for target_tenant, subscription_id in targets:
         try:
             pushed = await reconcile_one(app, target_tenant, subscription_id)
         except Exception as exc:
@@ -87,4 +91,54 @@ async def reconcile(app: FastAPI, *, tenant_id: str | None = None) -> ReconcileR
             continue
         report.synced += 1
         report.pushed += int(pushed)
+    await sweep_deleted_tenants(app, report, tenant_id=tenant_id, attempted={t for t, _ in targets})
     return report
+
+
+async def _orphans(app: FastAPI, tenant_id: str | None) -> list[str]:
+    """Customers whose tenant is gone and whose teardown has not completed."""
+    stmt = (
+        select(Customer.tenant_id)
+        .outerjoin(Tenant, Tenant.id == Customer.tenant_id)
+        .where(
+            Tenant.id.is_(None),
+            Customer.provider_customer_id.is_not(None),
+            Customer.teardown_done_at.is_(None),
+        )
+        .order_by(Customer.tenant_id)
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(Customer.tenant_id == tenant_id)
+    async with app.state.sm.db.session_factory() as session:
+        return list((await session.scalars(stmt)).all())
+
+
+async def sweep_deleted_tenants(
+    app: FastAPI,
+    report: ReconcileReport,
+    *,
+    tenant_id: str | None = None,
+    pace: Callable[[], Awaitable[None]] | None = None,
+    attempted: Collection[str] = (),
+) -> None:
+    """Retry the teardown of every deleted tenant not torn down yet.
+
+    The retry path ``reconcile_one`` cannot reach: a customer with no mirrored
+    subscription (one not mirrored yet, or a local-only row) or an open
+    checkout. A stamped customer (``teardown_done_at``) is not selected, so a
+    finished teardown costs nothing. Two instances sweeping the same customer
+    at once only cost calls: the teardown is idempotent. ``attempted`` are the
+    tenants this run already reconciled, so one failure is not tried twice.
+    """
+    for orphan in await _orphans(app, tenant_id):
+        if orphan in attempted:
+            continue
+        try:
+            await cancel_for_deleted_tenant(app, orphan)
+        except Exception as exc:
+            logger.warning("billing: teardown retry failed for tenant %s", orphan, exc_info=True)
+            report.errors.append((orphan, f"{type(exc).__name__}: {exc}"))
+        else:
+            report.torn_down += 1
+        if pace is not None:
+            await pace()

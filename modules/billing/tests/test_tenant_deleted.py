@@ -10,16 +10,15 @@ from __future__ import annotations
 import pytest
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub, make_tenant
-from simple_module_db import finalize_session
-from sm_billing.constants import PROVIDER_LIVE_STATUSES, SubscriptionStatus
+from sm_billing.constants import PROVIDER_CANCELABLE_STATUSES, SubscriptionStatus
 from sm_billing.contracts.provider import CheckoutSnapshot
-from sm_billing.lifecycle import tenant_service
-from sm_billing.models import Customer, Subscription
+from sm_billing.models import Customer
 from sm_billing.reconcile import reconcile
-from sqlalchemy import select
-from subscription_helpers import _snap
+from teardown_helpers import _delete, _paying_tenant, _sub
 from tenants.contracts.events import TenantDeleted
 from tenants.models import Tenant
+
+CUS = "cus_acme"
 
 
 @pytest.fixture
@@ -27,40 +26,6 @@ def fake(app) -> FakeProvider:
     provider = FakeProvider()
     app.state.sm_billing.provider = provider
     return provider
-
-
-async def _paying_tenant(app, fake, *, sid="sub_1", status="active", **sub_kw) -> str:
-    """A per-seat tenant with three members, mirrored and live at the provider."""
-    async with app.state.sm.db.session_factory() as session:
-        tenant = await make_tenant(session, members=3)
-        plan = await make_plan(session, "team", pricing_model="per_seat")
-        fields = {"provider_subscription_id": sid, "quantity": 3, **sub_kw}
-        await make_sub(session, tenant, plan, **fields)
-        session.add(
-            Customer(
-                tenant_id=tenant.id,
-                provider="stripe",
-                provider_customer_id="cus_1",
-                checkout_session_id="cs_open",
-            )
-        )
-        await session.commit()
-        tenant_id = tenant.id
-    if sid:
-        fake.snapshots[sid] = _snap(tenant_id, status=status, sid=sid, quantity=3)
-    return tenant_id
-
-
-async def _delete(app, tenant_id: str) -> None:
-    async with app.state.sm.db.session_factory() as session:
-        await tenant_service(session, app).delete_tenant(tenant_id)
-        await finalize_session(session)
-
-
-async def _sub(app, tenant_id: str) -> Subscription | None:
-    async with app.state.sm.db.session_factory() as session:
-        stmt = select(Subscription).where(Subscription.tenant_id == tenant_id)
-        return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def test_delete_cancels_immediately_and_keeps_the_rows(app, fake):
@@ -97,7 +62,7 @@ async def test_an_ended_subscription_is_not_canceled_again(app, fake, status):
     assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
 
 
-@pytest.mark.parametrize("status", sorted(PROVIDER_LIVE_STATUSES))
+@pytest.mark.parametrize("status", sorted(PROVIDER_CANCELABLE_STATUSES))
 async def test_every_live_status_is_canceled(app, fake, status):
     """The same set ``StripeProvider.live_subscription_ids`` filters on."""
     tenant_id = await _paying_tenant(app, fake, status=status)
@@ -107,7 +72,7 @@ async def test_every_live_status_is_canceled(app, fake, status):
 
 async def test_a_local_only_row_still_cancels_the_customers_subscriptions(app, fake):
     tenant_id = await _paying_tenant(app, fake, sid=None)
-    fake.live["cus_1"] = ["sub_unmirrored"]
+    fake.live[CUS] = ["sub_unmirrored"]
     await _delete(app, tenant_id)
     assert fake.called("expire_checkout") == [{"session_id": "cs_open"}]
     assert fake.called("cancel_now") == [{"subscription_id": "sub_unmirrored"}]
@@ -124,7 +89,7 @@ async def _checkout_id(app, tenant_id: str) -> str | None:
 async def test_a_checkout_that_cannot_be_paid_any_more_is_forgotten(app, fake, status):
     tenant_id = await _paying_tenant(app, fake)
     fake.fail.add("expire_checkout")
-    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, "cus_1", status)
+    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, CUS, status)
     await _delete(app, tenant_id)
     assert await _checkout_id(app, tenant_id) is None
     assert fake.called("cancel_now") == [{"subscription_id": "sub_1"}]
@@ -134,7 +99,7 @@ async def test_a_checkout_that_cannot_be_paid_any_more_is_forgotten(app, fake, s
 async def test_a_checkout_still_open_is_kept_and_retried(app, fake, caplog, status):
     tenant_id = await _paying_tenant(app, fake)
     fake.fail.add("expire_checkout")
-    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, "cus_1", status)
+    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, CUS, status)
     with caplog.at_level("WARNING"):
         await _delete(app, tenant_id)
     assert await _checkout_id(app, tenant_id) == "cs_open"
@@ -151,7 +116,7 @@ async def test_a_checkout_still_open_is_kept_and_retried(app, fake, caplog, stat
 
 async def test_a_live_subscription_not_mirrored_yet_is_canceled_too(app, fake):
     tenant_id = await _paying_tenant(app, fake)
-    fake.live["cus_1"] = ["sub_1", "sub_other_tab"]
+    fake.live[CUS] = ["sub_1", "sub_other_tab"]
     await _delete(app, tenant_id)
     assert {kw["subscription_id"] for kw in fake.called("cancel_now")} == {
         "sub_1",

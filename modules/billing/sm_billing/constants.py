@@ -92,13 +92,22 @@ ENTITLED_STATUSES: Final = frozenset(
     {SubscriptionStatus.TRIALING, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE}
 )
 
-#: Provider statuses of a subscription that still bills, grants access or can
-#: still be paid or resumed. The one set behind both "a second checkout would
-#: double-charge" (``live_subscription_ids``) and "deleting the tenant must
-#: cancel this" (``teardown``); only ``canceled`` and ``incomplete_expired`` end.
-PROVIDER_LIVE_STATUSES: Final = frozenset(
+#: Provider statuses after which a subscription can never bill again.
+PROVIDER_ENDED_STATUSES: Final = frozenset({"canceled", "incomplete_expired"})
+
+#: Every other status Stripe has: what deleting a tenant must cancel
+#: (``teardown``), including a first payment still pending (``incomplete``)
+#: and a subscription that can be resumed (``paused``).
+PROVIDER_CANCELABLE_STATUSES: Final = frozenset(
     {"trialing", "active", "past_due", "unpaid", "incomplete", "paused"}
 )
+
+#: What makes a new checkout answer ``already_subscribed`` — billing or
+#: granting access, so a second one would double-charge. Deliberately not
+#: ``incomplete``: after a failed first payment the owner must be able to start
+#: checkout again (change-plan has no subscription to work on), and Stripe
+#: expires the abandoned one on its own (``incomplete_expired``).
+PROVIDER_CHECKOUT_BLOCKING_STATUSES: Final = frozenset({"trialing", "active", "past_due", "unpaid"})
 
 #: Stripe statuses we fold onto ours (``incomplete_expired`` never paid).
 STRIPE_STATUS_MAP: Final = {

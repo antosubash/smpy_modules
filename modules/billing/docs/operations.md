@@ -25,6 +25,10 @@
    make migrate          # alembic upgrade heads (the history has a single head)
    ```
 
+   After upgrading billing, autogenerate again: a release can add a column
+   (the first release after 0.0.11 adds `billing_customer.teardown_done_at`,
+   for the deleted-tenant sweep), and billing reads it on every reconcile.
+
    The `billing` branch label names the revision; it does **not** make
    `alembic downgrade billing@base` remove billing alone. Autogenerate chains
    every revision off the current head, so that command walks everything
@@ -198,11 +202,16 @@ and so that Stripe's own `customer.subscription.deleted` webhook still maps to
 them. If Stripe is unreachable at that moment the delete is not held up: the
 log says `could not cancel the subscription of deleted tenant`, and the next
 reconcile (the scheduled one, or `smpy billing reconcile`) cancels it — a
-reconcile never re-applies a subscription whose organisation is gone. An open
-Checkout session that cannot be expired stays recorded, and the reconcile
-retries it, unless Stripe reports it already completed or expired. "Still
-bills" means trialing, active, past_due, unpaid, incomplete or paused: the
-same statuses that make a new checkout answer "already subscribed". Under the
+reconcile never re-applies a subscription whose organisation is gone. Every
+reconcile also sweeps the Stripe customers whose organisation is gone and whose
+teardown has not completed (`billing_customer.teardown_done_at` unset). That
+reaches what no subscription row points at: a subscription not mirrored yet,
+and an open Checkout session that could not be expired, which stays recorded
+unless Stripe reports it completed or expired. A finished teardown is
+stamped, and the sweep skips it from then on. Organisations deleted before
+this release are swept too, on the first reconcile after the upgrade. "Still
+bills" means any status that has not ended (`canceled`, `incomplete_expired`),
+so `incomplete` and `paused` are canceled too. Under the
 `manual` provider nothing reaches Stripe; a log line asks you to cancel there
 if the organisation had a Stripe subscription from before the switch.
 

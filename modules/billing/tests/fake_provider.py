@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
@@ -55,8 +56,11 @@ class FakeProvider:
     async def expire_checkout(self, session_id: str) -> None:
         self._record("expire_checkout", session_id=session_id)
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        self._record("live_subscription_ids", customer_id=customer_id)
+    async def live_subscription_ids(
+        self, customer_id: str, statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES
+    ) -> list[str]:
+        """``live`` as scripted: the test already chose which ids are live."""
+        self._record("live_subscription_ids", customer_id=customer_id, statuses=statuses)
         return self.live.get(customer_id, [])
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:

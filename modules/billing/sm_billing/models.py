@@ -73,6 +73,9 @@ class Customer(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     # The one open Checkout session, expired when a new one is started so two
     # tabs cannot both be paid into two subscriptions.
     checkout_session_id: str | None = Field(default=None, max_length=255)
+    # Set once the tenant was deleted and everything it had at the provider was
+    # canceled (``sm_billing.teardown``): the reconcile sweep skips it from then on.
+    teardown_done_at: datetime | None = Field(default=None, sa_column=_tz_column())
 
 
 class Subscription(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]

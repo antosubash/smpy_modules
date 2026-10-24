@@ -80,8 +80,9 @@ per-seat plans.
 Errors: `checkout_unavailable` 409 (manual provider), `plan_not_found` 404
 (unknown, archived or hidden plan), `plan_is_free` 400,
 `interval_unavailable` 400, `already_subscribed` 409 (a live subscription
-exists locally or at Stripe: trialing, active, past_due, unpaid, incomplete or
-paused. Use change-plan), `too_many_members` 409,
+exists locally or at Stripe: trialing, active, past_due or unpaid. Use
+change-plan. An `incomplete` one, a first payment that failed, does not block,
+so the owner can check out again; Stripe expires the abandoned one on its own), `too_many_members` 409,
 `tenant_owner_required` 403, `provider_error` 502.
 
 ### `POST /api/billing/portal`

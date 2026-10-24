@@ -14,7 +14,7 @@ imports billing.
 | `app.state.tenants.entitlements` (`EntitlementProvider`) | answer `limit` / `has_feature` from the plan in force (`entitlements.PlanEntitlements`, installed in `startup.run`) |
 | `TenantService.set_status` | suspend on `unpaid`, reactivate on recovery (`lifecycle.apply_lifecycle`) |
 | `MembershipAdded` / `MembershipRemoved` | push the member count to Stripe for per-seat plans (`seats.subscribe`); skipped once the tenant is gone |
-| `TenantDeleted` (0.0.38+) | cancel the tenant's subscriptions at Stripe immediately, then resync the local row (`teardown.subscribe`) |
+| `TenantDeleted` (0.0.38+) | cancel the tenant's subscriptions at Stripe immediately, then resync the local row (`teardown.subscribe`); reconcile sweeps deleted tenants whose teardown is unfinished (`reconcile.sweep_deleted_tenants`) |
 | `require_active_tenant`, `tenant:<role>` roles | scope every tenant route to the session's organisation |
 
 Stripe is behind `contracts/provider.py` (`BillingProvider`), which speaks
@@ -25,7 +25,7 @@ plain dataclasses. No Stripe object crosses it.
 | Table | Key | Holds |
 |---|---|---|
 | `billing_plan` | `id`, unique `key`, unique price IDs | price IDs, display amounts, `limits` (JSON `{key: int}`), `features` (JSON list), default/public/archived |
-| `billing_customer` | `tenant_id` | Stripe customer id, the one open Checkout session id |
+| `billing_customer` | `tenant_id` | Stripe customer id, the one open Checkout session id, `teardown_done_at` (deleted tenant fully canceled) |
 | `billing_subscription` | unique `tenant_id`, unique `provider_subscription_id` | the local mirror: plan, status, interval, quantity, trial/period end, `cancel_at_period_end`, `suspended_by_billing`, `synced_at` |
 | `billing_webhook_event` | provider event id | `processed_at`, `error` — idempotency and an audit trail |
 

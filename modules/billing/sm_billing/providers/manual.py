@@ -36,7 +36,9 @@ class ManualProvider:
     async def expire_checkout(self, session_id: str) -> None:
         raise ProviderError(_NO)
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
+    async def live_subscription_ids(
+        self, customer_id: str, statuses: frozenset[str] = frozenset()
+    ) -> list[str]:
         return []
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:

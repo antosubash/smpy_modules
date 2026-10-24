@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
+
 
 class ProviderError(Exception):
     """The provider refused or failed a call (network, auth, unknown object)."""
@@ -108,8 +110,16 @@ class BillingProvider(Protocol):
         """Close an open Checkout session so it can no longer be paid."""
         ...
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        """The customer's subscriptions that still bill or grant access."""
+    async def live_subscription_ids(
+        self,
+        customer_id: str,
+        statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES,
+    ) -> list[str]:
+        """Every one of the customer's subscriptions whose status is in ``statuses``.
+
+        The default answers checkout's "already subscribed"; deleting a tenant
+        passes ``PROVIDER_CANCELABLE_STATUSES``. All of them, however many pages.
+        """
         ...
 
     async def portal_url(self, customer_id: str, return_url: str) -> str: ...

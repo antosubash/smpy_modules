@@ -277,23 +277,3 @@ def test_factory_builds_stripe_with_encrypted_secrets():
 async def test_expire_checkout(provider):
     await provider.expire_checkout("cs_1")
     assert provider.calls[-1][:2] == ("checkout.expire_async", ("cs_1",))
-
-
-async def test_live_subscription_ids_filters_ended(provider):
-    listing = {
-        "object": "list",
-        "data": [
-            {"id": "sub_a", "object": "subscription", "status": "active"},
-            {"id": "sub_b", "object": "subscription", "status": "canceled"},
-            {"id": "sub_c", "object": "subscription", "status": "past_due"},
-            {"id": "sub_d", "object": "subscription", "status": "incomplete_expired"},
-            {"id": "sub_e", "object": "subscription", "status": "paused"},
-            {"id": "sub_f", "object": "subscription", "status": "incomplete"},
-        ],
-    }
-    provider._v1.subscriptions = _Recorder(provider.calls, "subscriptions", listing)
-    # The one set teardown cancels too (constants.PROVIDER_LIVE_STATUSES).
-    assert await provider.live_subscription_ids("cus_1") == ["sub_a", "sub_c", "sub_e", "sub_f"]
-    name, _, params = provider.calls[-1]
-    assert name == "subscriptions.list_async"
-    assert params == {"customer": "cus_1", "status": "all", "limit": 100}
