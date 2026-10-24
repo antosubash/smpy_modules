@@ -14,6 +14,10 @@ ADMIN_SOURCE = "admin"
 KEY_MAX = 128 - len(REFUND_SUFFIX)
 METER_MAX = SOURCE_MAX = 64
 TENANT_MAX = 32
+ACTOR_MAX = 255
+# Far past any plan limit (int4), well inside the BIGINT counter: a larger
+# quantity is a bug in the caller, not a reason for a database error.
+QTY_MAX = 2**53
 
 
 def check_text(name: str, value: str, maximum: int) -> None:
@@ -27,16 +31,22 @@ def check_call(tenant_id: str, meter: str, qty: int, key: str, source: str) -> N
     check_text("meter", meter, METER_MAX)
     check_text("idempotency_key", key, KEY_MAX)
     check_text("source", source, SOURCE_MAX)
-    if isinstance(qty, bool) or not isinstance(qty, int) or qty < 1:
-        raise ValueError("qty must be a positive integer")
+    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= QTY_MAX:
+        raise ValueError(f"qty must be an integer from 1 to {QTY_MAX}")
     if key.endswith(REFUND_SUFFIX) or key.startswith(ADJUST_PREFIX):
         reserved = f"keys ending {REFUND_SUFFIX!r} or starting {ADJUST_PREFIX!r} are reserved"
         raise ValueError(reserved)
 
 
-def check_adjust(tenant_id: str, meter: str, quantity: int, reason: str) -> None:
-    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity == 0:
+def check_adjust(
+    tenant_id: str, meter: str, quantity: int, reason: str, actor: str | None = None
+) -> None:
+    if isinstance(quantity, bool) or not isinstance(quantity, int):
         raise ValueError("quantity must be a non-zero integer")
+    if not 0 < abs(quantity) <= QTY_MAX:
+        raise ValueError(f"quantity must be a non-zero integer within +/-{QTY_MAX}")
+    if actor is not None:
+        check_text("actor", actor, ACTOR_MAX)
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("reason is required")
     check_text("tenant_id", tenant_id, TENANT_MAX)

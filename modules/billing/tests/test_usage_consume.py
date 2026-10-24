@@ -98,7 +98,16 @@ async def test_tenants_are_counted_apart(factory, usage):
 
 @pytest.mark.parametrize(
     ("qty", "key"),
-    [(0, "k"), (-1, "k"), (True, "k"), (1, ""), (1, "x:refund"), (1, "adjust:x"), (1, "k" * 122)],
+    [
+        (0, "k"),
+        (-1, "k"),
+        (True, "k"),
+        (2**53 + 1, "k"),
+        (1, ""),
+        (1, "x:refund"),
+        (1, "adjust:x"),
+        (1, "k" * 122),
+    ],
 )
 async def test_bad_arguments_raise(factory, usage, qty, key):
     tenant = await seed_limits(factory, {METER: 3})

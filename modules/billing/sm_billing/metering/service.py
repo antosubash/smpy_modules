@@ -108,11 +108,13 @@ class UsageService:
         tenant_id, meter, key = call["tenant_id"], call["meter"], call["idempotency_key"]
         async with self._reader(db) as session:
             event = await find_event(session, tenant_id, meter, key)
-            if event is None or event.period_start is None:
+            if event is None:
                 return None
             original = (event.kind, int(event.quantity), event.source)
             if original != (call["kind"], call["quantity"], call["source"]):
                 raise IdempotencyConflict(key)
+            if event.period_start is None:
+                return None
             refunded = await find_event(session, tenant_id, meter, key + REFUND_SUFFIX)
             row = await period_row(session, tenant_id, meter, as_utc(event.period_start))
         used, end = (int(row.used), as_utc(row.period_end)) if row else (event.quantity, None)
@@ -133,8 +135,9 @@ class UsageService:
         return Exceeded(used, res.limit or 0, qty, res.period[1])
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
-        res = await self._resolve(tenant_id, meter, None)
-        used = await self._used(tenant_id, meter, res.period[0])
+        async with self._factory() as session:  # one connection for both reads
+            res = await self._resolve(tenant_id, meter, session)
+            used = await self._used(tenant_id, meter, res.period[0], session)
         if res.limit is not None and used + qty > res.limit:
             return Exceeded(used, res.limit, qty, res.period[1])
         return Allowed(used, res.limit, res.period[1])
@@ -279,7 +282,7 @@ class UsageService:
         Ledgered as an ``adjust`` row with its reason. A negative quantity is a
         credit and may take ``used`` below zero.
         """
-        check_adjust(tenant_id, meter, quantity, reason)
+        check_adjust(tenant_id, meter, quantity, reason, actor)
         res = await self._resolve(tenant_id, meter, None)
         event = self._ledger(
             tenant_id,
