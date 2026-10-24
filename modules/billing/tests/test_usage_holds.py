@@ -137,6 +137,9 @@ async def test_unknown_hold_ids(usage):
             await call("0" * 32)
     with pytest.raises(HoldNotFound):
         await usage.extend("0" * 32, 60)
+    for call in (usage.commit, usage.release):  # longer than any issued id
+        with pytest.raises(HoldNotFound):
+            await call("0" * 33)
 
 
 async def test_ttl_defaults_meter_then_setting(factory, clock):

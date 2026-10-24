@@ -6,6 +6,8 @@ A bad argument is a programming error in the consumer, so it raises
 
 from __future__ import annotations
 
+from sm_billing.contracts.metering import HoldNotFound
+
 CONSUME, RECORD, REFUND, ADJUST = "consume", "record", "refund", "adjust"
 REFUND_SUFFIX = ":refund"
 ADJUST_PREFIX = "adjust:"
@@ -64,4 +66,7 @@ def check_ttl(ttl: int) -> int:
 
 
 def check_hold_id(hold_id: str) -> None:
+    """A hold id; one longer than any id ever issued names no hold (404, not 500)."""
+    if isinstance(hold_id, str) and len(hold_id) > HOLD_ID_MAX:
+        raise HoldNotFound(hold_id)
     check_text("hold_id", hold_id, HOLD_ID_MAX)
