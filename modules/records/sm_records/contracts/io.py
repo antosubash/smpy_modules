@@ -134,6 +134,9 @@ class TypeExport(SQLModel):
     """Carried so a definition exported from a multilingual install arrives at
     the next one still able to hold translations (Phase 5 §4.1)."""
     allowed_roles: list[str] = SQLField(default_factory=list)
+    public_submissions: dict[str, Any] | None = None
+    """Carried like ``is_public``: a definition that accepted submissions where
+    it was exported still does where it is imported."""
     collection: str | None = None
     """Which table set this type's documents live in (Phase 5 §6.2).
 

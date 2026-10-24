@@ -5,6 +5,7 @@
  * props, not a shape any other screen renders.
  */
 
+import type { PublicSubmissionsConfig } from '../../utils/public-submissions';
 import type { FieldDef, TenancyMode, TypeRead } from '../../utils/types';
 
 /** One entry of `props.target_types` — a candidate for `relation.options.
@@ -131,6 +132,8 @@ export type TypeMetadataValues = {
    *  "Records" hub (per-type sidebar entries design contract). Off by
    *  default for a new type. */
   showInMenu: boolean;
+  /** `null` for an ordinary type. Its `kind` is fixed once saved (#101). */
+  publicSubmissions: PublicSubmissionsConfig | null;
 };
 
 export const TOP_LEVEL_ERROR_FIELDS = new Set([
@@ -147,4 +150,5 @@ export const TOP_LEVEL_ERROR_FIELDS = new Set([
   'translatable',
   'collection',
   'show_in_menu',
+  'public_submissions',
 ]);

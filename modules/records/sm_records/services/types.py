@@ -31,6 +31,7 @@ from sm_records._text import has_nul
 from sm_records.collections import collections
 from sm_records.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
 from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.public_submissions import config as submissions
 from sm_records.services._common import (
     PurgedRecord,
     record_count,
@@ -153,6 +154,7 @@ async def create_type(
     translatable: bool = False,
     allowed_roles: list[str] | None = None,
     collection: str | None = None,
+    public_submissions: dict[str, Any] | None = None,
     actor: str | None = None,
 ) -> RecordType:
     if key in RESERVED_TYPE_KEYS:
@@ -181,7 +183,9 @@ async def create_type(
             "allowed_roles": allowed_roles,
         }
     )
-    defs, fields = normalise(fields_raw or [], settings)
+    config = submissions.parse(public_submissions)
+    defs, fields = normalise(fields_raw or [], settings, kind=(config or {}).get("kind"))
+    display_field = submissions.default_display(config, display_field)
     check_pointers(defs, display_field, slug_field)
     await check_targets(db, defs, key)
 
@@ -201,6 +205,7 @@ async def create_type(
         translatable=translatable,
         allowed_roles=list(allowed_roles or []),
         collection=collection,
+        public_submissions=submissions.settle(config, fields, is_public),
         created_by=actor,
     )
     try:

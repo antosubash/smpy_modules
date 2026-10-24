@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.public_submissions.config import FIELD, settle
+from sm_records.public_submissions.spec import INTERNAL, inject
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
 from sm_records.schema.types import FieldType
 from sm_records.services._common import type_id_map, utcnow
@@ -62,14 +64,22 @@ def check_type_text(values: dict[str, Any], *, stored_label: str | None = None) 
             )
 
 
-def normalise(fields_raw: list[dict[str, Any]], settings: RecordsSettings):
+def normalise(
+    fields_raw: list[dict[str, Any]], settings: RecordsSettings, *, kind: str | None = None
+):
     """Validate a proposed field list and return ``(definitions, stored form)``.
 
     The stored form is the *normalised* dump rather than what the caller sent:
     the validator fills defaults (``on_delete``, ``many``) and promotes
     ``unique`` to ``indexed``, and storing the raw input would make the next
     edit's "did the fields change?" comparison answer yes to a no-op.
+
+    ``kind`` is the type's public-submissions kind: every inbound system entry
+    is dropped and that kind's canonical ``sm_*`` fields appended
+    (``public_submissions.spec.inject``) before anything is validated, so the
+    limits below count them and no caller can alter one.
     """
+    fields_raw = inject(list(fields_raw or []), kind)
     try:
         # ``on_save``: this is the one path a proposed schema takes (type
         # create, update, rollback and the preview of any of them), and the
@@ -92,7 +102,17 @@ def normalise(fields_raw: list[dict[str, Any]], settings: RecordsSettings):
             f"{settings.max_indexed_fields_per_type}; every indexed field is a row "
             "written per record per save"
         )
-    return defs, [field.model_dump(mode="json") for field in defs]
+    return defs, [stored_form(field) for field in defs]
+
+
+def stored_form(field: FieldDefinition) -> dict[str, Any]:
+    """One definition as ``RecordType.fields`` stores it. ``system`` only when
+    set, so every ordinary field's stored dict — and therefore the no-op
+    comparison on save — is what it was before the flag existed."""
+    dumped = field.model_dump(mode="json")
+    if dumped.get("system") is None:
+        dumped.pop("system", None)
+    return dumped
 
 
 DISPLAY_FIELD_TYPES: frozenset[FieldType] = frozenset(
@@ -141,6 +161,11 @@ def check_pointers(
                 f"{name} {value!r} is not a field of this type",
                 [{"field": name, "message": f"{value!r} is not a declared field"}],
             )
+        if field.system == INTERNAL:
+            # Its value is half of every link a subscriber is sent; as a title
+            # or a slug it would be on every list row and in every export.
+            problem = f"{value!r} is an internal system field and cannot be used as {name}"
+            raise ValidationFailed(problem, [{"field": name, "message": problem}])
         allowed = _POINTER_TYPES[name]
         if field.type not in allowed:
             kinds = sorted(member.value for member in allowed)
@@ -198,7 +223,21 @@ async def write_type_row(
 
     Both type-edit paths end here; each passes its own ``take_snapshot`` rule,
     because they differ on which edits write a ``records_type_revision`` row.
+
+    The public-submissions config is settled against the fields and
+    ``is_public`` the row is about to have (``public_submissions.config``), so
+    an edit, a schema change, a rollback and an import all meet its rules.
     """
+    if fields is not None or {FIELD, "is_public"} & changes.keys():
+        settled = settle(
+            changes.get(FIELD, rtype.public_submissions),
+            fields if fields is not None else list(rtype.fields or []),
+            changes.get("is_public", rtype.is_public),
+        )
+        # Also when the caller sent one: ``settled`` is pruned, and may equal
+        # the stored config while the sent one (with a stale key) does not.
+        if FIELD in changes or settled != rtype.public_submissions:
+            changes[FIELD] = settled
     for name, value in changes.items():
         setattr(rtype, name, value)
     if fields is not None:

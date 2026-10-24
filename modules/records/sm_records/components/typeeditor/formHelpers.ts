@@ -5,6 +5,7 @@
  */
 
 import type { CreateTypePayload, UpdateTypeChanges } from '../../utils/api';
+import { PRESETS, type SubmissionKind } from '../../utils/public-submissions';
 import type { FieldDef, TypeRead } from '../../utils/types';
 import type { EditableField, TypeMetadataValues } from './types';
 
@@ -48,7 +49,26 @@ export function stripUids(fields: EditableField[]): FieldDef[] {
     help: field.help,
     constraints: field.constraints,
     options: field.options,
+    // Last and only when set, as the server stores it (`_schema.stored_form`).
+    ...(field.system ? { system: field.system } : {}),
   }));
+}
+
+/** A *From a preset* draft for a new type (#101): fresh, unsaved rows (their
+ *  keys still editable) and the metadata the preset sets. */
+export function presetDraft(kind: SubmissionKind): {
+  fields: EditableField[];
+  values: Partial<TypeMetadataValues>;
+} {
+  const preset = PRESETS[kind];
+  return {
+    fields: preset.fields.map((field) => ({ ...field, uid: newFieldUid(), fromServer: false })),
+    values: {
+      displayField: preset.displayField,
+      showInMenu: preset.showInMenu,
+      publicSubmissions: { ...preset.config, enabled: true },
+    },
+  };
 }
 
 /** A type key derived from a label — the same shape `rules.ts::KEY_PATTERN`
@@ -114,6 +134,7 @@ export function metadataFrom(type: TypeRead | null): TypeMetadataValues {
     translatable: type?.translatable ?? false,
     collection: type?.collection ?? '',
     showInMenu: type?.show_in_menu ?? false,
+    publicSubmissions: type?.public_submissions ?? null,
   };
 }
 
@@ -140,6 +161,7 @@ export function extraCreateFields(values: TypeMetadataValues): Partial<CreateTyp
   // thing said once (Phase 5 §6.2).
   if (values.collection) extra.collection = values.collection;
   if (values.showInMenu) extra.show_in_menu = true;
+  if (values.publicSubmissions) extra.public_submissions = values.publicSubmissions;
   return extra;
 }
 
@@ -172,6 +194,9 @@ export function buildChanges(
   }
   if (values.translatable !== current.translatable) changes.translatable = values.translatable;
   if (values.showInMenu !== current.show_in_menu) changes.show_in_menu = values.showInMenu;
+  if (JSON.stringify(values.publicSubmissions) !== JSON.stringify(current.public_submissions)) {
+    changes.public_submissions = values.publicSubmissions;
+  }
   const wireFields = stripUids(fields);
   if (JSON.stringify(wireFields) !== JSON.stringify(current.fields)) {
     changes.fields = wireFields;

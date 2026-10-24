@@ -128,6 +128,7 @@ async def create_record(
     actor: str | None = None,
     locale: str | None = None,
     translation_group: str | None = None,
+    system: dict[str, Any] | None = None,
 ) -> Record:
     """Write a new record, in one language, in its own translation group.
 
@@ -148,7 +149,9 @@ async def create_record(
     # from its source's ``unique`` claims.
     uuid = new_uuid()
     own_group = translation_group or uuid
-    _, values, stored, types = await _prepare(db, rtype, data, settings, None, own_group)
+    _, values, stored, types = await _prepare(
+        db, rtype, data, settings, None, own_group, system=system
+    )
     resolved_slug = _payload.slug_for(rtype, values, slug)
     await _claims.ensure_slug_free(db, rtype, resolved_slug, resolved_locale)
     _payload.check_position(position)
@@ -212,6 +215,7 @@ async def update_record(
     actor: str | None = None,
     event: RevisionEvent = RevisionEvent.UPDATE,
     orphaned_extra: dict[str, Any] | None = None,
+    system: dict[str, Any] | None = None,
 ) -> Record:
     """Write a record, restamping it at the type's current schema version.
 
@@ -231,6 +235,10 @@ async def update_record(
     caller is ``services.revisions.restore``, which has to put the undeclared
     half of an older payload somewhere (``extra="forbid"`` would otherwise make
     every revision older than a field deletion a permanent 422).
+
+    ``system`` is internal the same way: server-written values for the type's
+    ``sm_*`` fields. Without it every system value is carried over from the
+    row (``_payload.carry_system``) — on create, from nothing.
     """
     # Read before anything is assigned to the row: the reduce index is
     # maintained by *moving* this record from the group its old payload put
@@ -241,7 +249,7 @@ async def update_record(
     status_before = record.status.value
     own_group = record.translation_group
     defs, values, stored, types = await _prepare(
-        db, rtype, data, settings, record.id, own_group, previous=previous_data
+        db, rtype, data, settings, record.id, own_group, previous=previous_data, system=system
     )
     stored = _payload.migrate_orphaned(record, defs, stored, orphaned_extra)
     resolved_slug = _payload.slug_for(rtype, values, slug)

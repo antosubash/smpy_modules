@@ -425,6 +425,48 @@ returns and derives every URL from it at render time. A legacy `https://`
 value renders as a link; an id the library answers `404`/`422` for is shown as
 **File missing** and kept.
 
+## Public submissions and system fields
+
+A record type can accept submissions from the website (#101): a contact form
+(`kind: "form"`) or a newsletter list (`kind: "subscription"`). The
+configuration is one nullable JSON column, `records_type.public_submissions`
+(`contracts/public_submissions.py`). Null means an ordinary type, which is
+every type that has not opted in. **The type is the trust anchor**: which
+fields a visitor may fill (`public_fields`), the consent text and the
+recipients all live on it, never in a page block's props.
+
+Such a type carries **system fields**, `sm_*` keys with
+`FieldDefinition.system` set to `readonly` (shown read-only in the record
+editor's *Submission details* panel, the list's columns and the export) or
+`internal` (`sm_nonce`; hidden from all three). Four rules hold them in place:
+
+- **Injected, never trusted.** `services._schema.normalise`, the one path
+  every type create, update, rollback, import and preview takes, drops every
+  inbound entry that claims `system` and appends the kind's canonical
+  definitions (`public_submissions/spec.py`). A rollback to a revision from
+  before the type had a kind therefore still ends up with them.
+- **The prefix is reserved.** `schema/_keys.validate_key` refuses an ordinary
+  field keyed `sm_*` on save. A type stored before the rule still loads.
+- **Values are written only through `system=`.** `create_record` and
+  `update_record` take an internal `system=` mapping. `_payload.carry_system`
+  runs before validation on every write: an update keeps the stored values
+  whatever the client sent, and a create (an admin's, an import's) starts
+  with none. So no admin write, import or bulk action can set or change one,
+  and an echoed value is never an error. The values in `system=` are merged
+  *before* validation, so they are checked like any value.
+- **The kind is set once.** `public_submissions/config.check_change` refuses
+  clearing or changing it (409), and refuses the newsletter kind on a type
+  that already holds records, whose required unique `sm_email` none of them
+  has. `config.settle` checks the rest against the fields and `is_public` the
+  row is about to have: it runs on create and in `write_type_row`, so an edit,
+  a schema change, a rollback and an import all meet it. A type cannot be
+  public and accept submissions (409). Removing a field takes it off
+  `public_fields` in the same write.
+
+The config is operational like `is_public`: it is not snapshotted and bumps no
+`schema_version`. The first kind is the exception, because it adds the system
+fields as an ordinary additive schema change.
+
 ## The wire contracts
 
 `contracts/` is the only thing endpoints serialize, split by subject: `schemas`
@@ -498,6 +540,7 @@ sm_records/
 ├── schema/          field definitions, the compiler, the diff and its classes
 ├── index/           query building, writing, reindex, reduce, providers
 ├── services/        the domain; raises RecordsError, never commits
+├── public_submissions/  the sm_* system fields and the config's save rules
 ├── contracts/       wire DTOs
 ├── endpoints/       api/* (JSON), views*.py (Inertia) + _list_view.py (the list screen's offset/keyset query)
 ├── seed/            the demo dataset

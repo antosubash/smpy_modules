@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.constants import ORPHANED_KEY
 from sm_records.index.query import Filter, Sort, build_query, only_trashed
 from sm_records.models import Record, RecordType, tables_for
+from sm_records.public_submissions.spec import INTERNAL
 from sm_records.schema.compile import to_jsonable
 from sm_records.schema.fields import FieldDefinition
 
@@ -122,6 +123,12 @@ async def walk_records(
         db.expunge_all()
 
 
+def exported_defs(rtype: RecordType) -> list[FieldDefinition]:
+    """The fields an export carries: all but the ``internal`` system ones
+    (``sm_nonce``), whose value is half of every link a subscriber is sent."""
+    return [field for field in field_defs(rtype) if field.system != INTERNAL]
+
+
 def record_row(rtype: RecordType, record: Record, defs: list[FieldDefinition]) -> dict[str, Any]:
     """One record as the export file spells it.
 
@@ -161,7 +168,7 @@ async def iter_json(
     is what makes export-from-one / import-into-another a tenant clone."""
     async with session_factory() as db:
         rtype = await get_type_by_id(db, type_id)
-        defs = field_defs(rtype)
+        defs = exported_defs(rtype)
         header = {
             "key": rtype.key,
             "schema_version": rtype.schema_version,
@@ -201,7 +208,7 @@ async def iter_csv(
     module's own importer."""
     async with session_factory() as db:
         rtype = await get_type_by_id(db, type_id)
-        defs = field_defs(rtype)
+        defs = exported_defs(rtype)
         buffer = io.StringIO()
         writer = csv.writer(buffer, lineterminator="\r\n")
         writer.writerow(csv_header(defs))

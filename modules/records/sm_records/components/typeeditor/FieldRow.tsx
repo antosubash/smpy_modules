@@ -69,7 +69,8 @@ export function FieldRow({
       className="grid gap-3 rounded-lg border p-3"
       data-testid="records-field-row"
       data-field-index={index}
-      data-field-expanded={expanded ? 'true' : 'false'}
+      data-field-expanded={expanded && !field.system ? 'true' : 'false'}
+      data-field-system={field.system ? 'true' : undefined}
     >
       <FieldRowSummary
         field={field}
@@ -85,7 +86,7 @@ export function FieldRow({
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
       />
-      {expanded && (
+      {expanded && !field.system && (
         <FieldRowBody
           field={field}
           index={index}

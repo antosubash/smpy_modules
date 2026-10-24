@@ -11,11 +11,13 @@ import { groupErrors } from '../components/typeeditor/errors';
 import { FieldsCard } from '../components/typeeditor/FieldsCard';
 import {
   metadataFrom,
+  presetDraft,
   schemaIsDirty,
   typeIsDirty,
   withUids,
 } from '../components/typeeditor/formHelpers';
 import { PointerFields } from '../components/typeeditor/PointerFields';
+import { PublicSubmissionsCard } from '../components/typeeditor/PublicSubmissionsCard';
 import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
 import { SaveBar } from '../components/typeeditor/SaveBar';
 import { SchemaConflictPanel } from '../components/typeeditor/SchemaConflictPanel';
@@ -221,6 +223,23 @@ function TypeEditor({
             values={values}
             errors={errorGroups.topLevel}
             onChange={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
+          />
+
+          <PublicSubmissionsCard
+            isNew={isNew}
+            savedKind={current?.public_submissions?.kind ?? null}
+            config={values.publicSubmissions}
+            fields={fields}
+            allowedRoles={values.allowedRoles}
+            isPublic={values.isPublic}
+            contentLocales={content_locales}
+            errors={errorGroups.topLevel}
+            onChange={(publicSubmissions) => setValues((prev) => ({ ...prev, publicSubmissions }))}
+            onPreset={(kind) => {
+              const draft = presetDraft(kind);
+              setFields(draft.fields);
+              setValues((prev) => ({ ...prev, ...draft.values }));
+            }}
           />
 
           <SaveBar

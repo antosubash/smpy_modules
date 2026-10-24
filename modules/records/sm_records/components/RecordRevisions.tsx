@@ -5,7 +5,9 @@ import { toast } from 'sonner';
 import { ApiError } from '../utils/api';
 import { getRecordRevision, listRevisions, restoreRecordRevision } from '../utils/api-history';
 import { keys, type Translate, useT } from '../utils/i18n';
+import { withoutInternal } from '../utils/public-submissions';
 import type {
+  FieldDef,
   RecordRead,
   RecordRevision,
   RecordRevisionDetail,
@@ -43,11 +45,14 @@ export function RecordRevisions({
   uuid,
   currentVersion,
   onRestored,
+  fields = [],
 }: {
   typeKey: string;
   uuid: string;
   currentVersion: number;
   onRestored: (restored: RecordRead) => void;
+  /** The type's fields — only so a snapshot hides `internal` system values. */
+  fields?: FieldDef[];
 }) {
   const { t, locale } = useT();
   const [open, setOpen] = useState(false);
@@ -175,7 +180,7 @@ export function RecordRevisions({
                   {selected?.id === rev.id && (
                     <div className="mt-3 space-y-2 border-t pt-3">
                       <pre className="max-h-60 overflow-auto rounded-md border bg-muted p-2 text-xs">
-                        {JSON.stringify(selected.data, null, 2)}
+                        {JSON.stringify(withoutInternal(selected.data, fields), null, 2)}
                       </pre>
                       {restoreError && (
                         <p className="text-sm text-destructive" role="alert">

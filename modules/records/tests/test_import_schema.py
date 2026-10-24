@@ -44,6 +44,9 @@ async def test_type_export_is_importable_shaped(client):
         # collection-backed type landed on the next install as a shared-tables
         # type with no warning anywhere.
         "collection",
+        # Carried like ``is_public``: a definition that accepted submissions
+        # from the website where it was exported still does (#101).
+        "public_submissions",
     }
     # Facts about *this* install's copy, deliberately absent — see
     # ``contracts/io.py``.

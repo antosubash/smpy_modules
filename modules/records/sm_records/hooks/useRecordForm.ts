@@ -17,6 +17,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
 import { keys, useT } from '../utils/i18n';
+import { editableFields, withoutSystem } from '../utils/public-submissions';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator } from '../utils/validation';
@@ -34,7 +35,9 @@ export function useRecordForm(
   initialData?: Record<string, unknown> | null,
 ) {
   const { t } = useT();
-  const fields = type.fields;
+  // The server's own `sm_*` fields are not the form's (#101): left out of the
+  // payload, an admin save carries their stored values over unchanged.
+  const fields = useMemo(() => editableFields(type.fields), [type.fields]);
   const seedData = record?.data ?? initialData ?? null;
 
   const [values, setValues] = useState<FormValues>(() => toFormValues(fields, seedData));
@@ -48,7 +51,11 @@ export function useRecordForm(
   // re-derive it from whatever the next response actually says.
   const [invalidErrors, setInvalidErrors] = useState<ValidationError[]>(record?.invalid ?? []);
   const [raw, setRaw] = useState(false);
-  const [rawText, setRawText] = useState(() => pretty(seedData));
+  // The server's own values (`sm_nonce` above all) never reach the raw
+  // editor — the same text `toggleRaw` builds, which walks only `fields`.
+  const [rawText, setRawText] = useState(() =>
+    pretty(seedData && withoutSystem(seedData, type.fields)),
+  );
   const [rawError, setRawError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState(() => baselineOf(fields, record?.data ?? null));
   /** The key the editor should take the person to when a save is refused by
@@ -136,14 +143,14 @@ export function useRecordForm(
     (next: RecordRead) => {
       setValues(toFormValues(fields, next.data));
       setOriginal(next.data);
-      setRawText(pretty(next.data));
+      setRawText(pretty(withoutSystem(next.data, type.fields)));
       setClientErrors({});
       setServerErrors([]);
       setInvalidErrors(next.invalid ?? []);
       setRawError(null);
       setBaseline(baselineOf(fields, next.data));
     },
-    [fields],
+    [fields, type.fields],
   );
 
   /** Are the values on screen different from the record as it was loaded
@@ -155,10 +162,10 @@ export function useRecordForm(
   const dirty = useMemo(() => {
     if (raw) {
       const parsed = asObject(rawText);
-      return parsed === null ? true : stable(parsed) !== baseline;
+      return parsed === null ? true : stable(withoutSystem(parsed, type.fields)) !== baseline;
     }
     return stable(buildPayload(fields, values, original)) !== baseline;
-  }, [raw, rawText, fields, values, original, baseline]);
+  }, [raw, rawText, fields, values, original, baseline, type.fields]);
 
   /** The payload as it stands, valid or not — for the conflict panel's
    *  read-only "your version" pane. */
@@ -207,9 +214,10 @@ export function useRecordForm(
       // `_orphaned` stays visible in the raw editor — it's part of what the
       // record actually stores — but it is never the caller's to write
       // (services/_payload.py 422s the whole save if it's present). Strip it
-      // from what's submitted rather than from the display.
+      // from what's submitted rather than from the display. So are the
+      // system values (#101): the server writes those, whatever was typed.
       const { _orphaned: _submittedOrphaned, ...submittable } = parsed;
-      return submittable;
+      return withoutSystem(submittable, type.fields);
     }
     const found = validator(values);
     setClientErrors(found);
@@ -221,7 +229,7 @@ export function useRecordForm(
       return null;
     }
     return buildPayload(fields, values, original);
-  }, [raw, rawText, validator, values, fields, original, t]);
+  }, [raw, rawText, validator, values, fields, original, t, type.fields]);
 
   /** The key `validateAndBuild` stopped on, for the caller that focuses and
    *  scrolls to it. `null` once a save gets past the client validator. */

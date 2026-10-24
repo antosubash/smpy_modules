@@ -19,6 +19,7 @@ const values = (over: Partial<TypeMetadataValues>): TypeMetadataValues => ({
   translatable: false,
   collection: '',
   showInMenu: false,
+  publicSubmissions: null,
   ...over,
 });
 

@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
 from sm_records.constants import MAX_SLUG_LEN, ORPHANED_KEY
+from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.services import _claims
 from sm_records.services.errors import Conflict
@@ -231,6 +232,10 @@ async def create_translation(
             f"type {rtype.key!r} is not translatable; enable 'translatable' on the "
             "type before creating translations of its records"
         )
+    if (rtype.public_submissions or {}).get("kind") == KIND_SUBSCRIPTION:
+        # One record per address: a "translation" would be a second subscriber
+        # with no address, which only a signup can supply (#101).
+        raise Conflict(f"type {rtype.key!r} is a newsletter list; its records are not translated")
     target = locales.require(settings, locale)
     if target == source.locale:
         raise Conflict(f"record {source.uuid} is already in {target!r}")

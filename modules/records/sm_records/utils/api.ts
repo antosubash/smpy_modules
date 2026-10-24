@@ -13,6 +13,7 @@
 
 import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
 import { csrfHeaders } from './csrf';
+import type { PublicSubmissionsConfig } from './public-submissions';
 import type {
   FieldDef,
   FilterOp,
@@ -109,6 +110,8 @@ export type CreateTypePayload = {
    *  entries design contract). Omitted when off — the server default is the
    *  same `false`. */
   show_in_menu?: boolean;
+  /** Omitted for an ordinary type. */
+  public_submissions?: PublicSubmissionsConfig;
 };
 
 export function createType(payload: CreateTypePayload): Promise<TypeRead> {

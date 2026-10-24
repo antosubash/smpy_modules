@@ -6,6 +6,7 @@ import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { MediaApiProvider } from '../components/media/MediaApiContext';
+import { SubmissionDetails } from '../components/public_submissions/SubmissionDetails';
 import { RecordEditorActionsRow } from '../components/RecordEditorActionsRow';
 import { RecordEditorTypeLink } from '../components/RecordEditorTypeLink';
 import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
@@ -20,6 +21,7 @@ import { useRecordEditor } from '../hooks/useRecordEditor';
 import { displayFieldKey } from '../utils/errors-display';
 import { keys, useT } from '../utils/i18n';
 import type { MediaApi } from '../utils/media-api';
+import { editableFields } from '../utils/public-submissions';
 import { withCurrentPatched } from '../utils/record-types';
 import type { RecordRead, TenancyMode, TranslationRead, TypeRead } from '../utils/types';
 
@@ -167,14 +169,17 @@ function RecordEditor({
             />
           )}
 
-          {current && type.translatable && contentLocales.length > 1 && (
-            <RecordTranslations
-              typeKey={type.key}
-              record={current}
-              locales={contentLocales}
-              translations={withCurrentPatched(translations ?? [], current)}
-            />
-          )}
+          {current &&
+            type.translatable &&
+            contentLocales.length > 1 &&
+            type.public_submissions?.kind !== 'subscription' && (
+              <RecordTranslations
+                typeKey={type.key}
+                record={current}
+                locales={contentLocales}
+                translations={withCurrentPatched(translations ?? [], current)}
+              />
+            )}
 
           {unplaceable.length > 0 && (
             <ul
@@ -213,7 +218,7 @@ function RecordEditor({
           ) : (
             <MediaApiProvider value={media_api}>
               <RecordForm
-                fields={type.fields}
+                fields={editableFields(type.fields)}
                 values={form.values}
                 errors={form.fieldErrors}
                 disabled={pending}
@@ -222,6 +227,8 @@ function RecordEditor({
               />
             </MediaApiProvider>
           )}
+
+          <SubmissionDetails fields={type.fields} data={current?.data} />
 
           <RecordAdvancedFields
             slug={slug}
@@ -256,6 +263,7 @@ function RecordEditor({
               typeKey={type.key}
               uuid={current.uuid}
               currentVersion={current.version}
+              fields={type.fields}
               onRestored={applyRestored}
             />
           )}

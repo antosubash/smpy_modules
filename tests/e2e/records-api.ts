@@ -44,6 +44,7 @@ export type TypeRead = {
   translatable: boolean;
   show_in_menu: boolean;
   collection: string | null;
+  public_submissions: Json | null;
 };
 
 export type RecordRead = {

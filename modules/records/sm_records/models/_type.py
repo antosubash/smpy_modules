@@ -87,6 +87,21 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     is_public: bool = Field(default=False)
     """Gates the anonymous read API. Off by default."""
 
+    public_submissions: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    """Whether, and how, this type accepts submissions from the website (#101):
+    the stored form of ``contracts.public_submissions.PublicSubmissionsConfig``,
+    or ``None`` for an ordinary type. Its ``kind`` is set once and decides the
+    ``sm_*`` system fields injected into ``fields``
+    (``sm_records.public_submissions.spec``).
+
+    Operational like ``is_public``: not snapshotted in ``records_type_revision``
+    and bumps no ``schema_version`` — except the first ``kind``, which adds the
+    system fields as an ordinary additive schema change. Nullable with no
+    backfill: null means "not a submissions type", so the migration is additive
+    and the feature inert until a type opts in."""
+
     show_in_menu: bool = Field(
         default=False,
         sa_column_kwargs={"server_default": false()},

@@ -90,7 +90,8 @@ export function availableColumns(type: ColumnType, showLocale: boolean): ListCol
   return [
     ...envelope.map((key): ListColumn => ({ kind: 'envelope', key })),
     ...type.fields
-      .filter((field) => field.key !== type.display_field)
+      // An `internal` system field (`sm_nonce`, #101) is never a column.
+      .filter((field) => field.key !== type.display_field && field.system !== 'internal')
       .map((field): ListColumn => ({ kind: 'field', key: field.key, field })),
   ];
 }

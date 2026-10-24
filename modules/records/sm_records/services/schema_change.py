@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.constants import REINDEX_ALL
 from sm_records.index.reindex import pending_map
 from sm_records.models import RecordType
+from sm_records.public_submissions.config import kind_of
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
@@ -100,7 +101,7 @@ async def preview(
     normalised ``fields`` differ from the stored ones is refused, and the
     marking pass is given ``field_defs(rtype)`` rather than the body's.
     """
-    new_defs, _ = normalise(fields_raw, settings)
+    new_defs, _ = normalise(fields_raw, settings, kind=kind_of(rtype))
     stored_defs = field_defs(rtype)
     if rescan and new_defs != stored_defs:
         raise ValidationFailed(
@@ -198,7 +199,9 @@ async def apply(
     """
     changes = dict(changes or {})
     new_defs, new_fields = (
-        normalise(fields_raw, settings) if fields_raw is not None else (field_defs(rtype), None)
+        normalise(fields_raw, settings, kind=kind_of(rtype, changes))
+        if fields_raw is not None
+        else (field_defs(rtype), None)
     )
 
     await lock_type(db, rtype)
