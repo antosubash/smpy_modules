@@ -32,6 +32,7 @@ def _message(resp) -> str:
         (form_config(public_fields=["name", "name"]), "twice"),
         (form_config(consent={"required": False, "text": {"EN!": "x"}}), "locale"),
         (form_config(consent={"required": False, "text": {"en": "x" * 2001}}), "2000"),
+        (form_config(consent={"required": False, "text": {"en": "a\x00b"}}), "NUL"),
         (form_config(consent={"required": True, "text": {}}), "text"),
         ({"kind": "subscription", "double_opt_in": False}, "consent"),
     ],

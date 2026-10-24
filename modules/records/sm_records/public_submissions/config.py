@@ -26,6 +26,7 @@ from sm_records.contracts.public_submissions import (
 from sm_records.models import RecordType
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES, is_system
 from sm_records.services._common import record_count
+from sm_records.services._lock import lock_type
 from sm_records.services.errors import Conflict, ValidationFailed
 
 __all__ = ["FIELD", "check_change", "default_display", "kind_of", "parse", "settle"]
@@ -89,6 +90,11 @@ async def check_change(db: AsyncSession, rtype: RecordType, changes: dict[str, A
             f"type {rtype.key!r} accepts {before} submissions; that cannot be turned "
             "off or changed once set — delete the type instead"
         )
+    if before is None and after == KIND_SUBSCRIPTION:
+        # Under the type's lock, which every record write takes first: a
+        # record created between this count and the commit would be a
+        # subscriber with no address.
+        await lock_type(db, rtype)
     if (
         before is None
         and after == KIND_SUBSCRIPTION
@@ -106,10 +112,12 @@ def _check_consent(config: dict[str, Any]) -> None:
     for locale, text in consent["text"].items():
         if not _LOCALE_RE.match(locale):
             raise _refuse(f"consent text locale {locale!r} is not a valid locale")
-        if len(text) > MAX_CONSENT_TEXT_LEN or has_nul(text):
+        if len(text) > MAX_CONSENT_TEXT_LEN:
             raise _refuse(
                 f"consent text ({locale}) must be at most {MAX_CONSENT_TEXT_LEN} characters"
             )
+        if has_nul(text):
+            raise _refuse(f"consent text ({locale}) must not contain NUL characters")
     no_opt_in = config["kind"] == KIND_SUBSCRIPTION and not config["double_opt_in"]
     if no_opt_in and not consent["required"]:
         raise _refuse("a newsletter without double opt-in has to require consent")
