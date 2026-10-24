@@ -165,9 +165,9 @@ async def _cancel(
         await resync(session, app, provider, mirrored)
     if stamp and customer is not None:
         customer.teardown_done_at = datetime.now(UTC)
-        # Done clears the failure count; the claim (``teardown_next_attempt_at``)
-        # is released by ``teardown_claim.succeeded`` once this run returns.
-        customer.teardown_attempts = 0
+        # The backoff (attempts, next due) is cleared by the token-conditional
+        # ``teardown_claim.succeeded`` once this run returns — never here, where
+        # a run whose lease lapsed would reset the count of the run that took over.
     return ids
 
 

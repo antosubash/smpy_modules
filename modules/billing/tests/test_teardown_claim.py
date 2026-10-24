@@ -125,6 +125,35 @@ async def test_success_clears_the_backoff(app, fake):
     assert (customer.teardown_attempts, customer.teardown_next_attempt_at) == (0, None)
 
 
+async def test_a_late_run_finishing_leaves_the_takeovers_backoff_alone(app, fake):
+    """A stalls in checkout expiry past its lease; B takes over and fails; A then
+    completes. A may stamp done, but B's attempt count and next due must stand."""
+    tenant_id = await _silently_deleted(app, fake)
+    original, stalled, resume = fake.expire_checkout, asyncio.Event(), asyncio.Event()
+
+    async def expire_once_stalled(session_id: str) -> None:
+        if not stalled.is_set():
+            stalled.set()
+            await resume.wait()
+        await original(session_id)
+
+    fake.expire_checkout = expire_once_stalled
+    run_a = asyncio.create_task(run_teardown(app, tenant_id))
+    await stalled.wait()
+    await _make_due(app, tenant_id)  # A's lease lapses
+    fake.fail.add("live_subscription_ids")
+    with pytest.raises(ProviderError):
+        await run_teardown(app, tenant_id)  # B claims, fails, books attempt 1
+    b_due = (await _customer(app, tenant_id)).teardown_next_attempt_at
+    fake.fail.clear()
+    resume.set()
+    await run_a
+    customer = await _customer(app, tenant_id)
+    assert customer.teardown_done_at is not None
+    assert customer.teardown_attempts == 1
+    assert customer.teardown_next_attempt_at == b_due
+
+
 async def test_a_failure_after_done_keeps_done(app, fake):
     """The recheck failing never un-does a finished teardown."""
     tenant_id = await _paying_tenant(app, fake)
