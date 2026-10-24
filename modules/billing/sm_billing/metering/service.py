@@ -146,7 +146,7 @@ class UsageService(HoldsMixin):
             if limit is not None and qty > limit:
                 # Only a credited (negative) counter can fit it; never insert.
                 stmt = sql.add_within_limit(
-                    **fields, start=period[0], qty=qty, limit=limit, now=now
+                    **fields, start=period[0], end=period[1], qty=qty, limit=limit, now=now
                 )
             else:
                 stmt = sql.upsert_period(

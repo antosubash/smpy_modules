@@ -24,7 +24,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy import case, update
 from sqlalchemy.dialects import postgresql, sqlite
 
 from sm_billing.models import UsageEvent, UsagePeriod
@@ -88,13 +88,54 @@ def upsert_period(
     total = table.c.used + stmt.excluded.used
     return stmt.on_conflict_do_update(
         index_elements=[table.c.tenant_id, table.c.meter, table.c.period_start],
-        set_={"used": total, "updated_at": stmt.excluded.updated_at},
+        set_={
+            "used": total,
+            "updated_at": stmt.excluded.updated_at,
+            "period_end": _later_end(table, stmt.excluded.period_end),
+        },
         where=None if limit is None else total <= limit,
     ).returning(table.c.used)
 
 
+def _later_end(table: Any, end: Any) -> Any:
+    """The row's ``period_end``, moved out to ``end`` when that is later.
+
+    A provider that extends a period keeps its start, so writes keep landing
+    in the same row; its stored end follows the resolved one. It never moves
+    in, so a write that resolved the period before a concurrent extension
+    cannot undo it.
+    """
+    return case((end > table.c.period_end, end), else_=table.c.period_end)
+
+
+def extend_rollups(*, tenant_id: str, start: datetime, end: datetime) -> Any:
+    """Every counter of the tenant's period starting at ``start`` ends at ``end``.
+
+    Run by ``sync.apply_snapshot`` when the provider moves a period's end but
+    keeps its start, so the stored end stays authoritative: the period after
+    it begins exactly where these rows end.
+    """
+    table = UsagePeriod.__table__
+    return (
+        update(table)
+        .where(
+            table.c.tenant_id == tenant_id,
+            table.c.period_start == start,
+            table.c.period_end != end,
+        )
+        .values(period_end=end)
+    )
+
+
 def add_within_limit(
-    *, tenant_id: str, meter: str, start: datetime, qty: int, limit: int, now: datetime
+    *,
+    tenant_id: str,
+    meter: str,
+    start: datetime,
+    qty: int,
+    limit: int,
+    now: datetime,
+    end: datetime | None = None,
 ) -> Any:
     """Add ``qty`` to an existing counter only ``WHERE used + qty <= limit``.
 
@@ -112,6 +153,10 @@ def add_within_limit(
             table.c.period_start == start,
             total <= limit,
         )
-        .values(used=total, updated_at=now)
+        .values(
+            used=total,
+            updated_at=now,
+            period_end=table.c.period_end if end is None else _later_end(table, end),
+        )
         .returning(table.c.used)
     )
