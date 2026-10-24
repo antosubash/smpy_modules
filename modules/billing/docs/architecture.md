@@ -154,7 +154,9 @@ Enforcement is one statement, so no check can be split from its write
 
 1. `INSERT … ON CONFLICT (tenant_id, meter, idempotency_key) DO NOTHING
    RETURNING id` claims the key; no row back is a replay, answered from the
-   ledger.
+   ledger — but only when the stored quantity, kind and source match the
+   call (otherwise `IdempotencyConflict`, 409), and as `Refunded`, not
+   admitted, once a `<key>:refund` row exists.
 2. `INSERT … ON CONFLICT (tenant_id, meter, period_start) DO UPDATE SET used =
    used + qty WHERE used + qty <= limit RETURNING used`; no row back is a
    refusal, and the transaction (ledger row included) rolls back.

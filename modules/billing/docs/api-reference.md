@@ -60,7 +60,7 @@ if usage is not None:
 
 | Call | Does |
 |---|---|
-| `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)` or `Exceeded(used, limit, requested, period_end)`; a refusal writes nothing |
+| `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)`, `Exceeded(used, limit, requested, period_end)` or, for a refunded key, `Refunded`; a refusal writes nothing |
 | `record(tenant, meter, qty, key, *, source, occurred_at=None, db=None)` | count usage reported after the fact, unconditionally (may pass the limit; the next `consume` is then refused) |
 | `refund(tenant, meter, key)` | reverse that call in the period it counted against; idempotent |
 | `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement |
@@ -69,6 +69,13 @@ The meter key is a `Plan.limits` key, exactly like an entitlement: absent is
 unlimited, `0` forbids. Quantities are positive integers in the meter's minor
 unit. A replayed `key` returns the original outcome with `replayed=True` and is
 never counted twice; keys ending `:refund` or starting `adjust:` are reserved.
+
+A key answers only for the call it was first used with. Reusing it with a
+different quantity, kind (`consume` versus `record`) or `source` raises
+`IdempotencyConflict` (409 `idempotency_conflict`) instead of replaying an
+admission it never paid for. A key whose call was refunded replays as
+`Refunded` (`ok` is false): it is spent, so a retry that should count again
+needs a new key. Tell the outcomes apart with `outcome.ok`.
 Never put personal data in a key or `source`.
 
 Each call runs in its own short transaction. Pass `db=` only when the business
@@ -243,6 +250,7 @@ Handled events: `checkout.session.completed` and
 | `tenant_not_found` | 404 | assign, resync | |
 | `invalid_return_url` | 400 | connection | `{"message"}` says the rule |
 | `provider_unavailable` | 503 | any | no provider built (startup failed) |
+| `idempotency_conflict` | 409 | a metered route | the idempotency key was first used for a different call (quantity, kind or source) |
 | `usage_busy` | 503 | a metered route (SQLite) | the metering write could not take the database lock; nothing was counted. `Retry-After: 1` |
 | `provider_error` | 502 | any | Stripe refused; `{"message"}` |
 | `plan_limit` | 402 | other modules | from `tenants`: `{"key", "limit"}` |

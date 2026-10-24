@@ -57,13 +57,43 @@ class Exceeded:
     ok: ClassVar[bool] = False
 
 
+@dataclass(frozen=True)
+class Refunded:
+    """A replay of a key whose call was since refunded: **not** admitted.
+
+    The key is spent; a retry that should count again needs a new key.
+    """
+
+    used: int
+    limit: int | None
+    period_end: datetime | None
+    replayed: bool = True
+
+    ok: ClassVar[bool] = False
+
+
+class IdempotencyConflict(Exception):  # noqa: N818 - reads as the condition
+    """The key was first used for a different call (quantity, kind or source).
+
+    A key answers only for the call it was first used with, so a reused key
+    can never buy an admission it did not pay for. Billing maps it to 409
+    ``idempotency_conflict``.
+    """
+
+    def __init__(self, key: str) -> None:
+        super().__init__(f"idempotency key {key!r} was used for a different call")
+        self.key = key
+
+
 @runtime_checkable
 class UsageMeter(Protocol):
     """Race-safe, idempotent per-period counters, keyed by tenant and meter.
 
     Every write runs in its own short transaction unless ``db=`` is passed
     (see ``consume``). A replayed ``idempotency_key`` is never counted twice:
-    it returns the original outcome with ``replayed=True``.
+    it returns the original outcome with ``replayed=True`` — ``Refunded`` if
+    that call was refunded since — and only for the same call: a key reused
+    with another quantity, kind or source raises ``IdempotencyConflict``.
     """
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
@@ -80,7 +110,7 @@ class UsageMeter(Protocol):
         *,
         source: str,
         db: AsyncSession | None = None,
-    ) -> Allowed | Exceeded:
+    ) -> Allowed | Exceeded | Refunded:
         """Atomically check and count ``qty`` against the current period.
 
         ``db=`` joins the caller's transaction (inside a savepoint) so the
@@ -101,7 +131,7 @@ class UsageMeter(Protocol):
         source: str,
         occurred_at: datetime | None = None,
         db: AsyncSession | None = None,
-    ) -> Allowed:
+    ) -> Allowed | Refunded:
         """Count usage reported after the fact, unconditionally.
 
         It may take the period past its limit; the next ``consume`` is then
@@ -116,4 +146,4 @@ class UsageMeter(Protocol):
         ...
 
 
-__all__ = ["Allowed", "Exceeded", "UsageMeter"]
+__all__ = ["Allowed", "Exceeded", "IdempotencyConflict", "Refunded", "UsageMeter"]

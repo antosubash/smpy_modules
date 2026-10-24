@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from sm_billing.contracts.metering import IdempotencyConflict
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.plans import PlanError
 
@@ -38,7 +39,12 @@ async def _provider_error(request: Request, exc: ProviderError) -> JSONResponse:
     return JSONResponse({"detail": "provider_error", "message": str(exc)}, status_code=502)
 
 
+async def _idempotency_conflict(_: Request, exc: IdempotencyConflict) -> JSONResponse:
+    return JSONResponse({"detail": "idempotency_conflict"}, status_code=409)
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(BillingError, _billing_error)
     app.add_exception_handler(PlanError, _plan_error)
     app.add_exception_handler(ProviderError, _provider_error)
+    app.add_exception_handler(IdempotencyConflict, _idempotency_conflict)

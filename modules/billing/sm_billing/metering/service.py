@@ -28,7 +28,7 @@ from uuid import uuid4
 
 from sqlalchemy import update
 
-from sm_billing.contracts.metering import Allowed, Exceeded
+from sm_billing.contracts.metering import Allowed, Exceeded, IdempotencyConflict, Refunded
 from sm_billing.metering import sql
 from sm_billing.metering.periods import as_utc, current_period
 from sm_billing.metering.tx import Apply, Counted, find_event, period_row, run_write
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _REPLAY = "replay"
+Outcome = Allowed | Exceeded | Refunded
 
 
 @dataclass(frozen=True)
@@ -96,16 +97,28 @@ class UsageService:
             row = await period_row(session, tenant_id, meter, start)
         return 0 if row is None else int(row.used)
 
-    async def _replay(self, tenant_id, meter, key, res: _Resolved, db=None) -> Allowed | None:
-        """The original outcome of ``key``, read back from the ledger."""
+    async def _replay(self, call: dict, res: _Resolved, db=None) -> Allowed | Refunded | None:
+        """The original outcome of ``call``'s key, read back from the ledger.
+
+        A key answers only for the call it was first used with: a different
+        quantity, kind or source raises ``IdempotencyConflict`` rather than
+        replaying an admission it never paid for. A key since refunded
+        replays as ``Refunded`` (not admitted); a retry needs a new key.
+        """
+        tenant_id, meter, key = call["tenant_id"], call["meter"], call["idempotency_key"]
         async with self._reader(db) as session:
             event = await find_event(session, tenant_id, meter, key)
             if event is None or event.period_start is None:
                 return None
+            original = (event.kind, int(event.quantity), event.source)
+            if original != (call["kind"], call["quantity"], call["source"]):
+                raise IdempotencyConflict(key)
+            refunded = await find_event(session, tenant_id, meter, key + REFUND_SUFFIX)
             row = await period_row(session, tenant_id, meter, as_utc(event.period_start))
-        if row is None:  # pragma: no cover - a ledger row always has its rollup
-            return Allowed(int(event.quantity), res.limit, None, replayed=True)
-        return Allowed(int(row.used), res.limit, as_utc(row.period_end), replayed=True)
+        used, end = (int(row.used), as_utc(row.period_end)) if row else (event.quantity, None)
+        if refunded is not None:
+            return Refunded(used, res.limit, end)
+        return Allowed(used, res.limit, end, replayed=True)
 
     async def _refuse(self, tenant_id, meter, qty, res: _Resolved, db=None) -> Exceeded:
         used = await self._used(tenant_id, meter, res.period[0], db)
@@ -167,13 +180,13 @@ class UsageService:
 
         return apply
 
-    async def _count(self, event: dict, res: _Resolved, limit, db) -> Allowed | Exceeded:
+    async def _count(self, event: dict, res: _Resolved, limit, db) -> Outcome:
         tenant_id, meter = event["tenant_id"], event["meter"]
         outcome = await run_write(self._factory, db, self._counter(event, res.period, limit))
         if isinstance(outcome, Counted):
             return Allowed(outcome.used, res.limit, res.period[1])
         if outcome == _REPLAY:
-            replayed = await self._replay(tenant_id, meter, event["idempotency_key"], res, db)
+            replayed = await self._replay(event, res, db)
             if replayed is not None:
                 return replayed
         return await self._refuse(tenant_id, meter, event["quantity"], res, db)
@@ -187,16 +200,16 @@ class UsageService:
         *,
         source: str,
         db: AsyncSession | None = None,
-    ) -> Allowed | Exceeded:
+    ) -> Outcome:
         check_call(tenant_id, meter, qty, idempotency_key, source)
         res = await self._resolve(tenant_id, meter, db)
-        if res.limit is not None and qty > res.limit:
-            # No write can fit; a key already counted is still a replay.
-            replayed = await self._replay(tenant_id, meter, idempotency_key, res, db)
-            return replayed or await self._refuse(tenant_id, meter, qty, res, db)
         event = self._ledger(
             tenant_id, meter, qty, CONSUME, idempotency_key, res.period[0], source=source
         )
+        if res.limit is not None and qty > res.limit:
+            # No write can fit; a key already used for this call still replays.
+            replayed = await self._replay(event, res, db)
+            return replayed or await self._refuse(tenant_id, meter, qty, res, db)
         return await self._count(event, res, res.limit, db)
 
     async def record(
@@ -209,7 +222,7 @@ class UsageService:
         source: str,
         occurred_at: datetime | None = None,
         db: AsyncSession | None = None,
-    ) -> Allowed:
+    ) -> Allowed | Refunded:
         check_call(tenant_id, meter, qty, idempotency_key, source)
         res = await self._resolve(tenant_id, meter, db)
         event = self._ledger(
@@ -223,7 +236,7 @@ class UsageService:
             occurred_at=occurred_at,
         )
         outcome = await self._count(event, res, None, db)
-        assert isinstance(outcome, Allowed)  # unconditional: never refused
+        assert not isinstance(outcome, Exceeded)  # unconditional: never refused
         return outcome
 
     async def refund(self, tenant_id: str, meter: str, idempotency_key: str) -> bool:
