@@ -182,7 +182,10 @@ the `csrf_token` prop.
 - **Deleting a tenant.** `tenants` publishes no `TenantDeleted` event, and
   billing's `tenant_id` is a plain column (one module cannot hold a foreign
   key into another module's tables). Deleting a tenant therefore neither
-  cancels its Stripe subscription nor removes its billing rows. Cancel the
-  subscription in Stripe first.
-- **Not in v1:** per-tenant limit overrides, coupons, usage metering, more
+  cancels its Stripe subscription nor removes its billing rows (its usage
+  ledger and counters included). Cancel the subscription in Stripe first.
+- **Usage metering is in progress (#99).** Per-period counters and their
+  ledger ship as `app.state.billing_usage` (see `docs/api-reference.md`);
+  gauge holds, `RequiresQuota` and the usage screens follow.
+- **Not in v1:** per-tenant limit overrides, coupons, more
   than one subscription per tenant, and translated UI text.

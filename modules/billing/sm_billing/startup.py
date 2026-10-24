@@ -1,5 +1,5 @@
 """Lifespan-start work: seed the default plan, build the provider, install
-entitlements, and start the periodic reconcile if one is configured.
+entitlements and the usage meter, and start the periodic reconcile if one is configured.
 
 Later settings changes rebuild the provider and re-sync the loop through
 ``sm_billing.live``, which calls :func:`sync_reconcile`.
@@ -30,12 +30,28 @@ async def run(app: FastAPI) -> None:
     session_factory = app.state.sm.db.session_factory
     await seed_default_plan(session_factory)
     app.state.tenants.entitlements = PlanEntitlements(session_factory)
+    install_usage(app)
     services = getattr(app.state, c.PACKAGE)
     from sm_billing.providers.factory import install_provider
 
     install_provider(services)
     services.stored_seen = {f: getattr(services.settings, f) for f in live.LOOP_FIELDS}
     start_reconcile(app)
+
+
+def install_usage(app: FastAPI) -> None:
+    """``app.state.billing_usage``, after checking the database can enforce it.
+
+    Here rather than in ``register_settings``: the session factory
+    (``app.state.sm``) does not exist yet at construction. Consumers read the
+    attribute per request, so none needs it earlier.
+    """
+    from sm_billing.metering import sql
+    from sm_billing.metering.service import UsageService
+
+    db = app.state.sm.db
+    sql.ensure_supported(db.engine.dialect.name)
+    setattr(app.state, c.USAGE_STATE_ATTR, UsageService(db.session_factory))
 
 
 def _wanted_interval(app: FastAPI) -> timedelta | None:

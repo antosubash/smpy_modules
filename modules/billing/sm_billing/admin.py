@@ -174,7 +174,13 @@ async def one_row(db: AsyncSession, app: FastAPI, tenant_id: str) -> Subscriptio
 
 
 async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn) -> None:
-    """Manual provider only: set the tenant's plan and status directly."""
+    """Manual provider only: set the tenant's plan and status directly.
+
+    The provider's dates go with its subscription id: a manual assignment has
+    no provider period, so usage counters fall back to the calendar month
+    (``metering.periods``) instead of running on a Stripe period that no
+    longer bills anyone.
+    """
     if current_provider(app).supports_checkout:
         raise BillingError("provider_managed", 409)
     if await db.get(Tenant, tenant_id) is None:
@@ -190,6 +196,9 @@ async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn)
     sub.status = data.status
     sub.interval = data.interval
     sub.provider_subscription_id = None
+    sub.trial_end = None
+    sub.current_period_start = None
+    sub.current_period_end = None
     sub.cancel_at_period_end = False
     await db.flush()
     await apply_lifecycle(db, app, sub)

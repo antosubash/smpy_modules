@@ -25,8 +25,10 @@ plain dataclasses. No Stripe object crosses it.
 |---|---|---|
 | `billing_plan` | `id`, unique `key`, unique price IDs | price IDs, display amounts, `limits` (JSON `{key: int}`), `features` (JSON list), default/public/archived |
 | `billing_customer` | `tenant_id` | Stripe customer id, the one open Checkout session id |
-| `billing_subscription` | unique `tenant_id`, unique `provider_subscription_id` | the local mirror: plan, status, interval, quantity, trial/period end, `cancel_at_period_end`, `suspended_by_billing`, `synced_at` |
+| `billing_subscription` | unique `tenant_id`, unique `provider_subscription_id` | the local mirror: plan, status, interval, quantity, trial end, period start and end, `cancel_at_period_end`, `suspended_by_billing`, `synced_at` |
 | `billing_webhook_event` | provider event id | `processed_at`, `error` — idempotency and an audit trail |
+| `billing_usage_event` | `id`, unique `(tenant_id, meter, idempotency_key)` | the append-only metering ledger: consume, record, refund and adjust rows, each with the `period_start` it counted against |
+| `billing_usage_period` | `(tenant_id, meter, period_start)` | the per-period counter (`used`, `period_end`) the conditional upsert enforces on |
 
 One subscription row per organisation. `tenant_id` is a plain column, not a
 foreign key: each module owns its own SQLAlchemy `MetaData`, so a cross-module
@@ -139,6 +141,44 @@ Plan writes flush inside a savepoint (`begin_nested`) so a concurrent create
 that hits a unique constraint becomes `409 plan_key_taken` / `price_taken`
 instead of a 500, and the request session stays usable.
 
+## Usage metering (`metering/`)
+
+`UsageService` (`app.state.billing_usage`) counts per tenant, meter and
+period. The period is the subscription's provider period
+(`current_period_start`/`_end`, written only by `sync.apply_snapshot`) when
+`now` is inside it, else the UTC calendar month (`metering/periods.py`).
+A manual assignment (`admin.assign`) clears the provider's dates along with
+its subscription id, so the subscription row stays the one source of truth: a
+tenant moved off Stripe mid-period resets on the 1st, not on the old Stripe
+renewal. Rollover needs no job: a new period is a new counter row.
+
+Enforcement is one statement, so no check can be split from its write
+(`metering/sql.py`):
+
+1. `INSERT … ON CONFLICT (tenant_id, meter, idempotency_key) DO NOTHING
+   RETURNING id` claims the key; no row back is a replay, answered from the
+   ledger — but only when the stored quantity, kind and source match the
+   call (otherwise `IdempotencyConflict`, 409), and as `Refunded`, not
+   admitted, once a `<key>:refund` row exists.
+2. `INSERT … ON CONFLICT (tenant_id, meter, period_start) DO UPDATE SET used =
+   used + qty WHERE used + qty <= limit RETURNING used`; no row back is a
+   refusal, and the transaction (ledger row included) rolls back. The insert
+   half has no `WHERE`, so a call with `qty > limit` instead runs `UPDATE …
+   SET used = used + qty WHERE … AND used + qty <= limit`, which never
+   inserts: refused when there is no row yet, admitted on a counter an admin
+   credited below zero when it still fits. `check` and `consume` agree.
+
+On Postgres (READ COMMITTED) a concurrent upsert waits on the row lock and
+the `WHERE` is re-evaluated against the committed row, so with a limit of 1
+exactly one of two racing calls is admitted. On SQLite there is one writer;
+the trap is a transaction that *read* before writing, whose stale snapshot
+fails with `SQLITE_BUSY_SNAPSHOT` regardless of `busy_timeout`. So the limit
+and period are read in a separate session closed first, and the write
+session's first statement is the ledger insert. Every own session ends with
+`finalize_session`; `db=` runs in a savepoint of the caller's transaction.
+`tests/test_usage_concurrency.py` races real connections on a file SQLite
+database and on Postgres.
+
 ## Settings and secrets
 
 `BillingSettings` subclasses `DbBackedSettings` (no env sources) and is
@@ -184,13 +224,14 @@ module must not import a sibling optional module).
 | File | Responsibility |
 |---|---|
 | `module.py` | framework hooks only |
-| `startup.py` | seed default plan, install provider and entitlements, start/stop the reconcile loop |
+| `startup.py` | seed default plan, install provider, entitlements and the usage meter, start/stop the reconcile loop |
 | `plans.py` | plan CRUD and invariants |
 | `resolve.py`, `entitlements.py` | plan in force; the entitlement seam |
 | `checkout.py`, `context.py`, `deps.py` | tenant-side service and request context |
 | `sync.py`, `webhooks.py`, `reconcile.py`, `seats.py` | provider → local state |
 | `scheduler.py` | the periodic reconcile: stale-row claims, pacing, the loop task |
 | `lifecycle.py` | status → tenant suspension |
+| `metering/`, `contracts/metering.py` | usage ledger, per-period counters and the `UsageMeter` seam |
 | `admin.py` | admin operations and connection settings |
 | `providers/` | `manual`, `stripe`, factory |
 | `endpoints/` | routers (tenant API, admin API, views, webhook) |
