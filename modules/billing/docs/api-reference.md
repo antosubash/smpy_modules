@@ -51,7 +51,10 @@ if TYPE_CHECKING:
 usage: UsageMeter | None = getattr(request.app.state, "billing_usage", None)
 if usage is not None:
     outcome = await usage.consume(
-        tenant_id, "ai.requests", 1, request.headers.get("Idempotency-Key") or job_id,
+        tenant_id,
+        "ai.requests",
+        1,
+        request.headers.get("Idempotency-Key") or job_id,
         source="ai",
     )
     if not outcome.ok:  # Exceeded: used + qty would pass the limit
