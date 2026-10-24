@@ -103,7 +103,10 @@ The charge is refunded **only when the handler raises**; a handler that returns
 an error response keeps it. The dependency is function-scoped
 (`Depends(..., scope="function")`, FastAPI 0.121+, billing's floor), so it
 exits when the handler returns: a failure delivering the response afterwards
-(the client disconnected) is not the handler's and refunds nothing.
+(the client disconnected) is not the handler's and refunds nothing. Before
+refunding it rolls back the request session (`get_db`, the one the handler
+uses), so a handler that wrote and then raised leaves no lock for the refund
+to wait behind.
 
 **One `Idempotency-Key` per operation: the handler runs at most once per key.**
 A replay never reaches the handler, so one unit of quota cannot buy repeated

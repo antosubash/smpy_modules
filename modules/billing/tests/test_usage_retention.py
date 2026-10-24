@@ -9,7 +9,7 @@ from sm_billing.constants import USAGE_STATE_ATTR
 from sm_billing.contracts.metering import Allowed
 from sm_billing.metering.retention import purge
 from sm_billing.metering.sweeper import UsageSweeper
-from usage_helpers import GAUGE, METER, Clock, events, gauge_service, hold_statuses
+from usage_helpers import GAUGE, METER, OCT, Clock, events, gauge_service, hold_statuses, used
 from usage_helpers import seed_limits as seed
 
 
@@ -91,3 +91,25 @@ async def test_a_backlog_is_purged_in_batches_across_ticks(app, factory, usage, 
     assert [t.events_purged for t in ticks] == [2, 1, 0]
     assert await events(factory, tenant) == 0
     assert sweep._purged_at == clock.now  # done: the next purge waits a day
+
+
+async def test_a_stale_batch_never_takes_a_newer_calls_refund(factory, usage, clock):
+    """B selects an old charge; A purges it; the key is reused, charged and
+    refunded; B's delete then runs with its stale selection."""
+    from sm_billing.metering.retention import delete_charges, select_charges
+
+    tenant = await seed(factory, {})
+    await usage.consume(tenant, METER, 1, "job", source="t")
+    await usage.refund(tenant, METER, "job")
+    clock.now += timedelta(days=2)
+    cutoff = clock.now - timedelta(days=1)
+    stale = await select_charges(factory, cutoff, 10)  # instance B
+    assert len(stale) == 1
+    assert (await purge(usage, retention_days=1)).events == 2  # instance A
+    again = await usage.consume(tenant, METER, 1, "job", source="t")
+    assert isinstance(again, Allowed) and not again.replayed
+    assert await usage.refund(tenant, METER, "job") is True
+    assert await delete_charges(factory, stale, cutoff) == 0  # B's stale batch: nothing
+    assert await events(factory, tenant) == 2  # the new charge and its refund stay
+    assert await usage.refund(tenant, METER, "job") is False  # no double refund
+    assert await used(factory, tenant, OCT[0]) == 0

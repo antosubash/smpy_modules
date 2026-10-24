@@ -6,7 +6,9 @@
   than its charge, so purging by each row's own age would delete the charge
   and keep the refund; the key would then replay as ``Refunded`` and a
   genuine refund of a new call under it would conflict. (``adjust:`` rows
-  have no partner: each is its own key.)
+  have no partner: each is its own key.) A refund is deleted only while the
+  selected charge row itself still exists, so a stale batch from another
+  instance never takes the refund of a newer call that reused the key.
 - **Bounded.** ``PURGE_BATCH`` rows per transaction, each finished with
   ``finalize_session``, and at most ``MAX_BATCHES`` per call. A backlog
   (after an outage, or after the retention was lowered) is worked off over
@@ -26,6 +28,7 @@ from typing import TYPE_CHECKING
 
 from simple_module_db import finalize_session, mark_written
 from sqlalchemy import delete, or_, select, tuple_
+from sqlalchemy.orm import aliased
 
 from sm_billing.contracts.metering import HoldStatus
 from sm_billing.metering.validate import REFUND, REFUND_SUFFIX
@@ -61,8 +64,8 @@ async def _delete(factory: async_sessionmaker, stmt) -> int:
     return int(result.rowcount or 0)  # ty: ignore[unresolved-attribute] - CursorResult
 
 
-async def _event_batch(factory: async_sessionmaker, cutoff: datetime, size: int) -> tuple[int, int]:
-    """One batch of old charges and their refunds: ``(selected, deleted)``."""
+async def select_charges(factory: async_sessionmaker, cutoff: datetime, size: int) -> list:
+    """Up to ``size`` charges (any kind but ``refund``) recorded before ``cutoff``."""
     stmt = (
         select(UsageEvent.id, UsageEvent.tenant_id, UsageEvent.meter, UsageEvent.idempotency_key)
         .where(UsageEvent.kind != REFUND, UsageEvent.recorded_at < cutoff)
@@ -70,21 +73,49 @@ async def _event_batch(factory: async_sessionmaker, cutoff: datetime, size: int)
         .limit(size)
     )
     async with factory() as session:
-        rows = (await session.execute(stmt)).all()
-    if not rows:
-        return 0, 0
+        return list((await session.execute(stmt)).all())
+
+
+async def delete_charges(factory: async_sessionmaker, rows: list, cutoff: datetime) -> int:
+    """Delete the selected charges and, for each one *still present*, its refund.
+
+    The refund is tied to the selected charge's own row, not only to its key:
+    if another instance purged that charge since our select and the key was
+    then reused, charged and refunded, the new refund shares the key but not
+    the charge, so the ``EXISTS`` finds nothing and it stays. One statement,
+    so the ``EXISTS`` sees the charges as they were before it deleted them.
+
+    A row counts as the selected charge only while it is still older than
+    ``cutoff``: SQLite reuses the highest rowid once that row is deleted, so
+    the reused key's new charge can carry the very id we selected, but never
+    an old ``recorded_at``.
+    """
+    ids = [r.id for r in rows]
     partners = [(r.tenant_id, r.meter, r.idempotency_key + REFUND_SUFFIX) for r in rows]
     key = tuple_(UsageEvent.tenant_id, UsageEvent.meter, UsageEvent.idempotency_key)
-    deleted = await _delete(
-        factory,
-        delete(UsageEvent).where(
-            or_(
-                UsageEvent.id.in_([r.id for r in rows]),
-                (UsageEvent.kind == REFUND) & key.in_(partners),
-            )
-        ),
+    charge = aliased(UsageEvent)
+    charge_still_there = (
+        select(charge.id)
+        .where(
+            charge.id.in_(ids),
+            charge.recorded_at < cutoff,
+            charge.tenant_id == UsageEvent.tenant_id,
+            charge.meter == UsageEvent.meter,
+            (charge.idempotency_key + REFUND_SUFFIX) == UsageEvent.idempotency_key,
+        )
+        .exists()
     )
-    return len(rows), deleted
+    refunds = (UsageEvent.kind == REFUND) & key.in_(partners) & charge_still_there
+    selected = UsageEvent.id.in_(ids) & (UsageEvent.recorded_at < cutoff)
+    return await _delete(factory, delete(UsageEvent).where(or_(selected, refunds)))
+
+
+async def _event_batch(factory: async_sessionmaker, cutoff: datetime, size: int) -> tuple[int, int]:
+    """One batch of old charges and their refunds: ``(selected, deleted)``."""
+    rows = await select_charges(factory, cutoff, size)
+    if not rows:
+        return 0, 0
+    return len(rows), await delete_charges(factory, rows, cutoff)
 
 
 async def _hold_batch(factory: async_sessionmaker, cutoff: datetime, size: int) -> tuple[int, int]:

@@ -5,9 +5,12 @@ Behind the ``quota_app``, ``runs`` and ``owner`` fixtures in ``conftest``.
 
 from __future__ import annotations
 
-from fastapi import HTTPException
+import uuid
+
+from fastapi import Depends, HTTPException
 from fastapi.responses import JSONResponse
 from helpers import make_plan
+from simple_module_db.deps import get_db
 from sm_billing.constants import METERS_STATE_ATTR
 from sm_billing.metering.deps import RequiresQuota
 from sm_billing.models import Subscription
@@ -42,7 +45,13 @@ def install_quota_routes(app):
         app.state.quota_runs.append(1)
         raise HTTPException(418, "teapot")
 
+    async def write_boom(_=RequiresQuota(METER), db=Depends(get_db)):
+        """Writes through the request session (SQLite: takes the write lock), then fails."""
+        await make_plan(db, f"w-{uuid.uuid4().hex[:8]}")  # flushes
+        raise HTTPException(418, "teapot")
+
     app.state.quota_runs = []
+    route(app, "/write-boom", write_boom)
     route(app, "/count", count)
     route(app, "/count-boom", count_boom)
     route(app, "/ok", ok)

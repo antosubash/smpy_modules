@@ -13,7 +13,9 @@ service's own short transaction. Refused → 402 ``quota_exceeded`` with
 response keeps the charge, the same rule ``get_db`` uses for rolling back. The
 dependency is function-scoped, so it exits when the handler returns: a failure
 delivering the response afterwards (the client disconnected) is not the
-handler's and refunds nothing.
+handler's and refunds nothing. Before refunding it rolls back the request's
+own session (``get_db``, shared with the handler), so a failed write's SQLite
+lock is gone before the refund writes.
 
 **One ``Idempotency-Key`` per operation; the handler runs at most once per
 key.** A replay never reaches the handler — otherwise one unit of quota would
@@ -41,7 +43,9 @@ from collections.abc import AsyncIterator
 from uuid import uuid4
 
 from fastapi import Depends, Request
+from simple_module_db.deps import get_db
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
 from sm_billing.contracts.metering import Allowed, Exceeded, QuotaExceededError
@@ -96,7 +100,9 @@ def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
     if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= QTY_MAX:
         raise ValueError(f"qty must be an integer from 1 to {QTY_MAX}")
 
-    async def requires_quota(request: Request) -> AsyncIterator[Allowed | None]:
+    async def requires_quota(
+        request: Request, db: AsyncSession = Depends(get_db)
+    ) -> AsyncIterator[Allowed | None]:
         usage = getattr(request.app.state, c.USAGE_STATE_ATTR, None)
         if usage is None:
             yield None
@@ -114,6 +120,13 @@ def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
             yield outcome
         except Exception:
             try:
+                # The request transaction first: ``get_db`` would roll it back
+                # on this exception anyway, but only *after* this function-
+                # scoped exit. On SQLite a handler that flushed a write holds
+                # the write lock in it, and the refund's own session would
+                # wait behind that lock until it timed out. Rolling back twice
+                # is harmless: ``get_db``'s rollback then has nothing to do.
+                await db.rollback()
                 await usage.refund(tenant_id, meter, key)
             except Exception:
                 # Never mask the handler's own error with the refund's.
