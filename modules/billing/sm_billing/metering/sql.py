@@ -27,6 +27,7 @@ from typing import Any
 from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
+from sm_billing.constants import ENTITLED_STATUSES
 from sm_billing.models import Subscription, UsageEvent, UsagePeriod
 
 _INSERTS = {"postgresql": postgresql.insert, "sqlite": sqlite.insert}
@@ -113,7 +114,13 @@ def _stored_end(tenant_id: str, period: tuple[datetime, datetime]) -> Any:
     sub_end = Subscription.current_period_end
     later = (
         select(case((sub_end > end, sub_end), else_=end))
-        .where(Subscription.tenant_id == tenant_id, Subscription.current_period_start == start)
+        .where(
+            Subscription.tenant_id == tenant_id,
+            Subscription.current_period_start == start,
+            # Only the provider's own period: a lapsed subscription's start
+            # can coincide with a calendar month's, whose end it is not.
+            Subscription.status.in_(ENTITLED_STATUSES),
+        )
         .with_for_update(read=True)
         .scalar_subquery()
     )

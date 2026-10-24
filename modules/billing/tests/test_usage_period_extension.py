@@ -11,6 +11,7 @@ from api_helpers import arm_csrf
 from helpers import make_plan, make_tenant
 from simple_module_db import finalize_session
 from sm_billing.contracts.provider import SubscriptionSnapshot
+from sm_billing.metering.periods import calendar_month
 from sm_billing.models import Subscription, UsagePeriod
 from sm_billing.sync import apply_snapshot
 from sqlalchemy import select, update
@@ -30,12 +31,14 @@ async def admin(authenticated_client):
     return authenticated_client
 
 
-def _snap(tenant_id: str, period: tuple[datetime, datetime]) -> SubscriptionSnapshot:
+def _snap(
+    tenant_id: str, period: tuple[datetime, datetime], status: str = "active"
+) -> SubscriptionSnapshot:
     return SubscriptionSnapshot(
         id="sub_1",
         customer_id="cus_1",
         tenant_id=tenant_id,
-        status="active",
+        status=status,
         price_id="price_team_m",
         quantity=1,
         trial_end=None,
@@ -45,9 +48,11 @@ def _snap(tenant_id: str, period: tuple[datetime, datetime]) -> SubscriptionSnap
     )
 
 
-async def _sync(app, tenant_id: str, period: tuple[datetime, datetime]) -> None:
+async def _sync(
+    app, tenant_id: str, period: tuple[datetime, datetime], status: str = "active"
+) -> None:
     async with app.state.sm.db.session_factory() as session:
-        await apply_snapshot(session, app, _snap(tenant_id, period), provider="stripe")
+        await apply_snapshot(session, app, _snap(tenant_id, period, status), provider="stripe")
         await finalize_session(session)
 
 
@@ -144,3 +149,17 @@ async def test_an_older_period_is_still_not_previous(app, admin):
     await _sync(app, tenant, (START, EXTENDED))
     await _sync(app, tenant, NEXT)
     assert await _previous(admin) == []
+
+
+async def test_a_lapsed_subscription_never_moves_a_calendar_month(app):
+    """A canceled subscription's counters are calendar months; one whose
+    start coincides with the month's keeps the month's end, through a
+    consume and through the snapshot sync."""
+    tenant = await _tenant(app)
+    month = calendar_month(NOW)
+    yearly = (month[0], month[0] + timedelta(days=365))
+    await _sync(app, tenant, yearly)
+    await _sync(app, tenant, yearly, status="canceled")
+    assert (await service(app, Clock(NOW)).consume(tenant, METER, 1, "k1", source="t")).ok
+    await _sync(app, tenant, yearly, status="canceled")
+    assert await _ends(app, tenant) == [(month[1], 1)]

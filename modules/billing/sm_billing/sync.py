@@ -58,17 +58,23 @@ async def _link_customer(db: AsyncSession, tenant_id: str, customer_id: str | No
         customer.provider = provider
 
 
-async def _follow_period_end(db: AsyncSession, tenant_id: str, snap: SubscriptionSnapshot):
+async def _follow_period_end(db: AsyncSession, tenant_id: str, sub: Subscription):
     """A provider that moves a period's end (same start) moves its usage
     counters' stored end too, in this transaction: the stored end stays the
-    period's real end, which is how the next period's "previous" finds it."""
-    if snap.current_period_start is None or snap.current_period_end is None:
+    period's real end, which is how the next period's "previous" finds it.
+    A lapsed subscription's counters are calendar months (``current_period``),
+    so its period is not theirs to move."""
+    if (
+        sub.status not in ENTITLED_STATUSES
+        or sub.current_period_start is None
+        or sub.current_period_end is None
+    ):
         return
     await db.execute(
         extend_rollups(
             tenant_id=tenant_id,
-            start=snap.current_period_start,
-            end=snap.current_period_end,
+            start=sub.current_period_start,
+            end=sub.current_period_end,
         )
     )
     mark_written(db)
@@ -131,7 +137,7 @@ async def apply_snapshot(
     # rollup), so the two wait on each other instead of deadlocking, and a
     # consume that has not inserted yet waits for this period end.
     await db.flush()
-    await _follow_period_end(db, tenant_id, snap)
+    await _follow_period_end(db, tenant_id, sub)
     await apply_lifecycle(db, app, sub)
     return sub
 

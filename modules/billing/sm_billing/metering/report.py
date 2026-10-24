@@ -190,7 +190,7 @@ async def _tenant_names(session, ids: list[str]) -> dict[str, tuple[str, str]]:
 
 
 def _matches(row: UsageRowOut, query: str) -> bool:
-    haystack = (row.tenant_id, row.tenant_name.lower(), row.tenant_slug.lower())
+    haystack = (row.tenant_id.lower(), row.tenant_name.lower(), row.tenant_slug.lower())
     return any(query in value for value in haystack)
 
 
