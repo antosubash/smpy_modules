@@ -47,10 +47,14 @@ function referencedKeys(): Set<string> {
     for (const match of text.matchAll(/\bkeys\.billing((?:\.\w+)+)/g)) {
       found.add(match[1].slice(1));
     }
-    for (const alias of text.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*keys\.billing\.(\w+);/g)) {
+    // A section may be nested (`const c = keys.billing.admin_usage;` read as
+    // `c.holds.title`), so both sides take every dotted segment.
+    for (const alias of text.matchAll(
+      /\b(?:const|let)\s+(\w+)\s*=\s*keys\.billing((?:\.\w+)+);/g,
+    )) {
       const [, name, section] = alias;
-      for (const use of text.matchAll(new RegExp(`\\b${name}\\.(\\w+)`, 'g'))) {
-        found.add(`${section}.${use[1]}`);
+      for (const use of text.matchAll(new RegExp(`\\b${name}((?:\\.\\w+)+)`, 'g'))) {
+        found.add(`${section.slice(1)}${use[1]}`);
       }
     }
   }

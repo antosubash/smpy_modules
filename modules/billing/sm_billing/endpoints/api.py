@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from simple_module_core.permissions import grants
+from simple_module_db.deps import get_db
 from simple_module_hosting.csrf import RequiresCsrf
 from simple_module_hosting.permissions import RequiresPermission, resolved_permissions_for
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
 from sm_billing.deps import (
@@ -17,6 +19,8 @@ from sm_billing.deps import (
     user_email,
 )
 from sm_billing.errors import BillingError
+from sm_billing.metering.admin import tenant_usage
+from sm_billing.metering.schemas import MeterUsageOut
 from sm_billing.schemas import PlanChoice, StatusOut, UrlOut
 
 router = APIRouter(dependencies=[Depends(RequiresCsrf())])
@@ -29,6 +33,16 @@ async def status(request: Request, ctx: Context, service: ContextServiceDep) -> 
     if not ctx.restore:
         _require(request, c.PERM_VIEW)
     return await service.status()
+
+
+@router.get("/usage", response_model=list[MeterUsageOut])
+async def usage(
+    request: Request, ctx: Context, db: AsyncSession = Depends(get_db)
+) -> list[MeterUsageOut]:
+    """The organisation's meters: used / limit, and when each counter resets."""
+    if not ctx.restore:
+        _require(request, c.PERM_VIEW)
+    return await tenant_usage(db, request.app, ctx.tenant_id)
 
 
 @router.post("/checkout", response_model=UrlOut, dependencies=_MANAGE)

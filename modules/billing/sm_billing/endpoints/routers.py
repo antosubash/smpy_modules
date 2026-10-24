@@ -15,11 +15,13 @@ _LIVE = [Depends(follow_live_settings)]
 def include(api_router: APIRouter, view_router: APIRouter) -> None:
     """Mount the tenant API, admin API, webhook and tenant views."""
     from sm_billing.endpoints.admin_api import router as admin_api
+    from sm_billing.endpoints.admin_usage_api import router as admin_usage_api
     from sm_billing.endpoints.api import router as api
     from sm_billing.endpoints.views import router as views
     from sm_billing.endpoints.webhooks import router as webhooks
 
     api_router.include_router(admin_api, dependencies=_LIVE)
+    api_router.include_router(admin_usage_api, dependencies=_LIVE)
     api_router.include_router(api, dependencies=_LIVE)
     # No CSRF on the webhook: Stripe has no session, the signature is the auth.
     view_router.include_router(webhooks, dependencies=_LIVE)

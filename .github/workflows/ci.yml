@@ -469,7 +469,7 @@ jobs:
       # jobs run single-tenant and skip them. Not sharded: the whole job takes
       # about a minute, most of it setup.
       - name: Run multi-tenant Playwright tests
-        run: npm run test:e2e -- billing-tenant news-tenant records-tenant
+        run: npm run test:e2e -- billing-tenant billing-usage news-tenant records-tenant
 
       - name: Flaky and failed tests
         if: ${{ !cancelled() }}

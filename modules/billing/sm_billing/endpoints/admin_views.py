@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_billing import admin
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
+from sm_billing.metering import admin as usage_admin
+from sm_billing.metering.report import overview
 from sm_billing.plans import PlanService
 
 router = APIRouter(dependencies=[Depends(RequiresPermission(c.PERM_PLATFORM_VIEW))])
@@ -76,5 +78,49 @@ async def connection_page(request: Request, inertia: InertiaDep) -> InertiaRespo
             **_common(request),
             "connection": admin.connection_out(request.app).model_dump(mode="json"),
             "webhook_url": str(request.base_url).rstrip("/") + c.WEBHOOK_PATH,
+        },
+    )
+
+
+def _flag(value: str | None) -> bool:
+    return (value or "").lower() in ("1", "true", "on", "yes")
+
+
+def _page(value: str | None) -> int:
+    try:
+        return max(1, min(int(value or 1), 1_000_000))
+    except ValueError:
+        return 1
+
+
+@router.get("/usage", response_model=None)
+async def usage_page(
+    request: Request, inertia: InertiaDep, db: AsyncSession = Depends(get_db)
+) -> InertiaResponse:
+    """Tenant x meter for the current (or previous) period; the drawer's ledger
+    and holds are fetched from ``/api/billing/admin/usage`` when it opens."""
+    params = request.query_params
+    meter = (params.get("meter") or "")[:64] or None
+    query = (params.get("q") or "")[:120]
+    period = "previous" if params.get("period") == "previous" else "current"
+    over = _flag(params.get("over"))
+    service = usage_admin.usage(request.app)
+    rows = await overview(
+        db,
+        usage_admin.registry(request.app),
+        service.now(),
+        meter=meter,
+        query=query,
+        over=over,
+        period=period,
+        page=_page(params.get("page")),
+    )
+    return await inertia.render(
+        c._PAGE_USAGE,
+        {
+            **_common(request),
+            "usage": rows.model_dump(mode="json"),
+            "meters": [m.model_dump(mode="json") for m in usage_admin.meters(request.app)],
+            "filters": {"meter": meter or "", "q": query, "over": over, "period": period},
         },
     )

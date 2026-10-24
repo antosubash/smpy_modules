@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_billing import constants as c
 from sm_billing.checkout import BillingService
 from sm_billing.context import billing_context
+from sm_billing.metering.admin import tenant_usage
 
 router = APIRouter()
 
@@ -43,11 +44,13 @@ async def billing_page(
         not ctx.restore and _perm(request, c.PERM_MANAGE) and ctx.role == c.TENANT_ROLE_OWNER
     )
     status = await service.status()
+    usage = await tenant_usage(db, request.app, ctx.tenant_id)
     return await inertia.render(
         c._PAGE_BILLING,
         {
             "status": status.model_dump(mode="json"),
             "plans": [p.model_dump(mode="json") for p in await service.public_plans()],
+            "usage": [u.model_dump(mode="json") for u in usage],
             "can_manage": can_manage,
             "restore": ctx.restore,
             "csrf_token": get_csrf_token(request),

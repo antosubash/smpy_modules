@@ -96,3 +96,82 @@ export interface AdminCommon {
   /** Why a chosen ``stripe`` fell back to ``manual``; "" when it did not. */
   provider_error: string;
 }
+
+// ── usage metering (sm_billing/metering/schemas.py) ─────────────────
+
+export type MeterKind = 'counter' | 'gauge';
+export type MeterUnit = 'count' | 'bytes' | 'tokens' | 'ms';
+export type UsageKind = 'consume' | 'record' | 'refund' | 'adjust';
+export type HoldStatus = 'held' | 'committed' | 'released' | 'expired';
+
+/** One meter on the tenant's usage card. */
+export interface MeterUsage {
+  meter: string;
+  kind: MeterKind;
+  unit: MeterUnit;
+  label_key: string;
+  used: number;
+  limit: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  holds: number | null;
+}
+
+/** One organisation x meter on the admin usage table. */
+export interface UsageRow {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_slug: string;
+  meter: string;
+  kind: MeterKind;
+  unit: MeterUnit;
+  label_key: string;
+  registered: boolean;
+  used: number;
+  limit: number | null;
+  percent: number | null;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+/** A page of a list, in `simple_module_db.paginate`'s shape. */
+export interface Paged<T> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
+export interface UsageEvent {
+  id: number;
+  meter: string;
+  kind: UsageKind;
+  quantity: number;
+  idempotency_key: string;
+  source: string;
+  actor: string | null;
+  reason: string | null;
+  period_start: string | null;
+  occurred_at: string;
+  recorded_at: string;
+}
+
+export interface UsageHold {
+  id: string;
+  meter: string;
+  quantity: number;
+  status: HoldStatus;
+  idempotency_key: string;
+  source: string;
+  expires_at: string | null;
+  created_at: string;
+  settled_at: string | null;
+}
+
+export interface MeterInfo {
+  key: string;
+  kind: MeterKind;
+  unit: MeterUnit;
+  label_key: string;
+}

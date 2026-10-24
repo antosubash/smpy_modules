@@ -10,15 +10,18 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { CurrentPlanCard } from '../components/CurrentPlanCard';
 import { PlanCard } from '../components/PlanCard';
+import { UsageCard } from '../components/UsageCard';
 import { useCheckoutPolling } from '../hooks/useCheckoutPolling';
 import { api, BILLING_API } from '../utils/api';
 import { type PlanCta, planCta, priceLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { Interval, Plan, Status } from '../utils/types';
+import type { Interval, MeterUsage, Plan, Status } from '../utils/types';
 
 interface Props {
   status: Status;
   plans: Plan[];
+  /** One row per meter the plan limits or the organisation has used. */
+  usage: MeterUsage[];
   can_manage: boolean;
   /** Suspended for non-payment: paying is the only thing offered. */
   restore: boolean;
@@ -29,7 +32,7 @@ interface Props {
 function Billing() {
   const { t, locale } = useT();
   const c = keys.billing.page;
-  const { status, plans, can_manage, restore, csrf_token, checkout } = usePage<{
+  const { status, plans, usage, can_manage, restore, csrf_token, checkout } = usePage<{
     props: Props;
   }>().props as unknown as Props;
   const [interval, setBillingInterval] = useState<Interval>(
@@ -132,6 +135,7 @@ function Billing() {
             busy={busy}
             onPortal={openPortal}
           />
+          <UsageCard usage={usage ?? []} />
 
           <section className="space-y-4" hidden={restore}>
             <div className="flex flex-wrap items-center justify-between gap-3">
