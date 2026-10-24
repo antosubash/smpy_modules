@@ -189,7 +189,7 @@ the `csrf_token` prop.
   subscription of its Stripe customer, and expires an open Checkout session.
   The local row then turns `canceled` from a re-fetch. Billing's rows are
   **kept for audit**: `billing_subscription` (canceled), `billing_customer`
-  and `billing_webhook_event` stay, and the customer row is what maps Stripe's
+  and `billing_webhook_event` stay (so do the usage ledger and counters), and the customer row is what maps Stripe's
   late `customer.subscription.deleted` back to them. If Stripe fails, the
   delete still stands; the error is logged and the next reconcile cancels it.
   That includes a subscription not mirrored yet and an open checkout: reconcile
@@ -207,5 +207,8 @@ the `csrf_token` prop.
   `manual` provider nothing reaches Stripe, and a tenant with a Stripe customer
   is logged for you to cancel there. On a framework older than 0.0.38 there is
   no event and no delete, so billing subscribes to nothing.
-- **Not in v1:** per-tenant limit overrides, coupons, usage metering, more
+- **Usage metering is in progress (#99).** Per-period counters and their
+  ledger ship as `app.state.billing_usage` (see `docs/api-reference.md`);
+  gauge holds, `RequiresQuota` and the usage screens follow.
+- **Not in v1:** per-tenant limit overrides, coupons, more
   than one subscription per tenant, and translated UI text.

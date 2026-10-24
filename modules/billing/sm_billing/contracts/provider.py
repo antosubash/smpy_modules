@@ -75,6 +75,8 @@ class SubscriptionSnapshot:
     trial_end: datetime | None
     current_period_end: datetime | None
     cancel_at_period_end: bool
+    #: Last, with a default, so a provider that has no period still builds one.
+    current_period_start: datetime | None = None
 
 
 @dataclass(frozen=True)
