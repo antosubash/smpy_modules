@@ -71,6 +71,17 @@ export function withoutInternal(
   return Object.fromEntries(Object.entries(data).filter(([key]) => !hidden.has(key)));
 }
 
+/** A payload with every system value (`sm_*`) left out — what the raw-JSON
+ *  editor submits. The server writes those itself and ignores a client's. */
+export function withoutSystem(
+  data: Record<string, unknown>,
+  fields: Pick<FieldDef, 'key' | 'system'>[],
+): Record<string, unknown> {
+  const system = new Set(fields.filter(isSystemField).map((f) => f.key));
+  if (system.size === 0) return data;
+  return Object.fromEntries(Object.entries(data).filter(([key]) => !system.has(key)));
+}
+
 /** Required ordinary fields with no default that a visitor is not given —
  *  the server refuses to enable a form that leaves one out (design §3.3). */
 export function missingRequired(fields: FieldDef[], publicFields: string[]): string[] {
