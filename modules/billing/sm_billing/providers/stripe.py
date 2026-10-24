@@ -67,6 +67,9 @@ def snapshot_from(sub: dict) -> SubscriptionSnapshot:
         trial_end=_ts(sub.get("trial_end")),
         current_period_end=_ts(sub.get("current_period_end") or item.get("current_period_end")),
         cancel_at_period_end=bool(sub.get("cancel_at_period_end")),
+        current_period_start=_ts(
+            sub.get("current_period_start") or item.get("current_period_start")
+        ),
     )
 
 
