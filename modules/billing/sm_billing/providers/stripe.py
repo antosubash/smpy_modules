@@ -18,20 +18,23 @@ from typing import Any
 
 import stripe
 
-from sm_billing.constants import CHECKOUT_COMPLETED, PROVIDER_STRIPE
+from sm_billing.constants import (
+    CHECKOUT_COMPLETED,
+    PROVIDER_CHECKOUT_BLOCKING_STATUSES,
+    PROVIDER_STRIPE,
+)
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
+    ProviderNotFound,
     SubscriptionSnapshot,
     WebhookEvent,
 )
 
 _SUBSCRIPTION_EVENTS = ("customer.subscription.",)
-# Still billing or granting access — a second checkout would double-charge.
-_LIVE_STATUSES = frozenset({"active", "trialing", "past_due", "unpaid"})
 
 
 def _ts(value: Any) -> datetime | None:
@@ -83,7 +86,10 @@ class StripeProvider:
         try:
             result = await fn(*args, **kwargs)
         except stripe.StripeError as exc:
-            raise ProviderError(exc.user_message or str(exc)) from exc
+            message = exc.user_message or str(exc)
+            if exc.code == "resource_missing":
+                raise ProviderNotFound(message) from exc
+            raise ProviderError(message) from exc
         return result.to_dict()
 
     async def ensure_customer(self, tenant_id: str, name: str, email: str | None) -> str | None:
@@ -131,10 +137,18 @@ class StripeProvider:
     async def expire_checkout(self, session_id: str) -> None:
         await self._call(self._v1.checkout.sessions.expire_async, session_id)
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        params = {"customer": customer_id, "status": "all", "limit": 100}
-        listing = await self._call(self._v1.subscriptions.list_async, params=params)
-        return [s["id"] for s in listing.get("data", []) if s.get("status") in _LIVE_STATUSES]
+    async def live_subscription_ids(
+        self, customer_id: str, statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES
+    ) -> list[str]:
+        ids: list[str] = []
+        params: dict[str, Any] = {"customer": customer_id, "status": "all", "limit": 100}
+        while True:  # every page: a live one past the first 100 must not be missed
+            listing = await self._call(self._v1.subscriptions.list_async, params=dict(params))
+            data = listing.get("data", [])
+            ids += [s["id"] for s in data if s.get("status") in statuses]
+            if not listing.get("has_more") or not data:
+                return ids
+            params["starting_after"] = data[-1]["id"]
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         params = {"customer": customer_id, "return_url": return_url}
@@ -165,6 +179,10 @@ class StripeProvider:
     async def cancel_at_period_end(self, subscription_id: str) -> None:
         params = {"cancel_at_period_end": True}
         await self._call(self._v1.subscriptions.update_async, subscription_id, params=params)
+
+    async def cancel_now(self, subscription_id: str) -> None:
+        # Stripe's defaults: no proration credit, no final invoice.
+        await self._call(self._v1.subscriptions.cancel_async, subscription_id)
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent:
         signature = headers.get("stripe-signature")
@@ -205,6 +223,7 @@ class StripeProvider:
             subscription_id=_id(session.get("subscription")),
             tenant_id=session.get("client_reference_id"),
             customer_id=_id(session.get("customer")),
+            status=session.get("status"),
         )
 
     async def verify_price(self, price_id: str) -> PriceInfo:

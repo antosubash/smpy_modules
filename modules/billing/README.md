@@ -16,7 +16,9 @@ module exposes:
   reactivates it. A tenant that an admin suspended by hand is never
   reactivated by billing.
 - **Events.** On `MembershipAdded` and `MembershipRemoved`, billing keeps the
-  Stripe quantity of a per-seat plan equal to the member count.
+  Stripe quantity of a per-seat plan equal to the member count. On
+  `TenantDeleted` it cancels the tenant's subscription at Stripe (see
+  *Deleting a tenant* below).
 
 **Full documentation** lives in [`docs/`](docs/index.md):
 [user guide](docs/user-guide.md) (admin screens and the owner's Billing page),
@@ -35,7 +37,9 @@ with `SM_MULTI_TENANT=true`, because the tenant billing screen needs an active
 organisation. Billing ships SQLModel tables but no migrations. Autogenerate a
 revision in the host and give its first revision
 `branch_labels = ("billing",)`, so the module can be removed on its own with
-`alembic downgrade billing@base`.
+`alembic downgrade billing@base`. Autogenerate again after upgrading billing,
+since a release can add a column (`billing_customer.teardown_done_at` and two backoff columns, after
+0.0.11).
 
 On first start, billing seeds a free default plan (`free`). It is idempotent,
 so a fresh install entitles every tenant before an admin has opened the plan
@@ -179,10 +183,29 @@ the `csrf_token` prop.
 
 ## Known limits
 
-- **Deleting a tenant.** `tenants` publishes no `TenantDeleted` event, and
-  billing's `tenant_id` is a plain column (one module cannot hold a foreign
-  key into another module's tables). Deleting a tenant therefore neither
-  cancels its Stripe subscription nor removes its billing rows. Cancel the
-  subscription in Stripe first.
+- **Deleting a tenant.** On `TenantDeleted` (framework 0.0.38,
+  `TenantService.delete_tenant`) billing cancels the tenant's Stripe
+  subscription **immediately**, not at period end, along with any other live
+  subscription of its Stripe customer, and expires an open Checkout session.
+  The local row then turns `canceled` from a re-fetch. Billing's rows are
+  **kept for audit**: `billing_subscription` (canceled), `billing_customer`
+  and `billing_webhook_event` stay, and the customer row is what maps Stripe's
+  late `customer.subscription.deleted` back to them. If Stripe fails, the
+  delete still stands; the error is logged and the next reconcile cancels it.
+  That includes a subscription not mirrored yet and an open checkout: reconcile
+  sweeps every customer whose organisation is gone until its teardown completes
+  (`billing_customer.teardown_done_at`), then skips it. A teardown that keeps
+  failing backs off (from 15 minutes up to a day), whichever path tried it,
+  and one atomic claim per organisation means only one worker at a time calls Stripe.
+  Stripe's "no such customer" is retried too, because a key from another
+  account or mode gives the same answer. A single-tenant host never sweeps. The Checkout session id
+  is forgotten only once Stripe says the session is no longer open. Everything
+  that has not ended is canceled, `incomplete` and `paused` included, across
+  every page of the customer's subscriptions.
+  A subscription that was never at a provider is marked canceled, and the
+  customer's Stripe subscriptions, if it has any, are still canceled. Under the
+  `manual` provider nothing reaches Stripe, and a tenant with a Stripe customer
+  is logged for you to cancel there. On a framework older than 0.0.38 there is
+  no event and no delete, so billing subscribes to nothing.
 - **Not in v1:** per-tenant limit overrides, coupons, usage metering, more
   than one subscription per tenant, and translated UI text.
