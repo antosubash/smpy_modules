@@ -82,6 +82,12 @@ class BillingModule(ModuleBase):
 
         crypto.set_secret_provider(_live_secret)
 
+        # Here, at construction, so consumers can define meters in their own
+        # ``on_startup`` whatever order the modules start in.
+        from sm_billing.metering.registry import MeterRegistry
+
+        setattr(app.state, c.METERS_STATE_ATTR, MeterRegistry())
+
     def register_exception_handlers(self, app: FastAPI) -> None:
         from sm_billing.errors import install_exception_handlers
 
@@ -150,7 +156,9 @@ class BillingModule(ModuleBase):
         await startup.run(app)
 
     async def on_shutdown(self, app: FastAPI) -> None:
-        """Stop the reconcile loop — the host's lifespan calls this directly."""
+        """Stop the reconcile loop and the usage sweeper — the host's lifespan
+        calls this directly."""
         from sm_billing import startup
 
         await startup.stop_reconcile(app)
+        await startup.stop_usage_sweeper(app)

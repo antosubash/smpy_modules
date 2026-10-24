@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from sm_billing.contracts.provider import BillingProvider
+    from sm_billing.metering.sweeper import UsageSweeper
     from sm_billing.scheduler import ReconcileScheduler
 
 
@@ -31,6 +32,8 @@ class BillingServices:
     provider_error: str = ""
     #: The periodic reconcile loop, when ``reconcile_interval_minutes`` started one.
     scheduler: ReconcileScheduler | None = None
+    #: The usage-hold sweeper (``sm_billing.metering.sweeper``), started at startup.
+    usage_sweeper: UsageSweeper | None = None
     #: Serialises live reloads: two saves at once must not both start a loop.
     reload_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     #: The provider/loop fields as ``sm_billing.live`` last read them from the

@@ -1,5 +1,6 @@
 """Lifespan-start work: seed the default plan, build the provider, install
-entitlements and the usage meter, and start the periodic reconcile if one is configured.
+entitlements and the usage meter, start the periodic reconcile if one is
+configured, and start the usage-hold sweeper.
 
 Later settings changes rebuild the provider and re-sync the loop through
 ``sm_billing.live``, which calls :func:`sync_reconcile`.
@@ -35,8 +36,9 @@ async def run(app: FastAPI) -> None:
     from sm_billing.providers.factory import install_provider
 
     install_provider(services)
-    services.stored_seen = {f: getattr(services.settings, f) for f in live.LOOP_FIELDS}
+    services.stored_seen = {f: getattr(services.settings, f) for f in live.FOLLOWED_FIELDS}
     start_reconcile(app)
+    start_usage_sweeper(app)
 
 
 def install_usage(app: FastAPI) -> None:
@@ -51,7 +53,30 @@ def install_usage(app: FastAPI) -> None:
 
     db = app.state.sm.db
     sql.ensure_supported(db.engine.dialect.name)
-    setattr(app.state, c.USAGE_STATE_ATTR, UsageService(db.session_factory))
+    services = getattr(app.state, c.PACKAGE)
+    meter = UsageService(
+        db.session_factory,
+        meters=getattr(app.state, c.METERS_STATE_ATTR),
+        hold_ttl=lambda: services.settings.usage_hold_ttl_seconds,
+    )
+    setattr(app.state, c.USAGE_STATE_ATTR, meter)
+
+
+def start_usage_sweeper(app: FastAPI) -> None:
+    """The hold sweeper runs on every instance; it reads its interval per tick."""
+    from sm_billing.metering.sweeper import UsageSweeper
+
+    services = getattr(app.state, c.PACKAGE)
+    services.usage_sweeper = UsageSweeper()
+    services.usage_sweeper.start(app)
+
+
+async def stop_usage_sweeper(app: FastAPI) -> None:
+    services = getattr(app.state, c.PACKAGE, None)
+    sweeper = getattr(services, "usage_sweeper", None)
+    if sweeper is not None:
+        services.usage_sweeper = None
+        await sweeper.stop()
 
 
 def _wanted_interval(app: FastAPI) -> timedelta | None:

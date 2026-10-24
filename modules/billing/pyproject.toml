@@ -23,6 +23,9 @@ dependencies = [
     "typer>=0.12",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
+    # ``Depends(..., scope="function")`` arrived in 0.121: ``RequiresQuota``
+    # must exit before the response is sent (``sm_billing.metering.deps``).
+    "fastapi>=0.121",
 ]
 
 [project.urls]

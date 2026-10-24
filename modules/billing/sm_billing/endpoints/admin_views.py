@@ -19,6 +19,13 @@ from sm_billing.plans import PlanService
 router = APIRouter(dependencies=[Depends(RequiresPermission(c.PERM_PLATFORM_VIEW))])
 
 
+def known_limit_keys(app) -> list[str]:
+    """The plan editor's suggestions: billing's own keys, then every registered meter."""
+    registry = getattr(app.state, c.METERS_STATE_ATTR, None)
+    meters = registry.keys() if registry is not None else []
+    return list(dict.fromkeys([*c.KNOWN_LIMIT_KEYS, *meters]))
+
+
 def _common(request: Request) -> dict:
     services = getattr(request.app.state, c.PACKAGE)
     return {
@@ -38,7 +45,7 @@ async def plans_page(
     plans = [plan_out(p).model_dump(mode="json") for p in await PlanService(db).list()]
     return await inertia.render(
         c._PAGE_PLANS,
-        {**_common(request), "plans": plans, "known_limit_keys": list(c.KNOWN_LIMIT_KEYS)},
+        {**_common(request), "plans": plans, "known_limit_keys": known_limit_keys(request.app)},
     )
 
 

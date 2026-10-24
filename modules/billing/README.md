@@ -97,6 +97,9 @@ Billing settings are stored in the database. They are registered with
 | `stripe_webhook_secret` | `whsec_…`, encrypted the same way. |
 | `return_base_url` | Origin that Stripe returns visitors to. If empty, the request's own origin is used. |
 | `reconcile_interval_minutes` | `0` (off) or N: re-read every subscription not synced for N minutes, on a loop inside the app. Takes effect on save, no restart. |
+| `usage_hold_ttl_seconds` | `900`: how long a usage hold lasts unless its meter or caller sets a TTL. |
+| `usage_sweep_interval_seconds` | `60`: how often lapsed holds are expired and the ledger purged; `0` turns the sweep off. |
+| `usage_event_retention_days` | `400`: days the usage ledger is kept (`0` forever); the per-period totals are never purged. |
 
 - **manual.** There is no payment. Admins assign a plan and status on
   **Admin → Billing → Subscriptions**. Setting `unpaid` suspends the tenant.
@@ -208,7 +211,10 @@ the `csrf_token` prop.
   is logged for you to cancel there. On a framework older than 0.0.38 there is
   no event and no delete, so billing subscribes to nothing.
 - **Usage metering is in progress (#99).** Per-period counters and their
-  ledger ship as `app.state.billing_usage` (see `docs/api-reference.md`);
-  gauge holds, `RequiresQuota` and the usage screens follow.
+  ledger ship as `app.state.billing_usage` (see `docs/api-reference.md`),
+  with gauge holds (`reserve`/`commit`/`release`/`extend`/`holding`), the
+  hold sweeper, the meter registry (`app.state.billing_meters`) and the
+  `RequiresQuota` dependency (`sm_billing.metering.deps`, 402
+  `quota_exceeded`). The usage screens and their docs follow.
 - **Not in v1:** per-tenant limit overrides, coupons, more
   than one subscription per tenant, and translated UI text.

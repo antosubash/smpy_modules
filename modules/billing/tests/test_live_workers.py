@@ -176,3 +176,36 @@ async def test_a_save_not_yet_committed_is_not_reverted(app):
     services.settings = services.settings.model_copy(update={"provider": c.PROVIDER_STRIPE})
     assert await live.ensure_current(app) is False
     assert services.settings.provider == c.PROVIDER_STRIPE
+
+
+async def test_usage_settings_saved_on_one_worker_reach_the_other(workers, monkeypatch):
+    from sm_billing.metering import sweeper
+
+    first, second = workers
+    await _save(first, usage_event_retention_days=30, usage_sweep_interval_seconds=0)
+    assert _billing(second).settings.usage_event_retention_days == 400  # not heard yet
+    # The usage fields are followed, but nothing is rebuilt for them.
+    assert await live.ensure_current(second) is False
+    assert _billing(second).settings.usage_event_retention_days == 30
+    assert _billing(second).settings.usage_sweep_interval_seconds == 0
+
+    # A loop that last saw interval 1 idles from its next tick on: it re-reads first.
+    await _save(first, usage_sweep_interval_seconds=1)
+    await live.ensure_current(second)
+    await _save(first, usage_sweep_interval_seconds=0)  # second has not heard
+    assert _billing(second).settings.usage_sweep_interval_seconds == 1
+    ticks: list[int] = []
+
+    async def tick(self, _app):
+        ticks.append(1)
+        return sweeper.SweepReport()
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(sweeper.UsageSweeper, "tick", tick)
+    monkeypatch.setattr(sweeper, "_sleep", lambda _s: real_sleep(0.01))
+    loop = sweeper.UsageSweeper()
+    loop.start(second)
+    await real_sleep(0.2)
+    await loop.stop()
+    assert ticks == []
+    assert _billing(second).settings.usage_sweep_interval_seconds == 0
