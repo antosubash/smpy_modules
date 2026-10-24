@@ -37,6 +37,7 @@ from sm_billing.contracts.metering import (
 )
 from sm_billing.metering import hold_sql
 from sm_billing.metering.core import MeteringCore
+from sm_billing.metering.errors import IdempotencyReplay
 from sm_billing.metering.periods import as_utc
 from sm_billing.metering.tx import Counted, run_write
 from sm_billing.metering.validate import check_call, check_hold_id, check_text, check_ttl
@@ -251,20 +252,22 @@ class HoldsMixin(MeteringCore):
     ) -> AsyncIterator[Hold]:
         """Reserve for the block and release after it, raised or not.
 
-        A replayed key yields the original hold but leaves releasing it to the
-        call that made it; one already settled raises ``HoldExpired``.
+        The block runs at most once per key: a replayed key raises
+        ``IdempotencyReplay`` (409) while its hold is live (the first call's
+        block holds it) and ``HoldExpired`` once it is settled.
         """
         outcome = await self.reserve(tenant_id, meter, qty, idempotency_key, source=source, ttl=ttl)
         if isinstance(outcome, Exceeded):
             raise QuotaExceededError(meter, outcome)
         if not outcome.ok:
             raise HoldExpired(outcome.id, outcome.status)
+        if outcome.replayed:
+            raise IdempotencyReplay()
         try:
             yield outcome
         finally:
-            if not outcome.replayed:
-                # Shielded: a cancelled job must still give its slot back.
-                await asyncio.shield(self.release(outcome.id))
+            # Shielded: a cancelled job must still give its slot back.
+            await asyncio.shield(self.release(outcome.id))
 
     # ── repair ───────────────────────────────────────────────────────
     async def recount(self, tenant_id: str, meter: str) -> int:

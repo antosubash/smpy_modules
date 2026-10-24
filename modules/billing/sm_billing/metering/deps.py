@@ -10,12 +10,22 @@ service's own short transaction. Refused → 402 ``quota_exceeded`` with
 ``meter``, ``limit``, ``used``, ``requested`` and ``resets_at``.
 
 **Refunds only when the handler raises.** A handler that *returns* an error
-response keeps the charge, the same rule ``get_db`` uses for rolling back. A
-client ``Idempotency-Key`` makes a retry of a request that succeeded free (a
-replay is never counted twice). A retry of one whose handler raised gets 409
-``idempotency_key_spent``: the charge was refunded and the key is spent (the
-metering rule), so the client retries with a new key. Without the header
-every request counts.
+response keeps the charge, the same rule ``get_db`` uses for rolling back.
+
+**One ``Idempotency-Key`` per operation; the handler runs at most once per
+key.** A replay never reaches the handler — otherwise one unit of quota would
+buy unlimited runs:
+
+- the key's charge went through (the handler ran, or is running right now
+  for a concurrent duplicate) → 409 ``idempotency_replay``, never a re-run.
+  The first response is not stored (not in v1), so a client treats this as
+  "already done";
+- the key's first run raised and was refunded → 409
+  ``idempotency_key_spent``: the key is spent (the metering rule) and a
+  retry that should run again sends a new key;
+- the same key on another route → 409 ``idempotency_conflict``.
+
+Without the header every request is charged as its own operation.
 
 With billing not started (``app.state.billing_usage`` missing) nothing is
 limited and the dependency yields ``None``.
@@ -34,6 +44,7 @@ from sm_billing import constants as c
 from sm_billing.contracts.metering import Allowed, Exceeded, QuotaExceededError
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import is_multi_tenant
+from sm_billing.metering.errors import IdempotencyReplay
 from sm_billing.metering.validate import (
     ADJUST_PREFIX,
     KEY_MAX,
@@ -94,15 +105,16 @@ def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
             raise QuotaExceededError(meter, outcome)
         if not outcome.ok:
             raise BillingError("idempotency_key_spent", 409)
+        if outcome.replayed:
+            raise IdempotencyReplay()
         try:
             yield outcome
         except Exception:
-            if not outcome.replayed:
-                try:
-                    await usage.refund(tenant_id, meter, key)
-                except Exception:
-                    # Never mask the handler's own error with the refund's.
-                    logger.exception("billing: refund failed tenant=%s meter=%s", tenant_id, meter)
+            try:
+                await usage.refund(tenant_id, meter, key)
+            except Exception:
+                # Never mask the handler's own error with the refund's.
+                logger.exception("billing: refund failed tenant=%s meter=%s", tenant_id, meter)
             raise
 
     return Depends(requires_quota)

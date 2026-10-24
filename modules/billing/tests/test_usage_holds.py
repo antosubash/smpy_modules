@@ -13,6 +13,7 @@ from sm_billing.contracts.metering import (
     IdempotencyConflict,
     QuotaExceededError,
 )
+from sm_billing.metering.errors import IdempotencyReplay
 from sm_billing.metering.registry import MeterRegistry
 from usage_helpers import GAUGE, Clock, gauge_service, hold_statuses, in_use, seed_limits
 
@@ -173,10 +174,12 @@ async def test_holding_refused_raises_quota_exceeded(factory, usage):
         async with usage.holding(tenant, GAUGE, 1, "second", source="t"):
             pytest.fail("must not enter")
     assert caught.value.meter == GAUGE and caught.value.outcome.used == 1
-    # A replay of a live key enters but leaves the release to the owner.
-    async with usage.holding(tenant, GAUGE, 1, "busy", source="t") as again:
-        assert again.replayed and again.id == first.id
+    # A replay of a live key never enters: the block runs once per key.
+    with pytest.raises(IdempotencyReplay):
+        async with usage.holding(tenant, GAUGE, 1, "busy", source="t"):
+            pytest.fail("a replayed key must not enter")
     assert await in_use(factory, tenant) == 1
+    assert await hold_statuses(factory, tenant) == ["held"]  # the owner's hold stays
     await usage.release(first.id)
     with pytest.raises(HoldExpired):
         async with usage.holding(tenant, GAUGE, 1, "busy", source="t"):

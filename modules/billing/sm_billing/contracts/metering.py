@@ -272,8 +272,8 @@ class UsageMeter(Protocol):
         source: str,
         ttl: int | None = None,
     ) -> AbstractAsyncContextManager[Hold]:
-        """``reserve`` on entry (``QuotaExceededError`` when refused) and
-        ``release`` on exit, raised or not."""
+        """``reserve`` on entry (``QuotaExceededError`` when refused; a replayed
+        key: 409 ``idempotency_replay``) and ``release`` on exit, raised or not."""
         ...
 
 

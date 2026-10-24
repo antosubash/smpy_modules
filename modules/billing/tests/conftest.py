@@ -112,3 +112,30 @@ def user_client(app) -> Callable:
             yield client, user_id
 
     return factory
+
+
+@pytest.fixture
+def quota_app(app):
+    """The app with ``quota_helpers``' ``RequiresQuota`` test routes."""
+    from quota_helpers import install_quota_routes
+
+    return install_quota_routes(app)
+
+
+@pytest.fixture
+def runs(quota_app) -> list[int]:
+    """One entry per run of a counting test handler."""
+    return quota_app.state.quota_runs
+
+
+@pytest.fixture
+async def owner(quota_app, user_client):
+    """A tenant owner's client whose plan allows 2 of the test meter."""
+    from api_helpers import create_tenant
+    from quota_helpers import limit_plan
+
+    async with user_client("owner@x.io") as (client, _):
+        tenant = await create_tenant(client)
+        await limit_plan(quota_app, tenant["id"], 2)
+        client.tenant_id = tenant["id"]
+        yield client

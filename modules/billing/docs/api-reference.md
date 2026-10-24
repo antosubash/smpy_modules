@@ -87,6 +87,54 @@ transaction is short: the counter's row lock is held until the caller commits,
 so every other call for that tenant and meter waits behind it. On SQLite a
 `db=` call can fail closed with 503 `usage_busy` (see the error table).
 
+### Guarding a route: `RequiresQuota`
+
+```python
+from sm_billing.metering.deps import RequiresQuota
+
+@router.post("/chat", dependencies=[RequiresQuota("ai.requests")])
+async def chat(...): ...
+```
+
+It charges `qty` (default 1) of a registered counter meter to the request's
+tenant before the handler runs. A refusal is 402
+`{"detail": "quota_exceeded", "meter", "limit", "used", "requested", "resets_at"}`.
+The charge is refunded **only when the handler raises**; a handler that returns
+an error response keeps it.
+
+**One `Idempotency-Key` per operation: the handler runs at most once per key.**
+A replay never reaches the handler, so one unit of quota cannot buy repeated
+runs:
+
+| The key's first request | A repeat with the same key gets |
+|---|---|
+| succeeded, or is still running (a concurrent duplicate) | 409 `idempotency_replay`: never a re-run, never charged. The first response is not stored (v1), so treat it as "already done" |
+| raised, and was refunded | 409 `idempotency_key_spent`: the key is spent. Send a new key to run (and be charged) again |
+| was on another route | 409 `idempotency_conflict` |
+
+Without the header every request is charged as its own operation. Keys over
+121 characters, or ending `:refund` / starting `adjust:`, get 400
+`invalid_idempotency_key`.
+
+### Gauges and holds
+
+For capacity held over time (concurrent jobs, reserved bytes), register a
+`gauge` meter and hold it:
+
+| Call | Does |
+|---|---|
+| `reserve(tenant, meter, qty, key, *, source, ttl=None)` | atomically hold `qty` within the limit → `Hold` or `Exceeded`; `ttl` (seconds) defaults to the meter's `hold_ttl_seconds`, else `usage_hold_ttl_seconds` |
+| `commit(hold_id)` | keep it with no expiry (stays counted until released); idempotent; `HoldExpired` (409 `hold_expired`) once lapsed or released |
+| `release(hold_id)` | return the capacity; `False` if already settled; `HoldNotFound` (404) for an unknown id |
+| `extend(hold_id, ttl)` | heartbeat: push a held hold's expiry to `ttl` seconds from now |
+| `holding(tenant, meter, qty, key, *, source, ttl=None)` | `async with`: reserve (raises `QuotaExceededError` → 402), release on exit. The block runs at most once per key: a replayed key raises 409 `idempotency_replay` |
+
+A hold that is neither committed nor extended lapses, and the sweeper returns
+its capacity. Meters are registered on `app.state.billing_meters` in the
+consumer's `on_startup` (`reg.define(key=..., kind="counter" | "gauge", unit=...,
+label_key=..., hold_ttl_seconds=...)`); a call on an unregistered meter, or one
+of the other kind, raises `UnknownMeterError`.
+
 ## Tenant API — `/api/billing`
 
 The organisation is always the session's **active tenant**; no route takes a
@@ -256,6 +304,11 @@ Handled events: `checkout.session.completed` and
 | `invalid_return_url` | 400 | connection | `{"message"}` says the rule |
 | `provider_unavailable` | 503 | any | no provider built (startup failed) |
 | `idempotency_conflict` | 409 | a metered route | the idempotency key was first used for a different call (quantity, kind or source) |
+| `idempotency_replay` | 409 | a `RequiresQuota` route, `holding()` | the key's operation already ran (or is running); it is never run twice |
+| `idempotency_key_spent` | 409 | a `RequiresQuota` route | the key's first run raised and was refunded; use a new key |
+| `invalid_idempotency_key` | 400 | a `RequiresQuota` route | the `Idempotency-Key` header is empty, too long or reserved |
+| `quota_exceeded` | 402 | a `RequiresQuota` route, `holding()` | `{"meter", "limit", "used", "requested", "resets_at"}`; `resets_at` is `null` for a gauge |
+| `hold_not_found` / `hold_expired` | 404 / 409 | hold calls | unknown hold id / the hold lapsed or was released (`{"status"}`) |
 | `usage_busy` | 503 | a metered route (SQLite) | the metering write could not take the database lock; nothing was counted. `Retry-After: 1` |
 | `provider_error` | 502 | any | Stripe refused; `{"message"}` |
 | `plan_limit` | 402 | other modules | from `tenants`: `{"key", "limit"}` |

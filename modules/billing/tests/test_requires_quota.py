@@ -3,57 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from api_helpers import create_tenant
-from fastapi import HTTPException
-from fastapi.responses import JSONResponse
-from helpers import make_plan
-from sm_billing.constants import METERS_STATE_ATTR
+from quota_helpers import PREFIX, route
 from sm_billing.metering.deps import RequiresQuota
-from sm_billing.models import Subscription
 from usage_helpers import METER, events
-
-PREFIX = "/api/quota-test"
-
-
-def _route(app, path: str, endpoint) -> None:
-    """Add a test route ahead of the host's catch-alls."""
-    app.add_api_route(f"{PREFIX}{path}", endpoint, methods=["GET"])
-    app.router.routes.insert(0, app.router.routes.pop())
-
-
-@pytest.fixture
-def quota_app(app):
-    getattr(app.state, METERS_STATE_ATTR).define(key=METER, kind="counter")
-
-    async def ok(outcome=RequiresQuota(METER)):
-        return {"used": outcome.used, "replayed": outcome.replayed}
-
-    async def boom(_=RequiresQuota(METER)):
-        raise HTTPException(418, "teapot")
-
-    async def soft_fail(_=RequiresQuota(METER)):
-        return JSONResponse({"detail": "nope"}, status_code=422)
-
-    _route(app, "/ok", ok)
-    _route(app, "/boom", boom)
-    _route(app, "/soft", soft_fail)
-    return app
-
-
-async def _limit(app, tenant_id: str, limit: int) -> None:
-    async with app.state.sm.db.session_factory() as session:
-        plan = await make_plan(session, "metered", limits={METER: limit})
-        session.add(Subscription(tenant_id=tenant_id, plan_id=plan.id))
-        await session.commit()
-
-
-@pytest.fixture
-async def owner(quota_app, user_client):
-    async with user_client("owner@x.io") as (client, _):
-        tenant = await create_tenant(client)
-        await _limit(quota_app, tenant["id"], 2)
-        client.tenant_id = tenant["id"]
-        yield client
 
 
 async def test_counts_then_answers_402(quota_app, owner):
@@ -86,22 +38,31 @@ async def test_a_returned_error_keeps_the_charge(quota_app, owner):
     assert (await owner.get(f"{PREFIX}/ok")).json()["used"] == 2
 
 
-async def test_an_idempotency_key_makes_a_retry_free(quota_app, owner):
+async def test_a_replayed_key_never_reruns_the_handler(quota_app, owner, runs):
     headers = {"Idempotency-Key": "client-1"}
-    first = (await owner.get(f"{PREFIX}/ok", headers=headers)).json()
-    again = (await owner.get(f"{PREFIX}/ok", headers=headers)).json()
-    assert first == {"used": 1, "replayed": False}
-    assert again["replayed"] is True
+    first = await owner.get(f"{PREFIX}/count", headers=headers)
+    again = await owner.get(f"{PREFIX}/count", headers=headers)
+    assert first.json() == {"used": 1}
+    assert again.status_code == 409 and again.json()["detail"] == "idempotency_replay"
+    assert runs == [1]  # the handler ran once
+    factory = quota_app.state.sm.db.session_factory
+    assert await events(factory, owner.tenant_id) == 1  # and the replay was not charged
     # The same key on another route is another call: 409, never a free pass.
     other = await owner.get(f"{PREFIX}/soft", headers=headers)
     assert other.status_code == 409 and other.json()["detail"] == "idempotency_conflict"
 
 
-async def test_a_refunded_key_is_spent(quota_app, owner):
+async def test_a_refunded_key_is_spent_and_never_reruns(quota_app, owner, runs):
+    """A key whose run raised was refunded; retrying it is refused, not re-run."""
     headers = {"Idempotency-Key": "client-2"}
-    assert (await owner.get(f"{PREFIX}/boom", headers=headers)).status_code == 418
-    retry = await owner.get(f"{PREFIX}/boom", headers=headers)
+    assert (await owner.get(f"{PREFIX}/count-boom", headers=headers)).status_code == 418
+    retry = await owner.get(f"{PREFIX}/count-boom", headers=headers)
     assert retry.status_code == 409 and retry.json()["detail"] == "idempotency_key_spent"
+    assert runs == [1]
+    # A new key runs (and is charged) again.
+    fresh = {"Idempotency-Key": "client-3"}
+    assert (await owner.get(f"{PREFIX}/count-boom", headers=fresh)).status_code == 418
+    assert runs == [1, 1]
 
 
 @pytest.mark.parametrize("key", ["x" * 122, "a:refund", "adjust:1", " "])
@@ -124,7 +85,7 @@ async def test_without_billing_started_nothing_is_limited(quota_app, owner, monk
     async def free(outcome=RequiresQuota(METER)):
         return {"outcome": outcome}
 
-    _route(quota_app, "/free", free)
+    route(quota_app, "/free", free)
     assert (await owner.get(f"{PREFIX}/free")).json() == {"outcome": None}
     assert await events(quota_app.state.sm.db.session_factory, owner.tenant_id) == 0
 
