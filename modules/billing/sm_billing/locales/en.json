@@ -285,6 +285,7 @@
       "source": "Source",
       "never": "Never (committed)",
       "empty": "No open holds.",
+      "truncated": "Showing the newest {count} holds only.",
       "release": "Release",
       "released": "Hold released",
       "already_settled": "That hold was already settled."

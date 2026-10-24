@@ -285,6 +285,7 @@
       "source": "Quelle",
       "never": "Nie (bestätigt)",
       "empty": "Keine offenen Reservierungen.",
+      "truncated": "Nur die neuesten {count} Reservierungen werden angezeigt.",
       "release": "Freigeben",
       "released": "Reservierung freigegeben",
       "already_settled": "Diese Reservierung war bereits abgeschlossen."
