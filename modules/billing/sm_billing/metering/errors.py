@@ -24,6 +24,19 @@ class UsageBusyError(BillingError):
         self.headers = {"Retry-After": "1"}
 
 
+class IdempotencyReplay(BillingError):  # noqa: N818 - reads as the condition
+    """A key whose charge (or hold) already went through was used again → 409.
+
+    ``RequiresQuota`` and ``holding()`` never run the work twice for one
+    charge: one key per operation. The replay itself is never counted; the
+    first response is not stored, so the client treats 409
+    ``idempotency_replay`` as "already done".
+    """
+
+    def __init__(self) -> None:
+        super().__init__("idempotency_replay", 409)
+
+
 def is_sqlite_busy(exc: OperationalError) -> bool:
     """Whether ``exc`` is SQLite's "database is locked" family."""
     orig = exc.orig

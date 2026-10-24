@@ -23,7 +23,9 @@ the save. So a worker never acts on a provider the database no longer names,
 every billing request, membership seat push and reconcile tenant, and rebuilds
 the same way when they differ — another worker's switch to ``manual`` stops
 this one's Stripe writes at its next operation, not at its next restart. That
-also picks up a value written with ``scripts/set_setting.py``. Stored secrets
+also picks up a value written with ``scripts/set_setting.py``. The
+``usage_*`` fields ride along (the hold sweeper re-reads them before every
+tick), so a sweep interval or retention saved on one worker reaches the rest. Stored secrets
 are compared as their ciphertext and never logged.
 """
 
@@ -49,6 +51,13 @@ logger = logging.getLogger(__name__)
 PROVIDER_FIELDS = frozenset({"provider", *c.SECRET_FIELDS})
 #: Fields whose change can start, stop or re-time the reconcile loop.
 LOOP_FIELDS = PROVIDER_FIELDS | {"reconcile_interval_minutes"}
+#: Usage-metering fields the sweeper and holds read per use: followed across
+#: workers like the rest, but nothing is rebuilt for them.
+USAGE_FIELDS = frozenset(
+    {"usage_hold_ttl_seconds", "usage_sweep_interval_seconds", "usage_event_retention_days"}
+)
+#: Every field :func:`ensure_current` re-reads from the database.
+FOLLOWED_FIELDS = LOOP_FIELDS | USAGE_FIELDS
 
 
 async def apply_reload(app: FastAPI, changed: Iterable[str]) -> None:
@@ -77,14 +86,14 @@ async def _rebuild(app: FastAPI, services: Any, changed: set[str]) -> None:
 
 
 async def _stored(app: FastAPI) -> dict[str, Any]:
-    """The ``LOOP_FIELDS`` values the database holds now (defaults where unset)."""
+    """The ``FOLLOWED_FIELDS`` values the database holds now (defaults where unset)."""
     from settings.constants import SYSTEM_SCOPE_ID
     from settings.contracts.schemas import SettingScope
     from settings.hydrate import build_settings
     from settings.models import Setting
     from sqlalchemy import select
 
-    keys = {f"{c.PACKAGE}.{field}": field for field in LOOP_FIELDS}
+    keys = {f"{c.PACKAGE}.{field}": field for field in FOLLOWED_FIELDS}
     stmt = select(Setting.key, Setting.value, Setting.value_type).where(
         Setting.scope == SettingScope.SYSTEM.value,
         Setting.scope_id == SYSTEM_SCOPE_ID,
@@ -94,14 +103,16 @@ async def _stored(app: FastAPI) -> dict[str, Any]:
         rows = (await session.execute(stmt)).tuples().all()
     overrides = {keys[key]: (value, value_type) for key, value, value_type in rows}
     settings = build_settings(type(getattr(app.state, c.PACKAGE).settings), overrides)
-    return {field: getattr(settings, field) for field in LOOP_FIELDS}
+    return {field: getattr(settings, field) for field in FOLLOWED_FIELDS}
 
 
 async def ensure_current(app: FastAPI) -> bool:
     """Catch up with a provider change another worker saved (#85).
 
-    Returns ``True`` when something was rebuilt. Cheap when nothing changed:
-    one indexed read of the settings table, no lock.
+    Returns ``True`` when something was rebuilt (a provider or loop field
+    moved). The ``USAGE_FIELDS`` are followed too, into the loaded settings,
+    but rebuild nothing and return ``False``. Cheap when nothing changed: one
+    indexed read of the settings table, no lock.
 
     A field is followed only when the *database* moved since the last read
     (``stored_seen``), never merely because memory and database differ: the
@@ -137,6 +148,8 @@ async def ensure_current(app: FastAPI) -> bool:
         # Field names only: the values include the (encrypted) Stripe secrets.
         logger.info("billing: following settings saved elsewhere: %s", ", ".join(sorted(changed)))
         services.settings = current.model_copy(update={f: stored[f] for f in changed})
+        if not changed & LOOP_FIELDS:
+            return False  # usage fields only: read per use, nothing to rebuild
         await _rebuild(app, services, changed)
     return True
 

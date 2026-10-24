@@ -13,24 +13,30 @@ Every call reads first and writes second, in **separate** transactions:
    upsert, so the check and the increment are one statement.
 
 How the write is wrapped (own transaction or the caller's savepoint) is
-``metering.tx``.
+``metering.tx``; the shared read side is ``metering.core``, and the gauge
+holds are ``metering.holds``.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import update
 
-from sm_billing.contracts.metering import Allowed, Exceeded, IdempotencyConflict, Refunded
+from sm_billing.contracts.metering import (
+    Allowed,
+    Exceeded,
+    IdempotencyConflict,
+    MeterKind,
+    Refunded,
+)
 from sm_billing.metering import sql
-from sm_billing.metering.periods import as_utc, current_period
+from sm_billing.metering.core import Resolved as _Resolved
+from sm_billing.metering.holds import HoldsMixin
+from sm_billing.metering.periods import as_utc
 from sm_billing.metering.tx import Apply, Counted, find_event, period_row, run_write
 from sm_billing.metering.validate import (
     ADJUST,
@@ -44,54 +50,21 @@ from sm_billing.metering.validate import (
     check_call,
 )
 from sm_billing.models import UsagePeriod
-from sm_billing.resolve import effective_plan
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 _REPLAY = "replay"
 Outcome = Allowed | Exceeded | Refunded
+_COUNTER = MeterKind.COUNTER
 
 
-@dataclass(frozen=True)
-class _Resolved:
-    limit: int | None
-    period: tuple[datetime, datetime]
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
-class UsageService:
-    """Per-tenant, per-period counters backed by ``billing_usage_*``."""
-
-    def __init__(
-        self, session_factory: async_sessionmaker, *, clock: Callable[[], datetime] = _utcnow
-    ) -> None:
-        self._factory = session_factory
-        self._clock = clock
+class UsageService(HoldsMixin):
+    """Per-period counters (here) and gauge holds (``HoldsMixin``)."""
 
     # ── reads ────────────────────────────────────────────────────────
-    @asynccontextmanager
-    async def _reader(self, db: AsyncSession | None):
-        """The caller's session when joined, else a short one of our own."""
-        if db is not None:
-            yield db
-            return
-        async with self._factory() as session:
-            yield session
-
-    async def _resolve(self, tenant_id: str, meter: str, db: AsyncSession | None) -> _Resolved:
-        now = self._clock()
-        async with self._reader(db) as session:
-            plan, sub = await effective_plan(session, tenant_id)
-            period = current_period(sub, now)
-        value = plan.limits.get(meter)
-        return _Resolved(None if value is None else int(value), period)
-
     async def _used(self, tenant_id: str, meter: str, start: datetime, db=None) -> int:
         async with self._reader(db) as session:
             row = await period_row(session, tenant_id, meter, start)
@@ -135,6 +108,7 @@ class UsageService:
         return Exceeded(used, res.limit or 0, qty, res.period[1])
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
+        self._require(meter, _COUNTER)
         async with self._factory() as session:  # one connection for both reads
             res = await self._resolve(tenant_id, meter, session)
             used = await self._used(tenant_id, meter, res.period[0], session)
@@ -206,6 +180,7 @@ class UsageService:
         db: AsyncSession | None = None,
     ) -> Outcome:
         check_call(tenant_id, meter, qty, idempotency_key, source)
+        self._require(meter, _COUNTER)
         res = await self._resolve(tenant_id, meter, db)
         event = self._ledger(
             tenant_id, meter, qty, CONSUME, idempotency_key, res.period[0], source=source
@@ -224,6 +199,7 @@ class UsageService:
         db: AsyncSession | None = None,
     ) -> Allowed | Refunded:
         check_call(tenant_id, meter, qty, idempotency_key, source)
+        self._require(meter, _COUNTER)
         res = await self._resolve(tenant_id, meter, db)
         event = self._ledger(
             tenant_id,
@@ -240,6 +216,7 @@ class UsageService:
         return outcome
 
     async def refund(self, tenant_id: str, meter: str, idempotency_key: str) -> bool:
+        self._require(meter, _COUNTER)
         async with self._factory() as session:
             original = await find_event(session, tenant_id, meter, idempotency_key)
         if original is None or original.kind not in (CONSUME, RECORD):
@@ -283,6 +260,7 @@ class UsageService:
         credit and may take ``used`` below zero.
         """
         check_adjust(tenant_id, meter, quantity, reason, actor)
+        self._require(meter, _COUNTER)
         res = await self._resolve(tenant_id, meter, None)
         event = self._ledger(
             tenant_id,

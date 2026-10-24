@@ -1859,6 +1859,7 @@ version = "0.0.11"
 source = { editable = "modules/billing" }
 dependencies = [
     { name = "cryptography" },
+    { name = "fastapi" },
     { name = "pydantic-settings" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
@@ -1881,6 +1882,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
+    { name = "fastapi", specifier = ">=0.121" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },

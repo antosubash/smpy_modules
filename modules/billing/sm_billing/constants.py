@@ -63,6 +63,8 @@ KNOWN_LIMIT_KEYS: Final = (ENTITLEMENT_SEATS,)
 
 # Where the ``UsageMeter`` implementation lives (``sm_billing.contracts.metering``).
 USAGE_STATE_ATTR: Final = "billing_usage"
+# Where the ``MeterRegistry`` lives (``sm_billing.metering.registry``).
+METERS_STATE_ATTR: Final = "billing_meters"
 
 DEFAULT_PLAN_KEY: Final = "free"
 DEFAULT_PLAN_NAME: Final = "Free"

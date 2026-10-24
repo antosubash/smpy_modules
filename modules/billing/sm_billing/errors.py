@@ -8,7 +8,12 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from sm_billing.contracts.metering import IdempotencyConflict
+from sm_billing.contracts.metering import (
+    HoldExpired,
+    HoldNotFound,
+    IdempotencyConflict,
+    QuotaExceededError,
+)
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.plans import PlanError
 
@@ -43,8 +48,38 @@ async def _idempotency_conflict(_: Request, exc: IdempotencyConflict) -> JSONRes
     return JSONResponse({"detail": "idempotency_conflict"}, status_code=409)
 
 
+def quota_body(exc: QuotaExceededError) -> dict[str, Any]:
+    """``{"detail": "quota_exceeded", meter, limit, used, requested, resets_at}``;
+    ``resets_at`` is ``None`` for a gauge, which never resets."""
+    outcome = exc.outcome
+    resets_at = outcome.period_end.isoformat() if outcome.period_end is not None else None
+    return {
+        "detail": "quota_exceeded",
+        "meter": exc.meter,
+        "limit": outcome.limit,
+        "used": outcome.used,
+        "requested": outcome.requested,
+        "resets_at": resets_at,
+    }
+
+
+async def _quota_exceeded(_: Request, exc: QuotaExceededError) -> JSONResponse:
+    return JSONResponse(quota_body(exc), status_code=402)
+
+
+async def _hold_not_found(_: Request, exc: HoldNotFound) -> JSONResponse:
+    return JSONResponse({"detail": "hold_not_found"}, status_code=404)
+
+
+async def _hold_expired(_: Request, exc: HoldExpired) -> JSONResponse:
+    return JSONResponse({"detail": "hold_expired", "status": exc.status}, status_code=409)
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(BillingError, _billing_error)
     app.add_exception_handler(PlanError, _plan_error)
     app.add_exception_handler(ProviderError, _provider_error)
     app.add_exception_handler(IdempotencyConflict, _idempotency_conflict)
+    app.add_exception_handler(QuotaExceededError, _quota_exceeded)
+    app.add_exception_handler(HoldNotFound, _hold_not_found)
+    app.add_exception_handler(HoldExpired, _hold_expired)

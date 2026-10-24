@@ -8,12 +8,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sm_billing.constants import PricingModel
+from sm_billing.metering.registry import MeterRegistry
 from sm_billing.metering.service import UsageService
-from sm_billing.models import Plan, Subscription, UsageEvent, UsagePeriod
+from sm_billing.models import Plan, Subscription, UsageEvent, UsageGauge, UsageHold, UsagePeriod
 from sm_billing.plans import seed_default_plan
 from sqlalchemy import func, select
 
 METER = "ai.requests"
+GAUGE = "jobs.concurrent"
 OCT = (datetime(2026, 10, 1, tzinfo=UTC), datetime(2026, 11, 1, tzinfo=UTC))
 NOV = (datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 12, 1, tzinfo=UTC))
 
@@ -75,3 +77,33 @@ async def events(factory, tenant_id: str, meter: str = METER, kind: str | None =
         if kind is not None:
             stmt = stmt.where(UsageEvent.kind == kind)
         return int((await session.execute(stmt)).scalar_one())
+
+
+def registry() -> MeterRegistry:
+    """The counter and the gauge the tests meter, registered."""
+    reg = MeterRegistry()
+    reg.define(key=METER, kind="counter")
+    reg.define(key=GAUGE, kind="gauge")
+    return reg
+
+
+def gauge_service(factory, clock: Clock | None = None, **kw: Any) -> UsageService:
+    return UsageService(factory, clock=clock or Clock(), meters=kw.pop("meters", registry()), **kw)
+
+
+async def in_use(factory, tenant_id: str, meter: str = GAUGE) -> int | None:
+    async with factory() as session:
+        stmt = select(UsageGauge.in_use).where(
+            UsageGauge.tenant_id == tenant_id, UsageGauge.meter == meter
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def hold_statuses(factory, tenant_id: str, meter: str = GAUGE) -> list[str]:
+    async with factory() as session:
+        stmt = (
+            select(UsageHold.status)
+            .where(UsageHold.tenant_id == tenant_id, UsageHold.meter == meter)
+            .order_by(UsageHold.status)
+        )
+        return list((await session.scalars(stmt)).all())
