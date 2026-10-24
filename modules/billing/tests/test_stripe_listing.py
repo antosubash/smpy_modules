@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 import stripe
 from sm_billing.constants import PROVIDER_CANCELABLE_STATUSES
+from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.providers.stripe import StripeProvider
 
 
@@ -79,3 +81,21 @@ async def test_a_listing_flagged_has_more_but_empty_ends():
     pages = _Stuck([], size=1)
     assert await _provider(pages).live_subscription_ids("cus_1") == []
     assert len(pages.params) == 1
+
+
+class _Missing(_Pages):
+    def __init__(self, code: str | None) -> None:
+        super().__init__([], size=1)
+        self.code = code
+
+    async def list_async(self, params):
+        raise stripe.InvalidRequestError("No such customer: 'cus_x'", "customer", code=self.code)
+
+
+async def test_resource_missing_is_provider_not_found():
+    """Terminal for the teardown: a customer Stripe no longer has bills nothing."""
+    with pytest.raises(ProviderNotFound):
+        await _provider(_Missing("resource_missing")).live_subscription_ids("cus_x")
+    with pytest.raises(ProviderError) as other:
+        await _provider(_Missing("parameter_invalid")).live_subscription_ids("cus_x")
+    assert not isinstance(other.value, ProviderNotFound)

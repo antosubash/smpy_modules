@@ -20,6 +20,11 @@ class ProviderError(Exception):
     """The provider refused or failed a call (network, auth, unknown object)."""
 
 
+class ProviderNotFound(ProviderError):  # noqa: N818 - reads as the condition
+    """The object the call named does not exist at the provider (Stripe
+    ``resource_missing``): permanent, so a retry would fail the same way."""
+
+
 class InvalidWebhookSignature(ProviderError):  # noqa: N818 - reads as the condition
     """The webhook body does not carry a valid signature → HTTP 400."""
 

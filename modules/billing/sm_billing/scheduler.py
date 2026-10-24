@@ -44,7 +44,8 @@ from sm_billing import constants as c
 from sm_billing import live
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.models import Subscription
-from sm_billing.reconcile import ReconcileReport, reconcile_one, sweep_deleted_tenants
+from sm_billing.reconcile import ReconcileReport, reconcile_one
+from sm_billing.sweep import Budget, sweep_deleted_tenants
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -188,9 +189,10 @@ async def reconcile_stale(
             pause, provider_errors = PACE_SECONDS, 0
         await _pause(pause)
     if not report.skipped:  # deleted tenants left with something at the provider
-        await sweep_deleted_tenants(
-            app, report, pace=lambda: _pause(PACE_SECONDS), attempted={r[1] for r in rows}
+        budget = Budget(
+            _pause, PACE_SECONDS, MAX_BACKOFF_SECONDS, MAX_PROVIDER_ERRORS, pause, provider_errors
         )
+        await sweep_deleted_tenants(app, report, attempted={r[1] for r in rows}, budget=budget)
     return report
 
 

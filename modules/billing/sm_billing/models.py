@@ -76,6 +76,10 @@ class Customer(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     # Set once the tenant was deleted and everything it had at the provider was
     # canceled (``sm_billing.teardown``): the reconcile sweep skips it from then on.
     teardown_done_at: datetime | None = Field(default=None, sa_column=_tz_column())
+    # The sweep's backoff for a teardown that keeps failing: failures so far,
+    # and when the next attempt is due (``sm_billing.sweep``).
+    teardown_attempts: int = Field(default=0)
+    teardown_next_attempt_at: datetime | None = Field(default=None, sa_column=_tz_column())
 
 
 class Subscription(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]

@@ -26,7 +26,7 @@
    ```
 
    After upgrading billing, autogenerate again: a release can add a column
-   (the first release after 0.0.11 adds `billing_customer.teardown_done_at`,
+   (the first release after 0.0.11 adds `billing_customer.teardown_done_at` and two backoff columns,
    for the deleted-tenant sweep), and billing reads it on every reconcile.
 
    The `billing` branch label names the revision; it does **not** make
@@ -208,8 +208,17 @@ teardown has not completed (`billing_customer.teardown_done_at` unset). That
 reaches what no subscription row points at: a subscription not mirrored yet,
 and an open Checkout session that could not be expired, which stays recorded
 unless Stripe reports it completed or expired. A finished teardown is
-stamped, and the sweep skips it from then on. Organisations deleted before
-this release are swept too, on the first reconcile after the upgrade. "Still
+stamped, and the sweep skips it from then on. A teardown that keeps failing
+backs off: 15 minutes after the first failure, doubling each time up to a day
+(`teardown_attempts`, `teardown_next_attempt_at`). Under the scheduler the
+sweep shares the tick's error budget, so five provider errors in a row end the
+tick. It re-reads the provider settings before each organisation and stops
+when they changed. A Stripe customer that no longer exists (`resource_missing`)
+is not a failure: there is nothing left to bill, so it is stamped done and
+logged. A single-tenant host never sweeps, and the `default` organisation is
+never torn down, because it has no organisation row by design. Organisations
+deleted before this release are swept too, on the first reconcile after the
+upgrade. "Still
 bills" means any status that has not ended (`canceled`, `incomplete_expired`),
 so `incomplete` and `paused` are canceled too. Under the
 `manual` provider nothing reaches Stripe; a log line asks you to cancel there

@@ -13,6 +13,7 @@ from sm_billing.contracts.provider import (
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
+    ProviderNotFound,
     SubscriptionSnapshot,
     WebhookEvent,
 )
@@ -31,12 +32,16 @@ class FakeProvider:
     events: dict[str, WebhookEvent] = field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     fail: set[str] = field(default_factory=set)
+    #: Methods that answer "no such object" (Stripe ``resource_missing``).
+    missing: set[str] = field(default_factory=set)
     live: dict[str, list[str]] = field(default_factory=dict)
     _customers: int = 0
     _sessions: int = 0
 
     def _record(self, method: str, **kw: Any) -> None:
         self.calls.append((method, kw))
+        if method in self.missing:
+            raise ProviderNotFound(f"{method}: no such object")
         if method in self.fail:
             raise ProviderError(f"{method} failed")
 

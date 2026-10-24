@@ -29,6 +29,7 @@ from sm_billing.contracts.provider import (
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
+    ProviderNotFound,
     SubscriptionSnapshot,
     WebhookEvent,
 )
@@ -85,7 +86,10 @@ class StripeProvider:
         try:
             result = await fn(*args, **kwargs)
         except stripe.StripeError as exc:
-            raise ProviderError(exc.user_message or str(exc)) from exc
+            message = exc.user_message or str(exc)
+            if exc.code == "resource_missing":
+                raise ProviderNotFound(message) from exc
+            raise ProviderError(message) from exc
         return result.to_dict()
 
     async def ensure_customer(self, tenant_id: str, name: str, email: str | None) -> str | None:

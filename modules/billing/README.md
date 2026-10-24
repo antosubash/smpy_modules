@@ -38,7 +38,7 @@ organisation. Billing ships SQLModel tables but no migrations. Autogenerate a
 revision in the host and give its first revision
 `branch_labels = ("billing",)`, so the module can be removed on its own with
 `alembic downgrade billing@base`. Autogenerate again after upgrading billing,
-since a release can add a column (`billing_customer.teardown_done_at`, after
+since a release can add a column (`billing_customer.teardown_done_at` and two backoff columns, after
 0.0.11).
 
 On first start, billing seeds a free default plan (`free`). It is idempotent,
@@ -194,7 +194,9 @@ the `csrf_token` prop.
   delete still stands; the error is logged and the next reconcile cancels it.
   That includes a subscription not mirrored yet and an open checkout: reconcile
   sweeps every customer whose organisation is gone until its teardown completes
-  (`billing_customer.teardown_done_at`), then skips it. The Checkout session id
+  (`billing_customer.teardown_done_at`), then skips it. A teardown that keeps
+  failing backs off (from 15 minutes up to a day). A Stripe customer that no
+  longer exists counts as done. A single-tenant host never sweeps. The Checkout session id
   is forgotten only once Stripe says the session is no longer open. Everything
   that has not ended is canceled, `incomplete` and `paused` included, across
   every page of the customer's subscriptions.
