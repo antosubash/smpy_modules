@@ -86,7 +86,9 @@ async def test_manual_assignment_drops_the_stripe_period(app, factory):
     async with factory() as session:
         stmt = select(Subscription).where(Subscription.tenant_id == tenant_id)
         sub = (await session.execute(stmt)).scalar_one()
-    assert (sub.current_period_start, sub.current_period_end, sub.trial_end) == (None,) * 3
+    assert (sub.current_period_start, sub.current_period_end) == (None, None)
+    # The trial history stays: checkout's one-trial rule reads it.
+    assert sub.trial_end is not None
 
     # Now on the calendar month: 1 November resets it, not the 7th.
     clock.now = datetime(2026, 10, 25, tzinfo=UTC)

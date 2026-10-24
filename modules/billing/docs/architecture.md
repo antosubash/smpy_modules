@@ -147,10 +147,12 @@ instead of a 500, and the request session stays usable.
 period. The period is the subscription's provider period
 (`current_period_start`/`_end`, written only by `sync.apply_snapshot`) when
 `now` is inside it, else the UTC calendar month (`metering/periods.py`).
-A manual assignment (`admin.assign`) clears the provider's dates along with
-its subscription id, so the subscription row stays the one source of truth: a
-tenant moved off Stripe mid-period resets on the 1st, not on the old Stripe
-renewal. Rollover needs no job: a new period is a new counter row.
+A manual assignment (`admin.assign`) clears the provider's period
+(`current_period_start`/`_end`) along with its subscription id, so the
+subscription row stays the one source of truth: a tenant moved off Stripe
+mid-period resets on the 1st, not on the old Stripe renewal. It keeps
+`trial_end`, the trial history checkout reads (one trial per organisation);
+metering never reads it. Rollover needs no job: a new period is a new counter row.
 
 Enforcement is one statement, so no check can be split from its write
 (`metering/sql.py`):
