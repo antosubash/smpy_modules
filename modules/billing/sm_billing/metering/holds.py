@@ -266,8 +266,14 @@ class HoldsMixin(MeteringCore):
         try:
             yield outcome
         finally:
-            # Shielded: a cancelled job must still give its slot back.
-            await asyncio.shield(self.release(outcome.id))
+            # Shielded: a cancelled job must still give its slot back. A release
+            # that fails (SQLite busy, the row purged) is logged, never raised:
+            # it would replace the block's own error, and the TTL returns the
+            # slot anyway.
+            try:
+                await asyncio.shield(self.release(outcome.id))
+            except Exception:
+                logger.exception("billing: hold release failed hold=%s", outcome.id)
 
     # ── repair ───────────────────────────────────────────────────────
     async def recount(self, tenant_id: str, meter: str) -> int:

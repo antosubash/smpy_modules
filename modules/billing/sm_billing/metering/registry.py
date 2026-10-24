@@ -43,7 +43,11 @@ class MeterRegistry:
         if hold_ttl_seconds is not None:
             if meter_kind is not MeterKind.GAUGE:
                 raise ValueError("hold_ttl_seconds is for gauges only")
-            if isinstance(hold_ttl_seconds, bool) or not 1 <= hold_ttl_seconds <= TTL_MAX:
+            if (
+                isinstance(hold_ttl_seconds, bool)
+                or not isinstance(hold_ttl_seconds, int)
+                or not 1 <= hold_ttl_seconds <= TTL_MAX
+            ):
                 raise ValueError(f"hold_ttl_seconds must be 1-{TTL_MAX}")
         definition = MeterDefinition(key, meter_kind, unit, label_key, hold_ttl_seconds)
         existing = self._meters.get(key)

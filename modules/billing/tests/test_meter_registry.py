@@ -31,6 +31,7 @@ def test_define_and_redefine():
         {"key": "k", "kind": "counter", "unit": "litres"},
         {"key": "k", "kind": "counter", "hold_ttl_seconds": 60},
         {"key": "k", "kind": "gauge", "hold_ttl_seconds": 0},
+        {"key": "k", "kind": "gauge", "hold_ttl_seconds": 1.5},
     ],
 )
 def test_bad_definitions(kwargs):

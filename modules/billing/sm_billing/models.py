@@ -214,6 +214,8 @@ class UsageHold(Base, table=True):  # ty: ignore[unsupported-base]
         UniqueConstraint("tenant_id", "meter", "idempotency_key", name="uq_billing_usage_hold_key"),
         Index("ix_billing_usage_hold_due", "status", "expires_at"),
         Index("ix_billing_usage_hold_meter", "tenant_id", "meter", "status"),
+        # The retention purge walks settled holds oldest first.
+        Index("ix_billing_usage_hold_settled", "settled_at"),
     )
 
     id: str = Field(primary_key=True, max_length=32)

@@ -167,6 +167,19 @@ async def test_holding_releases_on_exit_and_on_error(factory, usage):
     assert await hold_statuses(factory, tenant) == ["released", "released"]
 
 
+async def test_holding_a_failed_release_never_masks_the_blocks_error(factory, usage, monkeypatch):
+    tenant = await seed_limits(factory, {GAUGE: 1})
+
+    async def broken_release(hold_id):
+        raise OSError("database is locked")
+
+    monkeypatch.setattr(usage, "release", broken_release)
+    with pytest.raises(RuntimeError, match="job failed"):
+        async with usage.holding(tenant, GAUGE, 1, "masked", source="t"):
+            raise RuntimeError("job failed")
+    assert await hold_statuses(factory, tenant) == ["held"]  # the TTL returns it
+
+
 async def test_holding_refused_raises_quota_exceeded(factory, usage):
     tenant = await seed_limits(factory, {GAUGE: 1})
     first = await usage.reserve(tenant, GAUGE, 1, "busy", source="t")
