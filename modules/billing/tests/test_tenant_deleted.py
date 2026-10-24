@@ -192,3 +192,19 @@ async def test_a_late_webhook_for_the_deleted_tenant_still_maps(app, fake):
         sub = await apply_snapshot(session, app, fake.snapshots["sub_1"], provider="stripe")
         assert sub.tenant_id == tenant_id
         assert sub.status == SubscriptionStatus.CANCELED
+
+
+async def test_a_mirrored_row_with_no_customer_ends_once_the_provider_says_so(app, fake):
+    """No customer row maps the snapshot back once the tenant is gone (#92)."""
+    from subscription_helpers import _snap
+
+    async with app.state.sm.db.session_factory() as session:
+        tenant = await make_tenant(session, "imported")
+        plan = await make_plan(session, "team")
+        await make_sub(session, tenant, plan, provider_subscription_id="sub_imp")
+        await session.commit()
+        tenant_id = tenant.id
+    fake.snapshots["sub_imp"] = _snap(tenant_id, sid="sub_imp")
+    await _delete(app, tenant_id)
+    assert fake.called("cancel_now") == [{"subscription_id": "sub_imp"}]
+    assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED

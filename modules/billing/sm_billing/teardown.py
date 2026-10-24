@@ -63,7 +63,7 @@ from sm_billing import constants as c
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer, Subscription
-from sm_billing.sync import resync
+from sm_billing.sync import SyncError, resync
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -162,7 +162,20 @@ async def _cancel(
     for subscription_id in ids:
         await _cancel_one(provider, subscription_id)
     if sub is not None and mirrored:
-        await resync(session, app, provider, mirrored)
+        try:
+            await resync(session, app, provider, mirrored)
+        except SyncError as exc:
+            # Tenant gone and no customer row maps the snapshot back (an
+            # admin-imported row), so apply_snapshot cannot place it. Mark it
+            # canceled only once the provider itself says it ended — never on
+            # the strength of our own cancel call — rather than fail every
+            # tick for good, with no customer row to carry a backoff.
+            if exc.code != "unknown_tenant":
+                raise
+            snap = await provider.fetch_subscription(mirrored)
+            if snap.status not in c.PROVIDER_ENDED_STATUSES:
+                raise
+            sub.status = c.SubscriptionStatus.CANCELED
     if stamp and customer is not None:
         customer.teardown_done_at = datetime.now(UTC)
         # The backoff (attempts, next due) is cleared by the token-conditional
