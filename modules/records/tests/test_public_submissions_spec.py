@@ -151,6 +151,15 @@ async def test_a_newsletter_type_is_keyed_by_its_address(client):
     assert nonce["system"] == "internal"
 
 
+async def test_an_empty_type_made_a_newsletter_is_keyed_by_its_address(client):
+    await client.post(
+        API, json={"key": "list", "label": "List", "fields": []}, headers=roles(ADMIN)
+    )
+    resp = await update(client, "list", public_submissions={"kind": "subscription"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["display_field"] == "sm_email"
+
+
 async def test_a_populated_type_cannot_become_a_newsletter(client):
     await client.post(
         API,

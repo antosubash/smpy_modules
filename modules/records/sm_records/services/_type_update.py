@@ -163,8 +163,12 @@ async def update_type(
     check_type_text(changes, stored_label=rtype.label)
 
     fields_raw = changes.pop("fields_raw", None)
-    if await submissions.check_change(db, rtype, changes) and fields_raw is None:
-        fields_raw = list(rtype.fields or [])  # the first kind injects its fields
+    if await submissions.check_change(db, rtype, changes):
+        if fields_raw is None:
+            fields_raw = list(rtype.fields or [])  # the first kind injects its fields
+        changes["display_field"] = submissions.default_display(
+            changes[submissions.FIELD], changes.get("display_field", rtype.display_field)
+        )
     fields: list[dict[str, Any]] | None = None
     if fields_raw is not None:
         defs, fields = normalise(fields_raw, settings, kind=submissions.kind_of(rtype, changes))
