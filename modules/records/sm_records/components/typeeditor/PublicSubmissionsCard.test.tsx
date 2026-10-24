@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, mount } from '../../test-dom';
+import { click, mount, setValue } from '../../test-dom';
 import { defaultConfig, type PublicSubmissionsConfig } from '../../utils/public-submissions';
 import type { EditableField } from './types';
 
@@ -138,6 +138,23 @@ describe('PublicSubmissionsCard', () => {
     const errors = [{ field: 'public_submissions', message: 'nope, not like that' }];
     const view = await mount(card({ config: defaultConfig('form'), errors }));
     expect(view.find('[role="alert"]')?.textContent).toBe('nope, not like that');
+    await view.unmount();
+  });
+
+  it('a day count can be cleared and retyped; only a whole number is sent', async () => {
+    const onChange = vi.fn();
+    const config = defaultConfig('form');
+    const view = await mount(card({ config, savedKind: 'form', onChange }));
+    const input = view.find<HTMLInputElement>('#public-submissions-retention');
+    if (!input) throw new Error('no retention input');
+    await setValue(input, '');
+    expect(input.value).toBe('');
+    expect(onChange).not.toHaveBeenCalled();
+    await setValue(input, '30');
+    expect(onChange).toHaveBeenLastCalledWith({ ...config, retention_days: 30 });
+    onChange.mockClear();
+    await setValue(input, '12.7');
+    expect(onChange).not.toHaveBeenCalled();
     await view.unmount();
   });
 });

@@ -24,6 +24,11 @@ function NumberField({
   min: number;
   onChange: (value: number) => void;
 }) {
+  // The text as typed, so the box can be cleared and retyped: bound to
+  // `value` alone, an empty box snapped straight back to the old number. Only
+  // a whole number reaches the config; anything else reverts on blur.
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -31,12 +36,14 @@ function NumberField({
         id={id}
         type="number"
         min={min}
+        step={1}
         className="w-32"
-        value={String(value)}
+        value={text}
         onChange={(e) => {
-          const next = Number.parseInt(e.target.value, 10);
-          if (!Number.isNaN(next)) onChange(next);
+          setText(e.target.value);
+          if (/^\d+$/.test(e.target.value)) onChange(Number(e.target.value));
         }}
+        onBlur={() => setText(String(value))}
       />
       {help && <p className="text-sm text-muted-foreground">{help}</p>}
     </div>
