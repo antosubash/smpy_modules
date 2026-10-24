@@ -11,8 +11,11 @@ split by a concurrent writer:
   guarantee); on SQLite there is one writer at a time. No row back means
   refused.
 
-The first-ever row for a period is inserted without the ``WHERE``, which is
-why the service refuses ``qty > limit`` before it gets here.
+The first-ever row for a period is inserted without the ``WHERE``, so a call
+with ``qty > limit`` uses ``add_within_limit`` instead: a plain conditional
+``UPDATE`` that never inserts. With no row (``used`` is 0) it is refused; on
+a counter an admin credited below zero it is admitted when ``used + qty`` still
+fits, exactly what ``check`` answers.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.dialects import postgresql, sqlite
 
 from sm_billing.models import UsageEvent, UsagePeriod
@@ -87,3 +91,27 @@ def upsert_period(
         set_={"used": total, "updated_at": stmt.excluded.updated_at},
         where=None if limit is None else total <= limit,
     ).returning(table.c.used)
+
+
+def add_within_limit(
+    *, tenant_id: str, meter: str, start: datetime, qty: int, limit: int, now: datetime
+) -> Any:
+    """Add ``qty`` to an existing counter only ``WHERE used + qty <= limit``.
+
+    For ``qty > limit``, where inserting a fresh row would over-admit. On
+    Postgres a concurrent writer's row lock makes this wait and re-check the
+    committed row, as the upsert does.
+    """
+    table = UsagePeriod.__table__
+    total = table.c.used + qty
+    return (
+        update(table)
+        .where(
+            table.c.tenant_id == tenant_id,
+            table.c.meter == meter,
+            table.c.period_start == start,
+            total <= limit,
+        )
+        .values(used=total, updated_at=now)
+        .returning(table.c.used)
+    )

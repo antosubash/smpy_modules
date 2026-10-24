@@ -164,17 +164,18 @@ class UsageService:
             claimed = await session.execute(sql.insert_event(dialect, **event))
             if claimed.scalar_one_or_none() is None:
                 return _REPLAY
-            moved = await session.execute(
-                sql.upsert_period(
-                    dialect,
-                    tenant_id=event["tenant_id"],
-                    meter=event["meter"],
-                    period=period,
-                    qty=event["quantity"],
-                    limit=limit,
-                    now=event["recorded_at"],
+            fields = {"tenant_id": event["tenant_id"], "meter": event["meter"]}
+            qty, now = event["quantity"], event["recorded_at"]
+            if limit is not None and qty > limit:
+                # Only a credited (negative) counter can fit it; never insert.
+                stmt = sql.add_within_limit(
+                    **fields, start=period[0], qty=qty, limit=limit, now=now
                 )
-            )
+            else:
+                stmt = sql.upsert_period(
+                    dialect, **fields, period=period, qty=qty, limit=limit, now=now
+                )
+            moved = await session.execute(stmt)
             used = moved.scalar_one_or_none()
             return None if used is None else Counted(int(used))
 
@@ -206,10 +207,6 @@ class UsageService:
         event = self._ledger(
             tenant_id, meter, qty, CONSUME, idempotency_key, res.period[0], source=source
         )
-        if res.limit is not None and qty > res.limit:
-            # No write can fit; a key already used for this call still replays.
-            replayed = await self._replay(event, res, db)
-            return replayed or await self._refuse(tenant_id, meter, qty, res, db)
         return await self._count(event, res, res.limit, db)
 
     async def record(

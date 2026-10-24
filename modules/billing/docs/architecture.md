@@ -147,7 +147,10 @@ instead of a 500, and the request session stays usable.
 period. The period is the subscription's provider period
 (`current_period_start`/`_end`, written only by `sync.apply_snapshot`) when
 `now` is inside it, else the UTC calendar month (`metering/periods.py`).
-Rollover needs no job: a new period is a new counter row.
+A manual assignment (`admin.assign`) clears the provider's dates along with
+its subscription id, so the subscription row stays the one source of truth: a
+tenant moved off Stripe mid-period resets on the 1st, not on the old Stripe
+renewal. Rollover needs no job: a new period is a new counter row.
 
 Enforcement is one statement, so no check can be split from its write
 (`metering/sql.py`):
@@ -159,7 +162,11 @@ Enforcement is one statement, so no check can be split from its write
    admitted, once a `<key>:refund` row exists.
 2. `INSERT … ON CONFLICT (tenant_id, meter, period_start) DO UPDATE SET used =
    used + qty WHERE used + qty <= limit RETURNING used`; no row back is a
-   refusal, and the transaction (ledger row included) rolls back.
+   refusal, and the transaction (ledger row included) rolls back. The insert
+   half has no `WHERE`, so a call with `qty > limit` instead runs `UPDATE …
+   SET used = used + qty WHERE … AND used + qty <= limit`, which never
+   inserts: refused when there is no row yet, admitted on a counter an admin
+   credited below zero when it still fits. `check` and `consume` agree.
 
 On Postgres (READ COMMITTED) a concurrent upsert waits on the row lock and
 the `WHERE` is re-evaluated against the committed row, so with a limit of 1
