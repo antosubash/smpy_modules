@@ -18,10 +18,11 @@ customer row is what maps a late Stripe webhook for the deleted tenant back to
 its row. A subscription that never reached a provider is marked ``canceled``
 directly; its customer's provider subscriptions, if any, are still canceled.
 
-**Retries.** A failure is logged, never raised into the delete. Reconcile —
-scheduled or ``smpy billing reconcile`` — retries from two sides:
-``reconcile_one`` hands a mirrored subscription whose tenant is gone here, and
-:mod:`sm_billing.sweep` runs this, with backoff, for every customer whose
+**Retries.** A failure is logged, never raised into the delete. Every run of
+this goes through :func:`sm_billing.sweep.run_teardown`, which owns the due
+check and the failure count, so the ``TenantDeleted`` handler, ``reconcile_one``
+(a mirrored subscription whose tenant is gone) and the sweep share one backoff.
+:mod:`sm_billing.sweep` runs it for every customer whose
 tenant is gone and whose ``teardown_done_at`` is unset — which covers a
 customer with nothing mirrored and an open checkout. Once stamped, a customer
 costs the sweep nothing, and a later pass here only checks the mirrored
@@ -29,14 +30,18 @@ subscription (one a checkout paid at the last moment may have created).
 
 **Idempotent.** A tenant with no billing is a no-op; an ended subscription is
 not canceled again; a cancel the provider refuses because the subscription
-ended meanwhile (a concurrent reconcile, Stripe's own deletion) counts as done;
+ended meanwhile (a concurrent reconcile, Stripe canceling it) counts as done;
 a second ``TenantDeleted`` changes nothing. The checkout id is forgotten only
 once the provider says the session is no longer open.
 
-**Gone at the provider is terminal.** A customer, subscription or checkout
-session the provider answers ``resource_missing`` for (``ProviderNotFound``)
-has nothing left to bill: the customer is stamped done (logged), a mirrored
-subscription the provider no longer has is marked ``canceled`` locally.
+**"Not found" is retried, never terminal.** Stripe answers ``resource_missing``
+for an object of another account or mode, so a key briefly switched (live to
+test, or another account) would read a live customer as gone. Such a failure
+backs off like any other (:mod:`sm_billing.sweep`, capped at a day) with a
+warning naming the likely cause, and resumes once the right key is back. An
+organisation whose Stripe customer really was deleted is therefore retried
+once a day, logged each time, until an operator stamps
+``billing_customer.teardown_done_at``.
 
 **Single-tenant hosts never tear down.** Everything there is ``"default"``
 with no tenant row; ``"default"`` is refused everywhere.
@@ -55,7 +60,7 @@ from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
 
 from sm_billing import constants as c
-from sm_billing.contracts.provider import ProviderError, ProviderNotFound
+from sm_billing.contracts.provider import ProviderError
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer, Subscription
 from sm_billing.sync import resync
@@ -101,22 +106,6 @@ def _provider(app: FastAPI, tenant_id: str) -> BillingProvider | None:
     return None
 
 
-#: What ``_status`` answers for an object the provider no longer has.
-_GONE = "gone"
-
-
-async def _status(provider: BillingProvider, subscription_id: str) -> str:
-    """The subscription's provider status, or ``_GONE`` when it does not exist."""
-    try:
-        return (await provider.fetch_subscription(subscription_id)).status
-    except ProviderNotFound:
-        return _GONE
-
-
-def _ended(status: str) -> bool:
-    return status == _GONE or status in c.PROVIDER_ENDED_STATUSES
-
-
 async def _expire_checkout(provider: BillingProvider, customer: Customer) -> None:
     """Expire the open session; forget its id only once it cannot be paid."""
     session_id = customer.checkout_session_id
@@ -124,42 +113,22 @@ async def _expire_checkout(provider: BillingProvider, customer: Customer) -> Non
         return
     try:
         await provider.expire_checkout(session_id)
-    except ProviderNotFound:
-        pass  # no such session: nothing to pay into
     except ProviderError:
         # Expiring a completed or already expired session fails too. Ask the
-        # provider which it is; anything still open (or unknown) is retried.
-        try:
-            status = (await provider.fetch_checkout(session_id)).status
-        except ProviderNotFound:
-            status = _GONE
-        if status in (_OPEN, None):
+        # provider which it is; anything still open (or unknown) is retried. A
+        # session it cannot find raises here: retried, never assumed gone.
+        if (await provider.fetch_checkout(session_id)).status in (_OPEN, None):
             raise
     customer.checkout_session_id = None
-
-
-async def _customer_ids(provider: BillingProvider, customer: Customer, tenant_id: str) -> list[str]:
-    """The customer's subscriptions that have not ended; none if it is gone."""
-    try:
-        return await provider.live_subscription_ids(
-            customer.provider_customer_id or "", c.PROVIDER_CANCELABLE_STATUSES
-        )
-    except ProviderNotFound:
-        # Terminal, not a failure: no customer, nothing left to bill.
-        logger.info(
-            "billing: deleted tenant %s's customer %s no longer exists at the provider",
-            tenant_id,
-            customer.provider_customer_id,
-        )
-        return []
 
 
 async def _cancel_one(provider: BillingProvider, subscription_id: str) -> None:
     try:
         await provider.cancel_now(subscription_id)
     except ProviderError:
-        # Refused because it ended meanwhile (another canceler won) or is gone?
-        if not _ended(await _status(provider, subscription_id)):
+        # Refused because it ended meanwhile (another canceler won)? Then done.
+        snap = await provider.fetch_subscription(subscription_id)
+        if snap.status not in c.PROVIDER_ENDED_STATUSES:
             raise
 
 
@@ -172,22 +141,28 @@ async def _cancel(
     full: bool,
     stamp: bool,
 ) -> list[str]:
-    """Cancel and resync; ``full`` also lists the customer, ``stamp`` marks it done."""
+    """Cancel and resync; ``full`` also lists the customer, ``stamp`` marks it done.
+
+    "No such object" (``ProviderNotFound``) is raised like any failure, never
+    read as "nothing left to bill": Stripe hides objects from a key of another
+    account or mode, so a briefly wrong key would otherwise finish a live
+    customer's teardown for good.
+    """
     sub, customer = await _rows(session, tenant_id)
     ids: list[str] = []
     if full and customer is not None and customer.provider_customer_id:
-        ids = await _customer_ids(provider, customer, tenant_id)
+        ids = await provider.live_subscription_ids(
+            customer.provider_customer_id, c.PROVIDER_CANCELABLE_STATUSES
+        )
     mirrored = sub.provider_subscription_id if sub is not None else None
-    mirrored_status = await _status(provider, mirrored) if mirrored else _GONE
-    if mirrored and mirrored not in ids and not _ended(mirrored_status):
-        ids.append(mirrored)
+    if mirrored and mirrored not in ids:
+        snap = await provider.fetch_subscription(mirrored)
+        if snap.status not in c.PROVIDER_ENDED_STATUSES:
+            ids.append(mirrored)
     for subscription_id in ids:
         await _cancel_one(provider, subscription_id)
     if sub is not None and mirrored:
-        if mirrored_status == _GONE:
-            sub.status = c.SubscriptionStatus.CANCELED  # nothing at the provider to re-read
-        else:
-            await resync(session, app, provider, mirrored)
+        await resync(session, app, provider, mirrored)
     if stamp and customer is not None:
         customer.teardown_done_at = datetime.now(UTC)
     return ids
@@ -272,10 +247,11 @@ def subscribe(bus: EventBus, app: FastAPI) -> None:
 
     async def _on_deleted(event: TenantDeleted) -> None:
         from sm_billing.live import ensure_current
+        from sm_billing.sweep import run_teardown  # it imports this module
 
         try:
             await ensure_current(app)  # not through a provider another worker replaced
-            await cancel_for_deleted_tenant(app, event.tenant_id)
+            await run_teardown(app, event.tenant_id)  # a failure is recorded for backoff
         except Exception:
             logger.warning(
                 "billing: could not cancel the subscription of deleted tenant %s; the next "

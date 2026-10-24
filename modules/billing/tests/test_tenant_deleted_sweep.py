@@ -1,5 +1,5 @@
-"""The deleted-tenant sweep: backoff, terminal "gone", the failure budget, live
-settings, and never on a single-tenant host (#92)."""
+"""The deleted-tenant sweep: one backoff for every path, "not found" retried,
+the failure budget, live settings, and never on a single-tenant host (#92)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sm_billing.constants import SubscriptionStatus
 from sm_billing.models import Customer
 from sm_billing.reconcile import reconcile
 from subscription_helpers import _snap
-from teardown_helpers import _customer, _delete, _paying_tenant, _sub
+from teardown_helpers import _customer, _delete, _make_due, _paying_tenant, _sub
 
 
 @pytest.fixture
@@ -35,36 +35,62 @@ def pauses(monkeypatch) -> list[float]:
 
 
 async def _failing_orphans(app, fake, n: int) -> list[str]:
-    """``n`` deleted tenants whose customer listing keeps failing."""
+    """``n`` deleted tenants whose customer listing keeps failing, all due again."""
     fake.fail.add("live_subscription_ids")
     ids = []
     for i in range(n):
         tenant_id = await _paying_tenant(app, fake, with_sub=False, slug=f"org{i}")
-        await _delete(app, tenant_id)  # the event's own attempt fails too
+        await _delete(app, tenant_id)  # the event's own attempt fails and backs off
         ids.append(tenant_id)
+    await _make_due(app, *ids)
     return ids
 
 
-async def test_a_failing_teardown_backs_off_instead_of_retrying_every_run(app, fake):
-    [tenant_id] = await _failing_orphans(app, fake, 1)
+async def test_the_events_failure_is_recorded_too(app, fake):
+    """No path skips the bookkeeping: the TenantDeleted handler counts as attempt 1."""
+    fake.fail.add("live_subscription_ids")
+    tenant_id = await _paying_tenant(app, fake, with_sub=False)
     before = datetime.now(UTC)
-    first = await reconcile(app)
-    assert [t for t, _ in first.errors] == [tenant_id]
+    await _delete(app, tenant_id)
     customer = await _customer(app, tenant_id)
     assert customer.teardown_attempts == 1
     due = customer.teardown_next_attempt_at.replace(tzinfo=UTC)
     assert due >= before + sweep.RETRY_BASE - timedelta(seconds=5)
+    fake.calls.clear()
+    report = await reconcile(app)  # not due yet: no provider call at all
+    assert (report.errors, fake.calls) == ([], [])
+
+
+async def test_a_failing_teardown_backs_off_instead_of_retrying_every_run(app, fake):
+    [tenant_id] = await _failing_orphans(app, fake, 1)
+    first = await reconcile(app)
+    assert [t for t, _ in first.errors] == [tenant_id]
+    assert (await _customer(app, tenant_id)).teardown_attempts == 2
 
     fake.calls.clear()
-    second = await reconcile(app)  # not due yet: no provider call at all
+    second = await reconcile(app)
     assert (second.errors, fake.calls) == ([], [])
 
-    async with app.state.sm.db.session_factory() as session:
-        (await session.get(Customer, tenant_id)).teardown_next_attempt_at = before
-        await session.commit()
+    await _make_due(app, tenant_id)
     fake.fail.clear()
     assert (await reconcile(app)).torn_down == 1
     assert (await _customer(app, tenant_id)).teardown_done_at is not None
+
+
+async def test_a_mirrored_subscription_goes_through_the_same_backoff(app, fake):
+    """reconcile_one's path for a deleted tenant: due check and failure count."""
+    tenant_id = await _paying_tenant(app, fake)
+    fake.fail.add("cancel_now")
+    await _delete(app, tenant_id)
+    await _make_due(app, tenant_id)
+    first = await reconcile(app)
+    assert [t for t, _ in first.errors] == [tenant_id]
+    assert (await _customer(app, tenant_id)).teardown_attempts == 2
+
+    fake.calls.clear()
+    second = await reconcile(app)
+    assert (second.errors, fake.calls) == ([], [])
+    assert (await _customer(app, tenant_id)).teardown_attempts == 2
 
 
 def test_the_retry_delay_doubles_up_to_a_cap():
@@ -73,26 +99,35 @@ def test_the_retry_delay_doubles_up_to_a_cap():
     assert sweep.retry_delay(50) == sweep.RETRY_CAP
 
 
-async def test_a_customer_gone_at_the_provider_is_terminal(app, fake, caplog):
-    tenant_id = await _paying_tenant(app, fake, with_sub=False)
-    fake.missing.add("live_subscription_ids")
-    with caplog.at_level("INFO"):
+@pytest.mark.parametrize("method", ["live_subscription_ids", "fetch_subscription"])
+async def test_not_found_is_retried_not_taken_as_done(app, fake, caplog, method):
+    """A key for another account or mode hides a live customer: never terminal.
+
+    Once the right key is back, the retry cancels what still bills.
+    """
+    tenant_id = await _paying_tenant(app, fake)
+    fake.missing.add(method)
+    with caplog.at_level("WARNING"):
         await _delete(app, tenant_id)
     customer = await _customer(app, tenant_id)
-    assert customer.teardown_done_at is not None
-    assert customer.teardown_attempts == 0
-    assert any("no longer exists at the provider" in r.message for r in caplog.records)
-    fake.calls.clear()
-    assert ((await reconcile(app)).errors, fake.calls) == ([], [])
+    assert (customer.teardown_done_at, customer.teardown_attempts) == (None, 1)
+    assert any("another account or test/live" in r.message for r in caplog.records)
+    assert (await _sub(app, tenant_id)).status == SubscriptionStatus.ACTIVE
 
-
-async def test_a_mirrored_subscription_gone_at_the_provider_is_canceled_locally(app, fake):
-    tenant_id = await _paying_tenant(app, fake)
-    fake.missing.add("fetch_subscription")
-    await _delete(app, tenant_id)
-    assert fake.called("cancel_now") == []
-    assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
+    fake.missing.clear()  # the live key is back
+    await _make_due(app, tenant_id)
+    await reconcile(app)
+    assert fake.snapshots["sub_1"].status == "canceled"
     assert (await _customer(app, tenant_id)).teardown_done_at is not None
+
+
+async def test_a_missing_checkout_session_is_retried(app, fake):
+    tenant_id = await _paying_tenant(app, fake, with_sub=False)
+    fake.fail.add("expire_checkout")
+    fake.missing.add("fetch_checkout")
+    await _delete(app, tenant_id)
+    customer = await _customer(app, tenant_id)
+    assert (customer.checkout_session_id, customer.teardown_done_at) == ("cs_open", None)
 
 
 async def test_the_sweep_spends_the_schedulers_failure_budget(app, fake, pauses):
@@ -110,6 +145,7 @@ async def test_the_sweep_stops_when_the_provider_settings_change(app, fake, monk
         fake.live[f"cus_{slug}"] = [f"sub_{slug}"]
         fake.snapshots[f"sub_{slug}"] = _snap(tenant_id, sid=f"sub_{slug}")
         await _delete(app, tenant_id)
+        await _make_due(app, tenant_id)
     fake.fail.clear()
     fake.calls.clear()
     answers = iter([False, True])

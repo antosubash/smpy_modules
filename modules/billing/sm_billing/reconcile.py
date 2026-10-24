@@ -23,9 +23,8 @@ from sm_billing.lifecycle import tenant_gone
 from sm_billing.models import Subscription
 from sm_billing.seats import push_quantity
 from sm_billing.services import current_provider
-from sm_billing.sweep import sweep_deleted_tenants
+from sm_billing.sweep import run_teardown, sweep_deleted_tenants
 from sm_billing.sync import resync
-from sm_billing.teardown import cancel_for_deleted_tenant
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -70,7 +69,7 @@ async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> b
         if deleted:
             # The ``TenantDeleted`` cancel may have failed: cancel rather than
             # keep mirroring a subscription nobody owns (``sm_billing.teardown``).
-            await cancel_for_deleted_tenant(app, tenant_id)
+            await run_teardown(app, tenant_id)  # due check and failure bookkeeping
             return False
         return await push_quantity(app, tenant_id)
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 
 from helpers import make_plan, make_sub, make_tenant
 from simple_module_db import finalize_session
@@ -60,3 +61,13 @@ async def _sub(app, tenant_id: str) -> Subscription | None:
 async def _customer(app, tenant_id: str) -> Customer | None:
     async with app.state.sm.db.session_factory() as session:
         return await session.get(Customer, tenant_id)
+
+
+async def _make_due(app, *tenant_ids: str) -> None:
+    """Pull each tenant's teardown retry forward to now, as time passing would."""
+    async with app.state.sm.db.session_factory() as session:
+        for tenant_id in tenant_ids:
+            customer = await session.get(Customer, tenant_id)
+            if customer is not None and customer.teardown_next_attempt_at is not None:
+                customer.teardown_next_attempt_at = datetime.now(UTC)
+        await session.commit()

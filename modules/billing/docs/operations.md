@@ -213,9 +213,16 @@ backs off: 15 minutes after the first failure, doubling each time up to a day
 (`teardown_attempts`, `teardown_next_attempt_at`). Under the scheduler the
 sweep shares the tick's error budget, so five provider errors in a row end the
 tick. It re-reads the provider settings before each organisation and stops
-when they changed. A Stripe customer that no longer exists (`resource_missing`)
-is not a failure: there is nothing left to bill, so it is stamped done and
-logged. A single-tenant host never sweeps, and the `default` organisation is
+when they changed. Every path that tears down a deleted organisation (the
+`TenantDeleted` handler, a subscription row's reconcile, the sweep) shares
+this backoff and failure count.
+
+A Stripe "No such customer/subscription" (`resource_missing`) is **retried**,
+not taken as done. Stripe also gives that answer for a key from another
+account, or a test key reading live objects, so a briefly wrong key must not
+end a live customer's teardown for good. The log names that likely cause. If
+the customer really was deleted in Stripe, the retry costs one call a day;
+set `billing_customer.teardown_done_at` to stop it. A single-tenant host never sweeps, and the `default` organisation is
 never torn down, because it has no organisation row by design. Organisations
 deleted before this release are swept too, on the first reconcile after the
 upgrade. "Still

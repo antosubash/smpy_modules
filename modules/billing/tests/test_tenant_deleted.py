@@ -14,7 +14,7 @@ from sm_billing.constants import PROVIDER_CANCELABLE_STATUSES, SubscriptionStatu
 from sm_billing.contracts.provider import CheckoutSnapshot
 from sm_billing.models import Customer
 from sm_billing.reconcile import reconcile
-from teardown_helpers import _delete, _paying_tenant, _sub
+from teardown_helpers import _delete, _make_due, _paying_tenant, _sub
 from tenants.contracts.events import TenantDeleted
 from tenants.models import Tenant
 
@@ -109,6 +109,7 @@ async def test_a_checkout_still_open_is_kept_and_retried(app, fake, caplog, stat
     assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
 
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     assert (await reconcile(app)).errors == []
     assert await _checkout_id(app, tenant_id) is None
     assert len(fake.called("cancel_now")) == 1
@@ -156,6 +157,7 @@ async def test_provider_failure_is_logged_and_reconcile_retries(app, fake, caplo
     assert any("deleted tenant" in r.message for r in caplog.records)
 
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     report = await reconcile(app)
     assert report.errors == []
     assert len(fake.called("cancel_now")) == 2
@@ -166,6 +168,7 @@ async def test_reconcile_failure_is_reported_per_tenant(app, fake):
     tenant_id = await _paying_tenant(app, fake)
     fake.fail.add("cancel_now")
     await _delete(app, tenant_id)
+    await _make_due(app, tenant_id)
     report = await reconcile(app)
     assert [t for t, _ in report.errors] == [tenant_id]
 

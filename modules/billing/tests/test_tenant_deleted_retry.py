@@ -17,7 +17,7 @@ from sm_billing.contracts.provider import CheckoutSnapshot
 from sm_billing.reconcile import reconcile
 from sm_billing.scheduler import reconcile_stale
 from subscription_helpers import _snap
-from teardown_helpers import _customer, _delete, _paying_tenant, _sub
+from teardown_helpers import _customer, _delete, _make_due, _paying_tenant, _sub
 
 CUS = "cus_acme"
 
@@ -53,6 +53,7 @@ async def test_an_unmirrored_subscription_whose_cancel_failed_is_retried(app, fa
     assert (await _customer(app, tenant_id)).teardown_done_at is None
 
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     report = await reconcile(app)
     assert (report.errors, report.torn_down) == ([], 1)
     assert fake.snapshots["sub_new"].status == "canceled"
@@ -67,6 +68,7 @@ async def test_a_local_only_row_whose_customer_cancel_failed_is_retried(app, fak
     assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
 
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     assert (await reconcile(app)).torn_down == 1
     assert fake.snapshots["sub_new"].status == "canceled"
 
@@ -77,6 +79,7 @@ async def test_the_scheduled_tick_sweeps_too(app, fake):
     fake.fail.add("cancel_now")
     await _delete(app, tenant_id)
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     report = await reconcile_stale(app, timedelta(minutes=60))
     assert report.torn_down == 1
     assert fake.snapshots["sub_new"].status == "canceled"
@@ -90,6 +93,7 @@ async def test_an_open_checkout_with_nothing_mirrored_is_retried(app, fake):
     assert (await _customer(app, tenant_id)).checkout_session_id == "cs_open"
 
     fake.fail.clear()
+    await _make_due(app, tenant_id)
     assert (await reconcile(app)).torn_down == 1
     customer = await _customer(app, tenant_id)
     assert customer.checkout_session_id is None

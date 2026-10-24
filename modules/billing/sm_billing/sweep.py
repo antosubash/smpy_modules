@@ -10,8 +10,12 @@ has not completed (``teardown_done_at``) and whose retry is due
 - **Cheap once done.** A stamped customer is never selected again.
 - **Backoff.** A failure counts ``teardown_attempts`` up and puts the next try
   ``RETRY_BASE * 2**(attempts-1)`` away, capped at ``RETRY_CAP``, so a customer
-  that keeps failing is not retried on every tick. A customer the provider no
-  longer has is terminal inside the teardown (stamped done), not a failure.
+  that keeps failing is not retried on every tick. :func:`run_teardown` owns
+  that bookkeeping for *every* deleted-tenant teardown — this sweep,
+  ``reconcile_one`` for a mirrored subscription, and the ``TenantDeleted``
+  handler — so no path skips the due check or the failure count. "Not found"
+  at the provider is a failure like any other: it may be a key for another
+  account or mode, so it is retried (warned about), never taken as done.
 - **Failure budget.** Under the scheduler the sweep shares the tick's
   :class:`Budget`: provider errors double the pause and enough of them in a row
   end the tick, exactly as for subscriptions, so an outage is waited out.
@@ -39,7 +43,7 @@ from sqlalchemy import or_, select
 from tenants.models import Tenant
 
 from sm_billing import live
-from sm_billing.contracts.provider import ProviderError
+from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer
 from sm_billing.teardown import cancel_for_deleted_tenant
@@ -119,6 +123,47 @@ async def _back_off(app: FastAPI, tenant_id: str) -> None:
         await finalize_session(session)
 
 
+def _aware(value: datetime) -> datetime:
+    """SQLite hands timezone-aware columns back naive; they were stored as UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+async def _due(app: FastAPI, tenant_id: str) -> bool:
+    async with app.state.sm.db.session_factory() as session:
+        customer = await session.get(Customer, tenant_id)
+    if customer is None or customer.teardown_next_attempt_at is None:
+        return True
+    return _aware(customer.teardown_next_attempt_at) <= datetime.now(UTC)
+
+
+async def run_teardown(app: FastAPI, tenant_id: str) -> list[str] | None:
+    """The one way a deleted tenant's teardown runs: the ``TenantDeleted``
+    handler, ``reconcile_one`` and the sweep all come through here.
+
+    Returns ``None`` without a provider call while the tenant's retry is not
+    due, else what :func:`~sm_billing.teardown.cancel_for_deleted_tenant`
+    canceled. A failure is recorded (``teardown_attempts``, the next due
+    time), logged and re-raised for the caller's report and budget.
+    """
+    if not await _due(app, tenant_id):
+        return None
+    try:
+        return await cancel_for_deleted_tenant(app, tenant_id)
+    except Exception as exc:
+        await _back_off(app, tenant_id)
+        if isinstance(exc, ProviderNotFound):
+            logger.warning(
+                "billing: the provider has no record of deleted tenant %s's customer or "
+                "subscription (%s). If the Stripe key is for another account or test/live "
+                "mode, fix it; the teardown retries with backoff either way",
+                tenant_id,
+                exc,
+            )
+        else:
+            logger.warning("billing: teardown failed for tenant %s", tenant_id, exc_info=True)
+        raise
+
+
 async def sweep_deleted_tenants(
     app: FastAPI,
     report: ReconcileReport,
@@ -137,11 +182,10 @@ async def sweep_deleted_tenants(
             report.skipped = "settings changed"  # the next run uses the new provider
             return
         try:
-            await cancel_for_deleted_tenant(app, orphan)
+            if await run_teardown(app, orphan) is None:
+                continue  # its retry was pushed back since the query
         except Exception as exc:
-            logger.warning("billing: teardown retry failed for tenant %s", orphan, exc_info=True)
             report.errors.append((orphan, f"{type(exc).__name__}: {exc}"))
-            await _back_off(app, orphan)
             if budget is not None and budget.failed(exc):
                 report.skipped = "provider failing"
                 logger.warning("billing: provider failing; the sweep resumes next interval")

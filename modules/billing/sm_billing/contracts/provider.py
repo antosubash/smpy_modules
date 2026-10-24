@@ -21,8 +21,9 @@ class ProviderError(Exception):
 
 
 class ProviderNotFound(ProviderError):  # noqa: N818 - reads as the condition
-    """The object the call named does not exist at the provider (Stripe
-    ``resource_missing``): permanent, so a retry would fail the same way."""
+    """The provider cannot see the object the call named (Stripe
+    ``resource_missing``). Not proof it is gone: Stripe answers the same for an
+    object of another account or test/live mode, so callers retry it."""
 
 
 class InvalidWebhookSignature(ProviderError):  # noqa: N818 - reads as the condition
