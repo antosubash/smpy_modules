@@ -104,6 +104,7 @@ async def apply_snapshot(
     sub.provider_subscription_id = snap.id
     sub.quantity = max(1, snap.quantity)
     sub.trial_end = snap.trial_end
+    sub.current_period_start = snap.current_period_start
     sub.current_period_end = snap.current_period_end
     sub.cancel_at_period_end = snap.cancel_at_period_end
     sub.synced_at = datetime.now(UTC)

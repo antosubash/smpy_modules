@@ -23,7 +23,10 @@ class BillingError(Exception):
 
 
 async def _billing_error(_: Request, exc: BillingError) -> JSONResponse:
-    return JSONResponse({"detail": exc.code, **exc.extra}, status_code=exc.status_code)
+    headers = getattr(exc, "headers", None)
+    return JSONResponse(
+        {"detail": exc.code, **exc.extra}, status_code=exc.status_code, headers=headers
+    )
 
 
 async def _plan_error(_: Request, exc: PlanError) -> JSONResponse:

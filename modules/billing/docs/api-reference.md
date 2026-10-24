@@ -32,6 +32,51 @@ administrator then sets them per plan in the plan editor's Limits and Features.
 To have a key suggested in the editor, add it to `KNOWN_LIMIT_KEYS` in
 `sm_billing/constants.py`.
 
+## Metering usage (from another module)
+
+For limits that are *used up* per billing period (API calls, AI tokens,
+exports), billing installs a `UsageMeter` as `app.state.billing_usage`. Never
+import billing at runtime: read the attribute, and treat `None` as "billing is
+not installed, nothing is limited". The protocol is
+`sm_billing.contracts.metering`; import it only under `TYPE_CHECKING`.
+(Upstream issue antosubash/simple_module_python#616 tracks moving it next to
+`EntitlementProvider` in `tenants.contracts`.)
+
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sm_billing.contracts.metering import UsageMeter
+
+usage: UsageMeter | None = getattr(request.app.state, "billing_usage", None)
+if usage is not None:
+    outcome = await usage.consume(
+        tenant_id, "ai.requests", 1, request.headers.get("Idempotency-Key") or job_id,
+        source="ai",
+    )
+    if not outcome.ok:  # Exceeded: used + qty would pass the limit
+        raise HTTPException(402, f"limit {outcome.limit} reached")
+```
+
+| Call | Does |
+|---|---|
+| `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)` or `Exceeded(used, limit, requested, period_end)`; a refusal writes nothing |
+| `record(tenant, meter, qty, key, *, source, occurred_at=None, db=None)` | count usage reported after the fact, unconditionally (may pass the limit; the next `consume` is then refused) |
+| `refund(tenant, meter, key)` | reverse that call in the period it counted against; idempotent |
+| `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement |
+
+The meter key is a `Plan.limits` key, exactly like an entitlement: absent is
+unlimited, `0` forbids. Quantities are positive integers in the meter's minor
+unit. A replayed `key` returns the original outcome with `replayed=True` and is
+never counted twice; keys ending `:refund` or starting `adjust:` are reserved.
+Never put personal data in a key or `source`.
+
+Each call runs in its own short transaction. Pass `db=` only when the business
+write that follows must be atomic with the usage *and* the rest of that
+transaction is short: the counter's row lock is held until the caller commits,
+so every other call for that tenant and meter waits behind it. On SQLite a
+`db=` call can fail closed with 503 `usage_busy` (see the error table).
+
 ## Tenant API — `/api/billing`
 
 The organisation is always the session's **active tenant**; no route takes a
@@ -198,5 +243,6 @@ Handled events: `checkout.session.completed` and
 | `tenant_not_found` | 404 | assign, resync | |
 | `invalid_return_url` | 400 | connection | `{"message"}` says the rule |
 | `provider_unavailable` | 503 | any | no provider built (startup failed) |
+| `usage_busy` | 503 | a metered route (SQLite) | the metering write could not take the database lock; nothing was counted. `Retry-After: 1` |
 | `provider_error` | 502 | any | Stripe refused; `{"message"}` |
 | `plan_limit` | 402 | other modules | from `tenants`: `{"key", "limit"}` |
