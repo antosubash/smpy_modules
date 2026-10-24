@@ -49,13 +49,17 @@ export function PublicFieldsChecklist({
       {candidates.map((field) => {
         const id = `public-field-${field.uid}`;
         const eligible = SUBMITTABLE_TYPES.has(field.type);
+        const ticked = selected.includes(field.key);
         return (
           <div key={field.uid} className="grid gap-0.5">
             <div className="flex items-center gap-2">
               <Checkbox
                 id={id}
-                checked={selected.includes(field.key)}
-                disabled={!eligible}
+                checked={ticked}
+                // A ticked field whose type changed to one a visitor cannot
+                // fill in stays untickable, or the server's refusal of it
+                // (`config.settle`) could never be cleared from this screen.
+                disabled={!eligible && !ticked}
                 onCheckedChange={(checked) => toggle(field.key, checked === true)}
               />
               <Label htmlFor={id} className="font-normal">

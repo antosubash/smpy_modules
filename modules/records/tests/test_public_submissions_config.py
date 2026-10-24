@@ -27,6 +27,8 @@ def _message(resp) -> str:
         (form_config(notify_to=["not-an-address"]), "notify_to"),
         (form_config(notify_to=[f"a{i}@x.io" for i in range(11)]), "notify_to"),
         (form_config(retention_days=-1), "retention_days"),
+        (form_config(retention_days=36501), "retention_days"),
+        ({"kind": "subscription", "pending_purge_days": 10**9}, "pending_purge_days"),
         (form_config(public_fields=["name", "name"]), "twice"),
         (form_config(consent={"required": False, "text": {"EN!": "x"}}), "locale"),
         (form_config(consent={"required": False, "text": {"en": "x" * 2001}}), "2000"),

@@ -98,10 +98,14 @@ export function FieldList({
     focusRefs.current.set(`${uid}:${direction}`, node);
   };
 
+  // The server keeps the system fields last (#101), so an ordinary row never
+  // moves past them: its list ends at the last ordinary row.
+  const movable = fields.filter((f) => !f.system).length;
+
   const moveTo = (index: number, to: number, uid: string, direction: 'up' | 'down') => {
     // A row that reaches an end loses its button to `disabled`, so focus
     // lands on the one that can still move rather than nowhere.
-    const stillMovable = direction === 'up' ? to > 0 : to < fields.length - 1;
+    const stillMovable = direction === 'up' ? to > 0 : to < movable - 1;
     refocus.current = `${uid}:${stillMovable ? direction : direction === 'up' ? 'down' : 'up'}`;
     onChange(move(fields, index, to));
   };
@@ -135,7 +139,7 @@ export function FieldList({
               key={field.uid}
               field={field}
               index={index}
-              total={fields.length}
+              total={movable}
               expanded={expanded.has(field.uid)}
               keyLocked={field.fromServer}
               siblingKeys={fields.filter((_, i) => i !== index).map((f) => f.key)}

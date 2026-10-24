@@ -24,6 +24,7 @@ __all__ = [
     "KIND_SUBSCRIPTION",
     "MAX_CONSENT_TEXT_LEN",
     "MAX_NOTIFY_TO",
+    "MAX_RETENTION_DAYS",
     "ConsentConfig",
     "PublicSubmissionsConfig",
     "SubmissionKind",
@@ -38,6 +39,9 @@ SubmissionKind = Literal["form", "subscription"]
 
 MAX_NOTIFY_TO = 10
 MAX_CONSENT_TEXT_LEN = 2000
+MAX_RETENTION_DAYS = 36500
+"""A century: an unbounded day count overflows ``timedelta`` the first time a
+purge subtracts it from now."""
 
 
 class ConsentConfig(SQLModel):
@@ -69,9 +73,9 @@ class PublicSubmissionsConfig(SQLModel):
     consent: ConsentConfig = Field(default_factory=ConsentConfig)
     double_opt_in: bool = True
     """Subscription kind only. Off requires ``consent.required``."""
-    retention_days: int = Field(default=365, ge=0)
+    retention_days: int = Field(default=365, ge=0, le=MAX_RETENTION_DAYS)
     """Form kind: records older than this are purged. ``0`` keeps them."""
-    pending_purge_days: int = Field(default=30, ge=1)
+    pending_purge_days: int = Field(default=30, ge=1, le=MAX_RETENTION_DAYS)
     """Subscription kind: never-confirmed records are purged after this."""
 
     @field_validator("notify_to")
