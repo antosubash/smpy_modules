@@ -133,9 +133,16 @@ export function UsageDetail({ row, meters, csrf, canManage, onClose, onChanged }
                 </Button>
               ))}
           </div>
-          <UsageHolds holds={detail.holds} canManage={canManage} busy={busy} onRelease={release} />
+          <UsageHolds
+            holds={detail.holds}
+            failed={detail.failed}
+            canManage={canManage}
+            busy={busy}
+            onRelease={release}
+          />
           <UsageLedger
             ledger={detail.ledger}
+            failed={detail.failed}
             kind={detail.kind}
             onKind={detail.setKind}
             onPage={detail.setPage}

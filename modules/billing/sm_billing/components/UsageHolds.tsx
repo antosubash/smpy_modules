@@ -14,13 +14,15 @@ import { formatDateTime, holdStatusLabel } from '../utils/usage';
 
 interface Props {
   holds: UsageHold[] | null;
+  /** The current query failed: show that, not the last query's rows. */
+  failed: boolean;
   canManage: boolean;
   busy: boolean;
   onRelease: (hold: UsageHold) => void;
 }
 
 /** The holds that make up the gauges: held (expiring) or committed (until released). */
-export function UsageHolds({ holds, canManage, busy, onRelease }: Props) {
+export function UsageHolds({ holds, failed, canManage, busy, onRelease }: Props) {
   const { t, locale } = useT();
   const c = keys.billing.admin_usage.holds;
   return (
@@ -28,7 +30,9 @@ export function UsageHolds({ holds, canManage, busy, onRelease }: Props) {
       <h3 id="usage-holds-title" className="text-sm font-semibold">
         {t(c.title)}
       </h3>
-      {holds === null ? (
+      {failed ? (
+        <p className="text-sm text-destructive">{t(keys.billing.admin_usage.ledger.load_failed)}</p>
+      ) : holds === null ? (
         <p className="text-sm text-muted-foreground">
           {t(keys.billing.admin_usage.ledger.loading)}
         </p>

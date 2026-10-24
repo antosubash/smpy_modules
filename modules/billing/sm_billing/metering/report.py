@@ -13,14 +13,14 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from tenants.models import Tenant
 
 from sm_billing.constants import ENTITLED_STATUSES
 from sm_billing.contracts.metering import LIVE_HOLD_STATUSES, MeterKind
-from sm_billing.metering.periods import as_utc, current_period
+from sm_billing.metering.periods import as_utc, current_period, previous_period
 from sm_billing.metering.schemas import MeterUsageOut, Period, UsagePageOut, UsageRowOut
 from sm_billing.models import Plan, Subscription, UsageGauge, UsageHold, UsagePeriod
 from sm_billing.plans import PlanService
@@ -31,8 +31,9 @@ if TYPE_CHECKING:
     from sm_billing.contracts.metering import MeterDefinition
     from sm_billing.metering.registry import MeterRegistry
 
-#: How far back "previous period" looks: an annual period plus margin.
-PREVIOUS_LOOKBACK = timedelta(days=400)
+#: How far back a rollup can start and still be the current or previous period:
+#: two annual periods plus margin.
+PREVIOUS_LOOKBACK = timedelta(days=800)
 #: The "over 80%" filter's threshold.
 OVER_PERCENT = 80.0
 
@@ -41,6 +42,8 @@ OVER_PERCENT = 80.0
 class TenantPlan:
     limits: dict[str, int]
     period: tuple[datetime, datetime]
+    #: The period immediately before ``period`` (its end is ``period``'s start).
+    previous: tuple[datetime, datetime]
 
 
 async def plan_contexts(
@@ -69,7 +72,8 @@ async def plan_contexts(
         entitled = sub is not None and sub.status in ENTITLED_STATUSES
         plan = (plans.get(sub.plan_id) if entitled and sub else None) or default
         limits = {k: int(v) for k, v in (plan.limits or {}).items()}
-        out[tenant_id] = TenantPlan(limits, current_period(sub, now))
+        period = current_period(sub, now)
+        out[tenant_id] = TenantPlan(limits, period, previous_period(sub, now))
     return out
 
 
@@ -137,35 +141,44 @@ def percent(used: int, limit: int | None) -> float | None:
     return round(used * 100.0 / limit, 1)
 
 
-async def _counter_rows(session, now: datetime, meter: str | None, period: Period):
+async def _counter_rows(session, now: datetime, meter: str | None):
+    """Every rollup that can be a tenant's current or previous period."""
     cols = (UsagePeriod.tenant_id, UsagePeriod.meter, UsagePeriod.used)
-    stmt = select(*cols, UsagePeriod.period_start, UsagePeriod.period_end)
-    if period == "current":
-        stmt = stmt.where(UsagePeriod.period_start <= now, UsagePeriod.period_end > now)
-    else:
-        stmt = stmt.where(
-            UsagePeriod.period_end <= now, UsagePeriod.period_end > now - PREVIOUS_LOOKBACK
-        )
+    stmt = select(*cols, UsagePeriod.period_start, UsagePeriod.period_end).where(
+        UsagePeriod.period_start <= now, UsagePeriod.period_start > now - PREVIOUS_LOOKBACK
+    )
     if meter:
         stmt = stmt.where(UsagePeriod.meter == meter)
     return (await session.execute(stmt)).all()
 
 
-def _pick_counters(rows, ctx: dict[str, TenantPlan], period: Period) -> dict[tuple, Any]:
-    """Current: the row of the tenant's current period. Previous: the latest
-    row that ended by the time the current one started."""
-    picked: dict[tuple, Any] = {}
+def _pick_counters(rows, ctx: dict[str, TenantPlan], period: Period) -> dict[tuple, tuple]:
+    """``{(tenant, meter): (used, start, end)}`` for the period asked for.
+
+    Current: the rollup whose ``period_start`` is the tenant's resolved
+    current start (the row enforcement counts into), shown with the resolved
+    end: a provider that extends a period keeps its start, so the row's
+    stored end can be stale. Previous: the rollup of the period immediately
+    before, matched on either of its exact boundaries; a tenant that used
+    nothing then has no row, never an older one.
+    """
+    picked: dict[tuple, tuple] = {}
     for row in rows:
-        start = ctx[row.tenant_id].period[0]
+        plan = ctx[row.tenant_id]
         row_start, row_end = as_utc(row.period_start), as_utc(row.period_end)
-        if period == "current" and row_start != start:
-            continue  # a period the provider has since moved off
-        if period == "previous" and row_end > start:
-            continue
+        if period == "current":
+            if row_start != plan.period[0]:
+                continue
+            shown = plan.period
+        else:
+            prev_start, prev_end = plan.previous
+            if row_start >= prev_end or (row_start != prev_start and row_end != prev_end):
+                continue
+            shown = (row_start, prev_end)
         key = (row.tenant_id, row.meter)
         best = picked.get(key)
-        if best is None or as_utc(best.period_start) < row_start:
-            picked[key] = row
+        if best is None or best[1] < row_start:
+            picked[key] = (int(row.used), *shown)
     return picked
 
 
@@ -200,14 +213,15 @@ async def overview(
     per_page: int = 25,
 ) -> UsagePageOut:
     """Every tenant x meter with usage, fullest first, filtered and paged."""
-    counters = await _counter_rows(session, now, meter, period)
+    counters = await _counter_rows(session, now, meter)
     gauges = await _gauge_levels(session, None, meter) if period == "current" else []
     ids = sorted({r.tenant_id for r in counters} | {r.tenant_id for r in gauges})
     ctx = await plan_contexts(session, ids, now)
     names = await _tenant_names(session, ids)
+    picked = _pick_counters(counters, ctx, period)
     raw = [
-        (r.tenant_id, r.meter, MeterKind.COUNTER, int(r.used), r.period_start, r.period_end)
-        for r in _pick_counters(counters, ctx, period).values()
+        (tenant_id, key, MeterKind.COUNTER, used, start, end)
+        for (tenant_id, key), (used, start, end) in picked.items()
     ]
     raw += [(r.tenant_id, r.meter, MeterKind.GAUGE, int(r.in_use), None, None) for r in gauges]
     rows: list[UsageRowOut] = []

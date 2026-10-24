@@ -9,7 +9,7 @@ month containing ``now``. Rollover needs no job: a new period is a new
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sm_billing.constants import ENTITLED_STATUSES
@@ -33,9 +33,8 @@ def calendar_month(now: datetime) -> tuple[datetime, datetime]:
     return start, datetime(now.year, now.month + 1, 1, tzinfo=UTC)
 
 
-def current_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime]:
-    """The ``[start, end)`` a call at ``now`` counts against; ``end`` is exclusive."""
-    now = as_utc(now)
+def _provider_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime] | None:
+    """The subscription's own period, when it is in force and ``now`` is inside it."""
     if (
         sub is not None
         and sub.status in ENTITLED_STATUSES
@@ -45,4 +44,44 @@ def current_period(sub: Subscription | None, now: datetime) -> tuple[datetime, d
         start, end = as_utc(sub.current_period_start), as_utc(sub.current_period_end)
         if start <= now < end:
             return start, end
-    return calendar_month(now)
+    return None
+
+
+def current_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime]:
+    """The ``[start, end)`` a call at ``now`` counts against; ``end`` is exclusive."""
+    now = as_utc(now)
+    return _provider_period(sub, now) or calendar_month(now)
+
+
+def _back_one(start: datetime, *, years: int) -> datetime:
+    """``start`` one month (or ``years`` years) earlier, the day clamped to
+    the shorter month (Mar 31 -> Feb 28)."""
+    if years:
+        year, month = start.year - years, start.month
+    elif start.month == 1:
+        year, month = start.year - 1, 12
+    else:
+        year, month = start.year, start.month - 1
+    day = start.day
+    while True:
+        try:
+            return start.replace(year=year, month=month, day=day)
+        except ValueError:
+            day -= 1
+
+
+def previous_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime]:
+    """The period immediately before ``current_period(sub, now)``.
+
+    One subscription interval back from the provider's start when the
+    provider's period is the current one, else the previous calendar month.
+    Its end is always the current period's start.
+    """
+    now = as_utc(now)
+    provider = _provider_period(sub, now)
+    if provider is None:
+        start = calendar_month(now)[0]
+        return calendar_month(start - timedelta(microseconds=1))[0], start
+    start = provider[0]
+    yearly = sub is not None and sub.interval == "year"
+    return _back_one(start, years=1 if yearly else 0), start

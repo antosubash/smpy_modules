@@ -6,28 +6,37 @@ import type { Paged, UsageEvent, UsageHold } from '../utils/types';
 export const USAGE_API = `${ADMIN_API}/usage`;
 const LEDGER_PER_PAGE = 20;
 
+interface Loaded {
+  key: string;
+  ledger: Paged<UsageEvent>;
+  holds: UsageHold[];
+}
+
 /**
  * One organisation's ledger page and open holds, for the usage drawer.
  *
  * Fetched when the drawer opens and again whenever a filter, the page or
- * `refresh()` changes; a response for a tenant the drawer has since left is
- * dropped. `null` tenant: nothing loads.
+ * `refresh()` changes; a response for a query the drawer has since left is
+ * dropped. `ledger`/`holds` are `null` until the current query has answered,
+ * and stay `null` (with `failed`) when it fails. `null` tenant: nothing loads.
  */
 export function useUsageDetail(tenantId: string | null, csrf: string, initialMeter = '') {
   const [meter, setMeterState] = useState(initialMeter);
   const [kind, setKindState] = useState('');
   const [page, setPage] = useState(1);
   const [version, setVersion] = useState(0);
-  const [ledger, setLedger] = useState<Paged<UsageEvent> | null>(null);
-  const [holds, setHolds] = useState<UsageHold[] | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  // What the controls ask for. Results are shown only while they answer this
+  // exact query, so a filter change never leaves the last filter's holds
+  // (and their Release buttons) on screen under the new controls.
+  const key = JSON.stringify([tenantId, meter, kind, page]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over when the drawer opens on another tenant
   useEffect(() => {
     setMeterState(initialMeter);
     setKindState('');
     setPage(1);
-    setLedger(null);
-    setHolds(null);
   }, [tenantId, initialMeter]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is the refresh trigger
@@ -49,16 +58,22 @@ export function useUsageDetail(tenantId: string | null, csrf: string, initialMet
       api<Paged<UsageEvent>>(`${base}/events?${ledgerQuery}`, csrf),
       api<UsageHold[]>(`${base}/holds?${holdsQuery}`, csrf),
     ])
-      .then(([nextLedger, nextHolds]) => {
+      .then(([ledger, holds]) => {
         if (!live) return;
-        setLedger(nextLedger);
-        setHolds(nextHolds);
+        setLoaded({ key, ledger, holds });
+        setFailedKey(null);
       })
-      .catch((err: Error) => live && toast.error(err.message));
+      .catch((err: Error) => {
+        if (!live) return;
+        // Drop what was shown: after a failed refresh it may be stale too.
+        setLoaded(null);
+        setFailedKey(key);
+        toast.error(err.message);
+      });
     return () => {
       live = false;
     };
-  }, [tenantId, csrf, meter, kind, page, version]);
+  }, [key, csrf, version]);
 
   const setMeter = useCallback((value: string) => {
     setMeterState(value);
@@ -70,5 +85,17 @@ export function useUsageDetail(tenantId: string | null, csrf: string, initialMet
   }, []);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
-  return { meter, setMeter, kind, setKind, page, setPage, ledger, holds, refresh };
+  const current = loaded?.key === key ? loaded : null;
+  return {
+    meter,
+    setMeter,
+    kind,
+    setKind,
+    page,
+    setPage,
+    ledger: current?.ledger ?? null,
+    holds: current?.holds ?? null,
+    failed: failedKey === key,
+    refresh,
+  };
 }

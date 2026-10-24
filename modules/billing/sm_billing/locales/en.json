@@ -267,7 +267,8 @@
       "actor": "By",
       "reason": "Reason",
       "empty": "No ledger entries.",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "load_failed": "Could not load this. Change a filter or try again."
     },
     "kinds": {
       "consume": "Consumed",

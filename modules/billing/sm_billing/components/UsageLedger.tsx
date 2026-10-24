@@ -16,13 +16,14 @@ import { formatDateTime, kindLabel, USAGE_KINDS } from '../utils/usage';
 
 interface Props {
   ledger: Paged<UsageEvent> | null;
+  failed: boolean;
   kind: string;
   onKind: (kind: string) => void;
   onPage: (page: number) => void;
 }
 
 /** The ledger: every change to a counter, newest first, with who and why for adjustments. */
-export function UsageLedger({ ledger, kind, onKind, onPage }: Props) {
+export function UsageLedger({ ledger, failed, kind, onKind, onPage }: Props) {
   const { t, locale } = useT();
   const c = keys.billing.admin_usage.ledger;
   return (
@@ -45,7 +46,9 @@ export function UsageLedger({ ledger, kind, onKind, onPage }: Props) {
           </NativeSelect>
         </div>
       </div>
-      {ledger === null ? (
+      {failed ? (
+        <p className="text-sm text-destructive">{t(keys.billing.admin_usage.ledger.load_failed)}</p>
+      ) : ledger === null ? (
         <p className="text-sm text-muted-foreground">{t(c.loading)}</p>
       ) : ledger.items.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t(c.empty)}</p>

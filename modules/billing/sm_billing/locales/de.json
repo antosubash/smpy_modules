@@ -267,7 +267,8 @@
       "actor": "Von",
       "reason": "Grund",
       "empty": "Keine Journaleinträge.",
-      "loading": "Wird geladen…"
+      "loading": "Wird geladen…",
+      "load_failed": "Konnte nicht geladen werden. Ändern Sie einen Filter oder versuchen Sie es erneut."
     },
     "kinds": {
       "consume": "Verbraucht",
