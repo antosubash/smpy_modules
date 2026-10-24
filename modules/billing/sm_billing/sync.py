@@ -126,8 +126,12 @@ async def apply_snapshot(
     sub.current_period_end = snap.current_period_end
     sub.cancel_at_period_end = snap.cancel_at_period_end
     sub.synced_at = datetime.now(UTC)
-    await _follow_period_end(db, tenant_id, snap)
+    # Subscription first, rollups second: the same lock order as a consume
+    # (its insert reads the subscription row FOR SHARE, then writes the
+    # rollup), so the two wait on each other instead of deadlocking, and a
+    # consume that has not inserted yet waits for this period end.
     await db.flush()
+    await _follow_period_end(db, tenant_id, snap)
     await apply_lifecycle(db, app, sub)
     return sub
 
