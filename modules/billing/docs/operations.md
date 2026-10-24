@@ -215,7 +215,12 @@ sweep shares the tick's error budget, so five provider errors in a row end the
 tick. It re-reads the provider settings before each organisation and stops
 when they changed. Every path that tears down a deleted organisation (the
 `TenantDeleted` handler, a subscription row's reconcile, the sweep) shares
-this backoff and failure count.
+this backoff and failure count. Each run first claims the organisation's
+`billing_customer` row with one conditional update. Only the winner talks to
+Stripe, so two workers never cancel twice or count one failure twice. A
+claim is a five-minute lease, so a run that crashed is taken over by a later
+tick. Success clears the backoff. An organisation already torn down keeps
+backing off too when a later recheck fails, for instance with a wrong key.
 
 A Stripe "No such customer/subscription" (`resource_missing`) is **retried**,
 not taken as done. Stripe also gives that answer for a key from another

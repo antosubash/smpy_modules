@@ -190,7 +190,7 @@ module must not import a sibling optional module).
 | `resolve.py`, `entitlements.py` | plan in force; the entitlement seam |
 | `checkout.py`, `context.py`, `deps.py` | tenant-side service and request context |
 | `sync.py`, `webhooks.py`, `reconcile.py`, `seats.py` | provider → local state |
-| `teardown.py`, `sweep.py` | what deleting a tenant cancels; the reconcile retry of it |
+| `teardown.py`, `sweep.py`, `teardown_claim.py` | what deleting a tenant cancels; the reconcile retry of it; the per-customer claim and backoff every run goes through |
 | `scheduler.py` | the periodic reconcile: stale-row claims, pacing, the loop task |
 | `lifecycle.py` | status → tenant suspension |
 | `admin.py` | admin operations and connection settings |

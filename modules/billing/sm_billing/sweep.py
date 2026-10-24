@@ -8,12 +8,13 @@ has not completed (``teardown_done_at``) and whose retry is due
 (``teardown_next_attempt_at``), and runs :mod:`sm_billing.teardown` for it.
 
 - **Cheap once done.** A stamped customer is never selected again.
-- **Backoff.** A failure counts ``teardown_attempts`` up and puts the next try
-  ``RETRY_BASE * 2**(attempts-1)`` away, capped at ``RETRY_CAP``, so a customer
-  that keeps failing is not retried on every tick. :func:`run_teardown` owns
-  that bookkeeping for *every* deleted-tenant teardown — this sweep,
-  ``reconcile_one`` for a mirrored subscription, and the ``TenantDeleted``
-  handler — so no path skips the due check or the failure count. "Not found"
+- **Claim and backoff.** :func:`run_teardown` is the only way a deleted
+  tenant's teardown runs — this sweep, ``reconcile_one`` for a mirrored
+  subscription, and the ``TenantDeleted`` handler — and it first wins an
+  atomic claim on the customer row (:mod:`sm_billing.teardown_claim`), so two
+  concurrent runs never both call the provider. A failure counts
+  ``teardown_attempts`` up and puts the next try 15 minutes away, doubling to
+  a day, for a torn-down customer's later rechecks too; success clears it. "Not found"
   at the provider is a failure like any other: it may be a key for another
   account or mode, so it is retried (warned about), never taken as done.
 - **Failure budget.** Under the scheduler the sweep shares the tick's
@@ -34,10 +35,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from simple_module_db import finalize_session
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import or_, select
 from tenants.models import Tenant
@@ -47,6 +47,7 @@ from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer
 from sm_billing.teardown import cancel_for_deleted_tenant
+from sm_billing.teardown_claim import claim, failed, succeeded
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -54,11 +55,6 @@ if TYPE_CHECKING:
     from sm_billing.reconcile import ReconcileReport
 
 logger = logging.getLogger(__name__)
-
-#: First retry delay after a failed teardown; doubles per failure.
-RETRY_BASE = timedelta(minutes=15)
-#: Longest gap between two retries of one customer.
-RETRY_CAP = timedelta(hours=24)
 
 
 @dataclass
@@ -84,12 +80,6 @@ class Budget:
         return self.errors >= self.max_errors
 
 
-def retry_delay(attempts: int) -> timedelta:
-    """The wait after the ``attempts``-th consecutive failure."""
-    exponent = min(max(0, attempts - 1), 16)  # 15 min * 2**7 already passes the cap
-    return min(RETRY_BASE * 2**exponent, RETRY_CAP)
-
-
 async def _orphans(app: FastAPI, tenant_id: str | None, now: datetime) -> list[str]:
     """Customers whose tenant is gone, not torn down, and due for a try."""
     stmt = (
@@ -113,44 +103,24 @@ async def _orphans(app: FastAPI, tenant_id: str | None, now: datetime) -> list[s
         return list((await session.scalars(stmt)).all())
 
 
-async def _back_off(app: FastAPI, tenant_id: str) -> None:
-    async with app.state.sm.db.session_factory() as session:
-        customer = await session.get(Customer, tenant_id)
-        if customer is not None and customer.teardown_done_at is None:
-            customer.teardown_attempts += 1
-            delay = retry_delay(customer.teardown_attempts)
-            customer.teardown_next_attempt_at = datetime.now(UTC) + delay
-        await finalize_session(session)
-
-
-def _aware(value: datetime) -> datetime:
-    """SQLite hands timezone-aware columns back naive; they were stored as UTC."""
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-
-
-async def _due(app: FastAPI, tenant_id: str) -> bool:
-    async with app.state.sm.db.session_factory() as session:
-        customer = await session.get(Customer, tenant_id)
-    if customer is None or customer.teardown_next_attempt_at is None:
-        return True
-    return _aware(customer.teardown_next_attempt_at) <= datetime.now(UTC)
-
-
 async def run_teardown(app: FastAPI, tenant_id: str) -> list[str] | None:
     """The one way a deleted tenant's teardown runs: the ``TenantDeleted``
     handler, ``reconcile_one`` and the sweep all come through here.
 
-    Returns ``None`` without a provider call while the tenant's retry is not
-    due, else what :func:`~sm_billing.teardown.cancel_for_deleted_tenant`
-    canceled. A failure is recorded (``teardown_attempts``, the next due
-    time), logged and re-raised for the caller's report and budget.
+    Returns ``None`` without a provider call unless this call wins the
+    tenant's claim (:mod:`sm_billing.teardown_claim`: due, and no other run
+    holding it), else what :func:`~sm_billing.teardown.cancel_for_deleted_tenant`
+    canceled. Success clears the backoff; a failure is recorded (attempts, next
+    due time) — for a customer already torn down too — logged and re-raised for
+    the caller's report and budget.
     """
-    if not await _due(app, tenant_id):
-        return None
+    token = await claim(app, tenant_id)
+    if token is None:
+        return None  # not due, or another run holds it right now
     try:
-        return await cancel_for_deleted_tenant(app, tenant_id)
+        canceled = await cancel_for_deleted_tenant(app, tenant_id)
     except Exception as exc:
-        await _back_off(app, tenant_id)
+        await failed(app, tenant_id, token)
         if isinstance(exc, ProviderNotFound):
             logger.warning(
                 "billing: the provider has no record of deleted tenant %s's customer or "
@@ -162,6 +132,8 @@ async def run_teardown(app: FastAPI, tenant_id: str) -> list[str] | None:
         else:
             logger.warning("billing: teardown failed for tenant %s", tenant_id, exc_info=True)
         raise
+    await succeeded(app, tenant_id, token)
+    return canceled
 
 
 async def sweep_deleted_tenants(

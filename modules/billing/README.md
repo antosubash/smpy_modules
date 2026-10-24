@@ -195,7 +195,8 @@ the `csrf_token` prop.
   That includes a subscription not mirrored yet and an open checkout: reconcile
   sweeps every customer whose organisation is gone until its teardown completes
   (`billing_customer.teardown_done_at`), then skips it. A teardown that keeps
-  failing backs off (from 15 minutes up to a day), whichever path tried it.
+  failing backs off (from 15 minutes up to a day), whichever path tried it,
+  and one atomic claim per organisation means only one worker at a time calls Stripe.
   Stripe's "no such customer" is retried too, because a key from another
   account or mode gives the same answer. A single-tenant host never sweeps. The Checkout session id
   is forgotten only once Stripe says the session is no longer open. Everything

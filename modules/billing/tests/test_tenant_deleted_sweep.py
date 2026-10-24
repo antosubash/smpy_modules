@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub
-from sm_billing import live, scheduler, sweep
+from sm_billing import live, scheduler, teardown_claim
 from sm_billing.constants import SubscriptionStatus
 from sm_billing.models import Customer
 from sm_billing.reconcile import reconcile
@@ -55,7 +55,7 @@ async def test_the_events_failure_is_recorded_too(app, fake):
     customer = await _customer(app, tenant_id)
     assert customer.teardown_attempts == 1
     due = customer.teardown_next_attempt_at.replace(tzinfo=UTC)
-    assert due >= before + sweep.RETRY_BASE - timedelta(seconds=5)
+    assert due >= before + teardown_claim.RETRY_BASE - timedelta(seconds=5)
     fake.calls.clear()
     report = await reconcile(app)  # not due yet: no provider call at all
     assert (report.errors, fake.calls) == ([], [])
@@ -94,9 +94,9 @@ async def test_a_mirrored_subscription_goes_through_the_same_backoff(app, fake):
 
 
 def test_the_retry_delay_doubles_up_to_a_cap():
-    assert sweep.retry_delay(1) == sweep.RETRY_BASE
-    assert sweep.retry_delay(3) == sweep.RETRY_BASE * 4
-    assert sweep.retry_delay(50) == sweep.RETRY_CAP
+    assert teardown_claim.retry_delay(1) == teardown_claim.RETRY_BASE
+    assert teardown_claim.retry_delay(3) == teardown_claim.RETRY_BASE * 4
+    assert teardown_claim.retry_delay(50) == teardown_claim.RETRY_CAP
 
 
 @pytest.mark.parametrize("method", ["live_subscription_ids", "fetch_subscription"])
