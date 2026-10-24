@@ -19,9 +19,11 @@ from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select
 
 from sm_billing import constants as c
+from sm_billing.lifecycle import tenant_gone
 from sm_billing.models import Subscription
 from sm_billing.seats import push_quantity
 from sm_billing.services import current_provider
+from sm_billing.sweep import run_teardown, sweep_deleted_tenants
 from sm_billing.sync import resync
 
 if TYPE_CHECKING:
@@ -36,6 +38,8 @@ class ReconcileReport:
     pushed: int = 0
     errors: list[tuple[str, str]] = field(default_factory=list)
     skipped: str = ""
+    #: Deleted tenants whose provider leftovers the sweep canceled.
+    torn_down: int = 0
 
 
 async def _targets(app: FastAPI, tenant_id: str | None) -> list[tuple[str, str]]:
@@ -58,8 +62,15 @@ async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> b
     provider = current_provider(app)
     with tenant_context(tenant_id):
         async with app.state.sm.db.session_factory() as session:
-            await resync(session, app, provider, subscription_id)
-            await finalize_session(session)
+            deleted = await tenant_gone(session, app, tenant_id)
+            if not deleted:
+                await resync(session, app, provider, subscription_id)
+                await finalize_session(session)
+        if deleted:
+            # The ``TenantDeleted`` cancel may have failed: cancel rather than
+            # keep mirroring a subscription nobody owns (``sm_billing.teardown``).
+            await run_teardown(app, tenant_id)  # due check and failure bookkeeping
+            return False
         return await push_quantity(app, tenant_id)
 
 
@@ -69,7 +80,8 @@ async def reconcile(app: FastAPI, *, tenant_id: str | None = None) -> ReconcileR
     if provider is None or not provider.supports_checkout:
         report.skipped = f"{getattr(provider, 'name', 'no')} provider"
         return report
-    for target_tenant, subscription_id in await _targets(app, tenant_id):
+    targets = await _targets(app, tenant_id)
+    for target_tenant, subscription_id in targets:
         try:
             pushed = await reconcile_one(app, target_tenant, subscription_id)
         except Exception as exc:
@@ -78,4 +90,5 @@ async def reconcile(app: FastAPI, *, tenant_id: str | None = None) -> ReconcileR
             continue
         report.synced += 1
         report.pushed += int(pushed)
+    await sweep_deleted_tenants(app, report, tenant_id=tenant_id, attempted={t for t, _ in targets})
     return report

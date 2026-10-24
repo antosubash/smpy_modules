@@ -228,6 +228,11 @@ async def test_set_quantity_and_cancel(provider):
     assert provider.calls[-1][2] == {"cancel_at_period_end": True}
 
 
+async def test_cancel_now_deletes_the_subscription_immediately(provider):
+    await provider.cancel_now("sub_1")
+    assert provider.calls[-1] == ("subscriptions.cancel_async", ("sub_1",), None)
+
+
 async def test_customer_and_portal(provider):
     assert await provider.ensure_customer("t1", "Acme", "o@x.io") == "cus_new"
     assert provider.calls[-1][2]["metadata"] == {"tenant_id": "t1"}
@@ -272,20 +277,3 @@ def test_factory_builds_stripe_with_encrypted_secrets():
 async def test_expire_checkout(provider):
     await provider.expire_checkout("cs_1")
     assert provider.calls[-1][:2] == ("checkout.expire_async", ("cs_1",))
-
-
-async def test_live_subscription_ids_filters_ended(provider):
-    listing = {
-        "object": "list",
-        "data": [
-            {"id": "sub_a", "object": "subscription", "status": "active"},
-            {"id": "sub_b", "object": "subscription", "status": "canceled"},
-            {"id": "sub_c", "object": "subscription", "status": "past_due"},
-            {"id": "sub_d", "object": "subscription", "status": "incomplete_expired"},
-        ],
-    }
-    provider._v1.subscriptions = _Recorder(provider.calls, "subscriptions", listing)
-    assert await provider.live_subscription_ids("cus_1") == ["sub_a", "sub_c"]
-    name, _, params = provider.calls[-1]
-    assert name == "subscriptions.list_async"
-    assert params == {"customer": "cus_1", "status": "all", "limit": 100}

@@ -37,6 +37,8 @@ def reconcile_command(
             typer.echo(f"Nothing to reconcile: {report.skipped}.")
             return 0
         typer.echo(f"Synced {report.synced}, pushed {report.pushed} quantity change(s).")
+        if report.torn_down:
+            typer.echo(f"Canceled what {report.torn_down} deleted organisation(s) still had.")
         for tenant_id, error in report.errors:
             typer.echo(f"  {tenant_id}: {error}", err=True)
         return 1 if report.errors else 0

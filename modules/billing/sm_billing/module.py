@@ -3,8 +3,9 @@
 Plugs into the seams ``simple_module_tenants`` exposes and changes none of
 them: it installs ``PlanEntitlements`` as ``app.state.tenants.entitlements``
 (so the seat limit ``tenants`` already enforces comes from the tenant's plan),
-reacts to membership events to keep per-seat quantities in step, and drives
-``TenantService.set_status`` when a subscription stops being paid.
+reacts to membership events to keep per-seat quantities in step, drives
+``TenantService.set_status`` when a subscription stops being paid, and cancels
+a deleted tenant's subscription (``sm_billing.teardown``).
 """
 
 from __future__ import annotations
@@ -137,10 +138,11 @@ class BillingModule(ModuleBase):
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         if app is None:
             return
-        from sm_billing import live, seats
+        from sm_billing import live, seats, teardown
 
         seats.subscribe(bus, app)
         live.subscribe(bus, app)
+        teardown.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
         from sm_billing import startup

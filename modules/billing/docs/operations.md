@@ -25,6 +25,10 @@
    make migrate          # alembic upgrade heads (the history has a single head)
    ```
 
+   After upgrading billing, autogenerate again: a release can add a column
+   (the first release after 0.0.11 adds `billing_customer.teardown_done_at` and two backoff columns,
+   for the deleted-tenant sweep), and billing reads it on every reconcile.
+
    The `billing` branch label names the revision; it does **not** make
    `alembic downgrade billing@base` remove billing alone. Autogenerate chains
    every revision off the current head, so that command walks everything
@@ -186,9 +190,52 @@ rows are unprocessed, and whether the scheduled reconcile is running. An old
 
 Billing's tables (`billing_plan`, `billing_customer`, `billing_subscription`,
 `billing_webhook_event`) hold `tenant_id` as a plain column: one module cannot
-hold a foreign key into another module's tables. **Deleting an organisation
-neither cancels its Stripe subscription nor removes its billing rows** — the
-`tenants` module publishes no deletion event yet. Cancel the subscription in
-Stripe before deleting an organisation. `billing_webhook_event` grows by one
+hold a foreign key into another module's tables, so deleting an organisation
+does not cascade into them.
+
+**Deleting an organisation cancels its Stripe subscription immediately**
+(framework 0.0.38's `TenantDeleted`): every subscription of its Stripe customer
+that still bills or grants access is canceled — no proration credit, no final
+invoice, Stripe's defaults — an open Checkout session is expired, and the
+local row is re-fetched to `canceled`. The billing rows are **kept** for audit
+and so that Stripe's own `customer.subscription.deleted` webhook still maps to
+them. If Stripe is unreachable at that moment the delete is not held up: the
+log says `could not cancel the subscription of deleted tenant`, and the next
+reconcile (the scheduled one, or `smpy billing reconcile`) cancels it — a
+reconcile never re-applies a subscription whose organisation is gone. Every
+reconcile also sweeps the Stripe customers whose organisation is gone and whose
+teardown has not completed (`billing_customer.teardown_done_at` unset). That
+reaches what no subscription row points at: a subscription not mirrored yet,
+and an open Checkout session that could not be expired, which stays recorded
+unless Stripe reports it completed or expired. A finished teardown is
+stamped, and the sweep skips it from then on. A teardown that keeps failing
+backs off: 15 minutes after the first failure, doubling each time up to a day
+(`teardown_attempts`, `teardown_next_attempt_at`). Under the scheduler the
+sweep shares the tick's error budget, so five provider errors in a row end the
+tick. It re-reads the provider settings before each organisation and stops
+when they changed. Every path that tears down a deleted organisation (the
+`TenantDeleted` handler, a subscription row's reconcile, the sweep) shares
+this backoff and failure count. Each run first claims the organisation's
+`billing_customer` row with one conditional update. Only the winner talks to
+Stripe, so two workers never cancel twice or count one failure twice. A
+claim is a five-minute lease, so a run that crashed is taken over by a later
+tick. Success clears the backoff. An organisation already torn down keeps
+backing off too when a later recheck fails, for instance with a wrong key.
+
+A Stripe "No such customer/subscription" (`resource_missing`) is **retried**,
+not taken as done. Stripe also gives that answer for a key from another
+account, or a test key reading live objects, so a briefly wrong key must not
+end a live customer's teardown for good. The log names that likely cause. If
+the customer really was deleted in Stripe, the retry costs one call a day;
+set `billing_customer.teardown_done_at` to stop it. A single-tenant host never sweeps, and the `default` organisation is
+never torn down, because it has no organisation row by design. Organisations
+deleted before this release are swept too, on the first reconcile after the
+upgrade. "Still
+bills" means any status that has not ended (`canceled`, `incomplete_expired`),
+so `incomplete` and `paused` are canceled too. Under the
+`manual` provider nothing reaches Stripe; a log line asks you to cancel there
+if the organisation had a Stripe subscription from before the switch.
+
+`billing_webhook_event` grows by one
 row per delivery; prune processed rows older than Stripe's retry window
 (three days) if it matters.
