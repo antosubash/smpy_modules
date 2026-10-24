@@ -110,6 +110,11 @@ test.describe('Records — accepting submissions from the website', () => {
     expect(email?.unique).toBe(true);
     // The preset is gone once the type exists.
     await expect(presets).toHaveCount(0);
+    // The internal nonce is half of every subscriber link: never a pointer.
+    const display = page.locator('#type-editor-display-field');
+    await expect(display).toHaveValue('sm_email');
+    await expect(display.locator('option[value="sm_nonce"]')).toHaveCount(0);
+    await expect(page.locator('#type-editor-slug-field option[value="sm_nonce"]')).toHaveCount(0);
 
     await apiDeleteType(page, key, 0);
   });
