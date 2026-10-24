@@ -186,9 +186,22 @@ rows are unprocessed, and whether the scheduled reconcile is running. An old
 
 Billing's tables (`billing_plan`, `billing_customer`, `billing_subscription`,
 `billing_webhook_event`) hold `tenant_id` as a plain column: one module cannot
-hold a foreign key into another module's tables. **Deleting an organisation
-neither cancels its Stripe subscription nor removes its billing rows** — the
-`tenants` module publishes no deletion event yet. Cancel the subscription in
-Stripe before deleting an organisation. `billing_webhook_event` grows by one
+hold a foreign key into another module's tables, so deleting an organisation
+does not cascade into them.
+
+**Deleting an organisation cancels its Stripe subscription immediately**
+(framework 0.0.38's `TenantDeleted`): every subscription of its Stripe customer
+that still bills or grants access is canceled — no proration credit, no final
+invoice, Stripe's defaults — an open Checkout session is expired, and the
+local row is re-fetched to `canceled`. The billing rows are **kept** for audit
+and so that Stripe's own `customer.subscription.deleted` webhook still maps to
+them. If Stripe is unreachable at that moment the delete is not held up: the
+log says `could not cancel the subscription of deleted tenant`, and the next
+reconcile (the scheduled one, or `smpy billing reconcile`) cancels it — a
+reconcile never re-applies a subscription whose organisation is gone. Under the
+`manual` provider nothing reaches Stripe; a log line asks you to cancel there
+if the organisation had a Stripe subscription from before the switch.
+
+`billing_webhook_event` grows by one
 row per delivery; prune processed rows older than Stripe's retry window
 (three days) if it matters.

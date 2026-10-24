@@ -17,12 +17,14 @@ from typing import TYPE_CHECKING
 
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select
+from tenants.models import Tenant
 
 from sm_billing import constants as c
 from sm_billing.models import Subscription
 from sm_billing.seats import push_quantity
 from sm_billing.services import current_provider
 from sm_billing.sync import resync
+from sm_billing.teardown import cancel_for_deleted_tenant
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -58,8 +60,15 @@ async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> b
     provider = current_provider(app)
     with tenant_context(tenant_id):
         async with app.state.sm.db.session_factory() as session:
-            await resync(session, app, provider, subscription_id)
-            await finalize_session(session)
+            deleted = await session.get(Tenant, tenant_id) is None
+            if not deleted:
+                await resync(session, app, provider, subscription_id)
+                await finalize_session(session)
+        if deleted:
+            # The ``TenantDeleted`` cancel may have failed: cancel rather than
+            # keep mirroring a subscription nobody owns (``sm_billing.teardown``).
+            await cancel_for_deleted_tenant(app, tenant_id)
+            return False
         return await push_quantity(app, tenant_id)
 
 

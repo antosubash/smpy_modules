@@ -51,6 +51,9 @@ class ManualProvider:
     async def cancel_at_period_end(self, subscription_id: str) -> None:
         raise ProviderError(_NO)
 
+    async def cancel_now(self, subscription_id: str) -> None:
+        raise ProviderError(_NO)
+
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent:
         raise ProviderError(_NO)
 

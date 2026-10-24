@@ -228,6 +228,11 @@ async def test_set_quantity_and_cancel(provider):
     assert provider.calls[-1][2] == {"cancel_at_period_end": True}
 
 
+async def test_cancel_now_deletes_the_subscription_immediately(provider):
+    await provider.cancel_now("sub_1")
+    assert provider.calls[-1] == ("subscriptions.cancel_async", ("sub_1",), None)
+
+
 async def test_customer_and_portal(provider):
     assert await provider.ensure_customer("t1", "Acme", "o@x.io") == "cus_new"
     assert provider.calls[-1][2]["metadata"] == {"tenant_id": "t1"}

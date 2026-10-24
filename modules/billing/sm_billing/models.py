@@ -7,8 +7,8 @@ filters on it. Nothing billing-specific is added to ``tenants_tenant``.
 
 ``tenant_id`` is a plain string, not a foreign key: each module owns its own
 ``MetaData``, so a cross-module FK cannot resolve (``tenants`` stores
-``user_id`` the same way). Deleting a tenant therefore leaves its billing rows
-behind — see the README's tenant-deletion note.
+``user_id`` the same way). Deleting a tenant keeps its billing rows, for audit:
+``sm_billing.teardown`` cancels the subscription and leaves them ``canceled``.
 """
 
 from __future__ import annotations

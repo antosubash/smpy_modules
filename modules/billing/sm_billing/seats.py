@@ -13,6 +13,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from tenants.models import Tenant
+
 from sm_billing import constants as c
 from sm_billing.lifecycle import tenant_service
 from sm_billing.resolve import effective_plan
@@ -30,6 +32,11 @@ async def push_quantity(app: FastAPI, tenant_id: str) -> bool:
     if provider is None or not provider.supports_checkout:
         return False
     async with app.state.sm.db.session_factory() as session:
+        if await session.get(Tenant, tenant_id) is None:
+            # ``delete_tenant`` publishes a ``MembershipRemoved`` per member
+            # before ``TenantDeleted``; resizing a subscription about to be
+            # canceled would only leave a proration behind.
+            return False
         plan, sub = await effective_plan(session, tenant_id)
         if (
             sub is None

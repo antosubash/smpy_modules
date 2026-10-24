@@ -166,6 +166,10 @@ class StripeProvider:
         params = {"cancel_at_period_end": True}
         await self._call(self._v1.subscriptions.update_async, subscription_id, params=params)
 
+    async def cancel_now(self, subscription_id: str) -> None:
+        # Stripe's defaults: no proration credit, no final invoice.
+        await self._call(self._v1.subscriptions.cancel_async, subscription_id)
+
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent:
         signature = headers.get("stripe-signature")
         if not signature:

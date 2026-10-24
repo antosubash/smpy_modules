@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sm_billing.contracts.provider import (
@@ -73,6 +73,13 @@ class FakeProvider:
 
     async def cancel_at_period_end(self, subscription_id: str) -> None:
         self._record("cancel_at_period_end", subscription_id=subscription_id)
+
+    async def cancel_now(self, subscription_id: str) -> None:
+        """Records the call and, like Stripe, leaves the subscription canceled."""
+        self._record("cancel_now", subscription_id=subscription_id)
+        snap = self.snapshots.get(subscription_id)
+        if snap is not None:
+            self.snapshots[subscription_id] = replace(snap, status="canceled")
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent:
         if headers.get(SIGNATURE_HEADER) != GOOD_SIGNATURE:

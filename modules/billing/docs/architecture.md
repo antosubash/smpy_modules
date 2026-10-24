@@ -13,7 +13,8 @@ imports billing.
 |---|---|
 | `app.state.tenants.entitlements` (`EntitlementProvider`) | answer `limit` / `has_feature` from the plan in force (`entitlements.PlanEntitlements`, installed in `startup.run`) |
 | `TenantService.set_status` | suspend on `unpaid`, reactivate on recovery (`lifecycle.apply_lifecycle`) |
-| `MembershipAdded` / `MembershipRemoved` | push the member count to Stripe for per-seat plans (`seats.subscribe`) |
+| `MembershipAdded` / `MembershipRemoved` | push the member count to Stripe for per-seat plans (`seats.subscribe`); skipped once the tenant is gone |
+| `TenantDeleted` (0.0.38+) | cancel the tenant's subscriptions at Stripe immediately, then resync the local row (`teardown.subscribe`) |
 | `require_active_tenant`, `tenant:<role>` roles | scope every tenant route to the session's organisation |
 
 Stripe is behind `contracts/provider.py` (`BillingProvider`), which speaks
@@ -189,6 +190,7 @@ module must not import a sibling optional module).
 | `resolve.py`, `entitlements.py` | plan in force; the entitlement seam |
 | `checkout.py`, `context.py`, `deps.py` | tenant-side service and request context |
 | `sync.py`, `webhooks.py`, `reconcile.py`, `seats.py` | provider → local state |
+| `teardown.py` | what deleting a tenant cancels |
 | `scheduler.py` | the periodic reconcile: stale-row claims, pacing, the loop task |
 | `lifecycle.py` | status → tenant suspension |
 | `admin.py` | admin operations and connection settings |
